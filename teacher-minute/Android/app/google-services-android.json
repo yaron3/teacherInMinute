@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "922632930084",
+    "project_id": "teacher-in-a-moment",
+    "storage_bucket": "teacher-in-a-moment.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:922632930084:android:9d52fa48bd34879bfde9b1",
+        "android_client_info": {
+          "package_name": "com.yaronj.tim"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAx11X0ezhughh9_Dep5oTeEnj5U5KaXQY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
