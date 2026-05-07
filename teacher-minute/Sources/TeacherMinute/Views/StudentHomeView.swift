@@ -268,3 +268,10 @@ struct RecentLessonRow: View {
         }
     }
 }
+#if os(iOS)
+struct StudentHomeView_Previews: PreviewProvider {
+  static var previews: some View {
+	StudentHomeView()
+  }
+}
+#endif

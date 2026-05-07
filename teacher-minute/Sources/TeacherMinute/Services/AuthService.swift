@@ -34,6 +34,8 @@ final class AuthService {
     print("got result: \(result)")
     return true
   }
+  
+  
 //  func signInWithGoogle()  async throws -> Bool{
 //    // Get the client ID from your Firebase configuration.
 //    guard let clientID = FirebaseApp.app()?.options.clientID else {

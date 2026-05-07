@@ -13,7 +13,7 @@ let package = Package(
         .package(url: "https://source.skip.tools/skip.git", from: "1.8.13"),
         .package(url: "https://source.skip.tools/skip-fuse-ui.git", from: "1.0.0"),
         .package(url: "https://github.com/skiptools/skip-firebase.git",from: "0.16.0"),
-        .package(url: "https://github.com/google/GoogleSignIn-iOS",from: "8.0.0"),
+        .package(url: "https://github.com/google/GoogleSignIn-iOS",from: "9.0.0"),
         // Add Firebase SDK explicitly so we can reference FirebaseAuth directly and ensure it's embedded.
 //        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "12.12.1"),
     ],

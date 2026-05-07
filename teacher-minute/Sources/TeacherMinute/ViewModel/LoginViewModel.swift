@@ -22,6 +22,8 @@ final class LoginViewModel {
         !password.isEmpty &&
         !isLoading
     }
+  var navigateTeacherHome = false
+  var navigateStudentHome = false
 
     func login() async {
         guard canSubmit else { return }
@@ -32,6 +34,7 @@ final class LoginViewModel {
             if emailOrPhone.isEmail {
                 _ = try await authService.signIn(email: emailOrPhone, password: password)
               isLoading = false
+			  
             }
         } catch {
             print("Login error: \(error)")
@@ -40,7 +43,19 @@ final class LoginViewModel {
     }
 
     func loginWithGoogle() {
-        // TODO: Connect Google Sign-In
+        #if canImport(UIKit)
+        iOSGoogleSignInProvider().signIn { result in
+            switch result {
+            case .success(let authResult):
+                print("Google sign-in success: \(authResult.user.uid)")
+            case .failure(let error):
+                print("Google sign-in error: \(error.localizedDescription)")
+            }
+        }
+        #endif
+      #if skip
+      AndroidGoogleAuth().signIn()
+      #endif
     }
 
     func loginWithApple() {
