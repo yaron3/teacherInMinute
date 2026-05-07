@@ -52,19 +52,19 @@ struct CompleteProfileView: View {
 	  .padding(.top, 20)
 	  
 	  HStack(spacing: 12) {
-		AuthInputField(
-		  title: "Age",
-		  placeholder: "16",
-		  systemImage: "number",
-		  text: $viewModel.age,
-		  keyboardType: .numberPad
-		)
-		
+		dobPicker
 		gradePicker
 	  }
 	  .padding(.top, 20)
 	  
 	  Spacer()
+	  
+	  if let error = viewModel.errorMessage {
+		Text(error)
+		  .font(.system(size: 12))
+		  .foregroundStyle(.red)
+		  .padding(.bottom, 8)
+	  }
 	  
 	  AuthPrimaryButton(
 		title: "Continue",
@@ -85,6 +85,33 @@ struct CompleteProfileView: View {
 		} else {
 		  router.push(.studentHome)
 		}
+	  }
+	}
+  }
+  
+  var dobPicker: some View {
+	VStack(alignment: .leading, spacing: 10) {
+	  Text("Date of Birth")
+		.font(.system(size: 13, weight: .semibold))
+		.foregroundStyle(Color.authPrimaryText)
+	  
+	  DatePicker(
+		"",
+		selection: $viewModel.dateOfBirth,
+		in: Date.distantPast...Date(),
+		displayedComponents: .date
+	  )
+	  .labelsHidden()
+#if !os(Android)
+	  .datePickerStyle(.compact)
+#endif
+	  .frame(height: 56)
+	  .padding(.horizontal, 12)
+	  .background(.white)
+	  .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+	  .overlay {
+		RoundedRectangle(cornerRadius: 15, style: .continuous)
+		  .stroke(Color.authFieldBorder, lineWidth: 1)
 	  }
 	}
   }
