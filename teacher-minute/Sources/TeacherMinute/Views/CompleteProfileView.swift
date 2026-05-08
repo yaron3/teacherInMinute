@@ -86,6 +86,19 @@ struct CompleteProfileView: View {
 		  router.push(.studentHome)
 		}
 	  }
+	  viewModel.checkAndAutoAdvance()
+	}
+	.overlay {
+	  if viewModel.isCheckingCompletion {
+		ZStack {
+		  Color.black.opacity(0.25).ignoresSafeArea()
+		  VStack(spacing: 12) {
+			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(.white)
+			Text("Loading your profile…")
+			  .font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
+		  }
+		}
+	  }
 	}
   }
   

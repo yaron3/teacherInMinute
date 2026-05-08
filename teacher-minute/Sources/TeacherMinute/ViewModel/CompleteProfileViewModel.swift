@@ -26,6 +26,7 @@ final class CompleteProfileViewModel {
   var grade = ""
   
   var isLoading = false
+  var isCheckingCompletion = true
   var errorMessage: String?
   var onContinue: (() -> Void)?
   
@@ -41,6 +42,28 @@ final class CompleteProfileViewModel {
 	self.role = role
 	self.selectedRole = role
   }
+  
+  // MARK: - Auto-advance
+  
+  func checkAndAutoAdvance() {
+	Task {
+	  defer { isCheckingCompletion = false }
+	  guard let uid = Auth.auth().currentUser?.uid else { return }
+	  let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+	  let hasProfile = !(data["fullName"] as? String ?? "").isEmpty
+	  && !(data["phoneNumber"] as? String ?? "").isEmpty
+	  && data["dateOfBirth"] != nil
+	  if hasProfile {
+		// Pre-fill fields and auto-advance
+		fullName    = data["fullName"]    as? String ?? ""
+		phoneNumber = data["phoneNumber"] as? String ?? ""
+		grade       = data["grade"]       as? String ?? ""
+		onContinue?()
+	  }
+	}
+  }
+  
+  // MARK: - Save & continue
   
   func continueFlow() {
 	guard canContinue else { return }

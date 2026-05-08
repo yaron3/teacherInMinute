@@ -5,72 +5,106 @@
 //  Created by Yaron Jackoby on 06/05/2026.
 //
 
-
 import SwiftUI
 import Observation
+
+#if !os(Android)
+import FirebaseAuth
+#else
+import SkipFirebaseAuth
+#endif
 
 @Observable
 @MainActor
 final class LoginViewModel {
-    var emailOrPhone = ""
-    var password = ""
-    var isPasswordVisible = false
-    var isLoading = false
-    let authService = AuthService()
-    var canSubmit: Bool {
-        !emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !password.isEmpty &&
-        !isLoading
-    }
-  var navigateTeacherHome = false
-  var navigateStudentHome = false
-
-    func login() async {
-        guard canSubmit else { return }
-
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            if emailOrPhone.isEmail {
-                _ = try await authService.signIn(email: emailOrPhone, password: password)
-              isLoading = false
-			  
-            }
-        } catch {
-            print("Login error: \(error)")
-            isLoading = false
-        }
-    }
-
-    func loginWithGoogle() {
-        #if canImport(UIKit)
-        iOSGoogleSignInProvider().signIn { result in
-            switch result {
-            case .success(let authResult):
-                print("Google sign-in success: \(authResult.user.uid)")
-            case .failure(let error):
-                print("Google sign-in error: \(error.localizedDescription)")
-            }
-        }
-        #endif
-      #if skip
-      AndroidGoogleAuth().signIn()
-      #endif
-    }
-
-    func loginWithApple() {
-        // TODO: Connect Sign in with Apple
-    }
-
-    func forgotPassword() {
-        // TODO: Navigate to forgot-password flow
-    }
-
-    func signUp() {
-        // TODO: Navigate to sign-up flow
-    }
-
-    func back() {
-        // TODO: Dismiss / navigate back
-    }
+  var emailOrPhone = ""
+  var password     = ""
+  var isPasswordVisible = false
+  var isLoading    = false
+  
+  // Alert
+  var alertMessage: String?
+  var showAlert    = false
+  
+  // Navigation — set by login() after resolving onboarding state
+  var destination: AppRoute?
+  
+  let authService = AuthService()
+  
+  var canSubmit: Bool {
+	!emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+	!password.isEmpty &&
+	!isLoading
+  }
+  
+  // MARK: - Login + route resolution
+  
+  func login() async {
+	guard canSubmit else { return }
+	
+	isLoading = true
+	defer { isLoading = false }
+	
+	do {
+	  // 1. Authenticate
+	  _ = try await authService.signIn(
+		email: emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines),
+		password: password
+	  )
+	  
+	  // 2. Get the Firebase UID
+	  guard let uid = Auth.auth().currentUser?.uid else {
+		present(message: "Could not retrieve user session. Please try again.")
+		return
+	  }
+	  
+	  // 3. Resolve where in onboarding this user should go
+	  let resume = try await UserService.shared.resumeRoute(uid: uid)
+	  
+	  // 4. Map to AppRoute
+	  switch resume {
+		case .chooseRole:
+		  destination = .chooseRole
+		case .teacherIdentityVerification:
+		  destination = .teacherIdentityVerification
+		case .teacherSubjects:
+		  destination = .teacherSubjects
+		case .completeProfile(let role):
+		  destination = .completeProfile(role: role)
+		case .home(let role):
+		  destination = role == .teacher ? .teacherDashboard : .studentHome
+	  }
+	  
+	} catch {
+	  present(message: error.localizedDescription)
+	}
+  }
+  
+  // MARK: - Social
+  
+  func loginWithGoogle() {
+#if canImport(UIKit)
+	iOSGoogleSignInProvider().signIn { [weak self] result in
+	  switch result {
+		case .success: break   // TODO: resolve route the same way
+		case .failure(let error):
+		  Task { @MainActor in self?.present(message: error.localizedDescription) }
+	  }
+	}
+#endif
+#if skip
+	AndroidGoogleAuth().signIn()
+#endif
+  }
+  
+  func loginWithApple() { /* TODO */ }
+  func forgotPassword()  { /* TODO */ }
+  func back()            { /* TODO */ }
+  
+  // MARK: - Helpers
+  
+  private func present(message: String) {
+	alertMessage = message
+	showAlert    = true
+  }
 }
