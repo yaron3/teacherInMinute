@@ -28,6 +28,7 @@ let package = Package(
           .product(name: "SkipFirebaseCore", package: "skip-firebase"),
           .product(name: "SkipFirebaseAuth", package: "skip-firebase"),
           .product(name: "SkipFirebaseFirestore", package: "skip-firebase"),
+          .product(name: "SkipFirebaseStorage", package: "skip-firebase"),
           .product(name: "GoogleSignInSwift", package: "GoogleSignIn-iOS", condition: .when(platforms: [.iOS])
 
                   )

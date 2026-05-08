@@ -14,11 +14,11 @@ struct CreateAccountView: View {
 	case apple = "apple"
 	case google = "google"
   }
-  @State var agreeTerms = true
-  @State var sendUpdates = false
-  @State var isPasswordVisible = false
+  
   @State var viewModel = CreateAccountViewModel()
   @Environment(\.appRouter) var router
+  @State var isPasswordVisible = false
+  @FocusState var focusedField: SignupField?
   
   var body: some View {
 	ZStack {
@@ -29,7 +29,7 @@ struct CreateAccountView: View {
 			titleSection
 			inputCard
 			checkboxSection
-			continueButton.disabled(!viewModel.isValid)
+			continueButton
 			dividerSection
 			socialButtons
 		  }
@@ -38,41 +38,37 @@ struct CreateAccountView: View {
 		}
 		bottomLoginSection
 	  }
+	  
+	  // Loading overlay
+	  if viewModel.isLoading {
+		Color.black.opacity(0.18).ignoresSafeArea()
+		ProgressView()
+		  .progressViewStyle(.circular)
+		  .scaleEffect(1.6)
+		  .tint(.white)
+	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
 	.onChange(of: viewModel.navigateToChooseRole) { _, newValue in
 	  if newValue { router.push(.chooseRole) }
 	}
+	.onChange(of: viewModel.focusField) { _, field in
+	  focusedField = field
+	}
+	.alert("Sign Up", isPresented: $viewModel.showAlert) {
+	  Button("OK", role: .cancel) { viewModel.showAlert = false }
+	} message: {
+	  Text(viewModel.alertMessage ?? "")
+	}
   }
   
-  var header: some View {
-	HStack {
-	  Button {
-		// Back action
-	  } label: {
-		Image(systemName: "arrow.left")
-		  .font(.system(size: 18, weight: .semibold))
-		  .foregroundStyle(Color(hex: "#111827"))
-		  .frame(width: 44, height: 44)
-		  .background(
-			Circle()
-			  .fill(Color.white)
-			  .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
-		  )
-	  }
-	  
-	  Spacer()
-	}
-	.padding(.horizontal, 26)
-	.padding(.top, 12)
-  }
+  // MARK: - Sections
   
   var titleSection: some View {
 	VStack(alignment: .leading, spacing: 10) {
 	  Text("Create Account")
 		.font(.system(size: 32, weight: .bold))
 		.foregroundStyle(Color(hex: "#111827"))
-	  
 	  Text("Join Math Connect to start learning or\nteaching today.")
 		.font(.system(size: 16, weight: .regular))
 		.lineSpacing(5)
@@ -83,23 +79,24 @@ struct CreateAccountView: View {
   var inputCard: some View {
 	VStack(alignment: .leading, spacing: 22) {
 	  fieldSection(
-		title: "Email or Phone",
+		title: "Email",
 		icon: "envelope",
-		placeholder: "Enter your email or phone",
+		placeholder: "Enter your email",
 		text: $viewModel.emailOrPhone,
-		isSecure: false
+		isSecure: false,
+		field: .email,
+		isValid: viewModel.emailOrPhone.isEmpty || viewModel.isEmailValid
 	  )
-	  
 	  fieldSection(
 		title: "Password",
 		icon: "lock.fill",
-		placeholder: "Create a strong password",
+		placeholder: "Min. 6 characters",
 		text: $viewModel.password,
 		isSecure: !isPasswordVisible,
+		field: .password,
+		isValid: viewModel.password.isEmpty || viewModel.isPasswordValid,
 		trailingIcon: isPasswordVisible ? "eye" : "eye.slash",
-		trailingAction: {
-		  isPasswordVisible.toggle()
-		}
+		trailingAction: { isPasswordVisible.toggle() }
 	  )
 	}
 	.padding(24)
@@ -116,6 +113,8 @@ struct CreateAccountView: View {
 	placeholder: String,
 	text: Binding<String>,
 	isSecure: Bool,
+	field: SignupField,
+	isValid: Bool,
 	trailingIcon: String? = nil,
 	trailingAction: (() -> Void)? = nil
   ) -> some View {
@@ -127,7 +126,7 @@ struct CreateAccountView: View {
 	  HStack(spacing: 12) {
 		Image(systemName: icon)
 		  .font(.system(size: 15, weight: .medium))
-		  .foregroundStyle(Color(hex: "#9CA3AF"))
+		  .foregroundStyle(isValid ? Color(hex: "#9CA3AF") : Color.red.opacity(0.8))
 		  .frame(width: 20)
 		
 		Group {
@@ -135,17 +134,16 @@ struct CreateAccountView: View {
 			SecureField(placeholder, text: text)
 		  } else {
 			TextField(placeholder, text: text)
-			  .keyboardType(title == "Email or Phone" ? .emailAddress : .default)
+			  .keyboardType(.emailAddress)
 			  .textInputAutocapitalization(.never)
 		  }
 		}
 		.font(.system(size: 16))
 		.foregroundStyle(Color(hex: "#111827"))
+		.focused($focusedField, equals: field)
 		
 		if let trailingIcon {
-		  Button {
-			trailingAction?()
-		  } label: {
+		  Button { trailingAction?() } label: {
 			Image(systemName: trailingIcon)
 			  .font(.system(size: 16, weight: .medium))
 			  .foregroundStyle(Color(hex: "#9CA3AF"))
@@ -159,50 +157,40 @@ struct CreateAccountView: View {
 		  .fill(Color(hex: "#F9FAFB"))
 		  .overlay(
 			RoundedRectangle(cornerRadius: 16)
-			  .stroke(Color(hex: "#EEF2F7"), lineWidth: 1)
+			  .stroke(isValid ? Color(hex: "#EEF2F7") : Color.red.opacity(0.5), lineWidth: 1.5)
 		  )
 	  )
+	  
+	  if !isValid {
+		Text(field == .email ? "Enter a valid email address." : "Must be at least 6 characters.")
+		  .font(.system(size: 11))
+		  .foregroundStyle(.red)
+		  .padding(.leading, 4)
+	  }
 	}
   }
   
   var checkboxSection: some View {
 	VStack(alignment: .leading, spacing: 18) {
-	  checkboxRow(
-		isOn: $agreeTerms,
-		text: "",
-		isTermsRow: true
-	  )
-	  
-	  checkboxRow(
-		isOn: $sendUpdates,
-		text: "Send me occasional updates and tips about\nMath Connect.",
-		isTermsRow: false
-	  )
+	  checkboxRow(isOn: $viewModel.agreedToTerms, isTermsRow: true)
+	  checkboxRow(isOn: $viewModel.sendUpdates,
+				  text: "Send me occasional updates and tips about\nMath Connect.",
+				  isTermsRow: false)
 	}
 	.padding(.horizontal, 8)
   }
   
-  func checkboxRow(
-	isOn: Binding<Bool>,
-	text: String,
-	isTermsRow: Bool = false
-  ) -> some View {
+  func checkboxRow(isOn: Binding<Bool>, text: String = "", isTermsRow: Bool = false) -> some View {
 	HStack(alignment: .top, spacing: 12) {
-	  Button {
-		isOn.wrappedValue.toggle()
-	  } label: {
+	  Button { isOn.wrappedValue.toggle() } label: {
 		ZStack {
 		  RoundedRectangle(cornerRadius: 4)
 			.fill(isOn.wrappedValue ? Color(hex: "#EC4899") : Color.white)
 			.frame(width: 18, height: 18)
 			.overlay(
 			  RoundedRectangle(cornerRadius: 4)
-				.stroke(
-				  isOn.wrappedValue ? Color(hex: "#EC4899") : Color(hex: "#CBD5E1"),
-				  lineWidth: 1
-				)
+				.stroke(isOn.wrappedValue ? Color(hex: "#EC4899") : Color(hex: "#CBD5E1"), lineWidth: 1)
 			)
-		  
 		  if isOn.wrappedValue {
 			Image(systemName: "checkmark")
 			  .font(.system(size: 11, weight: .bold))
@@ -212,9 +200,8 @@ struct CreateAccountView: View {
 	  }
 	  .buttonStyle(.plain)
 	  
-	  if isTermsRow {
-		termsTextView()
-	  } else {
+	  if isTermsRow { termsTextView() }
+	  else {
 		Text(text)
 		  .font(.system(size: 14))
 		  .lineSpacing(4)
@@ -226,18 +213,11 @@ struct CreateAccountView: View {
   func termsTextView() -> some View {
 	VStack(alignment: .leading, spacing: 2) {
 	  HStack(spacing: 0) {
-		Text("I agree to the ")
-		  .foregroundStyle(Color(hex: "#6B7280"))
-		
-		Text("Terms of Service")
-		  .foregroundStyle(Color(hex: "#EC4899"))
-		
-		Text(" and")
-		  .foregroundStyle(Color(hex: "#6B7280"))
+		Text("I agree to the ").foregroundStyle(Color(hex: "#6B7280"))
+		Text("Terms of Service").foregroundStyle(Color(hex: "#EC4899"))
+		Text(" and").foregroundStyle(Color(hex: "#6B7280"))
 	  }
-	  
-	  Text("Privacy Policy.")
-		.foregroundStyle(Color(hex: "#EC4899"))
+	  Text("Privacy Policy.").foregroundStyle(Color(hex: "#EC4899"))
 	}
 	.font(.system(size: 14))
 	.lineSpacing(4)
@@ -245,39 +225,37 @@ struct CreateAccountView: View {
   
   var continueButton: some View {
 	Button {
-	  Task {
-		await viewModel.signup()
-		
-	  }
+	  Task { await viewModel.signup() }
 	} label: {
-	  Text("Continue to Role Selection")
-		.font(.system(size: 16, weight: .semibold))
-		.foregroundStyle(.white)
-		.frame(maxWidth: .infinity)
-		.frame(height: 56)
-		.background(
-		  Capsule()
-			.fill(Color(hex: "#EC4899"))
-			.shadow(color: Color(hex: "#EC4899").opacity(0.28), radius: 14, x: 0, y: 8)
-		)
+	  ZStack {
+		Text("Continue to Role Selection")
+		  .font(.system(size: 16, weight: .semibold))
+		  .foregroundStyle(.white)
+		  .opacity(viewModel.isLoading ? 0 : 1)
+		if viewModel.isLoading {
+		  ProgressView().tint(.white)
+		}
+	  }
+	  .frame(maxWidth: .infinity)
+	  .frame(height: 56)
+	  .background(
+		Capsule()
+		  .fill(viewModel.canSubmit ? Color(hex: "#EC4899") : Color(hex: "#EC4899").opacity(0.45))
+		  .shadow(color: Color(hex: "#EC4899").opacity(viewModel.canSubmit ? 0.28 : 0), radius: 14, x: 0, y: 8)
+	  )
 	}
+	.disabled(viewModel.isLoading)
 	.padding(.top, 4)
   }
   
   var dividerSection: some View {
 	HStack(spacing: 16) {
-	  Rectangle()
-		.fill(Color(hex: "#E5E7EB"))
-		.frame(height: 1)
-	  
+	  Rectangle().fill(Color(hex: "#E5E7EB")).frame(height: 1)
 	  Text("Or continue with")
 		.font(.system(size: 14))
 		.foregroundStyle(Color(hex: "#6B7280"))
 		.lineLimit(1)
-	  
-	  Rectangle()
-		.fill(Color(hex: "#E5E7EB"))
-		.frame(height: 1)
+	  Rectangle().fill(Color(hex: "#E5E7EB")).frame(height: 1)
 	}
 	.padding(.horizontal, 16)
   }
@@ -290,14 +268,12 @@ struct CreateAccountView: View {
   }
   
   func socialButton(type: SOCIAL_TYPE) -> some View {
-	
 	Button {
-	  type == .google ?  viewModel.signupWithGoogle() : viewModel.signupWithApple()
+	  type == .google ? viewModel.signupWithGoogle() : viewModel.signupWithApple()
 	} label: {
 	  HStack(spacing: 10) {
 		Image(systemName: type == .google ? "g.circle.fill" : "apple.logo")
 		  .font(.system(size: 20, weight: .semibold))
-		
 		Text(type == .google ? "Google" : "Apple")
 		  .font(.system(size: 15, weight: .semibold))
 	  }
@@ -307,10 +283,7 @@ struct CreateAccountView: View {
 	  .background(
 		RoundedRectangle(cornerRadius: 14)
 		  .fill(Color.white)
-		  .overlay(
-			RoundedRectangle(cornerRadius: 14)
-			  .stroke(Color(hex: "#E5E7EB"), lineWidth: 1)
-		  )
+		  .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#E5E7EB"), lineWidth: 1))
 		  .shadow(color: .black.opacity(0.025), radius: 6, x: 0, y: 4)
 	  )
 	}
@@ -318,14 +291,9 @@ struct CreateAccountView: View {
   
   var bottomLoginSection: some View {
 	HStack(spacing: 4) {
-	  Text("Already have an account?")
-		.foregroundStyle(Color(hex: "#6B7280"))
-	  
-	  Button {
-		// Login action
-	  } label: {
-		Text("Log In")
-		  .foregroundStyle(Color(hex: "#EC4899"))
+	  Text("Already have an account?").foregroundStyle(Color(hex: "#6B7280"))
+	  Button { router.push(.login) } label: {
+		Text("Log In").foregroundStyle(Color(hex: "#EC4899"))
 	  }
 	}
 	.font(.system(size: 14))
@@ -335,8 +303,6 @@ struct CreateAccountView: View {
 
 #if os(iOS)
 struct CreateAccountView_Previews: PreviewProvider {
-  static var previews: some View {
-	CreateAccountView()
-  }
+  static var previews: some View { CreateAccountView() }
 }
 #endif

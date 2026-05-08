@@ -5,52 +5,103 @@
 //  Created by Yaron Jackoby on 06/05/2026.
 //
 
-
-//
-//  LoginViewModel.swift
-//  teacher-minute
-//
-//  Created by Yaron Jackoby on 06/05/2026.
-//
-
-
 import SwiftUI
 import Observation
+
+// MARK: - Validation errors
+
+enum SignupValidationError: LocalizedError {
+  case invalidEmail
+  case passwordTooShort
+  case termsNotAccepted
+  
+  var errorDescription: String? {
+	switch self {
+	  case .invalidEmail:       return "Please enter a valid email address."
+	  case .passwordTooShort:   return "Password must be at least 6 characters."
+	  case .termsNotAccepted:   return "You must agree to the Terms of Service and Privacy Policy to continue."
+	}
+  }
+  
+  /// Which field to focus after showing the alert
+  var focusField: SignupField? {
+	switch self {
+	  case .invalidEmail:     return .email
+	  case .passwordTooShort: return .password
+	  case .termsNotAccepted: return nil
+	}
+  }
+}
+
+enum SignupField: Hashable {
+  case email, password
+}
+
+// MARK: - ViewModel
 
 @Observable
 @MainActor
 final class CreateAccountViewModel {
-  var emailOrPhone = ""
-  var password = ""
-  var isPasswordVisible = false
-  var isLoading = false
+  var emailOrPhone    = ""
+  var password        = ""
+  var agreedToTerms   = true
+  var sendUpdates     = false
+  var isLoading       = false
   var navigateToChooseRole = false
+  
+  // Alert state
+  var alertMessage: String?
+  var showAlert       = false
+  var focusField: SignupField?
+  
   let authService = AuthService()
-  var canSubmit: Bool {
-	!emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-	!password.isEmpty &&
-	!isLoading
+  
+  // MARK: - Derived
+  
+  var isEmailValid: Bool {
+	emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmail
   }
   
-  var isValid: Bool { canSubmit }
+  var isPasswordValid: Bool {
+	password.count >= 6
+  }
+  
+  /// True only when ALL rules pass — used to enable/disable the button
+  var canSubmit: Bool {
+	isEmailValid && isPasswordValid && agreedToTerms && !isLoading
+  }
+  
+  // MARK: - Signup
   
   func signup() async {
-	guard canSubmit else { return }
+	// Validate in order and surface first failure
+	if !isEmailValid {
+	  present(error: .invalidEmail)
+	  return
+	}
+	if !isPasswordValid {
+	  present(error: .passwordTooShort)
+	  return
+	}
+	if !agreedToTerms {
+	  present(error: .termsNotAccepted)
+	  return
+	}
 	
 	isLoading = true
 	defer { isLoading = false }
+	
 	do {
-	  if emailOrPhone.isEmail {
-		let result = try await authService.createUser(email: emailOrPhone, password: password)
-		print("result: \(result)")
-		isLoading = false
-		navigateToChooseRole = true
-	  }
+	  _ = try await authService.createUser(email: emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines),
+										   password: password)
+	  navigateToChooseRole = true
 	} catch {
-	  print("Login error: \(error)")
-	  isLoading = false
+	  alertMessage = error.localizedDescription
+	  showAlert = true
 	}
   }
+  
+  // MARK: - Social
   
   func signupWithGoogle() {
 #if canImport(UIKit)
@@ -66,22 +117,17 @@ final class CreateAccountViewModel {
 #if skip
 	AndroidGoogleAuth().signIn()
 #endif
-	
   }
   
   func signupWithApple() {
 	print("not implemented yet")
   }
   
-  func forgotPassword() {
-	// TODO: Navigate to forgot-password flow
-  }
+  // MARK: - Helpers
   
-  func signUp() {
-	// TODO: Navigate to sign-up flow
-  }
-  
-  func back() {
-	// TODO: Dismiss / navigate back
+  private func present(error: SignupValidationError) {
+	alertMessage = error.errorDescription
+	showAlert    = true
+	focusField   = error.focusField
   }
 }
