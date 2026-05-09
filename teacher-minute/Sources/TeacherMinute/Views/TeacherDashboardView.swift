@@ -60,9 +60,7 @@ struct TeacherDashboardView: View {
 		.fill(Color.appGrayBackground)
 		.frame(width: 84, height: 84)
 		.overlay {
-		  Image(systemName: "moon.fill")
-			.font(.system(size: 34, weight: .semibold))
-			.foregroundStyle(Color.appSecondaryText)
+		  PlatformIcon(systemName: "moon.fill", size: 34, weight: .semibold, color: .appSecondaryText)
 		}
 	  
 	  Text("You're Offline")
@@ -110,9 +108,7 @@ struct TeacherDashboardView: View {
 			.fill(Color.appGreen)
 			.frame(width: 64, height: 64)
 			.overlay {
-			  Image(systemName: "antenna.radiowaves.left.and.right")
-				.font(.system(size: 25, weight: .semibold))
-				.foregroundStyle(.white)
+			  PlatformIcon(systemName: "antenna.radiowaves.left.and.right", size: 25, weight: .semibold, color: .white)
 			}
 		}
 	  
@@ -162,9 +158,7 @@ struct TeacherDashboardView: View {
 		  .fill(Color.appGreenSoft)
 		  .frame(width: 38, height: 38)
 		  .overlay {
-			Image(systemName: "checkmark.seal")
-			  .font(.system(size: 15, weight: .semibold))
-			  .foregroundStyle(Color.appGreen)
+			PlatformIcon(systemName: "checkmark.seal", size: 15, weight: .semibold, color: .appGreen)
 		  }
 		
 		VStack(alignment: .leading, spacing: 4) {
@@ -199,7 +193,9 @@ struct TeacherDashboardView: View {
 	  
 	  HStack(spacing: 16) {
 		EarningsCard(title: "Today", amount: "$0.00", subtitle: "0 mins tutored")
+		  .frame(maxWidth: .infinity)
 		EarningsCard(title: "This Week", amount: "$142.50", subtitle: "+12% vs last week", subtitleColor: .appGreen)
+		  .frame(maxWidth: .infinity)
 	  }
 	}
   }
@@ -282,9 +278,7 @@ struct TeacherDashboardView: View {
   
   func statusItem(icon: String, title: String, subtitle: String, color: Color) -> some View {
 	HStack(spacing: 6) {
-	  Image(systemName: icon)
-		.font(.system(size: 13, weight: .semibold))
-		.foregroundStyle(color)
+	  PlatformIcon(systemName: icon, size: 13, weight: .semibold, color: color)
 	  
 	  VStack(alignment: .leading, spacing: 2) {
 		Text(title)
@@ -304,9 +298,7 @@ struct TeacherDashboardView: View {
 		.fill(color.opacity(0.12))
 		.frame(width: 30, height: 30)
 		.overlay {
-		  Image(systemName: icon)
-			.font(.system(size: 12, weight: .semibold))
-			.foregroundStyle(color)
+		  PlatformIcon(systemName: icon, size: 12, weight: .semibold, color: color)
 		}
 	  
 	  VStack(alignment: .leading, spacing: 3) {
@@ -322,108 +314,104 @@ struct TeacherDashboardView: View {
 	  Spacer()
 	}
   }
-}
-
-struct EarningsCard: View {
-  let title: String
-  let amount: String
-  let subtitle: String
-  var subtitleColor: Color = .appSecondaryText
   
-  var body: some View {
-	RoundedInfoCard {
-	  VStack(alignment: .leading, spacing: 8) {
-		Text(title)
-		  .font(.system(size: 12))
-		  .foregroundStyle(Color.appSecondaryText)
-		
-		Text(amount)
-		  .font(.system(size: 25, weight: .bold))
-		  .foregroundStyle(Color.appPrimaryText)
-		
-		Text(subtitle)
-		  .font(.system(size: 11))
-		  .foregroundStyle(subtitleColor)
+  struct EarningsCard: View {
+	let title: String
+	let amount: String
+	let subtitle: String
+	var subtitleColor: Color = .appSecondaryText
+	
+	var body: some View {
+	  RoundedInfoCard {
+		VStack(alignment: .leading, spacing: 8) {
+		  Text(title)
+			.font(.system(size: 12))
+			.foregroundStyle(Color.appSecondaryText)
+		  
+		  Text(amount)
+			.font(.system(size: 25, weight: .bold))
+			.foregroundStyle(Color.appPrimaryText)
+		  
+		  Text(subtitle)
+			.font(.system(size: 11))
+			.foregroundStyle(subtitleColor)
+		}
+		.frame(maxWidth: .infinity, alignment: .leading)
 	  }
-	  .frame(maxWidth: .infinity, alignment: .leading)
 	}
   }
-}
-
-struct LiveRequestCard: View {
-  let request: LiveStudentRequest
-  let accept: () -> Void
-  let reject: () -> Void
   
-  var body: some View {
-	RoundedInfoCard {
-	  VStack(spacing: 14) {
-		HStack(spacing: 12) {
-		  Circle()
-			.fill(Color.appPurpleSoft)
-			.frame(width: 48, height: 48)
-			.overlay {
-			  Image(systemName: "person.crop.circle.fill")
-				.font(.system(size: 28))
-				.foregroundStyle(Color.appPurple)
-			}
-		  
-		  VStack(alignment: .leading, spacing: 5) {
-			Text(request.studentName)
-			  .font(.system(size: 14, weight: .bold))
-			  .foregroundStyle(Color.appPrimaryText)
-			
-			Text(request.topic)
-			  .font(.system(size: 11))
-			  .foregroundStyle(Color.appSecondaryText)
-		  }
-		  
-		  Spacer()
-		  
-		  VStack(alignment: .trailing, spacing: 8) {
-			if request.isHighPriority {
-			  SmallPill(title: "High Priority", foreground: .appPink, background: .appPinkSoft)
-			}
-			
-			Text(request.waitingTime)
-			  .font(.system(size: 11))
-			  .foregroundStyle(Color.appSecondaryText)
-		  }
-		}
-		
-		HStack(spacing: 12) {
-		  Button(action: accept) {
-			Text(request.isHighPriority ? "Accept Request" : "Accept")
-			  .font(.system(size: 13, weight: .bold))
-			  .foregroundStyle(request.isHighPriority ? .white : Color.appPink)
-			  .frame(maxWidth: .infinity)
-			  .frame(height: 42)
-			  .background(request.isHighPriority ? Color.appPink : .white)
-			  .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+  struct LiveRequestCard: View {
+	let request: LiveStudentRequest
+	let accept: () -> Void
+	let reject: () -> Void
+	
+	var body: some View {
+	  RoundedInfoCard {
+		VStack(spacing: 14) {
+		  HStack(spacing: 12) {
+			Circle()
+			  .fill(Color.appPurpleSoft)
+			  .frame(width: 48, height: 48)
 			  .overlay {
-				RoundedRectangle(cornerRadius: 9, style: .continuous)
-				  .stroke(Color.appPink, lineWidth: request.isHighPriority ? 0 : 1.5)
+				PlatformIcon(systemName: "person.crop.circle.fill", size: 28, color: .appPurple)
 			  }
-		  }
-		  .buttonStyle(.plain)
-		  
-		  if request.isHighPriority {
-			Button(action: reject) {
-			  Image(systemName: "xmark")
-				.font(.system(size: 13, weight: .bold))
+			
+			VStack(alignment: .leading, spacing: 5) {
+			  Text(request.studentName)
+				.font(.system(size: 14, weight: .bold))
+				.foregroundStyle(Color.appPrimaryText)
+			  
+			  Text(request.topic)
+				.font(.system(size: 11))
 				.foregroundStyle(Color.appSecondaryText)
-				.frame(width: 48, height: 42)
-				.background(Color.appGrayBackground)
+			}
+			
+			Spacer()
+			
+			VStack(alignment: .trailing, spacing: 8) {
+			  if request.isHighPriority {
+				SmallPill(title: "High Priority", foreground: .appPink, background: .appPinkSoft)
+			  }
+			  
+			  Text(request.waitingTime)
+				.font(.system(size: 11))
+				.foregroundStyle(Color.appSecondaryText)
+			}
+		  }
+		  
+		  HStack(spacing: 12) {
+			Button(action: accept) {
+			  Text(request.isHighPriority ? "Accept Request" : "Accept")
+				.font(.system(size: 13, weight: .bold))
+				.foregroundStyle(request.isHighPriority ? .white : Color.appPink)
+				.frame(maxWidth: .infinity)
+				.frame(height: 42)
+				.background(request.isHighPriority ? Color.appPink : .white)
 				.clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+				.overlay {
+				  RoundedRectangle(cornerRadius: 9, style: .continuous)
+					.stroke(Color.appPink, lineWidth: request.isHighPriority ? 0 : 1.5)
+				}
 			}
 			.buttonStyle(.plain)
+			
+			if request.isHighPriority {
+			  Button(action: reject) {
+				PlatformIcon(systemName: "xmark", size: 13, weight: .bold, color: .appSecondaryText)
+				  .frame(width: 48, height: 42)
+				  .background(Color.appGrayBackground)
+				  .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+			  }
+			  .buttonStyle(.plain)
+			}
 		  }
 		}
 	  }
-	}
-	.overlay {
-	  RoundedRectangle(cornerRadius: 18, style: .continuous)
-		.stroke(request.isHighPriority ? Color.appPink : Color.clear, lineWidth: 1.5)
+	  .overlay {
+		RoundedRectangle(cornerRadius: 18, style: .continuous)
+		  .stroke(request.isHighPriority ? Color.appPink : Color.clear, lineWidth: 1.5)
+	  }
 	}
   }
 }
