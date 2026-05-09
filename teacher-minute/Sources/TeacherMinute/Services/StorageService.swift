@@ -9,7 +9,9 @@ import Foundation
 
 #if !os(Android)
 import FirebaseStorage
+#if os(iOS)
 import UIKit
+#endif
 #else
 import SkipFirebaseStorage
 #endif
@@ -30,7 +32,7 @@ final class StorageService {
   ) async throws -> String {
 	let path = "documents/\(uid)/\(name).jpg"
 	
-#if !os(Android)
+#if os(iOS)
 	// beginBackgroundTask is synchronous — no await.
 	// Use a reference-type box so the expiration handler and defer share the same ID.
 	final class BGTaskBox { var id = UIBackgroundTaskIdentifier.invalid }
