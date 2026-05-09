@@ -60,20 +60,7 @@ final class LoginViewModel {
 	  
 	  // 3. Resolve where in onboarding this user should go
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
-	  
-	  // 4. Map to AppRoute
-	  switch resume {
-		case .chooseRole:
-		  destination = .chooseRole
-		case .teacherIdentityVerification:
-		  destination = .teacherIdentityVerification
-		case .teacherSubjects:
-		  destination = .teacherSubjects
-		case .completeProfile(let role):
-		  destination = .completeProfile(role: role)
-		case .home(let role):
-		  destination = role == .teacher ? .teacherDashboard : .studentHome
-	  }
+	  destination = AppRoute.resumeDestination(for: resume)
 	  
 	} catch {
 	  present(message: error.localizedDescription)

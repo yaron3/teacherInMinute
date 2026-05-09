@@ -17,6 +17,21 @@ enum AppRoute: Hashable {
   case completeProfile(role: AuthRole)
   case studentHome
   case teacherDashboard
+  
+  static func resumeDestination(for resume: OnboardingResume) -> AppRoute {
+	 switch resume {
+	   case .chooseRole:
+		 return .chooseRole
+	   case .teacherIdentityVerification:
+		 return .teacherIdentityVerification
+	   case .teacherSubjects:
+		 return .teacherSubjects
+	   case .completeProfile(let role):
+		 return .completeProfile(role: role)
+	   case .home(let role):
+		 return role == .teacher ? .teacherDashboard : .studentHome
+	 }
+  }
 }
 
 @Observable

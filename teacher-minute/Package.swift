@@ -12,33 +12,27 @@ let package = Package(
     dependencies: [
         .package(url: "https://source.skip.tools/skip.git", from: "1.8.13"),
         .package(url: "https://source.skip.tools/skip-fuse-ui.git", from: "1.0.0"),
-        .package(url: "https://github.com/skiptools/skip-firebase.git",from: "0.16.0"),
-        .package(url: "https://github.com/google/GoogleSignIn-iOS",from: "9.0.0"),
-        // Add Firebase SDK explicitly so we can reference FirebaseAuth directly and ensure it's embedded.
-//        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "12.12.1"),
+        .package(url: "https://github.com/skiptools/skip-firebase.git", from: "0.16.0"),
+        .package(url: "https://github.com/google/GoogleSignIn-iOS", from: "9.0.0"),
     ],
     targets: [
-//        .target(name: "TeacherMinute", dependencies: [
-//            .product(name: "SkipFuseUI", package: "skip-fuse-ui"),
-//        ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-        
-        
-        .target(name: "TeacherMinute",dependencies: [
-          .product(name: "SkipFuseUI", package: "skip-fuse-ui"),
-          .product(name: "SkipFirebaseCore", package: "skip-firebase"),
-          .product(name: "SkipFirebaseAuth", package: "skip-firebase"),
-          .product(name: "SkipFirebaseFirestore", package: "skip-firebase"),
-          .product(name: "SkipFirebaseStorage", package: "skip-firebase"),
-          .product(name: "SkipFirebaseDatabase", package: "skip-firebase"),
-          .product(name: "GoogleSignInSwift", package: "GoogleSignIn-iOS", condition: .when(platforms: [.iOS])
-
-                  )
-   //       .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
-          // Ensure the FirebaseAuth runtime framework is brought into the app bundle.
-          // discarded firebase
+        .target(
+            name: "TeacherMinute",
+            dependencies: [
+                .product(name: "SkipFuseUI", package: "skip-fuse-ui"),
+                .product(name: "SkipFirebaseCore", package: "skip-firebase"),
+                .product(name: "SkipFirebaseAuth", package: "skip-firebase"),
+                .product(name: "SkipFirebaseFirestore", package: "skip-firebase"),
+                .product(name: "SkipFirebaseStorage", package: "skip-firebase"),
+                .product(name: "SkipFirebaseDatabase", package: "skip-firebase"),
+                .product(name: "GoogleSignInSwift", package: "GoogleSignIn-iOS", condition: .when(platforms: [.iOS])),
             ],
-            resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")])
-
-        
+            resources: [.process("Resources")],
+            plugins: [.plugin(name: "skipstone", package: "skip")]
+        ),
+        .testTarget(
+            name: "TeacherMinuteTests",
+            dependencies: ["TeacherMinute"]
+        ),
     ]
 )

@@ -7,79 +7,172 @@
 
 import Foundation
 
-// iOS: use the real FirebaseDatabase SDK.
-// Android: FirebaseDatabaseBridge.swift provides matching Swift wrappers
-//          that delegate to the Android Firebase Realtime Database API.
-#if !SKIP_BRIDGE
-#if !os(Android)
-import FirebaseDatabase
-private typealias FRTDB = FirebaseDatabase.Database
-private typealias DBRef  = FirebaseDatabase.DatabaseReference
-#else
-// On Android the types come from FirebaseDatabaseBridge.swift (same module).
-private typealias FRTDB = Database
-private typealias DBRef  = DatabaseReference
-#endif
-#endif
+#if SKIP
 
-// MARK: - TeacherPresenceService
-//
-// Manages two Firebase Realtime Database responsibilities for a logged-in teacher:
-//   1. Presence – writes online / offline status to  `teachers/{uid}/status`
-//   2. Live queue – observes `teachers/{uid}/waitingMessages` and publishes changes
-//      via an `onMessagesUpdated` callback so the ViewModel can react.
+private func presenceInfo(_ msg: String) {
+  print(msg)
+}
+
+private func presenceError(_ msg: String) {
+  print(msg)
+}
 
 @MainActor
 final class TeacherPresenceService {
-  
-  // MARK: - Properties
-  
   private let teacherUID: String
-  
-#if !SKIP_BRIDGE
-  /// Root reference for this teacher: `teachers/{uid}`
-  private let teacherRef: DBRef
-#endif
-  
+  private var teacherRef: DatabaseReference?
   private var messagesHandle: UInt?
-  
-  /// Called every time the waiting-messages list changes in the DB.
   var onMessagesUpdated: (([WaitingMessage]) -> Void)?
   
-  // MARK: - Init
-  
-  init(teacherUID: String) {
+  init(teacherUID: String, statusWriter: ((String) -> Void)? = nil) {
 	self.teacherUID = teacherUID
-#if !SKIP_BRIDGE
-	self.teacherRef = FRTDB.database()
-	  .reference(withPath: "teachers/\(teacherUID)")
-#endif
+	if let statusWriter {
+	  self.teacherRef = nil
+	  presenceInfo("[Presence] initialized with injected status writer uid=\(teacherUID)")
+	  self.injectedStatusWriter = statusWriter
+	} else {
+	  presenceInfo("[Presence] init uid=\(teacherUID)")
+	  self.teacherRef = Database.database().reference(withPath: "teachers/\(teacherUID)")
+	  presenceInfo("[Presence] teacherRef created")
+	}
   }
   
-  // Note: no deinit — goOffline() is the explicit teardown path and handles
-  // observer removal.  Firebase also cleans up observers on app termination.
-  
-  // MARK: - Presence
+  private var injectedStatusWriter: ((String) -> Void)?
   
   func goOnline() {
-#if !SKIP_BRIDGE
-	teacherRef.child("status").setValue("online")
-	startListeningToQueue(ref: teacherRef.child("waitingMessages"))
-#endif
+	presenceInfo("[Presence] goOnline called uid=\(self.teacherUID)")
+	writeStatus("online")
+	guard let ref = teacherRef else { return }
+	startListeningToQueue(ref: ref.child("waitingMessages"))
   }
   
   func goOffline() {
-#if !SKIP_BRIDGE
-	teacherRef.child("status").setValue("offline")
+	presenceInfo("[Presence] goOffline called uid=\(self.teacherUID)")
+	writeStatus("offline")
 	stopListeningToQueue()
-#endif
   }
   
-  // MARK: - Live Queue Listener
+  private func writeStatus(_ status: String) {
+	if let injectedStatusWriter {
+	  injectedStatusWriter(status)
+	  return
+	}
+	guard let ref = teacherRef else {
+	  presenceError("[Presence] writeStatus aborted, teacherRef is nil status=\(status)")
+	  return
+	}
+	ref.child("status").setValue(status)
+	presenceInfo("[Presence] wrote status=\(status) to DB")
+  }
   
-#if !SKIP_BRIDGE
-  private func startListeningToQueue(ref: DBRef) {
-	messagesHandle = ref.observe(.value) { [weak self] snapshot in
+  private func startListeningToQueue(ref: DatabaseReference) {
+	presenceInfo("[Presence] startListeningToQueue attaching observer")
+	messagesHandle = ref.observe(DataEventType.value) { [weak self] snapshot in
+	  guard let self else { return }
+	  presenceInfo("[Presence] snapshot received childrenCount=\(snapshot.childrenCount)")
+	  var messages: [WaitingMessage] = []
+	  
+	  for child in snapshot.children {
+		guard
+		  let snap = child as? DataSnapshot,
+		  let dict = snap.value as? [String: Any],
+		  let studentUID = dict["studentUID"] as? String,
+		  let studentName = dict["studentName"] as? String,
+		  let topic = dict["topic"] as? String,
+		  let subject = dict["subject"] as? String,
+		  let createdAt = dict["createdAt"] as? Double
+		else { continue }
+		
+		let statusRaw = dict["status"] as? String ?? "waiting"
+		guard statusRaw == "waiting" else { continue }
+		let isHighPriority = dict["isHighPriority"] as? Bool ?? false
+		let message = WaitingMessage(
+		  id: snap.key,
+		  studentUID: studentUID,
+		  studentName: studentName,
+		  topic: topic,
+		  subject: subject,
+		  isHighPriority: isHighPriority,
+		  createdAt: createdAt,
+		  statusRaw: statusRaw
+		)
+		messages.append(message)
+	  }
+	  
+	  messages.sort { $0.createdAt < $1.createdAt }
+	  self.onMessagesUpdated?(messages)
+	  ()
+	}
+  }
+  
+  private func stopListeningToQueue() {
+	guard let handle = messagesHandle else { return }
+	teacherRef?.child("waitingMessages").removeObserver(withHandle: handle)
+	messagesHandle = nil
+  }
+  
+  func accept(message: WaitingMessage) {
+	updateStatus(of: message, to: "accepted")
+  }
+  
+  func reject(message: WaitingMessage) {
+	updateStatus(of: message, to: "rejected")
+  }
+  
+  private func updateStatus(of message: WaitingMessage, to status: String) {
+	teacherRef?
+	  .child("waitingMessages")
+	  .child(message.id)
+	  .child("status")
+	  .setValue(status)
+  }
+}
+
+#elseif !SKIP_BRIDGE
+
+import FirebaseDatabase
+
+@MainActor
+final class TeacherPresenceService {
+  private let teacherUID: String
+  private let injectedStatusWriter: ((String) -> Void)?
+  private var teacherRef: FirebaseDatabase.DatabaseReference?
+  private var messagesHandle: UInt?
+  var onMessagesUpdated: (([WaitingMessage]) -> Void)?
+  
+  init(teacherUID: String, statusWriter: ((String) -> Void)? = nil) {
+	self.teacherUID = teacherUID
+	self.injectedStatusWriter = statusWriter
+	if statusWriter == nil {
+	  self.teacherRef = FirebaseDatabase.Database.database()
+		.reference(withPath: "teachers/\(teacherUID)")
+	}
+  }
+  
+  func goOnline() {
+	logger.info("[Presence] goOnline called uid=\(self.teacherUID)")
+	writeStatus("online")
+	guard let ref = teacherRef else { return }
+	startListeningToQueue(ref: ref.child("waitingMessages"))
+  }
+  
+  func goOffline() {
+	logger.info("[Presence] goOffline called uid=\(self.teacherUID)")
+	writeStatus("offline")
+	stopListeningToQueue()
+  }
+  
+  private func writeStatus(_ status: String) {
+	if let injectedStatusWriter {
+	  injectedStatusWriter(status)
+	  return
+	}
+	teacherRef?.child("status").setValue(status)
+	logger.info("[Presence] wrote status=\(status) to DB")
+  }
+  
+  private func startListeningToQueue(ref: FirebaseDatabase.DatabaseReference) {
+	messagesHandle = ref.observe(FirebaseDatabase.DataEventType.value) { [weak self] snapshot in
 	  guard let self else { return }
 	  var messages: [WaitingMessage] = []
 	  
@@ -87,83 +180,38 @@ final class TeacherPresenceService {
 		guard
 		  let snap = child as? DataSnapshot,
 		  let dict = snap.value as? [String: Any],
-		  let msg  = WaitingMessage(id: snap.key, data: dict),
+		  let msg = WaitingMessage(id: snap.key, data: dict),
 		  msg.status == .waiting
 		else { continue }
 		messages.append(msg)
 	  }
 	  
 	  messages.sort { $0.createdAt < $1.createdAt }
-	  
-	  // Dispatch to main actor. The trailing `()` forces the closure
-	  // return type to Void/Unit in both Swift and Kotlin (Skip).
-	  Task { @MainActor [weak self] in self?.onMessagesUpdated?(messages) }
-	  ()
+	  self.onMessagesUpdated?(messages)
 	}
   }
   
   private func stopListeningToQueue() {
 	guard let handle = messagesHandle else { return }
-	teacherRef.child("waitingMessages").removeObserver(withHandle: handle)
+	teacherRef?.child("waitingMessages").removeObserver(withHandle: handle)
 	messagesHandle = nil
   }
-#endif
   
-  // MARK: - Accept / Reject
-  
-  func accept(message: WaitingMessage) async {
-#if !SKIP_BRIDGE
+  func accept(message: WaitingMessage) {
 	updateStatus(of: message, to: .accepted)
-	await startSession(for: message)
-#endif
   }
   
   func reject(message: WaitingMessage) {
-#if !SKIP_BRIDGE
 	updateStatus(of: message, to: .rejected)
-#endif
   }
   
-  // MARK: - Helpers
-  
-#if !SKIP_BRIDGE
   private func updateStatus(of message: WaitingMessage, to status: WaitingMessage.MessageStatus) {
-	teacherRef
+	teacherRef?
 	  .child("waitingMessages")
 	  .child(message.id)
 	  .child("status")
 	  .setValue(status.rawValue)
   }
-  
-  // MARK: - HTTP Session Placeholder
-  
-  /// Placeholder HTTP call that would notify your backend to spin up a tutoring session.
-  /// Replace the URL and body with your real API contract.
-  private func startSession(for message: WaitingMessage) async {
-	guard let url = URL(string: "https://api.teacherminute.com/v1/sessions/start") else { return }
-	
-	var request = URLRequest(url: url)
-	request.httpMethod = "POST"
-	request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-	
-	let body: [String: Any] = [
-	  "teacherUID":  teacherUID,
-	  "studentUID":  message.studentUID,
-	  "messageID":   message.id,
-	  "subject":     message.subject,
-	  "topic":       message.topic,
-	]
-	
-	do {
-	  request.httpBody = try JSONSerialization.data(withJSONObject: body)
-	  let (data, response) = try await URLSession.shared.data(for: request)
-	  if let httpResponse = response as? HTTPURLResponse {
-		logger.info("Session start HTTP \(httpResponse.statusCode) for message \(message.id)")
-	  }
-	  _ = data // TODO: parse session token / room URL from response
-	} catch {
-	  logger.error("Failed to start session for message \(message.id): \(error)")
-	}
-  }
-#endif
 }
+
+#endif

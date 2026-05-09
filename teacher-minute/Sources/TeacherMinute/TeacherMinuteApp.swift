@@ -57,6 +57,12 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   }
   /* SKIP @bridge */public func onInit() {
 	logger.debug("onInit")
+#if SKIP
+	if FirebaseApp.app() == nil {
+	  FirebaseApp.configure()
+	  logger.info("Firebase configured on Android")
+	}
+#endif
   }
   
   /* SKIP @bridge */public func onLaunch() {
