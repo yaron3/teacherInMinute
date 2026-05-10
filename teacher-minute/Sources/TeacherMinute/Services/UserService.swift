@@ -47,6 +47,17 @@ final class UserService {
 	return snap.data()
   }
   
+  func fetchProfileSummary(uid: String) async throws -> UserProfileSummary? {
+	guard let data = try await fetchRaw(uid: uid) else { return nil }
+	return UserProfileSummary(uid: uid, data: data)
+  }
+  
+  func deleteUserData(uid: String) async throws {
+	let db = Firestore.firestore()
+	try await db.collection("users").document(uid).delete()
+	logger.info("Deleted user profile for uid: \(uid)")
+  }
+  
   // MARK: - Determine where to resume onboarding
   
   func resumeRoute(uid: String) async throws -> OnboardingResume {
@@ -67,9 +78,8 @@ final class UserService {
 	  let docs = data["uploadedDocuments"] as? [String] ?? []
 	  let hasIdentityDocs = docs.count >= 4
 	  
-	  // Subjects: check subjects array is non-empty
-	  let subjects = data["subjects"] as? [String] ?? []
-	  let hasSubjects = !subjects.isEmpty
+	  let subjectSelections = data["subjectSelections"] as? [String: [String]] ?? [:]
+	  let hasSubjects = subjectSelections.values.contains { !$0.isEmpty }
 	  
 	  if !hasIdentityDocs { return .teacherIdentityVerification }
 	  if !hasSubjects      { return .teacherSubjects }

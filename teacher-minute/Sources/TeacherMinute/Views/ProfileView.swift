@@ -41,28 +41,46 @@ struct ProfileView: View {
                 profileHeader
                     .padding(.top, 26)
 
-                Text("Teaching Details")
+                Text("Account Info")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Color.appPrimaryText)
                     .padding(.top, 30)
-
-                teachingCard(
-                    title: "Grade Levels Taught",
-                    chips: ["Middle School", "High School"],
-                    includeAdd: true,
-                    editAction: viewModel.editGradeLevels,
-                    addAction: viewModel.addGradeLevel
-                )
+                
+                VStack(spacing: 14) {
+                    ForEach(viewModel.contactRows, id: \.title) { row in
+                        ProfileInfoRow(
+                            icon: row.icon,
+                            title: row.title,
+                            value: row.value
+                        )
+                    }
+                }
                 .padding(.top, 14)
 
-                teachingCard(
-                    title: "Subjects",
-                    chips: ["Algebra", "Calculus", "Geometry"],
-                    includeAdd: false,
-                    editAction: viewModel.editSubjects,
-                    addAction: {}
-                )
-                .padding(.top, 18)
+                if viewModel.shouldShowTeachingDetails {
+                    Text("Teaching Details")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.appPrimaryText)
+                        .padding(.top, 30)
+
+                    teachingCard(
+                        title: "Grade Levels Taught",
+                        chips: viewModel.gradeLevels,
+                        includeAdd: viewModel.gradeLevels.isEmpty,
+                        editAction: viewModel.editGradeLevels,
+                        addAction: viewModel.addGradeLevel
+                    )
+                    .padding(.top, 14)
+
+                    teachingCard(
+                        title: "Subjects",
+                        chips: viewModel.subjectsOrPlaceholder,
+                        includeAdd: viewModel.subjects.isEmpty,
+                        editAction: viewModel.editSubjects,
+                        addAction: viewModel.editSubjects
+                    )
+                    .padding(.top, 18)
+                }
 
                 Text("Device Permissions")
                     .font(.system(size: 16, weight: .bold))
@@ -112,6 +130,9 @@ struct ProfileView: View {
             .padding(.bottom, 24)
         }
         .background(Color(.systemBackground))
+        .task {
+            await viewModel.loadProfile()
+        }
     }
 
     var profileHeader: some View {
@@ -258,6 +279,41 @@ struct ProfilePermissionRow: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+        }
+    }
+}
+
+struct ProfileInfoRow: View {
+    let icon: String
+    let title: String
+    let value: String
+    
+    var body: some View {
+        RoundedInfoCard {
+            HStack(spacing: 14) {
+                Circle()
+                    .fill(Color.appPurpleSoft)
+                    .frame(width: 42, height: 42)
+                    .overlay {
+                        Image(systemName: icon)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.appPurple)
+                    }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.appSecondaryText)
+                    
+                    Text(value)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.appPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                
+                Spacer()
             }
         }
     }

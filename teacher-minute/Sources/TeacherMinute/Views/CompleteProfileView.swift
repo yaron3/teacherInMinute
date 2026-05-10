@@ -80,11 +80,7 @@ struct CompleteProfileView: View {
 	.navigationBarTitleDisplayMode(.inline)
 	.onAppear {
 	  viewModel.onContinue = {
-		if viewModel.role == .teacher {
-		  router.push(.teacherDashboard)
-		} else {
-		  router.push(.studentHome)
-		}
+		router.replace(with: .mainTabs(role: viewModel.role))
 	  }
 	  viewModel.checkAndAutoAdvance()
 	}

@@ -20,24 +20,24 @@ struct TeacherSubjectsView: View {
 		  .foregroundStyle(Color.authSecondaryText)
 		  .frame(maxWidth: .infinity)
 		
-		Text("What can you teach?")
-		  .font(.system(size: 26, weight: .bold))
-		  .foregroundStyle(Color.authPrimaryText)
-		  .padding(.top, 20)
-		
-		Text("Select the math subjects you are comfortable\nteaching. Students will see these on your profile.")
-		  .font(.system(size: 13))
-		  .foregroundStyle(Color.authSecondaryText)
-		  .lineSpacing(5)
-		  .padding(.top, 8)
+			Text("What can you teach?")
+			  .font(.system(size: 26, weight: .bold))
+			  .foregroundStyle(Color.authPrimaryText)
+			  .padding(.top, 20)
+			
+			Text("Choose a subject area, then select at least\none subtopic students can request.")
+			  .font(.system(size: 13))
+			  .foregroundStyle(Color.authSecondaryText)
+			  .lineSpacing(5)
+			  .padding(.top, 8)
 		
 		searchField
 		  .padding(.top, 24)
 		
 		HStack {
-		  Text("Popular Subjects")
-			.font(.system(size: 15, weight: .bold))
-			.foregroundStyle(Color.authPrimaryText)
+			  Text("Subject Area")
+				.font(.system(size: 15, weight: .bold))
+				.foregroundStyle(Color.authPrimaryText)
 		  
 		  Spacer()
 		  
@@ -48,59 +48,72 @@ struct TeacherSubjectsView: View {
 			.frame(height: 24)
 			.background(Color.authFieldBorder.opacity(0.7))
 			.clipShape(Capsule())
-		}
-		.padding(.top, 28)
-		
-		FlowLayout(spacing: 10) {
-		  ForEach(viewModel.popularSubjects) { subject in
-			SubjectChip(
-			  subject: subject,
-			  isSelected: viewModel.selectedSubjects.contains(subject)
-			) {
-			  viewModel.toggle(subject)
 			}
-		  }
-		}
-		.padding(.top, 16)
-		
-		Text("Advanced Topics")
-		  .font(.system(size: 15, weight: .bold))
-		  .foregroundStyle(Color.authPrimaryText)
-		  .padding(.top, 32)
-		
-		FlowLayout(spacing: 10) {
-		  ForEach(viewModel.advancedSubjects) { subject in
-			SubjectChip(
-			  subject: subject,
-			  isSelected: viewModel.selectedSubjects.contains(subject)
-			) {
-			  viewModel.toggle(subject)
-			}
-		  }
-		}
-		.padding(.top, 16)
-		
-		AuthPrimaryButton(
+			.padding(.top, 28)
+			
+				FlowLayout(spacing: 10) {
+				  ForEach(viewModel.visibleAreas) { area in
+					SubjectAreaChip(
+					  area: area,
+					  isSelected: viewModel.isAreaSelected(area)
+					) {
+					  viewModel.toggleArea(area)
+					}
+				  }
+				}
+				.padding(.top, 16)
+				
+				if viewModel.shouldShowSubtopicsPrompt {
+				  Text("Choose one or more subjects to see subtopics.")
+					.font(.system(size: 13))
+					.foregroundStyle(Color.authSecondaryText)
+					.padding(.top, 24)
+				} else {
+				  VStack(alignment: .leading, spacing: 22) {
+					ForEach(viewModel.selectedAreas) { area in
+					  VStack(alignment: .leading, spacing: 12) {
+						HStack {
+						  Text("\(area.title) subtopics")
+							.font(.system(size: 15, weight: .bold))
+							.foregroundStyle(Color.authPrimaryText)
+						  
+						  Spacer()
+						  
+						  Text(viewModel.selectedSubtopicTitles(for: area).isEmpty ? "Required" : "\(viewModel.selectedSubtopicTitles(for: area).count) selected")
+							.font(.system(size: 11, weight: .semibold))
+							.foregroundStyle(Color.authSecondaryText)
+							.padding(.horizontal, 10)
+							.frame(height: 24)
+							.background(Color.authFieldBorder.opacity(0.7))
+							.clipShape(Capsule())
+						}
+						
+						FlowLayout(spacing: 10) {
+						  ForEach(viewModel.visibleSubtopics(for: area)) { subtopic in
+							SubjectChip(
+							  subject: subtopic,
+							  isSelected: viewModel.isSubtopicSelected(subtopic, in: area)
+							) {
+							  viewModel.toggleSubtopic(subtopic, in: area)
+							}
+						  }
+						}
+					  }
+					}
+				  }
+				  .padding(.top, 28)
+				}
+			
+			AuthPrimaryButton(
 		  title: "Continue to Onboarding",
 		  systemImage: "arrow.right",
 		  isEnabled: viewModel.canContinue
 		) {
 		  viewModel.continueOnboarding()
-		}
-		.padding(.top, 32)
-		
-		Button {
-		  viewModel.skip()
-		} label: {
-		  Text("Skip for now")
-			.font(.system(size: 13, weight: .medium))
-			.foregroundStyle(Color.authSecondaryText)
-			.frame(maxWidth: .infinity)
-		}
-		.buttonStyle(.plain)
-		.padding(.top, 18)
-		.padding(.bottom, 24)
-	  }
+			}
+			.padding(.top, 32)
+			.padding(.bottom, 24)
+		  }
 	  .padding(.horizontal, 18)
 	}
 	.background(Color(.systemBackground))
@@ -129,7 +142,7 @@ struct TeacherSubjectsView: View {
 		.font(.system(size: 14))
 		.foregroundStyle(Color.authIcon)
 	  
-	  TextField("Search subjects (e.g. Calculus)", text: $viewModel.searchText)
+	  TextField("Search subjects or subtopics", text: $viewModel.searchText)
 		.font(.system(size: 13))
 		.foregroundStyle(Color.authPrimaryText)
 		.textInputAutocapitalization(.never)
@@ -144,5 +157,33 @@ struct TeacherSubjectsView: View {
 		.stroke(Color.authFieldBorder, lineWidth: 1)
 	}
 	.shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+  }
+}
+
+struct SubjectAreaChip: View {
+  let area: TeachingSubjectArea
+  let isSelected: Bool
+  let action: () -> Void
+  
+  var body: some View {
+	Button(action: action) {
+	  HStack(spacing: 7) {
+		Image(systemName: area.systemImage)
+		  .font(.system(size: 12, weight: .semibold))
+		
+		Text(area.title)
+		  .font(.system(size: 13, weight: .medium))
+	  }
+	  .foregroundStyle(isSelected ? .white : Color.authPrimaryText)
+	  .padding(.horizontal, 14)
+	  .frame(height: 34)
+	  .background(isSelected ? Color.authPink : .white)
+	  .clipShape(Capsule())
+	  .overlay {
+		Capsule()
+		  .stroke(isSelected ? Color.authPink : Color.authFieldBorder, lineWidth: 1)
+	  }
+	}
+	.buttonStyle(.plain)
   }
 }

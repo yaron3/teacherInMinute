@@ -33,6 +33,8 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 			  TeacherSubjectsView()
 			case .completeProfile(let role):
 			  CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
+			case .mainTabs(let role):
+			  MainTabView(userMode: AppUserMode(role: role))
 			case .studentHome:
 			  StudentHomeView()
 			case .teacherDashboard:

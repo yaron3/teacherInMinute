@@ -9,7 +9,11 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @State var viewModel = MainTabViewModel()
+    @State var viewModel: MainTabViewModel
+    
+    init(userMode: AppUserMode = .teacher) {
+        self._viewModel = State(wrappedValue: MainTabViewModel(userMode: userMode))
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -23,7 +27,11 @@ struct MainTabView: View {
                     }
 
                 case .lessons:
-                    TeacherDashboardView()
+                    if viewModel.userMode == .student {
+                        StudentLessonHistoryView()
+                    } else {
+                        TeacherLessonHistoryView()
+                    }
 
                 case .profile:
                     ProfileView()
@@ -37,12 +45,13 @@ struct MainTabView: View {
 
             MainTabBar(
                 selectedTab: $viewModel.selectedTab,
-                showLessonsBadge: viewModel.hasTeacherRequestBadge,
+                showLessonsBadge: viewModel.shouldShowLessonsBadge,
                 showSettingsBadge: viewModel.hasNotificationBadge
             )
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Color(.systemBackground))
+        .navigationBarBackButtonHidden(true)
     }
 }
 

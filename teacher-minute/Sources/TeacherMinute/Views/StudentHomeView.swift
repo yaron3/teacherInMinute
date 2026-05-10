@@ -62,6 +62,18 @@ struct StudentHomeView: View {
             .padding(.bottom, 24)
         }
         .background(Color(.systemBackground))
+        .task {
+            await viewModel.loadProfile()
+            await viewModel.loadTeachingSubjects()
+        }
+        .sheet(isPresented: $viewModel.showAskTeacherSheet) {
+            AskTeacherSheet(viewModel: viewModel)
+        }
+        .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.alertMessage ?? "")
+        }
     }
 
     var askTeacherCard: some View {
@@ -174,6 +186,115 @@ struct StudentHomeView: View {
                     .foregroundStyle(Color.appPink)
             }
             .buttonStyle(.plain)
+        }
+    }
+}
+
+struct AskTeacherSheet: View {
+    @Bindable var viewModel: StudentHomeViewModel
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Ask a teacher")
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundStyle(Color.appPrimaryText)
+                        
+                        Text("Choose the topic and describe what you need help with.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.appSecondaryText)
+                            .lineSpacing(4)
+                    }
+                    
+                    pickerSection(
+                        title: "Field",
+                        selection: viewModel.selectedField.isEmpty ? "Choose field" : viewModel.selectedField,
+                        options: viewModel.availableFields,
+                        action: viewModel.selectField
+                    )
+                    
+                    pickerSection(
+                        title: "Subfield",
+                        selection: viewModel.selectedSubfield.isEmpty ? "Choose subfield" : viewModel.selectedSubfield,
+                        options: viewModel.availableSubfields
+                    ) { subfield in
+                        viewModel.selectedSubfield = subfield
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Question")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.appPrimaryText)
+                        
+                        TextEditor(text: $viewModel.question)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.appPrimaryText)
+                            .frame(minHeight: 120)
+                            .padding(12)
+                            .scrollContentBackground(.hidden)
+                            .background(Color.appGrayBackground.opacity(0.55))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    
+                    AuthPrimaryButton(
+                        title: viewModel.isFindingTeachers ? "Finding Teachers..." : "Find Teachers",
+                        systemImage: "person.2.fill",
+                        isEnabled: viewModel.canFindTeachers
+                    ) {
+                        Task { await viewModel.findTeachers() }
+                    }
+                    .padding(.top, 8)
+                }
+                .padding(18)
+            }
+            .background(Color(.systemBackground))
+            .navigationTitle("Request Help")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+    
+    private func pickerSection(
+        title: String,
+        selection: String,
+        options: [String],
+        action: @escaping (String) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.appPrimaryText)
+            
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button(option) {
+                        action(option)
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(selection)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(options.isEmpty ? Color.appSecondaryText : Color.appPrimaryText)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.appSecondaryText)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 50)
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.appGrayBackground, lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.025), radius: 10, x: 0, y: 5)
+            }
+            .disabled(options.isEmpty)
         }
     }
 }

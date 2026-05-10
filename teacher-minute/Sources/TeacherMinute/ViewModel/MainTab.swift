@@ -37,13 +37,25 @@ enum MainTab: Hashable, CaseIterable {
 enum AppUserMode {
     case student
     case teacher
+    
+    init(role: AuthRole) {
+        self = role == .teacher ? .teacher : .student
+    }
 }
 
 @Observable
 final class MainTabViewModel {
     var selectedTab: MainTab = .home
-    var userMode: AppUserMode = .teacher
+    var userMode: AppUserMode
 
     var hasTeacherRequestBadge = true
     var hasNotificationBadge = true
+    
+    var shouldShowLessonsBadge: Bool {
+        userMode == .teacher && hasTeacherRequestBadge
+    }
+    
+    init(userMode: AppUserMode = .teacher) {
+        self.userMode = userMode
+    }
 }

@@ -29,6 +29,10 @@ final class AuthService {
   
   var user: User?
   
+  var currentUserID: String? {
+    Auth.auth().currentUser?.uid
+  }
+  
   func signIn(email: String, password: String)  async throws -> Bool{
     let result = try await Auth.auth().signIn(withEmail: email, password: password)
     print("got result: \(result)")
@@ -98,4 +102,15 @@ final class AuthService {
       print("got result: \(result)")
     return true
     }
+  
+  func signOut() throws {
+    try Auth.auth().signOut()
+  }
+  
+  func deleteCurrentUser() async throws {
+    guard let user = Auth.auth().currentUser else {
+      throw SettingsError.missingUser
+    }
+    try await user.delete()
+  }
 }

@@ -66,8 +66,11 @@ final class TeacherDashboardViewModel {
 	  if let uid = user?.uid {
 		logger.info("[VM] authStateDidChange — uid=\(uid)")
 		Task { @MainActor [weak self] in
-		  guard let self, self.presenceService == nil else { return }
-		  self.configurePresence(uid: uid)
+		  guard let self else { return }
+		  if self.presenceService == nil {
+			self.configurePresence(uid: uid)
+		  }
+		  await self.loadProfile(uid: uid)
 		}
 	  } else {
 		logger.warning("[VM] authStateDidChange — user signed out, clearing presenceService")
@@ -105,6 +108,15 @@ final class TeacherDashboardViewModel {
 	presenceService = service
 	logger.info("[VM] configurePresence done — presenceService ready")
 #endif
+  }
+  
+  private func loadProfile(uid: String) async {
+	do {
+	  guard let profile = try await UserService.shared.fetchProfileSummary(uid: uid) else { return }
+	  teacherName = profile.displayName
+	} catch {
+	  logger.error("[TeacherDashboard] failed loading profile: \(error.localizedDescription)")
+	}
   }
   
   // MARK: - Actions

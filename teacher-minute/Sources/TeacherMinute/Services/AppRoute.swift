@@ -15,6 +15,7 @@ enum AppRoute: Hashable {
   case teacherIdentityVerification
   case teacherSubjects
   case completeProfile(role: AuthRole)
+  case mainTabs(role: AuthRole)
   case studentHome
   case teacherDashboard
   
@@ -29,7 +30,7 @@ enum AppRoute: Hashable {
 	   case .completeProfile(let role):
 		 return .completeProfile(role: role)
 	   case .home(let role):
-		 return role == .teacher ? .teacherDashboard : .studentHome
+		 return .mainTabs(role: role)
 	 }
   }
 }
@@ -49,6 +50,10 @@ final class AppRouter: @unchecked Sendable {
   
   func popToRoot() {
 	path.removeAll()
+  }
+  
+  func replace(with route: AppRoute) {
+	path = [route]
   }
 }
 
