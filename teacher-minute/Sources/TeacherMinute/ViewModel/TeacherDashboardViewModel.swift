@@ -82,7 +82,10 @@ final class TeacherDashboardViewModel {
   
   private func configurePresence(uid: String) {
 	logger.info("[VM] configurePresence — uid=\(uid)")
-#if SKIP
+#if os(Android)
+	presenceService = nil
+	logger.info("[VM] configurePresence done — Android Firebase SDK helper ready")
+#elseif SKIP
 	androidTeacherRef = Database.database().reference(withPath: "teachers/\(uid)")
 	presenceService = nil
 	logger.info("[VM] configurePresence done — Android database ref ready")
@@ -128,7 +131,7 @@ final class TeacherDashboardViewModel {
 	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline) presenceService=\(self.presenceService != nil ? "ready" : "nil")")
 #if os(Android)
 	let status = isOnline ? "online" : "offline"
-	Task { await writeAndroidStatusWithREST(status) }
+	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
 #else
 	if isOnline {
 	  presenceService?.goOnline()
@@ -138,30 +141,6 @@ final class TeacherDashboardViewModel {
 #endif
 #endif
   }
-
-#if os(Android)
-  private func writeAndroidStatusWithREST(_ status: String) async {
-	guard let user = Auth.auth().currentUser else { return }
-	do {
-	  let token = try await user.getIDToken()
-	  guard let encodedUID = user.uid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
-			let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-			let url = URL(string: "https://teacher-in-a-moment-default-rtdb.firebaseio.com/teachers/\(encodedUID)/status.json?auth=\(encodedToken)")
-	  else { return }
-	  
-	  var request = URLRequest(url: url)
-	  request.httpMethod = "PUT"
-	  request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-	  request.httpBody = "\"\(status)\"".data(using: .utf8)
-	  let (_, response) = try await URLSession.shared.data(for: request)
-	  if let httpResponse = response as? HTTPURLResponse {
-		logger.info("[VM] Android REST wrote teacher status=\(status) code=\(httpResponse.statusCode)")
-	  }
-	} catch {
-	  logger.error("[VM] Android REST status write failed: \(error)")
-	}
-  }
-#endif
   
   func accept(_ request: LiveStudentRequest) {
 	guard let message = rawMessages.first(where: { $0.id == request.id }) else { return }
