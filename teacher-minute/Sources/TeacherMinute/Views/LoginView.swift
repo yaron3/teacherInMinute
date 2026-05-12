@@ -84,7 +84,7 @@ struct LoginView: View {
 	Button {
 	  viewModel.back()
 	} label: {
-	  Image(systemName: "arrow.left")
+	  PlatformIcon(systemName: "arrow.left")
 		.font(.system(size: 18, weight: .semibold))
 		.foregroundStyle(Color.authPrimaryText)
 		.frame(width: 42, height: 42)
@@ -106,7 +106,7 @@ struct LoginView: View {
 		  .foregroundStyle(Color.authPrimaryText)
 		
 		HStack(spacing: 13) {
-		  Image(systemName: "envelope")
+		  PlatformIcon(systemName: "envelope")
 			.font(.system(size: 15))
 			.foregroundStyle(Color.authIcon)
 		  
@@ -134,7 +134,7 @@ struct LoginView: View {
 		  .foregroundStyle(Color.authPrimaryText)
 		
 		HStack(spacing: 13) {
-		  Image(systemName: "lock.fill")
+		  PlatformIcon(systemName: "lock.fill")
 			.font(.system(size: 15))
 			.foregroundStyle(Color.authIcon)
 		  
@@ -153,7 +153,7 @@ struct LoginView: View {
 		  Button {
 			viewModel.isPasswordVisible.toggle()
 		  } label: {
-			Image(systemName: viewModel.isPasswordVisible ? "eye" : "eye.slash")
+			PlatformIcon(systemName: viewModel.isPasswordVisible ? "eye" : "eye.slash")
 			  .font(.system(size: 17))
 			  .foregroundStyle(Color.authIcon)
 		  }
@@ -239,7 +239,7 @@ struct LoginView: View {
   func socialButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
 	Button(action: action) {
 	  HStack(spacing: 9) {
-		Image(systemName: systemImage).font(.system(size: 20, weight: .semibold))
+		PlatformIcon(systemName: systemImage).font(.system(size: 20, weight: .semibold))
 		Text(title).font(.system(size: 15, weight: .semibold))
 	  }
 	  .foregroundStyle(Color.authPrimaryText)

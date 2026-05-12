@@ -55,6 +55,7 @@ open class MainActivity: AppCompatActivity {
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
+        currentActivity = this
         logger.info("starting activity")
         UIApplication.launch(this)
         enableEdgeToEdge()
@@ -103,7 +104,17 @@ open class MainActivity: AppCompatActivity {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (currentActivity === this) {
+            currentActivity = null
+        }
         AppDelegate.shared.onDestroy()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (AndroidImagePickerManager.handleActivityResult(requestCode, resultCode, data)) {
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onLowMemory() {
@@ -130,6 +141,8 @@ open class MainActivity: AppCompatActivity {
     }
 
     companion object {
+        @JvmStatic
+        var currentActivity: MainActivity? = null
     }
 }
 

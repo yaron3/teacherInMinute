@@ -29,7 +29,7 @@ struct ProfileView: View {
                             .frame(width: 42, height: 42)
                             .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 6)
                             .overlay {
-                                Image(systemName: "pencil")
+                                PlatformIcon(systemName: "pencil")
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle(Color.appPrimaryText)
                             }
@@ -115,7 +115,7 @@ struct ProfileView: View {
                     viewModel.logout()
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
+					  PlatformIcon(systemName: "rectangle.portrait.and.arrow.right")
                         Text("Log Out")
                     }
                     .font(.system(size: 14, weight: .bold))
@@ -142,7 +142,7 @@ struct ProfileView: View {
                     .fill(Color.appPurpleSoft)
                     .frame(width: 96, height: 96)
                     .overlay {
-                        Image(systemName: "person.crop.circle.fill")
+                        PlatformIcon(systemName: "person.crop.circle.fill")
                             .font(.system(size: 72))
                             .foregroundStyle(Color.appPurple)
                     }
@@ -154,7 +154,7 @@ struct ProfileView: View {
                         .fill(Color.appPink)
                         .frame(width: 30, height: 30)
                         .overlay {
-                            Image(systemName: "camera.fill")
+						  PlatformIcon(systemName: "camera.fill")
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(.white)
                         }
@@ -248,7 +248,7 @@ struct ProfilePermissionRow: View {
                     .fill(iconColor.opacity(0.12))
                     .frame(width: 42, height: 42)
                     .overlay {
-                        Image(systemName: icon)
+                        PlatformIcon(systemName: icon)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(iconColor)
                     }
@@ -296,7 +296,7 @@ struct ProfileInfoRow: View {
                     .fill(Color.appPurpleSoft)
                     .frame(width: 42, height: 42)
                     .overlay {
-                        Image(systemName: icon)
+                        PlatformIcon(systemName: icon)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.appPurple)
                     }

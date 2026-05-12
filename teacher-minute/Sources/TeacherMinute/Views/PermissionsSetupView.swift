@@ -21,7 +21,7 @@ struct PermissionsSetupView: View {
                     .fill(Color.authPinkSoft)
                     .frame(width: 78, height: 78)
                     .overlay {
-                        Image(systemName: "mic.fill")
+                        PlatformIcon(systemName: "mic.fill")
                             .font(.system(size: 34, weight: .semibold))
                             .foregroundStyle(Color.authPink)
                     }
@@ -31,7 +31,7 @@ struct PermissionsSetupView: View {
                     .fill(Color.authPurpleSoft)
                     .frame(width: 34, height: 34)
                     .overlay {
-                        Image(systemName: "bell.fill")
+                        PlatformIcon(systemName: "bell.fill")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Color.authPurple)
                     }
@@ -109,7 +109,7 @@ struct PermissionCard: View {
                 .fill(iconBackground)
                 .frame(width: 42, height: 42)
                 .overlay {
-                    Image(systemName: icon)
+                    PlatformIcon(systemName: icon)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(iconColor)
                 }

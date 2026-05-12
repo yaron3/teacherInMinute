@@ -138,7 +138,7 @@ struct TeacherSubjectsView: View {
   
   var searchField: some View {
 	HStack(spacing: 10) {
-	  Image(systemName: "magnifyingglass")
+	  PlatformIcon(systemName: "magnifyingglass")
 		.font(.system(size: 14))
 		.foregroundStyle(Color.authIcon)
 	  
@@ -168,7 +168,7 @@ struct SubjectAreaChip: View {
   var body: some View {
 	Button(action: action) {
 	  HStack(spacing: 7) {
-		Image(systemName: area.systemImage)
+		PlatformIcon(systemName: area.systemImage)
 		  .font(.system(size: 12, weight: .semibold))
 		
 		Text(area.title)

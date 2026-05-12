@@ -122,9 +122,12 @@ struct SettingsRowView: View {
                     .fill(row.iconColor.backgroundColor)
                     .frame(width: 34, height: 34)
                     .overlay {
-                        Image(systemName: row.systemImage)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(row.iconColor.foregroundColor)
+                        PlatformIcon(
+                            systemName: row.systemImage,
+                            size: 13,
+                            weight: .semibold,
+                            color: row.iconColor.foregroundColor
+                        )
                     }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -141,9 +144,12 @@ struct SettingsRowView: View {
 
                 Spacer()
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.appSecondaryText)
+                PlatformIcon(
+                    systemName: "chevron.right",
+                    size: 12,
+                    weight: .semibold,
+                    color: Color.appSecondaryText
+                )
             }
             .padding(.horizontal, 16)
             .frame(height: row.subtitle == nil ? 54 : 64)

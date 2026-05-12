@@ -41,7 +41,7 @@ struct ResetPasswordView: View {
                 // NavigationStack back action should be handled by caller/environment if needed.
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "chevron.left")
+                    PlatformIcon(systemName: "chevron.left")
                         .font(.system(size: 12, weight: .semibold))
 
                     Text("Back to Log In")

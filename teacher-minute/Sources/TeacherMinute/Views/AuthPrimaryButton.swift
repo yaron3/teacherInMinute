@@ -20,7 +20,7 @@ struct AuthPrimaryButton: View {
                 Text(title)
 
                 if let systemImage {
-                    Image(systemName: systemImage)
+                    PlatformIcon(systemName: systemImage)
                         .font(.system(size: 13, weight: .bold))
                 }
             }
@@ -47,7 +47,7 @@ struct AuthIconHeader: View {
             .fill(backgroundColor)
             .frame(width: 54, height: 54)
             .overlay {
-                Image(systemName: systemImage)
+                PlatformIcon(systemName: systemImage)
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(iconColor)
             }
@@ -70,7 +70,7 @@ struct AuthInputField: View {
                 .foregroundStyle(Color.authPrimaryText)
 
             HStack(spacing: 12) {
-                Image(systemName: systemImage)
+                PlatformIcon(systemName: systemImage)
                     .font(.system(size: 14))
                     .foregroundStyle(Color.authIcon)
 
@@ -136,7 +136,7 @@ struct SubjectChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 7) {
-                Image(systemName: subject.systemImage)
+                PlatformIcon(systemName: subject.systemImage)
                     .font(.system(size: 12, weight: .semibold))
 
                 Text(subject.title)

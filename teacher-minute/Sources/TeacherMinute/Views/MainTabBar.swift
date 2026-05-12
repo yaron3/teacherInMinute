@@ -46,9 +46,12 @@ struct MainTabBar: View {
                     .fill(selectedTab == tab ? Color.appPinkSoft : Color.clear)
                     .frame(width: 48, height: 48)
                     .overlay {
-                        Image(systemName: tab.systemImage)
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(selectedTab == tab ? Color.appPink : Color.appSecondaryText)
+                        PlatformIcon(
+                            systemName: tab.systemImage,
+                            size: 20,
+                            weight: .semibold,
+                            color: selectedTab == tab ? Color.appPink : Color.appSecondaryText
+                        )
                     }
 
                 if showBadge {

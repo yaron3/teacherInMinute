@@ -9,168 +9,134 @@ import SwiftUI
 import Observation
 import Foundation
 
-#if !os(Android)
-import FirebaseAuth
-#else
-import SkipFirebaseAuth
-#endif
+// MARK: - Search State
+
+enum StudentSearchState {
+  case idle
+  case searching(questionId: String)
+  case matched(questionId: String, liveKitRoom: String, liveKitToken: String)
+  case noMatch
+  case error(String)
+}
+
+// MARK: - Supporting Models
 
 struct PricingOption: Identifiable {
-    let id = UUID()
-    let name: String
-    let price: String
-    let description: String
-    let isHighlighted: Bool
+  let id = UUID()
+  let name: String
+  let price: String
+  let description: String
+  let isHighlighted: Bool
 }
 
 struct RecentLesson: Identifiable {
-    let id = UUID()
-    let title: String
-    let teacher: String
-    let time: String
-    let duration: String
+  let id = UUID()
+  let title: String
+  let teacher: String
+  let time: String
+  let duration: String
 }
+
+// MARK: - ViewModel
 
 @Observable
 @MainActor
 final class StudentHomeViewModel {
-    var name = "Student"
-    var showAskTeacherSheet = false
-    var teachingSubjects: [RemoteTeachingSubject] = []
-    var selectedField = ""
-    var selectedSubfield = ""
-    var question = ""
-    var isFindingTeachers = false
-    var alertTitle = "Ask a Teacher"
-    var alertMessage: String?
-    var showAlert = false
-    
-    private let remoteConfigService: SettingsRemoteConfigService
-    private let teacherSearchRepository: TeacherSearchRepository
-    
-    init(
-        remoteConfigService: SettingsRemoteConfigService = .shared,
-        teacherSearchRepository: TeacherSearchRepository = CloudFunctionTeacherSearchRepository()
-    ) {
-        self.remoteConfigService = remoteConfigService
-        self.teacherSearchRepository = teacherSearchRepository
-    }
 
-    let pricingOptions = [
-        PricingOption(
-            name: "Standard",
-            price: "$0.50",
-            description: "Verified tutors for algebra, geometry, and basic calculus.",
-            isHighlighted: false
-        ),
-        PricingOption(
-            name: "Expert",
-            price: "$1.20",
-            description: "Advanced degree tutors for college-level help.",
-            isHighlighted: true
-        )
-    ]
+  var name = "Sarah Jenkins"
+  var searchState: StudentSearchState = .idle
 
-    let recentLessons = [
-        RecentLesson(
-            title: "Calculus Help",
-            teacher: "with Mr. Davis",
-            time: "Today, 2:30 PM",
-            duration: "14 mins"
-        ),
-        RecentLesson(
-            title: "Algebra II",
-            teacher: "with Ms. Chen",
-            time: "Yesterday",
-            duration: "22 mins"
-        )
-    ]
-    
-    var availableFields: [String] {
-        teachingSubjects.map(\.title)
-    }
-    
-    var availableSubfields: [String] {
-        teachingSubjects.first(where: { $0.title == selectedField })?.subtopics ?? []
-    }
-    
-    var canFindTeachers: Bool {
-        !selectedField.isEmpty
-        && !selectedSubfield.isEmpty
-        && !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && !isFindingTeachers
-    }
+  let pricingOptions = [
+    PricingOption(
+      name: "Standard",
+      price: "$0.50",
+      description: "Verified tutors for algebra, geometry, and basic calculus.",
+      isHighlighted: false
+    ),
+    PricingOption(
+      name: "Expert",
+      price: "$1.20",
+      description: "Advanced degree tutors for college-level help.",
+      isHighlighted: true
+    ),
+  ]
 
-    func askTeacher() {
-        showAskTeacherSheet = true
-    }
+  let recentLessons = [
+    RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis",
+                 time: "Today, 2:30 PM", duration: "14 mins"),
+    RecentLesson(title: "Algebra II", teacher: "with Ms. Chen",
+                 time: "Yesterday", duration: "22 mins"),
+  ]
 
-    func selectTier(_ option: PricingOption) {
-        // TODO: select pricing tier
-    }
+  private var pollingTask: Task<Void, Never>?
 
-    func viewAllLessons() {
-        // TODO: navigate to lessons
+  // MARK: - Actions
+
+  func askTeacher(topic: String, text: String, photoUrls: [String] = []) async {
+    guard case .idle = searchState else { return }
+    print("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
+    searchState = .searching(questionId: "")
+    do {
+      let result = try await FunctionsService.shared.createQuestion(
+        topic: topic, text: text, photoUrls: photoUrls
+      )
+      print("TeacherMinute askTeacher created questionId=\(result.questionId)")
+      searchState = .searching(questionId: result.questionId)
+      startPolling(questionId: result.questionId)
+    } catch {
+      print("TeacherMinute askTeacher failed error=\(error)")
+      searchState = .error(error.localizedDescription)
     }
-    
-    func loadProfile() async {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
+  }
+
+  func cancelSearch() async {
+    guard case .searching(let qid) = searchState else { return }
+    pollingTask?.cancel()
+    pollingTask = nil
+    if !qid.isEmpty {
+      try? await FunctionsService.shared.cancelQuestion(questionId: qid)
+    }
+    searchState = .idle
+  }
+
+  func resetSearch() {
+    pollingTask?.cancel()
+    pollingTask = nil
+    searchState = .idle
+  }
+
+  func selectTier(_ option: PricingOption) {}
+  func viewAllLessons() {}
+
+  // MARK: - Polling
+
+  private func startPolling(questionId: String) {
+    pollingTask?.cancel()
+    pollingTask = Task {
+      while !Task.isCancelled {
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        guard !Task.isCancelled else { return }
         do {
-            guard let profile = try await UserService.shared.fetchProfileSummary(uid: uid) else { return }
-            name = profile.displayName
+          let result = try await FunctionsService.shared.getQuestionStatus(questionId: questionId)
+          print("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
+          switch result.status {
+          case "accepted", "in_progress":
+            if let room = result.liveKitRoom, let token = result.liveKitToken {
+              searchState = .matched(questionId: questionId, liveKitRoom: room, liveKitToken: token)
+              return
+            }
+          case "unanswered":
+            break
+          case "cancelled":
+            searchState = .noMatch
+            return
+          default:
+            break
+          }
         } catch {
-            logger.error("[StudentHome] failed loading profile: \(error.localizedDescription)")
+          // transient network error — keep polling
         }
+      }
     }
-    
-    func loadTeachingSubjects() async {
-        do {
-            let subjects = try await remoteConfigService.fetchTeachingSubjects()
-            teachingSubjects = subjects
-            applyDefaultSubjectSelectionIfNeeded()
-        } catch {
-            logger.error("[StudentHome] failed loading teaching subjects: \(error.localizedDescription)")
-        }
-    }
-    
-    func selectField(_ field: String) {
-        selectedField = field
-        selectedSubfield = ""
-        applyDefaultSubfieldIfNeeded()
-    }
-    
-    func findTeachers() async {
-        guard canFindTeachers else { return }
-        isFindingTeachers = true
-        defer { isFindingTeachers = false }
-        
-        do {
-            let result = try await teacherSearchRepository.findTeachers(
-                field: selectedField,
-                subfield: selectedSubfield,
-                question: question.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-            alertTitle = "Teachers Found"
-            alertMessage = result.responseText.isEmpty ? "Your request was sent." : result.responseText
-            showAlert = true
-            showAskTeacherSheet = false
-        } catch {
-            alertTitle = "Teacher Search Failed"
-            alertMessage = error.localizedDescription
-            showAlert = true
-        }
-    }
-    
-    private func applyDefaultSubjectSelectionIfNeeded() {
-        guard selectedField.isEmpty, let firstSubject = teachingSubjects.first else { return }
-        selectedField = firstSubject.title
-        applyDefaultSubfieldIfNeeded()
-    }
-    
-    private func applyDefaultSubfieldIfNeeded() {
-        let subfields = availableSubfields
-        if subfields.count == 1, let onlySubfield = subfields.first {
-            selectedSubfield = onlySubfield
-        }
-    }
+  }
 }

@@ -47,6 +47,9 @@ SDKROOT = auto
 
 SWIFT_VERSION = 6
 
+// Avoid loading SwiftPM Obj-C dependencies twice via TeacherMinute.debug.dylib and PackageFrameworks.
+ENABLE_DEBUG_DYLIB = NO
+
 // Development team ID for on-device testing
 CODE_SIGNING_REQUIRED = NO
 CODE_SIGN_STYLE = Automatic

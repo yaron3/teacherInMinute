@@ -107,7 +107,7 @@ struct WelcomeView: View {
 		.fill(Color.primaryText)
 		.frame(width: 34, height: 34)
 		.overlay {
-		  Image(systemName: "graduationcap.fill")
+		  PlatformIcon(systemName: "graduationcap.fill")
 			.font(.system(size: 15, weight: .semibold))
 			.foregroundStyle(.white)
 		}
@@ -131,7 +131,7 @@ struct WelcomeView: View {
 		.shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 12)
 	  
 	  HStack(spacing: 0) {
-		Image(systemName: "photo")
+		PlatformIcon(systemName: "photo")
 		  .font(.system(size: 15))
 		  .foregroundStyle(Color.secondaryText)
 		
@@ -175,7 +175,7 @@ struct BadgeView: View {
   
   var body: some View {
 	HStack(spacing: 7) {
-	  Image(systemName: systemImage)
+	  PlatformIcon(systemName: systemImage)
 		.font(.system(size: 12, weight: .medium))
 	  
 	  Text(title)

@@ -20,10 +20,6 @@ import SkipFirebaseCore
 import SkipFirebaseAuth
 #endif
 
-#if os(iOS)
-import GoogleSignInSwift
-#endif
-
 @MainActor
 final class AuthService {
   

@@ -145,7 +145,7 @@ struct CompleteProfileView: View {
 		  
 		  Spacer()
 		  
-		  Image(systemName: "chevron.down")
+		  PlatformIcon(systemName: "chevron.down")
 			.font(.system(size: 12, weight: .semibold))
 			.foregroundStyle(Color.authIcon)
 		}

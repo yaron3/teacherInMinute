@@ -9,7 +9,6 @@
 import UIKit
 import FirebaseCore
 import GoogleSignIn
-import GoogleSignInSwift
 import FirebaseAuth
 
 // Assuming you have the UIApplication.topMostViewController() extension defined as well.

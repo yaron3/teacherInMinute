@@ -99,7 +99,7 @@ struct RoleCard: View {
 			.fill(accent.opacity(0.08))
 			.frame(width: 46, height: 46)
 			.overlay {
-			  Image(systemName: icon)
+			  PlatformIcon(systemName: icon)
 				.font(.system(size: 21, weight: .semibold))
 				.foregroundStyle(accent)
 			}
@@ -111,7 +111,7 @@ struct RoleCard: View {
 			  .fill(accent)
 			  .frame(width: 22, height: 22)
 			  .overlay {
-				Image(systemName: "checkmark")
+				PlatformIcon(systemName: "checkmark")
 				  .font(.system(size: 10, weight: .bold))
 				  .foregroundStyle(.white)
 			  }

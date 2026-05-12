@@ -90,7 +90,7 @@ struct TeacherLessonHistoryView: View {
     
     private var searchField: some View {
         HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
+            PlatformIcon(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.appSecondaryText)
             
@@ -126,9 +126,12 @@ struct TeacherLessonHistoryRow: View {
                         .fill(Color.appPurpleSoft)
                         .frame(width: 46, height: 46)
                         .overlay {
-                            Image(systemName: "person.fill.checkmark")
-                                .font(.system(size: 17, weight: .bold))
-                                .foregroundStyle(Color.appPurple)
+                            PlatformIcon(
+                                systemName: "person.fill.checkmark",
+                                size: 17,
+                                weight: .bold,
+                                color: Color.appPurple
+                            )
                         }
                     
                     VStack(alignment: .leading, spacing: 5) {

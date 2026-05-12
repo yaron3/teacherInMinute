@@ -1,7 +1,11 @@
 import Foundation
 import SkipFuse
 import SwiftUI
+#if canImport(FirebaseCore)
+import FirebaseCore
+#else
 import SkipFirebaseCore
+#endif
 
 
 /// A logger for the TeacherMinute module.
@@ -58,14 +62,12 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   private init() {
   }
   /* SKIP @bridge */public func onInit() {
-	logger.debug("onInit")
-#if SKIP
-	if FirebaseApp.app() == nil {
-	  FirebaseApp.configure()
-	  logger.info("Firebase configured on Android")
-	}
-#endif
-  }
+		logger.debug("onInit")
+		if FirebaseApp.app() == nil {
+		  FirebaseApp.configure()
+		  logger.info("Firebase configured")
+		}
+	  }
   
   /* SKIP @bridge */public func onLaunch() {
 	logger.debug("onLaunch")

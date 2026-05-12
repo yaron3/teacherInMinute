@@ -124,7 +124,7 @@ struct CreateAccountView: View {
 		.foregroundStyle(Color(hex: "#111827"))
 	  
 	  HStack(spacing: 12) {
-		Image(systemName: icon)
+		PlatformIcon(systemName: icon)
 		  .font(.system(size: 15, weight: .medium))
 		  .foregroundStyle(isValid ? Color(hex: "#9CA3AF") : Color.red.opacity(0.8))
 		  .frame(width: 20)
@@ -144,7 +144,7 @@ struct CreateAccountView: View {
 		
 		if let trailingIcon {
 		  Button { trailingAction?() } label: {
-			Image(systemName: trailingIcon)
+			PlatformIcon(systemName: trailingIcon)
 			  .font(.system(size: 16, weight: .medium))
 			  .foregroundStyle(Color(hex: "#9CA3AF"))
 		  }
@@ -192,7 +192,7 @@ struct CreateAccountView: View {
 				.stroke(isOn.wrappedValue ? Color(hex: "#EC4899") : Color(hex: "#CBD5E1"), lineWidth: 1)
 			)
 		  if isOn.wrappedValue {
-			Image(systemName: "checkmark")
+			PlatformIcon(systemName: "checkmark")
 			  .font(.system(size: 11, weight: .bold))
 			  .foregroundStyle(.white)
 		  }
@@ -272,7 +272,7 @@ struct CreateAccountView: View {
 	  type == .google ? viewModel.signupWithGoogle() : viewModel.signupWithApple()
 	} label: {
 	  HStack(spacing: 10) {
-		Image(systemName: type == .google ? "g.circle.fill" : "apple.logo")
+		PlatformIcon(systemName: type == .google ? "g.circle.fill" : "apple.logo")
 		  .font(.system(size: 20, weight: .semibold))
 		Text(type == .google ? "Google" : "Apple")
 		  .font(.system(size: 15, weight: .semibold))

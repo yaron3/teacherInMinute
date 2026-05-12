@@ -22,7 +22,7 @@ struct VerifyPhoneView: View {
                 .frame(width: 76, height: 76)
                 .shadow(color: Color.authPink.opacity(0.12), radius: 24, x: 0, y: 12)
                 .overlay {
-                    Image(systemName: "shield.lefthalf.filled")
+                    PlatformIcon(systemName: "shield.lefthalf.filled")
                         .font(.system(size: 30, weight: .semibold))
                         .foregroundStyle(Color.authPink)
                 }
@@ -46,7 +46,7 @@ struct VerifyPhoneView: View {
                 viewModel.changeContactInfo()
             } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: "pencil")
+                    PlatformIcon(systemName: "pencil")
                         .font(.system(size: 10, weight: .semibold))
 
                     Text("Change contact info")
@@ -68,7 +68,7 @@ struct VerifyPhoneView: View {
                 viewModel.resendCode()
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
+                    PlatformIcon(systemName: "arrow.clockwise")
                         .font(.system(size: 12, weight: .semibold))
 
                     Text("Resend Code Now")

@@ -8,6 +8,8 @@
 import SwiftUI
 #if !os(Android)
 @preconcurrency import PhotosUI
+#else
+import SkipBridge
 #endif
 
 @MainActor
@@ -76,7 +78,12 @@ struct TeacherIdentityVerificationView: View {
 					   }
 					   .padding(.top, 12)
 #else
-		  credentialsPickerLabel
+			  Button {
+				pickAndUploadAndroidImage(for: .teachingCredentials)
+			  } label: {
+				credentialsPickerLabel
+			  }
+			  .buttonStyle(.plain)
 #endif
 		  
 		  sectionTitle("Government ID")
@@ -120,8 +127,19 @@ struct TeacherIdentityVerificationView: View {
 			  MainActor.assumeIsolated { loadAndUpload(item, for: .governmentIDBack) }
 			}
 #else
-			idFrontPickerLabel
-			idBackPickerLabel
+				Button {
+				  pickAndUploadAndroidImage(for: .governmentIDFront)
+				} label: {
+				  idFrontPickerLabel
+				}
+				.buttonStyle(.plain)
+				
+				Button {
+				  pickAndUploadAndroidImage(for: .governmentIDBack)
+				} label: {
+				  idBackPickerLabel
+				}
+				.buttonStyle(.plain)
 #endif
 		  }
 		  .padding(.top, 12)
@@ -151,7 +169,12 @@ struct TeacherIdentityVerificationView: View {
 		  }
 		  .padding(.top, 12)
 #else
-		  selfiePickerLabel
+			  Button {
+				pickAndUploadAndroidImage(for: .selfie)
+			  } label: {
+				selfiePickerLabel
+			  }
+			  .buttonStyle(.plain)
 #endif
 		  
 		  privacyBox
@@ -251,6 +274,31 @@ struct TeacherIdentityVerificationView: View {
 	  }
 	}
   }
+#else
+  private func pickAndUploadAndroidImage(for target: UploadTarget) {
+	Task {
+	  do {
+		print("TeacherMinute Android image pick requested target=\(target)")
+		let base64 = try await Task.detached(priority: .userInitiated) {
+		  try AndroidImagePickerBridge.pickImageBase64()
+		}.value
+		print("TeacherMinute Android image pick returned target=\(target) base64Length=\(base64.count)")
+		guard !base64.isEmpty else {
+		  print("TeacherMinute Android image pick cancelled target=\(target)")
+		  return
+		}
+		guard let data = Data(base64Encoded: base64) else {
+		  viewModel.uploadError = "Could not read selected image"
+		  return
+		}
+		print("TeacherMinute Android image decoded target=\(target) bytes=\(data.count)")
+		viewModel.handlePickedImage(data, for: target)
+	  } catch {
+		print("TeacherMinute Android image pick failed target=\(target) error=\(error)")
+		viewModel.uploadError = error.localizedDescription
+	  }
+	}
+  }
 #endif
   
   // MARK: - Sub-views
@@ -282,7 +330,7 @@ struct TeacherIdentityVerificationView: View {
   
   var privacyBox: some View {
 	HStack(alignment: .top, spacing: 12) {
-	  Image(systemName: "shield.lefthalf.filled")
+	  PlatformIcon(systemName: "shield.lefthalf.filled")
 		.font(.system(size: 18, weight: .semibold))
 		.foregroundStyle(Color.authPurple)
 	  VStack(alignment: .leading, spacing: 6) {
@@ -306,7 +354,7 @@ struct TeacherIdentityVerificationView: View {
 	  viewModel.acceptedTerms.toggle()
 	} label: {
 	  HStack(alignment: .top, spacing: 10) {
-		Image(systemName: viewModel.acceptedTerms ? "checkmark.square.fill" : "square")
+		PlatformIcon(systemName: viewModel.acceptedTerms ? "checkmark.square.fill" : "square")
 		  .font(.system(size: 18))
 		  .foregroundStyle(viewModel.acceptedTerms ? Color.authPink : Color.authIcon)
 		Text("I confirm that the uploaded documents are\nauthentic and belong to me. I agree to the\nVerification Terms.")
@@ -340,7 +388,7 @@ struct StatusRow: View {
 		.fill(Color.authFieldBorder)
 		.frame(width: 18, height: 18)
 		.overlay {
-		  Image(systemName: isDone ? "checkmark" : "circle.fill")
+		  PlatformIcon(systemName: isDone ? "checkmark" : "circle.fill")
 			.font(.system(size: 8, weight: .bold))
 			.foregroundStyle(isDone ? Color.authGreen : Color.authIcon)
 		}
@@ -405,7 +453,7 @@ struct UploadLargeBox: View {
 			  .progressViewStyle(.circular)
 			  .tint(Color.authPink)
 		  } else {
-			Image(systemName: isCompleted ? "checkmark" : icon)
+			PlatformIcon(systemName: isCompleted ? "checkmark" : icon)
 			  .font(.system(size: 16, weight: .bold))
 			  .foregroundStyle(isCompleted ? Color.authGreen : Color.authPink)
 		  }
@@ -459,7 +507,7 @@ struct IDUploadBox: View {
 			  .progressViewStyle(.circular)
 			  .tint(Color.authPurple)
 		  } else {
-			Image(systemName: isCompleted ? "checkmark" : "person.text.rectangle")
+			PlatformIcon(systemName: isCompleted ? "checkmark" : "person.text.rectangle")
 			  .font(.system(size: 14, weight: .semibold))
 			  .foregroundStyle(isCompleted ? Color.authGreen : Color.authPurple)
 		  }
@@ -514,7 +562,7 @@ struct SelfieRow: View {
 			  .progressViewStyle(.circular)
 			  .tint(Color.authPrimaryText)
 		  } else {
-			Image(systemName: isCompleted ? "checkmark" : "camera.fill")
+			PlatformIcon(systemName: isCompleted ? "checkmark" : "camera.fill")
 			  .foregroundStyle(isCompleted ? Color.authGreen : Color.authPrimaryText)
 		  }
 		}
@@ -531,7 +579,7 @@ struct SelfieRow: View {
 	  
 	  Spacer()
 	  
-	  Image(systemName: "chevron.right")
+	  PlatformIcon(systemName: "chevron.right")
 		.font(.system(size: 12, weight: .semibold))
 		.foregroundStyle(Color.authIcon)
 	}
@@ -544,3 +592,23 @@ struct SelfieRow: View {
 	}
   }
 }
+
+#if os(Android)
+private enum AndroidImagePickerBridge {
+  private static let managerClass = try! JClass(name: "teacher/minute/AndroidImagePickerManager")
+  private static let pickImageBase64Method = managerClass.getStaticMethodID(
+	name: "pickImageBase64",
+	sig: "()Ljava/lang/String;"
+  )!
+
+  static func pickImageBase64() throws -> String {
+	try jniContext {
+	  try managerClass.callStatic(
+		method: pickImageBase64Method,
+		options: [.kotlincompat],
+		args: []
+	  )
+	}
+  }
+}
+#endif

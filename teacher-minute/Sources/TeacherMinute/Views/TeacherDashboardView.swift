@@ -248,16 +248,22 @@ struct TeacherDashboardView: View {
 		
 		Spacer()
 		
-		SmallPill(title: "2 Waiting", foreground: .appPrimaryText, background: .appGrayBackground)
+			SmallPill(title: "\(viewModel.inviteIDs.count) Waiting", foreground: .appPrimaryText, background: .appGrayBackground)
 	  }
-	  
-	  ForEach(viewModel.liveRequests) { request in
-		LiveRequestCard(request: request) {
-		  viewModel.accept(request)
-		} reject: {
-		  viewModel.reject(request)
-		}
-	  }
+
+		  ForEach(viewModel.inviteIDs, id: \.self) { inviteID in
+			LiveRequestCard(
+			  id: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  text: viewModel.inviteTexts[inviteID] ?? "",
+			  expiresAt: viewModel.inviteExpiresAt[inviteID] ?? 0.0,
+			  wave: viewModel.inviteWaves[inviteID] ?? 1
+			) {
+			  viewModel.acceptInvite(questionId: inviteID)
+			} decline: {
+			  viewModel.declineInvite(questionId: inviteID)
+			}
+		  }
 	}
   }
   
@@ -342,10 +348,20 @@ struct TeacherDashboardView: View {
   }
   
   struct LiveRequestCard: View {
-	let request: LiveStudentRequest
-	let accept: () -> Void
-	let reject: () -> Void
-	
+		let id: String
+		let topic: String
+		let text: String
+		let expiresAt: Double
+		let wave: Int
+		let accept: () -> Void
+		let decline: () -> Void
+
+		private var isFirstWave: Bool { wave == 1 }
+		private var timeLabel: String {
+		  let secs = Int(max(0, (expiresAt - Date().timeIntervalSince1970 * 1000.0) / 1000.0))
+		  return "\(secs)s left"
+		}
+
 	var body: some View {
 	  RoundedInfoCard {
 		VStack(spacing: 14) {
@@ -356,61 +372,61 @@ struct TeacherDashboardView: View {
 			  .overlay {
 				PlatformIcon(systemName: "person.crop.circle.fill", size: 28, color: .appPurple)
 			  }
-			
+
 			VStack(alignment: .leading, spacing: 5) {
-			  Text(request.studentName)
+			  Text("Student")
 				.font(.system(size: 14, weight: .bold))
 				.foregroundStyle(Color.appPrimaryText)
-			  
-			  Text(request.topic)
+
+				  Text(topic.capitalized)
 				.font(.system(size: 11))
 				.foregroundStyle(Color.appSecondaryText)
 			}
-			
+
 			Spacer()
-			
+
 			VStack(alignment: .trailing, spacing: 8) {
-			  if request.isHighPriority {
-				SmallPill(title: "High Priority", foreground: .appPink, background: .appPinkSoft)
+			  if isFirstWave {
+				SmallPill(title: "First Wave", foreground: .appPink, background: .appPinkSoft)
 			  }
-			  
-			  Text(request.waitingTime)
+
+			  Text(timeLabel)
 				.font(.system(size: 11))
 				.foregroundStyle(Color.appSecondaryText)
 			}
 		  }
-		  
+
 		  HStack(spacing: 12) {
 			Button(action: accept) {
-			  Text(request.isHighPriority ? "Accept Request" : "Accept")
+			  Text("Accept")
 				.font(.system(size: 13, weight: .bold))
-				.foregroundStyle(request.isHighPriority ? .white : Color.appPink)
+				.foregroundStyle(.white)
 				.frame(maxWidth: .infinity)
 				.frame(height: 42)
-				.background(request.isHighPriority ? Color.appPink : .white)
+				.background(Color.appPink)
 				.clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-				.overlay {
-				  RoundedRectangle(cornerRadius: 9, style: .continuous)
-					.stroke(Color.appPink, lineWidth: request.isHighPriority ? 0 : 1.5)
-				}
 			}
 			.buttonStyle(.plain)
-			
-			if request.isHighPriority {
-			  Button(action: reject) {
-				PlatformIcon(systemName: "xmark", size: 13, weight: .bold, color: .appSecondaryText)
-				  .frame(width: 48, height: 42)
-				  .background(Color.appGrayBackground)
-				  .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-			  }
-			  .buttonStyle(.plain)
+
+			Button(action: decline) {
+			  PlatformIcon(systemName: "xmark", size: 13, weight: .bold, color: .appSecondaryText)
+				.frame(width: 48, height: 42)
+				.background(Color.appGrayBackground)
+				.clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 			}
+			.buttonStyle(.plain)
 		  }
+
+			  Text(text)
+			.font(.system(size: 12))
+			.foregroundStyle(Color.appSecondaryText)
+			.lineLimit(2)
+			.frame(maxWidth: .infinity, alignment: .leading)
 		}
 	  }
 	  .overlay {
 		RoundedRectangle(cornerRadius: 18, style: .continuous)
-		  .stroke(request.isHighPriority ? Color.appPink : Color.clear, lineWidth: 1.5)
+		  .stroke(isFirstWave ? Color.appPink : Color.clear, lineWidth: 1.5)
 	  }
 	}
   }

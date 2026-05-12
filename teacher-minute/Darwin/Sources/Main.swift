@@ -1,10 +1,5 @@
 import SwiftUI
 import TeacherMinute
-#if os(Android)
-import SkipFirebaseCore
-#else
-import FirebaseCore
-#endif
 
 private typealias AppRootView = TeacherMinuteRootView
 private typealias AppDelegate = TeacherMinuteAppDelegate
@@ -13,10 +8,6 @@ private typealias AppDelegate = TeacherMinuteAppDelegate
 @main struct AppMain: App {
     @AppDelegateAdaptor(AppMainDelegate.self) var appDelegate
     @Environment(\.scenePhase) private var scenePhase
-  init() {
-    
-    FirebaseApp.configure()
-  }
 
     var body: some Scene {
         WindowGroup {

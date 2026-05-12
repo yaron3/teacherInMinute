@@ -90,7 +90,7 @@ struct StudentLessonHistoryView: View {
     
     private var searchField: some View {
         HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
+            PlatformIcon(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.appSecondaryText)
             
@@ -125,9 +125,12 @@ struct HistoryMetricCard: View {
                     .fill(tint.opacity(0.12))
                     .frame(width: 34, height: 34)
                     .overlay {
-                        Image(systemName: systemImage)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(tint)
+                        PlatformIcon(
+                            systemName: systemImage,
+                            size: 14,
+                            weight: .semibold,
+                            color: tint
+                        )
                     }
                 
                 Text(title)
@@ -159,7 +162,7 @@ struct StudentLessonHistoryRow: View {
                         .fill(Color.appPinkSoft)
                         .frame(width: 46, height: 46)
                         .overlay {
-                            Image(systemName: "function")
+                            PlatformIcon(systemName: "function")
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundStyle(Color.appPink)
                         }
@@ -227,8 +230,12 @@ struct LessonActionButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .bold))
+                PlatformIcon(
+                    systemName: systemImage,
+                    size: 12,
+                    weight: .bold,
+                    color: foreground
+                )
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
             }

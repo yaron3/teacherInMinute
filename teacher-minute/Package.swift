@@ -26,7 +26,7 @@ let package = Package(
                 .product(name: "SkipFirebaseStorage", package: "skip-firebase"),
                 .product(name: "SkipFirebaseDatabase", package: "skip-firebase"),
                 .product(name: "SkipFirebaseRemoteConfig", package: "skip-firebase"),
-                .product(name: "GoogleSignInSwift", package: "GoogleSignIn-iOS", condition: .when(platforms: [.iOS])),
+                .product(name: "GoogleSignIn", package: "GoogleSignIn-iOS", condition: .when(platforms: [.iOS])),
             ],
             resources: [.process("Resources")],
             plugins: [.plugin(name: "skipstone", package: "skip")]
