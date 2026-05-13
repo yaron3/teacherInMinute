@@ -72,13 +72,16 @@ final class StudentHomeViewModel {
 
   // MARK: - Actions
 
-  func askTeacher(topic: String, text: String, photoUrls: [String] = []) async {
+  func askTeacher(topic: String, text: String, photoUrls: [String] = [], conversationType: String = "text") async {
     guard case .idle = searchState else { return }
     print("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
     searchState = .searching(questionId: "")
     do {
       let result = try await FunctionsService.shared.createQuestion(
-        topic: topic, text: text, photoUrls: photoUrls
+        topic: topic,
+        text: text,
+        photoUrls: photoUrls,
+        conversationType: conversationType
       )
       print("TeacherMinute askTeacher created questionId=\(result.questionId)")
       searchState = .searching(questionId: result.questionId)
@@ -121,10 +124,12 @@ final class StudentHomeViewModel {
           print("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
           switch result.status {
           case "accepted", "in_progress":
-            if let room = result.liveKitRoom, let token = result.liveKitToken {
-              searchState = .matched(questionId: questionId, liveKitRoom: room, liveKitToken: token)
-              return
-            }
+            searchState = .matched(
+              questionId: questionId,
+              liveKitRoom: result.liveKitRoom ?? "",
+              liveKitToken: result.liveKitToken ?? ""
+            )
+            return
           case "unanswered":
             break
           case "cancelled":

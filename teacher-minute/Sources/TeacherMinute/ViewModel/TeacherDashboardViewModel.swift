@@ -33,6 +33,7 @@ final class TeacherDashboardViewModel {
   var activeCallRoom: String? = nil
   var activeCallToken: String? = nil
   var activeCallStudentUid: String? = nil
+  var activeQuestionId: String? = nil
   var errorMessage: String? = nil
 
   // MARK: - Private
@@ -235,10 +236,11 @@ final class TeacherDashboardViewModel {
     Task {
       do {
         let result = try await FunctionsService.shared.acceptInvite(questionId: questionId)
+        activeQuestionId = questionId
         activeCallRoom = result.liveKitRoom
         activeCallToken = result.liveKitToken
         activeCallStudentUid = result.studentUid
-        logger.info("[VM] acceptInvite — room=\(result.liveKitRoom)")
+        logger.info("[VM] acceptInvite — questionId=\(questionId) room=\(result.liveKitRoom ?? "")")
       } catch {
         errorMessage = error.localizedDescription
         logger.error("[VM] acceptInvite failed — \(error.localizedDescription)")
@@ -259,6 +261,7 @@ final class TeacherDashboardViewModel {
   }
 
   func endCall() {
+    activeQuestionId = nil
     activeCallRoom = nil
     activeCallToken = nil
     activeCallStudentUid = nil

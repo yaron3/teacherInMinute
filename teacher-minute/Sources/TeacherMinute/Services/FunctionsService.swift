@@ -35,8 +35,8 @@ enum FunctionsError: Error {
 // MARK: - Call result
 
 struct AcceptInviteResult {
-  let liveKitRoom: String
-  let liveKitToken: String
+  let liveKitRoom: String?
+  let liveKitToken: String?
   let studentUid: String
 }
 
@@ -64,10 +64,10 @@ final class FunctionsService {
 
   // MARK: - Student callables
 
-  func createQuestion(topic: String, text: String, photoUrls: [String] = []) async throws -> CreateQuestionResult {
+  func createQuestion(topic: String, text: String, photoUrls: [String] = [], conversationType: String = "text") async throws -> CreateQuestionResult {
     let result = try await call(
       function: "createQuestion",
-      data: ["topic": topic, "text": text, "photoUrls": photoUrls]
+      data: ["topic": topic, "text": text, "photoUrls": photoUrls, "conversationType": conversationType]
     )
     guard
       let questionId = result["questionId"] as? String,
@@ -94,11 +94,9 @@ final class FunctionsService {
 
   func acceptInvite(questionId: String) async throws -> AcceptInviteResult {
     let result = try await call(function: "acceptInvite", data: ["questionId": questionId])
-    guard
-      let room  = result["liveKitRoom"]  as? String,
-      let token = result["liveKitToken"] as? String,
-      let suid  = result["studentUid"]   as? String
-    else { throw FunctionsError.decodingError }
+    guard let suid = result["studentUid"] as? String else { throw FunctionsError.decodingError }
+    let room = result["liveKitRoom"] as? String
+    let token = result["liveKitToken"] as? String
     return AcceptInviteResult(liveKitRoom: room, liveKitToken: token, studentUid: suid)
   }
 

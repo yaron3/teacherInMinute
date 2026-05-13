@@ -34,7 +34,7 @@ struct PlatformIcon: View {
         switch systemName {
         case "moon.fill":                           return "🌙"
         case "antenna.radiowaves.left.and.right":   return "📡"
-        case "checkmark.seal":                      return "✅"
+        case "checkmark.seal":                      return "☑️"
         case "checkmark.seal.fill":                 return "✅"
         case "mic.fill":                            return "🎤"
         case "video.fill":                          return "📷"
@@ -58,6 +58,7 @@ struct PlatformIcon: View {
         case "pause.fill":                          return "Ⅱ"
         case "function":                            return "ƒ"
         case "magnifyingglass":                     return "⌕"
+        case "arrow.up":                            return "↑"
         case "person.crop.circle.fill":             return "👤"
         case "xmark":                               return "✕"
         case "wifi":                                return "📶"

@@ -10,10 +10,26 @@ import SwiftUI
 
 struct TeacherDashboardView: View {
   @State var viewModel = TeacherDashboardViewModel()
+  @Binding var hidesTabBar: Bool
+
+  init(hidesTabBar: Binding<Bool> = .constant(false)) {
+    self._hidesTabBar = hidesTabBar
+  }
   
   var body: some View {
-	ScrollView(.vertical, showsIndicators: false) {
-	  VStack(alignment: .leading, spacing: 0) {
+    if let questionId = viewModel.activeQuestionId {
+      ChatSessionView(questionId: questionId, role: "teacher", title: "Student") {
+        viewModel.endCall()
+      }
+      .onAppear {
+        hidesTabBar = true
+      }
+      .onDisappear {
+        hidesTabBar = false
+      }
+    } else {
+		ScrollView(.vertical, showsIndicators: false) {
+		  VStack(alignment: .leading, spacing: 0) {
 		AppTopHeader(
 		  avatarSystemImage: "person.crop.circle.fill",
 		  eyebrow: "Teacher Dashboard",
@@ -50,8 +66,9 @@ struct TeacherDashboardView: View {
 	  }
 	  .padding(.horizontal, 18)
 	  .padding(.bottom, 24)
-	}
-	.background(Color.white)
+		}
+		.background(Color.white)
+    }
   }
   
   var offlineHero: some View {

@@ -10,6 +10,11 @@ import SwiftUI
 struct StudentHomeView: View {
     @State var viewModel = StudentHomeViewModel()
     @State var showingAskSheet = false
+    @Binding var hidesTabBar: Bool
+
+    init(hidesTabBar: Binding<Bool> = .constant(false)) {
+        self._hidesTabBar = hidesTabBar
+    }
 
     var body: some View {
         ZStack {
@@ -84,9 +89,15 @@ struct StudentHomeView: View {
             SearchingOverlay {
                 Task { await viewModel.cancelSearch() }
             }
-        case .matched(_, let room, let token):
-            MatchedOverlay(liveKitRoom: room, liveKitToken: token) {
+        case .matched(let questionId, _, _):
+            ChatSessionView(questionId: questionId, role: "student", title: "Teacher") {
                 viewModel.resetSearch()
+            }
+            .onAppear {
+                hidesTabBar = true
+            }
+            .onDisappear {
+                hidesTabBar = false
             }
         case .noMatch:
             NoMatchOverlay {
@@ -223,6 +234,7 @@ struct AskTeacherSheet: View {
 
     @State  var selectedTopic = "algebra"
     @State  var questionText = ""
+    @State  var conversationType = "text"
     private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 }
 
     var body: some View {
@@ -254,6 +266,22 @@ struct AskTeacherSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
+                    Text("Session type")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.appPrimaryText)
+
+                    HStack(spacing: 10) {
+                        ConversationTypeChip(title: "Text", isSelected: true) {
+                            conversationType = "text"
+                        }
+                        ConversationTypeChip(title: "Audio + Text", isSelected: false) {}
+                            .opacity(0.45)
+                        ConversationTypeChip(title: "Video + Audio + Text", isSelected: false) {}
+                            .opacity(0.45)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
                     Text("Your question")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.appPrimaryText)
@@ -277,7 +305,8 @@ struct AskTeacherSheet: View {
                     Task {
                         await viewModel.askTeacher(
                             topic: selectedTopic,
-                            text: questionText.trimmingCharacters(in: .whitespaces)
+                            text: questionText.trimmingCharacters(in: .whitespaces),
+                            conversationType: conversationType
                         )
                     }
                 } label: {
@@ -301,6 +330,27 @@ struct AskTeacherSheet: View {
                 }
             }
         }
+    }
+}
+
+struct ConversationTypeChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isSelected ? .white : Color.appPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(isSelected ? Color.appPink : Color.appGrayBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

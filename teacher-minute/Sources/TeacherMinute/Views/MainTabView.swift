@@ -10,6 +10,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @State var viewModel: MainTabViewModel
+    @State var hidesTabBar = false
     
     init(userMode: AppUserMode = .teacher) {
         self._viewModel = State(wrappedValue: MainTabViewModel(userMode: userMode))
@@ -21,9 +22,9 @@ struct MainTabView: View {
                 switch viewModel.selectedTab {
                 case .home:
                     if viewModel.userMode == .student {
-                        StudentHomeView()
+                        StudentHomeView(hidesTabBar: $hidesTabBar)
                     } else {
-                        TeacherDashboardView()
+                        TeacherDashboardView(hidesTabBar: $hidesTabBar)
                     }
 
                 case .lessons:
@@ -41,13 +42,18 @@ struct MainTabView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, 82)
+            .padding(.bottom, hidesTabBar ? 0 : 82)
 
-            MainTabBar(
-                selectedTab: $viewModel.selectedTab,
-                showLessonsBadge: viewModel.shouldShowLessonsBadge,
-                showSettingsBadge: viewModel.hasNotificationBadge
-            )
+            if !hidesTabBar {
+                MainTabBar(
+                    selectedTab: $viewModel.selectedTab,
+                    showLessonsBadge: viewModel.shouldShowLessonsBadge,
+                    showSettingsBadge: viewModel.hasNotificationBadge
+                )
+            }
+        }
+        .onChange(of: viewModel.selectedTab) { _, _ in
+            hidesTabBar = false
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Color(.systemBackground))
