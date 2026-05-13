@@ -76,8 +76,29 @@ struct MainTabView: View {
     @ViewBuilder
     var teacherGlobalOverlay: some View {
         if viewModel.userMode == .teacher, let teacherDashboardViewModel {
-            if let questionId = teacherDashboardViewModel.activeQuestionId {
-                ChatSessionView(questionId: questionId, role: "teacher", title: "Student") {
+            if teacherDashboardViewModel.isAcceptingCalls, teacherDashboardViewModel.acceptingQuestionId != nil {
+                ConnectionSetupView(
+                    participantName: teacherDashboardViewModel.activeStudentName,
+                    hasAudio: false,
+                    footerText: "Setting up the session"
+                ) {
+                    teacherDashboardViewModel.cancelAcceptingInvite()
+                }
+                .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+                .zIndex(20)
+                .onAppear {
+                    hidesTabBar = true
+                }
+                .onDisappear {
+                    hidesTabBar = false
+                }
+            } else if let questionId = teacherDashboardViewModel.activeQuestionId {
+                ChatSessionView(
+                    questionId: questionId,
+                    role: "teacher",
+                    title: "Student",
+                    initialDetails: teacherDashboardViewModel.activeChatInitialDetails()
+                ) {
                     teacherDashboardViewModel.endCall()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -104,7 +125,7 @@ struct MainTabView: View {
 
     var isTeacherGlobalOverlayVisible: Bool {
         guard viewModel.userMode == .teacher, let teacherDashboardViewModel else { return false }
-        return teacherDashboardViewModel.activeQuestionId != nil || teacherDashboardViewModel.inviteIDs.first != nil
+        return teacherDashboardViewModel.isAcceptingCalls || teacherDashboardViewModel.activeQuestionId != nil || teacherDashboardViewModel.inviteIDs.first != nil
     }
 }
 

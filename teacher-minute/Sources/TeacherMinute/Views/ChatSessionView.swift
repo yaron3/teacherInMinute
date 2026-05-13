@@ -7,12 +7,23 @@ struct ChatSessionView: View {
   @State var boardStrokes: [BoardStroke] = []
   @State var errorMessage: String?
   @State var isConnecting: Bool
+  @State var selectedTab = "chat"
+  @State var displayDate = Date()
+  @State var sessionDetailsRevision = 0
+  @FocusState var isMessageFieldFocused: Bool
   let title: String
   let hasAudio: Bool
   let onClose: () -> Void
 
-  init(questionId: String, role: String, title: String, hasAudio: Bool = false, onClose: @escaping () -> Void) {
-    let viewModel = ChatSessionViewModel(questionId: questionId, role: role)
+  init(
+    questionId: String,
+    role: String,
+    title: String,
+    hasAudio: Bool = false,
+    initialDetails: ChatSessionDetails? = nil,
+    onClose: @escaping () -> Void
+  ) {
+    let viewModel = ChatSessionViewModel(questionId: questionId, role: role, initialDetails: initialDetails)
     self._viewModel = State(initialValue: viewModel)
     self._isConnecting = State(initialValue: viewModel.isConnecting)
     self.title = title
@@ -31,7 +42,7 @@ struct ChatSessionView: View {
   var body: some View {
     Group {
       if isConnecting {
-        ConnectionSetupView(participantName: title, hasAudio: hasAudio, onCancel: onClose)
+        ConnectionSetupView(participantName: participantName, hasAudio: hasAudio, onCancel: onClose)
       } else {
         sessionBody
       }
@@ -50,11 +61,21 @@ struct ChatSessionView: View {
       viewModel.onConnectingUpdated = { value in
         isConnecting = value
       }
+      viewModel.onSessionDetailsUpdated = {
+        sessionDetailsRevision += 1
+        displayDate = Date()
+      }
       messages = viewModel.messages
       boardStrokes = viewModel.boardStrokes
       errorMessage = viewModel.errorMessage
       isConnecting = viewModel.isConnecting
       viewModel.start()
+    }
+    .task {
+      while !Task.isCancelled {
+        displayDate = Date()
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+      }
     }
     .onDisappear {
       viewModel.stop()
@@ -65,8 +86,11 @@ struct ChatSessionView: View {
     VStack(spacing: 0) {
       header
 
-      ChatThreadView(messages: messages)
-        .frame(maxHeight: .infinity)
+      sessionStats
+
+      originalQuestionBanner
+
+      sessionTabs
 
       if let errorMessage {
         Text(errorMessage)
@@ -77,7 +101,31 @@ struct ChatSessionView: View {
           .padding(.top, 6)
       }
 
-      ChatInputBar(text: $draft) {
+      Group {
+        if selectedTab == "chat" {
+          VStack(spacing: 0) {
+            sessionNotice
+            ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
+          }
+        } else {
+          WhiteboardView(
+            strokes: boardStrokes,
+            revision: boardRevision,
+            onStrokeFinished: { points in
+              let boardPoints = points.map { BoardPoint(x: Double($0.x), y: Double($0.y)) }
+              boardStrokes = boardStrokes + [viewModel.localStroke(points: boardPoints)]
+              viewModel.sendStroke(boardPoints)
+            },
+            onClear: {
+              boardStrokes = []
+              viewModel.clearBoard()
+            }
+          )
+        }
+      }
+      .frame(maxHeight: .infinity)
+
+      ChatInputBar(text: $draft, isFocused: $isMessageFieldFocused) {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         draft = ""
@@ -86,70 +134,203 @@ struct ChatSessionView: View {
       }
       .padding(.horizontal, 12)
       .padding(.bottom, 10)
-
-      WhiteboardView(
-        strokes: boardStrokes,
-        revision: boardRevision,
-        onStrokeFinished: { points in
-          let boardPoints = points.map { BoardPoint(x: Double($0.x), y: Double($0.y)) }
-          boardStrokes = boardStrokes + [viewModel.localStroke(points: boardPoints)]
-          viewModel.sendStroke(boardPoints)
-        },
-        onClear: {
-          boardStrokes = []
-          viewModel.clearBoard()
-        }
-      )
-        .frame(maxHeight: .infinity)
     }
+    .background(Color.white)
   }
 
   var boardRevision: String {
     boardStrokes.map { "\($0.id):\($0.points.count)" }.joined(separator: "|")
   }
 
+  var participantName: String {
+    let name = viewModel.participantName.trimmingCharacters(in: .whitespacesAndNewlines)
+    return name.isEmpty ? title : name
+  }
+
   var header: some View {
     HStack(spacing: 12) {
       Circle()
         .fill(Color.appPinkSoft)
-        .frame(width: 36, height: 36)
+        .frame(width: 40, height: 40)
         .overlay {
-          PlatformIcon(systemName: "bubble.left.and.bubble.right.fill", size: 16, weight: .semibold, color: .appPink)
+          PlatformIcon(systemName: "person.crop.circle.fill", size: 24, weight: .semibold, color: .appPink)
+        }
+        .overlay(alignment: .bottomTrailing) {
+          Circle()
+            .fill(Color.appGreen)
+            .frame(width: 10, height: 10)
+            .overlay {
+              Circle().stroke(.white, lineWidth: 2)
+            }
         }
 
       VStack(alignment: .leading, spacing: 2) {
-        Text(title)
+        Text(participantName)
           .font(.system(size: 15, weight: .bold))
           .foregroundStyle(Color.appPrimaryText)
-        Text("Text session")
+        Text("Connected")
           .font(.system(size: 11, weight: .medium))
           .foregroundStyle(Color.appGreen)
       }
 
       Spacer()
 
-      Button(action: onClose) {
-        PlatformIcon(systemName: "xmark", size: 13, weight: .bold, color: .appSecondaryText)
-          .frame(width: 36, height: 36)
+      Button {} label: {
+        PlatformIcon(systemName: "mic.fill", size: 13, weight: .bold, color: .appPrimaryText)
+          .frame(width: 34, height: 34)
           .background(Color.appGrayBackground)
           .clipShape(Circle())
       }
       .buttonStyle(.plain)
+
+      Button {} label: {
+        PlatformIcon(systemName: "speaker.wave.2.fill", size: 13, weight: .bold, color: .appPrimaryText)
+          .frame(width: 34, height: 34)
+          .background(Color.appGrayBackground)
+          .clipShape(Circle())
+      }
+      .buttonStyle(.plain)
+
+      Button(action: onClose) {
+        Text("End")
+          .font(.system(size: 12, weight: .bold))
+          .foregroundStyle(.white)
+          .padding(.horizontal, 12)
+          .frame(height: 32)
+          .background(Color.red)
+          .clipShape(Capsule())
+      }
+      .buttonStyle(.plain)
     }
     .padding(.horizontal, 16)
-    .padding(.vertical, 12)
+    .padding(.vertical, 8)
     .background(.white)
     .overlay(alignment: .bottom) {
       Rectangle()
         .fill(Color.appBorder)
         .frame(height: 1)
+      }
+  }
+
+  var sessionStats: some View {
+    HStack(spacing: 0) {
+      VStack(alignment: .leading, spacing: 6) {
+        Text(viewModel.primaryAmountTitle)
+          .font(.system(size: 11, weight: .medium))
+          .foregroundStyle(Color.appSecondaryText)
+        Text(viewModel.primaryAmountText(at: displayDate))
+          .font(.system(size: 22, weight: .bold))
+          .foregroundStyle(Color.appPink)
+        Text(viewModel.primaryAmountSubtitle)
+          .font(.system(size: 10, weight: .medium))
+          .foregroundStyle(Color.appSecondaryText)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      Rectangle()
+        .fill(Color.appBorder)
+        .frame(width: 1, height: 54)
+
+      VStack(alignment: .trailing, spacing: 4) {
+        Text("Session Time")
+          .font(.system(size: 11, weight: .medium))
+          .foregroundStyle(Color.appSecondaryText)
+        Text(viewModel.sessionTimeText(at: displayDate))
+          .font(.system(size: 28, weight: .heavy))
+          .foregroundStyle(Color.appPrimaryText)
+        Text("minutes")
+          .font(.system(size: 10, weight: .medium))
+          .foregroundStyle(Color.appSecondaryText)
+      }
+      .frame(maxWidth: .infinity, alignment: .trailing)
     }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 16)
+    .background(Color.appPinkSoft.opacity(0.45))
+  }
+
+  var originalQuestionBanner: some View {
+    HStack(alignment: .top, spacing: 10) {
+      PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: .appOrange)
+        .padding(.top, 2)
+      VStack(alignment: .leading, spacing: 5) {
+        Text("ORIGINAL QUESTION")
+          .font(.system(size: 10, weight: .bold))
+          .foregroundStyle(Color.appOrange)
+        Text(viewModel.originalQuestion)
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(Color.appPrimaryText)
+          .lineSpacing(3)
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
+    .background(Color.yellow.opacity(0.14))
+    .overlay(alignment: .bottom) {
+      Rectangle().fill(Color.yellow.opacity(0.45)).frame(height: 1)
+    }
+  }
+
+  var sessionTabs: some View {
+    HStack(spacing: 0) {
+      tabButton(id: "chat", title: "Chat", icon: "bubble.left.fill")
+      tabButton(id: "photos", title: "Photos", icon: "photo.fill")
+    }
+    .frame(height: 40)
+    .background(.white)
+    .overlay(alignment: .bottom) {
+      Rectangle().fill(Color.appBorder).frame(height: 1)
+    }
+  }
+
+  func tabButton(id: String, title: String, icon: String) -> some View {
+    Button {
+      if id == "photos" {
+        isMessageFieldFocused = false
+      }
+      selectedTab = id
+    } label: {
+      VStack(spacing: 8) {
+        HStack(spacing: 6) {
+          PlatformIcon(
+            systemName: icon,
+            size: 12,
+            weight: .semibold,
+            color: selectedTab == id ? .appPink : .appSecondaryText
+          )
+          Text(title)
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(selectedTab == id ? Color.appPink : Color.appSecondaryText)
+        }
+        Rectangle()
+          .fill(selectedTab == id ? Color.appPink : Color.clear)
+          .frame(height: 2)
+      }
+    }
+    .buttonStyle(.plain)
+    .frame(maxWidth: .infinity)
+  }
+
+  var sessionNotice: some View {
+    Text(viewModel.sessionNoticeText)
+      .font(.system(size: 10, weight: .semibold))
+      .foregroundStyle(Color.appOrange)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 6)
+      .background(Color.yellow.opacity(0.18))
+      .clipShape(Capsule())
+      .overlay {
+        Capsule().stroke(Color.yellow.opacity(0.55), lineWidth: 1)
+      }
+      .padding(.top, 12)
   }
 }
 
 struct ConnectionSetupView: View {
   let participantName: String
   let hasAudio: Bool
+  var footerText = "Your teacher will join shortly"
   let onCancel: () -> Void
   @State var capsuleRotation = -18.0
 
@@ -175,7 +356,7 @@ struct ConnectionSetupView: View {
 
       Spacer()
 
-      Text("Your teacher will join shortly")
+      Text(footerText)
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(Color.appSecondaryText)
 
@@ -361,6 +542,8 @@ struct LoadingDotsView: View {
 
 struct ChatThreadView: View {
   let messages: [ChatMessage]
+  let now: Date
+  let viewModel: any ChatSessionViewModeling
 
   var body: some View {
     ScrollViewReader { proxy in
@@ -376,13 +559,14 @@ struct ChatThreadView: View {
           }
 
           ForEach(messages) { message in
-            ChatBubble(message: message)
+            ChatBubble(message: message, timeText: viewModel.messageTimeText(createdAt: message.createdAt, at: now))
               .id(message.id)
           }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 14)
+        .padding(.vertical, 10)
       }
+      .background(Color.appGrayBackground.opacity(0.45))
       .onChange(of: messages.count) { _, _ in
         if let last = messages.last {
           withAnimation(.easeOut(duration: 0.2)) {
@@ -396,32 +580,57 @@ struct ChatThreadView: View {
 
 struct ChatBubble: View {
   let message: ChatMessage
+  let timeText: String
 
   var body: some View {
-    HStack {
-      if message.isMine { Spacer(minLength: 44) }
+    HStack(alignment: .bottom, spacing: 8) {
+      if message.isMine { Spacer(minLength: 54) }
 
-      VStack(alignment: message.isMine ? .trailing : .leading, spacing: 3) {
-        Text(message.senderRole.capitalized)
-          .font(.system(size: 10, weight: .semibold))
-          .foregroundStyle(Color.appSecondaryText)
+      if !message.isMine {
+        avatar
+      }
 
+      VStack(alignment: message.isMine ? .trailing : .leading, spacing: 5) {
         Text(message.text)
           .font(.system(size: 14))
           .foregroundStyle(message.isMine ? .white : Color.appPrimaryText)
-          .padding(.horizontal, 13)
-          .padding(.vertical, 9)
-          .background(message.isMine ? Color.appPink : Color.appGrayBackground)
-          .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+          .lineSpacing(3)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 12)
+          .background(message.isMine ? Color.appPink : Color(red: 229 / 255, green: 231 / 255, blue: 235 / 255))
+          .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+        Text(timeText)
+          .font(.system(size: 9, weight: .medium))
+          .foregroundStyle(Color.appSecondaryText)
       }
 
-      if !message.isMine { Spacer(minLength: 44) }
+      if message.isMine {
+        avatar
+      }
+
+      if !message.isMine { Spacer(minLength: 54) }
     }
+  }
+
+  var avatar: some View {
+    Circle()
+      .fill(message.isMine ? Color.appPurpleSoft : Color.appGreenSoft)
+      .frame(width: 24, height: 24)
+      .overlay {
+        PlatformIcon(
+          systemName: "person.crop.circle.fill",
+          size: 18,
+          weight: .semibold,
+          color: message.isMine ? .appPurple : .appGreen
+        )
+      }
   }
 }
 
 struct ChatInputBar: View {
   @Binding var text: String
+  let isFocused: FocusState<Bool>.Binding
   let send: () -> Void
 
   var canSend: Bool {
@@ -430,7 +639,13 @@ struct ChatInputBar: View {
 
   var body: some View {
     HStack(spacing: 10) {
+      PlatformIcon(systemName: "photo.fill", size: 15, weight: .semibold, color: .appPrimaryText)
+        .frame(width: 36, height: 36)
+        .background(Color.appGrayBackground)
+        .clipShape(Circle())
+
       TextField("Message", text: $text)
+        .focused(isFocused)
         .font(.system(size: 14))
         .padding(.horizontal, 14)
         .frame(height: 42)
@@ -438,14 +653,20 @@ struct ChatInputBar: View {
         .clipShape(Capsule())
 
       Button(action: send) {
-        PlatformIcon(systemName: "arrow.up", size: 14, weight: .bold, color: .white)
+        PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: .white)
           .frame(width: 42, height: 42)
-          .background(canSend ? Color.appPink : Color.appBorder)
+          .background(
+            LinearGradient(
+              colors: canSend ? [Color.appPink, Color.appPurple] : [Color.appBorder, Color.appBorder],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            )
+          )
           .clipShape(Circle())
       }
       .buttonStyle(.plain)
     }
-    .padding(.top, 8)
+    .padding(.top, 10)
   }
 }
 

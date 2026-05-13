@@ -187,11 +187,75 @@ object AndroidChatManager {
             .toString()
     }
 
+    @JvmStatic
+    fun fetchSessionDetailsJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance(DATABASE_URL)
+                .getReference("questions")
+                .child(questionId)
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+        if (!snapshot.exists()) return JSONObject().toString()
+
+        return JSONObject()
+            .put("studentUid", snapshot.firstString("studentUid", "studentUID", "studentId"))
+            .put("teacherUid", snapshot.firstString("teacherUid", "teacherUID", "teacherId"))
+            .put("studentName", snapshot.firstString("studentName", "studentFullName", "studentDisplayName", "name"))
+            .put("teacherName", snapshot.firstString("teacherName", "teacherFullName", "teacherDisplayName"))
+            .put("text", snapshot.firstString("text", "questionText", "originalQuestion", "message", "topic"))
+            .put("createdAt", snapshot.child("createdAt").value.asDoubleOrNull() ?: 0.0)
+            .put(
+                "acceptedAt",
+                snapshot.child("acceptedAt").value.asDoubleOrNull()
+                    ?: snapshot.child("connectedAt").value.asDoubleOrNull()
+                    ?: snapshot.child("startedAt").value.asDoubleOrNull()
+                    ?: 0.0
+            )
+            .put(
+                "connectionFeeCents",
+                snapshot.child("connectionFeeCents").value.asIntOrNull()
+                    ?: snapshot.child("connectionFee").value.asIntOrNull()
+                    ?: 0
+            )
+            .put(
+                "pricePerMinuteCents",
+                snapshot.child("pricePerMinuteCents").value.asIntOrNull()
+                    ?: snapshot.child("ratePerMinuteCents").value.asIntOrNull()
+                    ?: snapshot.child("costPerMinuteCents").value.asIntOrNull()
+                    ?: 0
+            )
+            .put(
+                "teacherSharePercent",
+                snapshot.child("teacherSharePercent").value.asDoubleOrNull()
+                    ?: snapshot.child("teacherShare").value.asDoubleOrNull()
+                    ?: 75.0
+            )
+            .toString()
+    }
+
     private fun Any?.asDoubleOrNull(): Double? {
         return when (this) {
             is Number -> toDouble()
             is String -> toDoubleOrNull()
             else -> null
         }
+    }
+
+    private fun Any?.asIntOrNull(): Int? {
+        return when (this) {
+            is Number -> toInt()
+            is String -> toIntOrNull()
+            else -> null
+        }
+    }
+
+    private fun com.google.firebase.database.DataSnapshot.firstString(vararg keys: String): String {
+        for (key in keys) {
+            val value = child(key).getValue(String::class.java)
+            if (!value.isNullOrBlank()) return value
+        }
+        return ""
     }
 }

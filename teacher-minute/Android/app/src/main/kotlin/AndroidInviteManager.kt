@@ -53,6 +53,15 @@ object AndroidInviteManager {
                 !child.child("voiceMessageUrl").getValue(String::class.java).isNullOrBlank() ||
                     !child.child("audioUrl").getValue(String::class.java).isNullOrBlank() ||
                     !child.child("voiceUrl").getValue(String::class.java).isNullOrBlank()
+            val studentName = child.firstString("studentName", "studentFullName", "studentDisplayName", "name")
+            val studentUid = child.firstString("studentUid", "studentUID", "studentId")
+            val connectionFeeCents = child.child("connectionFeeCents").value.asIntOrNull()
+                ?: child.child("connectionFee").value.asIntOrNull()
+                ?: 0
+            val pricePerMinuteCents = child.child("pricePerMinuteCents").value.asIntOrNull()
+                ?: child.child("ratePerMinuteCents").value.asIntOrNull()
+                ?: child.child("costPerMinuteCents").value.asIntOrNull()
+                ?: 50
 
             if (topic == null || text == null) {
                 Log.w(
@@ -76,6 +85,10 @@ object AndroidInviteManager {
                     .put("wave", wave)
                     .put("photoUrls", photoUrls)
                     .put("hasVoiceMessage", hasVoiceMessage)
+                    .put("studentUid", studentUid)
+                    .put("studentName", studentName)
+                    .put("connectionFeeCents", connectionFeeCents)
+                    .put("pricePerMinuteCents", pricePerMinuteCents)
             )
         }
 
@@ -99,5 +112,13 @@ object AndroidInviteManager {
             is String -> toIntOrNull()
             else -> null
         }
+    }
+
+    private fun com.google.firebase.database.DataSnapshot.firstString(vararg keys: String): String {
+        for (key in keys) {
+            val value = child(key).getValue(String::class.java)
+            if (!value.isNullOrBlank()) return value
+        }
+        return ""
     }
 }

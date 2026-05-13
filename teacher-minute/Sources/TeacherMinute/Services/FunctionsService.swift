@@ -94,6 +94,7 @@ final class FunctionsService {
 
   func acceptInvite(questionId: String) async throws -> AcceptInviteResult {
     let result = try await call(function: "acceptInvite", data: ["questionId": questionId, "inviteId": questionId])
+	logger.info("acceptInvite result: \(result)")
     let suid = result["studentUid"] as? String
       ?? result["studentUID"] as? String
       ?? result["studentId"] as? String

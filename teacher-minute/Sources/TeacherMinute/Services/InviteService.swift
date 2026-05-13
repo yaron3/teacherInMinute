@@ -52,6 +52,13 @@ final class InviteService {
         let hasVoiceMessage = (dict["voiceMessageUrl"] as? String)?.isEmpty == false
           || (dict["audioUrl"] as? String)?.isEmpty == false
           || (dict["voiceUrl"] as? String)?.isEmpty == false
+        let studentName = Self.firstString(dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
+        let studentUid = Self.firstString(dict, keys: ["studentUid", "studentUID", "studentId"])
+        let connectionFeeCents = Self.intValue(dict["connectionFeeCents"]) ?? Self.intValue(dict["connectionFee"]) ?? 0
+        let pricePerMinuteCents = Self.intValue(dict["pricePerMinuteCents"])
+          ?? Self.intValue(dict["ratePerMinuteCents"])
+          ?? Self.intValue(dict["costPerMinuteCents"])
+          ?? 50
         let invite = IncomingInvite(
           id: snap.key,
           topic: topic,
@@ -59,7 +66,11 @@ final class InviteService {
           expiresAt: expiresAt,
           wave: wave,
           photoUrls: photoUrls,
-          hasVoiceMessage: hasVoiceMessage
+          hasVoiceMessage: hasVoiceMessage,
+          studentUid: studentUid,
+          studentName: studentName,
+          connectionFeeCents: connectionFeeCents,
+          pricePerMinuteCents: pricePerMinuteCents
         )
         if !invite.isExpired { invites.append(invite) }
       }
@@ -73,6 +84,24 @@ final class InviteService {
     ref?.removeObserver(withHandle: handle)
     self.handle = nil
     invLog("[InviteService] stopListening uid=\(teacherUid)")
+  }
+
+  private static func firstString(_ dict: [String: Any], keys: [String]) -> String {
+    for key in keys {
+      if let value = dict[key] as? String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+      }
+    }
+    return ""
+  }
+
+  private static func intValue(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? NSNumber { return value.intValue }
+    if let value = value as? String { return Int(value) }
+    if let value = value as? Double { return Int(value) }
+    return nil
   }
 }
 
@@ -112,6 +141,13 @@ final class InviteService {
         let hasVoiceMessage = (dict["voiceMessageUrl"] as? String)?.isEmpty == false
           || (dict["audioUrl"] as? String)?.isEmpty == false
           || (dict["voiceUrl"] as? String)?.isEmpty == false
+        let studentName = Self.firstString(dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
+        let studentUid = Self.firstString(dict, keys: ["studentUid", "studentUID", "studentId"])
+        let connectionFeeCents = Self.intValue(dict["connectionFeeCents"]) ?? Self.intValue(dict["connectionFee"]) ?? 0
+        let pricePerMinuteCents = Self.intValue(dict["pricePerMinuteCents"])
+          ?? Self.intValue(dict["ratePerMinuteCents"])
+          ?? Self.intValue(dict["costPerMinuteCents"])
+          ?? 50
         let invite = IncomingInvite(
           id: snap.key,
           topic: topic,
@@ -119,7 +155,11 @@ final class InviteService {
           expiresAt: expiresAt,
           wave: wave,
           photoUrls: photoUrls,
-          hasVoiceMessage: hasVoiceMessage
+          hasVoiceMessage: hasVoiceMessage,
+          studentUid: studentUid,
+          studentName: studentName,
+          connectionFeeCents: connectionFeeCents,
+          pricePerMinuteCents: pricePerMinuteCents
         )
         if !invite.isExpired { invites.append(invite) }
       }
@@ -134,6 +174,24 @@ final class InviteService {
     ref.removeObserver(withHandle: handle)
     self.handle = nil
 	logger.info("[InviteService] stopListening uid=\(self.teacherUid)")
+  }
+
+  private static func firstString(_ dict: [String: Any], keys: [String]) -> String {
+    for key in keys {
+      if let value = dict[key] as? String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+      }
+    }
+    return ""
+  }
+
+  private static func intValue(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? NSNumber { return value.intValue }
+    if let value = value as? String { return Int(value) }
+    if let value = value as? Double { return Int(value) }
+    return nil
   }
 }
 

@@ -9,6 +9,12 @@ import SwiftUI
 import Observation
 import Foundation
 
+#if !os(Android)
+import FirebaseAuth
+#else
+import SkipFirebaseAuth
+#endif
+
 // MARK: - Search State
 
 enum StudentSearchState {
@@ -45,6 +51,9 @@ final class StudentHomeViewModel {
 
   var name = "Sarah Jenkins"
   var searchState: StudentSearchState = .idle
+  var activeQuestionText = ""
+  var activeConnectionFeeCents = 0
+  var selectedPricePerMinuteCents = 50
 
   let pricingOptions = [
     PricingOption(
@@ -69,6 +78,7 @@ final class StudentHomeViewModel {
   ]
 
   private var pollingTask: Task<Void, Never>?
+  private var didLoadProfile = false
 
   // MARK: - Actions
 
@@ -84,6 +94,8 @@ final class StudentHomeViewModel {
         conversationType: conversationType
       )
       print("TeacherMinute askTeacher created questionId=\(result.questionId)")
+      activeQuestionText = text
+      activeConnectionFeeCents = result.connectionFeeCents
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
     } catch {
@@ -108,8 +120,33 @@ final class StudentHomeViewModel {
     searchState = .idle
   }
 
-  func selectTier(_ option: PricingOption) {}
+  func selectTier(_ option: PricingOption) {
+    selectedPricePerMinuteCents = Self.cents(from: option.price)
+  }
   func viewAllLessons() {}
+
+  func loadProfileIfNeeded() async {
+    guard !didLoadProfile, let uid = Auth.auth().currentUser?.uid else { return }
+    didLoadProfile = true
+    if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+      name = profile.displayName
+    }
+  }
+
+  func chatInitialDetails() -> ChatSessionDetails {
+    ChatSessionDetails(
+      studentUid: Auth.auth().currentUser?.uid ?? "",
+      teacherUid: "",
+      studentName: name,
+      teacherName: "Teacher",
+      questionText: activeQuestionText,
+      createdAt: 0,
+      acceptedAt: Date().timeIntervalSince1970 * 1000.0,
+      connectionFeeCents: activeConnectionFeeCents,
+      pricePerMinuteCents: selectedPricePerMinuteCents,
+      teacherSharePercent: 75
+    )
+  }
 
   // MARK: - Polling
 
@@ -174,5 +211,10 @@ final class StudentHomeViewModel {
       || status == "matched"
       || status == "connected"
       || status == "active"
+  }
+
+  private static func cents(from price: String) -> Int {
+    let numeric = price.replacingOccurrences(of: "$", with: "")
+    return Int(((Double(numeric) ?? 0) * 100).rounded())
   }
 }

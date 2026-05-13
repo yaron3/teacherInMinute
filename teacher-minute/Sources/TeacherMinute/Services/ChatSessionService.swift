@@ -30,6 +30,19 @@ struct BoardStroke: Identifiable, Equatable {
   let isMine: Bool
 }
 
+struct ChatSessionDetails: Equatable {
+  let studentUid: String
+  let teacherUid: String
+  let studentName: String
+  let teacherName: String
+  let questionText: String
+  let createdAt: Double
+  let acceptedAt: Double
+  let connectionFeeCents: Int
+  let pricePerMinuteCents: Int
+  let teacherSharePercent: Double
+}
+
 @MainActor
 final class ChatSessionService {
   private let questionId: String
@@ -48,6 +61,33 @@ final class ChatSessionService {
     let questionRef = FirebaseDatabase.Database.database().reference(withPath: "questions/\(questionId)")
     self.messagesRef = questionRef.child("messages")
     self.boardRef = questionRef.child("board/strokes")
+#endif
+  }
+
+  func fetchSessionDetails() async throws -> ChatSessionDetails? {
+#if os(Android)
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchSessionDetails(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+          !dict.isEmpty else {
+      return nil
+    }
+    return Self.details(from: dict)
+#else
+    let questionRef = FirebaseDatabase.Database.database().reference(withPath: "questions/\(questionId)")
+    return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<ChatSessionDetails?, Error>) in
+      questionRef.observeSingleEvent(of: .value) { snapshot in
+        guard let dict = snapshot.value as? [String: Any] else {
+          cont.resume(returning: nil)
+          return
+        }
+        cont.resume(returning: Self.details(from: dict))
+      } withCancel: { error in
+        cont.resume(throwing: error)
+      }
+    }
 #endif
   }
 
@@ -266,6 +306,51 @@ final class ChatSessionService {
           let json = String(data: data, encoding: .utf8) else { return "[]" }
     return json
   }
+
+  static func normalizedMilliseconds(_ value: Double) -> Double {
+    value > 0 && value < 10_000_000_000 ? value * 1000.0 : value
+  }
+
+  private static func details(from dict: [String: Any]) -> ChatSessionDetails {
+    ChatSessionDetails(
+      studentUid: firstString(in: dict, keys: ["studentUid", "studentUID", "studentId"]),
+      teacherUid: firstString(in: dict, keys: ["teacherUid", "teacherUID", "teacherId"]),
+      studentName: firstString(in: dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"]),
+      teacherName: firstString(in: dict, keys: ["teacherName", "teacherFullName", "teacherDisplayName"]),
+      questionText: firstString(in: dict, keys: ["text", "questionText", "originalQuestion", "message", "topic"]),
+      createdAt: normalizedMilliseconds(doubleValue(dict["createdAt"]) ?? 0),
+      acceptedAt: normalizedMilliseconds(
+        doubleValue(dict["acceptedAt"])
+          ?? doubleValue(dict["connectedAt"])
+          ?? doubleValue(dict["startedAt"])
+          ?? 0
+      ),
+      connectionFeeCents: intValue(dict["connectionFeeCents"]) ?? intValue(dict["connectionFee"]) ?? 0,
+      pricePerMinuteCents: intValue(dict["pricePerMinuteCents"])
+        ?? intValue(dict["ratePerMinuteCents"])
+        ?? intValue(dict["costPerMinuteCents"])
+        ?? 0,
+      teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75
+    )
+  }
+
+  private static func firstString(in dict: [String: Any], keys: [String]) -> String {
+    for key in keys {
+      if let value = dict[key] as? String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+      }
+    }
+    return ""
+  }
+
+  private static func intValue(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? NSNumber { return value.intValue }
+    if let value = value as? String { return Int(value) }
+    if let value = value as? Double { return Int(value) }
+    return nil
+  }
 }
 
 @MainActor
@@ -276,13 +361,22 @@ protocol ChatSessionViewModeling: AnyObject {
   var boardStrokes: [BoardStroke] { get set }
   var errorMessage: String? { get set }
   var isConnecting: Bool { get set }
+  var participantName: String { get }
+  var originalQuestion: String { get }
+  var primaryAmountTitle: String { get }
+  var primaryAmountSubtitle: String { get }
+  var sessionNoticeText: String { get }
   var onMessagesUpdated: (([ChatMessage]) -> Void)? { get set }
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)? { get set }
   var onErrorUpdated: ((String?) -> Void)? { get set }
   var onConnectingUpdated: ((Bool) -> Void)? { get set }
+  var onSessionDetailsUpdated: (() -> Void)? { get set }
 
   func start()
   func stop()
+  func primaryAmountText(at date: Date) -> String
+  func sessionTimeText(at date: Date) -> String
+  func messageTimeText(createdAt: Double, at date: Date) -> String
   func localMessage(text: String) -> ChatMessage
   func localStroke(points: [BoardPoint]) -> BoardStroke
   func send(_ messageText: String)
@@ -300,10 +394,28 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var draft = ""
   var errorMessage: String?
   var isConnecting = true
+  var details: ChatSessionDetails?
+  var participantName: String {
+    if role == "teacher" {
+      return nonEmpty(details?.studentName) ?? "Student"
+    }
+    return nonEmpty(details?.teacherName) ?? "Teacher"
+  }
+  var originalQuestion: String {
+    nonEmpty(details?.questionText) ?? "Question details are loading."
+  }
+  var primaryAmountTitle: String {
+    role == "teacher" ? "Live Earnings" : "Session Cost"
+  }
+  var primaryAmountSubtitle: String {
+    role == "teacher" ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
+  }
+  let sessionNoticeText = "Session started - Billing active"
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
+  var onSessionDetailsUpdated: (() -> Void)?
   var boardRevision: String {
     boardStrokes.map { "\($0.id):\($0.points.count)" }.joined(separator: "|")
   }
@@ -311,9 +423,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private let service: ChatSessionService
   private var pollingTask: Task<Void, Never>?
 
-  init(questionId: String, role: String) {
+  init(questionId: String, role: String, initialDetails: ChatSessionDetails? = nil) {
     self.questionId = questionId
     self.role = role
+    self.details = initialDetails
     self.service = ChatSessionService(questionId: questionId)
   }
 
@@ -321,11 +434,25 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     isConnecting = true
     onConnectingUpdated?(true)
     Task {
+      await loadSessionDetails()
       try? await Task.sleep(nanoseconds: 1_400_000_000)
       guard !Task.isCancelled else { return }
       isConnecting = false
       onConnectingUpdated?(false)
       beginListening()
+    }
+  }
+
+  private func loadSessionDetails() async {
+    do {
+      if let updated = try await service.fetchSessionDetails() {
+        details = mergedDetails(current: details, updated: updated)
+        await loadParticipantProfiles()
+        onSessionDetailsUpdated?()
+      }
+    } catch {
+      errorMessage = error.localizedDescription
+      onErrorUpdated?(errorMessage)
     }
   }
 
@@ -371,6 +498,31 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func send() {
     send(draft)
+  }
+
+  func primaryAmountText(at date: Date) -> String {
+    let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
+    let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
+    let cents = role == "teacher" ? grossCents * (teacherSharePercent / 100.0) : grossCents
+    return currencyText(cents: max(0, cents))
+  }
+
+  func sessionTimeText(at date: Date) -> String {
+    let seconds = sessionDurationSeconds(at: date)
+    return String(format: "%02d:%02d", seconds / 60, seconds % 60)
+  }
+
+  func messageTimeText(createdAt: Double, at date: Date) -> String {
+    let createdAtMilliseconds = ChatSessionService.normalizedMilliseconds(createdAt)
+    guard createdAtMilliseconds > 0 else { return "Just now" }
+    let elapsed = max(0, Int(date.timeIntervalSince1970 - createdAtMilliseconds / 1000.0))
+    if elapsed < 60 { return "Just now" }
+    let minutes = elapsed / 60
+    if minutes < 60 { return minutes == 1 ? "1 min ago" : "\(minutes) min ago" }
+    let hours = minutes / 60
+    if hours < 24 { return hours == 1 ? "1 hr ago" : "\(hours) hrs ago" }
+    let days = hours / 24
+    return days == 1 ? "1 day ago" : "\(days) days ago"
   }
 
   func localMessage(text: String) -> ChatMessage {
@@ -441,6 +593,81 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       }
     }
   }
+
+  private var connectionFeeCents: Int {
+    details?.connectionFeeCents ?? 0
+  }
+
+  private var pricePerMinuteCents: Int {
+    details?.pricePerMinuteCents ?? 0
+  }
+
+  private var teacherSharePercent: Double {
+    details?.teacherSharePercent ?? 75
+  }
+
+  private func sessionDurationSeconds(at date: Date) -> Int {
+    let startMilliseconds = details?.acceptedAt ?? 0
+    guard startMilliseconds > 0 else { return 0 }
+    return max(0, Int(date.timeIntervalSince1970 - startMilliseconds / 1000.0))
+  }
+
+  private func currencyText(cents: Double) -> String {
+    String(format: "$%.2f", cents / 100.0)
+  }
+
+  private func nonEmpty(_ value: String?) -> String? {
+    guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+      return nil
+    }
+    return trimmed
+  }
+
+  private func mergedDetails(current: ChatSessionDetails?, updated: ChatSessionDetails) -> ChatSessionDetails {
+    guard let current else { return updated }
+    return ChatSessionDetails(
+      studentUid: nonEmpty(updated.studentUid) ?? current.studentUid,
+      teacherUid: nonEmpty(updated.teacherUid) ?? current.teacherUid,
+      studentName: nonEmpty(updated.studentName) ?? current.studentName,
+      teacherName: nonEmpty(updated.teacherName) ?? current.teacherName,
+      questionText: nonEmpty(updated.questionText) ?? current.questionText,
+      createdAt: updated.createdAt > 0 ? updated.createdAt : current.createdAt,
+      acceptedAt: updated.acceptedAt > 0 ? updated.acceptedAt : current.acceptedAt,
+      connectionFeeCents: updated.connectionFeeCents > 0 ? updated.connectionFeeCents : current.connectionFeeCents,
+      pricePerMinuteCents: updated.pricePerMinuteCents > 0 ? updated.pricePerMinuteCents : current.pricePerMinuteCents,
+      teacherSharePercent: updated.teacherSharePercent > 0 ? updated.teacherSharePercent : current.teacherSharePercent
+    )
+  }
+
+  private func loadParticipantProfiles() async {
+    guard let current = details else { return }
+    var studentName = current.studentName
+    var teacherName = current.teacherName
+
+    if nonEmpty(studentName) == nil, let uid = nonEmpty(current.studentUid),
+       let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+      studentName = profile.displayName
+    }
+
+    if nonEmpty(teacherName) == nil, let uid = nonEmpty(current.teacherUid),
+       let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+      teacherName = profile.displayName
+    }
+
+    guard studentName != current.studentName || teacherName != current.teacherName else { return }
+    details = ChatSessionDetails(
+      studentUid: current.studentUid,
+      teacherUid: current.teacherUid,
+      studentName: studentName,
+      teacherName: teacherName,
+      questionText: current.questionText,
+      createdAt: current.createdAt,
+      acceptedAt: current.acceptedAt,
+      connectionFeeCents: current.connectionFeeCents,
+      pricePerMinuteCents: current.pricePerMinuteCents,
+      teacherSharePercent: current.teacherSharePercent
+    )
+  }
 }
 
 
@@ -471,6 +698,10 @@ private enum AndroidChatBridge {
   private static let markQuestionAcceptedMethod = managerClass.getStaticMethodID(
     name: "markQuestionAccepted",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
+  )!
+  private static let fetchSessionDetailsMethod = managerClass.getStaticMethodID(
+    name: "fetchSessionDetailsJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
   )!
 
   static func fetchMessages(questionId: String) throws -> String {
@@ -541,6 +772,16 @@ private enum AndroidChatBridge {
         ]
       )
     }
+  }
+
+  static func fetchSessionDetails(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchSessionDetailsMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
   }
 }
 #endif

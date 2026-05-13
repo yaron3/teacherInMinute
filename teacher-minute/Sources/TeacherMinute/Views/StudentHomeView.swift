@@ -72,6 +72,9 @@ struct StudentHomeView: View {
         .sheet(isPresented: $showingAskSheet) {
             AskTeacherSheet(viewModel: viewModel, isPresented: $showingAskSheet)
         }
+        .task {
+            await viewModel.loadProfileIfNeeded()
+        }
     }
 
     // MARK: - State overlay
@@ -90,7 +93,12 @@ struct StudentHomeView: View {
                 Task { await viewModel.cancelSearch() }
             }
         case .matched(let questionId, _, _):
-            ChatSessionView(questionId: questionId, role: "student", title: "Teacher") {
+            ChatSessionView(
+                questionId: questionId,
+                role: "student",
+                title: "Teacher",
+                initialDetails: viewModel.chatInitialDetails()
+            ) {
                 viewModel.resetSearch()
             }
             .onAppear {

@@ -27,8 +27,28 @@ struct TeacherDashboardView: View {
   }
 
   var body: some View {
-    if showsSessionOverlay, let questionId = viewModel.activeQuestionId {
-      ChatSessionView(questionId: questionId, role: "teacher", title: "Student") {
+    if showsSessionOverlay, viewModel.isAcceptingCalls, viewModel.acceptingQuestionId != nil {
+      ConnectionSetupView(
+        participantName: viewModel.activeStudentName,
+        hasAudio: false,
+        footerText: "Setting up the session",
+        onCancel: {
+          viewModel.cancelAcceptingInvite()
+        }
+      )
+      .onAppear {
+        hidesTabBar = true
+      }
+      .onDisappear {
+        hidesTabBar = false
+      }
+    } else if showsSessionOverlay, let questionId = viewModel.activeQuestionId {
+      ChatSessionView(
+        questionId: questionId,
+        role: "teacher",
+        title: "Student",
+        initialDetails: viewModel.activeChatInitialDetails()
+      ) {
         viewModel.endCall()
       }
       .onAppear {
@@ -58,9 +78,14 @@ struct TeacherDashboardView: View {
 
               onlineStatusCard
                 .padding(.top, 20)
-
-              liveQueue
-                .padding(.top, 24)
+			  ZStack {
+				liveQueue
+				  .padding(.top, 24)
+				  .disabled(viewModel.isAcceptingCalls)
+					if viewModel.isAcceptingCalls {
+					  ProgressView()
+					}
+				  }
             } else {
               offlineHero
                 .padding(.top, 44)

@@ -17,10 +17,20 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var boardStrokes: [BoardStroke]
   var errorMessage: String?
   var isConnecting: Bool
+  let participantName: String
+  let originalQuestion: String
+  let primaryAmountTitle: String
+  let primaryAmountSubtitle: String
+  let sessionNoticeText: String
+  let sessionStartedAt: Double
+  let connectionFeeCents: Int
+  let pricePerMinuteCents: Int
+  let teacherSharePercent: Double
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
+  var onSessionDetailsUpdated: (() -> Void)?
 
   private let currentUid = "mock-current-user"
 
@@ -29,13 +39,29 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     role: String = "student",
     messages: [ChatMessage] = [],
     boardStrokes: [BoardStroke] = [],
-    isConnecting: Bool = true
+    isConnecting: Bool = true,
+    participantName: String = "Michael",
+    originalQuestion: String = "How do I solve quadratic equations using the quadratic formula? I'm confused about the discriminant.",
+    sessionNoticeText: String = "Session started - Billing active",
+    sessionStartedAt: Double = Date().timeIntervalSince1970 * 1000.0 - 83_000.0,
+    connectionFeeCents: Int = 0,
+    pricePerMinuteCents: Int = 60,
+    teacherSharePercent: Double = 75
   ) {
     self.questionId = questionId
     self.role = role
     self.messages = messages.isEmpty ? Self.defaultMessages(currentRole: role) : messages
     self.boardStrokes = boardStrokes
     self.isConnecting = isConnecting
+    self.participantName = participantName
+    self.originalQuestion = originalQuestion
+    self.primaryAmountTitle = role == "teacher" ? "Live Earnings" : "Session Cost"
+    self.primaryAmountSubtitle = role == "teacher" ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
+    self.sessionNoticeText = sessionNoticeText
+    self.sessionStartedAt = sessionStartedAt
+    self.connectionFeeCents = connectionFeeCents
+    self.pricePerMinuteCents = pricePerMinuteCents
+    self.teacherSharePercent = teacherSharePercent
   }
 
   func start() {
@@ -55,6 +81,27 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func stop() {
     isConnecting = true
     onConnectingUpdated?(true)
+  }
+
+  func primaryAmountText(at date: Date) -> String {
+    let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
+    let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
+    let cents = role == "teacher" ? grossCents * (teacherSharePercent / 100.0) : grossCents
+    return String(format: "$%.2f", max(0, cents) / 100.0)
+  }
+
+  func sessionTimeText(at date: Date) -> String {
+    let seconds = sessionDurationSeconds(at: date)
+    return String(format: "%02d:%02d", seconds / 60, seconds % 60)
+  }
+
+  func messageTimeText(createdAt: Double, at date: Date) -> String {
+    let elapsed = max(0, Int(date.timeIntervalSince1970 - createdAt / 1000.0))
+    if elapsed < 60 { return "Just now" }
+    let minutes = elapsed / 60
+    if minutes < 60 { return minutes == 1 ? "1 min ago" : "\(minutes) min ago" }
+    let hours = minutes / 60
+    return hours == 1 ? "1 hr ago" : "\(hours) hrs ago"
   }
 
   func localMessage(text: String) -> ChatMessage {
@@ -101,20 +148,24 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     [
       ChatMessage(
         id: "mock-1",
-        text: "Hi, show me where you got stuck.",
+        text: "Hi! Let me help you with the quadratic formula. First, can you show me the specific problem you're working on?",
         senderUid: currentRole == "teacher" ? "mock-current-user" : "mock-other-user",
         senderRole: "teacher",
-        createdAt: 1,
+        createdAt: Date().timeIntervalSince1970 * 1000.0 - 120_000.0,
         isMine: currentRole == "teacher"
       ),
       ChatMessage(
         id: "mock-2",
-        text: "I understand the first step, but not how to factor it.",
+        text: "Sure! It's x^2 - 5x + 6 = 0",
         senderUid: currentRole == "student" ? "mock-current-user" : "mock-other-user",
         senderRole: "student",
-        createdAt: 2,
+        createdAt: Date().timeIntervalSince1970 * 1000.0 - 60_000.0,
         isMine: currentRole == "student"
       )
     ]
+  }
+
+  private func sessionDurationSeconds(at date: Date) -> Int {
+    max(0, Int(date.timeIntervalSince1970 - sessionStartedAt / 1000.0))
   }
 }

@@ -32,11 +32,22 @@ final class TeacherDashboardViewModel {
   var inviteWaves: [String: Int] = [:]
   var invitePhotoUrls: [String: [String]] = [:]
   var inviteHasVoiceMessage: [String: Bool] = [:]
+  var inviteStudentNames: [String: String] = [:]
+  var inviteStudentUids: [String: String] = [:]
+  var inviteConnectionFeeCents: [String: Int] = [:]
+  var invitePricePerMinuteCents: [String: Int] = [:]
   var activeCallRoom: String? = nil
   var activeCallToken: String? = nil
   var activeCallStudentUid: String? = nil
   var activeQuestionId: String? = nil
+  var activeQuestionText = ""
+  var activeStudentName = "Student"
+  var activeConnectionFeeCents = 0
+  var activePricePerMinuteCents = 50
+  var activeAcceptedAt = 0.0
+  var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
+  var isAcceptingCalls = false
 
   // MARK: - Private
 
@@ -51,6 +62,8 @@ final class TeacherDashboardViewModel {
   private var androidTeacherRef: DatabaseReference?
 #endif
   private var authListenerHandle: Any?
+  private var acceptingTask: Task<Void, Never>?
+  private var didLoadProfile = false
 
   // MARK: - Init
 
@@ -65,6 +78,7 @@ final class TeacherDashboardViewModel {
           guard let self, self.inviteService == nil else { return }
 #endif
           self.configurePresence(uid: uid)
+          await self.loadProfile(uid: uid)
         }
       } else {
         Task { @MainActor [weak self] in
@@ -112,6 +126,10 @@ final class TeacherDashboardViewModel {
             "wave": $0.wave,
             "photoUrls": $0.photoUrls,
             "hasVoiceMessage": $0.hasVoiceMessage,
+            "studentUid": $0.studentUid,
+            "studentName": $0.studentName,
+            "connectionFeeCents": $0.connectionFeeCents,
+            "pricePerMinuteCents": $0.pricePerMinuteCents,
           ]
         }
       )
@@ -196,6 +214,10 @@ final class TeacherDashboardViewModel {
     var waves: [String: Int] = [:]
     var photoUrlsByID: [String: [String]] = [:]
     var hasVoiceByID: [String: Bool] = [:]
+    var studentNames: [String: String] = [:]
+    var studentUids: [String: String] = [:]
+    var connectionFees: [String: Int] = [:]
+    var pricesPerMinute: [String: Int] = [:]
 
     for row in rows {
       guard let id = row["id"] as? String,
@@ -229,6 +251,13 @@ final class TeacherDashboardViewModel {
       waves[id] = wave
       photoUrlsByID[id] = row["photoUrls"] as? [String] ?? []
       hasVoiceByID[id] = row["hasVoiceMessage"] as? Bool ?? false
+      studentNames[id] = Self.firstString(row, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
+      studentUids[id] = Self.firstString(row, keys: ["studentUid", "studentUID", "studentId"])
+      connectionFees[id] = Self.intValue(row["connectionFeeCents"]) ?? Self.intValue(row["connectionFee"]) ?? 0
+      pricesPerMinute[id] = Self.intValue(row["pricePerMinuteCents"])
+        ?? Self.intValue(row["ratePerMinuteCents"])
+        ?? Self.intValue(row["costPerMinuteCents"])
+        ?? 50
     }
 
     inviteIDs = ids
@@ -238,26 +267,59 @@ final class TeacherDashboardViewModel {
     inviteWaves = waves
     invitePhotoUrls = photoUrlsByID
     inviteHasVoiceMessage = hasVoiceByID
+    inviteStudentNames = studentNames
+    inviteStudentUids = studentUids
+    inviteConnectionFeeCents = connectionFees
+    invitePricePerMinuteCents = pricesPerMinute
   }
 
   // MARK: - Invite Actions
 
   func acceptInvite(questionId: String) {
+    guard acceptingQuestionId == nil, activeQuestionId == nil else { return }
     errorMessage = nil
-    Task {
+    acceptingQuestionId = questionId
+    isAcceptingCalls = true
+    activeQuestionText = inviteTexts[questionId] ?? ""
+    activeStudentName = inviteStudentNames[questionId]?.isEmpty == false ? inviteStudentNames[questionId] ?? "Student" : "Student"
+    activeConnectionFeeCents = inviteConnectionFeeCents[questionId] ?? 0
+    activePricePerMinuteCents = invitePricePerMinuteCents[questionId] ?? 50
+    activeAcceptedAt = Date().timeIntervalSince1970 * 1000.0
+    print("TeacherMinute teacherAccept tapped questionId=\(questionId)")
+    logger.info("[VM] acceptInvite tapped — questionId=\(questionId)")
+
+    acceptingTask?.cancel()
+    acceptingTask = Task { [weak self] in
+      guard let self else { return }
       do {
         let result = try await FunctionsService.shared.acceptInvite(questionId: questionId)
+        try Task.checkCancellation()
         try await ChatSessionService.markQuestionAccepted(
           questionId: questionId,
           teacherUid: Auth.auth().currentUser?.uid
         )
-        inviteIDs = inviteIDs.filter { $0 != questionId }
-        activeQuestionId = questionId
+        try Task.checkCancellation()
         activeCallRoom = result.liveKitRoom
         activeCallToken = result.liveKitToken
-        activeCallStudentUid = result.studentUid
-        logger.info("[VM] acceptInvite — questionId=\(questionId) room=\(result.liveKitRoom ?? "")")
+        activeCallStudentUid = result.studentUid ?? inviteStudentUids[questionId]
+        if activeStudentName == "Student", let studentUid = activeCallStudentUid, !studentUid.isEmpty,
+           let profile = try? await UserService.shared.fetchProfileSummary(uid: studentUid) {
+          activeStudentName = profile.displayName
+        }
+        inviteIDs = inviteIDs.filter { $0 != questionId }
+        acceptingQuestionId = nil
+        isAcceptingCalls = false
+        activeQuestionId = questionId
+        logger.info("[VM] acceptInvite ready — questionId=\(questionId) room=\(result.liveKitRoom ?? "")")
+      } catch is CancellationError {
+        acceptingQuestionId = nil
+        isAcceptingCalls = false
+        clearActiveCallState()
+        logger.info("[VM] acceptInvite cancelled — questionId=\(questionId)")
       } catch {
+        acceptingQuestionId = nil
+        isAcceptingCalls = false
+        clearActiveCallState()
         errorMessage = error.localizedDescription
         logger.error("[VM] acceptInvite failed — \(error.localizedDescription)")
       }
@@ -276,14 +338,72 @@ final class TeacherDashboardViewModel {
     }
   }
 
+  func cancelAcceptingInvite() {
+    acceptingTask?.cancel()
+    acceptingTask = nil
+    acceptingQuestionId = nil
+    isAcceptingCalls = false
+    clearActiveCallState()
+  }
+
   func endCall() {
     activeQuestionId = nil
+    clearActiveCallState()
+  }
+
+  private func clearActiveCallState() {
     activeCallRoom = nil
     activeCallToken = nil
     activeCallStudentUid = nil
+    activeQuestionText = ""
+    activeStudentName = "Student"
+    activeConnectionFeeCents = 0
+    activePricePerMinuteCents = 50
+    activeAcceptedAt = 0
   }
 
   func editSubjects() {
     // TODO: navigate to subject edit screen
+  }
+
+  func activeChatInitialDetails() -> ChatSessionDetails {
+    ChatSessionDetails(
+      studentUid: activeCallStudentUid ?? "",
+      teacherUid: Auth.auth().currentUser?.uid ?? "",
+      studentName: activeStudentName,
+      teacherName: teacherName,
+      questionText: activeQuestionText,
+      createdAt: 0,
+      acceptedAt: activeAcceptedAt > 0 ? activeAcceptedAt : Date().timeIntervalSince1970 * 1000.0,
+      connectionFeeCents: activeConnectionFeeCents,
+      pricePerMinuteCents: activePricePerMinuteCents,
+      teacherSharePercent: 75
+    )
+  }
+
+  private static func firstString(_ row: [String: Any], keys: [String]) -> String {
+    for key in keys {
+      if let value = row[key] as? String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+      }
+    }
+    return ""
+  }
+
+  private static func intValue(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? NSNumber { return value.intValue }
+    if let value = value as? String { return Int(value) }
+    if let value = value as? Double { return Int(value) }
+    return nil
+  }
+
+  private func loadProfile(uid: String) async {
+    guard !didLoadProfile else { return }
+    didLoadProfile = true
+    if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+      teacherName = profile.displayName
+    }
   }
 }
