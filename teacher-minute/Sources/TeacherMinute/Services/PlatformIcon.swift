@@ -36,6 +36,9 @@ struct PlatformIcon: View {
         case "antenna.radiowaves.left.and.right":   return "📡"
         case "checkmark.seal":                      return "☑️"
         case "checkmark.seal.fill":                 return "✅"
+        case "checkmark.circle.fill":               return "✓"
+        case "questionmark.circle":                 return "?"
+        case "photo.fill":                          return "▧"
         case "mic.fill":                            return "🎤"
         case "video.fill":                          return "📷"
         case "circle.fill":                         return "🟢"
@@ -59,6 +62,7 @@ struct PlatformIcon: View {
         case "function":                            return "ƒ"
         case "magnifyingglass":                     return "⌕"
         case "arrow.up":                            return "↑"
+		case "arrow.rigt":							return "→"
         case "person.crop.circle.fill":             return "👤"
         case "xmark":                               return "✕"
         case "wifi":                                return "📶"
@@ -66,6 +70,10 @@ struct PlatformIcon: View {
         case "chevron.right":                       return "›"
         case "star.fill":                           return "⭐"
 		case "pencil":                            	return "✏️"
+		case "atom":                                return "⚛️"
+		case "x.squareroot":                       	return "√"
+		case "phone":                               return "📱"
+		case "chevron.down":                        return "↓"
         default:
 			logger.error("!!! icon: \(systemName) is missing !!!")
 			return "●"

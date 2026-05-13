@@ -37,7 +37,7 @@ enum FunctionsError: Error {
 struct AcceptInviteResult {
   let liveKitRoom: String?
   let liveKitToken: String?
-  let studentUid: String
+  let studentUid: String?
 }
 
 struct CreateQuestionResult {
@@ -93,8 +93,10 @@ final class FunctionsService {
   // MARK: - Teacher callables
 
   func acceptInvite(questionId: String) async throws -> AcceptInviteResult {
-    let result = try await call(function: "acceptInvite", data: ["questionId": questionId])
-    guard let suid = result["studentUid"] as? String else { throw FunctionsError.decodingError }
+    let result = try await call(function: "acceptInvite", data: ["questionId": questionId, "inviteId": questionId])
+    let suid = result["studentUid"] as? String
+      ?? result["studentUID"] as? String
+      ?? result["studentId"] as? String
     let room = result["liveKitRoom"] as? String
     let token = result["liveKitToken"] as? String
     return AcceptInviteResult(liveKitRoom: room, liveKitToken: token, studentUid: suid)

@@ -30,6 +30,8 @@ final class TeacherDashboardViewModel {
   var inviteTexts: [String: String] = [:]
   var inviteExpiresAt: [String: Double] = [:]
   var inviteWaves: [String: Int] = [:]
+  var invitePhotoUrls: [String: [String]] = [:]
+  var inviteHasVoiceMessage: [String: Bool] = [:]
   var activeCallRoom: String? = nil
   var activeCallToken: String? = nil
   var activeCallStudentUid: String? = nil
@@ -108,6 +110,8 @@ final class TeacherDashboardViewModel {
             "text": $0.text,
             "expiresAt": $0.expiresAt,
             "wave": $0.wave,
+            "photoUrls": $0.photoUrls,
+            "hasVoiceMessage": $0.hasVoiceMessage,
           ]
         }
       )
@@ -190,6 +194,8 @@ final class TeacherDashboardViewModel {
     var texts: [String: String] = [:]
     var expiresAtByID: [String: Double] = [:]
     var waves: [String: Int] = [:]
+    var photoUrlsByID: [String: [String]] = [:]
+    var hasVoiceByID: [String: Bool] = [:]
 
     for row in rows {
       guard let id = row["id"] as? String,
@@ -221,6 +227,8 @@ final class TeacherDashboardViewModel {
       texts[id] = text
       expiresAtByID[id] = expiresAt
       waves[id] = wave
+      photoUrlsByID[id] = row["photoUrls"] as? [String] ?? []
+      hasVoiceByID[id] = row["hasVoiceMessage"] as? Bool ?? false
     }
 
     inviteIDs = ids
@@ -228,14 +236,22 @@ final class TeacherDashboardViewModel {
     inviteTexts = texts
     inviteExpiresAt = expiresAtByID
     inviteWaves = waves
+    invitePhotoUrls = photoUrlsByID
+    inviteHasVoiceMessage = hasVoiceByID
   }
 
   // MARK: - Invite Actions
 
   func acceptInvite(questionId: String) {
+    errorMessage = nil
     Task {
       do {
         let result = try await FunctionsService.shared.acceptInvite(questionId: questionId)
+        try await ChatSessionService.markQuestionAccepted(
+          questionId: questionId,
+          teacherUid: Auth.auth().currentUser?.uid
+        )
+        inviteIDs = inviteIDs.filter { $0 != questionId }
         activeQuestionId = questionId
         activeCallRoom = result.liveKitRoom
         activeCallToken = result.liveKitToken

@@ -44,6 +44,15 @@ object AndroidInviteManager {
             val expiresAt = child.child("expiresAt").value.asDoubleOrNull()
                 ?: (System.currentTimeMillis() + 12_000).toDouble()
             val wave = child.child("wave").value.asIntOrNull() ?: 1
+            val photoUrls = JSONArray()
+            for (photo in child.child("photoUrls").children) {
+                val url = photo.getValue(String::class.java)
+                if (!url.isNullOrBlank()) photoUrls.put(url)
+            }
+            val hasVoiceMessage =
+                !child.child("voiceMessageUrl").getValue(String::class.java).isNullOrBlank() ||
+                    !child.child("audioUrl").getValue(String::class.java).isNullOrBlank() ||
+                    !child.child("voiceUrl").getValue(String::class.java).isNullOrBlank()
 
             if (topic == null || text == null) {
                 Log.w(
@@ -65,6 +74,8 @@ object AndroidInviteManager {
                     .put("text", text)
                     .put("expiresAt", expiresAt)
                     .put("wave", wave)
+                    .put("photoUrls", photoUrls)
+                    .put("hasVoiceMessage", hasVoiceMessage)
             )
         }
 

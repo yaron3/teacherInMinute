@@ -48,12 +48,18 @@ final class InviteService {
           let expiresAt = dict["expiresAt"] as? Double,
           let wave      = dict["wave"]      as? Int
         else { continue }
+        let photoUrls = dict["photoUrls"] as? [String] ?? []
+        let hasVoiceMessage = (dict["voiceMessageUrl"] as? String)?.isEmpty == false
+          || (dict["audioUrl"] as? String)?.isEmpty == false
+          || (dict["voiceUrl"] as? String)?.isEmpty == false
         let invite = IncomingInvite(
           id: snap.key,
           topic: topic,
           text: text,
           expiresAt: expiresAt,
-          wave: wave
+          wave: wave,
+          photoUrls: photoUrls,
+          hasVoiceMessage: hasVoiceMessage
         )
         if !invite.isExpired { invites.append(invite) }
       }
@@ -102,12 +108,18 @@ final class InviteService {
           let expiresAt = dict["expiresAt"] as? Double,
           let wave      = dict["wave"]      as? Int
         else { continue }
+        let photoUrls = dict["photoUrls"] as? [String] ?? []
+        let hasVoiceMessage = (dict["voiceMessageUrl"] as? String)?.isEmpty == false
+          || (dict["audioUrl"] as? String)?.isEmpty == false
+          || (dict["voiceUrl"] as? String)?.isEmpty == false
         let invite = IncomingInvite(
           id: snap.key,
           topic: topic,
           text: text,
           expiresAt: expiresAt,
-          wave: wave
+          wave: wave,
+          photoUrls: photoUrls,
+          hasVoiceMessage: hasVoiceMessage
         )
         if !invite.isExpired { invites.append(invite) }
       }

@@ -51,6 +51,30 @@ final class ChatSessionService {
 #endif
   }
 
+  static func markQuestionAccepted(questionId: String, teacherUid: String?) async throws {
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.markQuestionAccepted(questionId: questionId, teacherUid: teacherUid ?? "")
+    }.value
+#else
+    var payload: [String: Any] = [
+      "status": "accepted",
+      "acceptedAt": Date().timeIntervalSince1970 * 1000.0
+    ]
+    if let teacherUid, !teacherUid.isEmpty {
+      payload["teacherUid"] = teacherUid
+    }
+
+    let questionRef = FirebaseDatabase.Database.database().reference(withPath: "questions/\(questionId)")
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      questionRef.updateChildValues(payload) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
   func startListening(onUpdate: @escaping ([ChatMessage]) -> Void) {
 #if !os(Android)
     messagesHandle = messagesRef.observe(.value) { snapshot in
@@ -388,6 +412,10 @@ private enum AndroidChatBridge {
     name: "clearBoard",
     sig: "(Ljava/lang/String;)V"
   )!
+  private static let markQuestionAcceptedMethod = managerClass.getStaticMethodID(
+    name: "markQuestionAccepted",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)V"
+  )!
 
   static func fetchMessages(questionId: String) throws -> String {
     try jniContext {
@@ -442,6 +470,19 @@ private enum AndroidChatBridge {
         method: clearBoardMethod,
         options: [.kotlincompat],
         args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    }
+  }
+
+  static func markQuestionAccepted(questionId: String, teacherUid: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: markQuestionAcceptedMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          teacherUid.toJavaParameter(options: [.kotlincompat])
+        ]
       )
     }
   }

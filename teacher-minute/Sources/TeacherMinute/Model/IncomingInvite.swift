@@ -22,6 +22,8 @@ struct IncomingInvite: Identifiable {
   let text: String
   let expiresAt: Double   // Unix ms
   let wave: Int
+  let photoUrls: [String]
+  let hasVoiceMessage: Bool
 
   var secondsRemaining: Double {
     (expiresAt - Date().timeIntervalSince1970 * 1000.0) / 1000.0
@@ -40,6 +42,8 @@ struct IncomingInvite: Identifiable {
   let text: String
   let expiresAt: Double   // Unix ms
   let wave: Int
+  let photoUrls: [String]
+  let hasVoiceMessage: Bool
 
   var secondsRemaining: Double {
     (expiresAt - Date().timeIntervalSince1970 * 1000) / 1000

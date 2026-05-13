@@ -13,6 +13,7 @@ import {
   DispatchInviteDoc,
   WAVE_SIZES,
   WAVE_TIMEOUT_SECONDS,
+  INVITE_EXPIRY_SECONDS,
 } from "./types";
 
 const db = admin.database();
@@ -39,7 +40,7 @@ async function sendWave(
   if (batch.length === 0) return [];
 
   const now = Timestamp.now();
-  const expiresAt = Timestamp.fromMillis(Date.now() + WAVE_TIMEOUT_SECONDS * 1000);
+  const expiresAt = Timestamp.fromMillis(Date.now() + INVITE_EXPIRY_SECONDS * 1000);
   const firestoreBatch = firestore.batch();
 
   for (const { uid } of batch) {
@@ -70,7 +71,7 @@ async function sendWave(
       await db.ref(`teacherInvites/${uid}/${qid}`).set({
         topic: questionData.topic,
         text: questionData.text.slice(0, 300),
-        expiresAt: Date.now() + WAVE_TIMEOUT_SECONDS * 1000,
+        expiresAt: Date.now() + INVITE_EXPIRY_SECONDS * 1000,
         wave,
       });
 
@@ -84,7 +85,7 @@ async function sendWave(
           studentName: questionData.studentUid,
           questionText: questionData.text,
           wave,
-          ttlSeconds: WAVE_TIMEOUT_SECONDS,
+          ttlSeconds: INVITE_EXPIRY_SECONDS,
         });
       }
     })
@@ -148,8 +149,8 @@ export const dispatchQuestion = onDocumentCreated(
 
 // ─── evaluateWave — Cloud Tasks handler ──────────────────────────────────────
 // FR-B-003, FR-B-005
-// Called 12s after each wave is sent. If no teacher accepted, fans out next wave
-// or declares the question unanswered after wave 3.
+// Called WAVE_TIMEOUT_SECONDS after each wave. Fans out the next wave without
+// cancelling earlier invites — all teachers have INVITE_EXPIRY_SECONDS to accept.
 
 export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number }>(
   {
@@ -174,30 +175,8 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
       return;
     }
 
-    // Mark all pending invites from this wave as timed out
-    const invitesSnap = await firestore
-      .collection("questions")
-      .doc(qid)
-      .collection("invites")
-      .where("wave", "==", wave)
-      .where("response", "==", "pending")
-      .get();
-
-    if (!invitesSnap.empty) {
-      const timeoutBatch = firestore.batch();
-      invitesSnap.docs.forEach((d) => timeoutBatch.update(d.ref, { response: "timeout" }));
-      await timeoutBatch.commit();
-
-      // Remove RTDB signals for timed-out teachers
-      await Promise.all(
-        invitesSnap.docs.map((d) => {
-          const tid = d.data().teacherUid as string;
-          return db.ref(`teacherInvites/${tid}/${qid}`).remove();
-        })
-      );
-      logger.info(`[evaluateWave] timed out ${invitesSnap.size} invites for wave=${wave} qid=${qid}`);
-    }
-
+    // Invites from this wave remain pending — teachers have INVITE_EXPIRY_SECONDS total to accept.
+    // Only fan out the next wave so more teachers are notified sooner.
     const nextWave = wave + 1;
 
     // FR-B-005: after wave 3 with no acceptance, declare unanswered

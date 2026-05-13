@@ -117,31 +117,62 @@ final class StudentHomeViewModel {
     pollingTask?.cancel()
     pollingTask = Task {
       while !Task.isCancelled {
-        try? await Task.sleep(nanoseconds: 3_000_000_000)
-        guard !Task.isCancelled else { return }
         do {
-          let result = try await FunctionsService.shared.getQuestionStatus(questionId: questionId)
+          let result = try await currentQuestionStatus(questionId: questionId)
+          let status = result.status.lowercased()
           print("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
-          switch result.status {
-          case "accepted", "in_progress":
+
+          if isAcceptedStatus(status) {
             searchState = .matched(
               questionId: questionId,
               liveKitRoom: result.liveKitRoom ?? "",
               liveKitToken: result.liveKitToken ?? ""
             )
             return
-          case "unanswered":
+          }
+
+          switch status {
+          case "unanswered", "waiting", "pending":
             break
-          case "cancelled":
+          case "cancelled", "canceled", "expired":
             searchState = .noMatch
             return
           default:
             break
           }
         } catch {
-          // transient network error — keep polling
+          guard !Task.isCancelled else { return }
+          print("TeacherMinute questionStatus polling error=\(error)")
         }
+
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
       }
     }
+  }
+
+  private func currentQuestionStatus(questionId: String) async throws -> QuestionStatusResult {
+    let functionResult = try await FunctionsService.shared.getQuestionStatus(questionId: questionId)
+    let functionStatus = functionResult.status.lowercased()
+    guard !isAcceptedStatus(functionStatus), functionStatus != "cancelled", functionStatus != "canceled" else {
+      return functionResult
+    }
+
+    if let realtimeResult = try? await QuestionStatusStore.fetch(questionId: questionId) {
+      let realtimeStatus = realtimeResult.status.lowercased()
+      if isAcceptedStatus(realtimeStatus) || realtimeStatus == "cancelled" || realtimeStatus == "canceled" {
+        print("TeacherMinute questionStatus realtimeOverride questionId=\(questionId) status=\(realtimeResult.status)")
+        return realtimeResult
+      }
+    }
+
+    return functionResult
+  }
+
+  private func isAcceptedStatus(_ status: String) -> Bool {
+    status == "accepted"
+      || status == "in_progress"
+      || status == "matched"
+      || status == "connected"
+      || status == "active"
   }
 }

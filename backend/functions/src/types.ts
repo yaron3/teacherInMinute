@@ -4,6 +4,7 @@ import { Timestamp } from "firebase-admin/firestore";
 
 export const WAVE_SIZES = [3, 5, 10] as const;
 export const WAVE_TIMEOUT_SECONDS = 12;
+export const INVITE_EXPIRY_SECONDS = 90;
 export const HARD_CAP_MINUTES = 30;
 export const BASE_RATE_PER_MIN_CENTS = 99;
 export const CONNECTION_FEE_CENTS = 50;

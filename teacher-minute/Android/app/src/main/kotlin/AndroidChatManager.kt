@@ -143,6 +143,46 @@ object AndroidChatManager {
         Tasks.await(ref.removeValue(), TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
+    @JvmStatic
+    fun markQuestionAccepted(questionId: String, teacherUid: String) {
+        val values = mutableMapOf<String, Any>(
+            "status" to "accepted",
+            "acceptedAt" to System.currentTimeMillis().toDouble()
+        )
+        if (teacherUid.isNotBlank()) {
+            values["teacherUid"] = teacherUid
+        }
+
+        Log.i(TAG, "Marking question accepted questionId=$questionId teacherUid=$teacherUid")
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+        Tasks.await(ref.updateChildren(values), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    @JvmStatic
+    fun fetchQuestionStatusJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance(DATABASE_URL)
+                .getReference("questions")
+                .child(questionId)
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+
+        val status = snapshot.child("status").getValue(String::class.java)
+        if (status.isNullOrBlank()) {
+            return JSONObject().toString()
+        }
+
+        return JSONObject()
+            .put("status", status)
+            .put("liveKitRoom", snapshot.child("liveKitRoom").getValue(String::class.java) ?: "")
+            .put("liveKitToken", snapshot.child("liveKitToken").getValue(String::class.java) ?: "")
+            .toString()
+    }
+
     private fun Any?.asDoubleOrNull(): Double? {
         return when (this) {
             is Number -> toDouble()
