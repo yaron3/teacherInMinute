@@ -68,7 +68,6 @@ struct MainTabView: View {
                 hidesTabBar = false
             }
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Color(.systemBackground))
         .navigationBarBackButtonHidden(true)
     }

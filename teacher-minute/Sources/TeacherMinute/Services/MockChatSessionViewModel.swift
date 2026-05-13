@@ -55,8 +55,9 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.isConnecting = isConnecting
     self.participantName = participantName
     self.originalQuestion = originalQuestion
-    self.primaryAmountTitle = role == "teacher" ? "Live Earnings" : "Session Cost"
-    self.primaryAmountSubtitle = role == "teacher" ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
+    let isTeacherRole = Self.isTeacherRole(role)
+    self.primaryAmountTitle = isTeacherRole ? "Live Earnings" : "Session Cost"
+    self.primaryAmountSubtitle = isTeacherRole ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
     self.sessionNoticeText = sessionNoticeText
     self.sessionStartedAt = sessionStartedAt
     self.connectionFeeCents = connectionFeeCents
@@ -86,7 +87,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func primaryAmountText(at date: Date) -> String {
     let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
     let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
-    let cents = role == "teacher" ? grossCents * (teacherSharePercent / 100.0) : grossCents
+    let cents = Self.isTeacherRole(role) ? grossCents * (teacherSharePercent / 100.0) : grossCents
     return String(format: "$%.2f", max(0, cents) / 100.0)
   }
 
@@ -163,6 +164,10 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
         isMine: currentRole == "student"
       )
     ]
+  }
+
+  private static func isTeacherRole(_ role: String) -> Bool {
+    role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "teacher"
   }
 
   private func sessionDurationSeconds(at date: Date) -> Int {

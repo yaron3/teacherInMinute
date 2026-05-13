@@ -8,11 +8,15 @@
 import SwiftUI
 
 struct StudentHomeView: View {
-    @State var viewModel = StudentHomeViewModel()
+    @State var viewModel: any StudentHomeViewModeling
     @State var showingAskSheet = false
     @Binding var hidesTabBar: Bool
 
-    init(hidesTabBar: Binding<Bool> = .constant(false)) {
+    init(
+        viewModel: any StudentHomeViewModeling = StudentHomeViewModel(),
+        hidesTabBar: Binding<Bool> = .constant(false)
+    ) {
+        self._viewModel = State(initialValue: viewModel)
         self._hidesTabBar = hidesTabBar
     }
 
@@ -235,7 +239,7 @@ struct StudentHomeView: View {
 // MARK: - Ask Teacher Sheet
 
 struct AskTeacherSheet: View {
-    let viewModel: StudentHomeViewModel
+    let viewModel: any StudentHomeViewModeling
     @Binding var isPresented: Bool
 
     static let topics = ["algebra", "geometry", "trigonometry", "calculus", "statistics", "arithmetic"]
@@ -243,6 +247,7 @@ struct AskTeacherSheet: View {
     @State  var selectedTopic = "algebra"
     @State  var questionText = ""
     @State  var conversationType = "text"
+    @FocusState var isQuestionFocused: Bool
     private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 }
 
     var body: some View {
@@ -295,18 +300,22 @@ struct AskTeacherSheet: View {
                         .foregroundStyle(Color.appPrimaryText)
 
                     TextEditor(text: $questionText)
+                        .focused($isQuestionFocused)
                         .font(.system(size: 14))
                         .frame(minHeight: 120)
                         .padding(12)
                         .background(Color.appGrayBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
+                    if isQuestionFocused {
+                        MathSymbolRow(text: $questionText, isFocused: $isQuestionFocused)
+                    }
+
                     Text("\(questionText.count) / 10 min chars")
                         .font(.system(size: 11))
                         .foregroundStyle(canSubmit ? Color.appGreen : Color.appSecondaryText)
                 }
 
-                Spacer()
 
                 Button {
                     isPresented = false
@@ -314,6 +323,7 @@ struct AskTeacherSheet: View {
                         await viewModel.askTeacher(
                             topic: selectedTopic,
                             text: questionText.trimmingCharacters(in: .whitespaces),
+                            photoUrls: [],
                             conversationType: conversationType
                         )
                     }
@@ -323,7 +333,7 @@ struct AskTeacherSheet: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(canSubmit ? Color.appPink : Color.appGrayBackground)
+                        .background( Color.appPink)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -340,6 +350,16 @@ struct AskTeacherSheet: View {
         }
     }
 }
+#if os(iOS)
+struct AskTeacherSheet_Previews: PreviewProvider {
+  static var previews: some View {
+    AskTeacherSheet(
+      viewModel: MockStudentHomeViewModel(),
+      isPresented: .constant(true)
+    )
+  }
+}
+#endif
 
 struct ConversationTypeChip: View {
     let title: String
@@ -630,7 +650,7 @@ struct RecentLessonRow: View {
 #if os(iOS)
 struct StudentHomeView_Previews: PreviewProvider {
     static var previews: some View {
-        StudentHomeView()
+        StudentHomeView(viewModel: MockStudentHomeViewModel())
     }
 }
 #endif

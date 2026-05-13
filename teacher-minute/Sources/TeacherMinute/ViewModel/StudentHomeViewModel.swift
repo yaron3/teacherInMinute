@@ -43,11 +43,32 @@ struct RecentLesson: Identifiable {
   let duration: String
 }
 
+// MARK: - ViewModel Protocol
+
+@MainActor
+protocol StudentHomeViewModeling: AnyObject {
+  var name: String { get set }
+  var searchState: StudentSearchState { get set }
+  var activeQuestionText: String { get set }
+  var activeConnectionFeeCents: Int { get set }
+  var selectedPricePerMinuteCents: Int { get set }
+  var pricingOptions: [PricingOption] { get }
+  var recentLessons: [RecentLesson] { get }
+
+  func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
+  func cancelSearch() async
+  func resetSearch()
+  func selectTier(_ option: PricingOption)
+  func viewAllLessons()
+  func loadProfileIfNeeded() async
+  func chatInitialDetails() -> ChatSessionDetails
+}
+
 // MARK: - ViewModel
 
 @Observable
 @MainActor
-final class StudentHomeViewModel {
+final class StudentHomeViewModel: StudentHomeViewModeling {
 
   var name = "Sarah Jenkins"
   var searchState: StudentSearchState = .idle
@@ -211,6 +232,95 @@ final class StudentHomeViewModel {
       || status == "matched"
       || status == "connected"
       || status == "active"
+  }
+
+  private static func cents(from price: String) -> Int {
+    let numeric = price.replacingOccurrences(of: "$", with: "")
+    return Int(((Double(numeric) ?? 0) * 100).rounded())
+  }
+}
+
+@Observable
+@MainActor
+final class MockStudentHomeViewModel: StudentHomeViewModeling {
+  var name: String
+  var searchState: StudentSearchState
+  var activeQuestionText: String
+  var activeConnectionFeeCents: Int
+  var selectedPricePerMinuteCents: Int
+
+  let pricingOptions: [PricingOption]
+  let recentLessons: [RecentLesson]
+
+  init(
+    name: String = "Sarah Jenkins",
+    searchState: StudentSearchState = .idle,
+    activeQuestionText: String = "",
+    activeConnectionFeeCents: Int = 0,
+    selectedPricePerMinuteCents: Int = 50,
+    pricingOptions: [PricingOption] = [
+      PricingOption(
+        name: "Standard",
+        price: "$0.50",
+        description: "Verified tutors for algebra, geometry, and basic calculus.",
+        isHighlighted: false
+      ),
+      PricingOption(
+        name: "Expert",
+        price: "$1.20",
+        description: "Advanced degree tutors for college-level help.",
+        isHighlighted: true
+      ),
+    ],
+    recentLessons: [RecentLesson] = [
+      RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis", time: "Today, 2:30 PM", duration: "14 mins"),
+      RecentLesson(title: "Algebra II", teacher: "with Ms. Chen", time: "Yesterday", duration: "22 mins"),
+    ]
+  ) {
+    self.name = name
+    self.searchState = searchState
+    self.activeQuestionText = activeQuestionText
+    self.activeConnectionFeeCents = activeConnectionFeeCents
+    self.selectedPricePerMinuteCents = selectedPricePerMinuteCents
+    self.pricingOptions = pricingOptions
+    self.recentLessons = recentLessons
+  }
+
+  func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {
+    activeQuestionText = text
+    activeConnectionFeeCents = 50
+    searchState = .searching(questionId: "mock-question")
+  }
+
+  func cancelSearch() async {
+    searchState = .idle
+  }
+
+  func resetSearch() {
+    searchState = .idle
+  }
+
+  func selectTier(_ option: PricingOption) {
+    selectedPricePerMinuteCents = Self.cents(from: option.price)
+  }
+
+  func viewAllLessons() {}
+
+  func loadProfileIfNeeded() async {}
+
+  func chatInitialDetails() -> ChatSessionDetails {
+    ChatSessionDetails(
+      studentUid: "mock-student",
+      teacherUid: "mock-teacher",
+      studentName: name,
+      teacherName: "Teacher",
+      questionText: activeQuestionText,
+      createdAt: 0,
+      acceptedAt: Date().timeIntervalSince1970 * 1000.0,
+      connectionFeeCents: activeConnectionFeeCents,
+      pricePerMinuteCents: selectedPricePerMinuteCents,
+      teacherSharePercent: 75
+    )
   }
 
   private static func cents(from price: String) -> Int {

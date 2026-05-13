@@ -396,19 +396,20 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var isConnecting = true
   var details: ChatSessionDetails?
   var participantName: String {
-    if role == "teacher" {
-      return nonEmpty(details?.studentName) ?? "Student"
+    if isTeacherRole {
+	  return nonEmpty(details?.teacherName) ?? "Teacher"
     }
-    return nonEmpty(details?.teacherName) ?? "Teacher"
+	return nonEmpty(details?.studentName) ?? "Student"
+   
   }
   var originalQuestion: String {
     nonEmpty(details?.questionText) ?? "Question details are loading."
   }
   var primaryAmountTitle: String {
-    role == "teacher" ? "Live Earnings" : "Session Cost"
+    isTeacherRole ? "Live Earnings" : "Session Cost"
   }
   var primaryAmountSubtitle: String {
-    role == "teacher" ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
+    isTeacherRole ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
   }
   let sessionNoticeText = "Session started - Billing active"
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
@@ -503,7 +504,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   func primaryAmountText(at date: Date) -> String {
     let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
     let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
-    let cents = role == "teacher" ? grossCents * (teacherSharePercent / 100.0) : grossCents
+    let cents = isTeacherRole ? grossCents * (teacherSharePercent / 100.0) : grossCents
     return currencyText(cents: max(0, cents))
   }
 
@@ -592,6 +593,18 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         print("Board clear failed: \(error.localizedDescription)")
       }
     }
+  }
+
+  private var isTeacherRole: Bool {
+    if let currentUid = nonEmpty(Auth.auth().currentUser?.uid) {
+      if let teacherUid = nonEmpty(details?.teacherUid), currentUid == teacherUid {
+        return true
+      }
+      if let studentUid = nonEmpty(details?.studentUid), currentUid == studentUid {
+        return false
+      }
+    }
+    return role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "teacher"
   }
 
   private var connectionFeeCents: Int {

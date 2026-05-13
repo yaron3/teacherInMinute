@@ -13,7 +13,7 @@ struct ChatSessionView: View {
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let hasAudio: Bool
-  let onClose: () -> Void
+  let onClose: @MainActor @Sendable () -> Void
 
   init(
     questionId: String,
@@ -21,7 +21,7 @@ struct ChatSessionView: View {
     title: String,
     hasAudio: Bool = false,
     initialDetails: ChatSessionDetails? = nil,
-    onClose: @escaping () -> Void
+    onClose: @escaping @MainActor @Sendable () -> Void
   ) {
     let viewModel = ChatSessionViewModel(questionId: questionId, role: role, initialDetails: initialDetails)
     self._viewModel = State(initialValue: viewModel)
@@ -31,7 +31,7 @@ struct ChatSessionView: View {
     self.onClose = onClose
   }
 
-  init(viewModel: any ChatSessionViewModeling, title: String, hasAudio: Bool = false, onClose: @escaping () -> Void) {
+  init(viewModel: any ChatSessionViewModeling, title: String, hasAudio: Bool = false, onClose: @escaping @MainActor @Sendable () -> Void) {
     self._viewModel = State(initialValue: viewModel)
     self._isConnecting = State(initialValue: viewModel.isConnecting)
     self.title = title
@@ -125,17 +125,29 @@ struct ChatSessionView: View {
       }
       .frame(maxHeight: .infinity)
 
-      ChatInputBar(text: $draft, isFocused: $isMessageFieldFocused) {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        draft = ""
-        messages = messages + [viewModel.localMessage(text: text)]
-        viewModel.send(text)
-      }
-      .padding(.horizontal, 12)
-      .padding(.bottom, 10)
+#if os(Android)
+      inputBar
+#endif
     }
     .background(Color.white)
+#if !os(Android)
+    .safeAreaInset(edge: .bottom) {
+      inputBar
+        .background(Color.white)
+    }
+#endif
+  }
+
+  var inputBar: some View {
+    ChatInputBar(text: $draft, isFocused: $isMessageFieldFocused) {
+      let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !text.isEmpty else { return }
+      draft = ""
+      messages = messages + [viewModel.localMessage(text: text)]
+      viewModel.send(text)
+    }
+    .padding(.horizontal, 12)
+    .padding(.bottom, 10)
   }
 
   var boardRevision: String {
@@ -327,442 +339,8 @@ struct ChatSessionView: View {
   }
 }
 
-struct ConnectionSetupView: View {
-  let participantName: String
-  let hasAudio: Bool
-  var footerText = "Your teacher will join shortly"
-  let onCancel: () -> Void
-  @State var capsuleRotation = -18.0
-
-  var connectionTitle: String {
-    hasAudio ? "Connecting\naudio" : "Connecting"
-  }
-
-  var body: some View {
-    VStack(spacing: 0) {
-      Spacer(minLength: 34)
-
-      avatarSection
-
-      connectionCard
-        .padding(.horizontal, 16)
-        .padding(.top, 42)
-
-      if hasAudio {
-        microphonePermissionCard
-          .padding(.horizontal, 16)
-          .padding(.top, 16)
-      }
-
-      Spacer()
-
-      Text(footerText)
-        .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(Color.appSecondaryText)
-
-      Button(action: onCancel) {
-        Text("Cancel Session")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(Color.appPink)
-          .frame(height: 36)
-      }
-      .buttonStyle(.plain)
-      .padding(.bottom, 36)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(
-      LinearGradient(
-        colors: [Color.white, Color.appPinkSoft.opacity(0.35), Color.white],
-        startPoint: .top,
-        endPoint: .bottom
-      )
-    )
-  }
-
-  var avatarSection: some View {
-    VStack(spacing: 14) {
-      Circle()
-        .fill(Color.appGrayBackground)
-        .frame(width: 70, height: 70)
-        .overlay {
-          PlatformIcon(systemName: "person.crop.circle.fill", size: 62, color: .appSecondaryText)
-        }
-        .overlay {
-          Circle().stroke(.white, lineWidth: 4)
-        }
-        .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 5)
-
-      Text(participantName)
-        .font(.system(size: 20, weight: .bold))
-        .foregroundStyle(Color.appPrimaryText)
-
-      HStack(spacing: 4) {
-        ForEach(0..<5, id: \.self) { _ in
-          PlatformIcon(systemName: "star.fill", size: 11, weight: .bold, color: .yellow)
-        }
-        Text("4.9")
-          .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(Color.appPrimaryText)
-        Text("(127 reviews)")
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(Color.appSecondaryText)
-      }
-    }
-  }
-
-  var connectionCard: some View {
-    HStack(spacing: 22) {
-      Capsule()
-        .fill(
-          LinearGradient(
-            colors: [Color.appPink, Color.appPurple],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        )
-        .frame(width: 62, height: 104)
-        .rotationEffect(.degrees(capsuleRotation))
-        .overlay {
-          PlatformIcon(systemName: "wifi", size: 20, weight: .bold, color: .white)
-        }
-        .task {
-          withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-            capsuleRotation = 342.0
-          }
-        }
-	  Spacer()
-      VStack(alignment: .leading, spacing: 8) {
-        HStack(alignment: .top, spacing: 8) {
-          Text(connectionTitle)
-            .font(.system(size: 16, weight: .bold))
-            .foregroundStyle(Color.appPrimaryText)
-            .lineLimit(2)
-
-          LoadingDotsView()
-            .padding(.top, 7)
-        }
-
-        Text("Setting up your session")
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(Color.appSecondaryText)
-
-        GeometryReader { proxy in
-          ZStack(alignment: .leading) {
-            Capsule()
-              .fill(Color.appGrayBackground)
-            Capsule()
-              .fill(
-                LinearGradient(
-                  colors: [Color.appPink, Color.appPurple],
-                  startPoint: .leading,
-                  endPoint: .trailing
-                )
-              )
-              .frame(width: proxy.size.width * 0.66)
-          }
-        }
-        .frame(height: 5)
-        .padding(.top, 14)
-      }
-
-      Spacer(minLength: 0)
-    }
-    .padding(28)
-    .frame(maxWidth: .infinity, minHeight: 132)
-    .background(.white)
-    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-  }
-
-  var microphonePermissionCard: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      HStack(alignment: .top, spacing: 12) {
-        Circle()
-          .fill(Color.appOrange.opacity(0.12))
-          .frame(width: 34, height: 34)
-          .overlay {
-            PlatformIcon(systemName: "mic.fill", size: 14, weight: .semibold, color: .appOrange)
-          }
-
-        VStack(alignment: .leading, spacing: 6) {
-          Text("Microphone Permission")
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(Color.appPrimaryText)
-          Text("Make sure your microphone is enabled for the best learning experience.")
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Color.appSecondaryText)
-            .lineSpacing(3)
-        }
-      }
-
-      Button {} label: {
-        HStack(spacing: 8) {
-          PlatformIcon(systemName: "checkmark", size: 11, weight: .bold, color: .white)
-          Text("Allow Microphone")
-            .font(.system(size: 13, weight: .bold))
-        }
-        .foregroundStyle(.white)
-        .frame(maxWidth: .infinity)
-        .frame(height: 42)
-        .background(Color.appOrange)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-      }
-      .buttonStyle(.plain)
-      .padding(.leading, 52)
-    }
-    .padding(16)
-    .background(Color.appOrange.opacity(0.06))
-    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .stroke(Color.appOrange.opacity(0.28), lineWidth: 1)
-    }
-  }
-}
-
-struct LoadingDotsView: View {
-  @State var phase = 0
-
-  var body: some View {
-    HStack(spacing: 4) {
-      ForEach(0..<2, id: \.self) { index in
-        Circle()
-          .fill(Color.appPrimaryText)
-          .frame(width: 3, height: 3)
-          .opacity(phase == index ? 1 : 0.28)
-      }
-    }
-    .task {
-      while !Task.isCancelled {
-        try? await Task.sleep(nanoseconds: 420_000_000)
-        phase = (phase + 1) % 2
-      }
-    }
-  }
-}
-
-struct ChatThreadView: View {
-  let messages: [ChatMessage]
-  let now: Date
-  let viewModel: any ChatSessionViewModeling
-
-  var body: some View {
-    ScrollViewReader { proxy in
-      ScrollView(.vertical, showsIndicators: false) {
-        LazyVStack(spacing: 8) {
-          if messages.isEmpty {
-            Text("Start with a text explanation, then use the board below for the math work.")
-              .font(.system(size: 13))
-              .foregroundStyle(Color.appSecondaryText)
-              .multilineTextAlignment(.center)
-              .padding(.horizontal, 28)
-              .padding(.top, 24)
-          }
-
-          ForEach(messages) { message in
-            ChatBubble(message: message, timeText: viewModel.messageTimeText(createdAt: message.createdAt, at: now))
-              .id(message.id)
-          }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-      }
-      .background(Color.appGrayBackground.opacity(0.45))
-      .onChange(of: messages.count) { _, _ in
-        if let last = messages.last {
-          withAnimation(.easeOut(duration: 0.2)) {
-            proxy.scrollTo(last.id, anchor: .bottom)
-          }
-        }
-      }
-    }
-  }
-}
-
-struct ChatBubble: View {
-  let message: ChatMessage
-  let timeText: String
-
-  var body: some View {
-    HStack(alignment: .bottom, spacing: 8) {
-      if message.isMine { Spacer(minLength: 54) }
-
-      if !message.isMine {
-        avatar
-      }
-
-      VStack(alignment: message.isMine ? .trailing : .leading, spacing: 5) {
-        Text(message.text)
-          .font(.system(size: 14))
-          .foregroundStyle(message.isMine ? .white : Color.appPrimaryText)
-          .lineSpacing(3)
-          .padding(.horizontal, 14)
-          .padding(.vertical, 12)
-          .background(message.isMine ? Color.appPink : Color(red: 229 / 255, green: 231 / 255, blue: 235 / 255))
-          .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-
-        Text(timeText)
-          .font(.system(size: 9, weight: .medium))
-          .foregroundStyle(Color.appSecondaryText)
-      }
-
-      if message.isMine {
-        avatar
-      }
-
-      if !message.isMine { Spacer(minLength: 54) }
-    }
-  }
-
-  var avatar: some View {
-    Circle()
-      .fill(message.isMine ? Color.appPurpleSoft : Color.appGreenSoft)
-      .frame(width: 24, height: 24)
-      .overlay {
-        PlatformIcon(
-          systemName: "person.crop.circle.fill",
-          size: 18,
-          weight: .semibold,
-          color: message.isMine ? .appPurple : .appGreen
-        )
-      }
-  }
-}
-
-struct ChatInputBar: View {
-  @Binding var text: String
-  let isFocused: FocusState<Bool>.Binding
-  let send: () -> Void
-
-  var canSend: Bool {
-    !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  var body: some View {
-    HStack(spacing: 10) {
-      PlatformIcon(systemName: "photo.fill", size: 15, weight: .semibold, color: .appPrimaryText)
-        .frame(width: 36, height: 36)
-        .background(Color.appGrayBackground)
-        .clipShape(Circle())
-
-      TextField("Message", text: $text)
-        .focused(isFocused)
-        .font(.system(size: 14))
-        .padding(.horizontal, 14)
-        .frame(height: 42)
-        .background(Color.appGrayBackground)
-        .clipShape(Capsule())
-
-      Button(action: send) {
-        PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: .white)
-          .frame(width: 42, height: 42)
-          .background(
-            LinearGradient(
-              colors: canSend ? [Color.appPink, Color.appPurple] : [Color.appBorder, Color.appBorder],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
-            )
-          )
-          .clipShape(Circle())
-      }
-      .buttonStyle(.plain)
-    }
-    .padding(.top, 10)
-  }
-}
-
-struct WhiteboardView: View {
-  let strokes: [BoardStroke]
-  let revision: String
-  let onStrokeFinished: ([CGPoint]) -> Void
-  let onClear: () -> Void
-  @State var activeStroke: [CGPoint] = []
-
-  var visibleStrokes: [[CGPoint]] {
-    let remoteStrokes = strokes.map { stroke in
-      stroke.points.map { CGPoint(x: $0.x, y: $0.y) }
-    }
-    return activeStroke.isEmpty ? remoteStrokes : remoteStrokes + [activeStroke]
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Text("Board")
-          .font(.system(size: 13, weight: .bold))
-          .foregroundStyle(Color.appPrimaryText)
-
-        Spacer()
-
-        Button("Clear") {
-          activeStroke.removeAll()
-          onClear()
-        }
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(Color.appPink)
-      }
-      .padding(.horizontal, 16)
-
-      GeometryReader { proxy in
-        ZStack {
-          Color.white
-
-          if visibleStrokes.isEmpty {
-            VStack(spacing: 8) {
-              PlatformIcon(systemName: "pencil", size: 22, weight: .semibold, color: .appSecondaryText)
-              Text("Use your finger to write or sketch.")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.appSecondaryText)
-            }
-          }
-
-          ForEach(visibleStrokes.indices, id: \.self) { index in
-            Path { path in
-              let points = visibleStrokes[index]
-              guard let first = points.first else { return }
-              path.move(to: first)
-              for point in points.dropFirst() {
-                path.addLine(to: point)
-              }
-            }
-            .stroke(Color.appPrimaryText, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-          }
-        }
-        .id(revision)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-          RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(Color.appBorder, lineWidth: 1)
-        }
-        .gesture(
-          DragGesture(minimumDistance: 0)
-            .onChanged { value in
-              let point = CGPoint(
-                x: min(max(value.location.x, 0), proxy.size.width),
-                y: min(max(value.location.y, 0), proxy.size.height)
-              )
-              if activeStroke.isEmpty {
-                activeStroke = [point]
-              } else {
-                activeStroke = activeStroke + [point]
-              }
-            }
-            .onEnded { _ in
-              let completedStroke = activeStroke
-              activeStroke.removeAll()
-              onStrokeFinished(completedStroke)
-            }
-        )
-      }
-      .padding(.horizontal, 16)
-      .padding(.bottom, 14)
-    }
-    .padding(.top, 10)
-    .background(Color.appGrayBackground.opacity(0.35))
-  }
-}
-
 #if os(iOS)
-struct TChatSessionView_Previews: PreviewProvider {
+struct ChatSessionView_Previews: PreviewProvider {
   static var previews: some View {
     ChatSessionView(
       viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher"),
@@ -772,13 +350,23 @@ struct TChatSessionView_Previews: PreviewProvider {
   }
 }
 
-struct TChatSessionProgressView_Previews: PreviewProvider {
+struct ChatSessionProgressView_Previews: PreviewProvider {
   static var previews: some View {
-	ChatSessionView(
-	  viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: false),
-	  title: "Student",
-	  onClose: {}
-	)
+    ChatSessionView(
+      viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: false),
+      title: "Student",
+      onClose: {}
+    )
+  }
+}
+
+struct ChatSessionConnectingView_Previews: PreviewProvider {
+  static var previews: some View {
+    ChatSessionView(
+      viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: true),
+      title: "Student",
+      onClose: {}
+    )
   }
 }
 #endif
