@@ -23,6 +23,14 @@ function totalCents(billedSecs) {
 }
 async function finaliseLesson(lessonId, endedBy) {
     const lRef = firestore.collection("lessons").doc(lessonId);
+    // Fetch messages before the transaction — read-only, no consistency required
+    const messagesSnap = await firestore
+        .collection("lessons")
+        .doc(lessonId)
+        .collection("messages")
+        .orderBy("sentAt")
+        .get();
+    const messages = messagesSnap.docs.map((d) => d.data());
     return firestore.runTransaction(async (tx) => {
         var _a, _b;
         const snap = await tx.get(lRef);
@@ -47,7 +55,7 @@ async function finaliseLesson(lessonId, endedBy) {
             endedBy,
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
-        // Mirror summary back to the question doc
+        // Mirror summary + session snapshot to the question doc
         const qRef = firestore.collection("questions").doc(lesson.questionId);
         tx.update(qRef, {
             status: "completed",
@@ -55,8 +63,17 @@ async function finaliseLesson(lessonId, endedBy) {
             billedSeconds: billed,
             totalCents: charged,
             endedBy,
+            participants: [lesson.studentUid, lesson.teacherUid],
+            startTime: lesson.startedAt,
+            endTime: firestore_1.Timestamp.fromDate(endedAt),
+            messages,
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
+        // Append questionId to history for both participants
+        const studentRef = firestore.collection("users").doc(lesson.studentUid);
+        const teacherRef = firestore.collection("users").doc(lesson.teacherUid);
+        tx.set(studentRef, { history: firestore_1.FieldValue.arrayUnion(lesson.questionId) }, { merge: true });
+        tx.set(teacherRef, { history: firestore_1.FieldValue.arrayUnion(lesson.questionId) }, { merge: true });
         firebase_functions_1.logger.info(`[lessons] finalised lessonId=${lessonId} billed=${billed}s total=${charged}¢ by=${endedBy}`);
         return { billedSeconds: billed, totalCents: charged };
     });

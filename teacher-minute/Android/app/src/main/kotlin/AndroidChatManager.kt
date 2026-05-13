@@ -97,6 +97,7 @@ object AndroidChatManager {
                     .put("id", id)
                     .put("points", points)
                     .put("createdAt", child.child("createdAt").value.asDoubleOrNull() ?: 0.0)
+                    .put("senderUid", child.child("senderUid").getValue(String::class.java) ?: "")
             )
         }
         return array.toString()
@@ -124,9 +125,12 @@ object AndroidChatManager {
             .child("strokes")
             .push()
 
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+            ?: throw IllegalStateException("Not signed in")
         val payload = mapOf(
             "points" to points,
-            "createdAt" to System.currentTimeMillis().toDouble()
+            "createdAt" to System.currentTimeMillis().toDouble(),
+            "senderUid" to uid
         )
 
         Log.i(TAG, "Sending board stroke questionId=$questionId points=${points.size}")

@@ -15,10 +15,7 @@ struct ChatMessage: Identifiable, Equatable {
   let senderUid: String
   let senderRole: String
   let createdAt: Double
-
-  var isMine: Bool {
-    senderUid == Auth.auth().currentUser?.uid
-  }
+  let isMine: Bool
 }
 
 struct BoardPoint: Equatable {
@@ -30,11 +27,13 @@ struct BoardStroke: Identifiable, Equatable {
   let id: String
   let points: [BoardPoint]
   let createdAt: Double
+  let isMine: Bool
 }
 
 @MainActor
 final class ChatSessionService {
   private let questionId: String
+  private let currentUserUid: String
 #if !os(Android)
   private let messagesRef: FirebaseDatabase.DatabaseReference
   private let boardRef: FirebaseDatabase.DatabaseReference
@@ -42,8 +41,9 @@ final class ChatSessionService {
   private var boardHandle: DatabaseHandle?
 #endif
 
-  init(questionId: String) {
+  init(questionId: String, currentUserUid: String? = nil) {
     self.questionId = questionId
+    self.currentUserUid = currentUserUid ?? Auth.auth().currentUser?.uid ?? ""
 #if !os(Android)
     let questionRef = FirebaseDatabase.Database.database().reference(withPath: "questions/\(questionId)")
     self.messagesRef = questionRef.child("messages")
@@ -82,7 +82,7 @@ final class ChatSessionService {
       for child in snapshot.children {
         guard let snap = child as? DataSnapshot,
               let dict = snap.value as? [String: Any],
-              let message = Self.message(from: snap.key, dict: dict) else { continue }
+              let message = Self.message(from: snap.key, dict: dict, currentUserUid: self.currentUserUid) else { continue }
         messages.append(message)
       }
       messages.sort { $0.createdAt < $1.createdAt }
@@ -98,7 +98,7 @@ final class ChatSessionService {
       for child in snapshot.children {
         guard let snap = child as? DataSnapshot,
               let dict = snap.value as? [String: Any],
-              let stroke = Self.stroke(from: snap.key, dict: dict) else { continue }
+              let stroke = Self.stroke(from: snap.key, dict: dict, currentUserUid: self.currentUserUid) else { continue }
         strokes.append(stroke)
       }
       strokes.sort { $0.createdAt < $1.createdAt }
@@ -157,7 +157,8 @@ final class ChatSessionService {
 #else
     let payload: [String: Any] = [
       "points": points.map { ["x": $0.x, "y": $0.y] },
-      "createdAt": Date().timeIntervalSince1970 * 1000.0
+      "createdAt": Date().timeIntervalSince1970 * 1000.0,
+      "senderUid": Auth.auth().currentUser?.uid ?? ""
     ]
     try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
       boardRef.childByAutoId().setValue(payload) { error, _ in
@@ -194,7 +195,7 @@ final class ChatSessionService {
     }
     return rows.compactMap { row in
       guard let id = row["id"] as? String else { return nil }
-      return Self.message(from: id, dict: row)
+      return Self.message(from: id, dict: row, currentUserUid: currentUserUid)
     }.sorted { $0.createdAt < $1.createdAt }
   }
 
@@ -208,12 +209,12 @@ final class ChatSessionService {
     }
     return rows.compactMap { row in
       guard let id = row["id"] as? String else { return nil }
-      return Self.stroke(from: id, dict: row)
+      return Self.stroke(from: id, dict: row, currentUserUid: currentUserUid)
     }.sorted { $0.createdAt < $1.createdAt }
   }
 #endif
 
-  private static func message(from id: String, dict: [String: Any]) -> ChatMessage? {
+  private static func message(from id: String, dict: [String: Any], currentUserUid: String) -> ChatMessage? {
     guard let text = dict["text"] as? String,
           let senderUid = dict["senderUid"] as? String else { return nil }
     let senderRole = dict["senderRole"] as? String ?? "student"
@@ -225,10 +226,17 @@ final class ChatSessionService {
     } else {
       createdAt = 0
     }
-    return ChatMessage(id: id, text: text, senderUid: senderUid, senderRole: senderRole, createdAt: createdAt)
+    return ChatMessage(
+      id: id,
+      text: text,
+      senderUid: senderUid,
+      senderRole: senderRole,
+      createdAt: createdAt,
+      isMine: senderUid == currentUserUid
+    )
   }
 
-  private static func stroke(from id: String, dict: [String: Any]) -> BoardStroke? {
+  private static func stroke(from id: String, dict: [String: Any], currentUserUid: String) -> BoardStroke? {
     guard let pointRows = dict["points"] as? [[String: Any]] else { return nil }
     let points = pointRows.compactMap { row -> BoardPoint? in
       guard let x = doubleValue(row["x"]),
@@ -236,7 +244,13 @@ final class ChatSessionService {
       return BoardPoint(x: x, y: y)
     }
     guard !points.isEmpty else { return nil }
-    return BoardStroke(id: id, points: points, createdAt: doubleValue(dict["createdAt"]) ?? 0)
+    let senderUid = dict["senderUid"] as? String ?? ""
+    return BoardStroke(
+      id: id,
+      points: points,
+      createdAt: doubleValue(dict["createdAt"]) ?? 0,
+      isMine: !senderUid.isEmpty && senderUid == currentUserUid
+    )
   }
 
   private static func doubleValue(_ value: Any?) -> Double? {
@@ -254,18 +268,42 @@ final class ChatSessionService {
   }
 }
 
+@MainActor
+protocol ChatSessionViewModeling: AnyObject {
+  var questionId: String { get }
+  var role: String { get }
+  var messages: [ChatMessage] { get set }
+  var boardStrokes: [BoardStroke] { get set }
+  var errorMessage: String? { get set }
+  var isConnecting: Bool { get set }
+  var onMessagesUpdated: (([ChatMessage]) -> Void)? { get set }
+  var onBoardStrokesUpdated: (([BoardStroke]) -> Void)? { get set }
+  var onErrorUpdated: ((String?) -> Void)? { get set }
+  var onConnectingUpdated: ((Bool) -> Void)? { get set }
+
+  func start()
+  func stop()
+  func localMessage(text: String) -> ChatMessage
+  func localStroke(points: [BoardPoint]) -> BoardStroke
+  func send(_ messageText: String)
+  func sendStroke(_ points: [BoardPoint])
+  func clearBoard()
+}
+
 @Observable
 @MainActor
-final class ChatSessionViewModel {
+final class ChatSessionViewModel: ChatSessionViewModeling {
   let questionId: String
   let role: String
   var messages: [ChatMessage] = []
   var boardStrokes: [BoardStroke] = []
   var draft = ""
   var errorMessage: String?
+  var isConnecting = true
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
+  var onConnectingUpdated: ((Bool) -> Void)?
   var boardRevision: String {
     boardStrokes.map { "\($0.id):\($0.points.count)" }.joined(separator: "|")
   }
@@ -280,6 +318,18 @@ final class ChatSessionViewModel {
   }
 
   func start() {
+    isConnecting = true
+    onConnectingUpdated?(true)
+    Task {
+      try? await Task.sleep(nanoseconds: 1_400_000_000)
+      guard !Task.isCancelled else { return }
+      isConnecting = false
+      onConnectingUpdated?(false)
+      beginListening()
+    }
+  }
+
+  private func beginListening() {
 #if os(Android)
     pollingTask?.cancel()
     pollingTask = Task {
@@ -314,6 +364,8 @@ final class ChatSessionViewModel {
   func stop() {
     pollingTask?.cancel()
     pollingTask = nil
+    isConnecting = true
+    onConnectingUpdated?(true)
     service.stopListening()
   }
 
@@ -327,7 +379,8 @@ final class ChatSessionViewModel {
       text: text,
       senderUid: Auth.auth().currentUser?.uid ?? "",
       senderRole: role,
-      createdAt: Date().timeIntervalSince1970 * 1000.0
+      createdAt: Date().timeIntervalSince1970 * 1000.0,
+      isMine: true
     )
   }
 
@@ -335,7 +388,8 @@ final class ChatSessionViewModel {
     BoardStroke(
       id: "local-\(Date().timeIntervalSince1970)",
       points: points,
-      createdAt: Date().timeIntervalSince1970 * 1000.0
+      createdAt: Date().timeIntervalSince1970 * 1000.0,
+      isMine: true
     )
   }
 
@@ -388,6 +442,8 @@ final class ChatSessionViewModel {
     }
   }
 }
+
+
 
 #if os(Android)
 private enum AndroidChatBridge {

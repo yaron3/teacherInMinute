@@ -65,7 +65,7 @@ struct PlatformIcon: View {
 		case "arrow.rigt":							return "→"
         case "person.crop.circle.fill":             return "👤"
         case "xmark":                               return "✕"
-        case "wifi":                                return "📶"
+        case "wifi":                                return "🛜"
         case "camera.fill":                         return "📸"
         case "chevron.right":                       return "›"
         case "star.fill":                           return "⭐"

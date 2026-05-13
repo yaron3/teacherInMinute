@@ -37,6 +37,15 @@ async function finaliseLesson(
 ): Promise<{ billedSeconds: number; totalCents: number }> {
   const lRef = firestore.collection("lessons").doc(lessonId);
 
+  // Fetch messages before the transaction — read-only, no consistency required
+  const messagesSnap = await firestore
+    .collection("lessons")
+    .doc(lessonId)
+    .collection("messages")
+    .orderBy("sentAt")
+    .get();
+  const messages = messagesSnap.docs.map((d) => d.data());
+
   return firestore.runTransaction(async (tx) => {
     const snap = await tx.get(lRef);
     if (!snap.exists) throw new HttpsError("not-found", "Lesson not found");
@@ -63,7 +72,7 @@ async function finaliseLesson(
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // Mirror summary back to the question doc
+    // Mirror summary + session snapshot to the question doc
     const qRef = firestore.collection("questions").doc(lesson.questionId);
     tx.update(qRef, {
       status: "completed",
@@ -71,8 +80,18 @@ async function finaliseLesson(
       billedSeconds: billed,
       totalCents: charged,
       endedBy,
+      participants: [lesson.studentUid, lesson.teacherUid],
+      startTime: lesson.startedAt,
+      endTime: Timestamp.fromDate(endedAt),
+      messages,
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    // Append questionId to history for both participants
+    const studentRef = firestore.collection("users").doc(lesson.studentUid);
+    const teacherRef = firestore.collection("users").doc(lesson.teacherUid);
+    tx.set(studentRef, { history: FieldValue.arrayUnion(lesson.questionId) }, { merge: true });
+    tx.set(teacherRef, { history: FieldValue.arrayUnion(lesson.questionId) }, { merge: true });
 
     logger.info(
       `[lessons] finalised lessonId=${lessonId} billed=${billed}s total=${charged}¢ by=${endedBy}`

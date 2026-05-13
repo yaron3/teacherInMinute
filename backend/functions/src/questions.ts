@@ -122,9 +122,18 @@ export const acceptInvite = onCall(async (req) => {
     const q = qSnap.data() as QuestionDoc;
     const inv = invSnap.data() as DispatchInviteDoc;
 
-    // FR-B-004: fail if another teacher already claimed it
-    if (q.status !== "searching") {
+    // FR-B-004: fail only if someone else already claimed it.
+    // "unanswered" means all waves timed out but no one accepted — a teacher with
+    // a still-valid invite (INVITE_EXPIRY_SECONDS > WAVE_TIMEOUT_SECONDS * waves)
+    // can still legitimately accept it.
+    if (q.status === "accepted" || q.status === "in_progress" || q.status === "completed") {
       throw new HttpsError("already-exists", "Question already claimed by another teacher");
+    }
+    if (q.status === "cancelled") {
+      throw new HttpsError("failed-precondition", "Question was cancelled by the student");
+    }
+    if (q.status !== "searching" && q.status !== "unanswered") {
+      throw new HttpsError("failed-precondition", `Question is not available (status: ${q.status})`);
     }
 
     if (inv.response !== "pending") {
