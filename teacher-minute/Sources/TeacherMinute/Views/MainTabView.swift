@@ -5,7 +5,6 @@
 //  Created by Yaron Jackoby on 06/05/2026.
 //
 
-
 import SwiftUI
 
 struct MainTabView: View {
@@ -19,47 +18,35 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch viewModel.selectedTab {
-                case .home:
-                    if viewModel.userMode == .student {
-                        StudentHomeView(hidesTabBar: $hidesTabBar)
-                    } else {
-                        if let teacherDashboardViewModel {
-                            TeacherDashboardView(
-                                viewModel: teacherDashboardViewModel,
-                                hidesTabBar: $hidesTabBar,
-                                showsSessionOverlay: false,
-                                showsIncomingOverlay: false
-                            )
-                        }
+        ZStack {
+            TabView(selection: $viewModel.selectedTab) {
+                tabContent(.home)
+                    .tabItem {
+                        Label(MainTab.home.title, systemImage: MainTab.home.systemImage)
                     }
+                    .tag(MainTab.home)
 
-                case .lessons:
-                    if viewModel.userMode == .student {
-                        StudentLessonHistoryView()
-                    } else {
-                        TeacherLessonHistoryView()
+                tabContent(.lessons)
+                    .tabItem {
+                        Label(MainTab.lessons.title, systemImage: MainTab.lessons.systemImage)
                     }
+                    .tag(MainTab.lessons)
+                    .badge(viewModel.shouldShowLessonsBadge ? 1 : 0)
 
-                case .profile:
-                    ProfileView()
+                tabContent(.profile)
+                    .tabItem {
+                        Label(MainTab.profile.title, systemImage: MainTab.profile.systemImage)
+                    }
+                    .tag(MainTab.profile)
 
-                case .settings:
-                    SettingsView()
-                }
+                tabContent(.settings)
+                    .tabItem {
+                        Label(MainTab.settings.title, systemImage: MainTab.settings.systemImage)
+                    }
+                    .tag(MainTab.settings)
+                    .badge(viewModel.hasNotificationBadge ? 1 : 0)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, hidesTabBar ? 0 : 82)
-
-            if !hidesTabBar {
-                MainTabBar(
-                    selectedTab: $viewModel.selectedTab,
-                    showLessonsBadge: viewModel.shouldShowLessonsBadge,
-                    showSettingsBadge: viewModel.hasNotificationBadge
-                )
-            }
+            .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
 
             teacherGlobalOverlay
         }
@@ -70,6 +57,37 @@ struct MainTabView: View {
         }
         .background(Color(.systemBackground))
         .navigationBarBackButtonHidden(true)
+        .navigationBarHidden(true)
+    }
+
+    @ViewBuilder
+    func tabContent(_ tab: MainTab) -> some View {
+        switch tab {
+        case .home:
+            if viewModel.userMode == .student {
+                StudentHomeView(hidesTabBar: $hidesTabBar)
+            } else if let teacherDashboardViewModel {
+                TeacherDashboardView(
+                    viewModel: teacherDashboardViewModel,
+                    hidesTabBar: $hidesTabBar,
+                    showsSessionOverlay: false,
+                    showsIncomingOverlay: false
+                )
+            }
+
+        case .lessons:
+            if viewModel.userMode == .student {
+                StudentLessonHistoryView()
+            } else {
+                TeacherLessonHistoryView()
+            }
+
+        case .profile:
+            ProfileView()
+
+        case .settings:
+            SettingsView()
+        }
     }
 
     @ViewBuilder
