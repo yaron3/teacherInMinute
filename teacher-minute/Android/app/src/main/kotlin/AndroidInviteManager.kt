@@ -13,19 +13,19 @@ object AndroidInviteManager {
     private const val TIMEOUT_SECONDS = 15L
 
     @JvmStatic
-    fun fetchInvitesJson(teacherUid: String): String {
-        Log.i(TAG, "Fetching invites uid=$teacherUid")
+    fun fetchInvitesJson(teacherId: String): String {
+        Log.i(TAG, "Fetching invites uid=$teacherId")
 
         val snapshot = Tasks.await(
             FirebaseDatabase.getInstance(DATABASE_URL)
                 .getReference("teacherInvites")
-                .child(teacherUid)
+                .child(teacherId)
                 .get(),
             TIMEOUT_SECONDS,
             TimeUnit.SECONDS
         )
 
-        Log.i(TAG, "Invite snapshot exists=${snapshot.exists()} children=${snapshot.childrenCount} uid=$teacherUid")
+        Log.i(TAG, "Invite snapshot exists=${snapshot.exists()} children=${snapshot.childrenCount} uid=$teacherId")
 
         val invites = mutableListOf<JSONObject>()
 
@@ -54,7 +54,7 @@ object AndroidInviteManager {
                     !child.child("audioUrl").getValue(String::class.java).isNullOrBlank() ||
                     !child.child("voiceUrl").getValue(String::class.java).isNullOrBlank()
             val studentName = child.firstString("studentName", "studentFullName", "studentDisplayName", "name")
-            val studentUid = child.firstString("studentUid", "studentUID", "studentId")
+            val studentId = child.firstString("studentId", "studentUID", "studentId")
             val connectionFeeCents = child.child("connectionFeeCents").value.asIntOrNull()
                 ?: child.child("connectionFee").value.asIntOrNull()
                 ?: 0
@@ -85,7 +85,7 @@ object AndroidInviteManager {
                     .put("wave", wave)
                     .put("photoUrls", photoUrls)
                     .put("hasVoiceMessage", hasVoiceMessage)
-                    .put("studentUid", studentUid)
+                    .put("studentId", studentId)
                     .put("studentName", studentName)
                     .put("connectionFeeCents", connectionFeeCents)
                     .put("pricePerMinuteCents", pricePerMinuteCents)
@@ -94,7 +94,7 @@ object AndroidInviteManager {
 
         val array = JSONArray()
         invites.sortedBy { it.optDouble("expiresAt") }.forEach { array.put(it) }
-        Log.i(TAG, "Fetched invites count=${array.length()} uid=$teacherUid")
+        Log.i(TAG, "Fetched invites count=${array.length()} uid=$teacherId")
         return array.toString()
     }
 

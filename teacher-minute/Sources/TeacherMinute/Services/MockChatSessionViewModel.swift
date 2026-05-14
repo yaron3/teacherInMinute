@@ -31,6 +31,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
+  var onSessionEnded: (() -> Void)?
 
   private let currentUid = "mock-current-user"
 
@@ -143,6 +144,9 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func clearBoard() {
     boardStrokes.removeAll()
     onBoardStrokesUpdated?([])
+  }
+
+  func endLesson() async {
   }
 
   private static func defaultMessages(currentRole: String) -> [ChatMessage] {

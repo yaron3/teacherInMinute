@@ -9,13 +9,13 @@ enum AndroidInviteFetcher {
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
   )!
 
-  static func fetchInvites(teacherUid: String) async throws -> [[String: Any]] {
+  static func fetchInvites(teacherId: String) async throws -> [[String: Any]] {
     let json = try await Task.detached(priority: .userInitiated) {
       try jniContext {
         try managerClass.callStatic(
           method: fetchInvitesJsonMethod,
           options: [.kotlincompat],
-          args: [teacherUid.toJavaParameter(options: [.kotlincompat])]
+          args: [teacherId.toJavaParameter(options: [.kotlincompat])]
         )
       } as String
     }.value

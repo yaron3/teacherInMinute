@@ -39,6 +39,7 @@ final class TeacherDashboardViewModel {
   var activeCallRoom: String? = nil
   var activeCallToken: String? = nil
   var activeCallStudentUid: String? = nil
+  var activeLessonId: String? = nil
   var activeQuestionId: String? = nil
   var activeQuestionText = ""
   var activeStudentName = "Student"
@@ -115,7 +116,7 @@ final class TeacherDashboardViewModel {
 #endif
 
 #if !os(Android)
-    let service = InviteService(teacherUid: uid) { [weak self] updated in
+    let service = InviteService(teacherId: uid) { [weak self] updated in
       self?.setInvites(
         updated.map {
           [
@@ -126,7 +127,7 @@ final class TeacherDashboardViewModel {
             "wave": $0.wave,
             "photoUrls": $0.photoUrls,
             "hasVoiceMessage": $0.hasVoiceMessage,
-            "studentUid": $0.studentUid,
+            "studentId": $0.studentId,
             "studentName": $0.studentName,
             "connectionFeeCents": $0.connectionFeeCents,
             "pricePerMinuteCents": $0.pricePerMinuteCents,
@@ -190,7 +191,7 @@ final class TeacherDashboardViewModel {
     androidInvitePollingTask = Task { [weak self] in
       while !Task.isCancelled {
         do {
-          let updated = try await AndroidInviteFetcher.fetchInvites(teacherUid: uid)
+          let updated = try await AndroidInviteFetcher.fetchInvites(teacherId: uid)
           guard !Task.isCancelled else { return }
           self?.setInvites(updated)
           logger.info("[VM] Android invite polling fetched count=\(updated.count) uid=\(uid)")
@@ -215,7 +216,7 @@ final class TeacherDashboardViewModel {
     var photoUrlsByID: [String: [String]] = [:]
     var hasVoiceByID: [String: Bool] = [:]
     var studentNames: [String: String] = [:]
-    var studentUids: [String: String] = [:]
+    var studentIds: [String: String] = [:]
     var connectionFees: [String: Int] = [:]
     var pricesPerMinute: [String: Int] = [:]
 
@@ -252,7 +253,7 @@ final class TeacherDashboardViewModel {
       photoUrlsByID[id] = row["photoUrls"] as? [String] ?? []
       hasVoiceByID[id] = row["hasVoiceMessage"] as? Bool ?? false
       studentNames[id] = Self.firstString(row, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
-      studentUids[id] = Self.firstString(row, keys: ["studentUid", "studentUID", "studentId"])
+      studentIds[id] = Self.firstString(row, keys: ["studentId", "studentUID", "studentId"])
       connectionFees[id] = Self.intValue(row["connectionFeeCents"]) ?? Self.intValue(row["connectionFee"]) ?? 0
       pricesPerMinute[id] = Self.intValue(row["pricePerMinuteCents"])
         ?? Self.intValue(row["ratePerMinuteCents"])
@@ -268,7 +269,7 @@ final class TeacherDashboardViewModel {
     invitePhotoUrls = photoUrlsByID
     inviteHasVoiceMessage = hasVoiceByID
     inviteStudentNames = studentNames
-    inviteStudentUids = studentUids
+    inviteStudentUids = studentIds
     inviteConnectionFeeCents = connectionFees
     invitePricePerMinuteCents = pricesPerMinute
   }
@@ -296,14 +297,15 @@ final class TeacherDashboardViewModel {
         try Task.checkCancellation()
         try await ChatSessionService.markQuestionAccepted(
           questionId: questionId,
-          teacherUid: Auth.auth().currentUser?.uid
+          teacherId: Auth.auth().currentUser?.uid
         )
         try Task.checkCancellation()
         activeCallRoom = result.liveKitRoom
         activeCallToken = result.liveKitToken
-        activeCallStudentUid = result.studentUid ?? inviteStudentUids[questionId]
-        if activeStudentName == "Student", let studentUid = activeCallStudentUid, !studentUid.isEmpty,
-           let profile = try? await UserService.shared.fetchProfileSummary(uid: studentUid) {
+        activeCallStudentUid = result.studentId ?? inviteStudentUids[questionId]
+        activeLessonId = result.questionId
+        if activeStudentName == "Student", let studentId = activeCallStudentUid, !studentId.isEmpty,
+           let profile = try? await UserService.shared.fetchProfileSummary(uid: studentId) {
           activeStudentName = profile.displayName
         }
         inviteIDs = inviteIDs.filter { $0 != questionId }
@@ -355,6 +357,7 @@ final class TeacherDashboardViewModel {
     activeCallRoom = nil
     activeCallToken = nil
     activeCallStudentUid = nil
+    activeLessonId = nil
     activeQuestionText = ""
     activeStudentName = "Student"
     activeConnectionFeeCents = 0
@@ -368,8 +371,9 @@ final class TeacherDashboardViewModel {
 
   func activeChatInitialDetails() -> ChatSessionDetails {
     ChatSessionDetails(
-      studentUid: activeCallStudentUid ?? "",
-      teacherUid: Auth.auth().currentUser?.uid ?? "",
+      questionId: activeLessonId ?? "",
+      studentId: activeCallStudentUid ?? "",
+      teacherId: Auth.auth().currentUser?.uid ?? "",
       studentName: activeStudentName,
       teacherName: teacherName,
       questionText: activeQuestionText,

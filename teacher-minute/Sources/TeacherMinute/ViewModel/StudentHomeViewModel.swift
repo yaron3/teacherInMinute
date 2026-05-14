@@ -52,6 +52,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var activeQuestionText: String { get set }
   var activeConnectionFeeCents: Int { get set }
   var selectedPricePerMinuteCents: Int { get set }
+  var questionId: String? { get set }
   var pricingOptions: [PricingOption] { get }
   var recentLessons: [RecentLesson] { get }
 
@@ -61,7 +62,7 @@ protocol StudentHomeViewModeling: AnyObject {
   func selectTier(_ option: PricingOption)
   func viewAllLessons()
   func loadProfileIfNeeded() async
-  func chatInitialDetails() -> ChatSessionDetails
+  func chatInitialDetails(questionId: String?) -> ChatSessionDetails
 }
 
 // MARK: - ViewModel
@@ -75,6 +76,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var activeQuestionText = ""
   var activeConnectionFeeCents = 0
   var selectedPricePerMinuteCents = 50
+  var questionId: String?
 
   let pricingOptions = [
     PricingOption(
@@ -154,10 +156,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
   }
 
-  func chatInitialDetails() -> ChatSessionDetails {
+  func chatInitialDetails(questionId: String? = nil) -> ChatSessionDetails {
     ChatSessionDetails(
-      studentUid: Auth.auth().currentUser?.uid ?? "",
-      teacherUid: "",
+	  questionId: questionId ?? "",
+      studentId: Auth.auth().currentUser?.uid ?? "",
+      teacherId: "",
       studentName: name,
       teacherName: "Teacher",
       questionText: activeQuestionText,
@@ -181,6 +184,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
           print("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
 
           if isAcceptedStatus(status) {
+			self.questionId = result.questionId
             searchState = .matched(
               questionId: questionId,
               liveKitRoom: result.liveKitRoom ?? "",
@@ -248,6 +252,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var activeQuestionText: String
   var activeConnectionFeeCents: Int
   var selectedPricePerMinuteCents: Int
+  var questionId: String?
 
   let pricingOptions: [PricingOption]
   let recentLessons: [RecentLesson]
@@ -282,6 +287,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.activeQuestionText = activeQuestionText
     self.activeConnectionFeeCents = activeConnectionFeeCents
     self.selectedPricePerMinuteCents = selectedPricePerMinuteCents
+    self.questionId = "mock-lesson"
     self.pricingOptions = pricingOptions
     self.recentLessons = recentLessons
   }
@@ -308,10 +314,11 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   func loadProfileIfNeeded() async {}
 
-  func chatInitialDetails() -> ChatSessionDetails {
+  func chatInitialDetails(questionId: String? = nil) -> ChatSessionDetails {
     ChatSessionDetails(
-      studentUid: "mock-student",
-      teacherUid: "mock-teacher",
+      questionId: questionId ?? "mock-lesson",
+      studentId: "mock-student",
+      teacherId: "mock-teacher",
       studentName: name,
       teacherName: "Teacher",
       questionText: activeQuestionText,

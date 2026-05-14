@@ -24,32 +24,43 @@ final class SettingsRemoteConfigService {
     
     private enum Key {
         static let aboutURL = "settings_about_url"
+        static let supportEmail = "support_email"
+        static let eulaURL = "eula_url"
+        static let privacyPolicyURL = "privacy_policy"
         static let subjects = "subjects"
         static let baseURL = "baseURL"
     }
     
     private let defaultBaseURL = "https://us-central1-teacher-in-a-moment.cloudfunctions.net"
+    private let defaultSupportEmail = "support@tim.app"
     
     private init() {}
     
     func fetchAboutURL() async throws -> URL {
+        try await fetchURL(forKey: Key.aboutURL, missingError: .missingAboutURL)
+    }
+    
+    func fetchEULAURL() async throws -> URL {
+        try await fetchURL(forKey: Key.eulaURL, missingError: .missingLegalURL("EULA"))
+    }
+    
+    func fetchPrivacyPolicyURL() async throws -> URL {
+        try await fetchURL(forKey: Key.privacyPolicyURL, missingError: .missingLegalURL("Privacy policy"))
+    }
+    
+    func fetchSupportEmail() async -> String {
         let remoteConfig = RemoteConfig.remoteConfig()
         let settings = RemoteConfigSettings()
         settings.minimumFetchInterval = 3600
         settings.fetchTimeout = 15
         remoteConfig.configSettings = settings
         
-        _ = try await remoteConfig.fetchAndActivate()
+        _ = try? await remoteConfig.fetchAndActivate()
         let rawValue = remoteConfig
-            .configValue(forKey: Key.aboutURL)
+            .configValue(forKey: Key.supportEmail)
             .stringValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard let url = URL(string: rawValue), url.scheme != nil else {
-            throw SettingsError.missingAboutURL
-        }
-        
-        return url
+        return rawValue.isEmpty ? defaultSupportEmail : rawValue
     }
     
     func fetchTeachingSubjects() async throws -> [RemoteTeachingSubject] {
@@ -87,6 +98,26 @@ final class SettingsRemoteConfigService {
         return URL(string: urlString) ?? URL(string: defaultBaseURL)!
     }
     
+    private func fetchURL(forKey key: String, missingError: SettingsError) async throws -> URL {
+        let remoteConfig = RemoteConfig.remoteConfig()
+        let settings = RemoteConfigSettings()
+        settings.minimumFetchInterval = 3600
+        settings.fetchTimeout = 15
+        remoteConfig.configSettings = settings
+        
+        _ = try await remoteConfig.fetchAndActivate()
+        let rawValue = remoteConfig
+            .configValue(forKey: key)
+            .stringValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard let url = URL(string: rawValue), url.scheme != nil else {
+            throw missingError
+        }
+        
+        return url
+    }
+    
     private func subtopicKey(for subject: String) -> String {
         let normalizedSubject = subject
             .filter { $0.isLetter || $0.isNumber }
@@ -110,12 +141,15 @@ final class SettingsRemoteConfigService {
 
 enum SettingsError: LocalizedError {
     case missingAboutURL
+    case missingLegalURL(String)
     case missingUser
     
     var errorDescription: String? {
         switch self {
         case .missingAboutURL:
             return "About page is not configured yet."
+        case .missingLegalURL(let title):
+            return "\(title) URL is not configured yet."
         case .missingUser:
             return "No signed-in user was found."
         }

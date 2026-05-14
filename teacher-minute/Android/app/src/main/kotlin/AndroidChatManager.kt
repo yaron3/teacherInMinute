@@ -148,16 +148,16 @@ object AndroidChatManager {
     }
 
     @JvmStatic
-    fun markQuestionAccepted(questionId: String, teacherUid: String) {
+    fun markQuestionAccepted(questionId: String, teacherId: String) {
         val values = mutableMapOf<String, Any>(
             "status" to "accepted",
             "acceptedAt" to System.currentTimeMillis().toDouble()
         )
-        if (teacherUid.isNotBlank()) {
-            values["teacherUid"] = teacherUid
+        if (teacherId.isNotBlank()) {
+            values["teacherId"] = teacherId
         }
 
-        Log.i(TAG, "Marking question accepted questionId=$questionId teacherUid=$teacherUid")
+        Log.i(TAG, "Marking question accepted questionId=$questionId teacherId=$teacherId")
         val ref = FirebaseDatabase.getInstance(DATABASE_URL)
             .getReference("questions")
             .child(questionId)
@@ -184,6 +184,7 @@ object AndroidChatManager {
             .put("status", status)
             .put("liveKitRoom", snapshot.child("liveKitRoom").getValue(String::class.java) ?: "")
             .put("liveKitToken", snapshot.child("liveKitToken").getValue(String::class.java) ?: "")
+            .put("questionId", snapshot.firstString("questionId", "questionID", "id"))
             .toString()
     }
 
@@ -200,8 +201,9 @@ object AndroidChatManager {
         if (!snapshot.exists()) return JSONObject().toString()
 
         return JSONObject()
-            .put("studentUid", snapshot.firstString("studentUid", "studentUID", "studentId"))
-            .put("teacherUid", snapshot.firstString("teacherUid", "teacherUID", "teacherId"))
+            .put("questionId", snapshot.firstString("questionId", "questionID", "id"))
+            .put("studentId", snapshot.firstString("studentId", "studentUID", "studentId"))
+            .put("teacherId", snapshot.firstString("teacherId", "teacherUID", "teacherId"))
             .put("studentName", snapshot.firstString("studentName", "studentFullName", "studentDisplayName", "name"))
             .put("teacherName", snapshot.firstString("teacherName", "teacherFullName", "teacherDisplayName"))
             .put("text", snapshot.firstString("text", "questionText", "originalQuestion", "message", "topic"))

@@ -101,7 +101,7 @@ struct StudentHomeView: View {
                 questionId: questionId,
                 role: "student",
                 title: "Teacher",
-                initialDetails: viewModel.chatInitialDetails()
+                initialDetails: viewModel.chatInitialDetails(questionId: questionId)
             ) {
                 viewModel.resetSearch()
             }

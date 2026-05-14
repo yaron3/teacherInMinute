@@ -65,6 +65,9 @@ struct ChatSessionView: View {
         sessionDetailsRevision += 1
         displayDate = Date()
       }
+      viewModel.onSessionEnded = {
+        onClose()
+      }
       messages = viewModel.messages
       boardStrokes = viewModel.boardStrokes
       errorMessage = viewModel.errorMessage
@@ -203,7 +206,12 @@ struct ChatSessionView: View {
       }
       .buttonStyle(.plain)
 
-      Button(action: onClose) {
+      Button {
+        Task {
+          await viewModel.endLesson()
+          onClose()
+        }
+      } label: {
         Text("End")
           .font(.system(size: 12, weight: .bold))
           .foregroundStyle(.white)

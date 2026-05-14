@@ -22,7 +22,8 @@ enum QuestionStatusStore {
     return QuestionStatusResult(
       status: status,
       liveKitRoom: row["liveKitRoom"] as? String,
-      liveKitToken: row["liveKitToken"] as? String
+      liveKitToken: row["liveKitToken"] as? String,
+      questionId: firstString(in: row, keys: ["questionId", "questionID", "id"])
     )
 #else
     let ref = FirebaseDatabase.Database.database().reference(withPath: "questions/\(questionId)")
@@ -39,7 +40,8 @@ enum QuestionStatusStore {
           returning: QuestionStatusResult(
             status: status,
             liveKitRoom: dict["liveKitRoom"] as? String,
-            liveKitToken: dict["liveKitToken"] as? String
+            liveKitToken: dict["liveKitToken"] as? String,
+            questionId: firstString(in: dict, keys: ["questionId", "questionID", "id"])
           )
         )
       } withCancel: { error in
@@ -47,6 +49,16 @@ enum QuestionStatusStore {
       }
     }
 #endif
+  }
+
+  private static func firstString(in dict: [String: Any], keys: [String]) -> String? {
+    for key in keys {
+      if let value = dict[key] as? String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+      }
+    }
+    return nil
   }
 }
 

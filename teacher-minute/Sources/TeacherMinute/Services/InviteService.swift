@@ -2,7 +2,7 @@
 //  InviteService.swift
 //  teacher-minute
 //
-// Listens to RTDB path:  teacherInvites/{teacherUid}/{questionId}/
+// Listens to RTDB path:  teacherInvites/{teacherId}/{questionId}/
 //   topic     : String
 //   text      : String
 //   expiresAt : Double  (Unix ms)
@@ -21,21 +21,21 @@ private func invLog(_ msg: String) { print(msg) }
 
 @MainActor
 final class InviteService {
-  private let teacherUid: String
+  private let teacherId: String
   private var ref: DatabaseReference?
   private var handle: UInt?
   private let onInvitesUpdated: ([IncomingInvite]) -> Void
 
-  init(teacherUid: String, onInvitesUpdated: @escaping ([IncomingInvite]) -> Void) {
-    self.teacherUid = teacherUid
+  init(teacherId: String, onInvitesUpdated: @escaping ([IncomingInvite]) -> Void) {
+    self.teacherId = teacherId
     self.onInvitesUpdated = onInvitesUpdated
-    self.ref = Database.database().reference(withPath: "teacherInvites/\(teacherUid)")
-    invLog("[InviteService] init uid=\(teacherUid)")
+    self.ref = Database.database().reference(withPath: "teacherInvites/\(teacherId)")
+    invLog("[InviteService] init uid=\(teacherId)")
   }
 
   func startListening() {
     guard let ref else { return }
-    invLog("[InviteService] startListening uid=\(teacherUid)")
+    invLog("[InviteService] startListening uid=\(teacherId)")
     handle = ref.observe(DataEventType.value) { [weak self] snapshot in
       guard let self else { return }
       var invites: [IncomingInvite] = []
@@ -53,7 +53,7 @@ final class InviteService {
           || (dict["audioUrl"] as? String)?.isEmpty == false
           || (dict["voiceUrl"] as? String)?.isEmpty == false
         let studentName = Self.firstString(dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
-        let studentUid = Self.firstString(dict, keys: ["studentUid", "studentUID", "studentId"])
+        let studentId = Self.firstString(dict, keys: ["studentId", "studentUID", "studentId"])
         let connectionFeeCents = Self.intValue(dict["connectionFeeCents"]) ?? Self.intValue(dict["connectionFee"]) ?? 0
         let pricePerMinuteCents = Self.intValue(dict["pricePerMinuteCents"])
           ?? Self.intValue(dict["ratePerMinuteCents"])
@@ -67,7 +67,7 @@ final class InviteService {
           wave: wave,
           photoUrls: photoUrls,
           hasVoiceMessage: hasVoiceMessage,
-          studentUid: studentUid,
+          studentId: studentId,
           studentName: studentName,
           connectionFeeCents: connectionFeeCents,
           pricePerMinuteCents: pricePerMinuteCents
@@ -83,7 +83,7 @@ final class InviteService {
     guard let handle else { return }
     ref?.removeObserver(withHandle: handle)
     self.handle = nil
-    invLog("[InviteService] stopListening uid=\(teacherUid)")
+    invLog("[InviteService] stopListening uid=\(teacherId)")
   }
 
   private static func firstString(_ dict: [String: Any], keys: [String]) -> String {
@@ -111,17 +111,17 @@ import FirebaseDatabase
 
 @MainActor
 final class InviteService {
-  private let teacherUid: String
+  private let teacherId: String
   private let ref: FirebaseDatabase.DatabaseReference
   private var handle: DatabaseHandle?
   private let onInvitesUpdated: ([IncomingInvite]) -> Void
 
-  init(teacherUid: String, onInvitesUpdated: @escaping ([IncomingInvite]) -> Void) {
-    self.teacherUid = teacherUid
+  init(teacherId: String, onInvitesUpdated: @escaping ([IncomingInvite]) -> Void) {
+    self.teacherId = teacherId
     self.onInvitesUpdated = onInvitesUpdated
     self.ref = FirebaseDatabase.Database.database()
-      .reference(withPath: "teacherInvites/\(teacherUid)")
-    logger.info("[InviteService] init uid=\(teacherUid)")
+      .reference(withPath: "teacherInvites/\(teacherId)")
+    logger.info("[InviteService] init uid=\(teacherId)")
   }
 
   func startListening() {
@@ -142,7 +142,7 @@ final class InviteService {
           || (dict["audioUrl"] as? String)?.isEmpty == false
           || (dict["voiceUrl"] as? String)?.isEmpty == false
         let studentName = Self.firstString(dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
-        let studentUid = Self.firstString(dict, keys: ["studentUid", "studentUID", "studentId"])
+        let studentId = Self.firstString(dict, keys: ["studentId", "studentUID", "studentId"])
         let connectionFeeCents = Self.intValue(dict["connectionFeeCents"]) ?? Self.intValue(dict["connectionFee"]) ?? 0
         let pricePerMinuteCents = Self.intValue(dict["pricePerMinuteCents"])
           ?? Self.intValue(dict["ratePerMinuteCents"])
@@ -156,7 +156,7 @@ final class InviteService {
           wave: wave,
           photoUrls: photoUrls,
           hasVoiceMessage: hasVoiceMessage,
-          studentUid: studentUid,
+          studentId: studentId,
           studentName: studentName,
           connectionFeeCents: connectionFeeCents,
           pricePerMinuteCents: pricePerMinuteCents
@@ -166,14 +166,14 @@ final class InviteService {
       invites.sort { $0.expiresAt < $1.expiresAt }
       self.onInvitesUpdated(invites)
     }
-	logger.info("[InviteService] startListening uid=\(self.teacherUid)")
+	logger.info("[InviteService] startListening uid=\(self.teacherId)")
   }
 
   func stopListening() {
     guard let handle else { return }
     ref.removeObserver(withHandle: handle)
     self.handle = nil
-	logger.info("[InviteService] stopListening uid=\(self.teacherUid)")
+	logger.info("[InviteService] stopListening uid=\(self.teacherId)")
   }
 
   private static func firstString(_ dict: [String: Any], keys: [String]) -> String {

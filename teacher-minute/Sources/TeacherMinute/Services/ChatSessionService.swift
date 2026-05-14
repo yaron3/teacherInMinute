@@ -31,8 +31,9 @@ struct BoardStroke: Identifiable, Equatable {
 }
 
 struct ChatSessionDetails: Equatable {
-  let studentUid: String
-  let teacherUid: String
+  let questionId: String
+  let studentId: String
+  let teacherId: String
   let studentName: String
   let teacherName: String
   let questionText: String
@@ -48,8 +49,10 @@ final class ChatSessionService {
   private let questionId: String
   private let currentUserUid: String
 #if !os(Android)
+  private let questionRef: FirebaseDatabase.DatabaseReference
   private let messagesRef: FirebaseDatabase.DatabaseReference
   private let boardRef: FirebaseDatabase.DatabaseReference
+  private var sessionHandle: DatabaseHandle?
   private var messagesHandle: DatabaseHandle?
   private var boardHandle: DatabaseHandle?
 #endif
@@ -59,6 +62,7 @@ final class ChatSessionService {
     self.currentUserUid = currentUserUid ?? Auth.auth().currentUser?.uid ?? ""
 #if !os(Android)
     let questionRef = FirebaseDatabase.Database.database().reference(withPath: "questions/\(questionId)")
+    self.questionRef = questionRef
     self.messagesRef = questionRef.child("messages")
     self.boardRef = questionRef.child("board/strokes")
 #endif
@@ -91,18 +95,18 @@ final class ChatSessionService {
 #endif
   }
 
-  static func markQuestionAccepted(questionId: String, teacherUid: String?) async throws {
+  static func markQuestionAccepted(questionId: String, teacherId: String?) async throws {
 #if os(Android)
     try await Task.detached(priority: .userInitiated) {
-      try AndroidChatBridge.markQuestionAccepted(questionId: questionId, teacherUid: teacherUid ?? "")
+      try AndroidChatBridge.markQuestionAccepted(questionId: questionId, teacherId: teacherId ?? "")
     }.value
 #else
     var payload: [String: Any] = [
       "status": "accepted",
       "acceptedAt": Date().timeIntervalSince1970 * 1000.0
     ]
-    if let teacherUid, !teacherUid.isEmpty {
-      payload["teacherUid"] = teacherUid
+    if let teacherId, !teacherId.isEmpty {
+      payload["teacherId"] = teacherId
     }
 
     let questionRef = FirebaseDatabase.Database.database().reference(withPath: "questions/\(questionId)")
@@ -110,6 +114,16 @@ final class ChatSessionService {
       questionRef.updateChildValues(payload) { error, _ in
         if let error { cont.resume(throwing: error); return }
         cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
+  func startSessionListening(onEnded: @escaping () -> Void) {
+#if !os(Android)
+    sessionHandle = questionRef.observe(.value) { snapshot in
+      if !snapshot.exists() {
+        onEnded()
       }
     }
 #endif
@@ -149,6 +163,10 @@ final class ChatSessionService {
 
   func stopListening() {
 #if !os(Android)
+    if let sessionHandle {
+      questionRef.removeObserver(withHandle: sessionHandle)
+      self.sessionHandle = nil
+    }
     if let messagesHandle {
       messagesRef.removeObserver(withHandle: messagesHandle)
       self.messagesHandle = nil
@@ -313,8 +331,9 @@ final class ChatSessionService {
 
   private static func details(from dict: [String: Any]) -> ChatSessionDetails {
     ChatSessionDetails(
-      studentUid: firstString(in: dict, keys: ["studentUid", "studentUID", "studentId"]),
-      teacherUid: firstString(in: dict, keys: ["teacherUid", "teacherUID", "teacherId"]),
+      questionId: firstString(in: dict, keys: ["questionId", "questionID", "id"]),
+      studentId: firstString(in: dict, keys: ["studentId", "studentUID", "studentId"]),
+      teacherId: firstString(in: dict, keys: ["teacherId", "teacherUID", "teacherId"]),
       studentName: firstString(in: dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"]),
       teacherName: firstString(in: dict, keys: ["teacherName", "teacherFullName", "teacherDisplayName"]),
       questionText: firstString(in: dict, keys: ["text", "questionText", "originalQuestion", "message", "topic"]),
@@ -371,6 +390,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var onErrorUpdated: ((String?) -> Void)? { get set }
   var onConnectingUpdated: ((Bool) -> Void)? { get set }
   var onSessionDetailsUpdated: (() -> Void)? { get set }
+  var onSessionEnded: (() -> Void)? { get set }
 
   func start()
   func stop()
@@ -382,6 +402,7 @@ protocol ChatSessionViewModeling: AnyObject {
   func send(_ messageText: String)
   func sendStroke(_ points: [BoardPoint])
   func clearBoard()
+  func endLesson() async
 }
 
 @Observable
@@ -417,12 +438,15 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
+  var onSessionEnded: (() -> Void)?
   var boardRevision: String {
     boardStrokes.map { "\($0.id):\($0.points.count)" }.joined(separator: "|")
   }
 
   private let service: ChatSessionService
   private var pollingTask: Task<Void, Never>?
+  private var hasReportedLessonEnd = false
+  private var didObserveActiveSession = false
 
   init(questionId: String, role: String, initialDetails: ChatSessionDetails? = nil) {
     self.questionId = questionId
@@ -447,6 +471,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private func loadSessionDetails() async {
     do {
       if let updated = try await service.fetchSessionDetails() {
+        didObserveActiveSession = true
         details = mergedDetails(current: details, updated: updated)
         await loadParticipantProfiles()
         onSessionDetailsUpdated?()
@@ -463,6 +488,12 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     pollingTask = Task {
       while !Task.isCancelled {
         do {
+          if try await service.fetchSessionDetails() == nil {
+            guard !Task.isCancelled else { return }
+            await handleRemoteSessionEnded()
+            return
+          }
+          didObserveActiveSession = true
           let rows = try await service.fetchMessages()
           let strokes = try await service.fetchBoardStrokes()
           guard !Task.isCancelled else { return }
@@ -478,6 +509,11 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       }
     }
 #else
+    service.startSessionListening { [weak self] in
+      Task { @MainActor in
+        await self?.handleRemoteSessionEnded()
+      }
+    }
     service.startListening { [weak self] rows in
       self?.messages = rows
       self?.onMessagesUpdated?(rows)
@@ -595,12 +631,42 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     }
   }
 
+  func endLesson() async {
+    await reportLessonEnded()
+    stop()
+  }
+
+  private func handleRemoteSessionEnded() async {
+    guard didObserveActiveSession || details != nil else { return }
+    await reportLessonEnded()
+    stop()
+    onSessionEnded?()
+  }
+
+  private func reportLessonEnded() async {
+    guard !hasReportedLessonEnd else { return }
+    hasReportedLessonEnd = true
+
+    do {
+      guard let questionId = nonEmpty(self.questionId) else {
+        logger.error("[ChatSession] cannot report endLesson without questionId questionId=\(self.questionId)")
+        return
+      }
+      try await FunctionsService.shared.endLesson(questionId: self.questionId)
+      logger.info("[ChatSession] endLesson reported questionId=\(questionId)")
+    } catch {
+      errorMessage = error.localizedDescription
+      onErrorUpdated?(errorMessage)
+      logger.error("[ChatSession] endLesson failed questionId=\(self.questionId): \(error.localizedDescription)")
+    }
+  }
+
   private var isTeacherRole: Bool {
     if let currentUid = nonEmpty(Auth.auth().currentUser?.uid) {
-      if let teacherUid = nonEmpty(details?.teacherUid), currentUid == teacherUid {
+      if let teacherId = nonEmpty(details?.teacherId), currentUid == teacherId {
         return true
       }
-      if let studentUid = nonEmpty(details?.studentUid), currentUid == studentUid {
+      if let studentId = nonEmpty(details?.studentId), currentUid == studentId {
         return false
       }
     }
@@ -639,8 +705,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private func mergedDetails(current: ChatSessionDetails?, updated: ChatSessionDetails) -> ChatSessionDetails {
     guard let current else { return updated }
     return ChatSessionDetails(
-      studentUid: nonEmpty(updated.studentUid) ?? current.studentUid,
-      teacherUid: nonEmpty(updated.teacherUid) ?? current.teacherUid,
+      questionId: nonEmpty(updated.questionId) ?? current.questionId,
+      studentId: nonEmpty(updated.studentId) ?? current.studentId,
+      teacherId: nonEmpty(updated.teacherId) ?? current.teacherId,
       studentName: nonEmpty(updated.studentName) ?? current.studentName,
       teacherName: nonEmpty(updated.teacherName) ?? current.teacherName,
       questionText: nonEmpty(updated.questionText) ?? current.questionText,
@@ -657,20 +724,21 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     var studentName = current.studentName
     var teacherName = current.teacherName
 
-    if nonEmpty(studentName) == nil, let uid = nonEmpty(current.studentUid),
+    if nonEmpty(studentName) == nil, let uid = nonEmpty(current.studentId),
        let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       studentName = profile.displayName
     }
 
-    if nonEmpty(teacherName) == nil, let uid = nonEmpty(current.teacherUid),
+    if nonEmpty(teacherName) == nil, let uid = nonEmpty(current.teacherId),
        let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       teacherName = profile.displayName
     }
 
     guard studentName != current.studentName || teacherName != current.teacherName else { return }
     details = ChatSessionDetails(
-      studentUid: current.studentUid,
-      teacherUid: current.teacherUid,
+      questionId: current.questionId,
+      studentId: current.studentId,
+      teacherId: current.teacherId,
       studentName: studentName,
       teacherName: teacherName,
       questionText: current.questionText,
@@ -774,14 +842,14 @@ private enum AndroidChatBridge {
     }
   }
 
-  static func markQuestionAccepted(questionId: String, teacherUid: String) throws {
+  static func markQuestionAccepted(questionId: String, teacherId: String) throws {
     try jniContext {
       try managerClass.callStatic(
         method: markQuestionAcceptedMethod,
         options: [.kotlincompat],
         args: [
           questionId.toJavaParameter(options: [.kotlincompat]),
-          teacherUid.toJavaParameter(options: [.kotlincompat])
+          teacherId.toJavaParameter(options: [.kotlincompat])
         ]
       )
     }

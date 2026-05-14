@@ -3,7 +3,7 @@
 //  teacher-minute
 //
 // Mirrors the RTDB node written by the backend at:
-//   teacherInvites/{teacherUid}/{questionId}/
+//   teacherInvites/{teacherId}/{questionId}/
 //     topic     : String
 //     text      : String  (first 300 chars of the student's question)
 //     expiresAt : Double  (Unix ms — the 12s wave deadline)
@@ -24,7 +24,7 @@ struct IncomingInvite: Identifiable {
   let wave: Int
   let photoUrls: [String]
   let hasVoiceMessage: Bool
-  let studentUid: String
+  let studentId: String
   let studentName: String
   let connectionFeeCents: Int
   let pricePerMinuteCents: Int
@@ -48,7 +48,7 @@ struct IncomingInvite: Identifiable {
   let wave: Int
   let photoUrls: [String]
   let hasVoiceMessage: Bool
-  let studentUid: String
+  let studentId: String
   let studentName: String
   let connectionFeeCents: Int
   let pricePerMinuteCents: Int

@@ -5,14 +5,51 @@
 //  Created by Yaron Jackoby on 06/05/2026.
 //
 
-
 import SwiftUI
 
 struct SettingsView: View {
-    @State var viewModel = SettingsViewModel()
+    @State var viewModel: SettingsViewModel
     @Environment(\.appRouter) var router
+    @Environment(\.openURL) var openURL
+
+    init(viewModel: SettingsViewModel = SettingsViewModel()) {
+        self._viewModel = State(wrappedValue: viewModel)
+    }
 
     var body: some View {
+        NavigationStack(path: $viewModel.navigationPath) {
+            settingsContent
+                .navigationDestination(for: SettingsDestination.self) { destination in
+                    destinationView(destination)
+                }
+        }
+        .background(Color(.systemBackground))
+        .alert(viewModel.activeConfirmation?.title ?? "Settings", isPresented: isShowingConfirmation) {
+            Button("Cancel", role: .cancel) {
+                viewModel.activeConfirmation = nil
+            }
+
+            if let confirmation = viewModel.activeConfirmation {
+                Button(confirmation.confirmTitle, role: confirmation.isDestructive ? .destructive : nil) {
+                    confirm(confirmation)
+                }
+            }
+        } message: {
+            Text(viewModel.activeConfirmation?.message ?? "")
+        }
+        .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.alertMessage ?? "")
+        }
+        .onChange(of: viewModel.externalURL) { _, url in
+            guard let url else { return }
+            openURL(url)
+            viewModel.consumeExternalURL()
+        }
+    }
+
+    var settingsContent: some View {
         ZStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
@@ -38,37 +75,24 @@ struct SettingsView: View {
                 .padding(.horizontal, 18)
             }
             
-            if viewModel.isLoading {
-                Color.black.opacity(0.18).ignoresSafeArea()
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .scaleEffect(1.4)
-                    .tint(.white)
-            }
+            loadingOverlay
         }
         .background(Color(.systemBackground))
-        .sheet(item: $viewModel.activeSheet) { sheet in
-            switch sheet {
-            case .about(let url):
-                AboutWebView(url: url)
-            }
-        }
-        .alert("Delete Account", isPresented: $viewModel.showDeleteAccountConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                Task {
-                    if await viewModel.deleteAccount() {
-                        router.popToRoot()
-                    }
-                }
-            }
-        } message: {
-            Text("This permanently deletes your account and profile data. This cannot be undone.")
-        }
-        .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(viewModel.alertMessage ?? "")
+    }
+
+    @ViewBuilder
+    func destinationView(_ destination: SettingsDestination) -> some View {
+        switch destination {
+        case .accountSecurity:
+            AccountSecuritySettingsView(viewModel: viewModel)
+        case .language:
+            LanguageSettingsView(viewModel: viewModel)
+        case .about:
+            AboutSettingsView(viewModel: viewModel)
+        case .webPage(let title, let url):
+            AboutWebView(url: url, title: title)
+        case .changePassword, .teacherPayouts, .studentPayments, .notifications, .privacyControls:
+            SettingsPlaceholderView(destination: destination)
         }
     }
 
@@ -83,7 +107,7 @@ struct SettingsView: View {
             VStack(spacing: 0) {
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
                     SettingsRowView(row: row) {
-                        select(row)
+                        viewModel.select(row)
                     }
 
                     if index < section.rows.count - 1 {
@@ -98,16 +122,250 @@ struct SettingsView: View {
             .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
         }
     }
-    
-    private func select(_ row: SettingsRow) {
-        if row.action == .logOut {
-            if viewModel.logOut() {
+
+    @ViewBuilder
+    var loadingOverlay: some View {
+        if viewModel.isLoading {
+            Color.black.opacity(0.18).ignoresSafeArea()
+            ProgressView()
+                .progressViewStyle(.circular)
+                .scaleEffect(1.4)
+                .tint(.white)
+        }
+    }
+
+    var isShowingConfirmation: Binding<Bool> {
+        Binding {
+            viewModel.activeConfirmation != nil
+        } set: { isPresented in
+            if !isPresented {
+                viewModel.activeConfirmation = nil
+            }
+        }
+    }
+
+    private func confirm(_ confirmation: SettingsConfirmation) {
+        viewModel.activeConfirmation = nil
+
+        Task {
+            if await viewModel.confirm(confirmation) {
                 router.popToRoot()
             }
-            return
         }
-        
-        viewModel.select(row)
+    }
+}
+
+struct AccountSecuritySettingsView: View {
+    let viewModel: SettingsViewModel
+
+    var body: some View {
+        ZStack {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    settingsSection(viewModel.accountSecuritySection)
+                        .padding(.top, 24)
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 24)
+            }
+
+            if viewModel.isLoading {
+                Color.black.opacity(0.18).ignoresSafeArea()
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .scaleEffect(1.4)
+                    .tint(.white)
+            }
+        }
+        .background(Color(.systemBackground))
+        .navigationTitle("Account & Security")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    func settingsSection(_ section: SettingsSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(section.title)
+                .font(.system(size: 12, weight: .bold))
+                .tracking(1)
+                .foregroundStyle(Color.appSecondaryText)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
+                    SettingsRowView(row: row) {
+                        viewModel.select(row)
+                    }
+
+                    if index < section.rows.count - 1 {
+                        Divider()
+                            .padding(.leading, 58)
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
+        }
+    }
+}
+
+struct LanguageSettingsView: View {
+    let viewModel: SettingsViewModel
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("LANGUAGE")
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(Color.appSecondaryText)
+                    .padding(.leading, 4)
+                    .padding(.top, 24)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(SettingsLanguageChoice.allCases.enumerated()), id: \.element.id) { index, language in
+                        Button {
+                            viewModel.selectedLanguage = language
+                        } label: {
+                            HStack(spacing: 14) {
+                                Circle()
+                                    .fill(Color.appGrayBackground)
+                                    .frame(width: 34, height: 34)
+                                    .overlay {
+                                        PlatformIcon(
+                                            systemName: "globe",
+                                            size: 13,
+                                            weight: .semibold,
+                                            color: Color.appPrimaryText
+                                        )
+                                    }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(language.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(Color.appPrimaryText)
+
+                                    if let subtitle = language.subtitle {
+                                        Text(subtitle)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(Color.appSecondaryText)
+                                    }
+                                }
+
+                                Spacer()
+
+                                if viewModel.selectedLanguage == language {
+                                    PlatformIcon(
+                                        systemName: "checkmark",
+                                        size: 14,
+                                        weight: .bold,
+                                        color: Color.appPink
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: language.subtitle == nil ? 54 : 64)
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < SettingsLanguageChoice.allCases.count - 1 {
+                            Divider()
+                                .padding(.leading, 58)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 24)
+        }
+        .background(Color(.systemBackground))
+        .navigationTitle("Language")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct AboutSettingsView: View {
+    let viewModel: SettingsViewModel
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                settingsSection(viewModel.aboutSection)
+                    .padding(.top, 24)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 24)
+        }
+        .background(Color(.systemBackground))
+        .navigationTitle("About")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    func settingsSection(_ section: SettingsSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(section.title)
+                .font(.system(size: 12, weight: .bold))
+                .tracking(1)
+                .foregroundStyle(Color.appSecondaryText)
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
+                    SettingsRowView(row: row) {
+                        viewModel.select(row)
+                    }
+
+                    if index < section.rows.count - 1 {
+                        Divider()
+                            .padding(.leading, 58)
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
+        }
+    }
+}
+
+struct SettingsPlaceholderView: View {
+    let destination: SettingsDestination
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Circle()
+                .fill(Color.appGrayBackground)
+                .frame(width: 58, height: 58)
+                .overlay {
+                    PlatformIcon(
+                        systemName: "gearshape.fill",
+                        size: 22,
+                        weight: .semibold,
+                        color: Color.appSecondaryText
+                    )
+                }
+
+            Text(destination.title)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Color.appPrimaryText)
+
+            Text(destination.placeholderMessage)
+                .font(.system(size: 13))
+                .foregroundStyle(Color.appSecondaryText)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+        .navigationTitle(destination.title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -157,3 +415,11 @@ struct SettingsRowView: View {
         .buttonStyle(.plain)
     }
 }
+
+#if os(iOS)
+struct SettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        SettingsView(viewModel: MockSettingsViewModel())
+    }
+}
+#endif

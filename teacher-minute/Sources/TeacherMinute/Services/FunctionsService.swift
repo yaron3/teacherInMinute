@@ -37,7 +37,8 @@ enum FunctionsError: Error {
 struct AcceptInviteResult {
   let liveKitRoom: String?
   let liveKitToken: String?
-  let studentUid: String?
+  let studentId: String?
+  let questionId: String?
 }
 
 struct CreateQuestionResult {
@@ -49,6 +50,7 @@ struct QuestionStatusResult {
   let status: String
   let liveKitRoom: String?
   let liveKitToken: String?
+  let questionId: String?
 }
 
 // MARK: - Service
@@ -86,7 +88,8 @@ final class FunctionsService {
     return QuestionStatusResult(
       status: status,
       liveKitRoom: result["liveKitRoom"] as? String,
-      liveKitToken: result["liveKitToken"] as? String
+      liveKitToken: result["liveKitToken"] as? String,
+	  questionId: Self.firstString(in: result, keys: ["questionId", "questionID", "id"])
     )
   }
 
@@ -95,12 +98,13 @@ final class FunctionsService {
   func acceptInvite(questionId: String) async throws -> AcceptInviteResult {
     let result = try await call(function: "acceptInvite", data: ["questionId": questionId, "inviteId": questionId])
 	logger.info("acceptInvite result: \(result)")
-    let suid = result["studentUid"] as? String
+    let suid = result["studentId"] as? String
       ?? result["studentUID"] as? String
       ?? result["studentId"] as? String
     let room = result["liveKitRoom"] as? String
     let token = result["liveKitToken"] as? String
-    return AcceptInviteResult(liveKitRoom: room, liveKitToken: token, studentUid: suid)
+    let questionId = Self.firstString(in: result, keys: ["questionId", "questionID", "id"])
+    return AcceptInviteResult(liveKitRoom: room, liveKitToken: token, studentId: suid, questionId: questionId)
   }
 
   func declineInvite(questionId: String) async throws {
@@ -109,12 +113,12 @@ final class FunctionsService {
 
   func startLesson(questionId: String) async throws -> String {
     let result = try await call(function: "startLesson", data: ["questionId": questionId])
-    guard let lessonId = result["lessonId"] as? String else { throw FunctionsError.decodingError }
-    return lessonId
+    guard let questionId = result["questionId"] as? String else { throw FunctionsError.decodingError }
+    return questionId
   }
 
-  func endLesson(lessonId: String) async throws {
-    _ = try await call(function: "endLesson", data: ["lessonId": lessonId])
+  func endLesson(questionId: String) async throws {
+    _ = try await call(function: "endLesson", data: ["questionId": questionId])
   }
 
   // MARK: - Core HTTP caller
@@ -174,6 +178,16 @@ final class FunctionsService {
     else { throw FunctionsError.decodingError }
 
     return result
+  }
+
+  private static func firstString(in dict: [String: Any], keys: [String]) -> String? {
+    for key in keys {
+      if let value = dict[key] as? String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+      }
+    }
+    return nil
   }
 
 #if !os(Android)

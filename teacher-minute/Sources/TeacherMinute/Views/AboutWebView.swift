@@ -12,14 +12,18 @@ import WebKit
 
 struct AboutWebView: View {
     let url: URL
+    let title: String
+    
+    init(url: URL, title: String = "About") {
+        self.url = url
+        self.title = title
+    }
     
     var body: some View {
-        NavigationStack {
-            WebContentView(url: url)
-                .ignoresSafeArea(edges: .bottom)
-                .navigationTitle("About")
-                .navigationBarTitleDisplayMode(.inline)
-        }
+        WebContentView(url: url)
+            .ignoresSafeArea(edges: .bottom)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -38,14 +42,18 @@ private struct WebContentView: UIViewRepresentable {
 #else
 struct AboutWebView: View {
     let url: URL
+    let title: String
+    
+    init(url: URL, title: String = "About") {
+        self.url = url
+        self.title = title
+    }
     
     var body: some View {
-        NavigationStack {
-            Link("Open About", destination: url)
-                .font(.system(size: 16, weight: .semibold))
-                .navigationTitle("About")
-                .navigationBarTitleDisplayMode(.inline)
-        }
+        Link("Open \(title)", destination: url)
+            .font(.system(size: 16, weight: .semibold))
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
     }
 }
 #endif

@@ -5,7 +5,6 @@
 //  Created by Yaron Jackoby on 06/05/2026.
 //
 
-
 import Observation
 import Foundation
 import SwiftUI
@@ -27,23 +26,124 @@ struct SettingsRow: Identifiable {
 }
 
 enum SettingsAction: Equatable {
+    case accountSecurity
     case changePassword
     case logOut
     case deleteAccount
     case teacherPayouts
     case studentPayments
     case notifications
-    case privacy
+    case privacyControls
+    case language
     case about
+    case contactUs
+    case eula
+    case privacyPolicy
 }
 
-enum SettingsSheet: Identifiable {
-    case about(URL)
-    
+enum SettingsDestination: Hashable {
+    case accountSecurity
+    case changePassword
+    case teacherPayouts
+    case studentPayments
+    case notifications
+    case privacyControls
+    case language
+    case about
+    case webPage(title: String, url: URL)
+
+    var title: String {
+        switch self {
+        case .accountSecurity: "Account & Security"
+        case .changePassword: "Change Password"
+        case .teacherPayouts: "Teacher Payout Settings"
+        case .studentPayments: "Student Payment Methods"
+        case .notifications: "Notification Preferences"
+        case .privacyControls: "Privacy Controls"
+        case .language: "Language"
+        case .about: "About"
+        case .webPage(let title, _): title
+        }
+    }
+
+    var placeholderMessage: String {
+        switch self {
+        case .changePassword:
+            "Password management will be available here."
+        case .teacherPayouts:
+            "Bank details and payout history will be available here."
+        case .studentPayments:
+            "Cards and billing history will be available here."
+        case .notifications:
+            "Notification preferences will be available here."
+        case .privacyControls:
+            "Privacy controls will be available here."
+        case .accountSecurity, .language, .about, .webPage:
+            ""
+        }
+    }
+}
+
+enum SettingsConfirmation: Identifiable {
+    case logOut
+    case deleteAccount
+
     var id: String {
         switch self {
-        case .about(let url):
-            return "about-\(url.absoluteString)"
+        case .logOut: "logOut"
+        case .deleteAccount: "deleteAccount"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .logOut: "Log Out"
+        case .deleteAccount: "Delete Account"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .logOut:
+            "Are you sure you want to log out?"
+        case .deleteAccount:
+            "This permanently deletes your account and profile data. This cannot be undone."
+        }
+    }
+
+    var confirmTitle: String {
+        switch self {
+        case .logOut: "Log Out"
+        case .deleteAccount: "Delete"
+        }
+    }
+
+    var isDestructive: Bool {
+        switch self {
+        case .logOut, .deleteAccount: true
+        }
+    }
+}
+
+enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
+    case system
+    case english
+    case hebrew
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: "System Language"
+        case .english: "English"
+        case .hebrew: "Hebrew"
+        }
+    }
+
+    var subtitle: String? {
+        switch self {
+        case .system: "Use the device language"
+        case .english, .hebrew: nil
         }
     }
 }
@@ -75,51 +175,48 @@ enum SettingsIconColor {
 
 @Observable
 @MainActor
-final class SettingsViewModel {
+class SettingsViewModel {
     let appVersion = "Math Connect App v2.4.1"
     
-    var activeSheet: SettingsSheet?
-    var showDeleteAccountConfirmation = false
+    var navigationPath: [SettingsDestination] = []
+    var activeConfirmation: SettingsConfirmation?
+    var externalURL: URL?
     var showAlert = false
     var alertTitle = "Settings"
     var alertMessage: String?
     var isLoading = false
+    var selectedLanguage: SettingsLanguageChoice {
+        didSet {
+            UserDefaults.standard.set(selectedLanguage.rawValue, forKey: languagePreferenceKey)
+        }
+    }
     
-    private let authService = AuthService()
+    private let authService: AuthService
     private let remoteConfigService: SettingsRemoteConfigService
+    private let languagePreferenceKey = "settings.language.preference"
     
-    init(remoteConfigService: SettingsRemoteConfigService = .shared) {
+    init(
+        authService: AuthService = AuthService(),
+        remoteConfigService: SettingsRemoteConfigService = .shared
+    ) {
+        self.authService = authService
         self.remoteConfigService = remoteConfigService
+        let savedLanguage = UserDefaults.standard.string(forKey: languagePreferenceKey)
+        self.selectedLanguage = savedLanguage.flatMap(SettingsLanguageChoice.init(rawValue:)) ?? .system
     }
 
     var sections: [SettingsSection] {
         [
             SettingsSection(
-                title: "ACCOUNT & SECURITY",
+                title: "ACCOUNT",
                 rows: [
                     SettingsRow(
-                        title: "Change Password",
-                        subtitle: nil,
+                        title: "Account & Security",
+                        subtitle: "Password, logout and account removal",
                         systemImage: "lock.fill",
                         iconColor: .primary,
                         isDestructive: false,
-                        action: .changePassword
-                    ),
-                    SettingsRow(
-                        title: "Log Out",
-                        subtitle: nil,
-                        systemImage: "rectangle.portrait.and.arrow.right",
-                        iconColor: .red,
-                        isDestructive: true,
-                        action: .logOut
-                    ),
-                    SettingsRow(
-                        title: "Delete Account",
-                        subtitle: "Permanently remove your account",
-                        systemImage: "trash.fill",
-                        iconColor: .red,
-                        isDestructive: true,
-                        action: .deleteAccount
+                        action: .accountSecurity
                     )
                 ]
             ),
@@ -148,6 +245,14 @@ final class SettingsViewModel {
                 title: "PREFERENCES",
                 rows: [
                     SettingsRow(
+                        title: "Language",
+                        subtitle: selectedLanguage.title,
+                        systemImage: "globe",
+                        iconColor: .primary,
+                        isDestructive: false,
+                        action: .language
+                    ),
+                    SettingsRow(
                         title: "Notification Preferences",
                         subtitle: nil,
                         systemImage: "bell.fill",
@@ -161,7 +266,7 @@ final class SettingsViewModel {
                         systemImage: "shield.lefthalf.filled",
                         iconColor: .primary,
                         isDestructive: false,
-                        action: .privacy
+                        action: .privacyControls
                     )
                 ]
             ),
@@ -181,16 +286,107 @@ final class SettingsViewModel {
         ]
     }
 
+    var accountSecuritySection: SettingsSection {
+        SettingsSection(
+            title: "ACCOUNT & SECURITY",
+            rows: [
+                SettingsRow(
+                    title: "Change Password",
+                    subtitle: nil,
+                    systemImage: "lock.fill",
+                    iconColor: .primary,
+                    isDestructive: false,
+                    action: .changePassword
+                ),
+                SettingsRow(
+                    title: "Log Out",
+                    subtitle: nil,
+                    systemImage: "rectangle.portrait.and.arrow.right",
+                    iconColor: .red,
+                    isDestructive: true,
+                    action: .logOut
+                ),
+                SettingsRow(
+                    title: "Delete Account",
+                    subtitle: "Permanently remove your account",
+                    systemImage: "trash.fill",
+                    iconColor: .red,
+                    isDestructive: true,
+                    action: .deleteAccount
+                )
+            ]
+        )
+    }
+
+    var aboutSection: SettingsSection {
+        SettingsSection(
+            title: "ABOUT",
+            rows: [
+                SettingsRow(
+                    title: "Contact Us",
+                    subtitle: nil,
+                    systemImage: "envelope.fill",
+                    iconColor: .primary,
+                    isDestructive: false,
+                    action: .contactUs
+                ),
+                SettingsRow(
+                    title: "EULA",
+                    subtitle: nil,
+                    systemImage: "doc.plaintext.fill",
+                    iconColor: .primary,
+                    isDestructive: false,
+                    action: .eula
+                ),
+                SettingsRow(
+                    title: "Privacy Policy",
+                    subtitle: nil,
+                    systemImage: "hand.raised.fill",
+                    iconColor: .primary,
+                    isDestructive: false,
+                    action: .privacyPolicy
+                )
+            ]
+        )
+    }
+
     func select(_ row: SettingsRow) {
         switch row.action {
+        case .accountSecurity:
+            navigationPath.append(.accountSecurity)
+        case .changePassword:
+            navigationPath.append(.changePassword)
+        case .teacherPayouts:
+            navigationPath.append(.teacherPayouts)
+        case .studentPayments:
+            navigationPath.append(.studentPayments)
+        case .notifications:
+            navigationPath.append(.notifications)
+        case .privacyControls:
+            navigationPath.append(.privacyControls)
+        case .language:
+            navigationPath.append(.language)
         case .about:
-            Task { await openAbout() }
-        case .deleteAccount:
-            showDeleteAccountConfirmation = true
+            navigationPath.append(.about)
+        case .contactUs:
+            Task { await openContactSupport() }
+        case .eula:
+            Task { await openEULA() }
+        case .privacyPolicy:
+            Task { await openPrivacyPolicy() }
         case .logOut:
-            _ = logOut()
-        default:
-            present(message: "This setting is not available yet.")
+            activeConfirmation = .logOut
+        case .deleteAccount:
+            activeConfirmation = .deleteAccount
+        }
+    }
+    
+    func confirm(_ confirmation: SettingsConfirmation) async -> Bool {
+        switch confirmation {
+        case .logOut:
+            return logOut()
+        case .deleteAccount:
+            return await deleteAccount()
         }
     }
     
@@ -226,20 +422,105 @@ final class SettingsViewModel {
         }
     }
     
-    private func openAbout() async {
+    func openContactSupport() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        let email = await remoteConfigService.fetchSupportEmail()
+        guard let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "mailto:\(encodedEmail)") else {
+            present(title: "Contact Us", message: "Support email is not configured correctly.")
+            return
+        }
+
+        externalURL = url
+    }
+
+    func openEULA() async {
+        await openRemoteWebPage(title: "EULA") {
+            try await remoteConfigService.fetchEULAURL()
+        }
+    }
+
+    func openPrivacyPolicy() async {
+        await openRemoteWebPage(title: "Privacy Policy") {
+            try await remoteConfigService.fetchPrivacyPolicyURL()
+        }
+    }
+
+    func openAbout() async {
+        await openRemoteWebPage(title: "About") {
+            try await remoteConfigService.fetchAboutURL()
+        }
+    }
+    
+    func present(title: String = "Settings", message: String) {
+        alertTitle = title
+        alertMessage = message
+        showAlert = true
+    }
+
+    func consumeExternalURL() {
+        externalURL = nil
+    }
+
+    private func openRemoteWebPage(title: String, fetchURL: () async throws -> URL) async {
         isLoading = true
         defer { isLoading = false }
         
         do {
-            activeSheet = .about(try await remoteConfigService.fetchAboutURL())
+            navigationPath.append(.webPage(title: title, url: try await fetchURL()))
         } catch {
-            present(title: "About", message: error.localizedDescription)
+            present(title: title, message: error.localizedDescription)
         }
     }
-    
-    private func present(title: String = "Settings", message: String) {
-        alertTitle = title
-        alertMessage = message
-        showAlert = true
+}
+
+@MainActor
+final class MockSettingsViewModel: SettingsViewModel {
+    override init(
+        authService: AuthService = AuthService(),
+        remoteConfigService: SettingsRemoteConfigService = .shared
+    ) {
+        super.init(authService: authService, remoteConfigService: remoteConfigService)
+    }
+
+    override func confirm(_ confirmation: SettingsConfirmation) async -> Bool {
+        switch confirmation {
+        case .logOut:
+            return true
+        case .deleteAccount:
+            present(title: "Delete Account", message: "Preview only. No account was deleted.")
+            return false
+        }
+    }
+
+    override func logOut() -> Bool {
+        true
+    }
+
+    override func deleteAccount() async -> Bool {
+        present(title: "Delete Account", message: "Preview only. No account was deleted.")
+        return false
+    }
+
+    override func openContactSupport() async {
+        externalURL = URL(string: "mailto:support@tim.app")
+    }
+
+    override func openEULA() async {
+        navigationPath.append(.webPage(title: "EULA", url: previewURL(path: "eula")))
+    }
+
+    override func openPrivacyPolicy() async {
+        navigationPath.append(.webPage(title: "Privacy Policy", url: previewURL(path: "privacy")))
+    }
+
+    override func openAbout() async {
+        navigationPath.append(.webPage(title: "About", url: previewURL(path: "about")))
+    }
+
+    private func previewURL(path: String) -> URL {
+        URL(string: "https://example.com/\(path)") ?? URL(fileURLWithPath: "/")
     }
 }
