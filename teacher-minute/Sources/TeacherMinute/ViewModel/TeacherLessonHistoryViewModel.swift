@@ -34,7 +34,7 @@ final class TeacherLessonHistoryViewModel {
     var selectedLesson: TeacherLessonHistoryItem?
     var playingLessonID: TeacherLessonHistoryItem.ID?
     
-    let lessons = [
+    var lessons = [
         TeacherLessonHistoryItem(
             title: "Calculus Help",
             student: "Sarah Jenkins",
@@ -104,10 +104,55 @@ final class TeacherLessonHistoryViewModel {
     func loadProfile() async {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         do {
-            guard let profile = try await UserService.shared.fetchProfileSummary(uid: uid) else { return }
-            teacherName = profile.displayName
+            if let profile = try await UserService.shared.fetchProfileSummary(uid: uid) {
+                teacherName = profile.displayName
+            }
+            let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
+            if !historyLessons.isEmpty {
+                lessons = historyLessons.map(Self.lessonHistoryItem)
+            }
         } catch {
             logger.error("[TeacherLessons] failed loading profile: \(error.localizedDescription)")
         }
+    }
+
+    private static func lessonHistoryItem(_ lesson: HistoryLesson) -> TeacherLessonHistoryItem {
+        TeacherLessonHistoryItem(
+            title: lesson.title,
+            student: lesson.otherParticipantName,
+            completedAt: dateText(lesson.acceptedAt),
+            duration: durationText(seconds: lesson.durationSeconds),
+            earnings: currencyText(cents: lesson.teacherEarningsCents),
+            summary: "Completed lesson with \(lesson.otherParticipantName).",
+            transcriptPreview: "Lesson transcript will appear here when available.",
+            hasAudio: false
+        )
+    }
+
+    private static func dateText(_ date: Date) -> String {
+        guard date > .distantPast else { return "Recently" }
+
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return "Today, \(formatter.string(from: date))"
+        }
+        if calendar.isDateInYesterday(date) {
+            return "Yesterday"
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+
+    private static func durationText(seconds: Int) -> String {
+        let minutes = max(1, Int((Double(max(0, seconds)) / 60.0).rounded(.up)))
+        return minutes == 1 ? "1 min" : "\(minutes) min"
+    }
+
+    private static func currencyText(cents: Int) -> String {
+        (Double(cents) / 100.0).formatted(.currency(code: "USD"))
     }
 }

@@ -29,10 +29,12 @@ final class SettingsRemoteConfigService {
         static let privacyPolicyURL = "privacy_policy"
         static let subjects = "subjects"
         static let baseURL = "baseURL"
+        static let defaultCommission = "default_commission"
     }
     
     private let defaultBaseURL = "https://us-central1-teacher-in-a-moment.cloudfunctions.net"
     private let defaultSupportEmail = "support@tim.app"
+    private let defaultTeacherCommission = 0.25
     
     private init() {}
     
@@ -96,6 +98,25 @@ final class SettingsRemoteConfigService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let urlString = rawValue.isEmpty ? defaultBaseURL : rawValue
         return URL(string: urlString) ?? URL(string: defaultBaseURL)!
+    }
+    
+    func fetchDefaultCommission() async -> Double {
+        let remoteConfig = RemoteConfig.remoteConfig()
+        let settings = RemoteConfigSettings()
+        settings.minimumFetchInterval = 3600
+        settings.fetchTimeout = 15
+        remoteConfig.configSettings = settings
+        
+        _ = try? await remoteConfig.fetchAndActivate()
+        let rawValue = remoteConfig
+            .configValue(forKey: Key.defaultCommission)
+            .stringValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let commission = Double(rawValue) else {
+            return defaultTeacherCommission
+        }
+        
+        return min(max(commission, 0), 1)
     }
     
     private func fetchURL(forKey key: String, missingError: SettingsError) async throws -> URL {

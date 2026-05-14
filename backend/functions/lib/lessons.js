@@ -11,6 +11,7 @@ const uuid_1 = require("uuid");
 const types_1 = require("./types");
 const firestore = admin.firestore();
 const db = admin.database();
+const HALF_MINUTE_SECONDS = 30;
 function firstString(...values) {
     for (const value of values) {
         if (typeof value === "string" && value.trim().length > 0) {
@@ -18,6 +19,65 @@ function firstString(...values) {
         }
     }
     return undefined;
+}
+function firstNumber(...values) {
+    for (const value of values) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return value;
+        }
+    }
+    return undefined;
+}
+function toMillis(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        // Heuristic: treat small epochs as seconds.
+        return value < 1e12 ? value * 1000 : value;
+    }
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? (parsed < 1e12 ? parsed * 1000 : parsed) : undefined;
+    }
+    if (!value || typeof value !== "object")
+        return undefined;
+    const obj = value;
+    if (typeof obj.toMillis === "function") {
+        const ms = obj.toMillis();
+        return Number.isFinite(ms) ? ms : undefined;
+    }
+    if (typeof obj.seconds === "number") {
+        return obj.seconds * 1000;
+    }
+    if (typeof obj._seconds === "number") {
+        return obj._seconds * 1000;
+    }
+    if (typeof obj.milliseconds === "number") {
+        return obj.milliseconds;
+    }
+    if (typeof obj.ms === "number") {
+        return obj.ms;
+    }
+    return undefined;
+}
+async function getCostPerMinute(teacherUid) {
+    var _a, _b;
+    const userSnap = await firestore.collection("users").doc(teacherUid).get();
+    const userData = userSnap.data();
+    const userCost = Number(userData === null || userData === void 0 ? void 0 : userData.costPerMinute);
+    if (Number.isFinite(userCost) && userCost > 0) {
+        return userCost;
+    }
+    try {
+        const template = await admin.remoteConfig().getTemplate();
+        const rcParam = (_a = template.parameters) === null || _a === void 0 ? void 0 : _a.cost_per_minute;
+        const rcCost = Number((_b = rcParam === null || rcParam === void 0 ? void 0 : rcParam.defaultValue) === null || _b === void 0 ? void 0 : _b.value);
+        if (Number.isFinite(rcCost) && rcCost > 0) {
+            return rcCost;
+        }
+    }
+    catch (error) {
+        firebase_functions_1.logger.warn(`[lessons] failed to read Remote Config costPerMinute for teacher=${teacherUid}`, error);
+    }
+    throw new https_1.HttpsError("failed-precondition", "costPerMinute is missing for teacher and Remote Config");
 }
 function sanitizeForFirestore(value) {
     if (value === undefined)
@@ -44,26 +104,40 @@ async function resolveQuestionContext(questionId) {
     const rtdbQuestion = ((_a = questionSnap.val()) !== null && _a !== void 0 ? _a : {});
     const fsQuestionSnap = await firestore.collection("questions").doc(questionId).get();
     const fsQuestion = ((_b = fsQuestionSnap.data()) !== null && _b !== void 0 ? _b : {});
+    const acceptedAtMs = firstNumber(toMillis(rtdbQuestion.acceptedAt), toMillis(fsQuestion.acceptedAt));
     const studentUid = firstString(rtdbQuestion.studentUid, rtdbQuestion.studentId, rtdbQuestion.userId, rtdbQuestion.askerUid, fsQuestion.studentUid);
     const teacherUid = firstString(rtdbQuestion.teacherUid, rtdbQuestion.teacherId, rtdbQuestion.teachedId, rtdbQuestion.acceptedByTeacher, rtdbQuestion.tutorUid, rtdbQuestion.responderUid, fsQuestion.acceptedByTeacher, fsQuestion.teacherUid);
     if (!studentUid || !teacherUid) {
         const keys = Object.keys(rtdbQuestion).sort().join(", ") || "none";
         throw new https_1.HttpsError("failed-precondition", `Question is missing participants (RTDB keys: ${keys})`);
     }
+    if (!acceptedAtMs) {
+        throw new https_1.HttpsError("failed-precondition", "Question is missing acceptedAt");
+    }
     return {
         questionRef,
         rtdbQuestion,
         studentUid,
         teacherUid,
+        acceptedAtMs,
     };
 }
 async function migrateQuestionToFirestore(questionId, endedBy, context) {
-    const { questionRef, rtdbQuestion, studentUid, teacherUid } = context;
+    const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs } = context;
     const endedAt = firestore_1.Timestamp.now();
+    const endedAtMs = endedAt.toMillis();
+    const rawSeconds = Math.max(0, Math.floor((endedAtMs - acceptedAtMs) / 1000));
+    const roundedSeconds = Math.floor(rawSeconds / HALF_MINUTE_SECONDS) * HALF_MINUTE_SECONDS;
+    const roundedMinutes = roundedSeconds / 60;
+    const costPerMinute = await getCostPerMinute(teacherUid);
+    const cost = Math.round(roundedMinutes * costPerMinute * 100) / 100;
     const migratedQuestion = sanitizeForFirestore(rtdbQuestion);
+    firebase_functions_1.logger.info(`[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost}`);
     const batch = firestore.batch();
     const qDocRef = firestore.collection("questions").doc(questionId);
-    batch.set(qDocRef, Object.assign(Object.assign({}, migratedQuestion), { state: "ended", status: "completed", studentUid, acceptedByTeacher: teacherUid, teacherId: teacherUid, teachedId: teacherUid, participants: [studentUid, teacherUid], endedBy,
+    batch.set(qDocRef, Object.assign(Object.assign({}, migratedQuestion), { state: "ended", status: "completed", studentUid, acceptedByTeacher: teacherUid, teacherId: teacherUid, teachedId: teacherUid, participants: [studentUid, teacherUid], durationSeconds: roundedSeconds, costPerMinute,
+        cost,
+        endedBy,
         endedAt, updatedAt: firestore_1.FieldValue.serverTimestamp() }), { merge: true });
     const studentRef = firestore.collection("users").doc(studentUid);
     const teacherRef = firestore.collection("users").doc(teacherUid);
@@ -148,7 +222,7 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
 // FR-B-007, FR-B-010
 // Called by student or teacher when they tap End.
 exports.endLesson = (0, https_1.onCall)(async (req) => {
-    var _a;
+    var _a, _b, _c;
     const debugContext = { stage: "init" };
     try {
         const uid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
@@ -183,10 +257,15 @@ exports.endLesson = (0, https_1.onCall)(async (req) => {
         return { success: true, questionId, endedBy };
     }
     catch (error) {
-        firebase_functions_1.logger.error("[lessons] endLesson failed", { error, debugContext });
+        const message = error instanceof Error ? error.message : String(error);
+        const stack = error instanceof Error ? error.stack : undefined;
+        firebase_functions_1.logger.error(`[lessons] endLesson failed stage=${String(debugContext.stage)} qid=${String((_b = debugContext.questionId) !== null && _b !== void 0 ? _b : "unknown")} uid=${String((_c = debugContext.uid) !== null && _c !== void 0 ? _c : "unknown")} message=${message}`);
+        firebase_functions_1.logger.error(`[lessons] endLesson debugContext=${JSON.stringify(debugContext)}`);
+        if (stack) {
+            firebase_functions_1.logger.error(`[lessons] endLesson stack=${stack}`);
+        }
         if (error instanceof https_1.HttpsError)
             throw error;
-        const message = error instanceof Error ? error.message : String(error);
         throw new https_1.HttpsError("internal", `endLesson failed: ${message}`);
     }
 });

@@ -17,6 +17,8 @@ import {
 const firestore = admin.firestore();
 const db = admin.database();
 
+const HALF_MINUTE_SECONDS = 30;
+
 function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === "string" && value.trim().length > 0) {
@@ -24,6 +26,71 @@ function firstString(...values: unknown[]): string | undefined {
     }
   }
   return undefined;
+}
+
+function firstNumber(...values: Array<number | undefined>): number | undefined {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function toMillis(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    // Heuristic: treat small epochs as seconds.
+    return value < 1e12 ? value * 1000 : value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? (parsed < 1e12 ? parsed * 1000 : parsed) : undefined;
+  }
+  if (!value || typeof value !== "object") return undefined;
+
+  const obj = value as Record<string, unknown> & { toMillis?: () => number };
+
+  if (typeof obj.toMillis === "function") {
+    const ms = obj.toMillis();
+    return Number.isFinite(ms) ? ms : undefined;
+  }
+
+  if (typeof obj.seconds === "number") {
+    return obj.seconds * 1000;
+  }
+  if (typeof obj._seconds === "number") {
+    return obj._seconds * 1000;
+  }
+  if (typeof obj.milliseconds === "number") {
+    return obj.milliseconds;
+  }
+  if (typeof obj.ms === "number") {
+    return obj.ms;
+  }
+
+  return undefined;
+}
+
+async function getCostPerMinute(teacherUid: string): Promise<number> {
+  const userSnap = await firestore.collection("users").doc(teacherUid).get();
+  const userData = userSnap.data() as Record<string, unknown> | undefined;
+  const userCost = Number(userData?.costPerMinute);
+  if (Number.isFinite(userCost) && userCost > 0) {
+    return userCost;
+  }
+
+  try {
+    const template = await admin.remoteConfig().getTemplate();
+    const rcParam = (template.parameters?.cost_per_minute as { defaultValue?: { value?: string } } | undefined);
+    const rcCost = Number(rcParam?.defaultValue?.value);
+    if (Number.isFinite(rcCost) && rcCost > 0) {
+      return rcCost;
+    }
+  } catch (error) {
+    logger.warn(`[lessons] failed to read Remote Config costPerMinute for teacher=${teacherUid}`, error);
+  }
+
+  throw new HttpsError("failed-precondition", "costPerMinute is missing for teacher and Remote Config");
 }
 
 function sanitizeForFirestore(value: unknown): unknown {
@@ -45,6 +112,7 @@ async function resolveQuestionContext(questionId: string): Promise<{
   rtdbQuestion: Record<string, unknown>;
   studentUid: string;
   teacherUid: string;
+  acceptedAtMs: number;
 }> {
   const questionRef = db.ref(`questions/${questionId}`);
   const questionSnap = await questionRef.once("value");
@@ -55,6 +123,11 @@ async function resolveQuestionContext(questionId: string): Promise<{
   const rtdbQuestion = (questionSnap.val() ?? {}) as Record<string, unknown>;
   const fsQuestionSnap = await firestore.collection("questions").doc(questionId).get();
   const fsQuestion = (fsQuestionSnap.data() ?? {}) as Partial<QuestionDoc> & Record<string, unknown>;
+
+  const acceptedAtMs = firstNumber(
+    toMillis(rtdbQuestion.acceptedAt),
+    toMillis(fsQuestion.acceptedAt)
+  );
 
   const studentUid = firstString(
     rtdbQuestion.studentUid,
@@ -83,11 +156,16 @@ async function resolveQuestionContext(questionId: string): Promise<{
     );
   }
 
+  if (!acceptedAtMs) {
+    throw new HttpsError("failed-precondition", "Question is missing acceptedAt");
+  }
+
   return {
     questionRef,
     rtdbQuestion,
     studentUid,
     teacherUid,
+    acceptedAtMs,
   };
 }
 
@@ -99,11 +177,22 @@ async function migrateQuestionToFirestore(
     rtdbQuestion: Record<string, unknown>;
     studentUid: string;
     teacherUid: string;
+    acceptedAtMs: number;
   }
 ): Promise<void> {
-  const { questionRef, rtdbQuestion, studentUid, teacherUid } = context;
+  const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs } = context;
   const endedAt = Timestamp.now();
+  const endedAtMs = endedAt.toMillis();
+  const rawSeconds = Math.max(0, Math.floor((endedAtMs - acceptedAtMs) / 1000));
+  const roundedSeconds = Math.floor(rawSeconds / HALF_MINUTE_SECONDS) * HALF_MINUTE_SECONDS;
+  const roundedMinutes = roundedSeconds / 60;
+  const costPerMinute = await getCostPerMinute(teacherUid);
+  const cost = Math.round(roundedMinutes * costPerMinute * 100) / 100;
   const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
+
+  logger.info(
+    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost}`
+  );
 
   const batch = firestore.batch();
   const qDocRef = firestore.collection("questions").doc(questionId);
@@ -118,6 +207,9 @@ async function migrateQuestionToFirestore(
       teacherId: teacherUid,
       teachedId: teacherUid,
       participants: [studentUid, teacherUid],
+      durationSeconds: roundedSeconds,
+      costPerMinute,
+      cost,
       endedBy,
       endedAt,
       updatedAt: FieldValue.serverTimestamp(),
@@ -274,9 +366,16 @@ export const endLesson = onCall(async (req) => {
 
     return { success: true, questionId, endedBy };
   } catch (error) {
-    logger.error("[lessons] endLesson failed", { error, debugContext });
-    if (error instanceof HttpsError) throw error;
     const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    logger.error(
+      `[lessons] endLesson failed stage=${String(debugContext.stage)} qid=${String(debugContext.questionId ?? "unknown")} uid=${String(debugContext.uid ?? "unknown")} message=${message}`
+    );
+    logger.error(`[lessons] endLesson debugContext=${JSON.stringify(debugContext)}`);
+    if (stack) {
+      logger.error(`[lessons] endLesson stack=${stack}`);
+    }
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", `endLesson failed: ${message}`);
   }
 });

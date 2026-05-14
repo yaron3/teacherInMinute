@@ -54,7 +54,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var selectedPricePerMinuteCents: Int { get set }
   var questionId: String? { get set }
   var pricingOptions: [PricingOption] { get }
-  var recentLessons: [RecentLesson] { get }
+  var recentLessons: [RecentLesson] { get set }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
   func cancelSearch() async
@@ -93,7 +93,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     ),
   ]
 
-  let recentLessons = [
+  var recentLessons = [
     RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis",
                  time: "Today, 2:30 PM", duration: "14 mins"),
     RecentLesson(title: "Algebra II", teacher: "with Ms. Chen",
@@ -153,6 +153,17 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     didLoadProfile = true
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
+    }
+    await loadRecentLessons(uid: uid)
+  }
+
+  private func loadRecentLessons(uid: String) async {
+    do {
+      let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid)
+      guard !historyLessons.isEmpty else { return }
+      recentLessons = historyLessons.map(Self.recentLesson)
+    } catch {
+      logger.error("[StudentHome] failed loading recent lessons: \(error.localizedDescription)")
     }
   }
 
@@ -242,6 +253,38 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     let numeric = price.replacingOccurrences(of: "$", with: "")
     return Int(((Double(numeric) ?? 0) * 100).rounded())
   }
+
+  private static func recentLesson(_ lesson: HistoryLesson) -> RecentLesson {
+    RecentLesson(
+      title: lesson.title,
+      teacher: "with \(lesson.otherParticipantName)",
+      time: relativeDateText(lesson.acceptedAt),
+      duration: durationText(seconds: lesson.durationSeconds)
+    )
+  }
+
+  private static func relativeDateText(_ date: Date) -> String {
+    guard date > .distantPast else { return "Recently" }
+
+    let calendar = Calendar.current
+    if calendar.isDateInToday(date) {
+      let formatter = DateFormatter()
+      formatter.dateFormat = "h:mm a"
+      return "Today, \(formatter.string(from: date))"
+    }
+    if calendar.isDateInYesterday(date) {
+      return "Yesterday"
+    }
+
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MMM d"
+    return formatter.string(from: date)
+  }
+
+  private static func durationText(seconds: Int) -> String {
+    let minutes = max(1, Int((Double(max(0, seconds)) / 60.0).rounded(.up)))
+    return minutes == 1 ? "1 min" : "\(minutes) mins"
+  }
 }
 
 @Observable
@@ -255,7 +298,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var questionId: String?
 
   let pricingOptions: [PricingOption]
-  let recentLessons: [RecentLesson]
+  var recentLessons: [RecentLesson]
 
   init(
     name: String = "Sarah Jenkins",
