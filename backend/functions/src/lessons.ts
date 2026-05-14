@@ -127,8 +127,8 @@ async function migrateQuestionToFirestore(
 
   const studentRef = firestore.collection("users").doc(studentUid);
   const teacherRef = firestore.collection("users").doc(teacherUid);
-  batch.set(studentRef, { messagesId: FieldValue.arrayUnion(questionId) }, { merge: true });
-  batch.set(teacherRef, { messagesId: FieldValue.arrayUnion(questionId) }, { merge: true });
+  batch.set(studentRef, { questions: FieldValue.arrayUnion(questionId) }, { merge: true });
+  batch.set(teacherRef, { questions: FieldValue.arrayUnion(questionId) }, { merge: true });
 
   await batch.commit();
   await questionRef.remove();
