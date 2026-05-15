@@ -16,6 +16,7 @@ import SkipFirebaseAuth
 
 struct TeacherLessonHistoryItem: Identifiable, Hashable {
     let id = UUID()
+    let questionId: String
     let title: String
     let student: String
     let completedAt: String
@@ -36,6 +37,7 @@ final class TeacherLessonHistoryViewModel {
     
     var lessons = [
         TeacherLessonHistoryItem(
+		  questionId: "123456789",
             title: "Calculus Help",
             student: "Sarah Jenkins",
             completedAt: "Today, 2:30 PM",
@@ -46,6 +48,7 @@ final class TeacherLessonHistoryViewModel {
             hasAudio: true
         ),
         TeacherLessonHistoryItem(
+		  questionId: "123456989",
             title: "Limits Review",
             student: "Noah Kim",
             completedAt: "Yesterday",
@@ -56,6 +59,7 @@ final class TeacherLessonHistoryViewModel {
             hasAudio: true
         ),
         TeacherLessonHistoryItem(
+		  questionId: "223456789",
             title: "Geometry Proofs",
             student: "Ava Brown",
             completedAt: "May 7",
@@ -118,6 +122,7 @@ final class TeacherLessonHistoryViewModel {
 
     private static func lessonHistoryItem(_ lesson: HistoryLesson) -> TeacherLessonHistoryItem {
         TeacherLessonHistoryItem(
+		  questionId: "123456790",
             title: lesson.title,
             student: lesson.otherParticipantName,
             completedAt: dateText(lesson.acceptedAt),
