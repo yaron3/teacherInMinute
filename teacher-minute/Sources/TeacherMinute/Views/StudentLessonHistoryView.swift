@@ -102,7 +102,7 @@ struct StudentLessonHistoryView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 48)
-        .background(.white)
+        .background(Color.appCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)

@@ -45,7 +45,7 @@ struct ConnectionSetupView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(
       LinearGradient(
-        colors: [Color.white, Color.appPinkSoft.opacity(0.35), Color.white],
+        colors: [Color.appCardBackground, Color.appPinkSoft.opacity(0.35), Color.appCardBackground],
         startPoint: .top,
         endPoint: .bottom
       )
@@ -144,7 +144,7 @@ struct ConnectionSetupView: View {
     }
     .padding(28)
     .frame(maxWidth: .infinity, minHeight: 132)
-    .background(.white)
+    .background(Color.appCardBackground)
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 

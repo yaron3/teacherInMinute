@@ -140,7 +140,7 @@ struct RoleCard: View {
 	  }
 	  .padding(20)
 	  .frame(maxWidth: .infinity)
-	  .background(.white)
+	  .background(Color.appCardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
 	  .overlay {
 		RoundedRectangle(cornerRadius: 22, style: .continuous)

@@ -88,7 +88,7 @@ struct LoginView: View {
 		.font(.system(size: 18, weight: .semibold))
 		.foregroundStyle(Color.authPrimaryText)
 		.frame(width: 42, height: 42)
-		.background(.white)
+		.background(Color.appCardBackground)
 		.clipShape(Circle())
 		.shadow(color: .black.opacity(0.05), radius: 14, x: 0, y: 8)
 	}
@@ -183,7 +183,7 @@ struct LoginView: View {
 	.padding(.horizontal, 24)
 	.padding(.top, 26)
 	.padding(.bottom, 24)
-	.background(.white)
+	.background(Color.appCardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
 	.shadow(color: .black.opacity(0.035), radius: 24, x: 0, y: 14)
   }
@@ -245,7 +245,7 @@ struct LoginView: View {
 	  .foregroundStyle(Color.authPrimaryText)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 56)
-	  .background(.white)
+	  .background(Color.appCardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 	  .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.authSocialBorder, lineWidth: 1) }
 	  .shadow(color: .black.opacity(0.04), radius: 10, x: 0, y: 5)

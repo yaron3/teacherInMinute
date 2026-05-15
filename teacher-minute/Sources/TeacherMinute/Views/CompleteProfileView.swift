@@ -116,7 +116,7 @@ struct CompleteProfileView: View {
 #endif
 	  .frame(height: 56)
 	  .padding(.horizontal, 12)
-	  .background(.white)
+	  .background(Color.appCardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 	  .overlay {
 		RoundedRectangle(cornerRadius: 15, style: .continuous)
@@ -151,7 +151,7 @@ struct CompleteProfileView: View {
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)
-		.background(.white)
+		.background(Color.appCardBackground)
 		.clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 		.overlay {
 		  RoundedRectangle(cornerRadius: 15, style: .continuous)

@@ -166,7 +166,7 @@ struct SettingsView: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(.white)
+            .background(Color.appCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
         }
@@ -250,7 +250,7 @@ struct AccountSecuritySettingsView: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(.white)
+            .background(Color.appCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
         }
@@ -323,7 +323,7 @@ struct LanguageSettingsView: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(.white)
+                .background(Color.appCardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
             }
@@ -370,7 +370,7 @@ struct AboutSettingsView: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(.white)
+            .background(Color.appCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
         }

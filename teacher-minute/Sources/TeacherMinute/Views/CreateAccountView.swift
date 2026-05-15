@@ -22,7 +22,7 @@ struct CreateAccountView: View {
   
   var body: some View {
 	ZStack {
-	  Color.white.ignoresSafeArea()
+	  Color.appCardBackground.ignoresSafeArea()
 	  VStack(spacing: 0) {
 		ScrollView(showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 24) {
@@ -102,7 +102,7 @@ struct CreateAccountView: View {
 	.padding(24)
 	.background(
 	  RoundedRectangle(cornerRadius: 22)
-		.fill(Color.white)
+		.fill(Color.appCardBackground)
 		.shadow(color: .black.opacity(0.045), radius: 18, x: 0, y: 10)
 	)
   }
@@ -185,7 +185,7 @@ struct CreateAccountView: View {
 	  Button { isOn.wrappedValue.toggle() } label: {
 		ZStack {
 		  RoundedRectangle(cornerRadius: 4)
-			.fill(isOn.wrappedValue ? Color(hex: "#EC4899") : Color.white)
+			.fill(isOn.wrappedValue ? Color(hex: "#EC4899") : Color.appCardBackground)
 			.frame(width: 18, height: 18)
 			.overlay(
 			  RoundedRectangle(cornerRadius: 4)
@@ -282,7 +282,7 @@ struct CreateAccountView: View {
 	  .frame(height: 54)
 	  .background(
 		RoundedRectangle(cornerRadius: 14)
-		  .fill(Color.white)
+		  .fill(Color.appCardBackground)
 		  .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#E5E7EB"), lineWidth: 1))
 		  .shadow(color: .black.opacity(0.025), radius: 6, x: 0, y: 4)
 	  )

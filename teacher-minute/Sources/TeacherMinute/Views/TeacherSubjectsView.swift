@@ -150,7 +150,7 @@ struct TeacherSubjectsView: View {
 	}
 	.padding(.horizontal, 16)
 	.frame(height: 44)
-	.background(.white)
+	.background(Color.appCardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 13, style: .continuous)

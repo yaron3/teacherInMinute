@@ -70,7 +70,7 @@ struct RoundedInfoCard<Content: View>: View {
   var body: some View {
 	content
 	  .padding(18)
-	  .background(.white)
+	  .background(Color.appCardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 	  .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
   }

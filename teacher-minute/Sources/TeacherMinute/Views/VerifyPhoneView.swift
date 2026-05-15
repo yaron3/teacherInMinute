@@ -134,7 +134,7 @@ struct VerifyPhoneView: View {
         .foregroundStyle(Color.authPrimaryText)
         .focused($focusedIndex, equals: index)
         .frame(width: 52, height: 56)
-        .background(.white)
+        .background(Color.appCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 13, style: .continuous)

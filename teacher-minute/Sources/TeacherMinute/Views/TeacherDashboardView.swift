@@ -103,7 +103,7 @@ struct TeacherDashboardView: View {
           .padding(.horizontal, 18)
           .padding(.bottom, 24)
         }
-        .background(Color.white)
+        .background(Color.appCardBackground)
 
         if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
           TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
@@ -337,7 +337,7 @@ struct TeacherDashboardView: View {
   func incomingQuestionOverlay(inviteID: String) -> some View {
     ZStack {
       LinearGradient(
-        colors: [Color.appPinkSoft.opacity(0.75), Color.white],
+        colors: [Color.appPinkSoft.opacity(0.75), Color.appCardBackground],
         startPoint: .top,
         endPoint: .bottom
       )
@@ -494,7 +494,7 @@ struct TeacherDashboardView: View {
       .padding(.vertical, 18)
       .background(
         LinearGradient(
-          colors: [Color.appPinkSoft.opacity(0.55), Color.white],
+          colors: [Color.appPinkSoft.opacity(0.55), Color.appCardBackground],
           startPoint: .top,
           endPoint: .center
         )
@@ -556,7 +556,7 @@ struct TeacherDashboardView: View {
           .clipShape(Capsule())
       }
       .padding(14)
-      .background(.white)
+      .background(Color.appCardBackground)
       .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
@@ -596,7 +596,7 @@ struct TeacherDashboardView: View {
         }
       }
       .padding(14)
-      .background(.white)
+      .background(Color.appCardBackground)
       .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
@@ -684,7 +684,7 @@ struct TeacherIncomingQuestionOverlay: View {
   var body: some View {
     ZStack {
       LinearGradient(
-        colors: [Color.appPinkSoft.opacity(0.75), Color.white],
+        colors: [Color.appPinkSoft.opacity(0.75), Color.appCardBackground],
         startPoint: .top,
         endPoint: .bottom
       )

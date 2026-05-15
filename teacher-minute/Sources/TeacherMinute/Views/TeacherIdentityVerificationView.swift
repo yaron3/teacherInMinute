@@ -323,7 +323,7 @@ struct TeacherIdentityVerificationView: View {
 	  StatusRow(title: "Selfie Verification",   isDone: viewModel.hasSelfie,            isMandatory: false)
 	}
 	.padding(16)
-	.background(.white)
+	.background(Color.appCardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 	.shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
   }
@@ -469,7 +469,7 @@ struct UploadLargeBox: View {
 	}
 	.frame(maxWidth: .infinity)
 	.frame(height: 116)
-	.background(.white)
+	.background(Color.appCardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -529,7 +529,7 @@ struct IDUploadBox: View {
 	}
 	.frame(maxWidth: .infinity)
 	.frame(height: 90)
-	.background(.white)
+	.background(Color.appCardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -584,7 +584,7 @@ struct SelfieRow: View {
 		.foregroundStyle(Color.authIcon)
 	}
 	.padding(14)
-	.background(.white)
+	.background(Color.appCardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 16, style: .continuous)

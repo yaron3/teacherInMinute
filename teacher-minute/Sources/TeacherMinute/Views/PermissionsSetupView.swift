@@ -133,7 +133,7 @@ struct PermissionCard: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity)
-        .background(.white)
+        .background(Color.appCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)

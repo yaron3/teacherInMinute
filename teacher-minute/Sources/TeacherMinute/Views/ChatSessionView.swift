@@ -132,11 +132,11 @@ struct ChatSessionView: View {
       inputBar
 #endif
     }
-    .background(Color.white)
+    .background(Color.appCardBackground)
 #if !os(Android)
     .safeAreaInset(edge: .bottom) {
       inputBar
-        .background(Color.white)
+        .background(Color.appCardBackground)
     }
 #endif
   }
@@ -224,7 +224,7 @@ struct ChatSessionView: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
-    .background(.white)
+    .background(Color.appCardBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
         .fill(Color.appBorder)
@@ -298,7 +298,7 @@ struct ChatSessionView: View {
       tabButton(id: "photos", title: "Photos", icon: "photo.fill")
     }
     .frame(height: 40)
-    .background(.white)
+    .background(Color.appCardBackground)
     .overlay(alignment: .bottom) {
       Rectangle().fill(Color.appBorder).frame(height: 1)
     }

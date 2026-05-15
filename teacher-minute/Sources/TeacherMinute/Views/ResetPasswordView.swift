@@ -83,7 +83,7 @@ struct ResetPasswordView: View {
             }
         }
         .padding(24)
-        .background(.white)
+        .background(Color.appCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: .black.opacity(0.035), radius: 24, x: 0, y: 14)
     }
