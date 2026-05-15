@@ -19,14 +19,16 @@ struct CreateAccountView: View {
   @Environment(\.appRouter) var router
   @State var isPasswordVisible = false
   @FocusState var focusedField: SignupField?
-  
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
 	ZStack {
-	  Color.appCardBackground.ignoresSafeArea()
+	  theme.appCardBackground.ignoresSafeArea()
 	  VStack(spacing: 0) {
 		ScrollView(showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 24) {
-			titleSection
 			inputCard
 			checkboxSection
 			continueButton
@@ -41,7 +43,7 @@ struct CreateAccountView: View {
 	  
 	  // Loading overlay
 	  if viewModel.isLoading {
-		Color.black.opacity(0.18).ignoresSafeArea()
+		theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
 		ProgressView()
 		  .progressViewStyle(.circular)
 		  .scaleEffect(1.6)
@@ -49,6 +51,7 @@ struct CreateAccountView: View {
 	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
+	.navigationTitle("Create Account")
 	.onChange(of: viewModel.navigateToChooseRole) { _, newValue in
 	  if newValue { router.push(.chooseRole) }
 	}
@@ -64,17 +67,6 @@ struct CreateAccountView: View {
   
   // MARK: - Sections
   
-  var titleSection: some View {
-	VStack(alignment: .leading, spacing: 10) {
-	  Text("Create Account")
-		.font(.system(size: 32, weight: .bold))
-		.foregroundStyle(Color(hex: "#111827"))
-	  Text("Join Math Connect to start learning or\nteaching today.")
-		.font(.system(size: 16, weight: .regular))
-		.lineSpacing(5)
-		.foregroundStyle(Color(hex: "#6B7280"))
-	}
-  }
   
   var inputCard: some View {
 	VStack(alignment: .leading, spacing: 22) {
@@ -102,8 +94,8 @@ struct CreateAccountView: View {
 	.padding(24)
 	.background(
 	  RoundedRectangle(cornerRadius: 22)
-		.fill(Color.appCardBackground)
-		.shadow(color: .black.opacity(0.045), radius: 18, x: 0, y: 10)
+		.fill(theme.appCardBackground)
+		.shadow(color: theme.appCardBackgroundShadow.opacity(0.045), radius: 18, x: 0, y: 10)
 	)
   }
   
@@ -126,7 +118,7 @@ struct CreateAccountView: View {
 	  HStack(spacing: 12) {
 		PlatformIcon(systemName: icon)
 		  .font(.system(size: 15, weight: .medium))
-		  .foregroundStyle(isValid ? Color(hex: "#9CA3AF") : Color.red.opacity(0.8))
+		  .foregroundStyle(isValid ? Color(hex: "#9CA3AF") : theme.red.opacity(0.8))
 		  .frame(width: 20)
 		
 		Group {
@@ -157,7 +149,7 @@ struct CreateAccountView: View {
 		  .fill(Color(hex: "#F9FAFB"))
 		  .overlay(
 			RoundedRectangle(cornerRadius: 16)
-			  .stroke(isValid ? Color(hex: "#EEF2F7") : Color.red.opacity(0.5), lineWidth: 1.5)
+			  .stroke(isValid ? Color(hex: "#EEF2F7") : theme.red.opacity(0.5), lineWidth: 1.5)
 		  )
 	  )
 	  
@@ -185,7 +177,7 @@ struct CreateAccountView: View {
 	  Button { isOn.wrappedValue.toggle() } label: {
 		ZStack {
 		  RoundedRectangle(cornerRadius: 4)
-			.fill(isOn.wrappedValue ? Color(hex: "#EC4899") : Color.appCardBackground)
+			.fill(isOn.wrappedValue ? Color(hex: "#EC4899") : theme.appCardBackground)
 			.frame(width: 18, height: 18)
 			.overlay(
 			  RoundedRectangle(cornerRadius: 4)
@@ -282,9 +274,9 @@ struct CreateAccountView: View {
 	  .frame(height: 54)
 	  .background(
 		RoundedRectangle(cornerRadius: 14)
-		  .fill(Color.appCardBackground)
+		  .fill(theme.appCardBackground)
 		  .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#E5E7EB"), lineWidth: 1))
-		  .shadow(color: .black.opacity(0.025), radius: 6, x: 0, y: 4)
+		  .shadow(color: theme.appPrimaryText.opacity(0.025), radius: 6, x: 0, y: 4)
 	  )
 	}
   }

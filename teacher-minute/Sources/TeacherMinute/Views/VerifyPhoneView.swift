@@ -11,35 +11,38 @@ import SwiftUI
 struct VerifyPhoneView: View {
     @State var viewModel = VerifyPhoneViewModel()
     @FocusState var focusedIndex: Int?
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
                 .frame(height: 78)
 
             Circle()
-                .fill(Color.authPinkSoft)
+                .fill(theme.authPinkSoft)
                 .frame(width: 76, height: 76)
-                .shadow(color: Color.authPink.opacity(0.12), radius: 24, x: 0, y: 12)
+                .shadow(color: theme.authPink.opacity(0.12), radius: 24, x: 0, y: 12)
                 .overlay {
                     PlatformIcon(systemName: "shield.lefthalf.filled")
                         .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(Color.authPink)
+                        .foregroundStyle(theme.authPink)
                 }
 
             Text("Verify your number")
                 .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Color.authPrimaryText)
+                .foregroundStyle(theme.authPrimaryText)
                 .padding(.top, 26)
 
             Text("We've sent a 4-digit security code to")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.authSecondaryText)
+                .foregroundStyle(theme.authSecondaryText)
                 .padding(.top, 10)
 
             Text(viewModel.phoneNumber)
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color.authPrimaryText)
+                .foregroundStyle(theme.authPrimaryText)
                 .padding(.top, 6)
 
             Button {
@@ -52,7 +55,7 @@ struct VerifyPhoneView: View {
                     Text("Change contact info")
                         .font(.system(size: 12, weight: .medium))
                 }
-                .foregroundStyle(Color.authPink)
+                .foregroundStyle(theme.authPink)
             }
             .buttonStyle(.plain)
             .padding(.top, 16)
@@ -74,10 +77,10 @@ struct VerifyPhoneView: View {
                     Text("Resend Code Now")
                         .font(.system(size: 13, weight: .semibold))
                 }
-                .foregroundStyle(Color.authPink)
+                .foregroundStyle(theme.authPink)
                 .padding(.horizontal, 16)
                 .frame(height: 36)
-                .background(Color.authPinkSoft)
+                .background(theme.authPinkSoft)
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -86,21 +89,21 @@ struct VerifyPhoneView: View {
             Spacer()
 
             Rectangle()
-                .fill(Color.authFieldBorder)
+                .fill(theme.authFieldBorder)
                 .frame(height: 1)
                 .padding(.horizontal, 18)
 
             HStack(spacing: 4) {
                 Text("Having trouble?")
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.authSecondaryText)
+                    .foregroundStyle(theme.authSecondaryText)
 
                 Button {
                     viewModel.contactSupport()
                 } label: {
                     Text("Contact Support")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.authPrimaryText)
+                        .foregroundStyle(theme.authPrimaryText)
                         .underline()
                 }
                 .buttonStyle(.plain)
@@ -131,14 +134,14 @@ struct VerifyPhoneView: View {
         .keyboardType(.numberPad)
         .multilineTextAlignment(.center)
         .font(.system(size: 24, weight: .bold))
-        .foregroundStyle(Color.authPrimaryText)
+        .foregroundStyle(theme.authPrimaryText)
         .focused($focusedIndex, equals: index)
         .frame(width: 52, height: 56)
-        .background(Color.appCardBackground)
+        .background(theme.appCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(Color.authFieldBorder, lineWidth: 1.5)
+                .stroke(theme.authFieldBorder, lineWidth: 1.5)
         }
     }
 }

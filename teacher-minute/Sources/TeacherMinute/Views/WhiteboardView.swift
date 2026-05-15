@@ -13,13 +13,16 @@ struct WhiteboardView: View {
     }
     return activeStroke.isEmpty ? remoteStrokes : remoteStrokes + [activeStroke]
   }
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
         Text("Board")
           .font(.system(size: 13, weight: .bold))
-          .foregroundStyle(Color.appPrimaryText)
+          .foregroundStyle(theme.appPrimaryText)
 
         Spacer()
 
@@ -28,20 +31,20 @@ struct WhiteboardView: View {
           onClear()
         }
         .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(Color.appPink)
+        .foregroundStyle(theme.appPink)
       }
       .padding(.horizontal, 16)
 
       GeometryReader { proxy in
         ZStack {
-          Color.white
+          theme.white
 
           if visibleStrokes.isEmpty {
             VStack(spacing: 8) {
-              PlatformIcon(systemName: "pencil", size: 22, weight: .semibold, color: .appSecondaryText)
+              PlatformIcon(systemName: "pencil", size: 22, weight: .semibold, color: theme.appSecondaryText)
               Text("Use your finger to write or sketch.")
                 .font(.system(size: 12))
-                .foregroundStyle(Color.appSecondaryText)
+                .foregroundStyle(theme.appSecondaryText)
             }
           }
 
@@ -54,14 +57,14 @@ struct WhiteboardView: View {
                 path.addLine(to: point)
               }
             }
-            .stroke(Color.appPrimaryText, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            .stroke(theme.appPrimaryText, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
           }
         }
         .id(revision)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
           RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(Color.appBorder, lineWidth: 1)
+            .stroke(theme.appBorder, lineWidth: 1)
         }
         .gesture(
           DragGesture(minimumDistance: 0)
@@ -87,6 +90,6 @@ struct WhiteboardView: View {
       .padding(.bottom, 14)
     }
     .padding(.top, 10)
-    .background(Color.appGrayBackground.opacity(0.35))
+    .background(theme.appGrayBackground.opacity(0.35))
   }
 }

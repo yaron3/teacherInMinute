@@ -18,11 +18,22 @@ struct PlatformIcon: View {
     var weight: Font.Weight = .regular
     var color: Color = .primary
 
+    private static let bundledIcons: Set<String> = [
+        "bubble.left.and.bubble.right.fill",
+		"g.circle.fill"
+    ]
+
     var body: some View {
 #if os(Android)
-        Text(Self.emoji(for: systemName))
-            .font(.system(size: size * 0.9))
-            .frame(width: size, height: size)
+        if Self.bundledIcons.contains(systemName) {
+            Image(systemName, bundle: .module)
+                .resizable()
+                .frame(width: size, height: size)
+        } else {
+            Text(Self.emoji(for: systemName))
+                .font(.system(size: size * 0.9))
+                .frame(width: size, height: size)
+        }
 #else
         Image(systemName: systemName)
             .font(.system(size: size, weight: weight))
@@ -84,7 +95,9 @@ struct PlatformIcon: View {
 		case "pin.fill":                           	return "📍"
 		case "square":                             	return "□"
 		case "graduationcap.fill":					return "🎓"
-			
+		case "envelope":                            return "📧"
+		case "eye.slash":							return "👁"
+		case "g.circle.fill":						return "G"
         default:
 			logger.error("!!! icon: \(systemName) is missing !!!")
 			return "●"

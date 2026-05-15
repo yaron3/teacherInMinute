@@ -11,23 +11,24 @@ import SwiftUI
 struct LoginView: View {
   @State var viewModel = LoginViewModel()
   @Environment(\.appRouter) var router
-  
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
 	ZStack {
 	  Color(.systemBackground)
 		.ignoresSafeArea()
 	  
 	  VStack(alignment: .leading, spacing: 0) {
-		backButton
-		
-		Text("Welcome Back")
-		  .font(.system(size: 32, weight: .bold))
-		  .foregroundStyle(Color.authPrimaryText)
-		  .padding(.top, 28)
+//		Text("Welcome Back")
+//		  .font(.system(size: 32, weight: .bold))
+//		  .foregroundStyle(theme.authPrimaryText)
+//		  .padding(.top, 28)
 		
 		Text("Log in to Math Connect to continue your\njourney.")
 		  .font(.system(size: 16, weight: .regular))
-		  .foregroundStyle(Color.authSecondaryText)
+		  .foregroundStyle(theme.authSecondaryText)
 		  .lineSpacing(6)
 		  .padding(.top, 10)
 		
@@ -54,7 +55,7 @@ struct LoginView: View {
 	  
 	  // Full-screen loading overlay while checking Firestore
 	  if viewModel.isLoading {
-		Color.black.opacity(0.25).ignoresSafeArea()
+		theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
 		VStack(spacing: 14) {
 		  ProgressView()
 			.progressViewStyle(.circular)
@@ -68,6 +69,7 @@ struct LoginView: View {
 	}
 	.navigationBarTitleDisplayMode(.inline)
 	// Push the resolved destination when login completes
+	.navigationTitle("Welcome Back")
 	.onChange(of: viewModel.destination) { _, route in
 	  guard let route else { return }
 	  router.push(route)
@@ -80,20 +82,7 @@ struct LoginView: View {
 	}
   }
   
-  var backButton: some View {
-	Button {
-	  viewModel.back()
-	} label: {
-	  PlatformIcon(systemName: "arrow.left")
-		.font(.system(size: 18, weight: .semibold))
-		.foregroundStyle(Color.authPrimaryText)
-		.frame(width: 42, height: 42)
-		.background(Color.appCardBackground)
-		.clipShape(Circle())
-		.shadow(color: .black.opacity(0.05), radius: 14, x: 0, y: 8)
-	}
-	.buttonStyle(.plain)
-  }
+
   
   // MARK: - Form card (unchanged structure, UIKit types removed for Skip compat)
   
@@ -103,27 +92,27 @@ struct LoginView: View {
 	  VStack(alignment: .leading, spacing: 9) {
 		Text("Email")
 		  .font(.system(size: 14, weight: .semibold))
-		  .foregroundStyle(Color.authPrimaryText)
+		  .foregroundStyle(theme.authPrimaryText)
 		
 		HStack(spacing: 13) {
 		  PlatformIcon(systemName: "envelope")
 			.font(.system(size: 15))
-			.foregroundStyle(Color.authIcon)
+			.foregroundStyle(theme.authIcon)
 		  
 		  TextField("Enter your email", text: $viewModel.emailOrPhone)
 			.font(.system(size: 16))
-			.foregroundStyle(Color.authPrimaryText)
+			.foregroundStyle(theme.authPrimaryText)
 			.keyboardType(.emailAddress)
 			.textInputAutocapitalization(.never)
 			.autocorrectionDisabled()
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)
-		.background(Color.authFieldBackground)
+		.background(theme.authFieldBackground)
 		.clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 		.overlay {
 		  RoundedRectangle(cornerRadius: 15, style: .continuous)
-			.stroke(Color.authFieldBorder, lineWidth: 1)
+			.stroke(theme.authFieldBorder, lineWidth: 1)
 		}
 	  }
 	  
@@ -131,12 +120,12 @@ struct LoginView: View {
 	  VStack(alignment: .leading, spacing: 9) {
 		Text("Password")
 		  .font(.system(size: 14, weight: .semibold))
-		  .foregroundStyle(Color.authPrimaryText)
+		  .foregroundStyle(theme.authPrimaryText)
 		
 		HStack(spacing: 13) {
 		  PlatformIcon(systemName: "lock.fill")
 			.font(.system(size: 15))
-			.foregroundStyle(Color.authIcon)
+			.foregroundStyle(theme.authIcon)
 		  
 		  Group {
 			if viewModel.isPasswordVisible {
@@ -146,7 +135,7 @@ struct LoginView: View {
 			}
 		  }
 		  .font(.system(size: 16))
-		  .foregroundStyle(Color.authPrimaryText)
+		  .foregroundStyle(theme.authPrimaryText)
 		  .textInputAutocapitalization(.never)
 		  .autocorrectionDisabled()
 		  
@@ -155,17 +144,17 @@ struct LoginView: View {
 		  } label: {
 			PlatformIcon(systemName: viewModel.isPasswordVisible ? "eye" : "eye.slash")
 			  .font(.system(size: 17))
-			  .foregroundStyle(Color.authIcon)
+			  .foregroundStyle(theme.authIcon)
 		  }
 		  .buttonStyle(.plain)
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)
-		.background(Color.authFieldBackground)
+		.background(theme.authFieldBackground)
 		.clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 		.overlay {
 		  RoundedRectangle(cornerRadius: 15, style: .continuous)
-			.stroke(Color.authFieldBorder, lineWidth: 1)
+			.stroke(theme.authFieldBorder, lineWidth: 1)
 		}
 	  }
 	  
@@ -174,7 +163,7 @@ struct LoginView: View {
 	  } label: {
 		Text("Forgot Password?")
 		  .font(.system(size: 14, weight: .medium))
-		  .foregroundStyle(Color.authPink)
+		  .foregroundStyle(theme.authPink)
 		  .frame(maxWidth: .infinity, alignment: .trailing)
 	  }
 	  .buttonStyle(.plain)
@@ -183,9 +172,9 @@ struct LoginView: View {
 	.padding(.horizontal, 24)
 	.padding(.top, 26)
 	.padding(.bottom, 24)
-	.background(Color.appCardBackground)
+	.background(theme.appCardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-	.shadow(color: .black.opacity(0.035), radius: 24, x: 0, y: 14)
+	.shadow(color: theme.appPrimaryText.opacity(0.035), radius: 24, x: 0, y: 14)
   }
   
   var loginButton: some View {
@@ -203,9 +192,9 @@ struct LoginView: View {
 	  .foregroundStyle(.white)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 57)
-	  .background(Color.authPink.opacity(viewModel.canSubmit ? 1 : 0.55))
+	  .background(theme.authPink.opacity(viewModel.canSubmit ? 1 : 0.55))
 	  .clipShape(Capsule())
-	  .shadow(color: Color.authPink.opacity(viewModel.canSubmit ? 0.25 : 0), radius: 18, x: 0, y: 10)
+	  .shadow(color: theme.authPink.opacity(viewModel.canSubmit ? 0.25 : 0), radius: 18, x: 0, y: 10)
 	}
 	.buttonStyle(.plain)
 	.disabled(!viewModel.canSubmit)
@@ -214,16 +203,16 @@ struct LoginView: View {
   var dividerTitle: some View {
 	HStack(spacing: 17) {
 	  Rectangle()
-		.fill(Color.authDivider)
+		.fill(theme.authDivider)
 		.frame(height: 1)
 	  
 	  Text("Or continue with")
 		.font(.system(size: 14, weight: .regular))
-		.foregroundStyle(Color.authSecondaryText)
+		.foregroundStyle(theme.authSecondaryText)
 		.lineLimit(1)
 	  
 	  Rectangle()
-		.fill(Color.authDivider)
+		.fill(theme.authDivider)
 		.frame(height: 1)
 	}
 	.padding(.horizontal, 16)
@@ -242,13 +231,13 @@ struct LoginView: View {
 		PlatformIcon(systemName: systemImage).font(.system(size: 20, weight: .semibold))
 		Text(title).font(.system(size: 15, weight: .semibold))
 	  }
-	  .foregroundStyle(Color.authPrimaryText)
+	  .foregroundStyle(theme.authPrimaryText)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 56)
-	  .background(Color.appCardBackground)
+	  .background(theme.appCardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-	  .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.authSocialBorder, lineWidth: 1) }
-	  .shadow(color: .black.opacity(0.04), radius: 10, x: 0, y: 5)
+	  .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.authSocialBorder, lineWidth: 1) }
+	  .shadow(color: theme.appPrimaryText.opacity(0.04), radius: 10, x: 0, y: 5)
 	}
 	.buttonStyle(.plain)
   }
@@ -256,17 +245,28 @@ struct LoginView: View {
   var bottomSignUp: some View {
 	HStack(spacing: 4) {
 	  Text("Don't have an account?")
-		.foregroundStyle(Color.authSecondaryText)
+		.foregroundStyle(theme.authSecondaryText)
 	  
 	  Button {
 		router.push(.createAccount)
 	  } label: {
 		Text("Sign Up")
 		  .fontWeight(.semibold)
-		  .foregroundStyle(Color.authPink)
+		  .foregroundStyle(theme.authPink)
 	  }
 	  .buttonStyle(.plain)
 	}
 	.font(.system(size: 14))
   }
 }
+#if os(iOS)
+struct LoginView_Previews: PreviewProvider {
+  
+  static var previews: some View {
+	
+	LoginView()
+	
+  }
+  
+}
+#endif

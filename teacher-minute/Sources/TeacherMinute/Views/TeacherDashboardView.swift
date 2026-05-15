@@ -13,7 +13,10 @@ struct TeacherDashboardView: View {
   @Binding var hidesTabBar: Bool
   let showsSessionOverlay: Bool
   let showsIncomingOverlay: Bool
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   init(
     viewModel: TeacherDashboardViewModel = TeacherDashboardViewModel(),
     hidesTabBar: Binding<Bool> = .constant(false),
@@ -103,7 +106,7 @@ struct TeacherDashboardView: View {
           .padding(.horizontal, 18)
           .padding(.bottom, 24)
         }
-        .background(Color.appCardBackground)
+        .background(theme.appCardBackground)
 
         if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
           TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
@@ -122,20 +125,20 @@ struct TeacherDashboardView: View {
   var offlineHero: some View {
 	VStack(spacing: 0) {
 	  Circle()
-		.fill(Color.appGrayBackground)
+		.fill(theme.appGrayBackground)
 		.frame(width: 84, height: 84)
 		.overlay {
-		  PlatformIcon(systemName: "moon.fill", size: 34, weight: .semibold, color: .appSecondaryText)
+		  PlatformIcon(systemName: "moon.fill", size: 34, weight: .semibold, color: theme.appSecondaryText)
 		}
 	  
 	  Text("You're Offline")
 		.font(.system(size: 26, weight: .bold))
-		.foregroundStyle(Color.appPrimaryText)
+		.foregroundStyle(theme.appPrimaryText)
 		.padding(.top, 22)
 	  
 	  Text("Go online to start receiving student requests and\nearn money.")
 		.font(.system(size: 13))
-		.foregroundStyle(Color.appSecondaryText)
+		.foregroundStyle(theme.appSecondaryText)
 		.multilineTextAlignment(.center)
 		.lineSpacing(5)
 		.padding(.top, 10)
@@ -150,11 +153,11 @@ struct TeacherDashboardView: View {
 		  
 		  Text("OFF")
 			.font(.system(size: 12, weight: .bold))
-			.foregroundStyle(Color.appSecondaryText)
+			.foregroundStyle(theme.appSecondaryText)
 			.padding(.trailing, 14)
 		}
 		.frame(height: 48)
-		.background(Color.appBorder)
+		.background(theme.appBorder)
 		.clipShape(Capsule())
 	  }
 	  .buttonStyle(.plain)
@@ -166,30 +169,30 @@ struct TeacherDashboardView: View {
   var onlineHero: some View {
 	VStack(spacing: 0) {
 	  Circle()
-		.fill(Color.appGreenSoft)
+		.fill(theme.appGreenSoft)
 		.frame(width: 112, height: 112)
 		.overlay {
 		  Circle()
-			.fill(Color.appGreen)
+			.fill(theme.appGreen)
 			.frame(width: 64, height: 64)
 			.overlay {
-			  PlatformIcon(systemName: "antenna.radiowaves.left.and.right", size: 25, weight: .semibold, color: .white)
+			  PlatformIcon(systemName: "antenna.radiowaves.left.and.right", size: 25, weight: .semibold, color: theme.white)
 			}
 		}
 	  
 	  Text("You're Online")
 		.font(.system(size: 26, weight: .bold))
-		.foregroundStyle(Color.appPrimaryText)
+		.foregroundStyle(theme.appPrimaryText)
 		.padding(.top, 18)
 	  
 	  HStack(spacing: 7) {
 		Circle()
-		  .fill(Color.appGreen)
+		  .fill(theme.appGreen)
 		  .frame(width: 7, height: 7)
 		
 		Text("Waiting for students...")
 		  .font(.system(size: 13, weight: .semibold))
-		  .foregroundStyle(Color.appGreen)
+		  .foregroundStyle(theme.appGreen)
 	  }
 	  .padding(.top, 10)
 	  
@@ -207,7 +210,7 @@ struct TeacherDashboardView: View {
 			.frame(width: 44, height: 44)
 		}
 		.frame(height: 48)
-		.background(Color.appGreen)
+		.background(theme.appGreen)
 		.clipShape(Capsule())
 	  }
 	  .buttonStyle(.plain)
@@ -220,20 +223,20 @@ struct TeacherDashboardView: View {
 	RoundedInfoCard {
 	  HStack(spacing: 14) {
 		Circle()
-		  .fill(Color.appGreenSoft)
+		  .fill(theme.appGreenSoft)
 		  .frame(width: 38, height: 38)
 		  .overlay {
-			PlatformIcon(systemName: "checkmark.seal", size: 15, weight: .semibold, color: .appGreen)
+			PlatformIcon(systemName: "checkmark.seal", size: 15, weight: .semibold, color: theme.appGreen)
 		  }
 		
 		VStack(alignment: .leading, spacing: 4) {
 		  Text("Verified Expert")
 			.font(.system(size: 14, weight: .bold))
-			.foregroundStyle(Color.appPrimaryText)
+			.foregroundStyle(theme.appPrimaryText)
 		  
 		  Text("Calculus, Algebra II")
 			.font(.system(size: 12))
-			.foregroundStyle(Color.appSecondaryText)
+			.foregroundStyle(theme.appSecondaryText)
 		}
 		
 		Spacer()
@@ -243,7 +246,7 @@ struct TeacherDashboardView: View {
 		} label: {
 		  Text("Edit Subjects")
 			.font(.system(size: 12, weight: .medium))
-			.foregroundStyle(Color.appPink)
+			.foregroundStyle(theme.appPink)
 		}
 		.buttonStyle(.plain)
 	  }
@@ -254,12 +257,12 @@ struct TeacherDashboardView: View {
 	VStack(alignment: .leading, spacing: 14) {
 	  Text("Earnings Snapshot")
 		.font(.system(size: 18, weight: .bold))
-		.foregroundStyle(Color.appPrimaryText)
+		.foregroundStyle(theme.appPrimaryText)
 	  
 	  HStack(spacing: 16) {
 		EarningsCard(title: "Today", amount: "$0.00", subtitle: "0 mins tutored")
 		  .frame(maxWidth: .infinity)
-		EarningsCard(title: "This Week", amount: "$142.50", subtitle: "+12% vs last week", subtitleColor: .appGreen)
+		EarningsCard(title: "This Week", amount: "$142.50", subtitle: "+12% vs last week", subtitleColor: theme.appGreen)
 		  .frame(maxWidth: .infinity)
 	  }
 	}
@@ -271,35 +274,35 @@ struct TeacherDashboardView: View {
 		VStack(alignment: .leading, spacing: 10) {
 		  Text("Live Earnings Today")
 			.font(.system(size: 12, weight: .medium))
-			.foregroundStyle(Color.appSecondaryText)
+			.foregroundStyle(theme.appSecondaryText)
 		  
 		  Text("$14.50")
 			.font(.system(size: 25, weight: .bold))
-			.foregroundStyle(Color.appPrimaryText)
+			.foregroundStyle(theme.appPrimaryText)
 		}
 		
 		Spacer()
 		
 		VStack(alignment: .trailing, spacing: 8) {
-		  SmallPill(title: "⚡ $0.50/min", foreground: .appPink, background: .appPinkSoft)
+		  SmallPill(title: "⚡ $0.50/min", foreground: theme.appPink, background: theme.appPinkSoft)
 		  
 		  Text("29 mins tutored")
 			.font(.system(size: 11))
-			.foregroundStyle(Color.appSecondaryText)
+			.foregroundStyle(theme.appSecondaryText)
 		}
 	  }
 	}
-	.background(Color.appPinkSoft.opacity(0.3))
+	.background(theme.appPinkSoft.opacity(0.3))
   }
   
   var onlineStatusCard: some View {
 	RoundedInfoCard {
 	  HStack {
-		statusItem(icon: "mic.fill", title: "Mic", subtitle: "On", color: .appGreen)
+		statusItem(icon: "mic.fill", title: "Mic", subtitle: "On", color: theme.appGreen)
 		Spacer()
-		statusItem(icon: "video.fill", title: "Cam", subtitle: "Ready", color: .appGreen)
+		statusItem(icon: "video.fill", title: "Cam", subtitle: "Ready", color: theme.appGreen)
 		Spacer()
-		statusItem(icon: "circle.fill", title: "Excellent", subtitle: "Connection", color: .appGreen)
+		statusItem(icon: "circle.fill", title: "Excellent", subtitle: "Connection", color: theme.appGreen)
 	  }
 	}
   }
@@ -309,11 +312,11 @@ struct TeacherDashboardView: View {
 		  HStack {
 		Text("Live Queue")
 		  .font(.system(size: 18, weight: .bold))
-		  .foregroundStyle(Color.appPrimaryText)
+		  .foregroundStyle(theme.appPrimaryText)
 		
 		Spacer()
 		
-			SmallPill(title: "\(viewModel.inviteIDs.count) Waiting", foreground: .appPrimaryText, background: .appGrayBackground)
+			SmallPill(title: "\(viewModel.inviteIDs.count) Waiting", foreground: theme.appPrimaryText, background: theme.appGrayBackground)
 	  }
 
 		  ForEach(viewModel.inviteIDs, id: \.self) { inviteID in
@@ -337,7 +340,7 @@ struct TeacherDashboardView: View {
   func incomingQuestionOverlay(inviteID: String) -> some View {
     ZStack {
       LinearGradient(
-        colors: [Color.appPinkSoft.opacity(0.75), Color.appCardBackground],
+        colors: [theme.appPinkSoft.opacity(0.75), theme.appCardBackground],
         startPoint: .top,
         endPoint: .bottom
       )
@@ -363,7 +366,7 @@ struct TeacherDashboardView: View {
           if let errorMessage = viewModel.errorMessage {
             Text(errorMessage)
               .font(.system(size: 12, weight: .semibold))
-              .foregroundStyle(Color.appPink)
+              .foregroundStyle(theme.appPink)
               .multilineTextAlignment(.center)
               .padding(.horizontal, 24)
               .padding(.top, 12)
@@ -381,14 +384,14 @@ struct TeacherDashboardView: View {
 	VStack(alignment: .leading, spacing: 14) {
 	  Text("Readiness Checklist")
 		.font(.system(size: 16, weight: .bold))
-		.foregroundStyle(Color.appPrimaryText)
+		.foregroundStyle(theme.appPrimaryText)
 	  
-	  checklistRow(icon: "mic.fill", title: "Microphone Enabled", subtitle: "Required for voice sessions.", color: .appGreen)
-	  checklistRow(icon: "camera.fill", title: "Camera Access (Optional)", subtitle: "Enable for video tutoring.", color: .appSecondaryText)
-	  checklistRow(icon: "wifi", title: "Connection Test", subtitle: "Check your internet speed.", color: .appSecondaryText)
+	  checklistRow(icon: "mic.fill", title: "Microphone Enabled", subtitle: "Required for voice sessions.", color: theme.appGreen)
+	  checklistRow(icon: "camera.fill", title: "Camera Access (Optional)", subtitle: "Enable for video tutoring.", color: theme.appSecondaryText)
+	  checklistRow(icon: "wifi", title: "Connection Test", subtitle: "Check your internet speed.", color: theme.appSecondaryText)
 	}
 	.padding(20)
-	.background(Color.appGrayBackground)
+	.background(theme.appGrayBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
   }
   
@@ -399,11 +402,11 @@ struct TeacherDashboardView: View {
 	  VStack(alignment: .leading, spacing: 2) {
 		Text(title)
 		  .font(.system(size: 11, weight: .bold))
-		  .foregroundStyle(Color.appPrimaryText)
+		  .foregroundStyle(theme.appPrimaryText)
 		
 		Text(subtitle)
 		  .font(.system(size: 10))
-		  .foregroundStyle(Color.appSecondaryText)
+		  .foregroundStyle(theme.appSecondaryText)
 	  }
 	}
   }
@@ -420,11 +423,11 @@ struct TeacherDashboardView: View {
 	  VStack(alignment: .leading, spacing: 3) {
 		Text(title)
 		  .font(.system(size: 13, weight: .bold))
-		  .foregroundStyle(Color.appPrimaryText)
+		  .foregroundStyle(theme.appPrimaryText)
 		
 		Text(subtitle)
 		  .font(.system(size: 11))
-		  .foregroundStyle(Color.appSecondaryText)
+		  .foregroundStyle(theme.appSecondaryText)
 	  }
 	  
 	  Spacer()
@@ -432,44 +435,48 @@ struct TeacherDashboardView: View {
   }
   
   struct EarningsCard: View {
+	@Environment(\.colorScheme) var colorScheme
+	var theme: AppTheme {
+	  AppTheme(colorScheme: colorScheme)
+	}
 	let title: String
 	let amount: String
 	let subtitle: String
-	var subtitleColor: Color = .appSecondaryText
-	
+	var subtitleColor: Color?
+
 	var body: some View {
 	  RoundedInfoCard {
 		VStack(alignment: .leading, spacing: 8) {
 		  Text(title)
 			.font(.system(size: 12))
-			.foregroundStyle(Color.appSecondaryText)
+			.foregroundStyle(theme.appSecondaryText)
 		  
 		  Text(amount)
 			.font(.system(size: 25, weight: .bold))
-			.foregroundStyle(Color.appPrimaryText)
+			.foregroundStyle(theme.appPrimaryText)
 		  
 		  Text(subtitle)
 			.font(.system(size: 11))
-			.foregroundStyle(subtitleColor)
+			.foregroundStyle(subtitleColor ?? theme.appSecondaryText)
 		}
 		.frame(maxWidth: .infinity, alignment: .leading)
 	  }
 	}
   }
   
-	  struct LiveRequestCard: View {
-			let id: String
-			let topic: String
-			let text: String
-			let expiresAt: Double
-			let wave: Int
+	struct LiveRequestCard: View {
+	  let id: String
+	  let topic: String
+	  let text: String
+	  let expiresAt: Double
+	  let wave: Int
       let photoUrls: [String]
       let hasVoiceMessage: Bool
-			let accept: () -> Void
-			let decline: () -> Void
+	  let accept: () -> Void
+	  let decline: () -> Void
       @State var now = Date().timeIntervalSince1970 * 1000.0
 
-			private var isFirstWave: Bool { wave == 1 }
+	  private var isFirstWave: Bool { wave == 1 }
       private var timerValue: Int {
         let delta = (expiresAt - now) / 1000.0
         if delta >= 0 {
@@ -481,8 +488,12 @@ struct TeacherDashboardView: View {
       private var timerCaption: String {
         now <= expiresAt ? "SECONDS" : "WAITING"
       }
-
-		var body: some View {
+	  @Environment(\.colorScheme) var colorScheme
+	  var theme: AppTheme {
+		AppTheme(colorScheme: colorScheme)
+	  }
+	  
+	  var body: some View {
       VStack(spacing: 16) {
         timerView
         studentCard
@@ -494,13 +505,13 @@ struct TeacherDashboardView: View {
       .padding(.vertical, 18)
       .background(
         LinearGradient(
-          colors: [Color.appPinkSoft.opacity(0.55), Color.appCardBackground],
+          colors: [theme.appPinkSoft.opacity(0.55), theme.appCardBackground],
           startPoint: .top,
           endPoint: .center
         )
       )
       .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-      .shadow(color: Color.appPink.opacity(0.12), radius: 18, x: 0, y: 10)
+      .shadow(color: theme.appPink.opacity(0.12), radius: 18, x: 0, y: 10)
       .task {
         while true {
           now = Date().timeIntervalSince1970 * 1000.0
@@ -512,16 +523,16 @@ struct TeacherDashboardView: View {
     var timerView: some View {
       ZStack {
         Circle()
-          .stroke(Color.appGreenSoft.opacity(0.85), lineWidth: 4)
+          .stroke(theme.appGreenSoft.opacity(0.85), lineWidth: 4)
           .frame(width: 74, height: 74)
 
         VStack(spacing: 1) {
           Text("\(timerValue)")
             .font(.system(size: 21, weight: .bold))
-            .foregroundStyle(Color.appPink)
+            .foregroundStyle(theme.appPink)
           Text(timerCaption)
             .font(.system(size: 7, weight: .bold))
-            .foregroundStyle(Color.appSecondaryText)
+            .foregroundStyle(theme.appSecondaryText)
         }
       }
     }
@@ -529,20 +540,20 @@ struct TeacherDashboardView: View {
     var studentCard: some View {
       HStack(spacing: 12) {
         Circle()
-          .fill(Color.appPurpleSoft)
+          .fill(theme.appPurpleSoft)
           .frame(width: 44, height: 44)
           .overlay {
-            PlatformIcon(systemName: "person.crop.circle.fill", size: 24, color: .appPurple)
+            PlatformIcon(systemName: "person.crop.circle.fill", size: 24, color: theme.appPurple)
           }
 
         VStack(alignment: .leading, spacing: 4) {
           Text("Student")
             .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(Color.appPrimaryText)
+            .foregroundStyle(theme.appPrimaryText)
 
           Text("Waiting now")
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Color.appSecondaryText)
+            .foregroundStyle(theme.appSecondaryText)
         }
 
         Spacer()
@@ -552,11 +563,11 @@ struct TeacherDashboardView: View {
           .foregroundStyle(.white)
           .padding(.horizontal, 12)
           .padding(.vertical, 8)
-          .background(Color.appPurple)
+          .background(theme.appPurple)
           .clipShape(Capsule())
       }
       .padding(14)
-      .background(Color.appCardBackground)
+      .background(theme.appCardBackground)
       .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
@@ -564,20 +575,20 @@ struct TeacherDashboardView: View {
       VStack(alignment: .leading, spacing: 14) {
         HStack(spacing: 9) {
           Circle()
-            .fill(Color.appPinkSoft)
+            .fill(theme.appPinkSoft)
             .frame(width: 22, height: 22)
             .overlay {
-              PlatformIcon(systemName: "questionmark.circle", size: 11, weight: .bold, color: .appPink)
+              PlatformIcon(systemName: "questionmark.circle", size: 11, weight: .bold, color: theme.appPink)
             }
 
           Text("QUESTION")
             .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(Color.appPrimaryText)
+            .foregroundStyle(theme.appPrimaryText)
         }
 
         Text(text)
           .font(.system(size: 12))
-          .foregroundStyle(Color.appPrimaryText)
+          .foregroundStyle(theme.appPrimaryText)
           .lineSpacing(3)
           .lineLimit(6)
           .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
@@ -596,20 +607,20 @@ struct TeacherDashboardView: View {
         }
       }
       .padding(14)
-      .background(Color.appCardBackground)
+      .background(theme.appCardBackground)
       .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     var attachmentTile: some View {
       RoundedRectangle(cornerRadius: 9, style: .continuous)
-        .fill(Color.appGrayBackground)
+        .fill(theme.appGrayBackground)
         .frame(width: 56, height: 56)
         .overlay {
-          PlatformIcon(systemName: "photo.fill", size: 16, weight: .semibold, color: .appSecondaryText)
+          PlatformIcon(systemName: "photo.fill", size: 16, weight: .semibold, color: theme.appSecondaryText)
         }
         .overlay {
           RoundedRectangle(cornerRadius: 9, style: .continuous)
-            .stroke(Color.appBorder, lineWidth: 1)
+            .stroke(theme.appBorder, lineWidth: 1)
         }
     }
 
@@ -619,16 +630,16 @@ struct TeacherDashboardView: View {
           .fill(.white)
           .frame(width: 34, height: 34)
           .overlay {
-            PlatformIcon(systemName: "play.fill", size: 12, weight: .bold, color: .appPink)
+            PlatformIcon(systemName: "play.fill", size: 12, weight: .bold, color: theme.appPink)
           }
 
         VStack(alignment: .leading, spacing: 2) {
           Text("Voice Message")
             .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(Color.appPrimaryText)
+            .foregroundStyle(theme.appPrimaryText)
           Text("0:23")
             .font(.system(size: 9, weight: .medium))
-            .foregroundStyle(Color.appSecondaryText)
+            .foregroundStyle(theme.appSecondaryText)
         }
 
         Spacer()
@@ -636,29 +647,29 @@ struct TeacherDashboardView: View {
         HStack(spacing: 3) {
           ForEach(0..<6, id: \.self) { index in
             Capsule()
-              .fill(Color.appPink.opacity(index % 2 == 0 ? 0.75 : 0.35))
+              .fill(theme.appPink.opacity(index % 2 == 0 ? 0.75 : 0.35))
               .frame(width: 3, height: CGFloat(14 + (index % 3) * 7))
           }
         }
       }
       .padding(10)
-      .background(Color.appPinkSoft.opacity(0.65))
+      .background(theme.appPinkSoft.opacity(0.65))
       .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
     }
 
     var acceptButton: some View {
       Button(action: accept) {
         HStack(spacing: 9) {
-          PlatformIcon(systemName: "checkmark.circle.fill", size: 14, weight: .bold, color: .white)
+          PlatformIcon(systemName: "checkmark.circle.fill", size: 14, weight: .bold, color: theme.white)
           Text("Accept Question")
             .font(.system(size: 15, weight: .bold))
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity)
         .frame(height: 52)
-        .background(Color.appPink)
+        .background(theme.appPink)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .shadow(color: Color.appPink.opacity(0.25), radius: 16, x: 0, y: 8)
+        .shadow(color: theme.appPink.opacity(0.25), radius: 16, x: 0, y: 8)
       }
       .buttonStyle(.plain)
     }
@@ -666,10 +677,10 @@ struct TeacherDashboardView: View {
     var declineButton: some View {
       Button(action: decline) {
         HStack(spacing: 6) {
-          PlatformIcon(systemName: "xmark", size: 10, weight: .semibold, color: .appSecondaryText)
+          PlatformIcon(systemName: "xmark", size: 10, weight: .semibold, color: theme.appSecondaryText)
           Text("Decline")
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.appSecondaryText)
+            .foregroundStyle(theme.appSecondaryText)
         }
         .frame(height: 26)
       }
@@ -680,11 +691,14 @@ struct TeacherDashboardView: View {
 struct TeacherIncomingQuestionOverlay: View {
   let inviteID: String
   let viewModel: TeacherDashboardViewModel
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
     ZStack {
       LinearGradient(
-        colors: [Color.appPinkSoft.opacity(0.75), Color.appCardBackground],
+        colors: [theme.appPinkSoft.opacity(0.75), theme.appCardBackground],
         startPoint: .top,
         endPoint: .bottom
       )

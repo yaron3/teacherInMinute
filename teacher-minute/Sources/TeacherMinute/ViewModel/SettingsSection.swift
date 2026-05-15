@@ -20,7 +20,7 @@ struct SettingsRow: Identifiable {
     let title: String
     let subtitle: String?
     let systemImage: String
-    let iconColor: SettingsIconColor
+    let iconColor: Color
     let isDestructive: Bool
     let action: SettingsAction
     let destination: SettingsDestination?
@@ -31,7 +31,7 @@ struct SettingsRow: Identifiable {
         title: String,
         subtitle: String? = nil,
         systemImage: String,
-        iconColor: SettingsIconColor,
+        iconColor: Color,
         isDestructive: Bool = false,
         action: SettingsAction
     ) {
@@ -208,30 +208,30 @@ enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
     }
 }
 
-enum SettingsIconColor {
-    case primary
-    case pink
-    case purple
-    case red
-
-    var foregroundColor: Color {
-        switch self {
-        case .primary: .appPrimaryText
-        case .pink: .appPink
-        case .purple: .appPurple
-        case .red: .red
-        }
-    }
-
-    var backgroundColor: Color {
-        switch self {
-        case .primary: .appGrayBackground
-        case .pink: .appPinkSoft
-        case .purple: .appPurpleSoft
-        case .red: Color.red.opacity(0.08)
-        }
-    }
-}
+//enum SettingsIconColor {
+//    case primary
+//    case pink
+//    case purple
+//    case red
+//
+//    var foregroundColor: Color {
+//        switch self {
+//        case .primary: .appPrimaryText
+//        case .pink: .appPink
+//        case .purple: .appPurple
+//        case .red: .red
+//        }
+//    }
+//
+//    var backgroundColor: Color {
+//        switch self {
+//        case .primary: .appGrayBackground
+//        case .pink: .appPinkSoft
+//        case .purple: .appPurpleSoft
+//        case .red: .red.opacity(0.08)
+//        }
+//    }
+//}
 
 @Observable
 @MainActor

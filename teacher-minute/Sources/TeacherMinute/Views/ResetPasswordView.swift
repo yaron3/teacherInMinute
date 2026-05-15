@@ -10,7 +10,10 @@ import SwiftUI
 
 struct ResetPasswordView: View {
     @State var viewModel = ResetPasswordViewModel()
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             AuthIconHeader(systemImage: "key.fill")
@@ -18,12 +21,12 @@ struct ResetPasswordView: View {
 
             Text("Reset Password")
                 .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(Color.authPrimaryText)
+                .foregroundStyle(theme.authPrimaryText)
                 .padding(.top, 26)
 
             Text("Enter your email or phone number and we'll\nsend you instructions to reset your password.")
                 .font(.system(size: 15))
-                .foregroundStyle(Color.authSecondaryText)
+                .foregroundStyle(theme.authSecondaryText)
                 .lineSpacing(5)
                 .padding(.top, 8)
 
@@ -47,7 +50,7 @@ struct ResetPasswordView: View {
                     Text("Back to Log In")
                         .font(.system(size: 14, weight: .medium))
                 }
-                .foregroundStyle(Color.authSecondaryText)
+                .foregroundStyle(theme.authSecondaryText)
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
@@ -83,9 +86,9 @@ struct ResetPasswordView: View {
             }
         }
         .padding(24)
-        .background(Color.appCardBackground)
+        .background(theme.appCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.035), radius: 24, x: 0, y: 14)
+        .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 24, x: 0, y: 14)
     }
 
     var methodPicker: some View {
@@ -97,7 +100,7 @@ struct ResetPasswordView: View {
             } label: {
                 Text("Email")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.authPrimaryText)
+                    .foregroundStyle(theme.authPrimaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
                     .background(viewModel.method == .email ? .white : .clear)
@@ -111,7 +114,7 @@ struct ResetPasswordView: View {
             } label: {
                 Text("Phone")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.authSecondaryText)
+                    .foregroundStyle(theme.authSecondaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
                     .background(viewModel.method == .phone ? .white : .clear)
@@ -119,7 +122,7 @@ struct ResetPasswordView: View {
             }
         }
         .padding(3)
-        .background(Color.authFieldBackground)
+        .background(theme.authFieldBackground)
         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
     }
 }

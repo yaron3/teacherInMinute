@@ -8,7 +8,10 @@ struct ChatInputBar: View {
   var canSend: Bool {
     !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var textFieldHeight: CGFloat {
 #if os(Android)
     52
@@ -24,9 +27,9 @@ struct ChatInputBar: View {
       }
 
       HStack(spacing: 10) {
-        PlatformIcon(systemName: "photo.fill", size: 15, weight: .semibold, color: .appPrimaryText)
+		PlatformIcon(systemName: "photo.fill", size: 15, weight: .semibold, color: theme.appPrimaryText)
           .frame(width: 36, height: 36)
-          .background(Color.appGrayBackground)
+          .background(theme.appGrayBackground)
           .clipShape(Circle())
 
         TextField("Message", text: $text)
@@ -36,17 +39,17 @@ struct ChatInputBar: View {
           .lineLimit(1)
           .padding(.horizontal, 14)
           .frame(height: textFieldHeight)
-          .background(Color.appGrayBackground)
+          .background(theme.appGrayBackground)
           .clipShape(Capsule())
 
         Button {
           send()
         } label: {
-          PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: .white)
+          PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.white)
             .frame(width: 42, height: 42)
             .background(
               LinearGradient(
-                colors: canSend ? [Color.appPink, Color.appPurple] : [Color.appBorder, Color.appBorder],
+                colors: canSend ? [theme.appPink, theme.appPurple] : [theme.appBorder, theme.appBorder],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
               )
@@ -67,7 +70,10 @@ struct MathSymbolRow: View {
   private let mathSymbols = [
     "=", "+", "−", "×", "÷", "^", "√", "π", "∞", "≈", "≠", "≤", "≥", "∫", "∑", "θ", "α", "β"
   ]
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: 8) {
@@ -78,9 +84,9 @@ struct MathSymbolRow: View {
           } label: {
             Text(symbol)
               .font(.system(size: 15, weight: .semibold))
-              .foregroundStyle(Color.appPrimaryText)
+              .foregroundStyle(theme.appPrimaryText)
               .frame(width: 34, height: 32)
-              .background(Color.appGrayBackground)
+              .background(theme.appGrayBackground)
               .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
           }
           .buttonStyle(.plain)

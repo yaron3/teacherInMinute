@@ -14,6 +14,10 @@ struct AuthPrimaryButton: View {
     var isEnabled = true
     let action: () -> Void
 
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
@@ -28,9 +32,9 @@ struct AuthPrimaryButton: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .background(Color.authPink.opacity(isEnabled ? 1 : 0.55))
+            .background(theme.authPink.opacity(isEnabled ? 1 : 0.55))
             .clipShape(Capsule())
-            .shadow(color: Color.authPink.opacity(0.25), radius: 18, x: 0, y: 10)
+            .shadow(color: theme.authPink.opacity(0.25), radius: 18, x: 0, y: 10)
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
@@ -39,17 +43,18 @@ struct AuthPrimaryButton: View {
 
 struct AuthIconHeader: View {
     let systemImage: String
-    var backgroundColor: Color = .authPinkSoft
-    var iconColor: Color = .authPink
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(backgroundColor)
+            .fill(theme.authPinkSoft)
             .frame(width: 54, height: 54)
             .overlay {
                 PlatformIcon(systemName: systemImage)
                     .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(iconColor)
+                    .foregroundStyle(theme.authPink)
             }
     }
 }
@@ -62,34 +67,37 @@ struct AuthInputField: View {
 
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType?
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.authPrimaryText)
+                .foregroundStyle(theme.authPrimaryText)
 
             HStack(spacing: 12) {
                 PlatformIcon(systemName: systemImage)
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.authIcon)
+                    .foregroundStyle(theme.authIcon)
 
                 TextField(placeholder, text: $text)
                     .font(.system(size: 15))
-                    .foregroundStyle(Color.authPrimaryText)
+                    .foregroundStyle(theme.authPrimaryText)
                     .keyboardType(keyboardType)
                     .textContentType(textContentType)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .tint(Color.authPink)
+                    .tint(theme.authPink)
             }
             .padding(.horizontal, 16)
             .frame(height: 56)
-            .background(Color.authFieldBackground)
+            .background(theme.authFieldBackground)
             .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .stroke(Color.authFieldBorder, lineWidth: 1)
+                    .stroke(theme.authFieldBorder, lineWidth: 1)
             }
         }
     }
@@ -97,34 +105,55 @@ struct AuthInputField: View {
 
 struct AuthSegmentedRolePicker: View {
     @Binding var selectedRole: AuthRole
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         HStack(spacing: 0) {
             ForEach(AuthRole.allCases) { role in
-                Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        selectedRole = role
-                    }
-                } label: {
-                    Text(role.title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(selectedRole == role ? Color.authPrimaryText : Color.authSecondaryText)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
-                        .background {
-                            if selectedRole == role {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(.white)
-                                    .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
+                roleButton(for: role)
             }
         }
         .padding(3)
-        .background(Color.authFieldBorder.opacity(0.55))
+        .background(theme.authFieldBorder.opacity(0.55))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func roleButton(for role: AuthRole) -> some View {
+        let isSelected = selectedRole == role
+
+        return Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                selectedRole = role
+            }
+        } label: {
+            Text(role.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isSelected ? theme.authPrimaryText : theme.authSecondaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background {
+                    AuthSelectedRoleBackground(
+                        isSelected: isSelected,
+                        shadowColor: theme.appPrimaryText
+                    )
+                }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct AuthSelectedRoleBackground: View {
+    let isSelected: Bool
+    let shadowColor: Color
+
+    var body: some View {
+        if isSelected {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.white)
+                .shadow(color: shadowColor.opacity(0.06), radius: 6, x: 0, y: 2)
+        }
     }
 }
 
@@ -132,7 +161,10 @@ struct SubjectChip: View {
     let subject: SubjectOption
     let isSelected: Bool
     let action: () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         Button(action: action) {
             HStack(spacing: 7) {
@@ -142,14 +174,14 @@ struct SubjectChip: View {
                 Text(subject.title)
                     .font(.system(size: 13, weight: .medium))
             }
-            .foregroundStyle(isSelected ? .white : Color.authPrimaryText)
+            .foregroundStyle(isSelected ? .white : theme.authPrimaryText)
             .padding(.horizontal, 14)
             .frame(height: 34)
-            .background(isSelected ? Color.authPink : .white)
+            .background(isSelected ? theme.authPink : .white)
             .clipShape(Capsule())
             .overlay {
                 Capsule()
-                    .stroke(isSelected ? Color.authPink : Color.authFieldBorder, lineWidth: 1)
+                    .stroke(isSelected ? theme.authPink : theme.authFieldBorder, lineWidth: 1)
             }
         }
         .buttonStyle(.plain)

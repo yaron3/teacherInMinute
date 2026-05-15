@@ -9,7 +9,10 @@ import SwiftUI
 
 struct StudentLessonHistoryView: View {
     @State var viewModel = StudentLessonHistoryViewModel()
-    
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
@@ -30,14 +33,14 @@ struct StudentLessonHistoryView: View {
                 HStack {
                     Text("Past Lessons")
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
                     
                     Spacer()
                     
                     SmallPill(
                         title: viewModel.completedCountText,
-                        foreground: .appPurple,
-                        background: .appPurpleSoft
+                        foreground: theme.appPurple,
+                        background: theme.appPurpleSoft
                     )
                 }
                 .padding(.top, 26)
@@ -76,14 +79,14 @@ struct StudentLessonHistoryView: View {
                 title: "Time Learned",
                 value: "54 min",
                 systemImage: "clock.fill",
-                tint: .appPink
+                tint: theme.appPink
             )
             
             HistoryMetricCard(
                 title: "Total Spend",
                 value: viewModel.totalSpendText,
                 systemImage: "creditcard.fill",
-                tint: .appPurple
+                tint: theme.appPurple
             )
         }
     }
@@ -92,23 +95,23 @@ struct StudentLessonHistoryView: View {
         HStack(spacing: 10) {
             PlatformIcon(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.appSecondaryText)
+                .foregroundStyle(theme.appSecondaryText)
             
             TextField("Search lessons or teachers", text: $viewModel.query)
                 .font(.system(size: 14))
-                .foregroundStyle(Color.appPrimaryText)
+                .foregroundStyle(theme.appPrimaryText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
         }
         .padding(.horizontal, 16)
         .frame(height: 48)
-        .background(Color.appCardBackground)
+        .background(theme.appCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.appGrayBackground, lineWidth: 1)
+                .stroke(theme.appGrayBackground, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.025), radius: 10, x: 0, y: 5)
+        .shadow(color: theme.appPrimaryText.opacity(0.025), radius: 10, x: 0, y: 5)
     }
 }
 
@@ -117,7 +120,10 @@ struct HistoryMetricCard: View {
     let value: String
     let systemImage: String
     let tint: Color
-    
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         RoundedInfoCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -135,11 +141,11 @@ struct HistoryMetricCard: View {
                 
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.appSecondaryText)
+                    .foregroundStyle(theme.appSecondaryText)
                 
                 Text(value)
                     .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(Color.appPrimaryText)
+                    .foregroundStyle(theme.appPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -153,56 +159,59 @@ struct StudentLessonHistoryRow: View {
     let isPlaying: Bool
     let viewAction: () -> Void
     let audioAction: () -> Void
-    
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         RoundedInfoCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
                     Circle()
-                        .fill(Color.appPinkSoft)
+                        .fill(theme.appPinkSoft)
                         .frame(width: 46, height: 46)
                         .overlay {
                             PlatformIcon(systemName: "function")
                                 .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(Color.appPink)
+                                .foregroundStyle(theme.appPink)
                         }
                     
                     VStack(alignment: .leading, spacing: 5) {
                         Text(lesson.title)
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color.appPrimaryText)
+                            .foregroundStyle(theme.appPrimaryText)
                         
                         Text("\(lesson.teacher) • \(lesson.completedAt)")
                             .font(.system(size: 11))
-                            .foregroundStyle(Color.appSecondaryText)
+                            .foregroundStyle(theme.appSecondaryText)
                     }
                     
                     Spacer()
                     
                     Text(lesson.price)
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
                 }
                 
                 Text(lesson.summary)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.appSecondaryText)
+                    .foregroundStyle(theme.appSecondaryText)
                     .lineSpacing(3)
                 
                 HStack(spacing: 10) {
                     LessonActionButton(
                         title: "View",
                         systemImage: "doc.text.fill",
-                        foreground: .appPrimaryText,
-                        background: .appGrayBackground,
+                        foreground: theme.appPrimaryText,
+                        background: theme.appGrayBackground,
                         action: viewAction
                     )
                     
                     LessonActionButton(
                         title: isPlaying ? "Pause" : "Listen",
                         systemImage: isPlaying ? "pause.fill" : "play.fill",
-                        foreground: lesson.hasAudio ? .white : .appSecondaryText,
-                        background: lesson.hasAudio ? Color.appPink : Color.appGrayBackground,
+                        foreground: lesson.hasAudio ? .white : theme.appSecondaryText,
+                        background: lesson.hasAudio ? theme.appPink : theme.appGrayBackground,
                         action: audioAction
                     )
                     .disabled(!lesson.hasAudio)
@@ -211,8 +220,8 @@ struct StudentLessonHistoryRow: View {
                     
                     SmallPill(
                         title: lesson.duration,
-                        foreground: .appGreen,
-                        background: .appGreenSoft
+                        foreground: theme.appGreen,
+                        background: theme.appGreenSoft
                     )
                 }
             }
@@ -253,7 +262,10 @@ struct StudentLessonDetailView: View {
     let lesson: StudentLessonHistoryItem
     let isPlaying: Bool
     let audioAction: () -> Void
-    
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -261,18 +273,18 @@ struct StudentLessonDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(lesson.title)
                             .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(Color.appPrimaryText)
+                            .foregroundStyle(theme.appPrimaryText)
                         
                         Text("\(lesson.teacher) • \(lesson.completedAt) • \(lesson.duration)")
                             .font(.system(size: 13))
-                            .foregroundStyle(Color.appSecondaryText)
+                            .foregroundStyle(theme.appSecondaryText)
                     }
                     
                     LessonActionButton(
                         title: isPlaying ? "Pause Audio" : "Listen to Lesson",
                         systemImage: isPlaying ? "pause.fill" : "play.fill",
-                        foreground: lesson.hasAudio ? .white : .appSecondaryText,
-                        background: lesson.hasAudio ? Color.appPink : Color.appGrayBackground,
+                        foreground: lesson.hasAudio ? .white : theme.appSecondaryText,
+                        background: lesson.hasAudio ? theme.appPink : theme.appGrayBackground,
                         action: audioAction
                     )
                     .disabled(!lesson.hasAudio)
@@ -281,11 +293,11 @@ struct StudentLessonDetailView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Summary")
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color.appPrimaryText)
+                                .foregroundStyle(theme.appPrimaryText)
                             
                             Text(lesson.summary)
                                 .font(.system(size: 13))
-                                .foregroundStyle(Color.appSecondaryText)
+                                .foregroundStyle(theme.appSecondaryText)
                                 .lineSpacing(4)
                         }
                     }
@@ -294,11 +306,11 @@ struct StudentLessonDetailView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Transcript Preview")
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color.appPrimaryText)
+                                .foregroundStyle(theme.appPrimaryText)
                             
                             Text(lesson.transcriptPreview)
                                 .font(.system(size: 13))
-                                .foregroundStyle(Color.appSecondaryText)
+                                .foregroundStyle(theme.appSecondaryText)
                                 .lineSpacing(4)
                         }
                     }

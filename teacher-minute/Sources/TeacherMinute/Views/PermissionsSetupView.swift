@@ -10,7 +10,10 @@ import SwiftUI
 
 struct PermissionsSetupView: View {
     @State var viewModel = PermissionsSetupViewModel()
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -18,34 +21,34 @@ struct PermissionsSetupView: View {
 
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.authPinkSoft)
+                    .fill(theme.authPinkSoft)
                     .frame(width: 78, height: 78)
                     .overlay {
                         PlatformIcon(systemName: "mic.fill")
                             .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(Color.authPink)
+                            .foregroundStyle(theme.authPink)
                     }
-                    .shadow(color: Color.authPink.opacity(0.1), radius: 24, x: 0, y: 12)
+                    .shadow(color: theme.authPink.opacity(0.1), radius: 24, x: 0, y: 12)
 
                 Circle()
-                    .fill(Color.authPurpleSoft)
+                    .fill(theme.authPurpleSoft)
                     .frame(width: 34, height: 34)
                     .overlay {
                         PlatformIcon(systemName: "bell.fill")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.authPurple)
+                            .foregroundStyle(theme.authPurple)
                     }
                     .offset(x: 12, y: 8)
             }
 
             Text("Connect & Learn")
                 .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Color.authPrimaryText)
+                .foregroundStyle(theme.authPrimaryText)
                 .padding(.top, 34)
 
             Text("To give you the best math tutoring\nexperience, we need a couple of\npermissions to connect you instantly.")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.authSecondaryText)
+                .foregroundStyle(theme.authSecondaryText)
                 .lineSpacing(6)
                 .multilineTextAlignment(.center)
                 .padding(.top, 12)
@@ -53,8 +56,8 @@ struct PermissionsSetupView: View {
             VStack(spacing: 16) {
                 PermissionCard(
                     icon: "mic.fill",
-                    iconColor: .authPink,
-                    iconBackground: .authPinkSoft,
+                    iconColor: theme.authPink,
+                    iconBackground: theme.authPinkSoft,
                     title: "Microphone",
                     subtitle: "Talk live with\nteachers to solve\nmath problems\ntogether in real-\ntime.",
                     isOn: $viewModel.microphoneEnabled
@@ -62,8 +65,8 @@ struct PermissionsSetupView: View {
 
                 PermissionCard(
                     icon: "bell.fill",
-                    iconColor: .authPurple,
-                    iconBackground: .authPurpleSoft,
+					iconColor: theme.authPurple,
+					iconBackground: theme.authPurpleSoft,
                     title: "Notifications",
                     subtitle: "Get instant alerts\nwhen a teacher\naccepts your\nrequest or replies.",
                     isOn: $viewModel.notificationsEnabled
@@ -82,7 +85,7 @@ struct PermissionsSetupView: View {
             } label: {
                 Text("Not now, use limited mode")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.authSecondaryText)
+                    .foregroundStyle(theme.authSecondaryText)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
@@ -102,7 +105,10 @@ struct PermissionCard: View {
     let title: String
     let subtitle: String
     @Binding var isOn: Bool
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Circle()
@@ -117,11 +123,11 @@ struct PermissionCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.authPrimaryText)
+                    .foregroundStyle(theme.authPrimaryText)
 
                 Text(subtitle)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.authSecondaryText)
+                    .foregroundStyle(theme.authSecondaryText)
                     .lineSpacing(4)
             }
 
@@ -129,16 +135,16 @@ struct PermissionCard: View {
 
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(Color.authGreen)
+                .tint(theme.authGreen)
         }
         .padding(18)
         .frame(maxWidth: .infinity)
-        .background(Color.appCardBackground)
+        .background(theme.appCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.authPink.opacity(0.10), lineWidth: 1)
+                .stroke(theme.authPink.opacity(0.10), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.03), radius: 18, x: 0, y: 10)
+		.shadow(color: theme.appPrimaryText.opacity(0.03), radius: 18, x: 0, y: 10)
     }
 }

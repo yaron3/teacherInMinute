@@ -11,7 +11,10 @@ struct StudentHomeView: View {
     @State var viewModel: any StudentHomeViewModeling
     @State var showingAskSheet = false
     @Binding var hidesTabBar: Bool
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     init(
         viewModel: any StudentHomeViewModeling = StudentHomeViewModel(),
         hidesTabBar: Binding<Bool> = .constant(false)
@@ -126,7 +129,7 @@ struct StudentHomeView: View {
         } label: {
             ZStack(alignment: .topTrailing) {
                 LinearGradient(
-                    colors: [Color.appPink, Color.appPurple],
+                    colors: [theme.appPink, theme.appPurple],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -166,14 +169,14 @@ struct StudentHomeView: View {
                     .overlay {
                         PlatformIcon(systemName: "arrow.right")
                             .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(Color.appPink)
+                            .foregroundStyle(theme.appPink)
                     }
                     .padding(.top, 36)
                     .padding(.trailing, 20)
             }
             .frame(height: 148)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: Color.appPink.opacity(0.25), radius: 18, x: 0, y: 10)
+            .shadow(color: theme.appPink.opacity(0.25), radius: 18, x: 0, y: 10)
         }
         .buttonStyle(.plain)
     }
@@ -184,18 +187,18 @@ struct StudentHomeView: View {
         RoundedInfoCard {
             HStack(alignment: .top, spacing: 14) {
                 Circle()
-                    .fill(Color.yellow.opacity(0.2))
+                    .fill(theme.yellow.opacity(0.2))
                     .frame(width: 34, height: 34)
                     .overlay {
                         PlatformIcon(systemName: "lightbulb.fill")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.appOrange)
+                            .foregroundStyle(theme.appOrange)
                     }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Tips for faster matches")
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     tipLine("Upload a clear photo of your math problem")
                     tipLine("Specify the exact topic (e.g., \u{201C}Derivatives\u{201D})")
@@ -210,11 +213,11 @@ struct StudentHomeView: View {
         HStack(spacing: 8) {
             PlatformIcon(systemName: "checkmark")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color.appGreen)
+                .foregroundStyle(theme.appGreen)
 
             Text(text)
                 .font(.system(size: 12))
-                .foregroundStyle(Color.appSecondaryText)
+                .foregroundStyle(theme.appSecondaryText)
         }
     }
 
@@ -222,14 +225,14 @@ struct StudentHomeView: View {
         HStack {
             Text(title)
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Color.appPrimaryText)
+                .foregroundStyle(theme.appPrimaryText)
 
             Spacer()
 
             Button(action: action) {
                 Text(actionTitle)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.appPink)
+                    .foregroundStyle(theme.appPink)
             }
             .buttonStyle(.plain)
         }
@@ -249,14 +252,17 @@ struct AskTeacherSheet: View {
     @State  var conversationType = "text"
     @FocusState var isQuestionFocused: Bool
     private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 }
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Topic")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
@@ -266,10 +272,10 @@ struct AskTeacherSheet: View {
                                 } label: {
                                     Text(topic.capitalized)
                                         .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(selectedTopic == topic ? .white : Color.appPrimaryText)
+                                        .foregroundStyle(selectedTopic == topic ? .white : theme.appPrimaryText)
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .background(selectedTopic == topic ? Color.appPink : Color.appGrayBackground)
+                                        .background(selectedTopic == topic ? theme.appPink : theme.appGrayBackground)
                                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                                 }
                                 .buttonStyle(.plain)
@@ -281,7 +287,7 @@ struct AskTeacherSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Session type")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     HStack(spacing: 10) {
                         ConversationTypeChip(title: "Text", isSelected: true) {
@@ -297,14 +303,14 @@ struct AskTeacherSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Your question")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     TextEditor(text: $questionText)
                         .focused($isQuestionFocused)
                         .font(.system(size: 14))
                         .frame(minHeight: 120)
                         .padding(12)
-                        .background(Color.appGrayBackground)
+                        .background(theme.appGrayBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                     if isQuestionFocused {
@@ -313,7 +319,7 @@ struct AskTeacherSheet: View {
 
                     Text("\(questionText.count) / 10 min chars")
                         .font(.system(size: 11))
-                        .foregroundStyle(canSubmit ? Color.appGreen : Color.appSecondaryText)
+                        .foregroundStyle(canSubmit ? theme.appGreen : theme.appSecondaryText)
                 }
 
 
@@ -333,7 +339,7 @@ struct AskTeacherSheet: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background( Color.appPink)
+                        .background( theme.appPink)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -365,17 +371,20 @@ struct ConversationTypeChip: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isSelected ? .white : Color.appPrimaryText)
+                .foregroundStyle(isSelected ? .white : theme.appPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(isSelected ? Color.appPink : Color.appGrayBackground)
+                .background(isSelected ? theme.appPink : theme.appGrayBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -386,10 +395,13 @@ struct ConversationTypeChip: View {
 
 struct SearchingOverlay: View {
     let onCancel: () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ZStack {
-            Color.black.opacity(0.5).ignoresSafeArea()
+            theme.appPrimaryText.opacity(0.5).ignoresSafeArea()
 
             VStack(spacing: 24) {
                 ProgressView()
@@ -426,19 +438,22 @@ struct MatchedOverlay: View {
     let liveKitRoom: String
     let liveKitToken: String
     let onDismiss: () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ZStack {
-            Color.black.opacity(0.6).ignoresSafeArea()
+            theme.appPrimaryText.opacity(0.6).ignoresSafeArea()
 
             VStack(spacing: 20) {
                 Circle()
-                    .fill(Color.appGreen.opacity(0.2))
+                    .fill(theme.appGreen.opacity(0.2))
                     .frame(width: 80, height: 80)
                     .overlay {
                         PlatformIcon(systemName: "checkmark.circle.fill")
                             .font(.system(size: 44))
-                            .foregroundStyle(Color.appGreen)
+                            .foregroundStyle(theme.appGreen)
                     }
 
                 Text("Teacher Found!")
@@ -456,7 +471,7 @@ struct MatchedOverlay: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
-                        .background(Color.appGreen)
+                        .background(theme.appGreen)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -469,19 +484,22 @@ struct MatchedOverlay: View {
 
 struct NoMatchOverlay: View {
     let onDismiss: () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ZStack {
-            Color.black.opacity(0.6).ignoresSafeArea()
+            theme.appPrimaryText.opacity(0.6).ignoresSafeArea()
 
             VStack(spacing: 20) {
                 Circle()
-                    .fill(Color.appSecondaryText.opacity(0.15))
+                    .fill(theme.appSecondaryText.opacity(0.15))
                     .frame(width: 80, height: 80)
                     .overlay {
                         PlatformIcon(systemName: "person.slash.fill")
                             .font(.system(size: 36))
-                            .foregroundStyle(Color.appSecondaryText)
+                            .foregroundStyle(theme.appSecondaryText)
                     }
 
                 Text("No Teachers Available")
@@ -499,7 +517,7 @@ struct NoMatchOverlay: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
-                        .background(Color.appPink)
+                        .background(theme.appPink)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -513,19 +531,22 @@ struct NoMatchOverlay: View {
 struct ErrorOverlay: View {
     let message: String
     let onDismiss: () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ZStack {
-            Color.black.opacity(0.6).ignoresSafeArea()
+            theme.appPrimaryText.opacity(0.6).ignoresSafeArea()
 
             VStack(spacing: 20) {
                 Circle()
-                    .fill(Color.appPink.opacity(0.18))
+                    .fill(theme.appPink.opacity(0.18))
                     .frame(width: 80, height: 80)
                     .overlay {
                         PlatformIcon(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 34))
-                            .foregroundStyle(Color.appPink)
+                            .foregroundStyle(theme.appPink)
                     }
 
                 Text("Could Not Send Question")
@@ -543,7 +564,7 @@ struct ErrorOverlay: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
-                        .background(Color.appPink)
+                        .background(theme.appPink)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -559,30 +580,33 @@ struct ErrorOverlay: View {
 struct PricingCard: View {
     let option: PricingOption
     let action: () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         RoundedInfoCard {
             VStack(alignment: .leading, spacing: 0) {
                 SmallPill(
                     title: option.name,
-                    foreground: option.isHighlighted ? .white : .appPink,
-                    background: option.isHighlighted ? .appPurple : .appPinkSoft
+					foreground: option.isHighlighted ? .white : theme.appPink,
+                    background: option.isHighlighted ? theme.appPurple : theme.appPinkSoft
                 )
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(option.price)
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     Text("/min")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.appSecondaryText)
+                        .foregroundStyle(theme.appSecondaryText)
                 }
                 .padding(.top, 18)
 
                 Text(option.description)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.appSecondaryText)
+                    .foregroundStyle(theme.appSecondaryText)
                     .lineSpacing(4)
                     .padding(.top, 8)
                     .frame(height: 48, alignment: .top)
@@ -590,10 +614,10 @@ struct PricingCard: View {
                 Button(action: action) {
                     Text("Select Tier")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(option.isHighlighted ? .white : Color.appPrimaryText)
+                        .foregroundStyle(option.isHighlighted ? .white : theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
-                        .background(option.isHighlighted ? Color.appPurple : Color.appGrayBackground)
+                        .background(option.isHighlighted ? theme.appPurple : theme.appGrayBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -603,44 +627,47 @@ struct PricingCard: View {
         }
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(option.isHighlighted ? Color.appPurple : Color.clear, lineWidth: 2)
+                .stroke(option.isHighlighted ? theme.appPurple : Color.clear, lineWidth: 2)
         }
     }
 }
 
 struct RecentLessonRow: View {
     let lesson: RecentLesson
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         RoundedInfoCard {
             HStack(spacing: 12) {
                 Circle()
-                    .fill(Color.appPurpleSoft)
+                    .fill(theme.appPurpleSoft)
                     .frame(width: 50, height: 50)
                     .overlay {
                         PlatformIcon(systemName: "person.crop.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundStyle(Color.appPurple)
+                            .foregroundStyle(theme.appPurple)
                     }
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(lesson.title)
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     Text("\(lesson.teacher) \u{2022} \(lesson.time)")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color.appSecondaryText)
+                        .foregroundStyle(theme.appSecondaryText)
                 }
 
                 Spacer()
 
                 VStack(spacing: 6) {
-                    SmallPill(title: "Solved", foreground: .appGreen, background: .appGreenSoft)
+                    SmallPill(title: "Solved", foreground: theme.appGreen, background: theme.appGreenSoft)
 
                     Text(lesson.duration)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
                 }
             }
         }

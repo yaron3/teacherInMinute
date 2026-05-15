@@ -10,7 +10,10 @@ import SwiftUI
 struct ChooseRoleView: View {
   @State var viewModel = ChooseRoleViewModel()
   @Environment(\.appRouter) var router
-  
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
 	VStack(alignment: .leading, spacing: 0) {
 	  AuthIconHeader(systemImage: "person.3.fill")
@@ -18,12 +21,12 @@ struct ChooseRoleView: View {
 	  
 	  Text("Choose Your Role")
 		.font(.system(size: 29, weight: .bold))
-		.foregroundStyle(Color.authPrimaryText)
+		.foregroundStyle(theme.authPrimaryText)
 		.padding(.top, 24)
 	  
 	  Text("How do you want to use Math Connect? You\ncan change this later in settings.")
 		.font(.system(size: 15))
-		.foregroundStyle(Color.authSecondaryText)
+		.foregroundStyle(theme.authSecondaryText)
 		.lineSpacing(5)
 		.padding(.top, 8)
 	  
@@ -33,7 +36,7 @@ struct ChooseRoleView: View {
 		  icon: "graduationcap.fill",
 		  details: ["On-demand help", "Per-minute billing"],
 		  isSelected: viewModel.selectedRole == .student,
-		  accent: .authPink
+		  accent: theme.authPink
 		) {
 		  viewModel.selectedRole = .student
 		}
@@ -43,7 +46,7 @@ struct ChooseRoleView: View {
 		  icon: "person.crop.rectangle",
 		  details: ["Earn while teaching", "Verification required"],
 		  isSelected: viewModel.selectedRole == .teacher,
-		  accent: .authPurple
+		  accent: theme.authPurple
 		) {
 		  viewModel.selectedRole = .teacher
 		}
@@ -62,7 +65,7 @@ struct ChooseRoleView: View {
 	  
 	  Text("By continuing, you agree to our ")
 		.font(.system(size: 12))
-		.foregroundStyle(Color.authSecondaryText)
+		.foregroundStyle(theme.authSecondaryText)
 		.frame(maxWidth: .infinity)
 		.overlay(alignment: .trailing) {
 		  HStack(spacing: 2) {
@@ -71,7 +74,7 @@ struct ChooseRoleView: View {
 			Text("Privacy.").underline()
 		  }
 		  .font(.system(size: 12, weight: .semibold))
-		  .foregroundStyle(Color.authPrimaryText)
+		  .foregroundStyle(theme.authPrimaryText)
 		  .padding(.trailing, 10)
 		}
 		.padding(.top, 14)
@@ -90,7 +93,10 @@ struct RoleCard: View {
   let isSelected: Bool
   let accent: Color
   let action: () -> Void
-  
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
 	Button(action: action) {
 	  VStack(alignment: .leading, spacing: 18) {
@@ -121,7 +127,7 @@ struct RoleCard: View {
 		VStack(alignment: .leading, spacing: 8) {
 		  Text(title)
 			.font(.system(size: 18, weight: .bold))
-			.foregroundStyle(Color.authPrimaryText)
+			.foregroundStyle(theme.authPrimaryText)
 		  
 		  HStack(spacing: 8) {
 			ForEach(details, id: \.self) { detail in
@@ -132,7 +138,7 @@ struct RoleCard: View {
 				
 				Text(detail)
 				  .font(.system(size: 12))
-				  .foregroundStyle(Color.authSecondaryText)
+				  .foregroundStyle(theme.authSecondaryText)
 			  }
 			}
 		  }
@@ -140,13 +146,13 @@ struct RoleCard: View {
 	  }
 	  .padding(20)
 	  .frame(maxWidth: .infinity)
-	  .background(Color.appCardBackground)
+	  .background(theme.appCardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
 	  .overlay {
 		RoundedRectangle(cornerRadius: 22, style: .continuous)
 		  .stroke(isSelected ? accent : Color.clear, lineWidth: 2)
 	  }
-	  .shadow(color: .black.opacity(0.035), radius: 20, x: 0, y: 12)
+	  .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 20, x: 0, y: 12)
 	}
 	.buttonStyle(.plain)
   }

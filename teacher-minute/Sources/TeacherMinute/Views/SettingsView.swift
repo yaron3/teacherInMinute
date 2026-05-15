@@ -12,7 +12,10 @@ struct SettingsView: View {
     @State var activeDestination: SettingsDestination?
     @Environment(\.appRouter) var router
     @Environment(\.openURL) var openURL
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     init(viewModel: SettingsViewModel = SettingsViewModel()) {
         self._viewModel = State(wrappedValue: viewModel)
     }
@@ -61,7 +64,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Settings")
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
                         .padding(.top, 24)
 
                     VStack(spacing: 28) {
@@ -73,7 +76,7 @@ struct SettingsView: View {
 
                     Text(viewModel.appVersion)
                         .font(.system(size: 11))
-                        .foregroundStyle(Color.appSecondaryText)
+                        .foregroundStyle(theme.appSecondaryText)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 28)
                         .padding(.bottom, 24)
@@ -97,11 +100,11 @@ struct SettingsView: View {
                             systemName: "chevron.left",
                             size: 14,
                             weight: .semibold,
-                            color: Color.appPink
+                            color: theme.appPink
                         )
                         Text("Settings")
                             .font(.system(size: 16))
-                            .foregroundStyle(Color.appPink)
+                            .foregroundStyle(theme.appPink)
                     }
                 }
 
@@ -110,7 +113,7 @@ struct SettingsView: View {
             .overlay {
                 Text(destination.title)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.appPrimaryText)
+                    .foregroundStyle(theme.appPrimaryText)
             }
             .padding(.horizontal, 16)
             .frame(height: 44)
@@ -144,7 +147,7 @@ struct SettingsView: View {
             Text(section.title)
                 .font(.system(size: 12, weight: .bold))
                 .tracking(1)
-                .foregroundStyle(Color.appSecondaryText)
+                .foregroundStyle(theme.appSecondaryText)
                 .padding(.leading, 4)
 
             VStack(spacing: 0) {
@@ -166,16 +169,16 @@ struct SettingsView: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(Color.appCardBackground)
+            .background(theme.appCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
+            .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
         }
     }
 
     @ViewBuilder
     var loadingOverlay: some View {
         if viewModel.isLoading {
-            Color.black.opacity(0.18).ignoresSafeArea()
+            theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
             ProgressView()
                 .progressViewStyle(.circular)
                 .scaleEffect(1.4)
@@ -206,7 +209,10 @@ struct SettingsView: View {
 
 struct AccountSecuritySettingsView: View {
     let viewModel: SettingsViewModel
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ZStack {
             ScrollView(.vertical, showsIndicators: false) {
@@ -219,7 +225,7 @@ struct AccountSecuritySettingsView: View {
             }
 
             if viewModel.isLoading {
-                Color.black.opacity(0.18).ignoresSafeArea()
+                theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
@@ -234,7 +240,7 @@ struct AccountSecuritySettingsView: View {
             Text(section.title)
                 .font(.system(size: 12, weight: .bold))
                 .tracking(1)
-                .foregroundStyle(Color.appSecondaryText)
+                .foregroundStyle(theme.appSecondaryText)
                 .padding(.leading, 4)
 
             VStack(spacing: 0) {
@@ -250,23 +256,26 @@ struct AccountSecuritySettingsView: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(Color.appCardBackground)
+            .background(theme.appCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
+            .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
         }
     }
 }
 
 struct LanguageSettingsView: View {
     let viewModel: SettingsViewModel
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("LANGUAGE")
                     .font(.system(size: 12, weight: .bold))
                     .tracking(1)
-                    .foregroundStyle(Color.appSecondaryText)
+                    .foregroundStyle(theme.appSecondaryText)
                     .padding(.leading, 4)
                     .padding(.top, 24)
 
@@ -277,26 +286,26 @@ struct LanguageSettingsView: View {
                         } label: {
                             HStack(spacing: 14) {
                                 Circle()
-                                    .fill(Color.appGrayBackground)
+                                    .fill(theme.appGrayBackground)
                                     .frame(width: 34, height: 34)
                                     .overlay {
                                         PlatformIcon(
                                             systemName: "globe",
                                             size: 13,
                                             weight: .semibold,
-                                            color: Color.appPrimaryText
+                                            color: theme.appPrimaryText
                                         )
                                     }
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(language.title)
                                         .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(Color.appPrimaryText)
+                                        .foregroundStyle(theme.appPrimaryText)
 
                                     if let subtitle = language.subtitle {
                                         Text(subtitle)
                                             .font(.system(size: 11))
-                                            .foregroundStyle(Color.appSecondaryText)
+                                            .foregroundStyle(theme.appSecondaryText)
                                     }
                                 }
 
@@ -307,7 +316,7 @@ struct LanguageSettingsView: View {
                                         systemName: "checkmark",
                                         size: 14,
                                         weight: .bold,
-                                        color: Color.appPink
+                                        color: theme.appPink
                                     )
                                 }
                             }
@@ -323,9 +332,9 @@ struct LanguageSettingsView: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(Color.appCardBackground)
+                .background(theme.appCardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
+                .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
             }
             .padding(.horizontal, 18)
             .padding(.bottom, 24)
@@ -336,7 +345,10 @@ struct LanguageSettingsView: View {
 
 struct AboutSettingsView: View {
     let viewModel: SettingsViewModel
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
@@ -354,7 +366,7 @@ struct AboutSettingsView: View {
             Text(section.title)
                 .font(.system(size: 12, weight: .bold))
                 .tracking(1)
-                .foregroundStyle(Color.appSecondaryText)
+                .foregroundStyle(theme.appSecondaryText)
                 .padding(.leading, 4)
 
             VStack(spacing: 0) {
@@ -370,37 +382,40 @@ struct AboutSettingsView: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(Color.appCardBackground)
+            .background(theme.appCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: .black.opacity(0.035), radius: 18, x: 0, y: 10)
+            .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
         }
     }
 }
 
 struct SettingsPlaceholderView: View {
     let destination: SettingsDestination
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         VStack(spacing: 14) {
             Circle()
-                .fill(Color.appGrayBackground)
+                .fill(theme.appGrayBackground)
                 .frame(width: 58, height: 58)
                 .overlay {
                     PlatformIcon(
                         systemName: "gearshape.fill",
                         size: 22,
                         weight: .semibold,
-                        color: Color.appSecondaryText
+                        color: theme.appSecondaryText
                     )
                 }
 
             Text(destination.title)
                 .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Color.appPrimaryText)
+                .foregroundStyle(theme.appPrimaryText)
 
             Text(destination.placeholderMessage)
                 .font(.system(size: 13))
-                .foregroundStyle(Color.appSecondaryText)
+                .foregroundStyle(theme.appSecondaryText)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 .padding(.horizontal, 32)
@@ -413,31 +428,34 @@ struct SettingsPlaceholderView: View {
 struct SettingsRowView: View {
     let row: SettingsRow
     let action: () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Circle()
-                    .fill(row.iconColor.backgroundColor)
+				.fill(theme.primaryBackground)
                     .frame(width: 34, height: 34)
                     .overlay {
                         PlatformIcon(
                             systemName: row.systemImage,
                             size: 13,
                             weight: .semibold,
-                            color: row.iconColor.foregroundColor
+							color: theme.primaryText
                         )
                     }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(row.title)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(row.isDestructive ? .red : Color.appPrimaryText)
+                        .foregroundStyle(row.isDestructive ? .red : theme.appPrimaryText)
 
                     if let subtitle = row.subtitle {
                         Text(subtitle)
                             .font(.system(size: 11))
-                            .foregroundStyle(Color.appSecondaryText)
+                            .foregroundStyle(theme.appSecondaryText)
                     }
                 }
 
@@ -447,7 +465,7 @@ struct SettingsRowView: View {
                     systemName: "chevron.right",
                     size: 12,
                     weight: .semibold,
-                    color: Color.appSecondaryText
+                    color: theme.appSecondaryText
                 )
             }
             .padding(.horizontal, 16)

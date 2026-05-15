@@ -10,14 +10,17 @@ import SwiftUI
 
 struct ProfileView: View {
     @State var viewModel = ProfileViewModel()
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     Text("Profile")
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     Spacer()
 
@@ -27,11 +30,11 @@ struct ProfileView: View {
                         Circle()
                             .fill(.white)
                             .frame(width: 42, height: 42)
-                            .shadow(color: .black.opacity(0.05), radius: 12, x: 0, y: 6)
+							.shadow(color: theme.appPrimaryText.opacity(0.05), radius: 12, x: 0, y: 6)
                             .overlay {
                                 PlatformIcon(systemName: "pencil")
                                     .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(Color.appPrimaryText)
+                                    .foregroundStyle(theme.appPrimaryText)
                             }
                     }
                     .buttonStyle(.plain)
@@ -43,7 +46,7 @@ struct ProfileView: View {
 
                 Text("Account Info")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.appPrimaryText)
+                    .foregroundStyle(theme.appPrimaryText)
                     .padding(.top, 30)
                 
                 VStack(spacing: 14) {
@@ -60,7 +63,7 @@ struct ProfileView: View {
                 if viewModel.shouldShowTeachingDetails {
                     Text("Teaching Details")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
                         .padding(.top, 30)
 
                     teachingCard(
@@ -84,7 +87,7 @@ struct ProfileView: View {
 
                 Text("Device Permissions")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.appPrimaryText)
+                    .foregroundStyle(theme.appPrimaryText)
                     .padding(.top, 30)
 
                 VStack(spacing: 14) {
@@ -92,7 +95,7 @@ struct ProfileView: View {
                         icon: "mic.fill",
                         title: "Microphone",
                         subtitle: "Enabled",
-                        iconColor: .appGreen,
+						iconColor: theme.appGreen,
                         isToggle: true,
                         isOn: $viewModel.microphoneEnabled
                     )
@@ -101,7 +104,7 @@ struct ProfileView: View {
                         icon: "bell.fill",
                         title: "Notifications",
                         subtitle: "Disabled",
-                        iconColor: .appSecondaryText,
+						iconColor: theme.appSecondaryText,
                         isToggle: false,
                         isOn: $viewModel.notificationsEnabled,
                         actionTitle: "Manage"
@@ -139,19 +142,19 @@ struct ProfileView: View {
         VStack(spacing: 0) {
             ZStack(alignment: .bottomTrailing) {
                 Circle()
-                    .fill(Color.appPurpleSoft)
+                    .fill(theme.appPurpleSoft)
                     .frame(width: 96, height: 96)
                     .overlay {
                         PlatformIcon(systemName: "person.crop.circle.fill")
                             .font(.system(size: 72))
-                            .foregroundStyle(Color.appPurple)
+                            .foregroundStyle(theme.appPurple)
                     }
 
                 Button {
                     viewModel.changePhoto()
                 } label: {
                     Circle()
-                        .fill(Color.appPink)
+                        .fill(theme.appPink)
                         .frame(width: 30, height: 30)
                         .overlay {
 						  PlatformIcon(systemName: "camera.fill")
@@ -164,21 +167,21 @@ struct ProfileView: View {
 
             Text(viewModel.name)
                 .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Color.appPrimaryText)
+                .foregroundStyle(theme.appPrimaryText)
                 .padding(.top, 14)
 
             HStack(spacing: 8) {
-                SmallPill(title: viewModel.role, foreground: .appPurple, background: .appPurpleSoft)
+			  SmallPill(title: viewModel.role, foreground: theme.appPurple, background: theme.appPurpleSoft)
 
                 if viewModel.isVerified {
-                    SmallPill(title: "Verified", foreground: .appGreen, background: .appGreenSoft)
+				  SmallPill(title: "Verified", foreground: theme.appGreen, background: theme.appGreenSoft)
                 }
             }
             .padding(.top, 8)
 
             Text(viewModel.memberSince)
                 .font(.system(size: 13))
-                .foregroundStyle(Color.appSecondaryText)
+                .foregroundStyle(theme.appSecondaryText)
                 .padding(.top, 12)
         }
         .frame(maxWidth: .infinity)
@@ -196,31 +199,31 @@ struct ProfileView: View {
                 HStack {
                     Text(title)
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.appSecondaryText)
+                        .foregroundStyle(theme.appSecondaryText)
 
                     Spacer()
 
                     Button(action: editAction) {
                         Text("Edit")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.appPink)
+                            .foregroundStyle(theme.appPink)
                     }
                     .buttonStyle(.plain)
                 }
 
               ChipGrid(minimumItemWidth: 96, spacing: 8) {
                   ForEach(chips, id: \.self) { chip in
-                      SmallPill(title: chip, foreground: .appPink, background: .appPinkSoft)
+					SmallPill(title: chip, foreground: theme.appPink, background: theme.appPinkSoft)
                   }
 
                   if includeAdd {
                       Button(action: addAction) {
                           Text("+ Add")
                               .font(.system(size: 12, weight: .medium))
-                              .foregroundStyle(Color.appSecondaryText)
+                              .foregroundStyle(theme.appSecondaryText)
                               .padding(.horizontal, 12)
                               .frame(height: 28)
-                              .background(Color.appGrayBackground)
+                              .background(theme.appGrayBackground)
                               .clipShape(Capsule())
                       }
                       .buttonStyle(.plain)
@@ -240,7 +243,10 @@ struct ProfilePermissionRow: View {
     @Binding var isOn: Bool
     var actionTitle: String?
     var action: (() -> Void)?
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         RoundedInfoCard {
             HStack(spacing: 14) {
@@ -256,7 +262,7 @@ struct ProfilePermissionRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     Text(subtitle)
                         .font(.system(size: 12, weight: .semibold))
@@ -268,14 +274,14 @@ struct ProfilePermissionRow: View {
                 if isToggle {
                     Toggle("", isOn: $isOn)
                         .labelsHidden()
-                        .tint(Color.appGreen)
+                        .tint(theme.appGreen)
                 } else if let actionTitle {
                     Button {
                         action?()
                     } label: {
                         Text(actionTitle)
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.appPink)
+                            .foregroundStyle(theme.appPink)
                     }
                     .buttonStyle(.plain)
                 }
@@ -288,27 +294,30 @@ struct ProfileInfoRow: View {
     let icon: String
     let title: String
     let value: String
-    
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
     var body: some View {
         RoundedInfoCard {
             HStack(spacing: 14) {
                 Circle()
-                    .fill(Color.appPurpleSoft)
+                    .fill(theme.appPurpleSoft)
                     .frame(width: 42, height: 42)
                     .overlay {
                         PlatformIcon(systemName: icon)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.appPurple)
+                            .foregroundStyle(theme.appPurple)
                     }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.appSecondaryText)
+                        .foregroundStyle(theme.appSecondaryText)
                     
                     Text(value)
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.appPrimaryText)
+                        .foregroundStyle(theme.appPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }

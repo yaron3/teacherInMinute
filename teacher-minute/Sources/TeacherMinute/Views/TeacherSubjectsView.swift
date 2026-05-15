@@ -11,23 +11,26 @@ import SwiftUI
 struct TeacherSubjectsView: View {
   @State var viewModel = TeacherSubjectsViewModel()
   @Environment(\.appRouter) var router
-  
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
 	ScrollView {
 	  VStack(alignment: .leading, spacing: 0) {
 		Text("Step 2 of 2")
 		  .font(.system(size: 13, weight: .medium))
-		  .foregroundStyle(Color.authSecondaryText)
+		  .foregroundStyle(theme.authSecondaryText)
 		  .frame(maxWidth: .infinity)
 		
 			Text("What can you teach?")
 			  .font(.system(size: 26, weight: .bold))
-			  .foregroundStyle(Color.authPrimaryText)
+			  .foregroundStyle(theme.authPrimaryText)
 			  .padding(.top, 20)
 			
 			Text("Choose a subject area, then select at least\none subtopic students can request.")
 			  .font(.system(size: 13))
-			  .foregroundStyle(Color.authSecondaryText)
+			  .foregroundStyle(theme.authSecondaryText)
 			  .lineSpacing(5)
 			  .padding(.top, 8)
 		
@@ -37,16 +40,16 @@ struct TeacherSubjectsView: View {
 		HStack {
 			  Text("Subject Area")
 				.font(.system(size: 15, weight: .bold))
-				.foregroundStyle(Color.authPrimaryText)
+				.foregroundStyle(theme.authPrimaryText)
 		  
 		  Spacer()
 		  
 		  Text(viewModel.selectedCountText)
 			.font(.system(size: 11, weight: .semibold))
-			.foregroundStyle(Color.authSecondaryText)
+			.foregroundStyle(theme.authSecondaryText)
 			.padding(.horizontal, 10)
 			.frame(height: 24)
-			.background(Color.authFieldBorder.opacity(0.7))
+			.background(theme.authFieldBorder.opacity(0.7))
 			.clipShape(Capsule())
 			}
 			.padding(.top, 28)
@@ -66,7 +69,7 @@ struct TeacherSubjectsView: View {
 				if viewModel.shouldShowSubtopicsPrompt {
 				  Text("Choose one or more subjects to see subtopics.")
 					.font(.system(size: 13))
-					.foregroundStyle(Color.authSecondaryText)
+					.foregroundStyle(theme.authSecondaryText)
 					.padding(.top, 24)
 				} else {
 				  VStack(alignment: .leading, spacing: 22) {
@@ -75,16 +78,16 @@ struct TeacherSubjectsView: View {
 						HStack {
 						  Text("\(area.title) subtopics")
 							.font(.system(size: 15, weight: .bold))
-							.foregroundStyle(Color.authPrimaryText)
+							.foregroundStyle(theme.authPrimaryText)
 						  
 						  Spacer()
 						  
 						  Text(viewModel.selectedSubtopicTitles(for: area).isEmpty ? "Required" : "\(viewModel.selectedSubtopicTitles(for: area).count) selected")
 							.font(.system(size: 11, weight: .semibold))
-							.foregroundStyle(Color.authSecondaryText)
+							.foregroundStyle(theme.authSecondaryText)
 							.padding(.horizontal, 10)
 							.frame(height: 24)
-							.background(Color.authFieldBorder.opacity(0.7))
+							.background(theme.authFieldBorder.opacity(0.7))
 							.clipShape(Capsule())
 						}
 						
@@ -125,7 +128,7 @@ struct TeacherSubjectsView: View {
 	.overlay {
 	  if viewModel.isCheckingCompletion {
 		ZStack {
-		  Color.black.opacity(0.25).ignoresSafeArea()
+		  theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
 		  VStack(spacing: 12) {
 			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(.white)
 			Text("Checking your subjects…")
@@ -140,23 +143,23 @@ struct TeacherSubjectsView: View {
 	HStack(spacing: 10) {
 	  PlatformIcon(systemName: "magnifyingglass")
 		.font(.system(size: 14))
-		.foregroundStyle(Color.authIcon)
+		.foregroundStyle(theme.authIcon)
 	  
 	  TextField("Search subjects or subtopics", text: $viewModel.searchText)
 		.font(.system(size: 13))
-		.foregroundStyle(Color.authPrimaryText)
+		.foregroundStyle(theme.authPrimaryText)
 		.textInputAutocapitalization(.never)
 		.autocorrectionDisabled()
 	}
 	.padding(.horizontal, 16)
 	.frame(height: 44)
-	.background(Color.appCardBackground)
+	.background(theme.appCardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 13, style: .continuous)
-		.stroke(Color.authFieldBorder, lineWidth: 1)
+		.stroke(theme.authFieldBorder, lineWidth: 1)
 	}
-	.shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+	.shadow(color: theme.appPrimaryText.opacity(0.03), radius: 10, x: 0, y: 4)
   }
 }
 
@@ -164,7 +167,10 @@ struct SubjectAreaChip: View {
   let area: TeachingSubjectArea
   let isSelected: Bool
   let action: () -> Void
-  
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
 	Button(action: action) {
 	  HStack(spacing: 7) {
@@ -174,14 +180,14 @@ struct SubjectAreaChip: View {
 		Text(area.title)
 		  .font(.system(size: 13, weight: .medium))
 	  }
-	  .foregroundStyle(isSelected ? .white : Color.authPrimaryText)
+	  .foregroundStyle(isSelected ? .white : theme.authPrimaryText)
 	  .padding(.horizontal, 14)
 	  .frame(height: 34)
-	  .background(isSelected ? Color.authPink : .white)
+	  .background(isSelected ? theme.authPink : .white)
 	  .clipShape(Capsule())
 	  .overlay {
 		Capsule()
-		  .stroke(isSelected ? Color.authPink : Color.authFieldBorder, lineWidth: 1)
+		  .stroke(isSelected ? theme.authPink : theme.authFieldBorder, lineWidth: 1)
 	  }
 	}
 	.buttonStyle(.plain)

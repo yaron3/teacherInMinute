@@ -4,7 +4,10 @@ struct ChatThreadView: View {
   let messages: [ChatMessage]
   let now: Date
   let viewModel: any ChatSessionViewModeling
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   var body: some View {
     ScrollViewReader { proxy in
       ScrollView(.vertical, showsIndicators: false) {
@@ -12,7 +15,7 @@ struct ChatThreadView: View {
           if messages.isEmpty {
             Text("Start with a text explanation, then use the board below for the math work.")
               .font(.system(size: 13))
-              .foregroundStyle(Color.appSecondaryText)
+              .foregroundStyle(theme.appSecondaryText)
               .multilineTextAlignment(.center)
               .padding(.horizontal, 28)
               .padding(.top, 24)
@@ -26,7 +29,7 @@ struct ChatThreadView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
       }
-      .background(Color.appGrayBackground.opacity(0.45))
+      .background(theme.appGrayBackground.opacity(0.45))
       .onChange(of: messages.count) { _, _ in
         if let last = messages.last {
           withAnimation(.easeOut(duration: 0.2)) {

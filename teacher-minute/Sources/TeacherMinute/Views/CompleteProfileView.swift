@@ -11,7 +11,10 @@ import SwiftUI
 struct CompleteProfileView: View {
   @State var viewModel: CompleteProfileViewModel
   @Environment(\.appRouter) var router
-  
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   init(viewModel: CompleteProfileViewModel = CompleteProfileViewModel(role: .student)) {
 	self._viewModel = State(wrappedValue: viewModel)
   }
@@ -20,12 +23,12 @@ struct CompleteProfileView: View {
 	VStack(alignment: .leading, spacing: 0) {
 	  Text("Complete your profile")
 		.font(.system(size: 26, weight: .bold))
-		.foregroundStyle(Color.authPrimaryText)
+		.foregroundStyle(theme.authPrimaryText)
 		.padding(.top, 42)
 	  
 	  Text("Tell us a bit about yourself to get started with\nMath Connect.")
 		.font(.system(size: 13))
-		.foregroundStyle(Color.authSecondaryText)
+		.foregroundStyle(theme.authSecondaryText)
 		.lineSpacing(5)
 		.padding(.top, 10)
 	  
@@ -87,7 +90,7 @@ struct CompleteProfileView: View {
 	.overlay {
 	  if viewModel.isCheckingCompletion {
 		ZStack {
-		  Color.black.opacity(0.25).ignoresSafeArea()
+		  theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
 		  VStack(spacing: 12) {
 			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(.white)
 			Text("Loading your profile…")
@@ -102,7 +105,7 @@ struct CompleteProfileView: View {
 	VStack(alignment: .leading, spacing: 10) {
 	  Text("Date of Birth")
 		.font(.system(size: 13, weight: .semibold))
-		.foregroundStyle(Color.authPrimaryText)
+		.foregroundStyle(theme.authPrimaryText)
 	  
 	  DatePicker(
 		"",
@@ -116,11 +119,11 @@ struct CompleteProfileView: View {
 #endif
 	  .frame(height: 56)
 	  .padding(.horizontal, 12)
-	  .background(Color.appCardBackground)
+	  .background(theme.appCardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 	  .overlay {
 		RoundedRectangle(cornerRadius: 15, style: .continuous)
-		  .stroke(Color.authFieldBorder, lineWidth: 1)
+		  .stroke(theme.authFieldBorder, lineWidth: 1)
 	  }
 	}
   }
@@ -129,7 +132,7 @@ struct CompleteProfileView: View {
 	VStack(alignment: .leading, spacing: 10) {
 	  Text("Your Grade")
 		.font(.system(size: 13, weight: .semibold))
-		.foregroundStyle(Color.authPrimaryText)
+		.foregroundStyle(theme.authPrimaryText)
 	  
 	  Menu {
 		ForEach(viewModel.grades, id: \.self) { grade in
@@ -141,21 +144,21 @@ struct CompleteProfileView: View {
 		HStack {
 		  Text(viewModel.grade.isEmpty ? "Select" : viewModel.grade)
 			.font(.system(size: 15))
-			.foregroundStyle(viewModel.grade.isEmpty ? Color.authSecondaryText : Color.authPrimaryText)
+			.foregroundStyle(viewModel.grade.isEmpty ? theme.authSecondaryText : theme.authPrimaryText)
 		  
 		  Spacer()
 		  
 		  PlatformIcon(systemName: "chevron.down")
 			.font(.system(size: 12, weight: .semibold))
-			.foregroundStyle(Color.authIcon)
+			.foregroundStyle(theme.authIcon)
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)
-		.background(Color.appCardBackground)
+		.background(theme.appCardBackground)
 		.clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 		.overlay {
 		  RoundedRectangle(cornerRadius: 15, style: .continuous)
-			.stroke(Color.authFieldBorder, lineWidth: 1)
+			.stroke(theme.authFieldBorder, lineWidth: 1)
 		}
 	  }
 	}

@@ -14,7 +14,10 @@ struct ChatSessionView: View {
   let title: String
   let hasAudio: Bool
   let onClose: @MainActor @Sendable () -> Void
-
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
   init(
     questionId: String,
     role: String,
@@ -98,7 +101,7 @@ struct ChatSessionView: View {
       if let errorMessage {
         Text(errorMessage)
           .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(Color.appPink)
+          .foregroundStyle(theme.appPink)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.horizontal, 16)
           .padding(.top, 6)
@@ -132,11 +135,11 @@ struct ChatSessionView: View {
       inputBar
 #endif
     }
-    .background(Color.appCardBackground)
+    .background(theme.appCardBackground)
 #if !os(Android)
     .safeAreaInset(edge: .bottom) {
       inputBar
-        .background(Color.appCardBackground)
+        .background(theme.appCardBackground)
     }
 #endif
   }
@@ -165,14 +168,14 @@ struct ChatSessionView: View {
   var header: some View {
     HStack(spacing: 12) {
       Circle()
-        .fill(Color.appPinkSoft)
+        .fill(theme.appPinkSoft)
         .frame(width: 40, height: 40)
         .overlay {
-          PlatformIcon(systemName: "person.crop.circle.fill", size: 24, weight: .semibold, color: .appPink)
+          PlatformIcon(systemName: "person.crop.circle.fill", size: 24, weight: .semibold, color: theme.appPink)
         }
         .overlay(alignment: .bottomTrailing) {
           Circle()
-            .fill(Color.appGreen)
+            .fill(theme.appGreen)
             .frame(width: 10, height: 10)
             .overlay {
               Circle().stroke(.white, lineWidth: 2)
@@ -182,26 +185,26 @@ struct ChatSessionView: View {
       VStack(alignment: .leading, spacing: 2) {
         Text(participantName)
           .font(.system(size: 15, weight: .bold))
-          .foregroundStyle(Color.appPrimaryText)
+          .foregroundStyle(theme.appPrimaryText)
         Text("Connected")
           .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(Color.appGreen)
+          .foregroundStyle(theme.appGreen)
       }
 
       Spacer()
 
       Button {} label: {
-        PlatformIcon(systemName: "mic.fill", size: 13, weight: .bold, color: .appPrimaryText)
+        PlatformIcon(systemName: "mic.fill", size: 13, weight: .bold, color: theme.appPrimaryText)
           .frame(width: 34, height: 34)
-          .background(Color.appGrayBackground)
+          .background(theme.appGrayBackground)
           .clipShape(Circle())
       }
       .buttonStyle(.plain)
 
       Button {} label: {
-        PlatformIcon(systemName: "speaker.wave.2.fill", size: 13, weight: .bold, color: .appPrimaryText)
+		PlatformIcon(systemName: "speaker.wave.2.fill", size: 13, weight: .bold, color: theme.appPrimaryText)
           .frame(width: 34, height: 34)
-          .background(Color.appGrayBackground)
+          .background(theme.appGrayBackground)
           .clipShape(Circle())
       }
       .buttonStyle(.plain)
@@ -217,17 +220,17 @@ struct ChatSessionView: View {
           .foregroundStyle(.white)
           .padding(.horizontal, 12)
           .frame(height: 32)
-          .background(Color.red)
+          .background(theme.red)
           .clipShape(Capsule())
       }
       .buttonStyle(.plain)
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
-    .background(Color.appCardBackground)
+    .background(theme.appCardBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(Color.appBorder)
+        .fill(theme.appBorder)
         .frame(height: 1)
       }
   }
@@ -237,58 +240,58 @@ struct ChatSessionView: View {
       VStack(alignment: .leading, spacing: 6) {
         Text(viewModel.primaryAmountTitle)
           .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(Color.appSecondaryText)
+          .foregroundStyle(theme.appSecondaryText)
         Text(viewModel.primaryAmountText(at: displayDate))
           .font(.system(size: 22, weight: .bold))
-          .foregroundStyle(Color.appPink)
+          .foregroundStyle(theme.appPink)
         Text(viewModel.primaryAmountSubtitle)
           .font(.system(size: 10, weight: .medium))
-          .foregroundStyle(Color.appSecondaryText)
+          .foregroundStyle(theme.appSecondaryText)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
       Rectangle()
-        .fill(Color.appBorder)
+        .fill(theme.appBorder)
         .frame(width: 1, height: 54)
 
       VStack(alignment: .trailing, spacing: 4) {
         Text("Session Time")
           .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(Color.appSecondaryText)
+          .foregroundStyle(theme.appSecondaryText)
         Text(viewModel.sessionTimeText(at: displayDate))
           .font(.system(size: 28, weight: .heavy))
-          .foregroundStyle(Color.appPrimaryText)
+          .foregroundStyle(theme.appPrimaryText)
         Text("minutes")
           .font(.system(size: 10, weight: .medium))
-          .foregroundStyle(Color.appSecondaryText)
+          .foregroundStyle(theme.appSecondaryText)
       }
       .frame(maxWidth: .infinity, alignment: .trailing)
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 16)
-    .background(Color.appPinkSoft.opacity(0.45))
+    .background(theme.appPinkSoft.opacity(0.45))
   }
 
   var originalQuestionBanner: some View {
     HStack(alignment: .top, spacing: 10) {
-      PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: .appOrange)
+	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.appOrange)
         .padding(.top, 2)
       VStack(alignment: .leading, spacing: 5) {
         Text("ORIGINAL QUESTION")
           .font(.system(size: 10, weight: .bold))
-          .foregroundStyle(Color.appOrange)
+          .foregroundStyle(theme.appOrange)
         Text(viewModel.originalQuestion)
           .font(.system(size: 12, weight: .medium))
-          .foregroundStyle(Color.appPrimaryText)
+          .foregroundStyle(theme.appPrimaryText)
           .lineSpacing(3)
       }
       Spacer(minLength: 0)
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
-    .background(Color.yellow.opacity(0.14))
+    .background(theme.yellow.opacity(0.14))
     .overlay(alignment: .bottom) {
-      Rectangle().fill(Color.yellow.opacity(0.45)).frame(height: 1)
+      Rectangle().fill(theme.yellow.opacity(0.45)).frame(height: 1)
     }
   }
 
@@ -298,9 +301,9 @@ struct ChatSessionView: View {
       tabButton(id: "photos", title: "Photos", icon: "photo.fill")
     }
     .frame(height: 40)
-    .background(Color.appCardBackground)
+    .background(theme.appCardBackground)
     .overlay(alignment: .bottom) {
-      Rectangle().fill(Color.appBorder).frame(height: 1)
+      Rectangle().fill(theme.appBorder).frame(height: 1)
     }
   }
 
@@ -317,14 +320,14 @@ struct ChatSessionView: View {
             systemName: icon,
             size: 12,
             weight: .semibold,
-            color: selectedTab == id ? .appPink : .appSecondaryText
+            color: selectedTab == id ? theme.appPink : theme.appSecondaryText
           )
           Text(title)
             .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(selectedTab == id ? Color.appPink : Color.appSecondaryText)
+            .foregroundStyle(selectedTab == id ? theme.appPink : theme.appSecondaryText)
         }
         Rectangle()
-          .fill(selectedTab == id ? Color.appPink : Color.clear)
+          .fill(selectedTab == id ? theme.appPink : Color.clear)
           .frame(height: 2)
       }
     }
@@ -335,13 +338,13 @@ struct ChatSessionView: View {
   var sessionNotice: some View {
     Text(viewModel.sessionNoticeText)
       .font(.system(size: 10, weight: .semibold))
-      .foregroundStyle(Color.appOrange)
+      .foregroundStyle(theme.appOrange)
       .padding(.horizontal, 12)
       .padding(.vertical, 6)
-      .background(Color.yellow.opacity(0.18))
+      .background(theme.yellow.opacity(0.18))
       .clipShape(Capsule())
       .overlay {
-        Capsule().stroke(Color.yellow.opacity(0.55), lineWidth: 1)
+        Capsule().stroke(theme.yellow.opacity(0.55), lineWidth: 1)
       }
       .padding(.top, 12)
   }
