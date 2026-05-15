@@ -10,19 +10,61 @@ import Foundation
 import SwiftUI
 
 struct SettingsSection: Identifiable {
-    let id = UUID()
     let title: String
     let rows: [SettingsRow]
+    
+    var id: String { title }
 }
 
 struct SettingsRow: Identifiable {
-    let id = UUID()
     let title: String
     let subtitle: String?
     let systemImage: String
     let iconColor: SettingsIconColor
     let isDestructive: Bool
     let action: SettingsAction
+    let destination: SettingsDestination?
+
+    var id: String { "\(title)-\(action.id)" }
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        systemImage: String,
+        iconColor: SettingsIconColor,
+        isDestructive: Bool = false,
+        action: SettingsAction
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.iconColor = iconColor
+        self.isDestructive = isDestructive
+        self.action = action
+        // Map actions that have in-stack destinations to SettingsDestination
+        switch action {
+        case .accountSecurity:
+			self.destination = .accountSecurity
+			logger.info("\(#fileID) \(#function): \(#file): \(#line)")
+        case .changePassword:  self.destination = .changePassword
+        case .teacherPayouts:  self.destination = .teacherPayouts
+        case .studentPayments: self.destination = .studentPayments
+        case .notifications:   self.destination = .notifications
+        case .privacyControls: self.destination = .privacyControls
+        case .language:        self.destination = .language
+        case .about:           self.destination = .about
+        case .eula:
+            // EULA/PrivacyPolicy are opened via remote URL; keep destination nil so viewModel handles it
+            self.destination = nil
+        case .privacyPolicy:
+            self.destination = nil
+        case .contactUs:
+            self.destination = nil
+        case .logOut, .deleteAccount:
+            // Destructive actions handled via confirmation; no navigation
+            self.destination = nil
+        }
+    }
 }
 
 enum SettingsAction: Equatable {
@@ -39,6 +81,24 @@ enum SettingsAction: Equatable {
     case contactUs
     case eula
     case privacyPolicy
+    
+    var id: String {
+        switch self {
+        case .accountSecurity: "accountSecurity"
+        case .changePassword: "changePassword"
+        case .logOut: "logOut"
+        case .deleteAccount: "deleteAccount"
+        case .teacherPayouts: "teacherPayouts"
+        case .studentPayments: "studentPayments"
+        case .notifications: "notifications"
+        case .privacyControls: "privacyControls"
+        case .language: "language"
+        case .about: "about"
+        case .contactUs: "contactUs"
+        case .eula: "eula"
+        case .privacyPolicy: "privacyPolicy"
+        }
+    }
 }
 
 enum SettingsDestination: Hashable {
@@ -524,3 +584,4 @@ final class MockSettingsViewModel: SettingsViewModel {
         URL(string: "https://example.com/\(path)") ?? URL(fileURLWithPath: "/")
     }
 }
+

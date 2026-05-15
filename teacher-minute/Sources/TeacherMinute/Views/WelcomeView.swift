@@ -22,69 +22,74 @@ struct WelcomeView: View {
 	  Color(.systemBackground)
 		.ignoresSafeArea()
 	  
-	  VStack(alignment: .leading, spacing: 0) {
-		header
-		
-		Text("Help you any where")
-		  .font(.system(size: 35, weight: .bold, design: .default))
-		  .foregroundStyle(Color.primaryText)
-		  .lineSpacing(-4)
-		  .padding(.top, 42)
-		
-		//previewCard
-		Image("student")
-		  .resizable()
-		  .scaledToFit()
-		
-		//.frame(width: 160, height: 160)
-		  .padding(.top, 32)
-		
-		Text("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise.")
-		  .font(.system(size: 16, weight: .regular))
-		  .foregroundStyle(Color.secondaryText)
-		  .lineSpacing(7)
-		  .padding(.top, 36)
-		
-		badges
-		  .padding(.top, 44)
-		
-		Spacer(minLength: 24)
-		
-		
-		Button {
-		  router.push(.createAccount)
-		} label: {
-		  Text("Sign Up")
-			.font(.system(size: 16, weight: .semibold))
-			.foregroundStyle(.white)
-			.frame(maxWidth: .infinity)
-			.frame(height: 62)
-			.background(Color.primaryText)
-			.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-		}
-		
-		
-		HStack(spacing: 4) {
-		  Text("Already have an account?")
-			.foregroundStyle(Color.secondaryText)
-		  
-		  Button {
-			router.push(.login)
-		  } label: {
-			Text("Log In")
-			  .fontWeight(.semibold)
-			  .foregroundStyle(Color.primaryText)
-		  }
-		}
-		.font(.system(size: 15))
-		.frame(maxWidth: .infinity)
-		.padding(.top, 20)
-		.padding(.bottom, 28)
-	  }
-	  .padding(.horizontal, 28)
-	  .padding(.top, 50)
-	  }
+      if isCheckingSession {
+        ProgressView()
+          .progressViewStyle(.circular)
+          .scaleEffect(1.4)
+      } else {
+        welcomeContent
+      }
+	}
 	  .task { await resumeExistingSessionIfNeeded() }
+  }
+
+  private var welcomeContent: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      header
+      
+      Text("Help you any where")
+        .font(.system(size: 35, weight: .bold, design: .default))
+        .foregroundStyle(Color.primaryText)
+        .lineSpacing(-4)
+        .padding(.top, 42)
+      
+      Image("student")
+        .resizable()
+        .scaledToFit()
+        .padding(.top, 32)
+      
+      Text("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise.")
+        .font(.system(size: 16, weight: .regular))
+        .foregroundStyle(Color.secondaryText)
+        .lineSpacing(7)
+        .padding(.top, 36)
+      
+      badges
+        .padding(.top, 44)
+      
+      Spacer(minLength: 24)
+      
+      Button {
+        router.push(.createAccount)
+      } label: {
+        Text("Sign Up")
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(.white)
+          .frame(maxWidth: .infinity)
+          .frame(height: 62)
+          .background(Color.primaryText)
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+      }
+      
+      HStack(spacing: 4) {
+        Text("Already have an account?")
+          .foregroundStyle(Color.secondaryText)
+        
+        Button {
+          router.push(.login)
+        } label: {
+          Text("Log In")
+            .fontWeight(.semibold)
+            .foregroundStyle(Color.primaryText)
+        }
+      }
+      .font(.system(size: 15))
+      .frame(maxWidth: .infinity)
+      .padding(.top, 20)
+      .padding(.bottom, 28)
+    }
+    .padding(.horizontal, 28)
+    .padding(.top, 50)
   }
   
   private func resumeExistingSessionIfNeeded() async {
@@ -94,7 +99,7 @@ struct WelcomeView: View {
 	
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
-	  router.path = [AppRoute.resumeDestination(for: resume)]
+	  router.replace(with: AppRoute.resumeDestination(for: resume))
 	  logger.info("[Auth] auto-login restored session uid=\(uid)")
 	} catch {
 	  logger.error("[Auth] auto-login failed: \(error)")

@@ -37,23 +37,26 @@ enum AppRoute: Hashable {
 
 @Observable
 final class AppRouter: @unchecked Sendable {
-  var path: [AppRoute] = []
-  
+  var path = NavigationPath()
+
   func push(_ route: AppRoute) {
 	path.append(route)
   }
-  
+
   func pop() {
 	guard !path.isEmpty else { return }
 	path.removeLast()
   }
-  
+
   func popToRoot() {
-	path.removeAll()
+	let count = path.count
+	logger.info("[Router] popToRoot, count=\(count)")
+	path = NavigationPath()
   }
-  
+
   func replace(with route: AppRoute) {
-	path = [route]
+	path = NavigationPath()
+	path.append(route)
   }
 }
 

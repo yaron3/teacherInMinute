@@ -9,6 +9,10 @@ private typealias AppDelegate = TeacherMinuteAppDelegate
     @AppDelegateAdaptor(AppMainDelegate.self) var appDelegate
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        AppDelegate.shared.onInit()
+    }
+
     var body: some Scene {
         WindowGroup {
             AppRootView()

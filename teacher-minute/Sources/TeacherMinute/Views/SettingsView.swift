@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @State var viewModel: SettingsViewModel
+    @State var activeDestination: SettingsDestination?
     @Environment(\.appRouter) var router
     @Environment(\.openURL) var openURL
 
@@ -17,18 +18,23 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $viewModel.navigationPath) {
-            settingsContent
-                .navigationDestination(for: SettingsDestination.self) { destination in
-                    destinationView(destination)
+        GeometryReader { geometry in
+            ZStack {
+                settingsContent
+                    .offset(x: activeDestination != nil ? -geometry.size.width : 0)
+
+                if let destination = activeDestination {
+                    destinationContainer(destination)
+                        .transition(.move(edge: .trailing))
                 }
+            }
+            .animation(.easeInOut(duration: 0.25), value: activeDestination)
         }
         .background(Color(.systemBackground))
         .alert(viewModel.activeConfirmation?.title ?? "Settings", isPresented: isShowingConfirmation) {
             Button("Cancel", role: .cancel) {
                 viewModel.activeConfirmation = nil
             }
-
             if let confirmation = viewModel.activeConfirmation {
                 Button(confirmation.confirmTitle, role: confirmation.isDestructive ? .destructive : nil) {
                     confirm(confirmation)
@@ -74,8 +80,45 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 18)
             }
-            
+
             loadingOverlay
+        }
+        .background(Color(.systemBackground))
+    }
+
+    func destinationContainer(_ destination: SettingsDestination) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button {
+                    activeDestination = nil
+                } label: {
+                    HStack(spacing: 5) {
+                        PlatformIcon(
+                            systemName: "chevron.left",
+                            size: 14,
+                            weight: .semibold,
+                            color: Color.appPink
+                        )
+                        Text("Settings")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color.appPink)
+                    }
+                }
+
+                Spacer()
+            }
+            .overlay {
+                Text(destination.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.appPrimaryText)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 44)
+
+            Divider()
+
+            destinationView(destination)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(.systemBackground))
     }
@@ -106,8 +149,14 @@ struct SettingsView: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-                    SettingsRowView(row: row) {
-                        viewModel.select(row)
+                    if let destination = row.destination {
+                        SettingsRowView(row: row) {
+                            activeDestination = destination
+                        }
+                    } else {
+                        SettingsRowView(row: row) {
+                            viewModel.select(row)
+                        }
                     }
 
                     if index < section.rows.count - 1 {
@@ -178,8 +227,6 @@ struct AccountSecuritySettingsView: View {
             }
         }
         .background(Color(.systemBackground))
-        .navigationTitle("Account & Security")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     func settingsSection(_ section: SettingsSection) -> some View {
@@ -284,8 +331,6 @@ struct LanguageSettingsView: View {
             .padding(.bottom, 24)
         }
         .background(Color(.systemBackground))
-        .navigationTitle("Language")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -302,8 +347,6 @@ struct AboutSettingsView: View {
             .padding(.bottom, 24)
         }
         .background(Color(.systemBackground))
-        .navigationTitle("About")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     func settingsSection(_ section: SettingsSection) -> some View {
@@ -364,8 +407,6 @@ struct SettingsPlaceholderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
-        .navigationTitle(destination.title)
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

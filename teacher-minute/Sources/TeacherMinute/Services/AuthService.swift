@@ -23,8 +23,38 @@ import SkipFirebaseAuth
 @MainActor
 final class AuthService {
   
-  var user: User?
+  var user: User? = Auth.auth().currentUser
+#if canImport(FirebaseAuth)
+  private var handle: AuthStateDidChangeListenerHandle?
+#else
+  // On platforms without FirebaseAuth (e.g., Android via Skip), the listener handle type isn't available.
+  // We omit the handle entirely.
+#endif
   
+  init() {
+#if canImport(FirebaseAuth)
+    handle = Auth.auth().addStateDidChangeListener { auth, user in
+      if let user = user {
+        logger.info("[AuthState] User signed in: \(user.uid), email: \(user.email ?? "No Email")")
+      } else {
+        logger.info("[AuthState] User signed out.")
+      }
+    }
+#else
+    // No-op on platforms without FirebaseAuth
+#endif
+  }
+  
+  @MainActor
+  deinit {
+#if canImport(FirebaseAuth)
+    if let handle = handle {
+      Auth.auth().removeStateDidChangeListener(handle)
+    }
+#else
+    // No-op
+#endif
+  }
   var currentUserID: String? {
     Auth.auth().currentUser?.uid
   }
@@ -100,6 +130,7 @@ final class AuthService {
     }
   
   func signOut() throws {
+    logger.info("[Auth] signOut requested")
     try Auth.auth().signOut()
   }
   
@@ -110,3 +141,4 @@ final class AuthService {
     try await user.delete()
   }
 }
+

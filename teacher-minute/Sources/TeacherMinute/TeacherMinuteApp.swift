@@ -17,7 +17,9 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 /* SKIP @bridge */public struct TeacherMinuteRootView : View {
   @State  var router = AppRouter()
   
-  /* SKIP @bridge */public init() { }
+  /* SKIP @bridge */public init() {
+    TeacherMinuteAppDelegate.shared.onInit()
+  }
   
   public var body: some View {
 	@Bindable var router = router
