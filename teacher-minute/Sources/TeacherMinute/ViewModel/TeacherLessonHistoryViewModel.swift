@@ -34,42 +34,9 @@ final class TeacherLessonHistoryViewModel {
     var query = ""
     var selectedLesson: TeacherLessonHistoryItem?
     var playingLessonID: TeacherLessonHistoryItem.ID?
-    
-    var lessons = [
-        TeacherLessonHistoryItem(
-		  questionId: "123456789",
-            title: "Calculus Help",
-            student: "Sarah Jenkins",
-            completedAt: "Today, 2:30 PM",
-            duration: "14 min",
-            earnings: "$14.20",
-            summary: "Guided Sarah through derivative rules and chain-rule problem setup.",
-            transcriptPreview: "First identify the outside function, then multiply by the derivative of the inside expression.",
-            hasAudio: true
-        ),
-        TeacherLessonHistoryItem(
-		  questionId: "123456989",
-            title: "Limits Review",
-            student: "Noah Kim",
-            completedAt: "Yesterday",
-            duration: "19 min",
-            earnings: "$19.40",
-            summary: "Reviewed one-sided limits, graph interpretation, and removable discontinuities.",
-            transcriptPreview: "The left-hand and right-hand limits need to meet before the full limit exists.",
-            hasAudio: true
-        ),
-        TeacherLessonHistoryItem(
-		  questionId: "223456789",
-            title: "Geometry Proofs",
-            student: "Ava Brown",
-            completedAt: "May 7",
-            duration: "24 min",
-            earnings: "$24.50",
-            summary: "Built a two-column proof using congruent triangles and parallel-line angle rules.",
-            transcriptPreview: "Start by writing the given statements, then use alternate interior angles for the parallel lines.",
-            hasAudio: false
-        )
-    ]
+    var totalTimeTaughtText = "0 min"
+
+    var lessons: [TeacherLessonHistoryItem] = []
     
     var filteredLessons: [TeacherLessonHistoryItem] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -112,6 +79,7 @@ final class TeacherLessonHistoryViewModel {
                 teacherName = profile.displayName
             }
             let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
+            totalTimeTaughtText = LessonFormatting.totalDurationText(lessons: historyLessons)
             if !historyLessons.isEmpty {
                 lessons = historyLessons.map(Self.lessonHistoryItem)
             }
@@ -122,42 +90,15 @@ final class TeacherLessonHistoryViewModel {
 
     private static func lessonHistoryItem(_ lesson: HistoryLesson) -> TeacherLessonHistoryItem {
         TeacherLessonHistoryItem(
-		  questionId: "123456790",
+            questionId: lesson.questionId,
             title: lesson.title,
             student: lesson.otherParticipantName,
-            completedAt: dateText(lesson.acceptedAt),
-            duration: durationText(seconds: lesson.durationSeconds),
-            earnings: currencyText(cents: lesson.teacherEarningsCents),
+            completedAt: LessonFormatting.relativeDateText(lesson.acceptedAt),
+            duration: LessonFormatting.shortDurationText(seconds: lesson.durationSeconds),
+            earnings: LessonFormatting.currencyText(cents: lesson.teacherEarningsCents),
             summary: "Completed lesson with \(lesson.otherParticipantName).",
             transcriptPreview: "Lesson transcript will appear here when available.",
             hasAudio: false
         )
-    }
-
-    private static func dateText(_ date: Date) -> String {
-        guard date > .distantPast else { return "Recently" }
-
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "h:mm a"
-            return "Today, \(formatter.string(from: date))"
-        }
-        if calendar.isDateInYesterday(date) {
-            return "Yesterday"
-        }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
-    }
-
-    private static func durationText(seconds: Int) -> String {
-        let minutes = max(1, Int((Double(max(0, seconds)) / 60.0).rounded(.up)))
-        return minutes == 1 ? "1 min" : "\(minutes) min"
-    }
-
-    private static func currencyText(cents: Int) -> String {
-        (Double(cents) / 100.0).formatted(.currency(code: "USD"))
     }
 }

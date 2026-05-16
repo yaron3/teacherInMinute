@@ -54,6 +54,9 @@ struct StudentHomeView: View {
                     }
                     .padding(.top, 10)
 
+                    statsStrip
+                        .padding(.top, 24)
+
                     tipsCard
                         .padding(.top, 28)
 
@@ -62,12 +65,26 @@ struct StudentHomeView: View {
                     }
                     .padding(.top, 28)
 
-                    VStack(spacing: 12) {
-                        ForEach(viewModel.recentLessons) { lesson in
-                            RecentLessonRow(lesson: lesson)
+                    if viewModel.recentLessons.isEmpty {
+                        RoundedInfoCard {
+                            HStack(spacing: 12) {
+                                PlatformIcon(systemName: "clock")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(theme.appSecondaryText)
+                                Text("No lessons yet. Ask a teacher to get started!")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(theme.appSecondaryText)
+                            }
                         }
+                        .padding(.top, 12)
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(viewModel.recentLessons) { lesson in
+                                RecentLessonRow(lesson: lesson)
+                            }
+                        }
+                        .padding(.top, 12)
                     }
-                    .padding(.top, 12)
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 24)
@@ -118,6 +135,26 @@ struct StudentHomeView: View {
             NoMatchOverlay {
                 viewModel.resetSearch()
             }
+        }
+    }
+
+    // MARK: - Stats
+
+    var statsStrip: some View {
+        HStack(spacing: 14) {
+            HistoryMetricCard(
+                title: "Time Learned",
+                value: viewModel.totalTimeLearnedText,
+                systemImage: "clock.fill",
+                tint: theme.appPink
+            )
+
+            HistoryMetricCard(
+                title: "Total Spend",
+                value: viewModel.totalSpendText,
+                systemImage: "creditcard.fill",
+                tint: theme.appPurple
+            )
         }
     }
 

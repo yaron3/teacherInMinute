@@ -77,7 +77,7 @@ struct TeacherLessonHistoryView: View {
         HStack(spacing: 14) {
             HistoryMetricCard(
                 title: "Time Taught",
-                value: "57 min",
+                value: viewModel.totalTimeTaughtText,
                 systemImage: "clock.fill",
                 tint: theme.appPink
             )

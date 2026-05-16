@@ -63,6 +63,7 @@ struct PlatformIcon: View {
         case "shield.lefthalf.filled":              return "🛡"
         case "doc.text.fill":                       return "📄"
         case "clock.fill":                          return "🕒"
+		case "clock":								return "⏰"
         case "dollarsign.circle.fill":              return "$"
         case "person.fill.checkmark":               return "✓"
         case "bubble.left.and.bubble.right.fill":   return "💬"
@@ -79,13 +80,14 @@ struct PlatformIcon: View {
         case "xmark":                               return "✕"
         case "wifi":                                return "🛜"
         case "camera.fill":                         return "📸"
-        case "chevron.right":                       return "›"
         case "star.fill":                           return "⭐"
 		case "pencil":                            	return "✏️"
 		case "atom":                                return "⚛️"
 		case "x.squareroot":                       	return "√"
 		case "phone":                               return "📞"
-		case "chevron.down":                        return "↓"
+		case "chevron.down":                        return "🔽"
+		case "chevron.left"	:						return "◀️"
+		case "chevron.right":                       return "▶️"
 		case "person":                              return "👤"
 		case "desktopcomputer":                     return "🖥️"
 		case "person.text.rectangle": 				return "🗂️"
@@ -98,6 +100,17 @@ struct PlatformIcon: View {
 		case "envelope":                            return "📧"
 		case "eye.slash":							return "👁"
 		case "g.circle.fill":						return "G"
+		case "building.columns.fill":				return "🏰"
+		case "lightbulb.fill":						return "💡"
+		case "checkmark":							return "✓"
+		case "envelope.fill":						return "📧"
+		case "phone.fill":							return "📞"
+		case "globe":                               return "🌍"
+		
+		case "doc.plaintext.fill":					return "txt"
+		case "hand.raised.fill":					return "✋"
+		
+			
         default:
 			logger.error("!!! icon: \(systemName) is missing !!!")
 			return "●"

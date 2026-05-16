@@ -55,6 +55,9 @@ protocol StudentHomeViewModeling: AnyObject {
   var questionId: String? { get set }
   var pricingOptions: [PricingOption] { get }
   var recentLessons: [RecentLesson] { get set }
+  var totalTimeLearnedText: String { get }
+  var totalSpendText: String { get }
+  var lessonCount: Int { get }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
   func cancelSearch() async
@@ -71,7 +74,7 @@ protocol StudentHomeViewModeling: AnyObject {
 @MainActor
 final class StudentHomeViewModel: StudentHomeViewModeling {
 
-  var name = "Sarah Jenkins"
+  var name = ""
   var searchState: StudentSearchState = .idle
   var activeQuestionText = ""
   var activeConnectionFeeCents = 0
@@ -93,12 +96,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     ),
   ]
 
-  var recentLessons = [
-    RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis",
-                 time: "Today, 2:30 PM", duration: "14 mins"),
-    RecentLesson(title: "Algebra II", teacher: "with Ms. Chen",
-                 time: "Yesterday", duration: "22 mins"),
-  ]
+  var recentLessons: [RecentLesson] = []
+  var totalTimeLearnedText = "0 min"
+  var totalSpendText = "$0.00"
+  var lessonCount = 0
 
   private var pollingTask: Task<Void, Never>?
   private var didLoadProfile = false
@@ -159,9 +160,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   private func loadRecentLessons(uid: String) async {
     do {
-      let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid)
-      guard !historyLessons.isEmpty else { return }
-      recentLessons = historyLessons.map(Self.recentLesson)
+      let allLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
+      lessonCount = allLessons.count
+      totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: allLessons)
+      totalSpendText = LessonFormatting.totalCostText(lessons: allLessons)
+      let recent = Array(allLessons.prefix(3))
+      if !recent.isEmpty {
+        recentLessons = recent.map(Self.recentLesson)
+      }
     } catch {
       logger.error("[StudentHome] failed loading recent lessons: \(error.localizedDescription)")
     }
@@ -258,32 +264,9 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     RecentLesson(
       title: lesson.title,
       teacher: "with \(lesson.otherParticipantName)",
-      time: relativeDateText(lesson.acceptedAt),
-      duration: durationText(seconds: lesson.durationSeconds)
+      time: LessonFormatting.relativeDateText(lesson.acceptedAt),
+      duration: LessonFormatting.durationText(seconds: lesson.durationSeconds)
     )
-  }
-
-  private static func relativeDateText(_ date: Date) -> String {
-    guard date > .distantPast else { return "Recently" }
-
-    let calendar = Calendar.current
-    if calendar.isDateInToday(date) {
-      let formatter = DateFormatter()
-      formatter.dateFormat = "h:mm a"
-      return "Today, \(formatter.string(from: date))"
-    }
-    if calendar.isDateInYesterday(date) {
-      return "Yesterday"
-    }
-
-    let formatter = DateFormatter()
-    formatter.dateFormat = "MMM d"
-    return formatter.string(from: date)
-  }
-
-  private static func durationText(seconds: Int) -> String {
-    let minutes = max(1, Int((Double(max(0, seconds)) / 60.0).rounded(.up)))
-    return minutes == 1 ? "1 min" : "\(minutes) mins"
   }
 }
 
@@ -299,6 +282,9 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   let pricingOptions: [PricingOption]
   var recentLessons: [RecentLesson]
+  var totalTimeLearnedText: String
+  var totalSpendText: String
+  var lessonCount: Int
 
   init(
     name: String = "Sarah Jenkins",
@@ -333,6 +319,9 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.questionId = "mock-lesson"
     self.pricingOptions = pricingOptions
     self.recentLessons = recentLessons
+    self.totalTimeLearnedText = "36 min"
+    self.totalSpendText = "$27.80"
+    self.lessonCount = recentLessons.count
   }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {

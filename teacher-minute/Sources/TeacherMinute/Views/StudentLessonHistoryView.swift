@@ -77,10 +77,11 @@ struct StudentLessonHistoryView: View {
         HStack(spacing: 14) {
             HistoryMetricCard(
                 title: "Time Learned",
-                value: "54 min",
+                value: viewModel.totalTimeLearnedText,
                 systemImage: "clock.fill",
                 tint: theme.appPink
             )
+			.frame(maxWidth: .infinity)
             
             HistoryMetricCard(
                 title: "Total Spend",
@@ -88,6 +89,7 @@ struct StudentLessonHistoryView: View {
                 systemImage: "creditcard.fill",
                 tint: theme.appPurple
             )
+			.frame(maxWidth: .infinity)
         }
     }
     
@@ -151,6 +153,7 @@ struct HistoryMetricCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity)
     }
 }
 

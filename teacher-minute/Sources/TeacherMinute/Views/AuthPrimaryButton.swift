@@ -12,7 +12,7 @@ struct AuthPrimaryButton: View {
     let title: String
     var systemImage: String?
     var isEnabled = true
-    let action: () -> Void
+    let action: @Sendable () -> Void
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
