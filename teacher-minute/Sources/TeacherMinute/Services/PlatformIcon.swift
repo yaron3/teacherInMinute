@@ -20,26 +20,31 @@ struct PlatformIcon: View {
 
     private static let bundledIcons: Set<String> = [
         "bubble.left.and.bubble.right.fill",
-		"g.circle.fill"
+		"g.circle.fill",
+		"teaching_tab_icon"
     ]
 
-    var body: some View {
+  var body: some View {
+	if Self.bundledIcons.contains(systemName) {
+	   Image(systemName, bundle: .module)
+		.resizable()
+		.frame(width: size, height: size)
+	} else {
 #if os(Android)
-        if Self.bundledIcons.contains(systemName) {
-            Image(systemName, bundle: .module)
-                .resizable()
-                .frame(width: size, height: size)
-        } else {
-            Text(Self.emoji(for: systemName))
-                .font(.system(size: size * 0.9))
-                .frame(width: size, height: size)
-        }
+	  
+	  Text(Self.emoji(for: systemName))
+		.font(.system(size: size * 0.9))
+		.frame(width: size, height: size)
+	  
 #else
-        Image(systemName: systemName)
-            .font(.system(size: size, weight: weight))
-            .foregroundStyle(color)
+	  Image(systemName: systemName)
+		.font(.system(size: size, weight: weight))
+		.foregroundStyle(color)
+	  
 #endif
-    }
+	}
+	
+  }
 
     static func emoji(for systemName: String) -> String {
         switch systemName {

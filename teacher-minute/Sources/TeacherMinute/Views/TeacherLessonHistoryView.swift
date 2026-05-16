@@ -47,12 +47,13 @@ struct TeacherLessonHistoryView: View {
                 
                 VStack(spacing: 12) {
                     ForEach(viewModel.filteredLessons) { lesson in
-                        TeacherLessonHistoryRow(
+                        LessonHistoryRow(
                             lesson: lesson,
-                            isPlaying: viewModel.isPlaying(lesson),
-                            viewAction: { viewModel.view(lesson) },
-                            audioAction: { viewModel.toggleAudio(for: lesson) }
-                        )
+                            accentColor: theme.appPurple,
+                            iconName: "person.fill.checkmark"
+                        ) {
+                            viewModel.view(lesson)
+                        }
                     }
                 }
                 .padding(.top, 14)
@@ -65,8 +66,9 @@ struct TeacherLessonHistoryView: View {
             await viewModel.loadProfile()
         }
         .sheet(item: $viewModel.selectedLesson) { lesson in
-            TeacherLessonDetailView(
+            LessonDetailView(
                 lesson: lesson,
+                amountLabel: "Earnings",
                 isPlaying: viewModel.isPlaying(lesson),
                 audioAction: { viewModel.toggleAudio(for: lesson) }
             )
@@ -112,150 +114,6 @@ struct TeacherLessonHistoryView: View {
                 .stroke(theme.appGrayBackground, lineWidth: 1)
         }
         .shadow(color: theme.appPrimaryText.opacity(0.025), radius: 10, x: 0, y: 5)
-    }
-}
-
-struct TeacherLessonHistoryRow: View {
-    let lesson: LessonHistoryItem
-    let isPlaying: Bool
-    let viewAction: () -> Void
-    let audioAction: () -> Void
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-    var body: some View {
-        RoundedInfoCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    Circle()
-                        .fill(theme.appPurpleSoft)
-                        .frame(width: 46, height: 46)
-                        .overlay {
-                            PlatformIcon(
-                                systemName: "person.fill.checkmark",
-                                size: 17,
-                                weight: .bold,
-                                color: theme.appPurple
-                            )
-                        }
-                    
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(lesson.title)
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(theme.appPrimaryText)
-                        
-                        Text("\(lesson.otherParticipant) • \(lesson.completedAt)")
-                            .font(.system(size: 11))
-                            .foregroundStyle(theme.appSecondaryText)
-                    }
-                    
-                    Spacer()
-                    
-                    Text(lesson.amount)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
-                }
-                
-                Text(lesson.summary)
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.appSecondaryText)
-                    .lineSpacing(3)
-                
-                HStack(spacing: 10) {
-                    LessonActionButton(
-                        title: "View",
-                        systemImage: "doc.text.fill",
-                        foreground: theme.appPrimaryText,
-                        background: theme.appGrayBackground,
-                        action: viewAction
-                    )
-                    
-                    LessonActionButton(
-                        title: isPlaying ? "Pause" : "Listen",
-                        systemImage: isPlaying ? "pause.fill" : "play.fill",
-                        foreground: lesson.hasAudio ?theme.appCardBackground: theme.appSecondaryText,
-                        background: lesson.hasAudio ? theme.appPink : theme.appGrayBackground,
-                        action: audioAction
-                    )
-                    .disabled(!lesson.hasAudio)
-                    
-                    Spacer()
-                    
-                    SmallPill(
-                        title: lesson.duration,
-                        foreground: theme.appGreen,
-                        background: theme.appGreenSoft
-                    )
-                }
-            }
-        }
-    }
-}
-
-struct TeacherLessonDetailView: View {
-    let lesson: LessonHistoryItem
-    let isPlaying: Bool
-    let audioAction: () -> Void
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(lesson.title)
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(theme.appPrimaryText)
-                        
-                        Text("\(lesson.otherParticipant) • \(lesson.completedAt) • \(lesson.duration)")
-                            .font(.system(size: 13))
-                            .foregroundStyle(theme.appSecondaryText)
-                    }
-                    
-                    LessonActionButton(
-                        title: isPlaying ? "Pause Audio" : "Listen to Lesson",
-                        systemImage: isPlaying ? "pause.fill" : "play.fill",
-                        foreground: lesson.hasAudio ?theme.appCardBackground: theme.appSecondaryText,
-                        background: lesson.hasAudio ? theme.appPink : theme.appGrayBackground,
-                        action: audioAction
-                    )
-                    .disabled(!lesson.hasAudio)
-                    
-                    RoundedInfoCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Teaching Summary")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(theme.appPrimaryText)
-                            
-                            Text(lesson.summary)
-                                .font(.system(size: 13))
-                                .foregroundStyle(theme.appSecondaryText)
-                                .lineSpacing(4)
-                        }
-                    }
-                    
-                    RoundedInfoCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Transcript Preview")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(theme.appPrimaryText)
-                            
-                            Text(lesson.transcriptPreview)
-                                .font(.system(size: 13))
-                                .foregroundStyle(theme.appSecondaryText)
-                                .lineSpacing(4)
-                        }
-                    }
-                }
-                .padding(18)
-            }
-            .background(Color(.systemBackground))
-            .navigationTitle("Lesson")
-            .navigationBarTitleDisplayMode(.inline)
-        }
     }
 }
 

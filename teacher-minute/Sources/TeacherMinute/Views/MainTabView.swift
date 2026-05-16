@@ -28,7 +28,15 @@ struct MainTabView: View {
 
                 tabContent(.lessons)
                     .tabItem {
-                        Label(MainTab.lessons.title, systemImage: MainTab.lessons.systemImage)
+                        Label {
+                            Text(MainTab.lessons.title)
+                        } icon: {
+                            Image(MainTab.lessons.systemImage, bundle: .module)
+                                .renderingMode(.template)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 40, height: 40)
+                        }
                     }
                     .tag(MainTab.lessons)
                     .badge(viewModel.shouldShowLessonsBadge ? 1 : 0)

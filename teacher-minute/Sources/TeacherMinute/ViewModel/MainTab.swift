@@ -27,12 +27,7 @@ enum MainTab: Hashable, CaseIterable {
     var systemImage: String {
         switch self {
         case .home: "house.fill"
-        case .lessons:
-            #if os(Android)
-            "paperplane.fill"
-            #else
-            "bubble.left.and.bubble.right.fill"
-            #endif
+        case .lessons: "teaching_tab_icon"
         case .profile: "person.fill"
         case .settings: "gearshape.fill"
         }
