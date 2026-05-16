@@ -29,7 +29,7 @@ struct AuthPrimaryButton: View {
                 }
             }
             .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(theme.appPrimaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(theme.authPink.opacity(isEnabled ? 1 : 0.55))
@@ -145,13 +145,17 @@ struct AuthSegmentedRolePicker: View {
 }
 
 struct AuthSelectedRoleBackground: View {
+	@Environment(\.colorScheme) var colorScheme
+	var theme: AppTheme {
+	  AppTheme(colorScheme: colorScheme)
+	}
     let isSelected: Bool
     let shadowColor: Color
 
     var body: some View {
         if isSelected {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.white)
+                .fill(theme.appPrimaryText)
                 .shadow(color: shadowColor.opacity(0.06), radius: 6, x: 0, y: 2)
         }
     }

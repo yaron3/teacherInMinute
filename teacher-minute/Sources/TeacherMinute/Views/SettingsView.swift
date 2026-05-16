@@ -13,12 +13,18 @@ struct SettingsView: View {
     @Environment(\.appRouter) var router
     @Environment(\.openURL) var openURL
   @Environment(\.colorScheme) var colorScheme
+  var role: AppUserMode
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
-    init(viewModel: SettingsViewModel = SettingsViewModel()) {
-        self._viewModel = State(wrappedValue: viewModel)
-    }
+  init(role: AppUserMode,viewModel: SettingsViewModel?) {
+	if let viewModel {
+	  self._viewModel = State(wrappedValue: viewModel)
+	} else {
+	  self._viewModel = State(wrappedValue: SettingsViewModel(role:role))
+	}
+	self.role = role
+  }
 
     var body: some View {
         GeometryReader { geometry in
@@ -182,7 +188,7 @@ struct SettingsView: View {
             ProgressView()
                 .progressViewStyle(.circular)
                 .scaleEffect(1.4)
-                .tint(.white)
+                .tint(theme.appPrimaryText)
         }
     }
 
@@ -229,7 +235,7 @@ struct AccountSecuritySettingsView: View {
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(.white)
+                    .tint(theme.appPrimaryText)
             }
         }
         .background(Color(.systemBackground))
@@ -478,7 +484,7 @@ struct SettingsRowView: View {
 #if os(iOS)
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView(viewModel: MockSettingsViewModel())
+	  SettingsView(role: .student, viewModel: MockSettingsViewModel(role: .student))
     }
 }
 #endif

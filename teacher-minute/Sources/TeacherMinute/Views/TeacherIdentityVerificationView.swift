@@ -224,10 +224,10 @@ struct TeacherIdentityVerificationView: View {
 		  ProgressView()
 			.progressViewStyle(.circular)
 			.scaleEffect(1.8)
-			.tint(.white)
+			.tint(theme.appPrimaryText)
 		  Text("Checking…")
 			.font(.system(size: 14, weight: .medium))
-			.foregroundStyle(.white)
+			.foregroundStyle(theme.appPrimaryText)
 		}
 	  }
 	}
@@ -422,7 +422,7 @@ struct StatusRow: View {
 		  if !isDone {
 			Text("!")
 			  .font(.system(size: 7, weight: .bold))
-			  .foregroundStyle(.white)
+			  .foregroundStyle(theme.appPrimaryText)
 		  }
 		}
 	}

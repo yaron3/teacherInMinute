@@ -217,7 +217,7 @@ struct ChatSessionView: View {
       } label: {
         Text("End")
           .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(.white)
+          .foregroundStyle(theme.appPrimaryText)
           .padding(.horizontal, 12)
           .frame(height: 32)
           .background(theme.red)

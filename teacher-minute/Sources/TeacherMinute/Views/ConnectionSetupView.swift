@@ -178,7 +178,7 @@ struct ConnectionSetupView: View {
           Text("Allow Microphone")
             .font(.system(size: 13, weight: .bold))
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(theme.appPrimaryText)
         .frame(maxWidth: .infinity)
         .frame(height: 42)
         .background(theme.appOrange)

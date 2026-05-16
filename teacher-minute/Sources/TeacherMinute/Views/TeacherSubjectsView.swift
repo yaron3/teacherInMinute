@@ -147,9 +147,9 @@ struct TeacherSubjectsView: View {
 		ZStack {
 		  theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
 		  VStack(spacing: 12) {
-			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(.white)
+			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.appPrimaryText)
 			Text("Checking your subjects…")
-			  .font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
+			  .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.appPrimaryText)
 		  }
 		}
 	  }

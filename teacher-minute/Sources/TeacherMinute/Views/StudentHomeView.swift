@@ -183,14 +183,14 @@ struct StudentHomeView: View {
                         .overlay {
                             PlatformIcon(systemName: "building.columns.fill")
                                 .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(theme.appPrimaryText)
                         }
 
                     Spacer()
 
                     Text("Ask a math teacher")
                         .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.appPrimaryText)
 
                     Text("Connect instantly • Per-minute billing")
                         .font(.system(size: 13, weight: .medium))
@@ -201,7 +201,7 @@ struct StudentHomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Circle()
-                    .fill(.white)
+                    .fill(theme.appPrimaryText)
                     .frame(width: 44, height: 44)
                     .overlay {
                         PlatformIcon(systemName: "arrow.right")
@@ -373,7 +373,7 @@ struct AskTeacherSheet: View {
                 } label: {
                     Text("Find a Teacher")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
                         .background( theme.appPink)
@@ -444,11 +444,11 @@ struct SearchingOverlay: View {
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.5)
-                    .tint(.white)
+                    .tint(theme.appPrimaryText)
 
                 Text("Searching for a teacher\u{2026}")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.appPrimaryText)
 
                 Text("This usually takes under 30 seconds.")
                     .font(.system(size: 13))
@@ -458,7 +458,7 @@ struct SearchingOverlay: View {
                 Button(action: onCancel) {
                     Text("Cancel")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.appPrimaryText)
                         .padding(.horizontal, 32)
                         .padding(.vertical, 12)
                         .background(.white.opacity(0.2))
@@ -495,7 +495,7 @@ struct MatchedOverlay: View {
 
                 Text("Teacher Found!")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.appPrimaryText)
 
                 Text("Your session is ready.\nRoom: \(liveKitRoom)")
                     .font(.system(size: 13))
@@ -505,7 +505,7 @@ struct MatchedOverlay: View {
                 Button(action: onDismiss) {
                     Text("Done")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(theme.appGreen)
@@ -541,7 +541,7 @@ struct NoMatchOverlay: View {
 
                 Text("No Teachers Available")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.appPrimaryText)
 
                 Text("All teachers are busy right now.\nTry again in a few minutes.")
                     .font(.system(size: 13))
@@ -551,7 +551,7 @@ struct NoMatchOverlay: View {
                 Button(action: onDismiss) {
                     Text("OK")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(theme.appPink)
@@ -588,7 +588,7 @@ struct ErrorOverlay: View {
 
                 Text("Could Not Send Question")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.appPrimaryText)
 
                 Text(message)
                     .font(.system(size: 13))
@@ -598,7 +598,7 @@ struct ErrorOverlay: View {
                 Button(action: onDismiss) {
                     Text("OK")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(theme.appPink)
@@ -707,6 +707,7 @@ struct RecentLessonRow: View {
                         .foregroundStyle(theme.appPrimaryText)
                 }
             }
+			.background(theme.appCardBackground)
         }
     }
 }

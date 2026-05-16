@@ -529,7 +529,7 @@ struct TeacherDashboardView: View {
 		
 		Text(topic.capitalized)
 		  .font(.system(size: 10, weight: .bold))
-		  .foregroundStyle(.white)
+		  .foregroundStyle(theme.appPrimaryText)
 		  .padding(.horizontal, 12)
 		  .padding(.vertical, 8)
 		  .background(theme.appPurple)
@@ -596,7 +596,7 @@ struct TeacherDashboardView: View {
 	var voiceMessageRow: some View {
 	  HStack(spacing: 12) {
 		Circle()
-		  .fill(.white)
+		  .fill(theme.appPrimaryText)
 		  .frame(width: 34, height: 34)
 		  .overlay {
 			PlatformIcon(systemName: "play.fill", size: 12, weight: .bold, color: theme.appPink)
@@ -633,7 +633,7 @@ struct TeacherDashboardView: View {
 		  Text("Accept Question")
 			.font(.system(size: 15, weight: .bold))
 		}
-		.foregroundStyle(.white)
+		.foregroundStyle(theme.appPrimaryText)
 		.frame(maxWidth: .infinity)
 		.frame(height: 52)
 		.background(theme.appPink)

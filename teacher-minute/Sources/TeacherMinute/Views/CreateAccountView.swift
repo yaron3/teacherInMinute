@@ -47,7 +47,7 @@ struct CreateAccountView: View {
 		ProgressView()
 		  .progressViewStyle(.circular)
 		  .scaleEffect(1.6)
-		  .tint(.white)
+		  .tint(theme.appPrimaryText)
 	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
@@ -186,7 +186,7 @@ struct CreateAccountView: View {
 		  if isOn.wrappedValue {
 			PlatformIcon(systemName: "checkmark")
 			  .font(.system(size: 11, weight: .bold))
-			  .foregroundStyle(.white)
+			  .foregroundStyle(theme.appPrimaryText)
 		  }
 		}
 	  }
@@ -222,10 +222,10 @@ struct CreateAccountView: View {
 	  ZStack {
 		Text("Continue to Role Selection")
 		  .font(.system(size: 16, weight: .semibold))
-		  .foregroundStyle(.white)
+		  .foregroundStyle(theme.appPrimaryText)
 		  .opacity(viewModel.isLoading ? 0 : 1)
 		if viewModel.isLoading {
-		  ProgressView().tint(.white)
+		  ProgressView().tint(theme.appPrimaryText)
 		}
 	  }
 	  .frame(maxWidth: .infinity)

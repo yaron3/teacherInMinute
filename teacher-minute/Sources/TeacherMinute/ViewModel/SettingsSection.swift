@@ -254,35 +254,26 @@ class SettingsViewModel {
     private let authService: AuthService
     private let remoteConfigService: SettingsRemoteConfigService
     private let languagePreferenceKey = "settings.language.preference"
-    
+	let role:AppUserMode
     init(
         authService: AuthService = AuthService(),
-        remoteConfigService: SettingsRemoteConfigService = .shared
+        remoteConfigService: SettingsRemoteConfigService = .shared,
+		role: AppUserMode
     ) {
         self.authService = authService
         self.remoteConfigService = remoteConfigService
         let savedLanguage = UserDefaults.standard.string(forKey: languagePreferenceKey)
         self.selectedLanguage = savedLanguage.flatMap(SettingsLanguageChoice.init(rawValue:)) ?? .system
+		self.role = role
     }
 
     var sections: [SettingsSection] {
         [
-            SettingsSection(
-                title: "ACCOUNT",
+		  
+		  role == .teacher ? SettingsSection(
+                title: "PAYOUTS",
                 rows: [
-                    SettingsRow(
-                        title: "Account & Security",
-                        subtitle: "Password, logout and account removal",
-                        systemImage: "lock.fill",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .accountSecurity
-                    )
-                ]
-            ),
-            SettingsSection(
-                title: "PAYMENTS & PAYOUTS",
-                rows: [
+				  
                     SettingsRow(
                         title: "Teacher Payout Settings",
                         subtitle: "Manage bank details & history",
@@ -290,7 +281,11 @@ class SettingsViewModel {
                         iconColor: .purple,
                         isDestructive: false,
                         action: .teacherPayouts
-                    ),
+					)
+					]
+		  ): SettingsSection(
+			title: "PAYMENTS",
+			rows: [
                     SettingsRow(
                         title: "Student Payment Methods",
                         subtitle: "Cards & billing history",
@@ -342,7 +337,20 @@ class SettingsViewModel {
                         action: .about
                     )
                 ]
-            )
+            ),
+			SettingsSection(
+			  title: "ACCOUNT",
+			  rows: [
+				SettingsRow(
+				  title: "Account & Security",
+				  subtitle: "Password, logout and account removal",
+				  systemImage: "lock.fill",
+				  iconColor: .primary,
+				  isDestructive: false,
+				  action: .accountSecurity
+				)
+			  ]
+			)
         ]
     }
 
@@ -540,9 +548,10 @@ class SettingsViewModel {
 final class MockSettingsViewModel: SettingsViewModel {
     override init(
         authService: AuthService = AuthService(),
-        remoteConfigService: SettingsRemoteConfigService = .shared
+        remoteConfigService: SettingsRemoteConfigService = .shared,
+		role: AppUserMode
     ) {
-        super.init(authService: authService, remoteConfigService: remoteConfigService)
+	  super.init(authService: authService, remoteConfigService: remoteConfigService, role: role)
     }
 
     override func confirm(_ confirmation: SettingsConfirmation) async -> Bool {

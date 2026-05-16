@@ -86,7 +86,7 @@ struct MainTabView: View {
             ProfileView()
 
         case .settings:
-            SettingsView()
+			SettingsView(role: viewModel.userMode, viewModel: nil)
         }
     }
 

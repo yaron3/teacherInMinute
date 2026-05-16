@@ -119,7 +119,7 @@ struct RoleCard: View {
 			  .overlay {
 				PlatformIcon(systemName: "checkmark")
 				  .font(.system(size: 10, weight: .bold))
-				  .foregroundStyle(.white)
+				  .foregroundStyle(theme.appPrimaryText)
 			  }
 		  }
 		}

@@ -60,10 +60,10 @@ struct LoginView: View {
 		  ProgressView()
 			.progressViewStyle(.circular)
 			.scaleEffect(1.8)
-			.tint(.white)
+			.tint(theme.appPrimaryText)
 		  Text("Signing in…")
 			.font(.system(size: 14, weight: .medium))
-			.foregroundStyle(.white)
+			.foregroundStyle(theme.appPrimaryText)
 		}
 	  }
 	}
@@ -183,13 +183,13 @@ struct LoginView: View {
 	} label: {
 	  HStack(spacing: 8) {
 		if viewModel.isLoading {
-		  ProgressView().tint(.white)
+		  ProgressView().tint(theme.appPrimaryText)
 		}
 		
 		Text(viewModel.isLoading ? "Signing In…" : "Log In")
 		  .font(.system(size: 16, weight: .semibold))
 	  }
-	  .foregroundStyle(.white)
+	  .foregroundStyle(theme.appPrimaryText)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 57)
 	  .background(theme.authPink.opacity(viewModel.canSubmit ? 1 : 0.55))
