@@ -10,9 +10,11 @@ import FirebaseAuth
 
 typealias FirebaseSignInResult = Result<AuthDataResult, Error>
 
+@MainActor
 protocol AuthProvider {
     func signIn(completion: @escaping (FirebaseSignInResult) -> Void)
 }
 
 protocol GoogleSignInProvider: AuthProvider {}
+protocol AppleSignInProvider: AuthProvider {}
 #endif

@@ -129,7 +129,30 @@ final class CreateAccountViewModel {
   }
   
   func signupWithApple() {
-	print("not implemented yet")
+#if canImport(UIKit)
+		iOSAppleSignInProvider().signIn { [weak self] result in
+		  switch result {
+			case .success:
+			  Task { @MainActor in self?.navigateToChooseRole = true }
+			case .failure(let error):
+			  Task { @MainActor in
+				self?.alertMessage = error.localizedDescription
+				self?.showAlert = true
+			  }
+		  }
+		}
+#elseif os(Android)
+		print("Android Apple sign-up tapped")
+		Task {
+		  do {
+			_ = try await AndroidAppleAuth().signIn()
+			navigateToChooseRole = true
+		  } catch {
+			alertMessage = error.localizedDescription
+			showAlert = true
+		  }
+		}
+#endif
   }
   
   // MARK: - Helpers

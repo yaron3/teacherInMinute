@@ -91,7 +91,44 @@ final class LoginViewModel {
 #endif
   }
   
-  func loginWithApple() { /* TODO */ }
+  func loginWithApple() {
+#if canImport(UIKit)
+	iOSAppleSignInProvider().signIn { [weak self] result in
+	  switch result {
+		case .success:
+		  Task { @MainActor in
+			guard let uid = Auth.auth().currentUser?.uid else {
+			  self?.present(message: "Could not retrieve user session. Please try again.")
+			  return
+			}
+			do {
+			  let resume = try await UserService.shared.resumeRoute(uid: uid)
+			  self?.destination = AppRoute.resumeDestination(for: resume)
+			} catch {
+			  self?.present(message: error.localizedDescription)
+			}
+		  }
+		case .failure(let error):
+		  Task { @MainActor in self?.present(message: error.localizedDescription) }
+	  }
+	}
+#elseif os(Android)
+	print("Android Apple login tapped")
+	Task {
+	  do {
+		_ = try await AndroidAppleAuth().signIn()
+		guard let uid = Auth.auth().currentUser?.uid else {
+		  present(message: "Could not retrieve user session. Please try again.")
+		  return
+		}
+		let resume = try await UserService.shared.resumeRoute(uid: uid)
+		destination = AppRoute.resumeDestination(for: resume)
+	  } catch {
+		present(message: error.localizedDescription)
+	  }
+	}
+#endif
+  }
   func forgotPassword()  { /* TODO */ }
   func back()            { /* TODO */ }
   
