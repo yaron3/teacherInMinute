@@ -64,6 +64,15 @@ struct PermissionsSetupView: View {
                 )
 
                 PermissionCard(
+                    icon: "camera.fill",
+                    iconColor: theme.authGreen,
+                    iconBackground: theme.authGreen.opacity(0.14),
+                    title: "Camera",
+                    subtitle: "Use video in live\\nlessons and update\\nyour profile photo\\nwhen needed.",
+                    isOn: $viewModel.cameraEnabled
+                )
+
+                PermissionCard(
                     icon: "bell.fill",
 					iconColor: theme.authPurple,
 					iconBackground: theme.authPurpleSoft,

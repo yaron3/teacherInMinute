@@ -2,10 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photo library to upload your teaching credentials, government ID, and selfie for identity verification.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera to take a selfie for identity verification.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>We need microphone access so students and teachers can talk during live lessons.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>We need access to your photo library to upload your profile photo, teaching credentials, government ID, and selfie for identity verification.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>We need access to your camera for profile photos, identity verification, and live lessons.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We need access to save verification documents to your photo library.</string>
 </dict>

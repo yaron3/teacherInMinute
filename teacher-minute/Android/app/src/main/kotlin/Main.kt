@@ -136,6 +136,9 @@ open class MainActivity: AppCompatActivity {
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: kotlin.Array<String>, grantResults: IntArray) {
+        if (AndroidPermissionManager.handleRequestPermissionsResult(requestCode, permissions, grantResults)) {
+            return
+        }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         logger.info("onRequestPermissionsResult: ${requestCode}")
     }

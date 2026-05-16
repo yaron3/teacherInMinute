@@ -41,6 +41,7 @@ struct UserProfileSummary {
     let role: AuthRole
     let subjects: [String]
     let createdAt: Date?
+    let profileImageURL: String
     
     init?(uid: String, data: [String: Any]) {
         let roleString = data["role"] as? String ?? ""
@@ -49,6 +50,10 @@ struct UserProfileSummary {
         self.fullName = data["fullName"] as? String ?? ""
         self.phoneNumber = data["phoneNumber"] as? String ?? ""
         self.grade = data["grade"] as? String ?? ""
+        self.profileImageURL = data["profileImageURL"] as? String
+            ?? data["profilePhotoURL"] as? String
+            ?? data["photoURL"] as? String
+            ?? ""
         self.role = roleString == AuthRole.teacher.rawValue ? .teacher : .student
         let subjectSelections = data["subjectSelections"] as? [String: [String]] ?? [:]
         self.subjects = subjectSelections

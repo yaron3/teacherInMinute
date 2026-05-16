@@ -7,14 +7,22 @@
 
 
 import SwiftUI
+#if !os(Android)
+@preconcurrency import PhotosUI
+#else
+import SkipBridge
+#endif
 
 struct ProfileView: View {
   @State var viewModel: ProfileViewModel
+#if !os(Android)
+  @State private var profilePhotoItem: PhotosPickerItem?
+#endif
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
-  init(viewModel: ProfileViewModel = ProfileViewModel(subjects: [], roleType: .student, isEditing: false, contactRows: [])) {
+  init(viewModel: ProfileViewModel = ProfileViewModel()) {
 	self._viewModel = State(initialValue: viewModel)
   }
   var body: some View {
@@ -89,64 +97,51 @@ struct ProfileView: View {
 		  .foregroundStyle(theme.appPrimaryText)
 		  .padding(.top, 30)
 		
-		VStack(spacing: 14) {
-		  ProfilePermissionRow(
-			icon: "mic.fill",
-			title: "Microphone",
-			subtitle: "Enabled",
-			iconColor: theme.appGreen,
-			isToggle: true,
-			isOn: $viewModel.microphoneEnabled
-		  )
-		  
-		  ProfilePermissionRow(
-			icon: "bell.fill",
-			title: "Notifications",
-			subtitle: "Disabled",
-			iconColor: theme.appSecondaryText,
-			isToggle: false,
-			isOn: $viewModel.notificationsEnabled,
-			actionTitle: "Manage"
-		  ) {
-			viewModel.manageNotifications()
-		  }
-		}
+			VStack(spacing: 14) {
+			  ProfilePermissionRow(
+				icon: "mic.fill",
+				title: "Microphone",
+				state: viewModel.microphoneState,
+				iconColor: viewModel.microphoneState.isGranted ? theme.appGreen : theme.appSecondaryText,
+                action: viewModel.requestMicrophonePermission
+              )
+			  
+			  ProfilePermissionRow(
+				icon: "camera.fill",
+				title: "Camera",
+				state: viewModel.cameraState,
+				iconColor: viewModel.cameraState.isGranted ? theme.appGreen : theme.appSecondaryText,
+                action: viewModel.requestCameraPermission
+              )
+
+			  ProfilePermissionRow(
+				icon: "bell.fill",
+				title: "Notifications",
+				state: viewModel.notificationsState,
+				iconColor: viewModel.notificationsState.isGranted ? theme.appGreen : theme.appSecondaryText,
+                action: viewModel.manageNotifications
+              )
+			}
 	  }
 	  .padding(.horizontal, 18)
 	  .padding(.bottom, 24)
 	}
-	.background(Color(.systemBackground))
-	.task {
-	  await viewModel.loadProfile()
-	}
-  }
-  
-  var profileHeader: some View {
-	VStack(spacing: 0) {
-	  ZStack(alignment: .bottomTrailing) {
-		Circle()
-		  .fill(theme.appPurpleSoft)
-		  .frame(width: 96, height: 96)
-		  .overlay {
-			PlatformIcon(systemName: "person.crop.circle.fill")
-			  .font(.system(size: 72))
-			  .foregroundStyle(theme.appPurple)
-		  }
-		
-		Button {
-		  viewModel.changePhoto()
-		} label: {
-		  Circle()
-			.fill(theme.appPink)
-			.frame(width: 30, height: 30)
-			.overlay {
-			  PlatformIcon(systemName: "camera.fill")
-				.font(.system(size: 12, weight: .bold))
-				.foregroundStyle(theme.appPrimaryText)
-			}
+		.background(Color(.systemBackground))
+		.task {
+		  await viewModel.loadProfile()
 		}
-		.buttonStyle(.plain)
+#if !os(Android)
+        .onChange(of: profilePhotoItem) { _, item in
+          loadProfilePhoto(item)
+        }
+#endif
 	  }
+	  
+	  var profileHeader: some View {
+	VStack(spacing: 0) {
+		  ZStack(alignment: .bottomTrailing) {
+            profilePhotoButton
+		  }
 	  
 	  Text(viewModel.name)
 		.font(.system(size: 22, weight: .bold))
@@ -168,6 +163,71 @@ struct ProfileView: View {
 		.padding(.top, 12)
 	}
 	.frame(maxWidth: .infinity)
+  }
+
+  @ViewBuilder
+  var profilePhotoButton: some View {
+#if !os(Android)
+    PhotosPicker(selection: $profilePhotoItem, matching: .images) {
+      profilePhotoContent
+    }
+    .buttonStyle(.plain)
+#else
+    Button {
+      pickAndroidProfilePhoto()
+    } label: {
+      profilePhotoContent
+    }
+    .buttonStyle(.plain)
+#endif
+  }
+
+  var profilePhotoContent: some View {
+    ZStack(alignment: .bottomTrailing) {
+      Group {
+        if let url = URL(string: viewModel.profileImageURL), !viewModel.profileImageURL.isEmpty {
+          AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+              image
+                .resizable()
+                .scaledToFill()
+            default:
+              defaultProfileIcon
+            }
+          }
+        } else {
+          defaultProfileIcon
+        }
+      }
+      .frame(width: 96, height: 96)
+      .clipShape(Circle())
+
+      Circle()
+        .fill(theme.appPink)
+        .frame(width: 30, height: 30)
+        .overlay {
+          if viewModel.isUploadingPhoto {
+            ProgressView()
+              .scaleEffect(0.7)
+              .tint(theme.appPrimaryText)
+          } else {
+            PlatformIcon(systemName: "camera.fill")
+              .font(.system(size: 12, weight: .bold))
+              .foregroundStyle(theme.appPrimaryText)
+          }
+        }
+    }
+  }
+
+  var defaultProfileIcon: some View {
+    Circle()
+      .fill(theme.appPurpleSoft)
+      .overlay {
+        PlatformIcon(systemName: "person.crop.circle.fill")
+          .font(.system(size: 72))
+          .foregroundStyle(theme.appPurple)
+      }
   }
   
   func teachingCard(
@@ -213,19 +273,61 @@ struct ProfileView: View {
 		  }
 		}
 	  }
-	}
+	  }
+  }
+
+#if !os(Android)
+  private func loadProfilePhoto(_ item: PhotosPickerItem?) {
+    guard let item else { return }
+    Task {
+      if let data = try? await item.loadTransferable(type: Data.self) {
+        viewModel.uploadProfileImage(data: data)
+      }
+    }
+  }
+#else
+  private func pickAndroidProfilePhoto() {
+    Task {
+      do {
+        let base64 = try await Task.detached(priority: .userInitiated) {
+          try AndroidProfileImagePickerBridge.pickImageBase64()
+        }.value
+        guard !base64.isEmpty, let data = Data(base64Encoded: base64) else { return }
+        viewModel.uploadProfileImage(data: data)
+      } catch {
+        viewModel.errorMessage = error.localizedDescription
+      }
+    }
+  }
+#endif
+}
+
+#if os(Android)
+private enum AndroidProfileImagePickerBridge {
+  private static let managerClass = try! JClass(name: "teacher/minute/AndroidImagePickerManager")
+  private static let pickImageBase64Method = managerClass.getStaticMethodID(
+    name: "pickImageBase64",
+    sig: "()Ljava/lang/String;"
+  )!
+
+  static func pickImageBase64() throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: pickImageBase64Method,
+        options: [.kotlincompat],
+        args: []
+      )
+    }
   }
 }
+#endif
 
 struct ProfilePermissionRow: View {
   let icon: String
   let title: String
-  let subtitle: String
+  let state: PermissionState
   let iconColor: Color
-  let isToggle: Bool
-  @Binding var isOn: Bool
-  var actionTitle: String?
-  var action: (() -> Void)?
+  let action: () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -247,27 +349,19 @@ struct ProfilePermissionRow: View {
 			.font(.system(size: 14, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
 		  
-		  Text(subtitle)
+		  Text(state.subtitle)
 			.font(.system(size: 12, weight: .semibold))
 			.foregroundStyle(iconColor)
 		}
 		
 		Spacer()
 		
-		if isToggle {
-		  Toggle("", isOn: $isOn)
-			.labelsHidden()
-			.tint(theme.appGreen)
-		} else if let actionTitle {
-		  Button {
-			action?()
-		  } label: {
-			Text(actionTitle)
-			  .font(.system(size: 13, weight: .semibold))
-			  .foregroundStyle(theme.appPink)
-		  }
-		  .buttonStyle(.plain)
-		}
+        Button(action: action) {
+          Text(state.actionTitle)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.appPink)
+        }
+        .buttonStyle(.plain)
 	  }
 	}
   }

@@ -48,8 +48,15 @@ final class UserService {
   }
   
   func fetchProfileSummary(uid: String) async throws -> UserProfileSummary? {
-	guard let data = try await fetchRaw(uid: uid) else { return nil }
-	return UserProfileSummary(uid: uid, data: data)
+		guard let data = try await fetchRaw(uid: uid) else { return nil }
+		return UserProfileSummary(uid: uid, data: data)
+  }
+
+  func updateProfileFields(uid: String, fields: [String: String]) async throws {
+    guard !fields.isEmpty else { return }
+    let db = Firestore.firestore()
+    try await db.collection("users").document(uid).setData(fields, merge: true)
+    logger.info("Updated profile fields for uid: \(uid)")
   }
   
   func deleteUserData(uid: String) async throws {

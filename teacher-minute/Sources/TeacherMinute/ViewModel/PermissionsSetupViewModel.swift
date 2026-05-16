@@ -12,13 +12,24 @@ import Observation
 @MainActor
 final class PermissionsSetupViewModel {
     var microphoneEnabled = true
+    var cameraEnabled = true
     var notificationsEnabled = true
 
     var onContinue: (() -> Void)?
 
     func continueSetup() {
-        // TODO: request actual system permissions
-        onContinue?()
+        Task {
+            if microphoneEnabled {
+                microphoneEnabled = await PermissionService.shared.requestCapturePermission(for: .microphone) == .granted
+            }
+            if cameraEnabled {
+                cameraEnabled = await PermissionService.shared.requestCapturePermission(for: .camera) == .granted
+            }
+            if notificationsEnabled {
+                notificationsEnabled = await PermissionService.shared.requestNotifications() == .granted
+            }
+            onContinue?()
+        }
     }
 
     func limitedMode() {

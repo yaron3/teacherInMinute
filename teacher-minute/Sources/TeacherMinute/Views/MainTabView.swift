@@ -91,7 +91,7 @@ struct MainTabView: View {
             }
 
         case .profile:
-            ProfileView()
+            ProfileView(viewModel: ProfileViewModel(roleType: viewModel.userMode == .teacher ? .teacher : .student))
 
         case .settings:
 			SettingsView(role: viewModel.userMode, viewModel: nil)
