@@ -1,14 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
+	<dict>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m</string>
+				</array>
+			</dict>
+		</array>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>We need microphone access so students and teachers can talk during live lessons.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>We need access to your photo library to upload your profile photo, teaching credentials, government ID, and selfie for identity verification.</string>
 		<key>NSCameraUsageDescription</key>
 		<string>We need access to your camera for profile photos, identity verification, and live lessons.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>We need access to save verification documents to your photo library.</string>
-</dict>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>We need access to save verification documents to your photo library.</string>
+	</dict>
 </plist>

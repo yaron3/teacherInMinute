@@ -111,6 +111,9 @@ open class MainActivity: AppCompatActivity {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (AndroidGoogleSignInManager.handleActivityResult(requestCode, resultCode, data)) {
+            return
+        }
         if (AndroidImagePickerManager.handleActivityResult(requestCode, resultCode, data)) {
             return
         }

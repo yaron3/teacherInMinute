@@ -114,8 +114,17 @@ final class CreateAccountViewModel {
 	  }
 	}
 #endif
-#if skip
-	AndroidGoogleAuth().signIn()
+#if os(Android)
+		print("Android Google sign-up tapped")
+		Task {
+		  do {
+			_ = try await AndroidGoogleAuth().signIn()
+			navigateToChooseRole = true
+		  } catch {
+			alertMessage = error.localizedDescription
+			showAlert = true
+		  }
+		}
 #endif
   }
   

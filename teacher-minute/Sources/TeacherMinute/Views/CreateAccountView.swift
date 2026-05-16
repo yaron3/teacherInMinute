@@ -113,12 +113,12 @@ struct CreateAccountView: View {
 	VStack(alignment: .leading, spacing: 9) {
 	  Text(title)
 		.font(.system(size: 14, weight: .semibold))
-		.foregroundStyle(Color(hex: "#111827"))
+		.foregroundStyle(theme.authPrimaryText)
 	  
 	  HStack(spacing: 12) {
 		PlatformIcon(systemName: icon)
 		  .font(.system(size: 15, weight: .medium))
-		  .foregroundStyle(isValid ? Color(hex: "#9CA3AF") : theme.red.opacity(0.8))
+		  .foregroundStyle(isValid ? theme.authIcon : theme.red.opacity(0.8))
 		  .frame(width: 20)
 		
 		Group {
@@ -131,33 +131,33 @@ struct CreateAccountView: View {
 		  }
 		}
 		.font(.system(size: 16))
-		.foregroundStyle(Color(hex: "#111827"))
+		.foregroundStyle(theme.authPrimaryText)
 		.focused($focusedField, equals: field)
 		
 		if let trailingIcon {
 		  Button { trailingAction?() } label: {
 			PlatformIcon(systemName: trailingIcon)
 			  .font(.system(size: 16, weight: .medium))
-			  .foregroundStyle(Color(hex: "#9CA3AF"))
+			  .foregroundStyle(theme.authIcon)
 		  }
 		}
 	  }
 	  .padding(.horizontal, 16)
 	  .frame(height: 56)
-	  .background(
-		RoundedRectangle(cornerRadius: 16)
-		  .fill(Color(hex: "#F9FAFB"))
-		  .overlay(
-			RoundedRectangle(cornerRadius: 16)
-			  .stroke(isValid ? Color(hex: "#EEF2F7") : theme.red.opacity(0.5), lineWidth: 1.5)
-		  )
-	  )
+		.background(
+		  RoundedRectangle(cornerRadius: 16)
+			.fill(theme.authFieldBackground)
+			.overlay(
+			  RoundedRectangle(cornerRadius: 16)
+				.stroke(isValid ? theme.authFieldBorder : theme.red.opacity(0.5), lineWidth: 1.5)
+			)
+		)
 	  
 	  if !isValid {
-		Text(field == .email ? "Enter a valid email address." : "Must be at least 6 characters.")
-		  .font(.system(size: 11))
-		  .foregroundStyle(.red)
-		  .padding(.leading, 4)
+			Text(field == .email ? "Enter a valid email address." : "Must be at least 6 characters.")
+			  .font(.system(size: 11))
+			  .foregroundStyle(theme.red)
+			  .padding(.leading, 4)
 	  }
 	}
   }
@@ -174,15 +174,15 @@ struct CreateAccountView: View {
   
   func checkboxRow(isOn: Binding<Bool>, text: String = "", isTermsRow: Bool = false) -> some View {
 	HStack(alignment: .top, spacing: 12) {
-	  Button { isOn.wrappedValue.toggle() } label: {
-		ZStack {
-		  RoundedRectangle(cornerRadius: 4)
-			.fill(isOn.wrappedValue ? Color(hex: "#EC4899") : theme.appCardBackground)
-			.frame(width: 18, height: 18)
-			.overlay(
+		  Button { isOn.wrappedValue.toggle() } label: {
+			ZStack {
 			  RoundedRectangle(cornerRadius: 4)
-				.stroke(isOn.wrappedValue ? Color(hex: "#EC4899") : Color(hex: "#CBD5E1"), lineWidth: 1)
-			)
+				.fill(isOn.wrappedValue ? theme.authPink : theme.appCardBackground)
+				.frame(width: 18, height: 18)
+				.overlay(
+				  RoundedRectangle(cornerRadius: 4)
+					.stroke(isOn.wrappedValue ? theme.authPink : theme.appBorder, lineWidth: 1)
+				)
 		  if isOn.wrappedValue {
 			PlatformIcon(systemName: "checkmark")
 			  .font(.system(size: 11, weight: .bold))
@@ -194,23 +194,23 @@ struct CreateAccountView: View {
 	  
 	  if isTermsRow { termsTextView() }
 	  else {
-		Text(text)
-		  .font(.system(size: 14))
-		  .lineSpacing(4)
-		  .foregroundStyle(Color(hex: "#6B7280"))
-	  }
+			Text(text)
+			  .font(.system(size: 14))
+			  .lineSpacing(4)
+			  .foregroundStyle(theme.authSecondaryText)
+		  }
 	}
   }
   
-  func termsTextView() -> some View {
-	VStack(alignment: .leading, spacing: 2) {
-	  HStack(spacing: 0) {
-		Text("I agree to the ").foregroundStyle(Color(hex: "#6B7280"))
-		Text("Terms of Service").foregroundStyle(Color(hex: "#EC4899"))
-		Text(" and").foregroundStyle(Color(hex: "#6B7280"))
+	func termsTextView() -> some View {
+	  VStack(alignment: .leading, spacing: 2) {
+		HStack(spacing: 0) {
+			Text("I agree to the ").foregroundStyle(theme.authSecondaryText)
+			Text("Terms of Service").foregroundStyle(theme.authPink)
+			Text(" and").foregroundStyle(theme.authSecondaryText)
+		}
+		Text("Privacy Policy.").foregroundStyle(theme.authPink)
 	  }
-	  Text("Privacy Policy.").foregroundStyle(Color(hex: "#EC4899"))
-	}
 	.font(.system(size: 14))
 	.lineSpacing(4)
   }
@@ -230,25 +230,25 @@ struct CreateAccountView: View {
 	  }
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 56)
-	  .background(
-		Capsule()
-		  .fill(viewModel.canSubmit ? Color(hex: "#EC4899") : Color(hex: "#EC4899").opacity(0.45))
-		  .shadow(color: Color(hex: "#EC4899").opacity(viewModel.canSubmit ? 0.28 : 0), radius: 14, x: 0, y: 8)
-	  )
+		.background(
+			Capsule()
+			  .fill(viewModel.canSubmit ? theme.authPink : theme.authPink.opacity(0.45))
+			  .shadow(color: theme.authPink.opacity(viewModel.canSubmit ? 0.28 : 0), radius: 14, x: 0, y: 8)
+		)
 	}
 	.disabled(viewModel.isLoading)
 	.padding(.top, 4)
   }
   
-  var dividerSection: some View {
-	HStack(spacing: 16) {
-	  Rectangle().fill(Color(hex: "#E5E7EB")).frame(height: 1)
-	  Text("Or continue with")
-		.font(.system(size: 14))
-		.foregroundStyle(Color(hex: "#6B7280"))
-		.lineLimit(1)
-	  Rectangle().fill(Color(hex: "#E5E7EB")).frame(height: 1)
-	}
+	var dividerSection: some View {
+	  HStack(spacing: 16) {
+		Rectangle().fill(theme.authDivider).frame(height: 1)
+		Text("Or continue with")
+		  .font(.system(size: 14))
+		  .foregroundStyle(theme.authSecondaryText)
+		  .lineLimit(1)
+		Rectangle().fill(theme.authDivider).frame(height: 1)
+	  }
 	.padding(.horizontal, 16)
   }
   
@@ -269,24 +269,24 @@ struct CreateAccountView: View {
 		Text(type == .google ? "Google" : "Apple")
 		  .font(.system(size: 15, weight: .semibold))
 	  }
-	  .foregroundStyle(Color(hex: "#111827"))
+	  .foregroundStyle(theme.authPrimaryText)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 54)
 	  .background(
-		RoundedRectangle(cornerRadius: 14)
-		  .fill(theme.appCardBackground)
-		  .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#E5E7EB"), lineWidth: 1))
-		  .shadow(color: theme.appPrimaryText.opacity(0.025), radius: 6, x: 0, y: 4)
+		  RoundedRectangle(cornerRadius: 14)
+			.fill(theme.appGrayBackground)
+			.overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.authSocialBorder, lineWidth: 1))
+			.shadow(color: theme.appPrimaryText.opacity(0.025), radius: 6, x: 0, y: 4)
 	  )
 	}
   }
   
-  var bottomLoginSection: some View {
-	HStack(spacing: 4) {
-	  Text("Already have an account?").foregroundStyle(Color(hex: "#6B7280"))
-	  Button { router.push(.login) } label: {
-		Text("Log In").foregroundStyle(Color(hex: "#EC4899"))
-	  }
+	var bottomLoginSection: some View {
+	  HStack(spacing: 4) {
+		Text("Already have an account?").foregroundStyle(theme.authSecondaryText)
+		Button { router.push(.login) } label: {
+			Text("Log In").foregroundStyle(theme.authPink)
+		}
 	}
 	.font(.system(size: 14))
 	.padding(.bottom, 18)

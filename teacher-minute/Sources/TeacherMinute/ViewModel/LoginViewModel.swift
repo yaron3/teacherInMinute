@@ -79,8 +79,15 @@ final class LoginViewModel {
 	  }
 	}
 #endif
-#if skip
-	AndroidGoogleAuth().signIn()
+#if os(Android)
+		print("Android Google login tapped")
+		Task {
+		  do {
+			_ = try await AndroidGoogleAuth().signIn()
+		  } catch {
+			present(message: error.localizedDescription)
+		  }
+		}
 #endif
   }
   
