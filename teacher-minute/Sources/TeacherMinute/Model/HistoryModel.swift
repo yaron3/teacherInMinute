@@ -24,6 +24,15 @@ struct HistoryLesson: Identifiable, Hashable {
     let teacherEarningsCents: Int
 }
 
+struct LessonMessage: Identifiable {
+	let id: String
+    let text: String
+	let senderRole: String
+    let kind: String
+    let senderUid: String
+    let createdAt: Date
+}
+
 @MainActor
 final class HistoryModel {
     static let shared = HistoryModel()
@@ -176,5 +185,65 @@ final class HistoryModel {
         }
 
         return 0
+    }
+
+    func fetchQuestionText(questionId: String) async throws -> String {
+        let snapshot = try await Firestore.firestore()
+            .collection("questions").document(questionId).getDocument()
+        guard let data = snapshot.data() else { return "" }
+        return Self.firstString(in: data, keys: ["text", "questionText", "originalQuestion", "message"])
+    }
+
+    func fetchLessonMessages(questionId: String) async throws -> [LessonMessage] {
+        let snapshot = try await Firestore.firestore()
+            .collection("questions")
+            .document(questionId)
+            .getDocument()
+        guard let data = snapshot.data() else { return [] }
+
+        return Self.lessonMessages(from: data["messages"])
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
+    private static func lessonMessages(from value: Any?) -> [LessonMessage] {
+        if let messages = value as? [[String: Any]] {
+            return messages.enumerated().compactMap { index, data in
+                lessonMessage(id: String(index), data: data)
+            }
+        }
+
+        if let messages = value as? [Any] {
+            return messages.enumerated().compactMap { index, value in
+                guard let data = value as? [String: Any] else { return nil }
+                return lessonMessage(id: String(index), data: data)
+            }
+        }
+
+        if let messages = value as? [String: Any] {
+            return messages.compactMap { id, value in
+                guard let data = value as? [String: Any] else { return nil }
+                return lessonMessage(id: id, data: data)
+            }
+        }
+
+        return []
+    }
+
+    private static func lessonMessage(id fallbackId: String, data: [String: Any]) -> LessonMessage? {
+        let text = firstString(in: data, keys: ["text", "message", "imageUrl", "photoUrl", "url"])
+        guard !text.isEmpty else { return nil }
+
+        let messageId = firstString(in: data, keys: ["id", "messageId"])
+        let senderRole = firstString(in: data, keys: ["senderRole", "role"])
+        let kind = firstString(in: data, keys: ["kind", "type"])
+
+        return LessonMessage(
+            id: messageId.isEmpty ? fallbackId : messageId,
+            text: text,
+            senderRole: senderRole.isEmpty ? "student" : senderRole,
+            kind: kind.isEmpty ? "text" : kind,
+            senderUid: firstString(in: data, keys: ["senderUid", "senderId", "uid"]),
+            createdAt: dateValue(data["createdAt"]) ?? Date.distantPast
+        )
     }
 }
