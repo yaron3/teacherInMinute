@@ -10,7 +10,9 @@ import SwiftUI
 
 struct TeacherSubjectsView: View {
   @State var viewModel = TeacherSubjectsViewModel()
+  var isEditing = false
   @Environment(\.appRouter) var router
+  @Environment(\.dismiss) var dismiss
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -18,10 +20,12 @@ struct TeacherSubjectsView: View {
   var body: some View {
 	ScrollView {
 	  VStack(alignment: .leading, spacing: 0) {
-		Text("Step 2 of 2")
-		  .font(.system(size: 13, weight: .medium))
-		  .foregroundStyle(theme.authSecondaryText)
-		  .frame(maxWidth: .infinity)
+		if !isEditing {
+		  Text("Step 2 of 2")
+			.font(.system(size: 13, weight: .medium))
+			.foregroundStyle(theme.authSecondaryText)
+			.frame(maxWidth: .infinity)
+		}
 		
 			Text("What can you teach?")
 			  .font(.system(size: 26, weight: .bold))
@@ -106,10 +110,10 @@ struct TeacherSubjectsView: View {
 				  }
 				  .padding(.top, 28)
 				}
-			
+			Spacer()
 			AuthPrimaryButton(
-		  title: "Continue to Onboarding",
-		  systemImage: "arrow.right",
+		  title: isEditing ? "Save Changes" : "Continue to Onboarding",
+		  systemImage: isEditing ? "checkmark" : "arrow.right",
 		  isEnabled: viewModel.canContinue
 		) {
 		  viewModel.continueOnboarding()
@@ -122,8 +126,21 @@ struct TeacherSubjectsView: View {
 	.background(Color(.systemBackground))
 	.navigationBarTitleDisplayMode(.inline)
 	.onAppear {
-	  viewModel.onContinue = { router.push(.completeProfile(role: .teacher)) }
-	  viewModel.checkAndAutoAdvance()
+	  if isEditing {
+		viewModel.onContinue = { dismiss() }
+		viewModel.loadSelections()
+	  } else {
+		viewModel.onContinue = { router.push(.completeProfile(role: .teacher)) }
+		viewModel.checkAndAutoAdvance()
+	  }
+	}
+	.navigationTitle(isEditing ? "Edit Subjects" : "")
+	.toolbar {
+	  if isEditing {
+		ToolbarItem(placement: .cancellationAction) {
+		  Button("Cancel") { dismiss() }
+		}
+	  }
 	}
 	.overlay {
 	  if viewModel.isCheckingCompletion {
@@ -180,10 +197,10 @@ struct SubjectAreaChip: View {
 		Text(area.title)
 		  .font(.system(size: 13, weight: .medium))
 	  }
-	  .foregroundStyle(isSelected ? .white : theme.authPrimaryText)
+	  .foregroundStyle(theme.authPrimaryText)
 	  .padding(.horizontal, 14)
 	  .frame(height: 34)
-	  .background(isSelected ? theme.authPink : .white)
+	  .background(isSelected ? theme.authPink : theme.authPinkSoft)
 	  .clipShape(Capsule())
 	  .overlay {
 		Capsule()

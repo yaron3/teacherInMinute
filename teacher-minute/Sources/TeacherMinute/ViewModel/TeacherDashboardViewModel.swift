@@ -11,6 +11,7 @@ import Foundation
 
 #if !os(Android)
 import FirebaseAuth
+import AVFoundation
 #else
 import SkipFirebaseAuth
 #endif
@@ -49,6 +50,40 @@ final class TeacherDashboardViewModel {
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
   var isAcceptingCalls = false
+  var isVerified = false
+  var subjects: [String] = []
+  var todayEarningsCents = 0
+  var todayMinutesTutored = 0
+  var weekEarningsCents = 0
+  var weekMinutesTutored = 0
+  var lastWeekEarningsCents = 0
+  var ratePerMinuteCents = 50
+  var hasMicAccess = false
+  var hasCameraAccess = false
+  var showsSubjectEditor = false
+
+  var formattedTodayEarnings: String {
+    Self.formatCents(todayEarningsCents)
+  }
+
+  var formattedWeekEarnings: String {
+    Self.formatCents(weekEarningsCents)
+  }
+
+  var formattedRate: String {
+    Self.formatCents(ratePerMinuteCents)
+  }
+
+  var weekChangeText: String? {
+    guard lastWeekEarningsCents > 0 else { return nil }
+    let change = Int(((Double(weekEarningsCents) - Double(lastWeekEarningsCents)) / Double(lastWeekEarningsCents) * 100).rounded())
+    let sign = change >= 0 ? "+" : ""
+    return "\(sign)\(change)% vs last week"
+  }
+
+  var subjectsDisplayText: String {
+    subjects.isEmpty ? "No subjects selected" : subjects.joined(separator: ", ")
+  }
 
   // MARK: - Private
 
@@ -366,7 +401,17 @@ final class TeacherDashboardViewModel {
   }
 
   func editSubjects() {
-    // TODO: navigate to subject edit screen
+    showsSubjectEditor = true
+  }
+
+  func reloadSubjects() {
+    guard let uid = Auth.auth().currentUser?.uid else { return }
+    Task {
+      if let data = try? await UserService.shared.fetchRaw(uid: uid) {
+        let summary = UserProfileSummary(uid: uid, data: data)
+        subjects = summary?.subjects ?? []
+      }
+    }
   }
 
   func activeChatInitialDetails() -> ChatSessionDetails {
@@ -406,8 +451,65 @@ final class TeacherDashboardViewModel {
   private func loadProfile(uid: String) async {
     guard !didLoadProfile else { return }
     didLoadProfile = true
-    if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
-      teacherName = profile.displayName
+
+    if let data = try? await UserService.shared.fetchRaw(uid: uid) {
+      let summary = UserProfileSummary(uid: uid, data: data)
+      teacherName = summary?.displayName ?? "Teacher"
+      subjects = summary?.subjects ?? []
+      isVerified = data["isVerified"] as? Bool ?? false
+      ratePerMinuteCents = Self.intValue(data["ratePerMinuteCents"]) ?? 50
     }
+
+    checkPermissions()
+    await loadEarnings(uid: uid)
+  }
+
+  private func loadEarnings(uid: String) async {
+    let lessons = (try? await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)) ?? []
+
+    let calendar = Calendar.current
+    let now = Date()
+    let startOfToday = calendar.startOfDay(for: now)
+    guard let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)),
+          let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfWeek) else { return }
+
+    var todayEarnings = 0
+    var todayMinutes = 0
+    var weekEarnings = 0
+    var weekMinutes = 0
+    var lastWeekEarnings = 0
+
+    for lesson in lessons {
+      let date = lesson.acceptedAt
+      if date >= startOfToday {
+        todayEarnings += lesson.teacherEarningsCents
+        todayMinutes += max(1, lesson.durationSeconds / 60)
+      }
+      if date >= startOfWeek {
+        weekEarnings += lesson.teacherEarningsCents
+        weekMinutes += max(1, lesson.durationSeconds / 60)
+      }
+      if date >= startOfLastWeek && date < startOfWeek {
+        lastWeekEarnings += lesson.teacherEarningsCents
+      }
+    }
+
+    todayEarningsCents = todayEarnings
+    todayMinutesTutored = todayMinutes
+    weekEarningsCents = weekEarnings
+    weekMinutesTutored = weekMinutes
+    lastWeekEarningsCents = lastWeekEarnings
+  }
+
+  private func checkPermissions() {
+#if !os(Android)
+    hasMicAccess = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    hasCameraAccess = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+#endif
+  }
+
+  private static func formatCents(_ cents: Int) -> String {
+    let dollars = Double(cents) / 100.0
+    return String(format: "$%.2f", dollars)
   }
 }

@@ -18,7 +18,7 @@ struct ChatBubble: View {
       VStack(alignment: message.isMine ? .trailing : .leading, spacing: 5) {
         Text(message.text)
           .font(.system(size: 14))
-          .foregroundStyle(message.isMine ? .white : theme.appPrimaryText)
+          .foregroundStyle(message.isMine ?theme.appCardBackground: theme.appPrimaryText)
           .lineSpacing(3)
           .padding(.horizontal, 14)
           .padding(.vertical, 12)

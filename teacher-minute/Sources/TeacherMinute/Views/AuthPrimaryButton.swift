@@ -174,10 +174,10 @@ struct SubjectChip: View {
                 Text(subject.title)
                     .font(.system(size: 13, weight: .medium))
             }
-            .foregroundStyle(isSelected ? .white : theme.authPrimaryText)
+			.foregroundStyle(theme.authPrimaryText)
             .padding(.horizontal, 14)
             .frame(height: 34)
-            .background(isSelected ? theme.authPink : .white)
+			.background(isSelected ? theme.authPink : theme.authPinkSoft)
             .clipShape(Capsule())
             .overlay {
                 Capsule()
@@ -187,3 +187,10 @@ struct SubjectChip: View {
         .buttonStyle(.plain)
     }
 }
+#if os(iOS)
+struct SubjectChipScreens_Previews: PreviewProvider {
+  static var previews: some View {
+	SubjectChip(subject: SubjectOption(title: "test", systemImage: "test"), isSelected: true, action: {})
+  }
+}
+#endif

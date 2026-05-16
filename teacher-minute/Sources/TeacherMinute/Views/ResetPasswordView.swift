@@ -103,7 +103,7 @@ struct ResetPasswordView: View {
                     .foregroundStyle(theme.authPrimaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
-                    .background(viewModel.method == .email ? .white : .clear)
+                    .background(viewModel.method == .email ?theme.appCardBackground: .clear)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
 
@@ -117,7 +117,7 @@ struct ResetPasswordView: View {
                     .foregroundStyle(theme.authSecondaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
-                    .background(viewModel.method == .phone ? .white : .clear)
+                    .background(viewModel.method == .phone ?theme.appCardBackground: .clear)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }

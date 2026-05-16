@@ -118,20 +118,31 @@ final class TeacherSubjectsViewModel {
 	Task {
 	  defer { isCheckingCompletion = false }
 	  await loadSubjectCatalog()
-	  guard let uid = Auth.auth().currentUser?.uid else { return }
-	  let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
-	  guard let selections = data["subjectSelections"] as? [String: [String]], !selections.isEmpty else { return }
-	  
-	  for area in subjectAreas {
-		let savedSubtopics = selections[area.title] ?? []
-		guard !savedSubtopics.isEmpty else { continue }
-		selectedAreaIDs.insert(area.id)
-		selectedSubtopicTitlesByArea[area.id] = Set(area.subtopics.map(\.title).filter { savedSubtopics.contains($0) })
-	  }
-	  
+	  await restoreExistingSelections()
 	  if canContinue {
 		onContinue?()
 	  }
+	}
+  }
+
+  func loadSelections() {
+	Task {
+	  defer { isCheckingCompletion = false }
+	  await loadSubjectCatalog()
+	  await restoreExistingSelections()
+	}
+  }
+
+  private func restoreExistingSelections() async {
+	guard let uid = Auth.auth().currentUser?.uid else { return }
+	let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+	guard let selections = data["subjectSelections"] as? [String: [String]], !selections.isEmpty else { return }
+
+	for area in subjectAreas {
+	  let savedSubtopics = selections[area.title] ?? []
+	  guard !savedSubtopics.isEmpty else { continue }
+	  selectedAreaIDs.insert(area.id)
+	  selectedSubtopicTitlesByArea[area.id] = Set(area.subtopics.map(\.title).filter { savedSubtopics.contains($0) })
 	}
   }
   

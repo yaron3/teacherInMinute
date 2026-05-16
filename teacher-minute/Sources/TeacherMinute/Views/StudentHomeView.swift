@@ -272,7 +272,7 @@ struct AskTeacherSheet: View {
                                 } label: {
                                     Text(topic.capitalized)
                                         .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(selectedTopic == topic ? .white : theme.appPrimaryText)
+                                        .foregroundStyle(selectedTopic == topic ?theme.appCardBackground: theme.appPrimaryText)
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
                                         .background(selectedTopic == topic ? theme.appPink : theme.appGrayBackground)
@@ -379,7 +379,7 @@ struct ConversationTypeChip: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isSelected ? .white : theme.appPrimaryText)
+                .foregroundStyle(isSelected ?theme.appCardBackground: theme.appPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .padding(.horizontal, 12)
@@ -589,7 +589,7 @@ struct PricingCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 SmallPill(
                     title: option.name,
-					foreground: option.isHighlighted ? .white : theme.appPink,
+					foreground: option.isHighlighted ?theme.appCardBackground: theme.appPink,
                     background: option.isHighlighted ? theme.appPurple : theme.appPinkSoft
                 )
 
@@ -614,7 +614,7 @@ struct PricingCard: View {
                 Button(action: action) {
                     Text("Select Tier")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(option.isHighlighted ? .white : theme.appPrimaryText)
+                        .foregroundStyle(option.isHighlighted ?theme.appCardBackground: theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
                         .background(option.isHighlighted ? theme.appPurple : theme.appGrayBackground)

@@ -210,7 +210,7 @@ struct StudentLessonHistoryRow: View {
                     LessonActionButton(
                         title: isPlaying ? "Pause" : "Listen",
                         systemImage: isPlaying ? "pause.fill" : "play.fill",
-                        foreground: lesson.hasAudio ? .white : theme.appSecondaryText,
+                        foreground: lesson.hasAudio ?theme.appCardBackground: theme.appSecondaryText,
                         background: lesson.hasAudio ? theme.appPink : theme.appGrayBackground,
                         action: audioAction
                     )
@@ -283,7 +283,7 @@ struct StudentLessonDetailView: View {
                     LessonActionButton(
                         title: isPlaying ? "Pause Audio" : "Listen to Lesson",
                         systemImage: isPlaying ? "pause.fill" : "play.fill",
-                        foreground: lesson.hasAudio ? .white : theme.appSecondaryText,
+                        foreground: lesson.hasAudio ?theme.appCardBackground: theme.appSecondaryText,
                         background: lesson.hasAudio ? theme.appPink : theme.appGrayBackground,
                         action: audioAction
                     )
