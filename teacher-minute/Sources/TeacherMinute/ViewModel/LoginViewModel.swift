@@ -73,7 +73,19 @@ final class LoginViewModel {
 #if canImport(UIKit)
 	iOSGoogleSignInProvider().signIn { [weak self] result in
 	  switch result {
-		case .success: break   // TODO: resolve route the same way
+		case .success:
+		  Task { @MainActor in
+			guard let uid = Auth.auth().currentUser?.uid else {
+			  self?.present(message: "Could not retrieve user session. Please try again.")
+			  return
+			}
+			do {
+			  let resume = try await UserService.shared.resumeRoute(uid: uid)
+			  self?.destination = AppRoute.resumeDestination(for: resume)
+			} catch {
+			  self?.present(message: error.localizedDescription)
+			}
+		  }
 		case .failure(let error):
 		  Task { @MainActor in self?.present(message: error.localizedDescription) }
 	  }
@@ -84,6 +96,12 @@ final class LoginViewModel {
 		Task {
 		  do {
 			_ = try await AndroidGoogleAuth().signIn()
+			guard let uid = Auth.auth().currentUser?.uid else {
+			  present(message: "Could not retrieve user session. Please try again.")
+			  return
+			}
+			let resume = try await UserService.shared.resumeRoute(uid: uid)
+			destination = AppRoute.resumeDestination(for: resume)
 		  } catch {
 			present(message: error.localizedDescription)
 		  }

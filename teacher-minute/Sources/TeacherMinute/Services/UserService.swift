@@ -73,6 +73,7 @@ final class UserService {
 	}
 	
 	let roleString = data["role"] as? String ?? ""
+	guard !roleString.isEmpty else { return .chooseRole }
 	let role: AuthRole = roleString == "teacher" ? .teacher : .student
 	
 	// Profile completeness: fullName + phoneNumber + dateOfBirth required for both roles

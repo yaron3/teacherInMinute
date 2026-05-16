@@ -8,6 +8,12 @@
 import SwiftUI
 import Observation
 
+#if !os(Android)
+import FirebaseAuth
+#else
+import SkipFirebaseAuth
+#endif
+
 // MARK: - Validation errors
 
 enum SignupValidationError: LocalizedError {
@@ -48,7 +54,9 @@ final class CreateAccountViewModel {
   var sendUpdates     = false
   var isLoading       = false
   var navigateToChooseRole = false
-  
+
+  var destination: AppRoute?
+
   // Alert state
   var alertMessage: String?
   var showAlert       = false
@@ -105,12 +113,17 @@ final class CreateAccountViewModel {
   
   func signupWithGoogle() {
 #if canImport(UIKit)
-	iOSGoogleSignInProvider().signIn { result in
+	iOSGoogleSignInProvider().signIn { [weak self] result in
 	  switch result {
-		case .success(let credential):
-		  print("Google sign up successful: \(credential)")
+		case .success:
+		  Task { @MainActor in
+			await self?.resolveRouteAfterSocialSignIn()
+		  }
 		case .failure(let error):
-		  print("Google sign up failed: \(error)")
+		  Task { @MainActor in
+			self?.alertMessage = error.localizedDescription
+			self?.showAlert = true
+		  }
 	  }
 	}
 #endif
@@ -119,7 +132,7 @@ final class CreateAccountViewModel {
 		Task {
 		  do {
 			_ = try await AndroidGoogleAuth().signIn()
-			navigateToChooseRole = true
+			await resolveRouteAfterSocialSignIn()
 		  } catch {
 			alertMessage = error.localizedDescription
 			showAlert = true
@@ -133,7 +146,9 @@ final class CreateAccountViewModel {
 		iOSAppleSignInProvider().signIn { [weak self] result in
 		  switch result {
 			case .success:
-			  Task { @MainActor in self?.navigateToChooseRole = true }
+			  Task { @MainActor in
+				await self?.resolveRouteAfterSocialSignIn()
+			  }
 			case .failure(let error):
 			  Task { @MainActor in
 				self?.alertMessage = error.localizedDescription
@@ -146,13 +161,28 @@ final class CreateAccountViewModel {
 		Task {
 		  do {
 			_ = try await AndroidAppleAuth().signIn()
-			navigateToChooseRole = true
+			await resolveRouteAfterSocialSignIn()
 		  } catch {
 			alertMessage = error.localizedDescription
 			showAlert = true
 		  }
 		}
 #endif
+  }
+
+  private func resolveRouteAfterSocialSignIn() async {
+	guard let uid = Auth.auth().currentUser?.uid else {
+	  alertMessage = "Could not retrieve user session. Please try again."
+	  showAlert = true
+	  return
+	}
+	do {
+	  let resume = try await UserService.shared.resumeRoute(uid: uid)
+	  destination = AppRoute.resumeDestination(for: resume)
+	} catch {
+	  alertMessage = error.localizedDescription
+	  showAlert = true
+	}
   }
   
   // MARK: - Helpers
