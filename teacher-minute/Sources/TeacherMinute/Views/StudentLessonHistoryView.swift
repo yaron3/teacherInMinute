@@ -158,7 +158,7 @@ struct HistoryMetricCard: View {
 }
 
 struct StudentLessonHistoryRow: View {
-    let lesson: StudentLessonHistoryItem
+    let lesson: LessonHistoryItem
     let isPlaying: Bool
     let viewAction: () -> Void
     let audioAction: () -> Void
@@ -184,14 +184,14 @@ struct StudentLessonHistoryRow: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(theme.appPrimaryText)
                         
-                        Text("\(lesson.teacher) • \(lesson.completedAt)")
+                        Text("\(lesson.otherParticipant) • \(lesson.completedAt)")
                             .font(.system(size: 11))
                             .foregroundStyle(theme.appSecondaryText)
                     }
                     
                     Spacer()
                     
-                    Text(lesson.price)
+                    Text(lesson.amount)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
                 }
@@ -262,7 +262,7 @@ struct LessonActionButton: View {
 }
 
 struct StudentLessonDetailView: View {
-    let lesson: StudentLessonHistoryItem
+    let lesson: LessonHistoryItem
     let isPlaying: Bool
     let audioAction: () -> Void
   @Environment(\.colorScheme) var colorScheme
@@ -278,7 +278,7 @@ struct StudentLessonDetailView: View {
                             .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(theme.appPrimaryText)
                         
-                        Text("\(lesson.teacher) • \(lesson.completedAt) • \(lesson.duration)")
+                        Text("\(lesson.otherParticipant) • \(lesson.completedAt) • \(lesson.duration)")
                             .font(.system(size: 13))
                             .foregroundStyle(theme.appSecondaryText)
                     }

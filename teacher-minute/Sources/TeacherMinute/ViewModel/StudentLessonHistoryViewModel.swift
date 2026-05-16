@@ -14,14 +14,14 @@ import FirebaseAuth
 import SkipFirebaseAuth
 #endif
 
-struct StudentLessonHistoryItem: Identifiable, Hashable {
+struct LessonHistoryItem: Identifiable, Hashable {
     let id = UUID()
     let questionId: String
     let title: String
-    let teacher: String
+    let otherParticipant: String
     let completedAt: String
     let duration: String
-    let price: String
+    let amount: String
     let summary: String
     let transcriptPreview: String
     let hasAudio: Bool
@@ -32,18 +32,18 @@ struct StudentLessonHistoryItem: Identifiable, Hashable {
 final class StudentLessonHistoryViewModel {
     var studentName = "Student"
     var query = ""
-    var selectedLesson: StudentLessonHistoryItem?
-    var playingLessonID: StudentLessonHistoryItem.ID?
+    var selectedLesson: LessonHistoryItem?
+    var playingLessonID: LessonHistoryItem.ID?
     var totalTimeLearnedText = "0 min"
 
-    var lessons: [StudentLessonHistoryItem] = []
+    var lessons: [LessonHistoryItem] = []
     
-    var filteredLessons: [StudentLessonHistoryItem] {
+    var filteredLessons: [LessonHistoryItem] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else { return lessons }
         return lessons.filter { lesson in
             lesson.title.localizedCaseInsensitiveContains(trimmedQuery)
-            || lesson.teacher.localizedCaseInsensitiveContains(trimmedQuery)
+            || lesson.otherParticipant.localizedCaseInsensitiveContains(trimmedQuery)
             || lesson.summary.localizedCaseInsensitiveContains(trimmedQuery)
         }
     }
@@ -54,21 +54,21 @@ final class StudentLessonHistoryViewModel {
     
     var totalSpendText: String {
         let total = lessons.reduce(0.0) { partialResult, lesson in
-            partialResult + (Double(lesson.price.replacingOccurrences(of: "$", with: "")) ?? 0)
+            partialResult + (Double(lesson.amount.replacingOccurrences(of: "$", with: "")) ?? 0)
         }
         return total.formatted(.currency(code: "USD"))
     }
     
-    func view(_ lesson: StudentLessonHistoryItem) {
+    func view(_ lesson: LessonHistoryItem) {
         selectedLesson = lesson
     }
     
-    func toggleAudio(for lesson: StudentLessonHistoryItem) {
+    func toggleAudio(for lesson: LessonHistoryItem) {
         guard lesson.hasAudio else { return }
         playingLessonID = playingLessonID == lesson.id ? nil : lesson.id
     }
     
-    func isPlaying(_ lesson: StudentLessonHistoryItem) -> Bool {
+    func isPlaying(_ lesson: LessonHistoryItem) -> Bool {
         playingLessonID == lesson.id
     }
     
@@ -88,14 +88,14 @@ final class StudentLessonHistoryViewModel {
         }
     }
 
-    private static func lessonHistoryItem(_ lesson: HistoryLesson) -> StudentLessonHistoryItem {
-        StudentLessonHistoryItem(
+    private static func lessonHistoryItem(_ lesson: HistoryLesson) -> LessonHistoryItem {
+        LessonHistoryItem(
             questionId: lesson.questionId,
             title: lesson.title,
-            teacher: lesson.otherParticipantName,
+            otherParticipant: lesson.otherParticipantName,
             completedAt: LessonFormatting.relativeDateText(lesson.acceptedAt),
             duration: LessonFormatting.shortDurationText(seconds: lesson.durationSeconds),
-            price: LessonFormatting.currencyText(cents: lesson.costCents),
+            amount: LessonFormatting.currencyText(cents: lesson.costCents),
             summary: "Completed lesson with \(lesson.otherParticipantName).",
             transcriptPreview: "Lesson transcript will appear here when available.",
             hasAudio: false

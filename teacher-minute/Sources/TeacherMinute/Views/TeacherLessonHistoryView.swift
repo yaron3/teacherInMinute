@@ -116,7 +116,7 @@ struct TeacherLessonHistoryView: View {
 }
 
 struct TeacherLessonHistoryRow: View {
-    let lesson: TeacherLessonHistoryItem
+    let lesson: LessonHistoryItem
     let isPlaying: Bool
     let viewAction: () -> Void
     let audioAction: () -> Void
@@ -145,14 +145,14 @@ struct TeacherLessonHistoryRow: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(theme.appPrimaryText)
                         
-                        Text("\(lesson.student) • \(lesson.completedAt)")
+                        Text("\(lesson.otherParticipant) • \(lesson.completedAt)")
                             .font(.system(size: 11))
                             .foregroundStyle(theme.appSecondaryText)
                     }
                     
                     Spacer()
                     
-                    Text(lesson.earnings)
+                    Text(lesson.amount)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
                 }
@@ -194,7 +194,7 @@ struct TeacherLessonHistoryRow: View {
 }
 
 struct TeacherLessonDetailView: View {
-    let lesson: TeacherLessonHistoryItem
+    let lesson: LessonHistoryItem
     let isPlaying: Bool
     let audioAction: () -> Void
   @Environment(\.colorScheme) var colorScheme
@@ -210,7 +210,7 @@ struct TeacherLessonDetailView: View {
                             .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(theme.appPrimaryText)
                         
-                        Text("\(lesson.student) • \(lesson.completedAt) • \(lesson.duration)")
+                        Text("\(lesson.otherParticipant) • \(lesson.completedAt) • \(lesson.duration)")
                             .font(.system(size: 13))
                             .foregroundStyle(theme.appSecondaryText)
                     }
