@@ -25,6 +25,7 @@ final class TeacherDashboardViewModel {
   // MARK: - State
 
   var teacherName = "Teacher"
+  var teacherImageURL = ""
   var isOnline = false
   var inviteIDs: [String] = []
   var inviteTopics: [String: String] = [:]
@@ -44,6 +45,7 @@ final class TeacherDashboardViewModel {
   var activeQuestionId: String? = nil
   var activeQuestionText = ""
   var activeStudentName = "Student"
+  var activeStudentImageURL = ""
   var activeConnectionFeeCents = 0
   var activePricePerMinuteCents = 50
   var activeAcceptedAt = 0.0
@@ -339,9 +341,12 @@ final class TeacherDashboardViewModel {
         activeCallToken = result.liveKitToken
         activeCallStudentUid = result.studentId ?? inviteStudentUids[questionId]
         activeLessonId = result.questionId
-        if activeStudentName == "Student", let studentId = activeCallStudentUid, !studentId.isEmpty,
+        if let studentId = activeCallStudentUid, !studentId.isEmpty,
            let profile = try? await UserService.shared.fetchProfileSummary(uid: studentId) {
-          activeStudentName = profile.displayName
+          if activeStudentName == "Student" {
+            activeStudentName = profile.displayName
+          }
+          activeStudentImageURL = profile.profileImageURL
         }
         inviteIDs = inviteIDs.filter { $0 != questionId }
         acceptingQuestionId = nil
@@ -395,6 +400,7 @@ final class TeacherDashboardViewModel {
     activeLessonId = nil
     activeQuestionText = ""
     activeStudentName = "Student"
+    activeStudentImageURL = ""
     activeConnectionFeeCents = 0
     activePricePerMinuteCents = 50
     activeAcceptedAt = 0
@@ -421,6 +427,8 @@ final class TeacherDashboardViewModel {
       teacherId: Auth.auth().currentUser?.uid ?? "",
       studentName: activeStudentName,
       teacherName: teacherName,
+      studentImageURL: activeStudentImageURL,
+      teacherImageURL: teacherImageURL,
       questionText: activeQuestionText,
       createdAt: 0,
       acceptedAt: activeAcceptedAt > 0 ? activeAcceptedAt : Date().timeIntervalSince1970 * 1000.0,
@@ -455,6 +463,7 @@ final class TeacherDashboardViewModel {
     if let data = try? await UserService.shared.fetchRaw(uid: uid) {
       let summary = UserProfileSummary(uid: uid, data: data)
       teacherName = summary?.displayName ?? "Teacher"
+      teacherImageURL = summary?.profileImageURL ?? ""
       subjects = summary?.subjects ?? []
       isVerified = data["isVerified"] as? Bool ?? false
       ratePerMinuteCents = Self.intValue(data["ratePerMinuteCents"]) ?? 50

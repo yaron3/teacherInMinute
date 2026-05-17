@@ -22,7 +22,11 @@ struct ChatThreadView: View {
           }
 
           ForEach(messages) { message in
-            ChatBubble(message: message, timeText: viewModel.messageTimeText(createdAt: message.createdAt, at: now))
+            ChatBubble(
+              message: message,
+              timeText: viewModel.messageTimeText(createdAt: message.createdAt, at: now),
+              avatarImageURL: message.isMine ? viewModel.currentUserImageURL : viewModel.participantImageURL
+            )
               .id(message.id)
           }
         }

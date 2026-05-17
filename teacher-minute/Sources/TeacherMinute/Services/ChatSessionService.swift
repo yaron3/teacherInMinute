@@ -36,6 +36,8 @@ struct ChatSessionDetails: Equatable {
   let teacherId: String
   let studentName: String
   let teacherName: String
+  let studentImageURL: String
+  let teacherImageURL: String
   let questionText: String
   let createdAt: Double
   let acceptedAt: Double
@@ -336,6 +338,8 @@ final class ChatSessionService {
       teacherId: firstString(in: dict, keys: ["teacherId", "teacherUID", "teacherId"]),
       studentName: firstString(in: dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"]),
       teacherName: firstString(in: dict, keys: ["teacherName", "teacherFullName", "teacherDisplayName"]),
+      studentImageURL: firstString(in: dict, keys: ["studentImageURL", "studentProfileImageURL", "studentPhotoURL"]),
+      teacherImageURL: firstString(in: dict, keys: ["teacherImageURL", "teacherProfileImageURL", "teacherPhotoURL"]),
       questionText: firstString(in: dict, keys: ["text", "questionText", "originalQuestion", "message", "topic"]),
       createdAt: normalizedMilliseconds(doubleValue(dict["createdAt"]) ?? 0),
       acceptedAt: normalizedMilliseconds(
@@ -381,6 +385,8 @@ protocol ChatSessionViewModeling: AnyObject {
   var errorMessage: String? { get set }
   var isConnecting: Bool { get set }
   var participantName: String { get }
+  var participantImageURL: String { get }
+  var currentUserImageURL: String { get }
   var originalQuestion: String { get }
   var primaryAmountTitle: String { get }
   var primaryAmountSubtitle: String { get }
@@ -418,10 +424,22 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var details: ChatSessionDetails?
   var participantName: String {
     if isTeacherRole {
-	  return nonEmpty(details?.teacherName) ?? "Teacher"
+	  return nonEmpty(details?.studentName) ?? "Student"
     }
-	return nonEmpty(details?.studentName) ?? "Student"
+	return nonEmpty(details?.teacherName) ?? "Teacher"
    
+  }
+  var participantImageURL: String {
+    if isTeacherRole {
+      return nonEmpty(details?.studentImageURL) ?? ""
+    }
+    return nonEmpty(details?.teacherImageURL) ?? ""
+  }
+  var currentUserImageURL: String {
+    if isTeacherRole {
+      return nonEmpty(details?.teacherImageURL) ?? ""
+    }
+    return nonEmpty(details?.studentImageURL) ?? ""
   }
   var originalQuestion: String {
     nonEmpty(details?.questionText) ?? "Question details are loading."
@@ -710,6 +728,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       teacherId: nonEmpty(updated.teacherId) ?? current.teacherId,
       studentName: nonEmpty(updated.studentName) ?? current.studentName,
       teacherName: nonEmpty(updated.teacherName) ?? current.teacherName,
+      studentImageURL: nonEmpty(updated.studentImageURL) ?? current.studentImageURL,
+      teacherImageURL: nonEmpty(updated.teacherImageURL) ?? current.teacherImageURL,
       questionText: nonEmpty(updated.questionText) ?? current.questionText,
       createdAt: updated.createdAt > 0 ? updated.createdAt : current.createdAt,
       acceptedAt: updated.acceptedAt > 0 ? updated.acceptedAt : current.acceptedAt,
@@ -723,24 +743,41 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     guard let current = details else { return }
     var studentName = current.studentName
     var teacherName = current.teacherName
+    var studentImageURL = current.studentImageURL
+    var teacherImageURL = current.teacherImageURL
 
-    if nonEmpty(studentName) == nil, let uid = nonEmpty(current.studentId),
+    if let uid = nonEmpty(current.studentId),
        let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
-      studentName = profile.displayName
+      if nonEmpty(studentName) == nil {
+        studentName = profile.displayName
+      }
+      if nonEmpty(studentImageURL) == nil {
+        studentImageURL = profile.profileImageURL
+      }
     }
 
-    if nonEmpty(teacherName) == nil, let uid = nonEmpty(current.teacherId),
+    if let uid = nonEmpty(current.teacherId),
        let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
-      teacherName = profile.displayName
+      if nonEmpty(teacherName) == nil {
+        teacherName = profile.displayName
+      }
+      if nonEmpty(teacherImageURL) == nil {
+        teacherImageURL = profile.profileImageURL
+      }
     }
 
-    guard studentName != current.studentName || teacherName != current.teacherName else { return }
+    guard studentName != current.studentName
+            || teacherName != current.teacherName
+            || studentImageURL != current.studentImageURL
+            || teacherImageURL != current.teacherImageURL else { return }
     details = ChatSessionDetails(
       questionId: current.questionId,
       studentId: current.studentId,
       teacherId: current.teacherId,
       studentName: studentName,
       teacherName: teacherName,
+      studentImageURL: studentImageURL,
+      teacherImageURL: teacherImageURL,
       questionText: current.questionText,
       createdAt: current.createdAt,
       acceptedAt: current.acceptedAt,

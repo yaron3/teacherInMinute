@@ -31,6 +31,7 @@ struct StudentHomeView: View {
                         avatarSystemImage: "person.crop.circle.fill",
                         eyebrow: "Welcome back",
                         name: viewModel.name,
+                        avatarImageURL: viewModel.profileImageURL,
                         showNotificationBadge: viewModel.hasUnreadMessages
                     )
                     .padding(.top, 18)
@@ -672,16 +673,13 @@ struct RecentLessonRow: View {
     var body: some View {
         RoundedInfoCard {
             HStack(spacing: 12) {
-                Circle()
-                    .fill(theme.appPurpleSoft)
-                    .frame(width: 50, height: 50)
-                    .overlay {
-                        PlatformIcon(
-                            systemName: "person.crop.circle.fill",
-                            size: 28,
-                            color: theme.appPurple
-                        )
-                    }
+                ProfileAvatarView(
+                    imageURL: lesson.teacherImageURL,
+                    size: 50,
+                    fallbackSystemImage: "person.crop.circle.fill",
+                    background: theme.appPurpleSoft,
+                    tint: theme.appPurple
+                )
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(lesson.title)

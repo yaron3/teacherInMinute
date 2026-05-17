@@ -18,6 +18,8 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var errorMessage: String?
   var isConnecting: Bool
   let participantName: String
+  let participantImageURL: String
+  let currentUserImageURL: String
   let originalQuestion: String
   let primaryAmountTitle: String
   let primaryAmountSubtitle: String
@@ -42,6 +44,8 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     boardStrokes: [BoardStroke] = [],
     isConnecting: Bool = true,
     participantName: String = "Michael",
+    participantImageURL: String = "",
+    currentUserImageURL: String = "",
     originalQuestion: String = "How do I solve quadratic equations using the quadratic formula? I'm confused about the discriminant.",
     sessionNoticeText: String = "Session started - Billing active",
     sessionStartedAt: Double = Date().timeIntervalSince1970 * 1000.0 - 83_000.0,
@@ -55,6 +59,8 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.boardStrokes = boardStrokes
     self.isConnecting = isConnecting
     self.participantName = participantName
+    self.participantImageURL = participantImageURL
+    self.currentUserImageURL = currentUserImageURL
     self.originalQuestion = originalQuestion
     let isTeacherRole = Self.isTeacherRole(role)
     self.primaryAmountTitle = isTeacherRole ? "Live Earnings" : "Session Cost"

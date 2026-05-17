@@ -83,6 +83,7 @@ struct RecentLesson: Identifiable {
   let id = UUID()
   let title: String
   let teacher: String
+  let teacherImageURL: String
   let time: String
   let duration: String
 }
@@ -103,6 +104,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var totalSpendText: String { get }
   var lessonCount: Int { get }
   var hasUnreadMessages: Bool { get set }
+  var profileImageURL: String { get set }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
   func cancelSearch() async
@@ -133,6 +135,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var totalSpendText = "$0.00"
   var lessonCount = 0
   var hasUnreadMessages = false
+  var profileImageURL = ""
 
   private var pollingTask: Task<Void, Never>?
   private var didLoadProfile = false
@@ -188,6 +191,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     didLoadProfile = true
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
+      profileImageURL = profile.profileImageURL
     }
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
@@ -223,6 +227,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       teacherId: "",
       studentName: name,
       teacherName: "Teacher",
+      studentImageURL: profileImageURL,
+      teacherImageURL: "",
       questionText: activeQuestionText,
       createdAt: 0,
       acceptedAt: Date().timeIntervalSince1970 * 1000.0,
@@ -302,6 +308,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     RecentLesson(
       title: lesson.title,
       teacher: "with \(lesson.otherParticipantName)",
+      teacherImageURL: lesson.otherParticipantImageURL,
       time: LessonFormatting.relativeDateText(lesson.acceptedAt),
       duration: LessonFormatting.durationText(seconds: lesson.durationSeconds)
     )
@@ -324,6 +331,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var totalSpendText: String
   var lessonCount: Int
   var hasUnreadMessages: Bool
+  var profileImageURL: String
 
   init(
     name: String = "Sarah Jenkins",
@@ -356,8 +364,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       ),
     ],
     recentLessons: [RecentLesson] = [
-      RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis", time: "Today, 2:30 PM", duration: "14 mins"),
-      RecentLesson(title: "Algebra II", teacher: "with Ms. Chen", time: "Yesterday", duration: "22 mins"),
+      RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis", teacherImageURL: "", time: "Today, 2:30 PM", duration: "14 mins"),
+      RecentLesson(title: "Algebra II", teacher: "with Ms. Chen", teacherImageURL: "", time: "Yesterday", duration: "22 mins"),
     ]
   ) {
     self.name = name
@@ -372,6 +380,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.totalSpendText = "$27.80"
     self.lessonCount = recentLessons.count
     self.hasUnreadMessages = true
+    self.profileImageURL = ""
   }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {
@@ -403,6 +412,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       teacherId: "mock-teacher",
       studentName: name,
       teacherName: "Teacher",
+      studentImageURL: profileImageURL,
+      teacherImageURL: "",
       questionText: activeQuestionText,
       createdAt: 0,
       acceptedAt: Date().timeIntervalSince1970 * 1000.0,

@@ -18,6 +18,7 @@ struct HistoryLesson: Identifiable, Hashable {
     let questionId: String
     let title: String
     let otherParticipantName: String
+    let otherParticipantImageURL: String
     let acceptedAt: Date
     let durationSeconds: Int
     let costCents: Int
@@ -97,6 +98,7 @@ final class HistoryModel {
             questionId: questionId,
             title: Self.lessonTitle(from: data),
             otherParticipantName: otherParticipant?.displayName ?? fallbackName,
+            otherParticipantImageURL: otherParticipant?.profileImageURL ?? "",
             acceptedAt: acceptedAt,
             durationSeconds: durationSeconds,
             costCents: costCents,

@@ -20,6 +20,7 @@ struct StudentLessonHistoryView: View {
                     avatarSystemImage: "person.crop.circle.fill",
                     eyebrow: "Lesson History",
                     name: viewModel.studentName,
+                    avatarImageURL: viewModel.profileImageURL,
                     showNotificationBadge: false
                 )
                 .padding(.top, 18)
@@ -50,9 +51,10 @@ struct StudentLessonHistoryView: View {
                         LessonHistoryRow(
                             lesson: lesson,
                             accentColor: theme.appPink,
-                            iconName: "function"
+                            iconName: "function",
+                            isLoading: viewModel.isLoading(lesson)
                         ) {
-                            viewModel.view(lesson)
+                            Task { await viewModel.view(lesson) }
                         }
                     }
                 }
@@ -70,6 +72,7 @@ struct StudentLessonHistoryView: View {
                 lesson: lesson,
                 amountLabel: "Cost",
                 isPlaying: viewModel.isPlaying(lesson),
+                initialDetails: viewModel.selectedLessonDetails,
                 audioAction: { viewModel.toggleAudio(for: lesson) }
             )
         }
@@ -168,6 +171,7 @@ struct LessonHistoryRow: View {
     let lesson: LessonHistoryItem
     let accentColor: Color
     let iconName: String
+    var isLoading = false
     let action: () -> Void
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
@@ -179,35 +183,41 @@ struct LessonHistoryRow: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
+        .disabled(isLoading)
     }
 
     private var rowContent: some View {
         RoundedInfoCard {
             HStack(alignment: .top, spacing: 12) {
-                Circle()
-                    .fill(accentColor.opacity(0.15))
-                    .frame(width: 46, height: 46)
-                    .overlay {
-                        PlatformIcon(systemName: iconName)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(accentColor)
-                    }
+                ProfileAvatarView(
+                    imageURL: lesson.otherParticipantImageURL,
+                    size: 46,
+                    fallbackSystemImage: iconName,
+                    background: accentColor.opacity(0.15),
+                    tint: accentColor
+                )
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(lesson.title)
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
 
-                    Text("\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
+                    Text(isLoading ? "Loading session details" : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
                         .font(.system(size: 11))
                         .foregroundStyle(theme.appSecondaryText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .trailing, spacing: 6) {
-                    Text(lesson.amount)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
+                    if isLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .tint(accentColor)
+                    } else {
+                        Text(lesson.amount)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(theme.appPrimaryText)
+                    }
 
                     SmallPill(
                         title: lesson.duration,
@@ -226,6 +236,7 @@ struct LessonHistoryRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .opacity(isLoading ? 0.72 : 1)
     }
 }
 
@@ -264,14 +275,32 @@ struct LessonDetailView: View {
     let lesson: LessonHistoryItem
     let amountLabel: String
     let isPlaying: Bool
+    let initialDetails: LessonDetails?
     let audioAction: () -> Void
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
         AppTheme(colorScheme: colorScheme)
     }
-    @State var messages: [LessonMessage] = []
-    @State var questionText: String = ""
-    @State var isLoading = true
+    @State var messages: [LessonMessage]
+    @State var questionText: String
+    @State var isLoading: Bool
+
+    init(
+        lesson: LessonHistoryItem,
+        amountLabel: String,
+        isPlaying: Bool,
+        initialDetails: LessonDetails?,
+        audioAction: @escaping () -> Void
+    ) {
+        self.lesson = lesson
+        self.amountLabel = amountLabel
+        self.isPlaying = isPlaying
+        self.initialDetails = initialDetails
+        self.audioAction = audioAction
+        _messages = State(initialValue: initialDetails?.messages ?? [])
+        _questionText = State(initialValue: initialDetails?.questionText ?? "")
+        _isLoading = State(initialValue: initialDetails == nil)
+    }
 
      var viewerRole: String {
         amountLabel == "Earnings" ? "teacher" : "student"
@@ -358,7 +387,8 @@ struct LessonDetailView: View {
                                 ForEach(messages) { message in
                                     LessonMessageBubble(
                                         message: message,
-                                        isMine: message.senderRole == viewerRole
+                                        isMine: message.senderRole == viewerRole,
+                                        avatarImageURL: message.senderRole == viewerRole ? lesson.currentUserImageURL : lesson.otherParticipantImageURL
                                     )
                                 }
                             }
@@ -398,7 +428,9 @@ struct LessonDetailView: View {
             .navigationTitle("Lesson")
             .navigationBarTitleDisplayMode(.inline)
             .task {
-                await loadLessonDetails()
+                if initialDetails == nil {
+                    await loadLessonDetails()
+                }
             }
         }
     }
@@ -417,6 +449,7 @@ struct LessonDetailView: View {
 struct LessonMessageBubble: View {
     let message: LessonMessage
     let isMine: Bool
+    let avatarImageURL: String
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
         AppTheme(colorScheme: colorScheme)
@@ -498,17 +531,13 @@ struct LessonMessageBubble: View {
     }
 
     private var avatar: some View {
-        Circle()
-            .fill(isMine ? theme.appPurpleSoft : theme.appGreenSoft)
-            .frame(width: 24, height: 24)
-            .overlay {
-                PlatformIcon(
-                    systemName: "person.crop.circle.fill",
-                    size: 18,
-                    weight: .semibold,
-                    color: isMine ? theme.appPurple : theme.appGreen
-                )
-            }
+        ProfileAvatarView(
+            imageURL: avatarImageURL,
+            size: 24,
+            fallbackSystemImage: "person.crop.circle.fill",
+            background: isMine ? theme.appPurpleSoft : theme.appGreenSoft,
+            tint: isMine ? theme.appPurple : theme.appGreen
+        )
     }
 
     private var timeText: String {

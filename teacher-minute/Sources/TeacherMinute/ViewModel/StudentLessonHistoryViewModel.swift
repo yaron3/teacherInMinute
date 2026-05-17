@@ -19,12 +19,20 @@ struct LessonHistoryItem: Identifiable, Hashable {
     let questionId: String
     let title: String
     let otherParticipant: String
+    let otherParticipantImageURL: String
+    let currentUserImageURL: String
     let completedAt: String
     let duration: String
     let amount: String
+    let amountCents: Int
     let summary: String
     let transcriptPreview: String
     let hasAudio: Bool
+}
+
+struct LessonDetails {
+    let questionText: String
+    let messages: [LessonMessage]
 }
 
 @Observable
@@ -33,8 +41,12 @@ final class StudentLessonHistoryViewModel {
     var studentName = "Student"
     var query = ""
     var selectedLesson: LessonHistoryItem?
+    var selectedLessonDetails: LessonDetails?
     var playingLessonID: LessonHistoryItem.ID?
     var totalTimeLearnedText = "0 min"
+    var totalSpendText = "$0.00"
+    var loadingLessonID: LessonHistoryItem.ID?
+    var profileImageURL = ""
 
     var lessons: [LessonHistoryItem] = []
     
@@ -52,15 +64,12 @@ final class StudentLessonHistoryViewModel {
         "\(lessons.count) completed"
     }
     
-    var totalSpendText: String {
-        let total = lessons.reduce(0.0) { partialResult, lesson in
-            partialResult + (Double(lesson.amount.replacingOccurrences(of: "$", with: "")) ?? 0)
-        }
-        return total.formatted(.currency(code: "USD"))
-    }
-    
-    func view(_ lesson: LessonHistoryItem) {
+    func view(_ lesson: LessonHistoryItem) async {
+        guard loadingLessonID == nil else { return }
+        loadingLessonID = lesson.id
+        selectedLessonDetails = await loadDetails(for: lesson)
         selectedLesson = lesson
+        loadingLessonID = nil
     }
     
     func toggleAudio(for lesson: LessonHistoryItem) {
@@ -77,25 +86,43 @@ final class StudentLessonHistoryViewModel {
         do {
             if let profile = try await UserService.shared.fetchProfileSummary(uid: uid) {
                 studentName = profile.displayName
+                profileImageURL = profile.profileImageURL
             }
             let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
             totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: historyLessons)
-            if !historyLessons.isEmpty {
-                lessons = historyLessons.map(Self.lessonHistoryItem)
-            }
+            totalSpendText = LessonFormatting.totalCostText(lessons: historyLessons)
+            lessons = historyLessons.map { Self.lessonHistoryItem($0, currentUserImageURL: profileImageURL) }
         } catch {
             logger.error("[StudentLessons] failed loading profile: \(error.localizedDescription)")
         }
     }
 
-    private static func lessonHistoryItem(_ lesson: HistoryLesson) -> LessonHistoryItem {
+    func isLoading(_ lesson: LessonHistoryItem) -> Bool {
+        loadingLessonID == lesson.id
+    }
+
+    private func loadDetails(for lesson: LessonHistoryItem) async -> LessonDetails {
+        do {
+            let questionText = try await HistoryModel.shared.fetchQuestionText(questionId: lesson.questionId)
+            let messages = try await HistoryModel.shared.fetchLessonMessages(questionId: lesson.questionId)
+            return LessonDetails(questionText: questionText, messages: messages)
+        } catch {
+            logger.error("[StudentLessons] failed loading lesson details: \(error.localizedDescription)")
+            return LessonDetails(questionText: "", messages: [])
+        }
+    }
+
+    private static func lessonHistoryItem(_ lesson: HistoryLesson, currentUserImageURL: String) -> LessonHistoryItem {
         LessonHistoryItem(
             questionId: lesson.questionId,
             title: lesson.title,
             otherParticipant: lesson.otherParticipantName,
+            otherParticipantImageURL: lesson.otherParticipantImageURL,
+            currentUserImageURL: currentUserImageURL,
             completedAt: LessonFormatting.relativeDateText(lesson.acceptedAt),
             duration: LessonFormatting.shortDurationText(seconds: lesson.durationSeconds),
             amount: LessonFormatting.currencyText(cents: lesson.costCents),
+            amountCents: lesson.costCents,
             summary: "Completed lesson with \(lesson.otherParticipantName).",
             transcriptPreview: "Lesson transcript will appear here when available.",
             hasAudio: false

@@ -185,20 +185,13 @@ struct ProfileView: View {
   var profilePhotoContent: some View {
     ZStack(alignment: .bottomTrailing) {
       Group {
-        if let url = URL(string: viewModel.profileImageURL), !viewModel.profileImageURL.isEmpty {
-          AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-              image
-                .resizable()
-                .scaledToFill()
-            default:
-              defaultProfileIcon
-            }
-          }
-        } else {
-          defaultProfileIcon
-        }
+        ProfileAvatarView(
+          imageURL: viewModel.profileImageURL,
+          size: 96,
+          fallbackSystemImage: "person.crop.circle.fill",
+          background: theme.appPurpleSoft,
+          tint: theme.appPurple
+        )
       }
       .frame(width: 96, height: 96)
       .clipShape(Circle())

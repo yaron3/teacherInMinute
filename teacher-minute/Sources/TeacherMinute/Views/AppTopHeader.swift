@@ -12,6 +12,7 @@ struct AppTopHeader: View {
   let avatarSystemImage: String
   let eyebrow: String
   let name: String
+  var avatarImageURL = ""
   var showNotificationBadge = false
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -20,12 +21,13 @@ struct AppTopHeader: View {
   
   var body: some View {
 	HStack(spacing: 10) {
-	  Circle()
-		.fill(theme.appPurpleSoft)
-		.frame(width: 38, height: 38)
-		.overlay {
-		  PlatformIcon(systemName: avatarSystemImage, size: 18, weight: .semibold, color: theme.appPurple)
-		}
+      ProfileAvatarView(
+        imageURL: avatarImageURL,
+        size: 38,
+        fallbackSystemImage: avatarSystemImage,
+        background: theme.appPurpleSoft,
+        tint: theme.appPurple
+      )
 	  
 	  VStack(alignment: .leading, spacing: 2) {
 		Text(eyebrow)

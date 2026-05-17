@@ -20,6 +20,7 @@ struct TeacherLessonHistoryView: View {
                     avatarSystemImage: "person.crop.circle.fill",
                     eyebrow: "Teaching History",
                     name: viewModel.teacherName,
+                    avatarImageURL: viewModel.profileImageURL,
                     showNotificationBadge: false
                 )
                 .padding(.top, 18)
@@ -50,9 +51,10 @@ struct TeacherLessonHistoryView: View {
                         LessonHistoryRow(
                             lesson: lesson,
                             accentColor: theme.appPurple,
-                            iconName: "person.fill.checkmark"
+                            iconName: "person.fill.checkmark",
+                            isLoading: viewModel.isLoading(lesson)
                         ) {
-                            viewModel.view(lesson)
+                            Task { await viewModel.view(lesson) }
                         }
                     }
                 }
@@ -70,6 +72,7 @@ struct TeacherLessonHistoryView: View {
                 lesson: lesson,
                 amountLabel: "Earnings",
                 isPlaying: viewModel.isPlaying(lesson),
+                initialDetails: viewModel.selectedLessonDetails,
                 audioAction: { viewModel.toggleAudio(for: lesson) }
             )
         }

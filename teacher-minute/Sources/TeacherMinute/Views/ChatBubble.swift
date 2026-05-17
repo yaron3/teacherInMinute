@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatBubble: View {
   let message: ChatMessage
   let timeText: String
+  let avatarImageURL: String
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -39,16 +40,12 @@ struct ChatBubble: View {
   }
 
   var avatar: some View {
-    Circle()
-      .fill(message.isMine ? theme.appPurpleSoft : theme.appGreenSoft)
-      .frame(width: 24, height: 24)
-      .overlay {
-        PlatformIcon(
-          systemName: "person.crop.circle.fill",
-          size: 18,
-          weight: .semibold,
-          color: message.isMine ? theme.appPurple : theme.appGreen
-        )
-      }
+    ProfileAvatarView(
+      imageURL: avatarImageURL,
+      size: 24,
+      fallbackSystemImage: "person.crop.circle.fill",
+      background: message.isMine ? theme.appPurpleSoft : theme.appGreenSoft,
+      tint: message.isMine ? theme.appPurple : theme.appGreen
+    )
   }
 }

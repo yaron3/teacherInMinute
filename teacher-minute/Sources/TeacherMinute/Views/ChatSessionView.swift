@@ -167,12 +167,13 @@ struct ChatSessionView: View {
 
   var header: some View {
     HStack(spacing: 12) {
-      Circle()
-        .fill(theme.appPinkSoft)
-        .frame(width: 40, height: 40)
-        .overlay {
-          PlatformIcon(systemName: "person.crop.circle.fill", size: 24, weight: .semibold, color: theme.appPink)
-        }
+      ProfileAvatarView(
+        imageURL: viewModel.participantImageURL,
+        size: 40,
+        fallbackSystemImage: "person.crop.circle.fill",
+        background: theme.appPinkSoft,
+        tint: theme.appPink
+      )
         .overlay(alignment: .bottomTrailing) {
           Circle()
             .fill(theme.appGreen)

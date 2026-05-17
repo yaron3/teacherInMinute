@@ -79,12 +79,25 @@ final class StorageService {
     }
 #endif
 
+    let uploadData = Self.profileUploadData(from: data)
     let ref = Storage.storage().reference().child(path)
     let metadata = StorageMetadata()
     metadata.contentType = mimeType
-    _ = try await ref.putDataAsync(data, metadata: metadata)
+    _ = try await ref.putDataAsync(uploadData, metadata: metadata)
     let downloadURL = try await ref.downloadURL()
     logger.info("Uploaded profile image: \(path)")
     return downloadURL.absoluteString
+  }
+
+  private static func profileUploadData(from data: Data) -> Data {
+#if os(iOS)
+    guard let image = UIImage(data: data),
+          let resized = image.resizedJPEGData(maxPixelSize: 320, compressionQuality: 0.82) else {
+      return data
+    }
+    return resized
+#else
+    return data
+#endif
   }
 }
