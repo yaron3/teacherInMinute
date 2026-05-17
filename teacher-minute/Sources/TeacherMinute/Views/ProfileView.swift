@@ -16,6 +16,7 @@ import SkipBridge
 struct ProfileView: View {
   @State var viewModel: ProfileViewModel
   @State var isShowingSubjectEditor = false
+  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
 #if !os(Android)
   @State private var profilePhotoItem: PhotosPickerItem?
 #endif
@@ -137,6 +138,9 @@ struct ProfileView: View {
               NavigationStack {
                 ProfileEditView(viewModel: viewModel)
               }
+              .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+              .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+              .id(languagePreference)
             }
             .sheet(isPresented: $isShowingSubjectEditor, onDismiss: {
               Task { await viewModel.loadProfile() }
@@ -144,6 +148,9 @@ struct ProfileView: View {
               NavigationStack {
                 TeacherSubjectsView(isEditing: true)
               }
+              .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+              .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+              .id(languagePreference)
             }
 #if !os(Android)
         .onChange(of: profilePhotoItem) { _, item in
@@ -319,22 +326,27 @@ struct ProfileEditView: View {
   @State var viewModel: ProfileViewModel
   @Environment(\.dismiss) var dismiss
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.layoutDirection) var layoutDirection
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
+  }
+  var contentAlignment: HorizontalAlignment {
+    layoutDirection == .rightToLeft ? .trailing : .leading
   }
 
   var body: some View {
     ScrollView(.vertical, showsIndicators: false) {
-      VStack(alignment: .leading, spacing: 0) {
+	  VStack(alignment: .leading, spacing: 0) {
         Text(LocalizationSupport.localized("Edit Profile"))
           .font(.system(size: 26, weight: .bold))
           .foregroundStyle(theme.authPrimaryText)
           .padding(.top, 24)
 
-        Text("Update the details students and teachers use to recognize and contact you.")
+        Text(LocalizationSupport.localized("Update the details students and teachers use to recognize and contact you."))
           .font(.system(size: 13))
           .foregroundStyle(theme.authSecondaryText)
           .lineSpacing(5)
+          .multilineTextAlignment(.leading)
           .padding(.top, 8)
 
         VStack(spacing: 16) {
@@ -394,14 +406,18 @@ struct ProfileTeachingGradePicker: View {
   let title: String
   @Binding var selectedGrades: Set<String>
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.layoutDirection) var layoutDirection
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
+  }
+  var contentAlignment: HorizontalAlignment {
+    layoutDirection == .rightToLeft ? .trailing : .leading
   }
 
   let grades = ProfileViewModel.availableTeachingGrades
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: contentAlignment, spacing: 10) {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
@@ -409,7 +425,7 @@ struct ProfileTeachingGradePicker: View {
 
         Spacer()
 
-        Text(selectedGrades.isEmpty ? LocalizationSupport.localized("Choose grades") : "\(selectedGrades.count) selected")
+        Text(selectedGrades.isEmpty ? LocalizationSupport.localized("Choose grades") : String(format: LocalizationSupport.localized("%lld selected"), selectedGrades.count))
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(theme.authSecondaryText)
           .padding(.horizontal, 10)
@@ -417,17 +433,20 @@ struct ProfileTeachingGradePicker: View {
           .background(theme.authFieldBorder.opacity(0.7))
           .clipShape(Capsule())
       }
-
-      FlowLayout(spacing: 10) {
-        ForEach(grades, id: \.self) { grade in
-          ProfileTeachingGradeChip(
-            title: grade,
-            isSelected: selectedGrades.contains(grade)
-          ) {
-            toggleGrade(grade)
-          }
-        }
-      }
+	  HStack {
+		Spacer()
+		FlowLayout(spacing: 10) {
+		  ForEach(grades, id: \.self) { grade in
+			ProfileTeachingGradeChip(
+			  title: grade,
+			  isSelected: selectedGrades.contains(grade)
+			) {
+			  toggleGrade(grade)
+			}
+		  }
+		}
+		Spacer()
+	  }
     }
   }
 

@@ -17,6 +17,7 @@ struct PlatformIcon: View {
     var size: CGFloat = 20
     var weight: Font.Weight = .regular
     var color: Color = .primary
+	@Environment(\.layoutDirection) var layoutDirection
 
     private static let bundledIcons: Set<String> = [
         "bubble.left.and.bubble.right.fill",
@@ -25,6 +26,7 @@ struct PlatformIcon: View {
     ]
 
   var body: some View {
+
 	if Self.bundledIcons.contains(systemName) {
 	   Image(systemName, bundle: .module)
 		.resizable()
@@ -32,12 +34,12 @@ struct PlatformIcon: View {
 	} else {
 #if os(Android)
 
-	  Text(Self.emoji(for: systemName))
+	  Text(Self.emoji(for: (systemName == "chevron.right" && layoutDirection == .rightToLeft) ? "chevron.left" : systemName))
 		.font(.system(size: size))
 		.foregroundStyle(color)
 
 #else
-	  Image(systemName: systemName)
+	  Image(systemName: (systemName == "chevron.right" && layoutDirection == .rightToLeft) ? "chevron.left" : systemName)
 		.font(.system(size: size, weight: weight))
 		.foregroundStyle(color)
 	  

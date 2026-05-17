@@ -68,28 +68,30 @@ struct AuthInputField: View {
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType?
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.layoutDirection) var layoutDirection
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
+  var contentAlignment: HorizontalAlignment {
+    layoutDirection == .rightToLeft ? .trailing : .leading
+  }
+  var textAlignment: TextAlignment {
+    layoutDirection == .rightToLeft ? .trailing : .leading
+  }
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+	  VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(theme.authPrimaryText)
 
             HStack(spacing: 12) {
-                PlatformIcon(systemName: systemImage)
-                    .font(.system(size: 14))
-                    .foregroundStyle(theme.authIcon)
-
-                TextField(placeholder, text: $text)
-                    .font(.system(size: 15))
-                    .foregroundStyle(theme.authPrimaryText)
-                    .keyboardType(keyboardType)
-                    .textContentType(textContentType)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .tint(theme.authPink)
+                if layoutDirection == .leftToRight {
+                    fieldIcon
+                    inputField
+                } else {
+                    inputField
+                    fieldIcon
+                }
             }
             .padding(.horizontal, 16)
             .frame(height: 56)
@@ -100,6 +102,24 @@ struct AuthInputField: View {
                     .stroke(theme.authFieldBorder, lineWidth: 1)
             }
         }
+    }
+
+    var fieldIcon: some View {
+        PlatformIcon(systemName: systemImage)
+            .font(.system(size: 14))
+            .foregroundStyle(theme.authIcon)
+    }
+
+    var inputField: some View {
+        TextField(placeholder, text: $text)
+            .font(.system(size: 15))
+            .foregroundStyle(theme.authPrimaryText)
+            .keyboardType(keyboardType)
+            .textContentType(textContentType)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .multilineTextAlignment(textAlignment)
+            .tint(theme.authPink)
     }
 }
 

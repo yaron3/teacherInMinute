@@ -1,5 +1,8 @@
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum LocalizationSupport {
     static let languagePreferenceKey = "settings.language.preference"
@@ -78,6 +81,18 @@ enum LocalizationSupport {
         default:
             layoutDirection
         }
+    }
+
+    @MainActor
+    static func applyPlatformLayoutDirection(languagePreference rawValue: String) {
+        #if canImport(UIKit)
+        let semanticAttribute: UISemanticContentAttribute = layoutDirection(languagePreference: rawValue) == .rightToLeft
+            ? .forceRightToLeft
+            : .forceLeftToRight
+        UIView.appearance().semanticContentAttribute = semanticAttribute
+        UINavigationBar.appearance().semanticContentAttribute = semanticAttribute
+        UITabBar.appearance().semanticContentAttribute = semanticAttribute
+        #endif
     }
 
     static var usesRightToLeftLayout: Bool {

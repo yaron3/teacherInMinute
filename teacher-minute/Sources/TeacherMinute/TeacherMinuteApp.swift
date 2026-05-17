@@ -22,10 +22,10 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
     TeacherMinuteAppDelegate.shared.onInit()
   }
   
-  public var body: some View {
-	@Bindable var router = router
-	NavigationStack(path: $router.path) {
-	  WelcomeView()
+      public var body: some View {
+		@Bindable var router = router
+		NavigationStack(path: $router.path) {
+		  WelcomeView()
 		.navigationDestination(for: AppRoute.self) { route in
 		  switch route {
 			case .createAccount:
@@ -48,13 +48,20 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 			  TeacherDashboardView()
 		  }
 		}
-		}
-			.environment(\.appRouter, router)
+			}
+				.environment(\.appRouter, router)
             .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
             .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-			.task {
-	  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
-	}
+            .id(languagePreference)
+            .onAppear {
+              LocalizationSupport.applyPlatformLayoutDirection(languagePreference: languagePreference)
+            }
+            .onChange(of: languagePreference) { _, newValue in
+              LocalizationSupport.applyPlatformLayoutDirection(languagePreference: newValue)
+            }
+				.task {
+		  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
+		}
   }
 }
 
