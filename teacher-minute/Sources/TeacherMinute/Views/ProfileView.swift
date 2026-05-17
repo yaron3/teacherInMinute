@@ -212,9 +212,12 @@ struct ProfileView: View {
               .scaleEffect(0.7)
               .tint(theme.appPrimaryText)
           } else {
-            PlatformIcon(systemName: "camera.fill")
-              .font(.system(size: 12, weight: .bold))
-              .foregroundStyle(theme.appPrimaryText)
+            PlatformIcon(
+              systemName: "camera.fill",
+              size: 12,
+              weight: .bold,
+              color: theme.appPrimaryText
+            )
           }
         }
     }
@@ -224,9 +227,11 @@ struct ProfileView: View {
     Circle()
       .fill(theme.appPurpleSoft)
       .overlay {
-        PlatformIcon(systemName: "person.crop.circle.fill")
-          .font(.system(size: 72))
-          .foregroundStyle(theme.appPurple)
+        PlatformIcon(
+          systemName: "person.crop.circle.fill",
+          size: 72,
+          color: theme.appPurple
+        )
       }
   }
   

@@ -10,6 +10,10 @@ import SwiftUI
 struct ChooseRoleView: View {
   @State var viewModel = ChooseRoleViewModel()
   @Environment(\.appRouter) var router
+  @State var showingTerms = false
+  @State var showingPrivacy = false
+  @State var termsURL = URL(string: "https://www.cnn.com")!
+  @State var privacyURL = URL(string: "https://www.cnn.com")!
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -63,26 +67,42 @@ struct ChooseRoleView: View {
 		}
 	  }
 	  
-	  Text("By continuing, you agree to our ")
-		.font(.system(size: 12))
-		.foregroundStyle(theme.authSecondaryText)
-		.frame(maxWidth: .infinity)
-		.overlay(alignment: .trailing) {
-		  HStack(spacing: 2) {
-			Text("Terms").underline()
-			Text("&")
-			Text("Privacy.").underline()
-		  }
-		  .font(.system(size: 12, weight: .semibold))
-		  .foregroundStyle(theme.authPrimaryText)
-		  .padding(.trailing, 10)
+	  HStack(spacing: 2) {
+		Text("By continuing, you agree to our")
+		  .foregroundStyle(theme.authSecondaryText)
+		Button { showingTerms = true } label: {
+		  Text("Terms").underline()
+			.fontWeight(.semibold)
+			.foregroundStyle(theme.authPrimaryText)
 		}
-		.padding(.top, 14)
-		.padding(.bottom, 24)
+		.buttonStyle(.plain)
+		Text("&")
+		  .foregroundStyle(theme.authSecondaryText)
+		Button { showingPrivacy = true } label: {
+		  Text("Privacy.").underline()
+			.fontWeight(.semibold)
+			.foregroundStyle(theme.authPrimaryText)
+		}
+		.buttonStyle(.plain)
+	  }
+	  .font(.system(size: 12))
+	  .frame(maxWidth: .infinity)
+	  .padding(.top, 14)
+	  .padding(.bottom, 24)
 	}
 	.padding(.horizontal, 20)
 	.background(Color(.systemBackground))
 	.navigationBarTitleDisplayMode(.inline)
+	.sheet(isPresented: $showingTerms) {
+	  NavigationStack { AboutWebView(url: termsURL, title: "Terms of Service") }
+	}
+	.sheet(isPresented: $showingPrivacy) {
+	  NavigationStack { AboutWebView(url: privacyURL, title: "Privacy Policy") }
+	}
+	.task {
+	  if let url = try? await SettingsRemoteConfigService.shared.fetchEULAURL() { termsURL = url }
+	  if let url = try? await SettingsRemoteConfigService.shared.fetchPrivacyPolicyURL() { privacyURL = url }
+	}
   }
 }
 
@@ -117,9 +137,12 @@ struct RoleCard: View {
 			  .fill(accent)
 			  .frame(width: 22, height: 22)
 			  .overlay {
-				PlatformIcon(systemName: "checkmark")
-				  .font(.system(size: 10, weight: .bold))
-				  .foregroundStyle(theme.appPrimaryText)
+				PlatformIcon(
+				  systemName: "checkmark",
+				  size: 10,
+				  weight: .bold,
+				  color: theme.appPrimaryText
+				)
 			  }
 		  }
 		}

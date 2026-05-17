@@ -32,9 +32,6 @@ struct CompleteProfileView: View {
 		.lineSpacing(5)
 		.padding(.top, 10)
 	  
-	  AuthSegmentedRolePicker(selectedRole: $viewModel.selectedRole)
-		.padding(.top, 28)
-	  
 	  AuthInputField(
 		title: "Full Name",
 		placeholder: "John Doe",
@@ -43,7 +40,7 @@ struct CompleteProfileView: View {
 		textContentType: .name
 	  )
 	  .padding(.top, 28)
-	  
+
 	  AuthInputField(
 		title: "Phone Number",
 		placeholder: "+1 (555) 000-0000",
@@ -53,12 +50,14 @@ struct CompleteProfileView: View {
 		textContentType: .telephoneNumber
 	  )
 	  .padding(.top, 20)
-	  
-	  HStack(spacing: 12) {
-		dobPicker
-		gradePicker
+
+	  if viewModel.role == .student {
+		HStack(spacing: 12) {
+		  dobPicker
+		  gradePicker
+		}
+		.padding(.top, 20)
 	  }
-	  .padding(.top, 20)
 	  
 	  Spacer()
 	  
@@ -148,9 +147,12 @@ struct CompleteProfileView: View {
 		  
 		  Spacer()
 		  
-		  PlatformIcon(systemName: "chevron.down")
-			.font(.system(size: 12, weight: .semibold))
-			.foregroundStyle(theme.authIcon)
+		  PlatformIcon(
+			systemName: "chevron.down",
+			size: 12,
+			weight: .semibold,
+			color: theme.authIcon
+		  )
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)

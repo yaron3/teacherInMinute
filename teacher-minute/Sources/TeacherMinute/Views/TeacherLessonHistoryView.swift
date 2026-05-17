@@ -95,9 +95,12 @@ struct TeacherLessonHistoryView: View {
     
     private var searchField: some View {
         HStack(spacing: 10) {
-            PlatformIcon(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(theme.appSecondaryText)
+            PlatformIcon(
+                systemName: "magnifyingglass",
+                size: 14,
+                weight: .semibold,
+                color: theme.appSecondaryText
+            )
             
             TextField("Search lessons or students", text: $viewModel.query)
                 .font(.system(size: 14))

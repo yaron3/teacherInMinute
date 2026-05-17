@@ -31,17 +31,18 @@ struct PlatformIcon: View {
 		.frame(width: size, height: size)
 	} else {
 #if os(Android)
-	  
+
 	  Text(Self.emoji(for: systemName))
-		.font(.system(size: size * 0.9))
-		.frame(width: size, height: size)
-	  
+		.font(.system(size: size))
+		.foregroundStyle(color)
+
 #else
 	  Image(systemName: systemName)
 		.font(.system(size: size, weight: weight))
 		.foregroundStyle(color)
 	  
 #endif
+	  
 	}
 	
   }
@@ -80,7 +81,7 @@ struct PlatformIcon: View {
         case "function":                            return "ƒ"
         case "magnifyingglass":                     return "⌕"
         case "arrow.up":                            return "↑"
-		case "arrow.right":							return "→"
+		case "arrow.right":							return "➡"
         case "person.crop.circle.fill":             return "👤"
         case "xmark":                               return "✕"
         case "wifi":                                return "🛜"

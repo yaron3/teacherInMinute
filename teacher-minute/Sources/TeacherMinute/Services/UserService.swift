@@ -65,6 +65,16 @@ final class UserService {
 	logger.info("Deleted user profile for uid: \(uid)")
   }
   
+  // MARK: - Unread messages
+
+  func hasUnreadMessages(uid: String) async -> Bool {
+	let db = Firestore.firestore()
+	let snap = try? await db.collection("users").document(uid)
+	  .collection("messages").document("unread").getDocument()
+	guard let data = snap?.data(), snap?.exists == true else { return false }
+	return !data.isEmpty
+  }
+
   // MARK: - Determine where to resume onboarding
   
   func resumeRoute(uid: String) async throws -> OnboardingResume {
@@ -76,24 +86,22 @@ final class UserService {
 	guard !roleString.isEmpty else { return .chooseRole }
 	let role: AuthRole = roleString == "teacher" ? .teacher : .student
 	
-	// Profile completeness: fullName + phoneNumber + dateOfBirth required for both roles
-	let hasProfile = !(data["fullName"] as? String ?? "").isEmpty
-	&& !(data["phoneNumber"] as? String ?? "").isEmpty
-	&& data["dateOfBirth"] != nil
-	
+	let hasName  = !(data["fullName"] as? String ?? "").isEmpty
+	let hasPhone = !(data["phoneNumber"] as? String ?? "").isEmpty
+
 	if role == .teacher {
-	  // Docs: check uploadedDocuments array has at least 4 entries
 	  let docs = data["uploadedDocuments"] as? [String] ?? []
 	  let hasIdentityDocs = docs.count >= 4
-	  
+
 	  let subjectSelections = data["subjectSelections"] as? [String: [String]] ?? [:]
 	  let hasSubjects = subjectSelections.values.contains { !$0.isEmpty }
-	  
+
 	  if !hasIdentityDocs { return .teacherIdentityVerification }
 	  if !hasSubjects      { return .teacherSubjects }
-	  if !hasProfile       { return .completeProfile(role: .teacher) }
+	  if !(hasName && hasPhone) { return .completeProfile(role: .teacher) }
 	  return .home(role: .teacher)
 	} else {
+	  let hasProfile = hasName && hasPhone && data["dateOfBirth"] != nil
 	  if !hasProfile { return .completeProfile(role: .student) }
 	  return .home(role: .student)
 	}

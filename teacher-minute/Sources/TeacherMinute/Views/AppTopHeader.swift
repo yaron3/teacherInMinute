@@ -48,7 +48,7 @@ struct AppTopHeader: View {
 			.frame(width: 42, height: 42)
 			.shadow(color: theme.appPrimaryText.opacity(0.05), radius: 12, x: 0, y: 6)
 			.overlay {
-			  PlatformIcon(systemName: "bell.fill", size: 15, weight: .semibold, color: theme.appPrimaryText)
+			  PlatformIcon(systemName: "bell.fill", size: 15, weight: .semibold, color: theme.appOrange)
 			}
 		  
 		  if showNotificationBadge {

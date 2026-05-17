@@ -58,6 +58,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var totalTimeLearnedText: String { get }
   var totalSpendText: String { get }
   var lessonCount: Int { get }
+  var hasUnreadMessages: Bool { get set }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
   func cancelSearch() async
@@ -100,6 +101,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var totalTimeLearnedText = "0 min"
   var totalSpendText = "$0.00"
   var lessonCount = 0
+  var hasUnreadMessages = false
 
   private var pollingTask: Task<Void, Never>?
   private var didLoadProfile = false
@@ -155,6 +157,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
     }
+    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
   }
 
@@ -285,6 +288,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var totalTimeLearnedText: String
   var totalSpendText: String
   var lessonCount: Int
+  var hasUnreadMessages: Bool
 
   init(
     name: String = "Sarah Jenkins",
@@ -322,6 +326,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.totalTimeLearnedText = "36 min"
     self.totalSpendText = "$27.80"
     self.lessonCount = recentLessons.count
+    self.hasUnreadMessages = true
   }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {

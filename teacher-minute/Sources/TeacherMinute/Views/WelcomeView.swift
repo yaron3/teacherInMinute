@@ -115,9 +115,12 @@ struct WelcomeView: View {
 		.fill(theme.primaryBackground)
 		.frame(width: 34, height: 34)
 		.overlay {
-		  PlatformIcon(systemName: "graduationcap.fill")
-			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
+		  PlatformIcon(
+			systemName: "graduationcap.fill",
+			size: 15,
+			weight: .semibold,
+			color: theme.primaryText
+		  )
 		}
 	  
 	  Text("Teacher in a Minute")
@@ -139,9 +142,11 @@ struct WelcomeView: View {
 		.shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 12)
 	  
 	  HStack(spacing: 0) {
-		PlatformIcon(systemName: "photo")
-		  .font(.system(size: 15))
-		  .foregroundStyle(theme.secondaryText)
+		PlatformIcon(
+		  systemName: "photo",
+		  size: 15,
+		  color: theme.secondaryText
+		)
 		
 		Text("App Preview")
 		  .font(.system(size: 16))

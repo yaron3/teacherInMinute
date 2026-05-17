@@ -158,9 +158,11 @@ struct TeacherSubjectsView: View {
   
   var searchField: some View {
 	HStack(spacing: 10) {
-	  PlatformIcon(systemName: "magnifyingglass")
-		.font(.system(size: 14))
-		.foregroundStyle(theme.authIcon)
+	  PlatformIcon(
+		systemName: "magnifyingglass",
+		size: 14,
+		color: theme.authIcon
+	  )
 	  
 	  TextField("Search subjects or subtopics", text: $viewModel.searchText)
 		.font(.system(size: 13))

@@ -18,7 +18,6 @@ import SkipFirebaseAuth
 @MainActor
 final class CompleteProfileViewModel {
   let role: AuthRole
-  var selectedRole: AuthRole
   var fullName = ""
   var phoneNumber = ""
   /// Default start = 15 years ago
@@ -40,7 +39,6 @@ final class CompleteProfileViewModel {
   
   init(role: AuthRole) {
 	self.role = role
-	self.selectedRole = role
   }
   
   // MARK: - Auto-advance
@@ -50,11 +48,12 @@ final class CompleteProfileViewModel {
 	  defer { isCheckingCompletion = false }
 	  guard let uid = Auth.auth().currentUser?.uid else { return }
 	  let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
-	  let hasProfile = !(data["fullName"] as? String ?? "").isEmpty
-	  && !(data["phoneNumber"] as? String ?? "").isEmpty
-	  && data["dateOfBirth"] != nil
+	  let hasName  = !(data["fullName"] as? String ?? "").isEmpty
+	  let hasPhone = !(data["phoneNumber"] as? String ?? "").isEmpty
+	  let hasProfile = role == .teacher
+		? (hasName && hasPhone)
+		: (hasName && hasPhone && data["dateOfBirth"] != nil)
 	  if hasProfile {
-		// Pre-fill fields and auto-advance
 		fullName    = data["fullName"]    as? String ?? ""
 		phoneNumber = data["phoneNumber"] as? String ?? ""
 		grade       = data["grade"]       as? String ?? ""

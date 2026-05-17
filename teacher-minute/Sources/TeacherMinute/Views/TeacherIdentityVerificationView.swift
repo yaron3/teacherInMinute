@@ -333,9 +333,12 @@ struct TeacherIdentityVerificationView: View {
   
   var privacyBox: some View {
 	HStack(alignment: .top, spacing: 12) {
-	  PlatformIcon(systemName: "shield.lefthalf.filled")
-		.font(.system(size: 18, weight: .semibold))
-		.foregroundStyle(theme.authPurple)
+	  PlatformIcon(
+		systemName: "shield.lefthalf.filled",
+		size: 18,
+		weight: .semibold,
+		color: theme.authPurple
+	  )
 	  VStack(alignment: .leading, spacing: 6) {
 		Text("Your Privacy Matters")
 		  .font(.system(size: 13, weight: .bold))
@@ -595,9 +598,12 @@ struct SelfieRow: View {
 	  
 	  Spacer()
 	  
-	  PlatformIcon(systemName: "chevron.right")
-		.font(.system(size: 12, weight: .semibold))
-		.foregroundStyle(theme.authIcon)
+	  PlatformIcon(
+		systemName: "chevron.right",
+		size: 12,
+		weight: .semibold,
+		color: theme.authIcon
+	  )
 	}
 	.padding(14)
 	.background(theme.appCardBackground)

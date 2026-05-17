@@ -95,9 +95,11 @@ struct LoginView: View {
 		  .foregroundStyle(theme.authPrimaryText)
 		
 		HStack(spacing: 13) {
-		  PlatformIcon(systemName: "envelope")
-			.font(.system(size: 15))
-			.foregroundStyle(theme.authIcon)
+		  PlatformIcon(
+			systemName: "envelope",
+			size: 15,
+			color: theme.authIcon
+		  )
 		  
 		  TextField("Enter your email", text: $viewModel.emailOrPhone)
 			.font(.system(size: 16))
@@ -123,9 +125,11 @@ struct LoginView: View {
 		  .foregroundStyle(theme.authPrimaryText)
 		
 		HStack(spacing: 13) {
-		  PlatformIcon(systemName: "lock.fill")
-			.font(.system(size: 15))
-			.foregroundStyle(theme.authIcon)
+		  PlatformIcon(
+			systemName: "lock.fill",
+			size: 15,
+			color: theme.authIcon
+		  )
 		  
 		  Group {
 			if viewModel.isPasswordVisible {

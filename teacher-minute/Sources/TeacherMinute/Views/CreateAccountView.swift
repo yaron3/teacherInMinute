@@ -19,6 +19,10 @@ struct CreateAccountView: View {
   @Environment(\.appRouter) var router
   @State var isPasswordVisible = false
   @FocusState var focusedField: SignupField?
+  @State var showingTerms = false
+  @State var showingPrivacy = false
+  @State var termsURL = URL(string: "https://www.cnn.com")!
+  @State var privacyURL = URL(string: "https://www.cnn.com")!
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -67,6 +71,16 @@ struct CreateAccountView: View {
 	  Button("OK", role: .cancel) { viewModel.showAlert = false }
 	} message: {
 	  Text(viewModel.alertMessage ?? "")
+	}
+	.sheet(isPresented: $showingTerms) {
+	  NavigationStack { AboutWebView(url: termsURL, title: "Terms of Service") }
+	}
+	.sheet(isPresented: $showingPrivacy) {
+	  NavigationStack { AboutWebView(url: privacyURL, title: "Privacy Policy") }
+	}
+	.task {
+	  if let url = try? await SettingsRemoteConfigService.shared.fetchEULAURL() { termsURL = url }
+	  if let url = try? await SettingsRemoteConfigService.shared.fetchPrivacyPolicyURL() { privacyURL = url }
 	}
   }
   
@@ -189,9 +203,12 @@ struct CreateAccountView: View {
 					.stroke(isOn.wrappedValue ? theme.authPink : theme.appBorder, lineWidth: 1)
 				)
 		  if isOn.wrappedValue {
-			PlatformIcon(systemName: "checkmark")
-			  .font(.system(size: 11, weight: .bold))
-			  .foregroundStyle(theme.appPrimaryText)
+			PlatformIcon(
+			  systemName: "checkmark",
+			  size: 11,
+			  weight: .bold,
+			  color: theme.appPrimaryText
+			)
 		  }
 		}
 	  }
@@ -211,10 +228,16 @@ struct CreateAccountView: View {
 	  VStack(alignment: .leading, spacing: 2) {
 		HStack(spacing: 0) {
 			Text("I agree to the ").foregroundStyle(theme.authSecondaryText)
-			Text("Terms of Service").foregroundStyle(theme.authPink)
+			Button { showingTerms = true } label: {
+			  Text("Terms of Service").foregroundStyle(theme.authPink)
+			}
+			.buttonStyle(.plain)
 			Text(" and").foregroundStyle(theme.authSecondaryText)
 		}
-		Text("Privacy Policy.").foregroundStyle(theme.authPink)
+		Button { showingPrivacy = true } label: {
+		  Text("Privacy Policy.").foregroundStyle(theme.authPink)
+		}
+		.buttonStyle(.plain)
 	  }
 	.font(.system(size: 14))
 	.lineSpacing(4)

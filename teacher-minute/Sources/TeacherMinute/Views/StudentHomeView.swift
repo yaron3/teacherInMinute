@@ -31,7 +31,7 @@ struct StudentHomeView: View {
                         avatarSystemImage: "person.crop.circle.fill",
                         eyebrow: "Welcome back",
                         name: viewModel.name,
-                        showNotificationBadge: true
+                        showNotificationBadge: viewModel.hasUnreadMessages
                     )
                     .padding(.top, 18)
 
@@ -68,9 +68,11 @@ struct StudentHomeView: View {
                     if viewModel.recentLessons.isEmpty {
                         RoundedInfoCard {
                             HStack(spacing: 12) {
-                                PlatformIcon(systemName: "clock")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(theme.appSecondaryText)
+                                PlatformIcon(
+                                    systemName: "clock",
+                                    size: 16,
+                                    color: theme.appSecondaryText
+                                )
                                 Text("No lessons yet. Ask a teacher to get started!")
                                     .font(.system(size: 13))
                                     .foregroundStyle(theme.appSecondaryText)
@@ -181,9 +183,12 @@ struct StudentHomeView: View {
                         .fill(.white.opacity(0.18))
                         .frame(width: 58, height: 58)
                         .overlay {
-                            PlatformIcon(systemName: "building.columns.fill")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(theme.appPrimaryText)
+                            PlatformIcon(
+                                systemName: "building.columns.fill",
+                                size: 24,
+                                weight: .semibold,
+                                color: theme.appPrimaryText
+                            )
                         }
 
                     Spacer()
@@ -204,9 +209,12 @@ struct StudentHomeView: View {
                     .fill(theme.appPrimaryText)
                     .frame(width: 44, height: 44)
                     .overlay {
-                        PlatformIcon(systemName: "arrow.right")
-                            .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(theme.appPink)
+                        PlatformIcon(
+                            systemName: "arrow.right",
+                            size: 17,
+                            weight: .bold,
+                            color: theme.appGrayBackground
+                        )
                     }
                     .padding(.top, 36)
                     .padding(.trailing, 20)
@@ -227,9 +235,7 @@ struct StudentHomeView: View {
                     .fill(theme.yellow.opacity(0.2))
                     .frame(width: 34, height: 34)
                     .overlay {
-                        PlatformIcon(systemName: "lightbulb.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(theme.appOrange)
+					  PlatformIcon(systemName: "lightbulb.fill", size: 14, weight: .semibold,color: theme.appOrange)
                     }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -248,9 +254,8 @@ struct StudentHomeView: View {
 
     func tipLine(_ text: String) -> some View {
         HStack(spacing: 8) {
-            PlatformIcon(systemName: "checkmark")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(theme.appGreen)
+            PlatformIcon(systemName: "checkmark", size: 10, weight: .bold,
+						 color: theme.appGreen)
 
             Text(text)
                 .font(.system(size: 12))
@@ -488,9 +493,11 @@ struct MatchedOverlay: View {
                     .fill(theme.appGreen.opacity(0.2))
                     .frame(width: 80, height: 80)
                     .overlay {
-                        PlatformIcon(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 44))
-                            .foregroundStyle(theme.appGreen)
+                        PlatformIcon(
+                            systemName: "checkmark.circle.fill",
+                            size: 44,
+                            color: theme.appGreen
+                        )
                     }
 
                 Text("Teacher Found!")
@@ -534,9 +541,11 @@ struct NoMatchOverlay: View {
                     .fill(theme.appSecondaryText.opacity(0.15))
                     .frame(width: 80, height: 80)
                     .overlay {
-                        PlatformIcon(systemName: "person.slash.fill")
-                            .font(.system(size: 36))
-                            .foregroundStyle(theme.appSecondaryText)
+                        PlatformIcon(
+                            systemName: "person.slash.fill",
+                            size: 36,
+                            color: theme.appSecondaryText
+                        )
                     }
 
                 Text("No Teachers Available")
@@ -581,9 +590,11 @@ struct ErrorOverlay: View {
                     .fill(theme.appPink.opacity(0.18))
                     .frame(width: 80, height: 80)
                     .overlay {
-                        PlatformIcon(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 34))
-                            .foregroundStyle(theme.appPink)
+                        PlatformIcon(
+                            systemName: "exclamationmark.triangle.fill",
+                            size: 34,
+                            color: theme.appPink
+                        )
                     }
 
                 Text("Could Not Send Question")
@@ -682,9 +693,11 @@ struct RecentLessonRow: View {
                     .fill(theme.appPurpleSoft)
                     .frame(width: 50, height: 50)
                     .overlay {
-                        PlatformIcon(systemName: "person.crop.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(theme.appPurple)
+                        PlatformIcon(
+                            systemName: "person.crop.circle.fill",
+                            size: 28,
+                            color: theme.appPurple
+                        )
                     }
 
                 VStack(alignment: .leading, spacing: 5) {

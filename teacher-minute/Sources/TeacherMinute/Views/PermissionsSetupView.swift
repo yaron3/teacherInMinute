@@ -24,9 +24,12 @@ struct PermissionsSetupView: View {
                     .fill(theme.authPinkSoft)
                     .frame(width: 78, height: 78)
                     .overlay {
-                        PlatformIcon(systemName: "mic.fill")
-                            .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(theme.authPink)
+                        PlatformIcon(
+                            systemName: "mic.fill",
+                            size: 34,
+                            weight: .semibold,
+                            color: theme.authPink
+                        )
                     }
                     .shadow(color: theme.authPink.opacity(0.1), radius: 24, x: 0, y: 12)
 
@@ -34,9 +37,12 @@ struct PermissionsSetupView: View {
                     .fill(theme.authPurpleSoft)
                     .frame(width: 34, height: 34)
                     .overlay {
-                        PlatformIcon(systemName: "bell.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(theme.authPurple)
+                        PlatformIcon(
+                            systemName: "bell.fill",
+                            size: 14,
+                            weight: .semibold,
+                            color: theme.authPurple
+                        )
                     }
                     .offset(x: 12, y: 8)
             }

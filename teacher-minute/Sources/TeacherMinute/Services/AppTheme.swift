@@ -291,3 +291,118 @@ struct AppTheme {
         )
     }
 }
+
+#if os(iOS)
+private struct AppThemeSwatch: View {
+    let name: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(color)
+                .frame(width: 44, height: 44)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.25), lineWidth: 0.5)
+                )
+            Text(name)
+                .font(.system(size: 14, design: .monospaced))
+            Spacer()
+        }
+    }
+}
+
+private struct AppThemePreviewView: View {
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                section("Text", swatches: [
+                    ("red", theme.red),
+                    ("yellow", theme.yellow),
+                    ("white", theme.white),
+                    ("appPrimaryText", theme.appPrimaryText),
+                    ("appSecondaryText", theme.appSecondaryText)
+                ])
+
+                section("Accent", swatches: [
+                    ("appPink", theme.appPink),
+                    ("appPinkSoft", theme.appPinkSoft),
+                    ("appPurple", theme.appPurple),
+                    ("appPurpleSoft", theme.appPurpleSoft),
+                    ("appGreen", theme.appGreen),
+                    ("appGreenSoft", theme.appGreenSoft),
+                    ("appOrange", theme.appOrange)
+                ])
+
+                section("Backgrounds & Surfaces", swatches: [
+                    ("appGrayBackground", theme.appGrayBackground),
+                    ("appCardBackground", theme.appCardBackground),
+                    ("appCardBackgroundShadow", theme.appCardBackgroundShadow)
+                ])
+
+                section("Borders", swatches: [
+                    ("appBorder", theme.appBorder)
+                ])
+
+                section("Auth", swatches: [
+                    ("authFieldBackground", theme.authFieldBackground),
+                    ("authFieldBorder", theme.authFieldBorder),
+                    ("authIcon", theme.authIcon),
+                    ("authDivider", theme.authDivider),
+                    ("authSocialBorder", theme.authSocialBorder)
+                ])
+
+                section("Generic", swatches: [
+                    ("primaryText", theme.primaryText),
+                    ("primaryBackground", theme.primaryBackground),
+                    ("secondaryText", theme.secondaryText),
+                    ("previewBackground", theme.previewBackground)
+                ])
+
+                section("Green Status", swatches: [
+                    ("greenText", theme.greenText),
+                    ("greenBackground", theme.greenBackground),
+                    ("greenBorder", theme.greenBorder)
+                ])
+
+                section("Gray Badge", swatches: [
+                    ("badgeGrayText", theme.badgeGrayText),
+                    ("grayBadgeBackground", theme.grayBadgeBackground),
+                    ("grayBadgeBorder", theme.grayBadgeBorder)
+                ])
+            }
+            .padding(20)
+        }
+    }
+
+    @ViewBuilder
+    private func section(_ title: String, swatches: [(String, Color)]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            VStack(spacing: 6) {
+                ForEach(swatches, id: \.0) { item in
+                    AppThemeSwatch(name: item.0, color: item.1)
+                }
+            }
+        }
+    }
+}
+
+#Preview("Light") {
+    AppThemePreviewView()
+        .preferredColorScheme(.light)
+}
+
+#Preview("Dark") {
+    AppThemePreviewView()
+        .preferredColorScheme(.dark)
+}
+
+#endif
