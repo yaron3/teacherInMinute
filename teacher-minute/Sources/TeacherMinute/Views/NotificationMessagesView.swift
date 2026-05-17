@@ -37,7 +37,7 @@ struct NotificationMessagesView: View {
                 }
             }
             .background(Color(.systemBackground))
-            .navigationTitle("Messages")
+            .navigationTitle(LocalizationSupport.localized("Messages"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

@@ -69,7 +69,7 @@ struct LoginView: View {
 	}
 	.navigationBarTitleDisplayMode(.inline)
 	// Push the resolved destination when login completes
-	.navigationTitle("Welcome Back")
+	.navigationTitle(LocalizationSupport.localized("Welcome Back"))
 	.onChange(of: viewModel.destination) { _, route in
 	  guard let route else { return }
 	  router.push(route)

@@ -22,14 +22,14 @@ struct MainTabView: View {
             TabView(selection: $viewModel.selectedTab) {
                 tabContent(.home)
                     .tabItem {
-                        Label(MainTab.home.title, systemImage: MainTab.home.systemImage)
+                        Label("Home", systemImage: MainTab.home.systemImage)
                     }
                     .tag(MainTab.home)
 
                 tabContent(.lessons)
                     .tabItem {
                         Label {
-                            Text(MainTab.lessons.title)
+                            Text("Lessons")
                         } icon: {
                             Image(MainTab.lessons.systemImage, bundle: .module)
                                 .renderingMode(.template)
@@ -43,13 +43,13 @@ struct MainTabView: View {
 
                 tabContent(.profile)
                     .tabItem {
-                        Label(MainTab.profile.title, systemImage: MainTab.profile.systemImage)
+                        Label("Profile", systemImage: MainTab.profile.systemImage)
                     }
                     .tag(MainTab.profile)
 
                 tabContent(.settings)
                     .tabItem {
-                        Label(MainTab.settings.title, systemImage: MainTab.settings.systemImage)
+                        Label("Settings", systemImage: MainTab.settings.systemImage)
                     }
                     .tag(MainTab.settings)
             }

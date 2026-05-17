@@ -16,6 +16,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 /// The default implementation merely loads the `ContentView` for the app and logs a message.
 /* SKIP @bridge */public struct TeacherMinuteRootView : View {
   @State  var router = AppRouter()
+  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   
   /* SKIP @bridge */public init() {
     TeacherMinuteAppDelegate.shared.onInit()
@@ -47,9 +48,11 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 			  TeacherDashboardView()
 		  }
 		}
-	}
-	.environment(\.appRouter, router)
-	.task {
+		}
+			.environment(\.appRouter, router)
+            .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+            .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+			.task {
 	  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
 	}
   }

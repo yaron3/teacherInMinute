@@ -22,7 +22,7 @@ struct AboutWebView: View {
     var body: some View {
         WebContentView(url: url)
             .ignoresSafeArea(edges: .bottom)
-            .navigationTitle(title)
+            .navigationTitle(LocalizationSupport.localized(title))
             .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -52,7 +52,7 @@ struct AboutWebView: View {
     var body: some View {
         Link("Open \(title)", destination: url)
             .font(.system(size: 16, weight: .semibold))
-            .navigationTitle(title)
+            .navigationTitle(LocalizationSupport.localized(title))
             .navigationBarTitleDisplayMode(.inline)
     }
 }

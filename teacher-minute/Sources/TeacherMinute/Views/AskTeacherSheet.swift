@@ -38,7 +38,7 @@ struct AskTeacherSheet: View {
                                 Button {
                                     selectedTopic = topic
                                 } label: {
-                                    Text(topic.capitalized)
+                                    Text(LocalizationSupport.localized(topic.capitalized))
                                         .font(.system(size: 13, weight: .semibold))
                                         .foregroundStyle(selectedTopic == topic ?theme.appCardBackground: theme.appPrimaryText)
                                         .padding(.horizontal, 16)
@@ -58,12 +58,12 @@ struct AskTeacherSheet: View {
                         .foregroundStyle(theme.appPrimaryText)
 
                     HStack(spacing: 10) {
-                        ConversationTypeChip(title: "Text", isSelected: true) {
+                        ConversationTypeChip(title: LocalizationSupport.localized("Text"), isSelected: true) {
                             conversationType = "text"
                         }
-                        ConversationTypeChip(title: "Audio + Text", isSelected: false) {}
+                        ConversationTypeChip(title: LocalizationSupport.localized("Audio + Text"), isSelected: false) {}
                             .opacity(0.45)
-                        ConversationTypeChip(title: "Video + Audio + Text", isSelected: false) {}
+                        ConversationTypeChip(title: LocalizationSupport.localized("Video + Audio + Text"), isSelected: false) {}
                             .opacity(0.45)
                     }
                 }
@@ -88,7 +88,7 @@ struct AskTeacherSheet: View {
                         MathSymbolRow(text: $questionText, isFocused: $isQuestionFocused)
                     }
 
-                    Text("\(questionText.count) / 10 min chars")
+                    Text(String(format: LocalizationSupport.localized("%lld / 10 min chars"), questionText.count))
                         .font(.system(size: 11))
                         .foregroundStyle(canSubmit ? theme.appGreen : theme.appSecondaryText)
                 }
@@ -117,7 +117,7 @@ struct AskTeacherSheet: View {
                 .disabled(!canSubmit)
             }
             .padding(10)
-            .navigationTitle("Ask a Teacher")
+            .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

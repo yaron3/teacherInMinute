@@ -22,8 +22,8 @@ final class TeacherLessonHistoryViewModel {
     var selectedLesson: LessonHistoryItem?
     var selectedLessonDetails: LessonDetails?
     var playingLessonID: LessonHistoryItem.ID?
-    var totalTimeTaughtText = "0 min"
-    var totalEarningsText = "$0.00"
+    var totalTimeTaughtText = LessonFormatting.totalDurationText(lessons: [])
+    var totalEarningsText = LessonFormatting.currencyText(cents: 0)
     var loadingLessonID: LessonHistoryItem.ID?
     var profileImageURL = ""
 
@@ -40,7 +40,7 @@ final class TeacherLessonHistoryViewModel {
     }
     
     var completedCountText: String {
-        "\(lessons.count) taught"
+        String(format: LocalizationSupport.localized("%lld taught"), Int64(lessons.count))
     }
     
     func view(_ lesson: LessonHistoryItem) async {
@@ -104,8 +104,11 @@ final class TeacherLessonHistoryViewModel {
             duration: LessonFormatting.shortDurationText(seconds: lesson.durationSeconds),
             amount: LessonFormatting.currencyText(cents: lesson.teacherEarningsCents),
             amountCents: lesson.teacherEarningsCents,
-            summary: "Completed lesson with \(lesson.otherParticipantName).",
-            transcriptPreview: "Lesson transcript will appear here when available.",
+            summary: String(
+                format: LocalizationSupport.localized("Completed lesson with %@."),
+                lesson.otherParticipantName
+            ),
+            transcriptPreview: LocalizationSupport.localized("Lesson transcript will appear here when available."),
             hasAudio: false
         )
     }

@@ -32,7 +32,7 @@ struct AppTopHeader: View {
       )
 	  
 	  VStack(alignment: .leading, spacing: 2) {
-		Text(eyebrow)
+		Text(LocalizedStringKey(eyebrow))
 		  .font(.system(size: 11))
 		  .foregroundStyle(theme.appSecondaryText)
 		
@@ -102,7 +102,7 @@ struct SmallPill: View {
   var background: Color?
   
   var body: some View {
-	Text(title)
+	Text(LocalizedStringKey(title))
 	  .font(.system(size: 11, weight: .semibold))
 	  .foregroundStyle(foreground ?? theme.appPink)
 	  .padding(.horizontal, 10)

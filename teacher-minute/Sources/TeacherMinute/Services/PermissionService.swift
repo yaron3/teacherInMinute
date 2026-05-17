@@ -138,17 +138,17 @@ enum PermissionState: String {
 
     var subtitle: String {
         switch self {
-        case .notDetermined: return "Not requested"
-        case .granted: return "Enabled"
-        case .denied: return "Disabled"
+        case .notDetermined: return LocalizationSupport.localized("Not requested")
+        case .granted: return LocalizationSupport.localized("Enabled")
+        case .denied: return LocalizationSupport.localized("Disabled")
         }
     }
 
     var actionTitle: String {
         switch self {
-        case .notDetermined: return "Enable"
-        case .granted: return "Manage"
-        case .denied: return "Settings"
+        case .notDetermined: return LocalizationSupport.localized("Enable")
+        case .granted: return LocalizationSupport.localized("Manage")
+        case .denied: return LocalizationSupport.localized("Settings")
         }
     }
 }

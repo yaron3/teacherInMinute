@@ -139,6 +139,8 @@ struct SettingsView: View {
             AccountSecuritySettingsView(viewModel: viewModel)
         case .language:
             LanguageSettingsView(viewModel: viewModel)
+        case .currency:
+            CurrencySettingsView(viewModel: viewModel)
         case .about:
             AboutSettingsView(viewModel: viewModel)
         case .webPage(let title, let url):
@@ -332,6 +334,84 @@ struct LanguageSettingsView: View {
                         .buttonStyle(.plain)
 
                         if index < SettingsLanguageChoice.allCases.count - 1 {
+                            Divider()
+                                .padding(.leading, 58)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+                .background(theme.appCardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 24)
+        }
+        .background(Color(.systemBackground))
+    }
+}
+
+struct CurrencySettingsView: View {
+    let viewModel: SettingsViewModel
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("CURRENCY")
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(theme.appSecondaryText)
+                    .padding(.leading, 4)
+                    .padding(.top, 24)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(SettingsCurrencyChoice.allCases.enumerated()), id: \.element.id) { index, currency in
+                        Button {
+                            viewModel.selectedCurrency = currency
+                        } label: {
+                            HStack(spacing: 14) {
+                                Circle()
+                                    .fill(theme.appGrayBackground)
+                                    .frame(width: 34, height: 34)
+                                    .overlay {
+                                        PlatformIcon(
+                                            systemName: "dollarsign.circle.fill",
+                                            size: 14,
+                                            weight: .semibold,
+                                            color: theme.appPrimaryText
+                                        )
+                                    }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(currency.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(theme.appPrimaryText)
+
+                                    Text(currency.subtitle)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(theme.appSecondaryText)
+                                }
+
+                                Spacer()
+
+                                if viewModel.selectedCurrency == currency {
+                                    PlatformIcon(
+                                        systemName: "checkmark",
+                                        size: 14,
+                                        weight: .bold,
+                                        color: theme.appPink
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 64)
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < SettingsCurrencyChoice.allCases.count - 1 {
                             Divider()
                                 .padding(.leading, 58)
                         }

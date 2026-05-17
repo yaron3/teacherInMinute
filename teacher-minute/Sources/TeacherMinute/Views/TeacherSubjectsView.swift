@@ -134,7 +134,7 @@ struct TeacherSubjectsView: View {
 		viewModel.checkAndAutoAdvance()
 	  }
 	}
-	.navigationTitle(isEditing ? "Edit Subjects" : "")
+	.navigationTitle(isEditing ? LocalizationSupport.localized("Edit Subjects") : "")
 	.toolbar {
 	  if isEditing {
 		ToolbarItem(placement: .cancellationAction) {

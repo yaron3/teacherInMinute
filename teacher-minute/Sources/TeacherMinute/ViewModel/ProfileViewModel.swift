@@ -188,13 +188,13 @@ final class ProfileViewModel {
 
     private func rebuildContactRows() {
         var rows = [
-            Parameter(description: "Full Name", value: name, image: "person.fill"),
-            Parameter(description: "Email", value: email, image: "envelope.fill"),
-            Parameter(description: "Phone", value: phoneNumber, image: "phone.fill")
+            Parameter(description: LocalizationSupport.localized("Full Name"), value: name, image: "person.fill"),
+            Parameter(description: LocalizationSupport.localized("Email"), value: email, image: "envelope.fill"),
+            Parameter(description: LocalizationSupport.localized("Phone"), value: phoneNumber, image: "phone.fill")
         ]
 
         if roleType == .student {
-            rows.append(Parameter(description: "Grade", value: grade, image: "graduationcap.fill"))
+            rows.append(Parameter(description: LocalizationSupport.localized("Grade"), value: LocalizationSupport.localized(grade), image: "graduationcap.fill"))
         }
 
         contactRows = rows

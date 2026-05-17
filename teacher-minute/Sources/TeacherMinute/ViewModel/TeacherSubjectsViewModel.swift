@@ -104,8 +104,14 @@ final class TeacherSubjectsViewModel {
   var selectedCountText: String {
 	let areaCount = selectedAreaIDs.count
 	let subtopicCount = selectedSubtopicTitlesByArea.values.reduce(0) { $0 + $1.count }
-	guard areaCount > 0 else { return "Choose subjects" }
-	return "\(areaCount) subject\(areaCount == 1 ? "" : "s"), \(subtopicCount) subtopic\(subtopicCount == 1 ? "" : "s")"
+	guard areaCount > 0 else { return LocalizationSupport.localized("Choose subjects") }
+	let subjectPart = areaCount == 1
+	  ? LocalizationSupport.localized("1 subject")
+	  : String(format: LocalizationSupport.localized("%lld subjects"), areaCount)
+	let subtopicPart = subtopicCount == 1
+	  ? LocalizationSupport.localized("1 subtopic")
+	  : String(format: LocalizationSupport.localized("%lld subtopics"), subtopicCount)
+	return "\(subjectPart), \(subtopicPart)"
   }
   
   var shouldShowSubtopicsPrompt: Bool {

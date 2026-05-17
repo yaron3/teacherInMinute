@@ -29,7 +29,7 @@ struct StudentHomeView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     AppTopHeader(
                         avatarSystemImage: "person.crop.circle.fill",
-                        eyebrow: "Welcome back",
+                        eyebrow: "Welcome Back",
                         name: viewModel.name,
                         avatarImageURL: viewModel.profileImageURL,
                         showNotificationBadge: viewModel.hasUnreadMessages,
@@ -267,7 +267,7 @@ struct StudentHomeView: View {
             PlatformIcon(systemName: "checkmark", size: 10, weight: .bold,
 						 color: theme.appGreen)
 
-            Text(text)
+            Text(LocalizedStringKey(text))
                 .font(.system(size: 12))
                 .foregroundStyle(theme.appSecondaryText)
         }
@@ -275,7 +275,7 @@ struct StudentHomeView: View {
 
     func sectionHeader(title: String, actionTitle: String? = nil, action: (() -> Void)? = nil) -> some View {
         HStack {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(theme.appPrimaryText)
 
@@ -283,7 +283,7 @@ struct StudentHomeView: View {
 
             if let actionTitle, let action {
                 Button(action: action) {
-                    Text(actionTitle)
+                    Text(LocalizedStringKey(actionTitle))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(theme.appPink)
                 }

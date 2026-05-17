@@ -55,7 +55,7 @@ struct CreateAccountView: View {
 	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
-	.navigationTitle("Create Account")
+	.navigationTitle(LocalizationSupport.localized("Create Account"))
 	.onChange(of: viewModel.navigateToChooseRole) { _, newValue in
 	  if newValue { router.push(.chooseRole) }
 	}

@@ -52,6 +52,7 @@ struct SettingsRow: Identifiable {
         case .notifications:   self.destination = .notifications
         case .privacyControls: self.destination = .privacyControls
         case .language:        self.destination = .language
+        case .currency:        self.destination = .currency
         case .about:           self.destination = .about
         case .eula:
             // EULA/PrivacyPolicy are opened via remote URL; keep destination nil so viewModel handles it
@@ -77,6 +78,7 @@ enum SettingsAction: Equatable {
     case notifications
     case privacyControls
     case language
+    case currency
     case about
     case contactUs
     case eula
@@ -93,6 +95,7 @@ enum SettingsAction: Equatable {
         case .notifications: "notifications"
         case .privacyControls: "privacyControls"
         case .language: "language"
+        case .currency: "currency"
         case .about: "about"
         case .contactUs: "contactUs"
         case .eula: "eula"
@@ -109,19 +112,21 @@ enum SettingsDestination: Hashable {
     case notifications
     case privacyControls
     case language
+    case currency
     case about
     case webPage(title: String, url: URL)
 
     var title: String {
         switch self {
-        case .accountSecurity: "Account & Security"
-        case .changePassword: "Change Password"
-        case .teacherPayouts: "Teacher Payout Settings"
-        case .studentPayments: "Student Payment Methods"
-        case .notifications: "Notification Preferences"
-        case .privacyControls: "Privacy Controls"
-        case .language: "Language"
-        case .about: "About"
+        case .accountSecurity: LocalizationSupport.localized("Account & Security")
+        case .changePassword: LocalizationSupport.localized("Change Password")
+        case .teacherPayouts: LocalizationSupport.localized("Teacher Payout Settings")
+        case .studentPayments: LocalizationSupport.localized("Student Payment Methods")
+        case .notifications: LocalizationSupport.localized("Notification Preferences")
+        case .privacyControls: LocalizationSupport.localized("Privacy Controls")
+        case .language: LocalizationSupport.localized("Language")
+        case .currency: LocalizationSupport.localized("Currency")
+        case .about: LocalizationSupport.localized("About")
         case .webPage(let title, _): title
         }
     }
@@ -129,16 +134,16 @@ enum SettingsDestination: Hashable {
     var placeholderMessage: String {
         switch self {
         case .changePassword:
-            "Password management will be available here."
+            LocalizationSupport.localized("Password management will be available here.")
         case .teacherPayouts:
-            "Bank details and payout history will be available here."
+            LocalizationSupport.localized("Bank details and payout history will be available here.")
         case .studentPayments:
-            "Cards and billing history will be available here."
+            LocalizationSupport.localized("Cards and billing history will be available here.")
         case .notifications:
-            "Notification preferences will be available here."
+            LocalizationSupport.localized("Notification preferences will be available here.")
         case .privacyControls:
-            "Privacy controls will be available here."
-        case .accountSecurity, .language, .about, .webPage:
+            LocalizationSupport.localized("Privacy controls will be available here.")
+        case .accountSecurity, .language, .currency, .about, .webPage:
             ""
         }
     }
@@ -157,24 +162,24 @@ enum SettingsConfirmation: Identifiable {
 
     var title: String {
         switch self {
-        case .logOut: "Log Out"
-        case .deleteAccount: "Delete Account"
+        case .logOut: LocalizationSupport.localized("Log Out")
+        case .deleteAccount: LocalizationSupport.localized("Delete Account")
         }
     }
 
     var message: String {
         switch self {
         case .logOut:
-            "Are you sure you want to log out?"
+            LocalizationSupport.localized("Are you sure you want to log out?")
         case .deleteAccount:
-            "This permanently deletes your account and profile data. This cannot be undone."
+            LocalizationSupport.localized("This permanently deletes your account and profile data. This cannot be undone.")
         }
     }
 
     var confirmTitle: String {
         switch self {
-        case .logOut: "Log Out"
-        case .deleteAccount: "Delete"
+        case .logOut: LocalizationSupport.localized("Log Out")
+        case .deleteAccount: LocalizationSupport.localized("Delete")
         }
     }
 
@@ -194,17 +199,39 @@ enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .system: "System Language"
-        case .english: "English"
-        case .hebrew: "Hebrew"
+        case .system: LocalizationSupport.localized("System Language")
+        case .english: LocalizationSupport.localized("English")
+        case .hebrew: LocalizationSupport.localized("Hebrew")
         }
     }
 
     var subtitle: String? {
         switch self {
-        case .system: "Use the device language"
+        case .system: LocalizationSupport.localized("Use the device language")
         case .english, .hebrew: nil
         }
+    }
+}
+
+enum SettingsCurrencyChoice: String, CaseIterable, Identifiable {
+    case usd = "$"
+    case ils = "₪"
+    case eur = "€"
+    case gbp = "£"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .usd: LocalizationSupport.localized("US Dollar")
+        case .ils: LocalizationSupport.localized("Israeli Shekel")
+        case .eur: LocalizationSupport.localized("Euro")
+        case .gbp: LocalizationSupport.localized("British Pound")
+        }
+    }
+
+    var subtitle: String {
+        rawValue
     }
 }
 
@@ -242,18 +269,22 @@ class SettingsViewModel {
     var activeConfirmation: SettingsConfirmation?
     var externalURL: URL?
     var showAlert = false
-    var alertTitle = "Settings"
+    var alertTitle = LocalizationSupport.localized("Settings")
     var alertMessage: String?
     var isLoading = false
     var selectedLanguage: SettingsLanguageChoice {
         didSet {
-            UserDefaults.standard.set(selectedLanguage.rawValue, forKey: languagePreferenceKey)
+            UserDefaults.standard.set(selectedLanguage.rawValue, forKey: LocalizationSupport.languagePreferenceKey)
+        }
+    }
+    var selectedCurrency: SettingsCurrencyChoice {
+        didSet {
+            UserDefaults.standard.set(selectedCurrency.rawValue, forKey: LessonFormatting.currencyPreferenceKey)
         }
     }
     
     private let authService: AuthService
     private let remoteConfigService: SettingsRemoteConfigService
-    private let languagePreferenceKey = "settings.language.preference"
 	let role:AppUserMode
     init(
         authService: AuthService = AuthService(),
@@ -262,21 +293,23 @@ class SettingsViewModel {
     ) {
         self.authService = authService
         self.remoteConfigService = remoteConfigService
-        let savedLanguage = UserDefaults.standard.string(forKey: languagePreferenceKey)
+        let savedLanguage = UserDefaults.standard.string(forKey: LocalizationSupport.languagePreferenceKey)
         self.selectedLanguage = savedLanguage.flatMap(SettingsLanguageChoice.init(rawValue:)) ?? .system
-		self.role = role
+        let savedCurrency = UserDefaults.standard.string(forKey: LessonFormatting.currencyPreferenceKey)
+        self.selectedCurrency = savedCurrency.flatMap(SettingsCurrencyChoice.init(rawValue:)) ?? .usd
+			self.role = role
     }
 
     var sections: [SettingsSection] {
         [
 		  
 		  role == .teacher ? SettingsSection(
-                title: "PAYOUTS",
+                title: LocalizationSupport.localized("PAYOUTS"),
                 rows: [
 				  
                     SettingsRow(
-                        title: "Teacher Payout Settings",
-                        subtitle: "Manage bank details & history",
+                        title: LocalizationSupport.localized("Teacher Payout Settings"),
+                        subtitle: LocalizationSupport.localized("Manage bank details & history"),
                         systemImage: "banknote.fill",
                         iconColor: .purple,
                         isDestructive: false,
@@ -284,11 +317,11 @@ class SettingsViewModel {
 					)
 					]
 		  ): SettingsSection(
-			title: "PAYMENTS",
+			title: LocalizationSupport.localized("PAYMENTS"),
 			rows: [
                     SettingsRow(
-                        title: "Student Payment Methods",
-                        subtitle: "Cards & billing history",
+                        title: LocalizationSupport.localized("Student Payment Methods"),
+                        subtitle: LocalizationSupport.localized("Cards & billing history"),
                         systemImage: "creditcard.fill",
                         iconColor: .pink,
                         isDestructive: false,
@@ -297,10 +330,10 @@ class SettingsViewModel {
                 ]
             ),
             SettingsSection(
-                title: "PREFERENCES",
+                title: LocalizationSupport.localized("PREFERENCES"),
                 rows: [
                     SettingsRow(
-                        title: "Language",
+                        title: LocalizationSupport.localized("Language"),
                         subtitle: selectedLanguage.title,
                         systemImage: "globe",
                         iconColor: .primary,
@@ -308,7 +341,15 @@ class SettingsViewModel {
                         action: .language
                     ),
                     SettingsRow(
-                        title: "Notification Preferences",
+                        title: LocalizationSupport.localized("Currency"),
+                        subtitle: selectedCurrency.subtitle,
+                        systemImage: "dollarsign.circle.fill",
+                        iconColor: .primary,
+                        isDestructive: false,
+                        action: .currency
+                    ),
+                    SettingsRow(
+                        title: LocalizationSupport.localized("Notification Preferences"),
                         subtitle: nil,
                         systemImage: "bell.fill",
                         iconColor: .primary,
@@ -316,7 +357,7 @@ class SettingsViewModel {
                         action: .notifications
                     ),
                     SettingsRow(
-                        title: "Privacy Controls",
+                        title: LocalizationSupport.localized("Privacy Controls"),
                         subtitle: nil,
                         systemImage: "shield.lefthalf.filled",
                         iconColor: .primary,
@@ -326,10 +367,10 @@ class SettingsViewModel {
                 ]
             ),
             SettingsSection(
-                title: "ABOUT",
+                title: LocalizationSupport.localized("ABOUT"),
                 rows: [
                     SettingsRow(
-                        title: "About",
+                        title: LocalizationSupport.localized("About"),
                         subtitle: nil,
                         systemImage: "doc.text.fill",
                         iconColor: .primary,
@@ -339,11 +380,11 @@ class SettingsViewModel {
                 ]
             ),
 			SettingsSection(
-			  title: "ACCOUNT",
+			  title: LocalizationSupport.localized("ACCOUNT"),
 			  rows: [
 				SettingsRow(
-				  title: "Account & Security",
-				  subtitle: "Password, logout and account removal",
+				  title: LocalizationSupport.localized("Account & Security"),
+				  subtitle: LocalizationSupport.localized("Password, logout and account removal"),
 				  systemImage: "lock.fill",
 				  iconColor: .primary,
 				  isDestructive: false,
@@ -356,10 +397,10 @@ class SettingsViewModel {
 
     var accountSecuritySection: SettingsSection {
         SettingsSection(
-            title: "ACCOUNT & SECURITY",
+            title: LocalizationSupport.localized("ACCOUNT & SECURITY"),
             rows: [
                 SettingsRow(
-                    title: "Change Password",
+                    title: LocalizationSupport.localized("Change Password"),
                     subtitle: nil,
                     systemImage: "lock.fill",
                     iconColor: .primary,
@@ -367,7 +408,7 @@ class SettingsViewModel {
                     action: .changePassword
                 ),
                 SettingsRow(
-                    title: "Log Out",
+                    title: LocalizationSupport.localized("Log Out"),
                     subtitle: nil,
                     systemImage: "rectangle.portrait.and.arrow.right",
                     iconColor: .red,
@@ -375,8 +416,8 @@ class SettingsViewModel {
                     action: .logOut
                 ),
                 SettingsRow(
-                    title: "Delete Account",
-                    subtitle: "Permanently remove your account",
+                    title: LocalizationSupport.localized("Delete Account"),
+                    subtitle: LocalizationSupport.localized("Permanently remove your account"),
                     systemImage: "trash.fill",
                     iconColor: .red,
                     isDestructive: true,
@@ -388,10 +429,10 @@ class SettingsViewModel {
 
     var aboutSection: SettingsSection {
         SettingsSection(
-            title: "ABOUT",
+            title: LocalizationSupport.localized("ABOUT"),
             rows: [
                 SettingsRow(
-                    title: "Contact Us",
+                    title: LocalizationSupport.localized("Contact Us"),
                     subtitle: nil,
                     systemImage: "envelope.fill",
                     iconColor: .primary,
@@ -399,7 +440,7 @@ class SettingsViewModel {
                     action: .contactUs
                 ),
                 SettingsRow(
-                    title: "EULA",
+                    title: LocalizationSupport.localized("EULA"),
                     subtitle: nil,
                     systemImage: "doc.plaintext.fill",
                     iconColor: .primary,
@@ -407,7 +448,7 @@ class SettingsViewModel {
                     action: .eula
                 ),
                 SettingsRow(
-                    title: "Privacy Policy",
+                    title: LocalizationSupport.localized("Privacy Policy"),
                     subtitle: nil,
                     systemImage: "hand.raised.fill",
                     iconColor: .primary,
@@ -434,6 +475,8 @@ class SettingsViewModel {
             navigationPath.append(.privacyControls)
         case .language:
             navigationPath.append(.language)
+        case .currency:
+            navigationPath.append(.currency)
         case .about:
             navigationPath.append(.about)
         case .contactUs:
@@ -473,8 +516,8 @@ class SettingsViewModel {
             return true
         } catch {
             present(
-                title: "Delete Account",
-                message: "\(error.localizedDescription) You may need to log in again before deleting your account."
+                title: LocalizationSupport.localized("Delete Account"),
+                message: "\(error.localizedDescription) " + LocalizationSupport.localized("You may need to log in again before deleting your account.")
             )
             return false
         }
@@ -485,7 +528,7 @@ class SettingsViewModel {
             try authService.signOut()
             return true
         } catch {
-            present(title: "Log Out", message: error.localizedDescription)
+            present(title: LocalizationSupport.localized("Log Out"), message: error.localizedDescription)
             return false
         }
     }
@@ -497,7 +540,7 @@ class SettingsViewModel {
         let email = await remoteConfigService.fetchSupportEmail()
         guard let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
               let url = URL(string: "mailto:\(encodedEmail)") else {
-            present(title: "Contact Us", message: "Support email is not configured correctly.")
+            present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Support email is not configured correctly."))
             return
         }
 
@@ -505,24 +548,24 @@ class SettingsViewModel {
     }
 
     func openEULA() async {
-        await openRemoteWebPage(title: "EULA") {
+        await openRemoteWebPage(title: LocalizationSupport.localized("EULA")) {
             try await remoteConfigService.fetchEULAURL()
         }
     }
 
     func openPrivacyPolicy() async {
-        await openRemoteWebPage(title: "Privacy Policy") {
+        await openRemoteWebPage(title: LocalizationSupport.localized("Privacy Policy")) {
             try await remoteConfigService.fetchPrivacyPolicyURL()
         }
     }
 
     func openAbout() async {
-        await openRemoteWebPage(title: "About") {
+        await openRemoteWebPage(title: LocalizationSupport.localized("About")) {
             try await remoteConfigService.fetchAboutURL()
         }
     }
     
-    func present(title: String = "Settings", message: String) {
+    func present(title: String = LocalizationSupport.localized("Settings"), message: String) {
         alertTitle = title
         alertMessage = message
         showAlert = true
@@ -559,7 +602,7 @@ final class MockSettingsViewModel: SettingsViewModel {
         case .logOut:
             return true
         case .deleteAccount:
-            present(title: "Delete Account", message: "Preview only. No account was deleted.")
+            present(title: LocalizationSupport.localized("Delete Account"), message: LocalizationSupport.localized("Preview only. No account was deleted."))
             return false
         }
     }
@@ -569,7 +612,7 @@ final class MockSettingsViewModel: SettingsViewModel {
     }
 
     override func deleteAccount() async -> Bool {
-        present(title: "Delete Account", message: "Preview only. No account was deleted.")
+        present(title: LocalizationSupport.localized("Delete Account"), message: LocalizationSupport.localized("Preview only. No account was deleted."))
         return false
     }
 
@@ -578,19 +621,18 @@ final class MockSettingsViewModel: SettingsViewModel {
     }
 
     override func openEULA() async {
-        navigationPath.append(.webPage(title: "EULA", url: previewURL(path: "eula")))
+        navigationPath.append(.webPage(title: LocalizationSupport.localized("EULA"), url: previewURL(path: "eula")))
     }
 
     override func openPrivacyPolicy() async {
-        navigationPath.append(.webPage(title: "Privacy Policy", url: previewURL(path: "privacy")))
+        navigationPath.append(.webPage(title: LocalizationSupport.localized("Privacy Policy"), url: previewURL(path: "privacy")))
     }
 
     override func openAbout() async {
-        navigationPath.append(.webPage(title: "About", url: previewURL(path: "about")))
+        navigationPath.append(.webPage(title: LocalizationSupport.localized("About"), url: previewURL(path: "about")))
     }
 
     private func previewURL(path: String) -> URL {
         URL(string: "https://example.com/\(path)") ?? URL(fileURLWithPath: "/")
     }
 }
-

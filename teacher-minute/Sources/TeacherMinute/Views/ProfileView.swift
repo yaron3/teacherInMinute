@@ -74,7 +74,7 @@ struct ProfileView: View {
 			.padding(.top, 30)
 		  
 		  teachingCard(
-			title: "Grade Levels Taught",
+			title: LocalizationSupport.localized("Grade Levels Taught"),
 			chips: viewModel.gradeLevels,
 			includeAdd: viewModel.gradeLevels.isEmpty,
 			editAction: viewModel.editGradeLevels,
@@ -83,7 +83,7 @@ struct ProfileView: View {
 		  .padding(.top, 14)
 		  
 		  teachingCard(
-			title: "Subjects",
+			title: LocalizationSupport.localized("Subjects"),
 			chips: viewModel.subjectsOrPlaceholder,
 			includeAdd: viewModel.subjects.isEmpty,
 			editAction: viewModel.editSubjects,
@@ -100,7 +100,7 @@ struct ProfileView: View {
 			VStack(spacing: 14) {
 			  ProfilePermissionRow(
 				icon: "mic.fill",
-				title: "Microphone",
+				title: LocalizationSupport.localized("Microphone"),
 				state: viewModel.microphoneState,
 				iconColor: viewModel.microphoneState.isGranted ? theme.appGreen : theme.appSecondaryText,
                 action: viewModel.requestMicrophonePermission
@@ -108,7 +108,7 @@ struct ProfileView: View {
 			  
 			  ProfilePermissionRow(
 				icon: "camera.fill",
-				title: "Camera",
+				title: LocalizationSupport.localized("Camera"),
 				state: viewModel.cameraState,
 				iconColor: viewModel.cameraState.isGranted ? theme.appGreen : theme.appSecondaryText,
                 action: viewModel.requestCameraPermission
@@ -116,7 +116,7 @@ struct ProfileView: View {
 
 			  ProfilePermissionRow(
 				icon: "bell.fill",
-				title: "Notifications",
+				title: LocalizationSupport.localized("Notifications"),
 				state: viewModel.notificationsState,
 				iconColor: viewModel.notificationsState.isGranted ? theme.appGreen : theme.appSecondaryText,
                 action: viewModel.manageNotifications
@@ -152,7 +152,7 @@ struct ProfileView: View {
 		SmallPill(title: viewModel.role, foreground: theme.appPurple, background: theme.appPurpleSoft)
 		
 		if viewModel.isVerified {
-		  SmallPill(title: "Verified", foreground: theme.appGreen, background: theme.appGreenSoft)
+		  SmallPill(title: LocalizationSupport.localized("Verified"), foreground: theme.appGreen, background: theme.appGreenSoft)
 		}
 	  }
 	  .padding(.top, 8)

@@ -132,8 +132,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var pricingOptions: [PricingOption] = []
 
   var recentLessons: [RecentLesson] = []
-  var totalTimeLearnedText = "0 min"
-  var totalSpendText = "$0.00"
+  var totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: [])
+  var totalSpendText = LessonFormatting.currencyText(cents: 0)
   var lessonCount = 0
   var hasUnreadMessages = false
   var profileImageURL = ""
@@ -145,7 +145,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func askTeacher(topic: String, text: String, photoUrls: [String] = [], conversationType: String = "text") async {
     guard case .idle = searchState else { return }
-    print("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
+	logger.info("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
     searchState = .searching(questionId: "")
     do {
       let result = try await FunctionsService.shared.createQuestion(
@@ -154,13 +154,13 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
         photoUrls: photoUrls,
         conversationType: conversationType
       )
-      print("TeacherMinute askTeacher created questionId=\(result.questionId)")
+	  logger.info("TeacherMinute askTeacher created questionId=\(result.questionId)")
       activeQuestionText = text
       activeConnectionFeeCents = result.connectionFeeCents
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
     } catch {
-      print("TeacherMinute askTeacher failed error=\(error)")
+	  logger.error("TeacherMinute askTeacher failed error=\(error)")
       searchState = .error(error.localizedDescription)
     }
   }
@@ -253,7 +253,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
         do {
           let result = try await currentQuestionStatus(questionId: questionId)
           let status = result.status.lowercased()
-          print("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
+		  logger.info("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
 
           if isAcceptedStatus(status) {
 			self.questionId = result.questionId
@@ -276,7 +276,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
           }
         } catch {
           guard !Task.isCancelled else { return }
-          print("TeacherMinute questionStatus polling error=\(error)")
+		  logger.error("TeacherMinute questionStatus polling error=\(error)")
         }
 
         try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -294,7 +294,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     if let realtimeResult = try? await QuestionStatusStore.fetch(questionId: questionId) {
       let realtimeStatus = realtimeResult.status.lowercased()
       if isAcceptedStatus(realtimeStatus) || realtimeStatus == "cancelled" || realtimeStatus == "canceled" {
-        print("TeacherMinute questionStatus realtimeOverride questionId=\(questionId) status=\(realtimeResult.status)")
+		logger.info("TeacherMinute questionStatus realtimeOverride questionId=\(questionId) status=\(realtimeResult.status)")
         return realtimeResult
       }
     }
@@ -382,8 +382,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.questionId = "mock-lesson"
     self.pricingOptions = pricingOptions
     self.recentLessons = recentLessons
-    self.totalTimeLearnedText = "36 min"
-    self.totalSpendText = "$27.80"
+    self.totalTimeLearnedText = String(format: LocalizationSupport.localized("%lld min"), Int64(36))
+    self.totalSpendText = LessonFormatting.currencyText(cents: 2780)
     self.lessonCount = recentLessons.count
     self.hasUnreadMessages = true
     self.profileImageURL = ""

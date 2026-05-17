@@ -149,7 +149,7 @@ struct HistoryMetricCard: View {
                         )
                     }
                 
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.appSecondaryText)
                 
@@ -425,7 +425,7 @@ struct LessonDetailView: View {
                 .padding(18)
             }
             .background(Color(.systemBackground))
-            .navigationTitle("Lesson")
+            .navigationTitle(LocalizationSupport.localized("Lesson"))
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 if initialDetails == nil {
