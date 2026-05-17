@@ -16,6 +16,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -179,7 +182,12 @@ internal fun PresentationRootView(context: ComposeContext) {
     PresentationRoot(defaultColorScheme = colorScheme, context = context) { ctx ->
         SyncSystemBarsWithTheme()
         val contentContext = ctx.content()
-        Box(modifier = ctx.modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = ctx.modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars),
+            contentAlignment = Alignment.Center
+        ) {
             AppRootView().Compose(context = contentContext)
         }
     }
