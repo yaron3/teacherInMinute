@@ -41,8 +41,21 @@ final class ProfileViewModel {
     }
 
     var gradeLevels: [String] {
-        grade.isEmpty ? [] : [grade]
+        teacherGradeLevels(from: grade)
     }
+
+    var selectedTeachingGrades: Set<String> {
+        get {
+            Set(gradeLevels)
+        }
+        set {
+            grade = Self.availableTeachingGrades
+                .filter { newValue.contains($0) }
+                .joined(separator: ", ")
+        }
+    }
+
+    static let availableTeachingGrades: [String] = (1...12).map { "Grade \($0)" }
 
     var subjectsOrPlaceholder: [String] {
         subjects.isEmpty ? ["No subjects added yet"] : subjects
@@ -72,11 +85,18 @@ final class ProfileViewModel {
     }
 
     func editProfile() {
-        if isEditing {
-            Task { await saveProfileEdits() }
-        } else {
-            isEditing = true
-        }
+        isEditing = true
+        rebuildContactRows()
+    }
+
+    func cancelProfileEditing() {
+        isEditing = false
+        errorMessage = nil
+        rebuildContactRows()
+    }
+
+    func saveProfileEdits() {
+        Task { await persistProfileEdits() }
     }
 
     func uploadProfileImage(data: Data) {
@@ -131,7 +151,7 @@ final class ProfileViewModel {
     }
 
     func editGradeLevels() {
-        isEditing = true
+        editProfile()
     }
 
     func editSubjects() {
@@ -139,16 +159,18 @@ final class ProfileViewModel {
     }
 
     func addGradeLevel() {
-        isEditing = true
+        editProfile()
     }
 
     func logout() {
         // Settings owns logout confirmation and routing.
     }
 
-    private func saveProfileEdits() async {
+    private func persistProfileEdits() async {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         syncFieldsFromRows()
+        isLoading = true
+        defer { isLoading = false }
 
         do {
             try await UserService.shared.updateProfileFields(uid: uid, fields: [
@@ -203,18 +225,23 @@ final class ProfileViewModel {
     private func syncFieldsFromRows() {
         for row in contactRows {
             let value = row.value.trimmingCharacters(in: .whitespacesAndNewlines)
-            switch row.description {
-            case "Full Name":
+            let description = row.description
+            if description == "Full Name" || description == LocalizationSupport.localized("Full Name") {
                 name = value
-            case "Email":
+            } else if description == "Email" || description == LocalizationSupport.localized("Email") {
                 email = value
-            case "Phone":
+            } else if description == "Phone" || description == LocalizationSupport.localized("Phone") {
                 phoneNumber = value
-            case "Grade":
+            } else if description == "Grade" || description == LocalizationSupport.localized("Grade") {
                 grade = value
-            default:
-                break
             }
         }
+    }
+
+    private func teacherGradeLevels(from value: String) -> [String] {
+        value
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }

@@ -15,6 +15,7 @@ import SkipBridge
 
 struct ProfileView: View {
   @State var viewModel: ProfileViewModel
+  @State var isShowingSubjectEditor = false
 #if !os(Android)
   @State private var profilePhotoItem: PhotosPickerItem?
 #endif
@@ -42,10 +43,10 @@ struct ProfileView: View {
 			  .fill(theme.appPrimaryText)
 			  .frame(width: 42, height: 42)
 			  .shadow(color: theme.appPrimaryText.opacity(0.05), radius: 12, x: 0, y: 6)
-			  .overlay {
-				PlatformIcon(systemName: viewModel.isEditing ? "checkmark" : "pencil", color: theme.appGreen)
-				  .font(.system(size: 15, weight: .bold))
-			  }
+		      .overlay {
+					PlatformIcon(systemName: "pencil", color: theme.appGreen)
+					  .font(.system(size: 15, weight: .bold))
+		      }
 		  }
 		  .buttonStyle(.plain)
 		}
@@ -82,15 +83,15 @@ struct ProfileView: View {
 		  )
 		  .padding(.top, 14)
 		  
-		  teachingCard(
-			title: LocalizationSupport.localized("Subjects"),
-			chips: viewModel.subjectsOrPlaceholder,
-			includeAdd: viewModel.subjects.isEmpty,
-			editAction: viewModel.editSubjects,
-			addAction: viewModel.editSubjects
-		  )
-		  .padding(.top, 18)
-		}
+			  teachingCard(
+				title: LocalizationSupport.localized("Subjects"),
+				chips: viewModel.subjectsOrPlaceholder,
+				includeAdd: viewModel.subjects.isEmpty,
+				editAction: { isShowingSubjectEditor = true },
+				addAction: { isShowingSubjectEditor = true }
+			  )
+			  .padding(.top, 18)
+			}
 		
 		Text("Device Permissions")
 		  .font(.system(size: 16, weight: .bold))
@@ -127,9 +128,23 @@ struct ProfileView: View {
 	  .padding(.bottom, 24)
 	}
 		.background(Color(.systemBackground))
-		.task {
-		  await viewModel.loadProfile()
-		}
+			.task {
+			  await viewModel.loadProfile()
+			}
+            .sheet(isPresented: $viewModel.isEditing, onDismiss: {
+              viewModel.cancelProfileEditing()
+            }) {
+              NavigationStack {
+                ProfileEditView(viewModel: viewModel)
+              }
+            }
+            .sheet(isPresented: $isShowingSubjectEditor, onDismiss: {
+              Task { await viewModel.loadProfile() }
+            }) {
+              NavigationStack {
+                TeacherSubjectsView(isEditing: true)
+              }
+            }
 #if !os(Android)
         .onChange(of: profilePhotoItem) { _, item in
           loadProfilePhoto(item)
@@ -298,6 +313,202 @@ struct ProfileView: View {
     }
   }
 #endif
+}
+
+struct ProfileEditView: View {
+  @State var viewModel: ProfileViewModel
+  @Environment(\.dismiss) var dismiss
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(LocalizationSupport.localized("Edit Profile"))
+          .font(.system(size: 26, weight: .bold))
+          .foregroundStyle(theme.authPrimaryText)
+          .padding(.top, 24)
+
+        Text("Update the details students and teachers use to recognize and contact you.")
+          .font(.system(size: 13))
+          .foregroundStyle(theme.authSecondaryText)
+          .lineSpacing(5)
+          .padding(.top, 8)
+
+        VStack(spacing: 16) {
+          ForEach($viewModel.contactRows, id: \.description) { $row in
+            ProfileEditInfoRow(parameter: $row)
+          }
+
+          if viewModel.roleType == .teacher {
+            ProfileTeachingGradePicker(
+              title: LocalizationSupport.localized("Grade Levels Taught"),
+              selectedGrades: $viewModel.selectedTeachingGrades
+            )
+          }
+        }
+        .padding(.top, 28)
+
+        if let error = viewModel.errorMessage {
+          Text(error)
+            .font(.system(size: 12))
+            .foregroundStyle(.red)
+            .padding(.top, 16)
+        }
+
+        AuthPrimaryButton(
+          title: viewModel.isLoading ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save Changes"),
+          systemImage: "checkmark",
+          isEnabled: !viewModel.isLoading
+        ) {
+          Task { @MainActor in
+            viewModel.saveProfileEdits()
+          }
+        }
+        .padding(.top, 28)
+        .padding(.bottom, 24)
+      }
+      .padding(.horizontal, 18)
+    }
+    .background(Color(.systemBackground))
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .cancellationAction) {
+        Button("Cancel") {
+          viewModel.cancelProfileEditing()
+          dismiss()
+        }
+      }
+    }
+    .onChange(of: viewModel.isEditing) { _, isEditing in
+      if !isEditing {
+        dismiss()
+      }
+    }
+  }
+}
+
+struct ProfileTeachingGradePicker: View {
+  let title: String
+  @Binding var selectedGrades: Set<String>
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  let grades = ProfileViewModel.availableTeachingGrades
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        Text(title)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.authPrimaryText)
+
+        Spacer()
+
+        Text(selectedGrades.isEmpty ? LocalizationSupport.localized("Choose grades") : "\(selectedGrades.count) selected")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(theme.authSecondaryText)
+          .padding(.horizontal, 10)
+          .frame(height: 24)
+          .background(theme.authFieldBorder.opacity(0.7))
+          .clipShape(Capsule())
+      }
+
+      FlowLayout(spacing: 10) {
+        ForEach(grades, id: \.self) { grade in
+          ProfileTeachingGradeChip(
+            title: grade,
+            isSelected: selectedGrades.contains(grade)
+          ) {
+            toggleGrade(grade)
+          }
+        }
+      }
+    }
+  }
+
+  private func toggleGrade(_ grade: String) {
+    if selectedGrades.contains(grade) {
+      selectedGrades.remove(grade)
+    } else {
+      selectedGrades.insert(grade)
+    }
+  }
+}
+
+struct ProfileTeachingGradeChip: View {
+  let title: String
+  let isSelected: Bool
+  let action: () -> Void
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 7) {
+        PlatformIcon(systemName: "graduationcap")
+          .font(.system(size: 12, weight: .semibold))
+
+        Text(LocalizedStringKey(title))
+          .font(.system(size: 13, weight: .medium))
+      }
+      .foregroundStyle(theme.authPrimaryText)
+      .padding(.horizontal, 14)
+      .frame(height: 34)
+      .background(isSelected ? theme.authPink : theme.authPinkSoft)
+      .clipShape(Capsule())
+      .overlay {
+        Capsule()
+          .stroke(isSelected ? theme.authPink : theme.authFieldBorder, lineWidth: 1)
+      }
+    }
+    .buttonStyle(.plain)
+  }
+}
+
+struct ProfileEditInfoRow: View {
+  @Binding var parameter: Parameter
+
+  var body: some View {
+    AuthInputField(
+      title: parameter.description,
+      placeholder: parameter.description,
+      systemImage: parameter.image,
+      text: $parameter.value,
+      keyboardType: keyboardType,
+      textContentType: textContentType
+    )
+  }
+
+  private var keyboardType: UIKeyboardType {
+    switch parameter.description {
+    case LocalizationSupport.localized("Email"):
+      return .emailAddress
+    case LocalizationSupport.localized("Phone"):
+      return .phonePad
+    default:
+      return .default
+    }
+  }
+
+  private var textContentType: UITextContentType? {
+    switch parameter.description {
+    case LocalizationSupport.localized("Full Name"):
+      return .name
+    case LocalizationSupport.localized("Email"):
+      return .emailAddress
+    case LocalizationSupport.localized("Phone"):
+      return .telephoneNumber
+    default:
+      return nil
+    }
+  }
 }
 
 #if os(Android)
