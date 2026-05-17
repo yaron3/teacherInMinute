@@ -18,11 +18,11 @@ struct ChatBubble: View {
       VStack(alignment: message.isMine ? .trailing : .leading, spacing: 5) {
         Text(message.text)
           .font(.system(size: 14))
-          .foregroundStyle(message.isMine ?theme.appCardBackground: theme.appPrimaryText)
+          .foregroundStyle(message.isMine ? theme.appCardBackground: theme.appPrimaryText)
           .lineSpacing(3)
           .padding(.horizontal, 14)
           .padding(.vertical, 12)
-          .background(message.isMine ? theme.appPink : Color(red: 229 / 255, green: 231 / 255, blue: 235 / 255))
+		  .background(message.isMine ? theme.appPink : theme.appCardBackground)
           .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
         Text(timeText)

@@ -451,7 +451,7 @@ struct SearchingOverlay: View {
   }
     var body: some View {
         ZStack {
-            theme.appPrimaryText.opacity(0.5).ignoresSafeArea()
+            theme.appGrayBackground.ignoresSafeArea()
 
             VStack(spacing: 24) {
                 ProgressView()
