@@ -444,29 +444,42 @@ struct ConversationTypeChip: View {
 // MARK: - State Overlays
 
 struct SearchingOverlay: View {
+    let avatarURLs: [URL?]
     let onCancel: () -> Void
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
+
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
+
+    @State  var ringRotation = 0.0
+    @State  var cycleIndex = 0
+
+    private let slotCount = 6
+    private let ringDiameter: CGFloat = 240
+    private let avatarSize: CGFloat = 60
+
+    init(avatarURLs: [URL?] = [], onCancel: @escaping () -> Void) {
+        self.avatarURLs = avatarURLs
+        self.onCancel = onCancel
+    }
+
     var body: some View {
         ZStack {
             theme.appGrayBackground.ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .scaleEffect(1.5)
-                    .tint(theme.appPrimaryText)
+            VStack(spacing: 28) {
+                avatarRing
 
-                Text("Searching for a teacher\u{2026}")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(theme.appPrimaryText)
-
-                Text("This usually takes under 30 seconds.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .multilineTextAlignment(.center)
+                VStack(spacing: 8) {
+                    Text("Searching for a teacher\u{2026}")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(theme.appPrimaryText)
+                    Text("This usually takes under 30 seconds.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.appSecondaryText)
+                        .multilineTextAlignment(.center)
+                }
 
                 Button(action: onCancel) {
                     Text("Cancel")
@@ -474,13 +487,94 @@ struct SearchingOverlay: View {
                         .foregroundStyle(theme.appPrimaryText)
                         .padding(.horizontal, 32)
                         .padding(.vertical, 12)
-                        .background(.white.opacity(0.2))
+                        .background(theme.appCardBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(theme.appBorder, lineWidth: 1)
+                        }
                 }
                 .buttonStyle(.plain)
             }
             .padding(32)
         }
+        .task {
+            withAnimation(.linear(duration: 18).repeatForever(autoreverses: false)) {
+                ringRotation = 360
+            }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_400_000_000)
+                cycleIndex += 1
+            }
+        }
+    }
+
+    private var avatarRing: some View {
+        ZStack {
+            Circle()
+                .stroke(theme.appPink.opacity(0.18), lineWidth: 1.5)
+                .frame(width: ringDiameter, height: ringDiameter)
+
+            Circle()
+                .fill(theme.appPink.opacity(0.08))
+                .frame(width: ringDiameter * 0.45, height: ringDiameter * 0.45)
+
+            ForEach(0..<slotCount, id: \.self) { index in
+                avatarSlot(index: index)
+            }
+            .rotationEffect(.degrees(ringRotation))
+        }
+        .frame(width: ringDiameter, height: ringDiameter)
+    }
+
+    @ViewBuilder
+    private func avatarSlot(index: Int) -> some View {
+        let angle = (Double(index) / Double(slotCount)) * 360.0 - 90.0
+        let radius = (ringDiameter - avatarSize) / 2
+        let x = cos(angle * .pi / 180) * Double(radius)
+        let y = sin(angle * .pi / 180) * Double(radius)
+
+        avatarImage(for: index)
+            .frame(width: avatarSize, height: avatarSize)
+            .clipShape(Circle())
+            .overlay {
+                Circle().stroke(theme.appCardBackground, lineWidth: 3)
+            }
+            .shadow(color: theme.appPrimaryText.opacity(0.10), radius: 6, x: 0, y: 3)
+            .rotationEffect(.degrees(-ringRotation))
+            .offset(x: CGFloat(x), y: CGFloat(y))
+    }
+
+    @ViewBuilder
+    private func avatarImage(for index: Int) -> some View {
+        if let url = currentURL(for: index) {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                placeholderAvatar
+            }
+        } else {
+            placeholderAvatar
+        }
+    }
+
+    private var placeholderAvatar: some View {
+        ZStack {
+            Circle().fill(theme.appPurpleSoft)
+            PlatformIcon(
+                systemName: "person.crop.circle.fill",
+                size: avatarSize * 0.9,
+                color: theme.appPurple
+            )
+        }
+    }
+
+    private func currentURL(for index: Int) -> URL? {
+        guard !avatarURLs.isEmpty else { return nil }
+        let urlIndex = (cycleIndex + index) % avatarURLs.count
+        return avatarURLs[urlIndex]
     }
 }
 
@@ -745,5 +839,12 @@ struct StudentHomeView_Previews: PreviewProvider {
     static var previews: some View {
         StudentHomeView(viewModel: MockStudentHomeViewModel())
     }
+}
+
+struct StudentSearchHomeView_Previews: PreviewProvider {
+  static var previews: some View {
+
+	StudentHomeView(viewModel: MockStudentHomeViewModel(searchState: .searching(questionId: "fdjhfdhdf")))
+  }
 }
 #endif
