@@ -27,12 +27,56 @@ enum StudentSearchState {
 
 // MARK: - Supporting Models
 
+/// Pricing tier type. Firestore stores the raw string in the `type` field.
+enum PricingType: String {
+  case payAsYouGo       = "pay_as_you_go"
+  case unlimitedWeek    = "unlimited_week"
+  case unlimitedMonth   = "unlimited_month"
+  case unlimitedYear    = "unlimited_year"
+
+  var billingPeriodText: String? {
+    switch self {
+    case .payAsYouGo:     return nil
+    case .unlimitedWeek:  return "per week"
+    case .unlimitedMonth: return "per month"
+    case .unlimitedYear:  return "per year"
+    }
+  }
+}
+
+/// A pricing tier loaded from Firestore (`pricing` collection).
+///
+/// Firestore document fields:
+///   - `name` (String)
+///   - `priceCents` (Int) — price in minor currency units
+///   - `currency` (String) — ISO code, defaults to "USD"
+///   - `type` (String) — one of `PricingType` raw values
+///   - `description` (String)
+///   - `isHighlighted` (Bool)
+///   - `sortOrder` (Int)
+///   - `purchaseSKU` (String, optional) — store / IAP product identifier
+///
+/// The document ID is exposed as `id` and is the key recorded on the user
+/// document (e.g. `users/{uid}.purchases[]`) when the tier is purchased.
 struct PricingOption: Identifiable {
-  let id = UUID()
+  let id: String
   let name: String
-  let price: String
+  let priceCents: Int
+  let currency: String
+  let type: PricingType
   let description: String
   let isHighlighted: Bool
+  let sortOrder: Int
+  let purchaseSKU: String?
+
+  var priceText: String {
+    let amount = Double(priceCents) / 100.0
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .currency
+    formatter.currencyCode = currency
+    formatter.maximumFractionDigits = 2
+    return formatter.string(from: NSNumber(value: amount)) ?? String(format: "$%.2f", amount)
+  }
 }
 
 struct RecentLesson: Identifiable {
@@ -82,20 +126,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var selectedPricePerMinuteCents = 50
   var questionId: String?
 
-  let pricingOptions = [
-    PricingOption(
-      name: "Standard",
-      price: "$0.50",
-      description: "Verified tutors for algebra, geometry, and basic calculus.",
-      isHighlighted: false
-    ),
-    PricingOption(
-      name: "Expert",
-      price: "$1.20",
-      description: "Advanced degree tutors for college-level help.",
-      isHighlighted: true
-    ),
-  ]
+  var pricingOptions: [PricingOption] = []
 
   var recentLessons: [RecentLesson] = []
   var totalTimeLearnedText = "0 min"
@@ -147,11 +178,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   }
 
   func selectTier(_ option: PricingOption) {
-    selectedPricePerMinuteCents = Self.cents(from: option.price)
+    selectedPricePerMinuteCents = option.priceCents
   }
   func viewAllLessons() {}
 
   func loadProfileIfNeeded() async {
+    await loadPricingOptions()
     guard !didLoadProfile, let uid = Auth.auth().currentUser?.uid else { return }
     didLoadProfile = true
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
@@ -159,6 +191,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
+  }
+
+  private func loadPricingOptions() async {
+    do {
+      pricingOptions = try await PricingService.shared.fetchPricingOptions()
+    } catch {
+      logger.error("[StudentHome] failed loading pricing options: \(error.localizedDescription)")
+    }
   }
 
   private func loadRecentLessons(uid: String) async {
@@ -258,11 +298,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       || status == "active"
   }
 
-  private static func cents(from price: String) -> Int {
-    let numeric = price.replacingOccurrences(of: "$", with: "")
-    return Int(((Double(numeric) ?? 0) * 100).rounded())
-  }
-
   private static func recentLesson(_ lesson: HistoryLesson) -> RecentLesson {
     RecentLesson(
       title: lesson.title,
@@ -298,16 +333,26 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     selectedPricePerMinuteCents: Int = 50,
     pricingOptions: [PricingOption] = [
       PricingOption(
+        id: "standard_pay_as_you_go",
         name: "Standard",
-        price: "$0.50",
+        priceCents: 50,
+        currency: "USD",
+        type: .payAsYouGo,
         description: "Verified tutors for algebra, geometry, and basic calculus.",
-        isHighlighted: false
+        isHighlighted: false,
+        sortOrder: 0,
+        purchaseSKU: nil
       ),
       PricingOption(
+        id: "expert_pay_as_you_go",
         name: "Expert",
-        price: "$1.20",
+        priceCents: 120,
+        currency: "USD",
+        type: .payAsYouGo,
         description: "Advanced degree tutors for college-level help.",
-        isHighlighted: true
+        isHighlighted: true,
+        sortOrder: 1,
+        purchaseSKU: nil
       ),
     ],
     recentLessons: [RecentLesson] = [
@@ -344,7 +389,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   }
 
   func selectTier(_ option: PricingOption) {
-    selectedPricePerMinuteCents = Self.cents(from: option.price)
+    selectedPricePerMinuteCents = option.priceCents
   }
 
   func viewAllLessons() {}
@@ -365,10 +410,5 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       pricePerMinuteCents: selectedPricePerMinuteCents,
       teacherSharePercent: 75
     )
-  }
-
-  private static func cents(from price: String) -> Int {
-    let numeric = price.replacingOccurrences(of: "$", with: "")
-    return Int(((Double(numeric) ?? 0) * 100).rounded())
   }
 }

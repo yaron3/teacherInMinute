@@ -38,7 +38,7 @@ struct StudentHomeView: View {
                     askTeacherCard
                         .padding(.top, 20)
 
-                    sectionHeader(title: "Pricing Options", actionTitle: "Compare all") {}
+                    sectionHeader(title: "Pricing Options")
                         .padding(.top, 24)
 
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -60,8 +60,14 @@ struct StudentHomeView: View {
                     tipsCard
                         .padding(.top, 28)
 
-                    sectionHeader(title: "Recent Lessons", actionTitle: "View all") {
-                        viewModel.viewAllLessons()
+                    Group {
+                        if viewModel.lessonCount > viewModel.recentLessons.count {
+                            sectionHeader(title: "Recent Lessons", actionTitle: "View all") {
+                                viewModel.viewAllLessons()
+                            }
+                        } else {
+                            sectionHeader(title: "Recent Lessons")
+                        }
                     }
                     .padding(.top, 28)
 
@@ -263,7 +269,7 @@ struct StudentHomeView: View {
         }
     }
 
-    func sectionHeader(title: String, actionTitle: String, action: @escaping () -> Void) -> some View {
+    func sectionHeader(title: String, actionTitle: String? = nil, action: (() -> Void)? = nil) -> some View {
         HStack {
             Text(title)
                 .font(.system(size: 18, weight: .bold))
@@ -271,12 +277,14 @@ struct StudentHomeView: View {
 
             Spacer()
 
-            Button(action: action) {
-                Text(actionTitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(theme.appPink)
+            if let actionTitle, let action {
+                Button(action: action) {
+                    Text(actionTitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(theme.appPink)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 }
@@ -642,11 +650,11 @@ struct PricingCard: View {
                 )
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(option.price)
+                    Text(option.priceText)
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
 
-                    Text("/min")
+                    Text(priceSuffix(for: option))
                         .font(.system(size: 12))
                         .foregroundStyle(theme.appSecondaryText)
                 }
@@ -677,6 +685,13 @@ struct PricingCard: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(option.isHighlighted ? theme.appPurple : Color.clear, lineWidth: 2)
         }
+    }
+
+    private func priceSuffix(for option: PricingOption) -> String {
+        if let period = option.type.billingPeriodText {
+            return period
+        }
+        return "/min"
     }
 }
 
