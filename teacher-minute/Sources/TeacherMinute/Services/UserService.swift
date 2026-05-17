@@ -68,11 +68,13 @@ final class UserService {
   // MARK: - Unread messages
 
   func hasUnreadMessages(uid: String) async -> Bool {
-	let db = Firestore.firestore()
-	let snap = try? await db.collection("users").document(uid)
-	  .collection("messages").document("unread").getDocument()
-	guard let data = snap?.data(), snap?.exists == true else { return false }
-	return !data.isEmpty
+    do {
+      let messages = try await NotificationMessageService.shared.fetchMessages(uid: uid)
+      return messages.contains { !$0.isRead }
+    } catch {
+      logger.error("[UserService] failed checking unread messages: \(error.localizedDescription)")
+      return false
+    }
   }
 
   // MARK: - Determine where to resume onboarding

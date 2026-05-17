@@ -14,6 +14,8 @@ struct AppTopHeader: View {
   let name: String
   var avatarImageURL = ""
   var showNotificationBadge = false
+  var onMessagesDismissed: (() -> Void)?
+  @State var showsMessages = false
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -42,7 +44,7 @@ struct AppTopHeader: View {
 	  Spacer()
 	  
 	  Button {
-		// TODO: open notifications
+			showsMessages = true
 	  } label: {
 		ZStack(alignment: .topTrailing) {
 		  Circle()
@@ -63,6 +65,11 @@ struct AppTopHeader: View {
 	  }
 	  .buttonStyle(.plain)
 	}
+    .sheet(isPresented: $showsMessages, onDismiss: {
+      onMessagesDismissed?()
+    }) {
+      NotificationMessagesView()
+    }
   }
 }
 

@@ -32,7 +32,10 @@ struct StudentHomeView: View {
                         eyebrow: "Welcome back",
                         name: viewModel.name,
                         avatarImageURL: viewModel.profileImageURL,
-                        showNotificationBadge: viewModel.hasUnreadMessages
+                        showNotificationBadge: viewModel.hasUnreadMessages,
+                        onMessagesDismissed: {
+                            Task { await viewModel.refreshUnreadMessages() }
+                        }
                     )
                     .padding(.top, 18)
 

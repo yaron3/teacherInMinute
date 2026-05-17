@@ -112,6 +112,7 @@ protocol StudentHomeViewModeling: AnyObject {
   func selectTier(_ option: PricingOption)
   func viewAllLessons()
   func loadProfileIfNeeded() async
+  func refreshUnreadMessages() async
   func chatInitialDetails(questionId: String?) -> ChatSessionDetails
 }
 
@@ -195,6 +196,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
+  }
+
+  func refreshUnreadMessages() async {
+    guard let uid = Auth.auth().currentUser?.uid else { return }
+    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
   }
 
   private func loadPricingOptions() async {
@@ -404,6 +410,10 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   func viewAllLessons() {}
 
   func loadProfileIfNeeded() async {}
+
+  func refreshUnreadMessages() async {
+    hasUnreadMessages = false
+  }
 
   func chatInitialDetails(questionId: String? = nil) -> ChatSessionDetails {
     ChatSessionDetails(

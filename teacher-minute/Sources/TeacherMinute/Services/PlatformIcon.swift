@@ -110,6 +110,7 @@ struct PlatformIcon: View {
 		case "lightbulb.fill":						return "💡"
 		case "checkmark":							return "✓"
 		case "envelope.fill":						return "📧"
+        case "envelope.open.fill":                  return "📬"
 		case "phone.fill":							return "📞"
 		case "globe":                               return "🌍"
 		

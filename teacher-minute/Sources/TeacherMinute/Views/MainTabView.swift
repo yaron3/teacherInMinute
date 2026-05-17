@@ -52,7 +52,6 @@ struct MainTabView: View {
                         Label(MainTab.settings.title, systemImage: MainTab.settings.systemImage)
                     }
                     .tag(MainTab.settings)
-                    .badge(viewModel.hasNotificationBadge ? 1 : 0)
             }
             .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
 

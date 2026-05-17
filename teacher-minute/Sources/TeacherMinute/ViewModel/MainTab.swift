@@ -49,7 +49,6 @@ final class MainTabViewModel {
     var userMode: AppUserMode
 
     var hasTeacherRequestBadge = true
-    var hasNotificationBadge = true
     
     var shouldShowLessonsBadge: Bool {
         userMode == .teacher && hasTeacherRequestBadge
