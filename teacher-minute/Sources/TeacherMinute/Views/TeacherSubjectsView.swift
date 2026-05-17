@@ -112,7 +112,7 @@ struct TeacherSubjectsView: View {
 				}
 			Spacer()
 			AuthPrimaryButton(
-		  title: isEditing ? "Save Changes" : "Continue to Onboarding",
+		  title: isEditing ? LocalizationSupport.localized("Save Changes") : LocalizationSupport.localized("Continue to Onboarding"),
 		  systemImage: isEditing ? "checkmark" : "arrow.right",
 		  isEnabled: viewModel.canContinue
 		) {
@@ -196,7 +196,7 @@ struct SubjectAreaChip: View {
 		PlatformIcon(systemName: area.systemImage)
 		  .font(.system(size: 12, weight: .semibold))
 		
-		Text(area.title)
+		Text(LocalizedStringKey(area.title))
 		  .font(.system(size: 13, weight: .medium))
 	  }
 	  .foregroundStyle(theme.authPrimaryText)

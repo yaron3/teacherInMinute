@@ -175,7 +175,7 @@ struct SubjectChip: View {
                 PlatformIcon(systemName: subject.systemImage)
                     .font(.system(size: 12, weight: .semibold))
 
-                Text(subject.title)
+                Text(LocalizedStringKey(subject.title))
                     .font(.system(size: 13, weight: .medium))
             }
 			.foregroundStyle(theme.authPrimaryText)
