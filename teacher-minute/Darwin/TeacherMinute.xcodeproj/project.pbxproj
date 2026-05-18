@@ -237,6 +237,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 0.0.1;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
 			};
@@ -252,6 +253,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 0.0.1;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
 			};
