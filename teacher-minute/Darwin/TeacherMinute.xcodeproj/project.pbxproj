@@ -235,6 +235,10 @@
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera for profile photos, identity verification, and live lessons.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access so students and teachers can talk during live lessons.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save verification documents to your photo library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photo library to upload your profile photo, teaching credentials, government ID, and selfie for identity verification.";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 0.0.1;
@@ -251,6 +255,10 @@
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera for profile photos, identity verification, and live lessons.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access so students and teachers can talk during live lessons.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save verification documents to your photo library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photo library to upload your profile photo, teaching credentials, government ID, and selfie for identity verification.";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 0.0.1;

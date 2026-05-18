@@ -70,7 +70,8 @@ final class TeacherLessonHistoryViewModel {
             let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
             totalTimeTaughtText = LessonFormatting.totalDurationText(lessons: historyLessons)
             totalEarningsText = LessonFormatting.currencyText(
-                cents: historyLessons.reduce(0) { $0 + $1.teacherEarningsCents }
+                cents: historyLessons.reduce(0) { $0 + $1.teacherEarningsCents },
+                currencyCode: historyLessons.first?.currencyCode ?? LessonFormatting.defaultCurrencyCode
             )
             lessons = historyLessons.map { Self.lessonHistoryItem($0, currentUserImageURL: profileImageURL) }
         } catch {
@@ -102,7 +103,7 @@ final class TeacherLessonHistoryViewModel {
             currentUserImageURL: currentUserImageURL,
             completedAt: LessonFormatting.relativeDateText(lesson.acceptedAt),
             duration: LessonFormatting.shortDurationText(seconds: lesson.durationSeconds),
-            amount: LessonFormatting.currencyText(cents: lesson.teacherEarningsCents),
+            amount: LessonFormatting.currencyText(cents: lesson.teacherEarningsCents, currencyCode: lesson.currencyCode),
             amountCents: lesson.teacherEarningsCents,
             summary: String(
                 format: LocalizationSupport.localized("Completed lesson with %@."),

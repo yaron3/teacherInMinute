@@ -8,10 +8,6 @@ import Foundation
 enum LessonFormatting {
     static let defaultCurrencyCode = "USD"
 
-    static var selectedCurrencyCode: String {
-        defaultCurrencyCode
-    }
-
     static func relativeDateText(_ date: Date) -> String {
         guard date > .distantPast else { return "Recently" }
 
@@ -44,7 +40,7 @@ enum LessonFormatting {
             : String(format: LocalizationSupport.localized("%lld min"), Int64(minutes))
     }
 
-    static func currencyText(cents: Int, currencyCode: String = selectedCurrencyCode) -> String {
+    static func currencyText(cents: Int, currencyCode: String = defaultCurrencyCode) -> String {
         let amount = Double(cents) / 100.0
         let isWholeAmount = cents % 100 == 0
         if shouldPlaceCurrencySymbolAfterAmount(currencyCode: currencyCode) {
@@ -93,8 +89,9 @@ enum LessonFormatting {
             : String(format: LocalizationSupport.localized("%lld min"), Int64(totalMinutes))
     }
 
-    static func totalCostText(lessons: [HistoryLesson], currencyCode: String = selectedCurrencyCode) -> String {
+    static func totalCostText(lessons: [HistoryLesson], currencyCode: String? = nil) -> String {
         let totalCents = lessons.reduce(0) { $0 + $1.costCents }
-        return currencyText(cents: totalCents, currencyCode: currencyCode)
+        let displayCurrencyCode = currencyCode ?? lessons.first?.currencyCode ?? defaultCurrencyCode
+        return currencyText(cents: totalCents, currencyCode: displayCurrencyCode)
     }
 }

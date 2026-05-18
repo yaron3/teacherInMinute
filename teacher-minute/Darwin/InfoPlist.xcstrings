@@ -1,7 +1,70 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-
+    "TeacherMinute lets you choose photos for your profile, lesson questions, and teacher verification documents." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TeacherMinute lets you choose photos for your profile, lesson questions, and teacher verification documents."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TeacherMinute מאפשרת לך לבחור תמונות לפרופיל, לשאלות בשיעורים ולמסמכי אימות מורה."
+          }
+        }
+      }
+    },
+    "TeacherMinute may save images you create or receive during lessons to your photo library." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TeacherMinute may save images you create or receive during lessons to your photo library."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TeacherMinute עשויה לשמור בספריית התמונות שלך תמונות שיצרת או קיבלת במהלך שיעורים."
+          }
+        }
+      }
+    },
+    "TeacherMinute uses the camera for live video tutoring and identity verification selfies." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TeacherMinute uses the camera for live video tutoring and identity verification selfies."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TeacherMinute משתמשת במצלמה לשיעורי וידאו חיים ולצילומי סלפי לאימות זהות."
+          }
+        }
+      }
+    },
+    "TeacherMinute uses the microphone for live voice tutoring sessions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TeacherMinute uses the microphone for live voice tutoring sessions."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TeacherMinute משתמשת במיקרופון לשיעורי קול חיים."
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }

@@ -60,6 +60,32 @@ enum LocalizationSupport {
             return "%lld דק׳"
         case "%lld mins":
             return "%lld דק׳"
+        case "Question details are loading.":
+            return "פרטי השאלה נטענים."
+        case "Live Earnings":
+            return "הכנסות בזמן אמת"
+        case "Session Cost":
+            return "עלות השיעור"
+        case "Your share (%lld%%)":
+            return "החלק שלך (%lld%%)"
+        case "Total so far":
+            return "סה״כ עד עכשיו"
+        case "Session started - Billing active":
+            return "השיעור התחיל - החיוב פעיל"
+        case "Just now":
+            return "עכשיו"
+        case "1 min ago":
+            return "לפני דקה"
+        case "%lld min ago":
+            return "לפני %lld דק׳"
+        case "1 hr ago":
+            return "לפני שעה"
+        case "%lld hrs ago":
+            return "לפני %lld שעות"
+        case "1 day ago":
+            return "לפני יום"
+        case "%lld days ago":
+            return "לפני %lld ימים"
         default:
             return nil
         }

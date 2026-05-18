@@ -14,7 +14,8 @@ struct StudentHomeView: View {
     @Binding var hidesTabBar: Bool
     @Environment(\.openURL) var openURL
     @Environment(\.scenePhase) var scenePhase
-  @Environment(\.colorScheme) var colorScheme
+    @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
+	@Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
@@ -113,6 +114,9 @@ struct StudentHomeView: View {
         }
         .sheet(isPresented: $showingAskSheet) {
             AskTeacherSheet(viewModel: viewModel, isPresented: $showingAskSheet)
+                .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+                .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+                .id(languagePreference)
         }
         .task {
             await viewModel.loadProfileIfNeeded()

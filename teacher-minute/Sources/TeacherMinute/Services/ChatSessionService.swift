@@ -44,6 +44,7 @@ struct ChatSessionDetails: Equatable {
   let connectionFeeCents: Int
   let pricePerMinuteCents: Int
   let teacherSharePercent: Double
+  let currencyCode: String
 }
 
 @MainActor
@@ -353,8 +354,20 @@ final class ChatSessionService {
         ?? intValue(dict["ratePerMinuteCents"])
         ?? intValue(dict["costPerMinuteCents"])
         ?? 0,
-      teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75
+      teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75,
+      currencyCode: currencyCode(from: dict)
     )
+  }
+
+  private static func currencyCode(from dict: [String: Any]) -> String {
+    let currency = firstString(in: dict, keys: [
+      "currencyCode",
+      "currency",
+      "packageCurrency",
+      "pricingCurrency",
+      "purchaseCurrency"
+    ])
+    return currency.isEmpty ? LessonFormatting.defaultCurrencyCode : currency
   }
 
   private static func firstString(in dict: [String: Any], keys: [String]) -> String {
@@ -424,9 +437,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var details: ChatSessionDetails?
   var participantName: String {
     if isTeacherRole {
-	  return nonEmpty(details?.studentName) ?? "Student"
+	  return nonEmpty(details?.studentName) ?? LocalizationSupport.localized("Student")
     }
-	return nonEmpty(details?.teacherName) ?? "Teacher"
+	return nonEmpty(details?.teacherName) ?? LocalizationSupport.localized("Teacher")
    
   }
   var participantImageURL: String {
@@ -442,15 +455,21 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     return nonEmpty(details?.studentImageURL) ?? ""
   }
   var originalQuestion: String {
-    nonEmpty(details?.questionText) ?? "Question details are loading."
+    nonEmpty(details?.questionText) ?? LocalizationSupport.localized("Question details are loading.")
   }
   var primaryAmountTitle: String {
-    isTeacherRole ? "Live Earnings" : "Session Cost"
+    LocalizationSupport.localized(isTeacherRole ? "Live Earnings" : "Session Cost")
   }
   var primaryAmountSubtitle: String {
-    isTeacherRole ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
+    if isTeacherRole {
+      return String(
+        format: LocalizationSupport.localized("Your share (%lld%%)"),
+        Int64(teacherSharePercent)
+      )
+    }
+    return LocalizationSupport.localized("Total so far")
   }
-  let sessionNoticeText = "Session started - Billing active"
+  let sessionNoticeText = LocalizationSupport.localized("Session started - Billing active")
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
@@ -569,15 +588,25 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func messageTimeText(createdAt: Double, at date: Date) -> String {
     let createdAtMilliseconds = ChatSessionService.normalizedMilliseconds(createdAt)
-    guard createdAtMilliseconds > 0 else { return "Just now" }
+    guard createdAtMilliseconds > 0 else { return LocalizationSupport.localized("Just now") }
     let elapsed = max(0, Int(date.timeIntervalSince1970 - createdAtMilliseconds / 1000.0))
-    if elapsed < 60 { return "Just now" }
+    if elapsed < 60 { return LocalizationSupport.localized("Just now") }
     let minutes = elapsed / 60
-    if minutes < 60 { return minutes == 1 ? "1 min ago" : "\(minutes) min ago" }
+    if minutes < 60 {
+      return minutes == 1
+        ? LocalizationSupport.localized("1 min ago")
+        : String(format: LocalizationSupport.localized("%lld min ago"), Int64(minutes))
+    }
     let hours = minutes / 60
-    if hours < 24 { return hours == 1 ? "1 hr ago" : "\(hours) hrs ago" }
+    if hours < 24 {
+      return hours == 1
+        ? LocalizationSupport.localized("1 hr ago")
+        : String(format: LocalizationSupport.localized("%lld hrs ago"), Int64(hours))
+    }
     let days = hours / 24
-    return days == 1 ? "1 day ago" : "\(days) days ago"
+    return days == 1
+      ? LocalizationSupport.localized("1 day ago")
+      : String(format: LocalizationSupport.localized("%lld days ago"), Int64(days))
   }
 
   func localMessage(text: String) -> ChatMessage {
@@ -710,7 +739,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   private func currencyText(cents: Double) -> String {
-    String(format: "$%.2f", cents / 100.0)
+    LessonFormatting.currencyText(cents: Int(cents.rounded()), currencyCode: details?.currencyCode ?? LessonFormatting.defaultCurrencyCode)
   }
 
   private func nonEmpty(_ value: String?) -> String? {
@@ -735,7 +764,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       acceptedAt: updated.acceptedAt > 0 ? updated.acceptedAt : current.acceptedAt,
       connectionFeeCents: updated.connectionFeeCents > 0 ? updated.connectionFeeCents : current.connectionFeeCents,
       pricePerMinuteCents: updated.pricePerMinuteCents > 0 ? updated.pricePerMinuteCents : current.pricePerMinuteCents,
-      teacherSharePercent: updated.teacherSharePercent > 0 ? updated.teacherSharePercent : current.teacherSharePercent
+      teacherSharePercent: updated.teacherSharePercent > 0 ? updated.teacherSharePercent : current.teacherSharePercent,
+      currencyCode: nonEmpty(updated.currencyCode) ?? current.currencyCode
     )
   }
 
@@ -783,7 +813,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       acceptedAt: current.acceptedAt,
       connectionFeeCents: current.connectionFeeCents,
       pricePerMinuteCents: current.pricePerMinuteCents,
-      teacherSharePercent: current.teacherSharePercent
+      teacherSharePercent: current.teacherSharePercent,
+      currencyCode: current.currencyCode
     )
   }
 }

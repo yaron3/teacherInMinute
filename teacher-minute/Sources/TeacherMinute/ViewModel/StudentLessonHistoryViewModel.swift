@@ -88,9 +88,10 @@ final class StudentLessonHistoryViewModel {
                 studentName = profile.displayName
                 profileImageURL = profile.profileImageURL
             }
+            let currencyCode = try await HistoryModel.shared.fetchPurchasedCurrencyCode(for: uid)
             let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
             totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: historyLessons)
-            totalSpendText = LessonFormatting.totalCostText(lessons: historyLessons)
+            totalSpendText = LessonFormatting.totalCostText(lessons: historyLessons, currencyCode: currencyCode)
             lessons = historyLessons.map { Self.lessonHistoryItem($0, currentUserImageURL: profileImageURL) }
         } catch {
             logger.error("[StudentLessons] failed loading profile: \(error.localizedDescription)")
@@ -121,7 +122,7 @@ final class StudentLessonHistoryViewModel {
             currentUserImageURL: currentUserImageURL,
             completedAt: LessonFormatting.relativeDateText(lesson.acceptedAt),
             duration: LessonFormatting.shortDurationText(seconds: lesson.durationSeconds),
-            amount: LessonFormatting.currencyText(cents: lesson.costCents),
+            amount: LessonFormatting.currencyText(cents: lesson.costCents, currencyCode: lesson.currencyCode),
             amountCents: lesson.costCents,
             summary: String(
                 format: LocalizationSupport.localized("Completed lesson with %@."),

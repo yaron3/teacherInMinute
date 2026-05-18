@@ -23,6 +23,7 @@ struct HistoryLesson: Identifiable, Hashable {
     let durationSeconds: Int
     let costCents: Int
     let teacherEarningsCents: Int
+    let currencyCode: String
 }
 
 struct LessonMessage: Identifiable {
@@ -40,6 +41,16 @@ final class HistoryModel {
 
     private init() {}
 
+    func fetchPurchasedCurrencyCode(for uid: String) async throws -> String {
+        let userSnapshot = try await Firestore.firestore().collection("users").document(uid).getDocument()
+        guard let userData = userSnapshot.data() else { return LessonFormatting.defaultCurrencyCode }
+        let pricingCurrencyById = await Self.pricingCurrencyById()
+        return Self.purchasedPackageCurrencyCode(
+            from: userData,
+            pricingCurrencyById: pricingCurrencyById
+        ) ?? LessonFormatting.defaultCurrencyCode
+    }
+
     func fetchRecentLessons(for uid: String, limit: Int = 3) async throws -> [HistoryLesson] {
         let userSnapshot = try await Firestore.firestore().collection("users").document(uid).getDocument()
         guard let userData = userSnapshot.data() else { return [] }
@@ -49,13 +60,20 @@ final class HistoryModel {
         let defaultCommission = await SettingsRemoteConfigService.shared.fetchDefaultCommission()
         let commission = Self.doubleValue(userData["commission"])
         let teacherMultiplier = max(0, 1.0 - (commission ?? defaultCommission))
+        let pricingCurrencyById = await Self.pricingCurrencyById()
+        let purchasedCurrencyCode = Self.purchasedPackageCurrencyCode(
+            from: userData,
+            pricingCurrencyById: pricingCurrencyById
+        ) ?? LessonFormatting.defaultCurrencyCode
 
         var lessons: [HistoryLesson] = []
         for questionId in questionIds {
             guard let lesson = try await fetchLesson(
                 questionId: questionId,
                 currentUserId: uid,
-                teacherMultiplier: teacherMultiplier
+                teacherMultiplier: teacherMultiplier,
+                pricingCurrencyById: pricingCurrencyById,
+                fallbackCurrencyCode: purchasedCurrencyCode
             ) else { continue }
             lessons.append(lesson)
         }
@@ -70,7 +88,9 @@ final class HistoryModel {
     private func fetchLesson(
         questionId: String,
         currentUserId: String,
-        teacherMultiplier: Double
+        teacherMultiplier: Double,
+        pricingCurrencyById: [String: String],
+        fallbackCurrencyCode: String
     ) async throws -> HistoryLesson? {
         let snapshot = try await Firestore.firestore().collection("questions").document(questionId).getDocument()
         guard let data = snapshot.data() else { return nil }
@@ -92,6 +112,11 @@ final class HistoryModel {
         let durationSeconds = endedAt.map { max(0, Int($0.timeIntervalSince(createdAt))) } ?? 0
         let costCents = Self.costCents(from: data)
         let teacherEarningsCents = Int((Double(costCents) * teacherMultiplier).rounded())
+        let currencyCode = Self.currencyCode(
+            from: data,
+            pricingCurrencyById: pricingCurrencyById,
+            fallbackCurrencyCode: fallbackCurrencyCode
+        )
 
         return HistoryLesson(
             id: questionId,
@@ -102,7 +127,8 @@ final class HistoryModel {
             acceptedAt: acceptedAt,
             durationSeconds: durationSeconds,
             costCents: costCents,
-            teacherEarningsCents: teacherEarningsCents
+            teacherEarningsCents: teacherEarningsCents,
+            currencyCode: currencyCode
         )
     }
 
@@ -169,6 +195,117 @@ final class HistoryModel {
         if let value = value as? String { return Double(value) }
         if let value = value as? Int { return Double(value) }
         return nil
+    }
+
+    private static func pricingCurrencyById() async -> [String: String] {
+        do {
+            return try await PricingService.shared.fetchPricingOptions().reduce(into: [:]) { result, option in
+                result[option.id] = option.currency
+                if let purchaseSKU = option.purchaseSKU, !purchaseSKU.isEmpty {
+                    result[purchaseSKU] = option.currency
+                }
+            }
+        } catch {
+            logger.error("[HistoryModel] failed loading pricing currencies: \(error.localizedDescription)")
+            return [:]
+        }
+    }
+
+    private static func purchasedPackageCurrencyCode(
+        from userData: [String: Any],
+        pricingCurrencyById: [String: String]
+    ) -> String? {
+        if let explicit = explicitCurrencyCode(from: userData) {
+            return explicit
+        }
+
+        let purchases = purchaseRows(from: userData["purchases"])
+            + purchaseRows(from: userData["purchaseHistory"])
+            + purchaseRows(from: userData["packages"])
+        for purchase in purchases.reversed() {
+            if let explicit = explicitCurrencyCode(from: purchase) {
+                return explicit
+            }
+            if let packageId = packageId(from: purchase), let currency = pricingCurrencyById[packageId] {
+                return currency
+            }
+        }
+
+        if let packageId = packageId(from: userData), let currency = pricingCurrencyById[packageId] {
+            return currency
+        }
+        return nil
+    }
+
+    private static func currencyCode(
+        from data: [String: Any],
+        pricingCurrencyById: [String: String],
+        fallbackCurrencyCode: String
+    ) -> String {
+        if let explicit = explicitCurrencyCode(from: data) {
+            return explicit
+        }
+        if let packageId = packageId(from: data), let currency = pricingCurrencyById[packageId] {
+            return currency
+        }
+        return fallbackCurrencyCode
+    }
+
+    private static func explicitCurrencyCode(from data: [String: Any]) -> String? {
+        let currency = firstString(in: data, keys: [
+            "currencyCode",
+            "currency",
+            "packageCurrency",
+            "pricingCurrency",
+            "purchaseCurrency"
+        ])
+        return currency.isEmpty ? nil : currency
+    }
+
+    private static func packageId(from data: [String: Any]) -> String? {
+        let id = firstString(in: data, keys: [
+            "pricingOptionId",
+            "pricingOptionID",
+            "pricingOption",
+            "packageId",
+            "packageID",
+            "package",
+            "purchasePackageId",
+            "purchasePackageID",
+            "purchaseSKU"
+        ])
+        if !id.isEmpty { return id }
+
+        for key in ["pricing", "package", "purchase"] {
+            if let nested = data[key] as? [String: Any], let nestedId = packageId(from: nested) {
+                return nestedId
+            }
+        }
+        return nil
+    }
+
+    private static func purchaseRows(from value: Any?) -> [[String: Any]] {
+        if let rows = value as? [[String: Any]] {
+            return rows
+        }
+        if let rows = value as? [Any] {
+            return rows.compactMap { row in
+                if let dict = row as? [String: Any] { return dict }
+                if let id = row as? String { return ["packageId": id] }
+                return nil
+            }
+        }
+        if let rows = value as? [String: Any] {
+            return rows.values.compactMap { value in
+                if let dict = value as? [String: Any] { return dict }
+                if let id = value as? String { return ["packageId": id] }
+                return nil
+            }
+        }
+        if let id = value as? String {
+            return [["packageId": id]]
+        }
+        return []
     }
 
     private static func costCents(from data: [String: Any]) -> Int {

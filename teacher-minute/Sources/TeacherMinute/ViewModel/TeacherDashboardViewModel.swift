@@ -435,7 +435,8 @@ final class TeacherDashboardViewModel {
       acceptedAt: activeAcceptedAt > 0 ? activeAcceptedAt : Date().timeIntervalSince1970 * 1000.0,
       connectionFeeCents: activeConnectionFeeCents,
       pricePerMinuteCents: activePricePerMinuteCents,
-      teacherSharePercent: 75
+      teacherSharePercent: 75,
+      currencyCode: LessonFormatting.defaultCurrencyCode
     )
   }
 

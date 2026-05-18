@@ -158,9 +158,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   private var pollingTask: Task<Void, Never>?
   private var didLoadProfile = false
   private var checkoutStartedRemainingMinutes = 0
-  private var displayCurrencyCode: String {
-    pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode
-  }
+  private var purchasedCurrencyCode = LessonFormatting.defaultCurrencyCode
 
   // MARK: - Actions
 
@@ -314,10 +312,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   private func loadRecentLessons(uid: String) async {
     do {
+      let currencyCode = try await HistoryModel.shared.fetchPurchasedCurrencyCode(for: uid)
+      purchasedCurrencyCode = currencyCode
       let allLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
       lessonCount = allLessons.count
       totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: allLessons)
-      totalSpendText = LessonFormatting.totalCostText(lessons: allLessons, currencyCode: displayCurrencyCode)
+      totalSpendText = LessonFormatting.totalCostText(lessons: allLessons, currencyCode: currencyCode)
       let recent = Array(allLessons.prefix(3))
       if !recent.isEmpty {
         recentLessons = recent.map(Self.recentLesson)
@@ -341,7 +341,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       acceptedAt: Date().timeIntervalSince1970 * 1000.0,
       connectionFeeCents: activeConnectionFeeCents,
       pricePerMinuteCents: selectedPricePerMinuteCents,
-      teacherSharePercent: 75
+      teacherSharePercent: 75,
+      currencyCode: purchasedCurrencyCode
     )
   }
 
@@ -566,7 +567,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       acceptedAt: Date().timeIntervalSince1970 * 1000.0,
       connectionFeeCents: activeConnectionFeeCents,
       pricePerMinuteCents: selectedPricePerMinuteCents,
-      teacherSharePercent: 75
+      teacherSharePercent: 75,
+      currencyCode: pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode
     )
   }
 }
