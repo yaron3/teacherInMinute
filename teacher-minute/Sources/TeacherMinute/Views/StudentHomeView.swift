@@ -117,17 +117,20 @@ struct StudentHomeView: View {
         .task {
             await viewModel.loadProfileIfNeeded()
         }
-        .onChange(of: viewModel.checkoutURL) { _, url in
+        .onChange(of: viewModel.checkoutURL) { url in
             guard let url else { return }
+            logger.info("[PaymentReturn] opening checkoutURL=\(url.absoluteString)")
             openURL(url)
             viewModel.checkoutDidOpen()
             viewModel.consumeCheckoutURL()
         }
         .onChange(of: paymentReturnStore.resultVersion) { _, _ in
             guard let result = paymentReturnStore.latestResult else { return }
+            logger.info("[PaymentReturn] StudentHome observed resultVersion=\(paymentReturnStore.resultVersion) rawURL=\(result.rawURL.absoluteString)")
             Task { await viewModel.handlePaymentReturn(result) }
         }
         .onChange(of: scenePhase) { _, phase in
+            logger.info("[PaymentReturn] StudentHome scenePhase changed active=\(phase == .active) awaiting=\(viewModel.isAwaitingPaymentReturn) resultVersion=\(paymentReturnStore.resultVersion)")
             guard phase == .active else { return }
             handleActiveAfterExternalCheckout()
         }
@@ -153,11 +156,26 @@ struct StudentHomeView: View {
 
     private func handleActiveAfterExternalCheckout() {
         guard viewModel.isAwaitingPaymentReturn else { return }
+        let resultVersionBeforeWait = paymentReturnStore.resultVersion
+        logger.info("[PaymentReturn] app active after checkout; waiting for deep link resultVersion=\(resultVersionBeforeWait)")
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 700_000_000)
-            guard viewModel.isAwaitingPaymentReturn, paymentReturnStore.latestResult == nil else { return }
-            viewModel.handleCheckoutReturnWithoutResult()
-            paymentReturnStore.handleMissingReturn()
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard viewModel.isAwaitingPaymentReturn else {
+                logger.info("[PaymentReturn] fallback skipped; no longer awaiting return")
+                return
+            }
+            guard paymentReturnStore.resultVersion == resultVersionBeforeWait, paymentReturnStore.latestResult == nil else {
+                logger.info("[PaymentReturn] fallback skipped; payment result arrived resultVersion=\(paymentReturnStore.resultVersion)")
+                return
+            }
+            logger.info("[PaymentReturn] no payment return URL arrived after wait; refreshing balance before fallback")
+            let confirmedByBalance = await viewModel.handleCheckoutReturnWithoutResult()
+            if confirmedByBalance {
+                paymentReturnStore.handleConfirmedWithoutReturnURL()
+            } else {
+                logger.info("[PaymentReturn] balance did not update after checkout return; showing pending confirmation")
+                paymentReturnStore.handleMissingReturn()
+            }
         }
     }
 

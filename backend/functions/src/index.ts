@@ -17,8 +17,8 @@ export { startLesson, endLesson, forceEndLesson } from "./lessons";
 export {
   createCheckoutSession,
   createPaymentSettingsSession,
-  capturePayPalOrder,
-  cancelPayPalOrder,
+  paypalSuccess,
+  paypalCancel,
   paypalWebhook,
   billingPage,
 } from "./payments";

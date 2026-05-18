@@ -41,7 +41,7 @@ struct PaymentReturnResult: Identifiable {
         case .cancelled:
             LocalizationSupport.localized("Payment Cancelled")
         case .noResponse:
-            LocalizationSupport.localized("Purchase Not Completed")
+            LocalizationSupport.localized("Payment Confirmation Pending")
         case .unknown:
             LocalizationSupport.localized("Payment Update")
         }
@@ -56,7 +56,7 @@ struct PaymentReturnResult: Identifiable {
         case .cancelled:
             return LocalizationSupport.localized("No payment was taken. You can choose a plan again when you are ready")
         case .noResponse:
-            return LocalizationSupport.localized("The purchase did not complete. If you were charged, your account will update after payment confirmation.")
+            return LocalizationSupport.localized("We have not received PayPal confirmation yet. If payment was approved, your account will update after PayPal confirms it.")
         case .unknown(let rawStatus):
             let format = LocalizationSupport.localized("Payment returned with status: %@")
             return String(format: format, rawStatus.isEmpty ? LocalizationSupport.localized("Unknown") : rawStatus)
@@ -72,6 +72,15 @@ struct PaymentReturnResult: Identifiable {
         )
     }
 
+    static func confirmedWithoutReturnURL() -> PaymentReturnResult {
+        PaymentReturnResult(
+            status: .success,
+            sessionID: nil,
+            orderID: nil,
+            rawURL: URL(string: "teacherminute://payment-return?status=success&source=balance_refresh") ?? URL(fileURLWithPath: "/")
+        )
+    }
+
     private init(status: PaymentReturnStatus, sessionID: String?, orderID: String?, rawURL: URL) {
         self.status = status
         self.sessionID = sessionID
@@ -80,7 +89,10 @@ struct PaymentReturnResult: Identifiable {
     }
 
     init?(url: URL) {
-        guard url.scheme == "teacherminute" || url.host == "teacherminute.app" else { return nil }
+        guard url.scheme == "teacherminute" || url.host == "teacherminute.app" else {
+            logger.info("[PaymentReturn] ignored URL scheme=\(url.scheme ?? "nil") host=\(url.host ?? "nil")")
+            return nil
+        }
 
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let queryItems = components?.queryItems ?? []
@@ -98,9 +110,14 @@ struct PaymentReturnResult: Identifiable {
             ?? (hostStatus.isEmpty ? nil : hostStatus)
             ?? "unknown"
 
-        self.status = PaymentReturnStatus(rawValue: rawStatus)
-        self.sessionID = query["sessionid"] ?? query["session_id"]
-        self.orderID = query["orderid"] ?? query["order_id"] ?? query["token"]
+        let parsedStatus = PaymentReturnStatus(rawValue: rawStatus)
+        let parsedSessionID = query["sessionid"] ?? query["session_id"]
+        let parsedOrderID = query["orderid"] ?? query["order_id"] ?? query["token"]
+        logger.info("[PaymentReturn] parsed url=\(url.absoluteString) rawStatus=\(rawStatus) sessionID=\(parsedSessionID ?? "nil") orderID=\(parsedOrderID ?? "nil")")
+
+        self.status = parsedStatus
+        self.sessionID = parsedSessionID
+        self.orderID = parsedOrderID
         self.rawURL = url
     }
 }
@@ -116,17 +133,27 @@ final class PaymentReturnStore {
     private init() {}
 
     func handle(url: URL) {
+        logger.info("[PaymentReturn] received openURL=\(url.absoluteString)")
         guard let result = PaymentReturnResult(url: url) else { return }
         latestResult = result
         resultVersion += 1
+        logger.info("[PaymentReturn] stored resultVersion=\(self.resultVersion) status=\(String(describing: result.status))")
     }
 
     func handleMissingReturn() {
+        logger.info("[PaymentReturn] no deep link result received; storing noResponse")
         latestResult = .noResponse()
         resultVersion += 1
     }
 
+    func handleConfirmedWithoutReturnURL() {
+        logger.info("[PaymentReturn] payment confirmed by balance refresh without deep link")
+        latestResult = .confirmedWithoutReturnURL()
+        resultVersion += 1
+    }
+
     func consumeLatestResult() {
+        logger.info("[PaymentReturn] consuming latest result")
         latestResult = nil
     }
 }

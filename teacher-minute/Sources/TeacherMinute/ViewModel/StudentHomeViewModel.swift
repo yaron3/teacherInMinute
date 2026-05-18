@@ -120,7 +120,7 @@ protocol StudentHomeViewModeling: AnyObject {
   func consumeCheckoutURL()
   func checkoutDidOpen()
   func handlePaymentReturn(_ result: PaymentReturnResult) async
-  func handleCheckoutReturnWithoutResult()
+  func handleCheckoutReturnWithoutResult() async -> Bool
   func viewAllLessons()
   func loadProfileIfNeeded() async
   func refreshUnreadMessages() async
@@ -156,6 +156,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   private var pollingTask: Task<Void, Never>?
   private var didLoadProfile = false
+  private var checkoutStartedRemainingMinutes = 0
   private var displayCurrencyCode: String {
     pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode
   }
@@ -214,8 +215,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func checkout(_ option: PricingOption) async {
     guard !isStartingCheckout else { return }
+    logger.info("[PaymentReturn] checkout start pricingOptionID=\(option.id)")
     isStartingCheckout = true
     checkoutPricingOptionID = option.id
+    checkoutStartedRemainingMinutes = remainingMinutes
     defer {
       isStartingCheckout = false
       checkoutPricingOptionID = nil
@@ -225,6 +228,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     do {
       let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id)
       checkoutURL = result.checkoutURL
+      logger.info("[PaymentReturn] checkout session created url=\(result.checkoutURL.absoluteString)")
+    } catch let error as FunctionsError {
+      logger.error("[PaymentReturn] createCheckoutSession failed details=\(error.localizedDescription)")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     } catch {
       logger.error("[StudentHome] failed creating checkout session: \(error.localizedDescription)")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
@@ -237,19 +244,37 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func checkoutDidOpen() {
     isAwaitingPaymentReturn = true
+    logger.info("[PaymentReturn] checkout opened; awaiting payment return")
   }
 
   func handlePaymentReturn(_ result: PaymentReturnResult) async {
+    logger.info("[PaymentReturn] handling result status=\(String(describing: result.status)) rawURL=\(result.rawURL.absoluteString)")
     isAwaitingPaymentReturn = false
     if case .success = result.status, let uid = Auth.auth().currentUser?.uid {
       await loadRecentLessons(uid: uid)
       await refreshRemainingMinutes(uid: uid)
+      logger.info("[PaymentReturn] success handled; refreshed lessons and remaining minutes")
     }
   }
 
-  func handleCheckoutReturnWithoutResult() {
-    guard isAwaitingPaymentReturn else { return }
+  func handleCheckoutReturnWithoutResult() async -> Bool {
+    guard isAwaitingPaymentReturn else { return false }
     isAwaitingPaymentReturn = false
+    logger.info("[PaymentReturn] checkout returned without a deep link result")
+    guard let uid = Auth.auth().currentUser?.uid else { return false }
+
+    let startingMinutes = checkoutStartedRemainingMinutes
+    for attempt in 1...6 {
+      await refreshRemainingMinutes(uid: uid)
+      logger.info("[PaymentReturn] balance refresh attempt=\(attempt) startingMinutes=\(startingMinutes) currentMinutes=\(self.remainingMinutes)")
+      if self.remainingMinutes > startingMinutes {
+        await loadRecentLessons(uid: uid)
+        logger.info("[PaymentReturn] balance increased after checkout return without deep link")
+        return true
+      }
+      try? await Task.sleep(nanoseconds: 2_000_000_000)
+    }
+    return false
   }
 
   func viewAllLessons() {}
@@ -504,14 +529,18 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   func checkoutDidOpen() {
     isAwaitingPaymentReturn = true
+    logger.info("[PaymentReturn] mock checkout opened")
   }
 
   func handlePaymentReturn(_ result: PaymentReturnResult) async {
+    logger.info("[PaymentReturn] mock handling result status=\(String(describing: result.status))")
     isAwaitingPaymentReturn = false
   }
 
-  func handleCheckoutReturnWithoutResult() {
+  func handleCheckoutReturnWithoutResult() async -> Bool {
     isAwaitingPaymentReturn = false
+    logger.info("[PaymentReturn] mock checkout returned without result")
+    return false
   }
 
   func viewAllLessons() {}

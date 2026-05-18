@@ -40,8 +40,30 @@ async function getAccessToken() {
     return cachedToken.token;
 }
 async function createOrder(params) {
+    var _a, _b;
     const token = await getAccessToken();
     const value = (params.amountCents / 100).toFixed(2);
+    const orderBody = {
+        intent: "CAPTURE",
+        purchase_units: [
+            {
+                amount: { currency_code: params.currency, value },
+                custom_id: params.uid,
+                invoice_id: params.sessionId,
+                description: params.description,
+            },
+        ],
+        payment_source: {
+            paypal: {
+                experience_context: {
+                    return_url: params.returnUrl,
+                    cancel_url: params.cancelUrl,
+                    user_action: "PAY_NOW",
+                },
+            },
+        },
+    };
+    firebase_functions_1.logger.info(`[paypal] createOrder request sessionId=${params.sessionId} uid=${params.uid} amount=${value} ${params.currency} returnUrl=${params.returnUrl}`);
     const res = await fetch(`${paypalBase()}/v2/checkout/orders`, {
         method: "POST",
         headers: {
@@ -49,28 +71,16 @@ async function createOrder(params) {
             "Content-Type": "application/json",
             "PayPal-Request-Id": params.sessionId,
         },
-        body: JSON.stringify({
-            intent: "CAPTURE",
-            purchase_units: [
-                {
-                    amount: { currency_code: params.currency, value },
-                    custom_id: params.uid,
-                    invoice_id: params.sessionId,
-                    description: params.description,
-                },
-            ],
-            application_context: {
-                return_url: params.returnUrl,
-                cancel_url: params.cancelUrl,
-                user_action: "PAY_NOW",
-            },
-        }),
+        body: JSON.stringify(orderBody),
     });
     if (!res.ok) {
-        firebase_functions_1.logger.error(`[paypal] createOrder failed status=${res.status}`);
+        const errBody = await res.text().catch(() => "(unreadable)");
+        firebase_functions_1.logger.error(`[paypal] createOrder failed status=${res.status} body=${errBody}`);
         throw new Error("Failed to create PayPal order");
     }
-    return (await res.json());
+    const data = (await res.json());
+    firebase_functions_1.logger.info(`[paypal] createOrder response orderId=${data.id} status=${data.status} linksCount=${(_b = (_a = data.links) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0}`);
+    return data;
 }
 async function captureOrder(orderId) {
     var _a, _b, _c;

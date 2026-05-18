@@ -60,6 +60,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
               LocalizationSupport.applyPlatformLayoutDirection(languagePreference: newValue)
             }
             .onOpenURL { url in
+              logger.info("[PaymentReturn] root onOpenURL received \(url.absoluteString)")
               PaymentReturnStore.shared.handle(url: url)
             }
 				.task {

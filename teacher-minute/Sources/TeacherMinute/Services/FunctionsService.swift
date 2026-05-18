@@ -29,7 +29,22 @@ enum FunctionsError: Error {
   case notSignedIn
   case httpError(statusCode: Int)
   case serverError(message: String, status: String)
-  case decodingError
+  case decodingError(function: String? = nil, response: String? = nil)
+}
+
+extension FunctionsError: LocalizedError {
+  var errorDescription: String? {
+    switch self {
+    case .notSignedIn:
+      "Not signed in"
+    case .httpError(let statusCode):
+      "HTTP error \(statusCode)"
+    case .serverError(let message, let status):
+      "\(status): \(message)"
+    case .decodingError(let function, let response):
+      "Could not decode \(function ?? "function") response. \(response ?? "")"
+    }
+  }
 }
 
 // MARK: - Call result
@@ -82,7 +97,7 @@ final class FunctionsService {
     guard
       let questionId = result["questionId"] as? String,
       let feeCents   = result["connectionFeeCents"] as? Int
-    else { throw FunctionsError.decodingError }
+    else { throw FunctionsError.decodingError() }
     return CreateQuestionResult(questionId: questionId, connectionFeeCents: feeCents)
   }
 
@@ -92,7 +107,7 @@ final class FunctionsService {
 
   func getQuestionStatus(questionId: String) async throws -> QuestionStatusResult {
     let result = try await call(function: "getQuestionStatus", data: ["questionId": questionId])
-    guard let status = result["status"] as? String else { throw FunctionsError.decodingError }
+    guard let status = result["status"] as? String else { throw FunctionsError.decodingError() }
     return QuestionStatusResult(
       status: status,
       liveKitRoom: result["liveKitRoom"] as? String,
@@ -104,12 +119,21 @@ final class FunctionsService {
   func createCheckoutSession(pricingOptionID: String) async throws -> CheckoutSessionResult {
     let result = try await call(
       function: "createCheckoutSession",
-      data: ["pricingOptionId": pricingOptionID]
+      data: [
+        "pricingOptionId": pricingOptionID,
+        "pricingOptionID": pricingOptionID,
+        "pricingOption": pricingOptionID,
+        "packageId": pricingOptionID,
+        "packageID": pricingOptionID
+      ]
     )
     guard
       let urlString = Self.firstString(in: result, keys: ["checkoutUrl", "checkoutURL", "url"]),
       let checkoutURL = URL(string: urlString)
-    else { throw FunctionsError.decodingError }
+    else {
+      logger.error("[PaymentReturn] createCheckoutSession missing checkout URL in result=\(result)")
+      throw FunctionsError.decodingError(function: "createCheckoutSession", response: "\(result)")
+    }
     return CheckoutSessionResult(checkoutURL: checkoutURL)
   }
 
@@ -118,7 +142,7 @@ final class FunctionsService {
     guard
       let urlString = Self.firstString(in: result, keys: ["settingsUrl", "settingsURL", "portalUrl", "portalURL", "url"]),
       let settingsURL = URL(string: urlString)
-    else { throw FunctionsError.decodingError }
+    else { throw FunctionsError.decodingError() }
     return PaymentSettingsSessionResult(settingsURL: settingsURL)
   }
 
@@ -142,7 +166,7 @@ final class FunctionsService {
 
   func startLesson(questionId: String) async throws -> String {
     let result = try await call(function: "startLesson", data: ["questionId": questionId])
-    guard let questionId = result["questionId"] as? String else { throw FunctionsError.decodingError }
+    guard let questionId = result["questionId"] as? String else { throw FunctionsError.decodingError() }
     return questionId
   }
 
@@ -157,10 +181,10 @@ final class FunctionsService {
     let statusCode: Int?
 
 #if os(Android)
-    print("TeacherMinute FunctionsService calling \(name)")
+    print("TeacherMinute FunctionsService calling \(name) data=\(data)")
     let payloadData = try JSONSerialization.data(withJSONObject: ["data": data])
     guard let payload = String(data: payloadData, encoding: .utf8) else {
-      throw FunctionsError.decodingError
+      throw FunctionsError.decodingError()
     }
     let responseString = try await Task.detached(priority: .userInitiated) {
       try AndroidFunctionsBridge.callFunction(
@@ -171,10 +195,10 @@ final class FunctionsService {
     }.value
     responseData = Data(responseString.utf8)
     statusCode = nil
-    print("TeacherMinute FunctionsService received \(name) bytes=\(responseData.count)")
+    print("TeacherMinute FunctionsService received \(name) bytes=\(responseData.count) response=\(responseString)")
 #else
     guard let url = URL(string: "\(baseURL)/\(name)") else {
-      throw FunctionsError.decodingError
+      throw FunctionsError.decodingError()
     }
 
     let idToken = try await currentUserIdToken()
@@ -194,6 +218,7 @@ final class FunctionsService {
        let error = json["error"] as? [String: Any] {
       let message = error["message"] as? String ?? "Unknown error"
       let status  = error["status"]  as? String ?? "UNKNOWN"
+      logger.error("[FunctionsService] \(name) server error status=\(status) message=\(message)")
       throw FunctionsError.serverError(message: message, status: status)
     }
 
@@ -204,8 +229,13 @@ final class FunctionsService {
     guard
       let json   = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
       let result = json["result"] as? [String: Any]
-    else { throw FunctionsError.decodingError }
+    else {
+      let responseText = String(data: responseData, encoding: .utf8)
+      logger.error("[FunctionsService] \(name) decode failed response=\(responseText ?? "<non-utf8>")")
+      throw FunctionsError.decodingError(function: name, response: responseText)
+    }
 
+    logger.info("[FunctionsService] \(name) result=\(result)")
     return result
   }
 

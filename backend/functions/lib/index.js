@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.billingPage = exports.paypalWebhook = exports.cancelPayPalOrder = exports.capturePayPalOrder = exports.createPaymentSettingsSession = exports.createCheckoutSession = exports.forceEndLesson = exports.endLesson = exports.startLesson = exports.getQuestionStatus = exports.declineInvite = exports.acceptInvite = exports.cancelQuestion = exports.createQuestion = exports.evaluateWave = exports.dispatchQuestion = exports.onUserCreate = void 0;
+exports.billingPage = exports.paypalWebhook = exports.paypalCancel = exports.paypalSuccess = exports.createPaymentSettingsSession = exports.createCheckoutSession = exports.forceEndLesson = exports.endLesson = exports.startLesson = exports.getQuestionStatus = exports.declineInvite = exports.acceptInvite = exports.cancelQuestion = exports.createQuestion = exports.evaluateWave = exports.dispatchQuestion = exports.onUserCreate = void 0;
 const admin = require("firebase-admin");
 admin.initializeApp();
 // Auth lifecycle
@@ -26,8 +26,8 @@ Object.defineProperty(exports, "forceEndLesson", { enumerable: true, get: functi
 var payments_1 = require("./payments");
 Object.defineProperty(exports, "createCheckoutSession", { enumerable: true, get: function () { return payments_1.createCheckoutSession; } });
 Object.defineProperty(exports, "createPaymentSettingsSession", { enumerable: true, get: function () { return payments_1.createPaymentSettingsSession; } });
-Object.defineProperty(exports, "capturePayPalOrder", { enumerable: true, get: function () { return payments_1.capturePayPalOrder; } });
-Object.defineProperty(exports, "cancelPayPalOrder", { enumerable: true, get: function () { return payments_1.cancelPayPalOrder; } });
+Object.defineProperty(exports, "paypalSuccess", { enumerable: true, get: function () { return payments_1.paypalSuccess; } });
+Object.defineProperty(exports, "paypalCancel", { enumerable: true, get: function () { return payments_1.paypalCancel; } });
 Object.defineProperty(exports, "paypalWebhook", { enumerable: true, get: function () { return payments_1.paypalWebhook; } });
 Object.defineProperty(exports, "billingPage", { enumerable: true, get: function () { return payments_1.billingPage; } });
 //# sourceMappingURL=index.js.map

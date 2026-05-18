@@ -2609,6 +2609,16 @@
         }
       }
     },
+    "Payment Confirmation Pending" : {
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "אישור התשלום בהמתנה"
+          }
+        }
+      }
+    },
     "Payout Details Missing" : {
       "localizations" : {
         "he" : {
@@ -3988,6 +3998,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ממתין עכשיו"
+          }
+        }
+      }
+    },
+    "We have not received PayPal confirmation yet. If payment was approved, your account will update after PayPal confirms it." : {
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "עדיין לא קיבלנו אישור מ־PayPal. אם התשלום אושר, החשבון שלך יתעדכן לאחר ש־PayPal יאשר אותו."
           }
         }
       }

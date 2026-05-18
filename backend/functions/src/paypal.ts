@@ -63,12 +63,39 @@ export interface PayPalLink {
 
 export interface PayPalOrderResult {
   id: string;
+  status?: string;
   links: PayPalLink[];
+  [key: string]: unknown;
 }
 
 export async function createOrder(params: CreateOrderParams): Promise<PayPalOrderResult> {
   const token = await getAccessToken();
   const value = (params.amountCents / 100).toFixed(2);
+
+  const orderBody = {
+    intent: "CAPTURE",
+    purchase_units: [
+      {
+        amount: { currency_code: params.currency, value },
+        custom_id: params.uid,
+        invoice_id: params.sessionId,
+        description: params.description,
+      },
+    ],
+    payment_source: {
+      paypal: {
+        experience_context: {
+          return_url: params.returnUrl,
+          cancel_url: params.cancelUrl,
+          user_action: "PAY_NOW",
+        },
+      },
+    },
+  };
+
+  logger.info(
+    `[paypal] createOrder request sessionId=${params.sessionId} uid=${params.uid} amount=${value} ${params.currency} returnUrl=${params.returnUrl}`
+  );
 
   const res = await fetch(`${paypalBase()}/v2/checkout/orders`, {
     method: "POST",
@@ -77,30 +104,20 @@ export async function createOrder(params: CreateOrderParams): Promise<PayPalOrde
       "Content-Type": "application/json",
       "PayPal-Request-Id": params.sessionId,
     },
-    body: JSON.stringify({
-      intent: "CAPTURE",
-      purchase_units: [
-        {
-          amount: { currency_code: params.currency, value },
-          custom_id: params.uid,
-          invoice_id: params.sessionId,
-          description: params.description,
-        },
-      ],
-      application_context: {
-        return_url: params.returnUrl,
-        cancel_url: params.cancelUrl,
-        user_action: "PAY_NOW",
-      },
-    }),
+    body: JSON.stringify(orderBody),
   });
 
   if (!res.ok) {
-    logger.error(`[paypal] createOrder failed status=${res.status}`);
+    const errBody = await res.text().catch(() => "(unreadable)");
+    logger.error(`[paypal] createOrder failed status=${res.status} body=${errBody}`);
     throw new Error("Failed to create PayPal order");
   }
 
-  return (await res.json()) as PayPalOrderResult;
+  const data = (await res.json()) as PayPalOrderResult;
+  logger.info(
+    `[paypal] createOrder response orderId=${data.id} status=${data.status} linksCount=${data.links?.length ?? 0}`
+  );
+  return data;
 }
 
 export interface CaptureResult {
