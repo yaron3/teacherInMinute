@@ -8,205 +8,198 @@ const firestore_1 = require("firebase-admin/firestore");
 const uuid_1 = require("uuid");
 const paypal_1 = require("./paypal");
 const firestore = admin.firestore();
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function minutesForPlan(pricing) {
-    if (pricing.minutesGranted && pricing.minutesGranted > 0)
-        return pricing.minutesGranted;
-    if (pricing.minutes && pricing.minutes > 0)
-        return pricing.minutes;
-    switch (pricing.type) {
-        case "unlimited_week": return 7 * 24 * 60;
-        case "unlimited_month": return 30 * 24 * 60;
-        case "unlimited_year": return 365 * 24 * 60;
-        default: return 0;
-    }
-}
-function planExpiresAt(type, from) {
-    const DAY_MS = 86400000;
-    switch (type) {
-        case "unlimited_week": return firestore_1.Timestamp.fromMillis(from.getTime() + 7 * DAY_MS);
-        case "unlimited_month": return firestore_1.Timestamp.fromMillis(from.getTime() + 30 * DAY_MS);
-        case "unlimited_year": return firestore_1.Timestamp.fromMillis(from.getTime() + 365 * DAY_MS);
-        default: return undefined;
-    }
-}
-async function grantPurchase(sessionId, session, captureId) {
-    const pricingSnap = await firestore.collection("pricing").doc(session.pricingOptionId).get();
-    const pricing = pricingSnap.data();
-    const now = new Date();
-    const exp = planExpiresAt(pricing.type, now);
-    const purchase = Object.assign({ pricingOptionId: session.pricingOptionId, provider: "paypal", amountCents: session.amountCents, currency: session.currency, type: pricing.type, status: "active", purchasedAt: firestore_1.Timestamp.now() }, (exp ? { expiresAt: exp } : {}));
-    const minutesToGrant = minutesForPlan(pricing);
-    const sessionRef = firestore.collection("paymentSessions").doc(sessionId);
-    const userRef = firestore.collection("users").doc(session.uid);
-    const purchaseRef = userRef.collection("purchases").doc(sessionId);
-    await firestore.runTransaction(async (tx) => {
-        var _a;
-        const freshSnap = await tx.get(sessionRef);
-        if (((_a = freshSnap.data()) === null || _a === void 0 ? void 0 : _a.status) === "paid") {
-            firebase_functions_1.logger.info(`[payments] grantPurchase already paid (idempotent) sessionId=${sessionId}`);
-            return;
-        }
-        const paidAt = firestore_1.Timestamp.now();
-        tx.update(sessionRef, { status: "paid", providerCaptureId: captureId, paidAt, updatedAt: paidAt });
-        tx.set(purchaseRef, purchase);
-        if (minutesToGrant > 0) {
-            tx.set(userRef, { remainingMinutes: firestore_1.FieldValue.increment(minutesToGrant) }, { merge: true });
-        }
-    });
-    firebase_functions_1.logger.info(`[payments] purchase granted sessionId=${sessionId} captureId=${captureId} uid=${session.uid} package=${session.pricingOptionId} type=${pricing.type} minutesGranted=${minutesToGrant}`);
+const FUNCTIONS_BASE_URL = "https://us-central1-teacher-in-a-moment.cloudfunctions.net";
+/** Coerce a value from Firestore (may be string, number, null, undefined) to a safe integer. */
+function toSafeMinutes(value) {
+    const n = Math.floor(Number(value));
+    return Number.isFinite(n) && n > 0 ? n : 0;
 }
 // ─── createCheckoutSession ────────────────────────────────────────────────────
 exports.createCheckoutSession = (0, https_1.onCall)(async (req) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     const uid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
     if (!uid)
         throw new https_1.HttpsError("unauthenticated", "Sign in required");
     const data = req.data;
-    const pricingOptionId = ((_d = (_c = (_b = data.pricingOptionId) !== null && _b !== void 0 ? _b : data.pricingOptionID) !== null && _c !== void 0 ? _c : data.packageId) !== null && _d !== void 0 ? _d : data.packageID);
-    firebase_functions_1.logger.info(`[payments] createCheckoutSession uid=${uid} packageId=${pricingOptionId !== null && pricingOptionId !== void 0 ? pricingOptionId : "(missing)"}`);
-    if (!pricingOptionId)
-        throw new https_1.HttpsError("invalid-argument", "pricingOptionId required");
-    const pricingSnap = await firestore.collection("pricing").doc(pricingOptionId).get();
-    if (!pricingSnap.exists)
-        throw new https_1.HttpsError("not-found", "Pricing option not found");
-    const pricing = pricingSnap.data();
-    if (pricing.active === false)
-        throw new https_1.HttpsError("not-found", "Pricing option is not active");
-    if (!pricing.priceCents || pricing.priceCents <= 0) {
-        throw new https_1.HttpsError("internal", "Invalid pricing configuration");
-    }
-    const baseUrl = process.env.PUBLIC_BASE_URL;
-    if (!baseUrl)
-        throw new https_1.HttpsError("internal", "PUBLIC_BASE_URL not configured");
-    const sessionId = (0, uuid_1.v4)();
-    const returnUrl = `${baseUrl}/paypalSuccess?sessionId=${sessionId}`;
-    const cancelUrl = `${baseUrl}/paypalCancel?sessionId=${sessionId}`;
+    const packageId = ((_e = (_d = (_c = (_b = data.pricingOptionId) !== null && _b !== void 0 ? _b : data.pricingOptionID) !== null && _c !== void 0 ? _c : data.packageId) !== null && _d !== void 0 ? _d : data.packageID) !== null && _e !== void 0 ? _e : data.pricingOption);
+    firebase_functions_1.logger.info(`[payments] createCheckoutSession uid=${uid} packageId=${packageId !== null && packageId !== void 0 ? packageId : "(missing)"}`);
+    if (!packageId)
+        throw new https_1.HttpsError("invalid-argument", "Missing pricing package id");
+    const packageSnap = await firestore.collection("pricing").doc(packageId).get();
+    if (!packageSnap.exists)
+        throw new https_1.HttpsError("not-found", "Pricing package not found");
+    const pkg = packageSnap.data();
+    const minutes = toSafeMinutes((_f = pkg.minutes) !== null && _f !== void 0 ? _f : pkg.minutesGranted);
+    if (!pkg.priceCents || pkg.priceCents <= 0)
+        throw new https_1.HttpsError("internal", "Invalid package price");
+    if (!pkg.currency)
+        throw new https_1.HttpsError("internal", "Invalid package currency");
+    if (minutes <= 0)
+        throw new https_1.HttpsError("internal", "Invalid package minutes");
+    firebase_functions_1.logger.info(`[payments] package fetched packageId=${packageId} priceCents=${pkg.priceCents} currency=${pkg.currency} minutes=${minutes}`);
+    const checkoutId = (0, uuid_1.v4)();
+    const returnUrl = `${FUNCTIONS_BASE_URL}/paypalSuccess?checkoutId=${checkoutId}`;
+    const cancelUrl = `${FUNCTIONS_BASE_URL}/paypalCancel?checkoutId=${checkoutId}`;
+    const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
+    const checkoutDoc = {
+        uid,
+        packageId,
+        priceCents: pkg.priceCents,
+        currency: pkg.currency,
+        minutes,
+        status: "created",
+        createdAt: firestore_1.Timestamp.now(),
+        paypalOrderId: null,
+    };
+    await checkoutRef.set(checkoutDoc);
     let order;
     try {
+        firebase_functions_1.logger.info(`[payments] PayPal createOrder checkoutId=${checkoutId} amount=${(pkg.priceCents / 100).toFixed(2)} ${pkg.currency}`);
         order = await (0, paypal_1.createOrder)({
-            amountCents: pricing.priceCents,
-            currency: (_e = pricing.currency) !== null && _e !== void 0 ? _e : "USD",
-            description: pricing.name,
+            amountCents: pkg.priceCents,
+            currency: pkg.currency,
+            description: pkg.name,
             uid,
-            sessionId,
+            sessionId: checkoutId,
             returnUrl,
             cancelUrl,
         });
     }
     catch (err) {
-        firebase_functions_1.logger.error(`[payments] createOrder failed uid=${uid} pricingOptionId=${pricingOptionId}`, err);
-        throw new https_1.HttpsError("internal", "Failed to create payment order");
+        firebase_functions_1.logger.error(`[payments] PayPal createOrder failed checkoutId=${checkoutId}`, err);
+        await checkoutRef.update({ status: "cancelled", updatedAt: firestore_1.Timestamp.now() });
+        throw new https_1.HttpsError("internal", "Failed to create PayPal order");
     }
-    const approveLink = order.links.find((l) => l.rel === "approve" || l.rel === "payer-action");
-    if (!approveLink) {
-        firebase_functions_1.logger.error(`[payments] no approve link orderId=${order.id} links=${JSON.stringify(order.links)}`);
+    const approvalLink = (_g = order.links) === null || _g === void 0 ? void 0 : _g.find((l) => l.rel === "approve" || l.rel === "payer-action");
+    if (!(approvalLink === null || approvalLink === void 0 ? void 0 : approvalLink.href)) {
+        firebase_functions_1.logger.error(`[payments] no approval URL checkoutId=${checkoutId} orderId=${order.id} links=${JSON.stringify(order.links)}`);
         throw new https_1.HttpsError("internal", "PayPal did not return an approval URL");
     }
-    firebase_functions_1.logger.info(`[payments] approval URL rel=${approveLink.rel} href=${approveLink.href} orderId=${order.id}`);
-    const session = {
-        uid,
-        pricingOptionId,
-        provider: "paypal",
-        providerOrderId: order.id,
-        status: "created",
-        amountCents: pricing.priceCents,
-        currency: (_f = pricing.currency) !== null && _f !== void 0 ? _f : "USD",
-        createdAt: firestore_1.Timestamp.now(),
+    firebase_functions_1.logger.info(`[payments] approval URL selected rel=${approvalLink.rel} href=${approvalLink.href}`);
+    await checkoutRef.update({
+        paypalOrderId: order.id,
+        approvalUrl: approvalLink.href,
+        status: "paypal_created",
         updatedAt: firestore_1.Timestamp.now(),
-    };
-    await firestore.collection("paymentSessions").doc(sessionId).set(session);
-    firebase_functions_1.logger.info(`[payments] session created sessionId=${sessionId} orderId=${order.id} uid=${uid} amountCents=${pricing.priceCents}`);
-    return { checkoutUrl: approveLink.href };
+    });
+    firebase_functions_1.logger.info(`[payments] checkout saved checkoutId=${checkoutId} paypalOrderId=${order.id}`);
+    return { checkoutUrl: approvalLink.href };
 });
 // ─── createPaymentSettingsSession ─────────────────────────────────────────────
 exports.createPaymentSettingsSession = (0, https_1.onCall)(async (req) => {
-    var _a;
+    var _a, _b;
     const uid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
     if (!uid)
         throw new https_1.HttpsError("unauthenticated", "Sign in required");
-    const baseUrl = process.env.PUBLIC_BASE_URL;
-    if (!baseUrl)
-        throw new https_1.HttpsError("internal", "PUBLIC_BASE_URL not configured");
+    const baseUrl = (_b = process.env.PUBLIC_BASE_URL) !== null && _b !== void 0 ? _b : FUNCTIONS_BASE_URL;
     firebase_functions_1.logger.info(`[payments] settings session uid=${uid}`);
     return { settingsUrl: `${baseUrl}/billingPage?uid=${uid}` };
 });
 // ─── paypalSuccess (HTTP) ─────────────────────────────────────────────────────
-// PayPal redirects the buyer here after approval. Captures the order and grants
-// entitlement, then redirects to the app deep link or a simple success page.
+// PayPal redirects here after buyer approval. Captures the order, credits the
+// user, then redirects to the app deep link.
 exports.paypalSuccess = (0, https_1.onRequest)(async (req, res) => {
-    const sessionId = req.query.sessionId;
+    var _a, _b, _c, _d;
+    const checkoutId = req.query.checkoutId;
     const token = req.query.token; // PayPal order id
-    firebase_functions_1.logger.info(`[payments] paypalSuccess sessionId=${sessionId} token=${token}`);
-    const failRedirect = `teacherminute://payment-return?status=cancelled&order_id=${token !== null && token !== void 0 ? token : "unknown"}`;
-    if (!sessionId || !token) {
-        firebase_functions_1.logger.warn(`[payments] paypalSuccess missing params — redirecting cancelled`);
+    firebase_functions_1.logger.info(`[payments] paypalSuccess checkoutId=${checkoutId} token=${token}`);
+    const failRedirect = `teacherminute://payment-return?status=cancelled&checkout_id=${checkoutId !== null && checkoutId !== void 0 ? checkoutId : "unknown"}&order_id=${token !== null && token !== void 0 ? token : "unknown"}`;
+    if (!checkoutId) {
+        firebase_functions_1.logger.warn(`[payments] paypalSuccess missing checkoutId`);
         res.redirect(302, failRedirect);
         return;
     }
-    const sessionRef = firestore.collection("paymentSessions").doc(sessionId);
-    const sessionSnap = await sessionRef.get();
-    if (!sessionSnap.exists) {
-        firebase_functions_1.logger.error(`[payments] paypalSuccess session not found sessionId=${sessionId}`);
+    const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
+    const checkoutSnap = await checkoutRef.get();
+    if (!checkoutSnap.exists) {
+        firebase_functions_1.logger.error(`[payments] paypalSuccess checkout not found checkoutId=${checkoutId}`);
         res.redirect(302, failRedirect);
         return;
     }
-    const session = sessionSnap.data();
-    if (session.status === "paid") {
-        firebase_functions_1.logger.info(`[payments] paypalSuccess already paid (idempotent) sessionId=${sessionId}`);
-        const deepLink = `teacherminute://payment-return?status=success&order_id=${token}`;
+    const checkout = checkoutSnap.data();
+    if (checkout.status === "completed") {
+        firebase_functions_1.logger.info(`[payments] paypalSuccess already completed (idempotent) checkoutId=${checkoutId}`);
+        const deepLink = `teacherminute://payment-return?status=success&order_id=${(_b = (_a = checkout.paypalOrderId) !== null && _a !== void 0 ? _a : token) !== null && _b !== void 0 ? _b : "unknown"}&checkout_id=${checkoutId}`;
         firebase_functions_1.logger.info(`[payments] paypalSuccess redirect ${deepLink}`);
         res.redirect(302, deepLink);
         return;
     }
-    if (session.providerOrderId !== token) {
-        firebase_functions_1.logger.error(`[payments] paypalSuccess order id mismatch sessionId=${sessionId} expected=${session.providerOrderId} got=${token}`);
+    const orderId = (_c = token !== null && token !== void 0 ? token : checkout.paypalOrderId) !== null && _c !== void 0 ? _c : "";
+    if (!orderId) {
+        firebase_functions_1.logger.error(`[payments] paypalSuccess no orderId checkoutId=${checkoutId}`);
         res.redirect(302, failRedirect);
         return;
     }
     let capture;
     try {
-        capture = await (0, paypal_1.captureOrder)(token);
-        firebase_functions_1.logger.info(`[payments] paypalSuccess capture orderId=${token} captureId=${capture.captureId} status=${capture.orderStatus} amountCents=${capture.amountCents} currency=${capture.currency}`);
+        capture = await (0, paypal_1.captureOrder)(orderId);
+        firebase_functions_1.logger.info(`[payments] paypalSuccess capture orderId=${orderId} captureId=${capture.captureId} status=${capture.orderStatus} amountCents=${capture.amountCents} currency=${capture.currency}`);
     }
     catch (err) {
-        firebase_functions_1.logger.error(`[payments] paypalSuccess captureOrder failed sessionId=${sessionId} orderId=${token}`, err);
+        firebase_functions_1.logger.error(`[payments] paypalSuccess captureOrder failed checkoutId=${checkoutId} orderId=${orderId}`, err);
+        // Webhook may have already captured and completed this checkout — check before failing.
+        const recheckSnap = await checkoutRef.get();
+        if (((_d = recheckSnap.data()) === null || _d === void 0 ? void 0 : _d.status) === "completed") {
+            firebase_functions_1.logger.info(`[payments] paypalSuccess capture failed but checkout already completed (webhook race) checkoutId=${checkoutId}`);
+            const deepLink = `teacherminute://payment-return?status=success&order_id=${orderId}&checkout_id=${checkoutId}`;
+            firebase_functions_1.logger.info(`[payments] paypalSuccess redirect ${deepLink}`);
+            res.redirect(302, deepLink);
+            return;
+        }
         res.redirect(302, failRedirect);
         return;
     }
-    if (capture.orderStatus !== "COMPLETED" ||
-        capture.amountCents !== session.amountCents ||
-        capture.currency !== session.currency) {
-        firebase_functions_1.logger.error(`[payments] paypalSuccess capture verification failed sessionId=${sessionId} orderStatus=${capture.orderStatus} amountCents=${capture.amountCents}/${session.amountCents} currency=${capture.currency}/${session.currency}`);
+    if (capture.orderStatus !== "COMPLETED") {
+        firebase_functions_1.logger.error(`[payments] paypalSuccess unexpected capture status checkoutId=${checkoutId} status=${capture.orderStatus}`);
         res.redirect(302, failRedirect);
         return;
     }
+    const userRef = firestore.collection("users").doc(checkout.uid);
     try {
-        await grantPurchase(sessionId, session, capture.captureId);
+        await firestore.runTransaction(async (tx) => {
+            var _a;
+            const freshSnap = await tx.get(checkoutRef);
+            if (((_a = freshSnap.data()) === null || _a === void 0 ? void 0 : _a.status) === "completed") {
+                firebase_functions_1.logger.info(`[payments] paypalSuccess transaction already completed checkoutId=${checkoutId}`);
+                return;
+            }
+            const now = firestore_1.Timestamp.now();
+            tx.update(checkoutRef, {
+                status: "completed",
+                completedAt: now,
+                updatedAt: now,
+                paypalOrderId: orderId,
+                paypalCaptureId: capture.captureId,
+            });
+            tx.set(userRef, {
+                remainingMinutes: firestore_1.FieldValue.increment(toSafeMinutes(checkout.minutes)),
+                totalMinutes: firestore_1.FieldValue.increment(toSafeMinutes(checkout.minutes)),
+            }, { merge: true });
+        });
     }
     catch (err) {
-        firebase_functions_1.logger.error(`[payments] paypalSuccess grantPurchase failed sessionId=${sessionId}`, err);
+        firebase_functions_1.logger.error(`[payments] paypalSuccess transaction failed checkoutId=${checkoutId}`, err);
         res.redirect(302, failRedirect);
         return;
     }
-    const deepLink = `teacherminute://payment-return?status=success&order_id=${token}`;
-    firebase_functions_1.logger.info(`[payments] paypalSuccess complete sessionId=${sessionId} captureId=${capture.captureId} uid=${session.uid} redirect=${deepLink}`);
+    firebase_functions_1.logger.info(`[payments] paypalSuccess credited uid=${checkout.uid} minutes=${checkout.minutes} checkoutId=${checkoutId}`);
+    const deepLink = `teacherminute://payment-return?status=success&order_id=${orderId}&checkout_id=${checkoutId}`;
+    firebase_functions_1.logger.info(`[payments] paypalSuccess redirect ${deepLink}`);
     res.redirect(302, deepLink);
 });
 // ─── paypalCancel (HTTP) ──────────────────────────────────────────────────────
 exports.paypalCancel = (0, https_1.onRequest)(async (req, res) => {
-    const sessionId = req.query.sessionId;
-    const token = req.query.token; // PayPal order id
-    firebase_functions_1.logger.info(`[payments] paypalCancel sessionId=${sessionId} token=${token}`);
-    if (sessionId) {
+    const checkoutId = req.query.checkoutId;
+    const token = req.query.token;
+    firebase_functions_1.logger.info(`[payments] paypalCancel checkoutId=${checkoutId} token=${token}`);
+    if (checkoutId) {
         firestore
-            .collection("paymentSessions")
-            .doc(sessionId)
-            .update({ status: "cancelled", updatedAt: firestore_1.FieldValue.serverTimestamp() })
-            .catch((err) => firebase_functions_1.logger.warn(`[payments] paypalCancel update failed sessionId=${sessionId}`, err));
+            .collection("paymentCheckouts")
+            .doc(checkoutId)
+            .update({ status: "cancelled", updatedAt: firestore_1.Timestamp.now() })
+            .catch((err) => firebase_functions_1.logger.warn(`[payments] paypalCancel update failed checkoutId=${checkoutId}`, err));
     }
-    const orderId = token !== null && token !== void 0 ? token : "unknown";
-    const deepLink = `teacherminute://payment-return?status=cancelled&order_id=${orderId}`;
+    const deepLink = `teacherminute://payment-return?status=cancelled&checkout_id=${checkoutId !== null && checkoutId !== void 0 ? checkoutId : "unknown"}`;
     firebase_functions_1.logger.info(`[payments] paypalCancel redirect ${deepLink}`);
     res.redirect(302, deepLink);
 });
@@ -223,8 +216,7 @@ exports.paypalWebhook = (0, https_1.onRequest)(async (req, res) => {
         res.status(500).send("Webhook not configured");
         return;
     }
-    // PayPal sandbox signature verification is unreliable — bypass it in sandbox
-    // so integration testing isn't blocked. Always verify in live mode.
+    // PayPal sandbox signature verification is unreliable — bypass it in sandbox.
     const isSandbox = process.env.PAYPAL_ENV !== "live";
     if (!isSandbox) {
         const valid = await (0, paypal_1.verifyWebhookSignature)({
@@ -272,30 +264,48 @@ async function handleWebhookEvent(eventType, resource) {
             break;
         case "PAYMENT.CAPTURE.COMPLETED": {
             const captureId = resource["id"];
-            const invoiceId = resource["invoice_id"];
+            const invoiceId = resource["invoice_id"]; // == checkoutId
             const captureAmount = resource["amount"];
             if (!invoiceId || !captureAmount) {
                 firebase_functions_1.logger.warn(`[payments] webhook CAPTURE.COMPLETED missing fields captureId=${captureId}`);
                 break;
             }
-            const sessionRef = firestore.collection("paymentSessions").doc(invoiceId);
-            const sessionSnap = await sessionRef.get();
-            if (!sessionSnap.exists) {
-                firebase_functions_1.logger.warn(`[payments] webhook CAPTURE.COMPLETED session not found invoiceId=${invoiceId}`);
+            const checkoutRef = firestore.collection("paymentCheckouts").doc(invoiceId);
+            const checkoutSnap = await checkoutRef.get();
+            if (!checkoutSnap.exists) {
+                firebase_functions_1.logger.warn(`[payments] webhook CAPTURE.COMPLETED checkout not found checkoutId=${invoiceId}`);
                 break;
             }
-            const session = sessionSnap.data();
-            if (session.status === "paid") {
-                firebase_functions_1.logger.info(`[payments] webhook CAPTURE.COMPLETED already paid sessionId=${invoiceId}`);
+            const checkout = checkoutSnap.data();
+            if (checkout.status === "completed") {
+                firebase_functions_1.logger.info(`[payments] webhook CAPTURE.COMPLETED already completed checkoutId=${invoiceId}`);
                 break;
             }
             const amountCents = Math.round(parseFloat(captureAmount.value) * 100);
-            if (amountCents !== session.amountCents || captureAmount.currency_code !== session.currency) {
-                firebase_functions_1.logger.error(`[payments] webhook CAPTURE.COMPLETED amount mismatch sessionId=${invoiceId} got=${amountCents}/${captureAmount.currency_code} expected=${session.amountCents}/${session.currency}`);
+            if (amountCents !== checkout.priceCents ||
+                captureAmount.currency_code !== checkout.currency) {
+                firebase_functions_1.logger.error(`[payments] webhook CAPTURE.COMPLETED amount mismatch checkoutId=${invoiceId} got=${amountCents}/${captureAmount.currency_code} expected=${checkout.priceCents}/${checkout.currency}`);
                 break;
             }
-            await grantPurchase(invoiceId, session, captureId);
-            firebase_functions_1.logger.info(`[payments] webhook reconciled capture sessionId=${invoiceId} captureId=${captureId}`);
+            const userRef = firestore.collection("users").doc(checkout.uid);
+            await firestore.runTransaction(async (tx) => {
+                var _a;
+                const fresh = await tx.get(checkoutRef);
+                if (((_a = fresh.data()) === null || _a === void 0 ? void 0 : _a.status) === "completed")
+                    return;
+                const now = firestore_1.Timestamp.now();
+                tx.update(checkoutRef, {
+                    status: "completed",
+                    completedAt: now,
+                    updatedAt: now,
+                    paypalCaptureId: captureId,
+                });
+                tx.set(userRef, {
+                    remainingMinutes: firestore_1.FieldValue.increment(toSafeMinutes(checkout.minutes)),
+                    totalMinutes: firestore_1.FieldValue.increment(toSafeMinutes(checkout.minutes)),
+                }, { merge: true });
+            });
+            firebase_functions_1.logger.info(`[payments] webhook reconciled checkoutId=${invoiceId} captureId=${captureId} uid=${checkout.uid} minutes=${checkout.minutes}`);
             break;
         }
         case "PAYMENT.CAPTURE.DENIED": {
@@ -306,16 +316,14 @@ async function handleWebhookEvent(eventType, resource) {
                 break;
             }
             await firestore
-                .collection("paymentSessions")
+                .collection("paymentCheckouts")
                 .doc(invoiceId)
-                .update({ status: "cancelled", updatedAt: firestore_1.FieldValue.serverTimestamp() })
-                .catch((err) => firebase_functions_1.logger.warn(`[payments] webhook CAPTURE.DENIED update failed sessionId=${invoiceId}`, err));
-            firebase_functions_1.logger.info(`[payments] webhook capture denied sessionId=${invoiceId} captureId=${captureId}`);
+                .update({ status: "cancelled", updatedAt: firestore_1.Timestamp.now() })
+                .catch((err) => firebase_functions_1.logger.warn(`[payments] webhook CAPTURE.DENIED update failed checkoutId=${invoiceId}`, err));
+            firebase_functions_1.logger.info(`[payments] webhook capture denied checkoutId=${invoiceId} captureId=${captureId}`);
             break;
         }
         case "PAYMENT.CAPTURE.REFUNDED":
-            // Full reconciliation requires fetching the original capture (resource.links[].rel=="up")
-            // and mapping invoice_id to the session. Implemented after vaulting rollout.
             firebase_functions_1.logger.info(`[payments] webhook refund received captureId=${resource["id"]}`);
             break;
         default:
@@ -323,44 +331,27 @@ async function handleWebhookEvent(eventType, resource) {
     }
 }
 // ─── billingPage (HTTP) ───────────────────────────────────────────────────────
-// Shows the user's payment history. Requires composite Firestore index on
-// paymentSessions: uid ASC + createdAt DESC.
 exports.billingPage = (0, https_1.onRequest)(async (req, res) => {
     const uid = req.query.uid;
     if (!uid) {
         res.status(400).send("Missing uid");
         return;
     }
-    const [sessionsSnap, purchasesSnap] = await Promise.all([
-        firestore
-            .collection("paymentSessions")
-            .where("uid", "==", uid)
-            .orderBy("createdAt", "desc")
-            .limit(20)
-            .get(),
-        firestore
-            .collection("users")
-            .doc(uid)
-            .collection("purchases")
-            .orderBy("purchasedAt", "desc")
-            .limit(20)
-            .get(),
-    ]);
+    const checkoutsSnap = await firestore
+        .collection("paymentCheckouts")
+        .where("uid", "==", uid)
+        .orderBy("createdAt", "desc")
+        .limit(20)
+        .get();
     const fmt = (ts) => ts ? new Date(ts.toMillis()).toLocaleDateString("en-US") : "—";
     const money = (cents, currency) => `${(cents / 100).toFixed(2)} ${currency}`;
     const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const sessionRows = sessionsSnap.docs
+    const rows = checkoutsSnap.docs
         .map((doc) => {
         const d = doc.data();
-        return `<tr><td>${esc(doc.id.slice(0, 8))}…</td><td>${fmt(d.createdAt)}</td><td>${money(d.amountCents, d.currency)}</td><td>${esc(d.status)}</td></tr>`;
+        return `<tr><td>${esc(doc.id.slice(0, 8))}…</td><td>${fmt(d.createdAt)}</td><td>${money(d.priceCents, d.currency)}</td><td>${d.minutes} min</td><td>${esc(d.status)}</td></tr>`;
     })
-        .join("") || "<tr><td colspan='4'>No payments yet.</td></tr>";
-    const purchaseRows = purchasesSnap.docs
-        .map((doc) => {
-        const d = doc.data();
-        return `<tr><td>${esc(doc.id.slice(0, 8))}…</td><td>${fmt(d.purchasedAt)}</td><td>${esc(d.type)}</td><td>${esc(d.status)}</td><td>${fmt(d.expiresAt)}</td></tr>`;
-    })
-        .join("") || "<tr><td colspan='5'>No purchases yet.</td></tr>";
+        .join("") || "<tr><td colspan='5'>No payments yet.</td></tr>";
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -377,12 +368,10 @@ th{background:#f9fafb;font-weight:600}
 </head>
 <body>
 <h1>Billing History</h1>
-<h2>Payment Sessions</h2>
-<table><thead><tr><th>ID</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
-<tbody>${sessionRows}</tbody></table>
-<h2>Purchases</h2>
-<table><thead><tr><th>ID</th><th>Purchased</th><th>Plan</th><th>Status</th><th>Expires</th></tr></thead>
-<tbody>${purchaseRows}</tbody></table>
+<table>
+<thead><tr><th>ID</th><th>Date</th><th>Amount</th><th>Minutes</th><th>Status</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
 <div class="support">Need help? <a href="mailto:support@teacherminute.com">Contact support</a></div>
 </body></html>`;
     res.setHeader("Content-Type", "text/html; charset=utf-8");

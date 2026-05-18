@@ -83,7 +83,7 @@ async function createOrder(params) {
     return data;
 }
 async function captureOrder(orderId) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e, _f, _g;
     const token = await getAccessToken();
     const res = await fetch(`${paypalBase()}/v2/checkout/orders/${orderId}/capture`, {
         method: "POST",
@@ -93,11 +93,13 @@ async function captureOrder(orderId) {
         },
     });
     if (!res.ok) {
-        firebase_functions_1.logger.error(`[paypal] captureOrder failed orderId=${orderId} status=${res.status}`);
-        throw new Error("Failed to capture PayPal order");
+        const errBody = await res.text().catch(() => "(unreadable)");
+        firebase_functions_1.logger.error(`[paypal] captureOrder failed orderId=${orderId} status=${res.status} body=${errBody}`);
+        throw new Error(`Failed to capture PayPal order: ${res.status} ${errBody}`);
     }
     const data = (await res.json());
-    const capture = (_c = (_b = (_a = data.purchase_units[0]) === null || _a === void 0 ? void 0 : _a.payments) === null || _b === void 0 ? void 0 : _b.captures) === null || _c === void 0 ? void 0 : _c[0];
+    firebase_functions_1.logger.info(`[paypal] captureOrder response orderId=${data.id} status=${data.status} capturesCount=${(_d = (_c = (_b = (_a = data.purchase_units[0]) === null || _a === void 0 ? void 0 : _a.payments) === null || _b === void 0 ? void 0 : _b.captures) === null || _c === void 0 ? void 0 : _c.length) !== null && _d !== void 0 ? _d : 0}`);
+    const capture = (_g = (_f = (_e = data.purchase_units[0]) === null || _e === void 0 ? void 0 : _e.payments) === null || _f === void 0 ? void 0 : _f.captures) === null || _g === void 0 ? void 0 : _g[0];
     if (!capture)
         throw new Error("No capture in PayPal response");
     return {

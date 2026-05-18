@@ -64,7 +64,8 @@ final class PricingService {
             return raw.isEmpty ? nil : raw
         }()
 
-        let minutesGranted: Int? = intValue(data["minutesGranted"])
+        let minutesGranted: Int? = intValue(data["minutes"])
+            ?? intValue(data["minutesGranted"])
 
         return PricingOption(
             id: id,

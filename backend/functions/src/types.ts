@@ -101,29 +101,31 @@ export interface PricingDoc {
   priceCents: number;
   currency: string;
   type: PlanType;
-  minutesGranted?: number;   // pay_as_you_go: minutes added to remainingMinutes on purchase
+  minutes?: number;          // minutes granted on purchase (primary field)
+  minutesGranted?: number;   // legacy alias for minutes
   description?: string;
   isHighlighted?: boolean;
   sortOrder?: number;
   active?: boolean;
 }
 
-// ─── Firestore — paymentSessions/{sessionId} ─────────────────────────────────
+// ─── Firestore — paymentCheckouts/{checkoutId} ───────────────────────────────
 
-export type PaymentSessionStatus = "created" | "paid" | "cancelled" | "refunded";
+export type CheckoutStatus = "created" | "paypal_created" | "completed" | "cancelled";
 
-export interface PaymentSessionDoc {
+export interface PaymentCheckoutDoc {
   uid: string;
-  pricingOptionId: string;
-  provider: "paypal";
-  providerOrderId: string;
-  providerCaptureId?: string;
-  status: PaymentSessionStatus;
-  amountCents: number;
+  packageId: string;
+  priceCents: number;
   currency: string;
+  minutes: number;
+  status: CheckoutStatus;
   createdAt: Timestamp;
-  updatedAt: Timestamp;
-  paidAt?: Timestamp;
+  updatedAt?: Timestamp;
+  paypalOrderId: string | null;
+  approvalUrl?: string;
+  completedAt?: Timestamp;
+  paypalCaptureId?: string;
 }
 
 // ─── Firestore — users/{uid} ─────────────────────────────────────────────────

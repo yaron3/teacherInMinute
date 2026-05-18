@@ -154,11 +154,17 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
   });
 
   if (!res.ok) {
-    logger.error(`[paypal] captureOrder failed orderId=${orderId} status=${res.status}`);
-    throw new Error("Failed to capture PayPal order");
+    const errBody = await res.text().catch(() => "(unreadable)");
+    logger.error(
+      `[paypal] captureOrder failed orderId=${orderId} status=${res.status} body=${errBody}`
+    );
+    throw new Error(`Failed to capture PayPal order: ${res.status} ${errBody}`);
   }
 
   const data = (await res.json()) as PayPalCaptureResponse;
+  logger.info(
+    `[paypal] captureOrder response orderId=${data.id} status=${data.status} capturesCount=${data.purchase_units[0]?.payments?.captures?.length ?? 0}`
+  );
   const capture = data.purchase_units[0]?.payments?.captures?.[0];
   if (!capture) throw new Error("No capture in PayPal response");
 

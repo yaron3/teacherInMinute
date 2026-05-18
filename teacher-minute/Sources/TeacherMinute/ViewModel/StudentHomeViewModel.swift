@@ -55,6 +55,7 @@ enum PricingType: String {
 ///   - `isHighlighted` (Bool)
 ///   - `sortOrder` (Int)
 ///   - `purchaseSKU` (String, optional) — store / IAP product identifier
+///   - `minutes` (Int) — number of lesson minutes granted by the package
 ///
 /// The document ID is exposed as `id` and is the key recorded on the user
 /// document (e.g. `users/{uid}.purchases[]`) when the tier is purchased.
@@ -76,7 +77,7 @@ struct PricingOption: Identifiable {
 
   var minutesText: String? {
     guard let minutes = minutesGranted, minutes > 0 else { return nil }
-    return "\(minutes) min"
+    return String(format: LocalizationSupport.localized("%lld min"), Int64(minutes))
   }
 }
 

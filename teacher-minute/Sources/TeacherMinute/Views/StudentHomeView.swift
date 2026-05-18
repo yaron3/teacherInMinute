@@ -347,7 +347,7 @@ struct StudentHomeView: View {
         }
     }
 
-    func sectionHeader(title: String, actionTitle: String? = nil, action: (() -> Void)? = nil) -> some View {
+    func sectionHeader(title: String, actionTitle: String? = nil, action: (@MainActor @Sendable () -> Void)? = nil) -> some View {
         HStack {
             Text(LocalizedStringKey(title))
                 .font(.system(size: 18, weight: .bold))
@@ -372,7 +372,7 @@ struct StudentHomeView: View {
 struct ConversationTypeChip: View {
     let title: String
     let isSelected: Bool
-    let action: () -> Void
+    let action: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -397,7 +397,7 @@ struct ConversationTypeChip: View {
 
 struct SearchingOverlay: View {
     let avatarURLs: [URL?]
-    let onCancel: () -> Void
+    let onCancel: @MainActor @Sendable () -> Void
 
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
@@ -411,7 +411,7 @@ struct SearchingOverlay: View {
     private let ringDiameter: CGFloat = 240
     private let avatarSize: CGFloat = 60
 
-    init(avatarURLs: [URL?] = [], onCancel: @escaping () -> Void) {
+    init(avatarURLs: [URL?] = [], onCancel: @escaping @MainActor @Sendable () -> Void) {
         self.avatarURLs = avatarURLs
         self.onCancel = onCancel
     }
@@ -533,7 +533,7 @@ struct SearchingOverlay: View {
 struct MatchedOverlay: View {
     let liveKitRoom: String
     let liveKitToken: String
-    let onDismiss: () -> Void
+    let onDismiss: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -581,7 +581,7 @@ struct MatchedOverlay: View {
 }
 
 struct NoMatchOverlay: View {
-    let onDismiss: () -> Void
+    let onDismiss: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -630,7 +630,7 @@ struct NoMatchOverlay: View {
 
 struct ErrorOverlay: View {
     let message: String
-    let onDismiss: () -> Void
+    let onDismiss: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -682,7 +682,7 @@ struct ErrorOverlay: View {
 struct PricingCard: View {
     let option: PricingOption
     let isLoading: Bool
-    let action: () -> Void
+    let action: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -696,33 +696,35 @@ struct PricingCard: View {
                     background: option.isHighlighted ? theme.appPurple : theme.appPinkSoft
                 )
 
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
+			  HStack(alignment: .firstTextBaseline, spacing: 4) {
+				  if let minutesText = option.minutesText {
+					HStack(spacing: 4) {
+					  PlatformIcon(systemName: "clock.fill", size: 28, color: theme.appGreen)
+					  Text(minutesText)
+						.font(.system(size: 28, weight: .bold))
+						.foregroundStyle(theme.appGreen)
+					}
+					.padding(.top, 4)
+					
+				  }
+				  
                     Text(option.priceText)
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
-
-                    Text(priceSuffix(for: option))
-                        .font(.system(size: 12))
-                        .foregroundStyle(theme.appSecondaryText)
+				  
+//                    Text(priceSuffix(for: option))
+//					.font(.system(size: 11, weight: .semibold))
+//                        .foregroundStyle(theme.appSecondaryText)
                 }
-                .padding(.top, 18)
-
+                .padding(.top, 8)
+				.padding(.leading, 5)
+			  
                 Text(option.description)
                     .font(.system(size: 12))
                     .foregroundStyle(theme.appSecondaryText)
                     .lineSpacing(4)
                     .padding(.top, 8)
-                    .frame(height: 48, alignment: .top)
-
-                if let minutesText = option.minutesText {
-                    HStack(spacing: 4) {
-                        PlatformIcon(systemName: "clock.fill", size: 10, color: theme.appGreen)
-                        Text(minutesText)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(theme.appGreen)
-                    }
-                    .padding(.top, 4)
-                }
+					.frame(height: .infinity, alignment: .top)
 
                 Button(action: action) {
                     HStack(spacing: 8) {
@@ -820,6 +822,56 @@ struct StudentSearchHomeView_Previews: PreviewProvider {
 struct ErrorOverlay_Previews: PreviewProvider {
   static var previews: some View {
     ErrorOverlay(message: "Could not connect to the teacher service. Please check your connection and try again.") {}
+  }
+}
+
+struct PricingCard_Previews: PreviewProvider {
+  static var previews: some View {
+    pricingCards
+      .previewDisplayName("English")
+
+    pricingCards
+      .environment(\.locale, Locale(identifier: "he"))
+      .environment(\.layoutDirection, .rightToLeft)
+      .previewDisplayName("Hebrew RTL")
+  }
+
+   static var pricingCards: some View {
+    HStack(spacing: 16) {
+      PricingCard(
+        option: PricingOption(
+          id: "starter",
+          name: "מתחילים",
+          priceCents: 5000,
+          currency: "ILS",
+          type: .payAsYouGo,
+          description: "עזרה קצרה בשיעורי בית ושאלות תרגול.",
+          isHighlighted: false,
+          sortOrder: 0,
+          purchaseSKU: nil,
+          minutesGranted: 30
+        ),
+        isLoading: false
+      ) {}
+
+      PricingCard(
+        option: PricingOption(
+          id: "popular",
+          name: "פופולרי",
+          priceCents: 9000,
+          currency: "ILS",
+          type: .payAsYouGo,
+          description: "יותר זמן להסברים מעמיקים ופתרון מודרך.",
+          isHighlighted: true,
+          sortOrder: 1,
+          purchaseSKU: nil,
+          minutesGranted: 60
+        ),
+        isLoading: true
+      ) {}
+    }
+    .padding()
+    .background(Color(.systemBackground))
   }
 }
 #endif
