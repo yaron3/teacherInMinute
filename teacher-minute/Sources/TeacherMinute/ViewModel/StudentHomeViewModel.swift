@@ -68,14 +68,15 @@ struct PricingOption: Identifiable {
   let isHighlighted: Bool
   let sortOrder: Int
   let purchaseSKU: String?
+  let minutesGranted: Int?
 
   var priceText: String {
-    let amount = Double(priceCents) / 100.0
-    let formatter = NumberFormatter()
-    formatter.numberStyle = .currency
-    formatter.currencyCode = currency
-    formatter.maximumFractionDigits = 2
-    return formatter.string(from: NSNumber(value: amount)) ?? String(format: "$%.2f", amount)
+    LessonFormatting.currencyText(cents: priceCents, currencyCode: currency)
+  }
+
+  var minutesText: String? {
+    guard let minutes = minutesGranted, minutes > 0 else { return nil }
+    return "\(minutes) min"
   }
 }
 
@@ -105,11 +106,21 @@ protocol StudentHomeViewModeling: AnyObject {
   var lessonCount: Int { get }
   var hasUnreadMessages: Bool { get set }
   var profileImageURL: String { get set }
+  var remainingMinutes: Int { get set }
+  var checkoutURL: URL? { get set }
+  var isStartingCheckout: Bool { get set }
+  var checkoutPricingOptionID: String? { get set }
+  var isAwaitingPaymentReturn: Bool { get set }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
   func cancelSearch() async
   func resetSearch()
   func selectTier(_ option: PricingOption)
+  func checkout(_ option: PricingOption) async
+  func consumeCheckoutURL()
+  func checkoutDidOpen()
+  func handlePaymentReturn(_ result: PaymentReturnResult) async
+  func handleCheckoutReturnWithoutResult()
   func viewAllLessons()
   func loadProfileIfNeeded() async
   func refreshUnreadMessages() async
@@ -137,9 +148,17 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var lessonCount = 0
   var hasUnreadMessages = false
   var profileImageURL = ""
+  var remainingMinutes = 0
+  var checkoutURL: URL?
+  var isStartingCheckout = false
+  var checkoutPricingOptionID: String?
+  var isAwaitingPaymentReturn = false
 
   private var pollingTask: Task<Void, Never>?
   private var didLoadProfile = false
+  private var displayCurrencyCode: String {
+    pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode
+  }
 
   // MARK: - Actions
 
@@ -159,6 +178,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       activeConnectionFeeCents = result.connectionFeeCents
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
+    } catch let err as FunctionsError {
+      if case .serverError(_, let status) = err, status == "RESOURCE_EXHAUSTED" {
+        logger.info("TeacherMinute askTeacher blocked: insufficient minutes")
+        searchState = .error(LocalizationSupport.localized("Not enough time left. Please purchase more minutes."))
+      } else {
+        logger.error("TeacherMinute askTeacher failed error=\(err)")
+        searchState = .error(err.localizedDescription)
+      }
     } catch {
 	  logger.error("TeacherMinute askTeacher failed error=\(error)")
       searchState = .error(error.localizedDescription)
@@ -184,6 +211,47 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   func selectTier(_ option: PricingOption) {
     selectedPricePerMinuteCents = option.priceCents
   }
+
+  func checkout(_ option: PricingOption) async {
+    guard !isStartingCheckout else { return }
+    isStartingCheckout = true
+    checkoutPricingOptionID = option.id
+    defer {
+      isStartingCheckout = false
+      checkoutPricingOptionID = nil
+    }
+    selectTier(option)
+
+    do {
+      let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id)
+      checkoutURL = result.checkoutURL
+    } catch {
+      logger.error("[StudentHome] failed creating checkout session: \(error.localizedDescription)")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    }
+  }
+
+  func consumeCheckoutURL() {
+    checkoutURL = nil
+  }
+
+  func checkoutDidOpen() {
+    isAwaitingPaymentReturn = true
+  }
+
+  func handlePaymentReturn(_ result: PaymentReturnResult) async {
+    isAwaitingPaymentReturn = false
+    if case .success = result.status, let uid = Auth.auth().currentUser?.uid {
+      await loadRecentLessons(uid: uid)
+      await refreshRemainingMinutes(uid: uid)
+    }
+  }
+
+  func handleCheckoutReturnWithoutResult() {
+    guard isAwaitingPaymentReturn else { return }
+    isAwaitingPaymentReturn = false
+  }
+
   func viewAllLessons() {}
 
   func loadProfileIfNeeded() async {
@@ -193,9 +261,16 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
+      remainingMinutes = profile.remainingMinutes
     }
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
+  }
+
+  private func refreshRemainingMinutes(uid: String) async {
+    if let data = try? await UserService.shared.fetchRaw(uid: uid) {
+      remainingMinutes = data["remainingMinutes"] as? Int ?? 0
+    }
   }
 
   func refreshUnreadMessages() async {
@@ -216,7 +291,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       let allLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
       lessonCount = allLessons.count
       totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: allLessons)
-      totalSpendText = LessonFormatting.totalCostText(lessons: allLessons)
+      totalSpendText = LessonFormatting.totalCostText(lessons: allLessons, currencyCode: displayCurrencyCode)
       let recent = Array(allLessons.prefix(3))
       if !recent.isEmpty {
         recentLessons = recent.map(Self.recentLesson)
@@ -338,6 +413,11 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var lessonCount: Int
   var hasUnreadMessages: Bool
   var profileImageURL: String
+  var remainingMinutes: Int
+  var checkoutURL: URL?
+  var isStartingCheckout = false
+  var checkoutPricingOptionID: String?
+  var isAwaitingPaymentReturn = false
 
   init(
     name: String = "Sarah Jenkins",
@@ -345,6 +425,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     activeQuestionText: String = "",
     activeConnectionFeeCents: Int = 0,
     selectedPricePerMinuteCents: Int = 50,
+    remainingMinutes: Int = 30,
     pricingOptions: [PricingOption] = [
       PricingOption(
         id: "standard_pay_as_you_go",
@@ -355,7 +436,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
         description: "Verified tutors for algebra, geometry, and basic calculus.",
         isHighlighted: false,
         sortOrder: 0,
-        purchaseSKU: nil
+        purchaseSKU: nil,
+        minutesGranted: 30
       ),
       PricingOption(
         id: "expert_pay_as_you_go",
@@ -366,7 +448,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
         description: "Advanced degree tutors for college-level help.",
         isHighlighted: true,
         sortOrder: 1,
-        purchaseSKU: nil
+        purchaseSKU: nil,
+        minutesGranted: 60
       ),
     ],
     recentLessons: [RecentLesson] = [
@@ -379,11 +462,15 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.activeQuestionText = activeQuestionText
     self.activeConnectionFeeCents = activeConnectionFeeCents
     self.selectedPricePerMinuteCents = selectedPricePerMinuteCents
+    self.remainingMinutes = remainingMinutes
     self.questionId = "mock-lesson"
     self.pricingOptions = pricingOptions
     self.recentLessons = recentLessons
     self.totalTimeLearnedText = String(format: LocalizationSupport.localized("%lld min"), Int64(36))
-    self.totalSpendText = LessonFormatting.currencyText(cents: 2780)
+    self.totalSpendText = LessonFormatting.currencyText(
+      cents: 2780,
+      currencyCode: pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode
+    )
     self.lessonCount = recentLessons.count
     self.hasUnreadMessages = true
     self.profileImageURL = ""
@@ -405,6 +492,26 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   func selectTier(_ option: PricingOption) {
     selectedPricePerMinuteCents = option.priceCents
+  }
+
+  func checkout(_ option: PricingOption) async {
+    selectTier(option)
+  }
+
+  func consumeCheckoutURL() {
+    checkoutURL = nil
+  }
+
+  func checkoutDidOpen() {
+    isAwaitingPaymentReturn = true
+  }
+
+  func handlePaymentReturn(_ result: PaymentReturnResult) async {
+    isAwaitingPaymentReturn = false
+  }
+
+  func handleCheckoutReturnWithoutResult() {
+    isAwaitingPaymentReturn = false
   }
 
   func viewAllLessons() {}

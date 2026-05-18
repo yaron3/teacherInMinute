@@ -227,13 +227,21 @@ struct TeacherDashboardView: View {
 	  Text("Earnings Snapshot")
 		.font(.system(size: 18, weight: .bold))
 		.foregroundStyle(theme.appPrimaryText)
-	  
+
 	  HStack(spacing: 16) {
 		EarningsCard(title: LocalizationSupport.localized("Today"), amount: viewModel.formattedTodayEarnings, subtitle: String(format: LocalizationSupport.localized("%lld mins tutored"), viewModel.todayMinutesTutored))
 		  .frame(maxWidth: .infinity)
 		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%lld mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.appGreen : nil)
 		  .frame(maxWidth: .infinity)
 	  }
+
+	  EarningsCard(
+		title: LocalizationSupport.localized("All Time"),
+		amount: String(format: LocalizationSupport.localized("%lld min"), viewModel.totalMinutes),
+		subtitle: LocalizationSupport.localized("Total minutes tutored"),
+		subtitleColor: theme.appGreen
+	  )
+	  .frame(maxWidth: .infinity)
 	}
   }
   

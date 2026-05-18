@@ -139,13 +139,15 @@ struct SettingsView: View {
             AccountSecuritySettingsView(viewModel: viewModel)
         case .language:
             LanguageSettingsView(viewModel: viewModel)
-        case .currency:
-            CurrencySettingsView(viewModel: viewModel)
         case .about:
             AboutSettingsView(viewModel: viewModel)
         case .webPage(let title, let url):
             AboutWebView(url: url, title: title)
-        case .changePassword, .teacherPayouts, .studentPayments, .notifications, .privacyControls:
+        case .studentPayments:
+            StudentPaymentsSettingsView(viewModel: viewModel)
+        case .teacherPayouts:
+            TeacherPayoutSettingsView(viewModel: viewModel)
+        case .changePassword, .notifications, .privacyControls:
             SettingsPlaceholderView(destination: destination)
         }
     }
@@ -351,84 +353,6 @@ struct LanguageSettingsView: View {
     }
 }
 
-struct CurrencySettingsView: View {
-    let viewModel: SettingsViewModel
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-    var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("CURRENCY")
-                    .font(.system(size: 12, weight: .bold))
-                    .tracking(1)
-                    .foregroundStyle(theme.appSecondaryText)
-                    .padding(.leading, 4)
-                    .padding(.top, 24)
-
-                VStack(spacing: 0) {
-                    ForEach(Array(SettingsCurrencyChoice.allCases.enumerated()), id: \.element.id) { index, currency in
-                        Button {
-                            viewModel.selectedCurrency = currency
-                        } label: {
-                            HStack(spacing: 14) {
-                                Circle()
-                                    .fill(theme.appGrayBackground)
-                                    .frame(width: 34, height: 34)
-                                    .overlay {
-                                        PlatformIcon(
-                                            systemName: "dollarsign.circle.fill",
-                                            size: 14,
-                                            weight: .semibold,
-                                            color: theme.appPrimaryText
-                                        )
-                                    }
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(currency.title)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(theme.appPrimaryText)
-
-                                    Text(currency.subtitle)
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(theme.appSecondaryText)
-                                }
-
-                                Spacer()
-
-                                if viewModel.selectedCurrency == currency {
-                                    PlatformIcon(
-                                        systemName: "checkmark",
-                                        size: 14,
-                                        weight: .bold,
-                                        color: theme.appPink
-                                    )
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(height: 64)
-                        }
-                        .buttonStyle(.plain)
-
-                        if index < SettingsCurrencyChoice.allCases.count - 1 {
-                            Divider()
-                                .padding(.leading, 58)
-                        }
-                    }
-                }
-                .padding(.vertical, 8)
-                .background(theme.appCardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
-            }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 24)
-        }
-        .background(Color(.systemBackground))
-    }
-}
-
 struct AboutSettingsView: View {
     let viewModel: SettingsViewModel
   @Environment(\.colorScheme) var colorScheme
@@ -508,6 +432,148 @@ struct SettingsPlaceholderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+    }
+}
+
+struct StudentPaymentsSettingsView: View {
+    let viewModel: SettingsViewModel
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            RoundedInfoCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Circle()
+                        .fill(theme.appPurpleSoft)
+                        .frame(width: 44, height: 44)
+                        .overlay {
+                            PlatformIcon(
+                                systemName: "creditcard.fill",
+                                size: 18,
+                                weight: .semibold,
+                                color: theme.appPurple
+                            )
+                        }
+
+                    Text(LocalizationSupport.localized("PayPal Checkout"))
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(theme.appPrimaryText)
+
+                    Text(LocalizationSupport.localized("Today we support PayPal only. Students do not need to save a payment method in the app; PayPal asks for the student credentials during each purchase."))
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.appSecondaryText)
+                        .lineSpacing(4)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 24)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+    }
+}
+
+struct TeacherPayoutSettingsView: View {
+    @Bindable var viewModel: SettingsViewModel
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            RoundedInfoCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    Circle()
+                        .fill(theme.appPurpleSoft)
+                        .frame(width: 44, height: 44)
+                        .overlay {
+                            PlatformIcon(
+                                systemName: "p.circle.fill",
+                                size: 20,
+                                weight: .semibold,
+                                color: theme.appPurple
+                            )
+                        }
+
+                    Text(LocalizationSupport.localized("PayPal Payouts"))
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(theme.appPrimaryText)
+
+                    Text(LocalizationSupport.localized("Teachers must add and keep a valid PayPal email in order to receive payouts. Payments cannot be sent until this information is valid."))
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.appSecondaryText)
+                        .lineSpacing(4)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(LocalizationSupport.localized("PayPal Email"))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(theme.appPrimaryText)
+
+                        TextField(LocalizationSupport.localized("teacher@example.com"), text: $viewModel.teacherPayPalEmail)
+                            .font(.system(size: 15))
+                            .foregroundStyle(theme.appPrimaryText)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(.horizontal, 14)
+                            .frame(height: 48)
+                            .background(theme.authFieldBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(theme.authFieldBorder, lineWidth: 1)
+                            }
+                    }
+
+                    Button {
+                        viewModel.saveTeacherPayoutSettings()
+                    } label: {
+                        HStack {
+                            if viewModel.isSavingPayoutSettings {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .tint(theme.appPrimaryText)
+                            } else {
+                                PlatformIcon(
+                                    systemName: "checkmark.circle.fill",
+                                    size: 14,
+                                    weight: .semibold,
+                                    color: theme.appPrimaryText
+                                )
+                            }
+
+                            Text(viewModel.isSavingPayoutSettings ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save PayPal Info"))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(theme.appPrimaryText)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(theme.appPink)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isSavingPayoutSettings)
+                    .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 24)
+            .padding(.bottom, 24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+        .task {
+            await viewModel.loadTeacherPayoutSettings()
+        }
     }
 }
 

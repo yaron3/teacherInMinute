@@ -53,6 +53,14 @@ struct QuestionStatusResult {
   let questionId: String?
 }
 
+struct CheckoutSessionResult {
+  let checkoutURL: URL
+}
+
+struct PaymentSettingsSessionResult {
+  let settingsURL: URL
+}
+
 // MARK: - Service
 
 @MainActor
@@ -91,6 +99,27 @@ final class FunctionsService {
       liveKitToken: result["liveKitToken"] as? String,
 	  questionId: Self.firstString(in: result, keys: ["questionId", "questionID", "id"])
     )
+  }
+
+  func createCheckoutSession(pricingOptionID: String) async throws -> CheckoutSessionResult {
+    let result = try await call(
+      function: "createCheckoutSession",
+      data: ["pricingOptionId": pricingOptionID]
+    )
+    guard
+      let urlString = Self.firstString(in: result, keys: ["checkoutUrl", "checkoutURL", "url"]),
+      let checkoutURL = URL(string: urlString)
+    else { throw FunctionsError.decodingError }
+    return CheckoutSessionResult(checkoutURL: checkoutURL)
+  }
+
+  func createPaymentSettingsSession() async throws -> PaymentSettingsSessionResult {
+    let result = try await call(function: "createPaymentSettingsSession", data: [:])
+    guard
+      let urlString = Self.firstString(in: result, keys: ["settingsUrl", "settingsURL", "portalUrl", "portalURL", "url"]),
+      let settingsURL = URL(string: urlString)
+    else { throw FunctionsError.decodingError }
+    return PaymentSettingsSessionResult(settingsURL: settingsURL)
   }
 
   // MARK: - Teacher callables

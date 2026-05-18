@@ -52,11 +52,21 @@ struct CompleteProfileView: View {
 	  .padding(.top, 20)
 
 	  if viewModel.role == .student {
-		HStack(spacing: 12) {
-		  dobPicker
-		  gradePicker
-		}
-		.padding(.top, 20)
+			HStack(spacing: 12) {
+			  dobPicker
+			  gradePicker
+			}
+			.padding(.top, 20)
+	  } else {
+			AuthInputField(
+			  title: LocalizationSupport.localized("PayPal Email"),
+			  placeholder: LocalizationSupport.localized("Optional"),
+			  systemImage: "p.circle.fill",
+			  text: $viewModel.paypalEmail,
+			  keyboardType: .emailAddress,
+			  textContentType: .emailAddress
+			)
+			.padding(.top, 20)
 	  }
 	  
 	  Spacer()
@@ -97,6 +107,14 @@ struct CompleteProfileView: View {
 		  }
 		}
 	  }
+	}
+	.alert(LocalizationSupport.localized("Payout Details Missing"), isPresented: $viewModel.showMissingPayoutInfoConfirmation) {
+	  Button(LocalizationSupport.localized("Add Now"), role: .cancel) {}
+	  Button(LocalizationSupport.localized("Continue Anyway")) {
+		viewModel.continueWithoutPayoutInfo()
+	  }
+	} message: {
+	  Text(LocalizationSupport.localized("You will not receive money until you provide bank account details or PayPal info."))
 	}
   }
   

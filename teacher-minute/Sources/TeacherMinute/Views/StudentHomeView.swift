@@ -9,8 +9,11 @@ import SwiftUI
 
 struct StudentHomeView: View {
     @State var viewModel: any StudentHomeViewModeling
+    @State var paymentReturnStore = PaymentReturnStore.shared
     @State var showingAskSheet = false
     @Binding var hidesTabBar: Bool
+    @Environment(\.openURL) var openURL
+    @Environment(\.scenePhase) var scenePhase
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -48,8 +51,11 @@ struct StudentHomeView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
                             ForEach(viewModel.pricingOptions) { option in
-                                PricingCard(option: option) {
-                                    viewModel.selectTier(option)
+                                PricingCard(
+                                    option: option,
+                                    isLoading: viewModel.isStartingCheckout && viewModel.checkoutPricingOptionID == option.id
+                                ) {
+                                    Task { await viewModel.checkout(option) }
                                 }
                             }
                         }
@@ -110,6 +116,48 @@ struct StudentHomeView: View {
         }
         .task {
             await viewModel.loadProfileIfNeeded()
+        }
+        .onChange(of: viewModel.checkoutURL) { _, url in
+            guard let url else { return }
+            openURL(url)
+            viewModel.checkoutDidOpen()
+            viewModel.consumeCheckoutURL()
+        }
+        .onChange(of: paymentReturnStore.resultVersion) { _, _ in
+            guard let result = paymentReturnStore.latestResult else { return }
+            Task { await viewModel.handlePaymentReturn(result) }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            handleActiveAfterExternalCheckout()
+        }
+        .alert(paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"), isPresented: isShowingPaymentReturnResult) {
+            Button("OK", role: .cancel) {
+                paymentReturnStore.consumeLatestResult()
+            }
+        } message: {
+            Text(paymentReturnStore.latestResult?.message ?? "")
+        }
+    }
+
+    var isShowingPaymentReturnResult: Binding<Bool> {
+        Binding(
+            get: { paymentReturnStore.latestResult != nil },
+            set: { isPresented in
+                if !isPresented {
+                    paymentReturnStore.consumeLatestResult()
+                }
+            }
+        )
+    }
+
+    private func handleActiveAfterExternalCheckout() {
+        guard viewModel.isAwaitingPaymentReturn else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard viewModel.isAwaitingPaymentReturn, paymentReturnStore.latestResult == nil else { return }
+            viewModel.handleCheckoutReturnWithoutResult()
+            paymentReturnStore.handleMissingReturn()
         }
     }
 
@@ -207,10 +255,18 @@ struct StudentHomeView: View {
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
 
-                    Text("Connect instantly • Per-minute billing")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .padding(.top, 6)
+                    HStack(spacing: 6) {
+                        Text("\(viewModel.remainingMinutes) min remaining")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.95))
+                        Text("•")
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.appGrayBackground.opacity(0.6))
+                        Text("Per-minute billing")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(theme.appGrayBackground.opacity(0.9))
+                    }
+                    .padding(.top, 6)
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -563,7 +619,7 @@ struct ErrorOverlay: View {
   }
     var body: some View {
         ZStack {
-            theme.appPrimaryText.opacity(0.6).ignoresSafeArea()
+            theme.appCardBackground.opacity(0.9).ignoresSafeArea()
 
             VStack(spacing: 20) {
                 Circle()
@@ -607,6 +663,7 @@ struct ErrorOverlay: View {
 
 struct PricingCard: View {
     let option: PricingOption
+    let isLoading: Bool
     let action: () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -639,16 +696,35 @@ struct PricingCard: View {
                     .padding(.top, 8)
                     .frame(height: 48, alignment: .top)
 
+                if let minutesText = option.minutesText {
+                    HStack(spacing: 4) {
+                        PlatformIcon(systemName: "clock.fill", size: 10, color: theme.appGreen)
+                        Text(minutesText)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(theme.appGreen)
+                    }
+                    .padding(.top, 4)
+                }
+
                 Button(action: action) {
-                    Text("Select Tier")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(option.isHighlighted ?theme.appCardBackground: theme.appPrimaryText)
+                    HStack(spacing: 8) {
+                        if isLoading {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .tint(option.isHighlighted ? theme.appCardBackground : theme.appPrimaryText)
+                        }
+
+                        Text(isLoading ? LocalizationSupport.localized("Connecting...") : LocalizationSupport.localized("Checkout"))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(option.isHighlighted ?theme.appCardBackground: theme.appPrimaryText)
+                    }
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
                         .background(option.isHighlighted ? theme.appPurple : theme.appGrayBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                .disabled(isLoading)
                 .padding(.top, 14)
             }
             .frame(width: 172)
@@ -663,7 +739,7 @@ struct PricingCard: View {
         if let period = option.type.billingPeriodText {
             return period
         }
-        return "/min"
+        return LocalizationSupport.localized("/min")
     }
 }
 
@@ -720,6 +796,12 @@ struct StudentSearchHomeView_Previews: PreviewProvider {
   static var previews: some View {
 
 	StudentHomeView(viewModel: MockStudentHomeViewModel(searchState: .searching(questionId: "fdjhfdhdf")))
+  }
+}
+
+struct ErrorOverlay_Previews: PreviewProvider {
+  static var previews: some View {
+    ErrorOverlay(message: "Could not connect to the teacher service. Please check your connection and try again.") {}
   }
 }
 #endif

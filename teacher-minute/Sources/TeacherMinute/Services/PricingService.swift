@@ -36,7 +36,7 @@ final class PricingService {
     }
 
     private static func makeOption(id: String, data: [String: Any]) -> PricingOption? {
-        let name = Self.string(data["name"])
+        let name = localizedString(data: data, key: "name")
         guard !name.isEmpty else { return nil }
 
         let priceCents: Int
@@ -56,13 +56,15 @@ final class PricingService {
         let typeRaw = Self.string(data["type"])
         let type = PricingType(rawValue: typeRaw) ?? .payAsYouGo
 
-        let description = Self.string(data["description"])
+        let description = localizedString(data: data, key: "description")
         let isHighlighted = (data["isHighlighted"] as? Bool) ?? false
         let sortOrder = intValue(data["sortOrder"]) ?? 0
         let purchaseSKU: String? = {
             let raw = Self.string(data["purchaseSKU"])
             return raw.isEmpty ? nil : raw
         }()
+
+        let minutesGranted: Int? = intValue(data["minutesGranted"])
 
         return PricingOption(
             id: id,
@@ -73,13 +75,24 @@ final class PricingService {
             description: description,
             isHighlighted: isHighlighted,
             sortOrder: sortOrder,
-            purchaseSKU: purchaseSKU
+            purchaseSKU: purchaseSKU,
+            minutesGranted: minutesGranted
         )
     }
 
     private static func string(_ value: Any?) -> String {
         guard let value = value as? String else { return "" }
         return value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func localizedString(data: [String: Any], key: String) -> String {
+        if let prefix = LocalizationSupport.preferredFieldPrefix {
+            let localizedValue = string(data["\(prefix)_\(key)"])
+            if !localizedValue.isEmpty {
+                return localizedValue
+            }
+        }
+        return string(data[key])
     }
 
     private static func intValue(_ value: Any?) -> Int? {

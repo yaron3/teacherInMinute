@@ -14,6 +14,7 @@ struct UserProfile: Codable {
   let phoneNumber: String
   let dateOfBirth: Date
   let grade: String
+  let paypalEmail: String
   let role: String   // "student" | "teacher"
   let createdAt: Date
   
@@ -23,12 +24,13 @@ struct UserProfile: Codable {
 	  "uid":         uid,
 	  "email":       email,
 	  "fullName":    fullName,
-	  "phoneNumber": phoneNumber,
-	  "dateOfBirth": iso.string(from: dateOfBirth),
-	  "grade":       grade,
-	  "role":        role,
-	  "createdAt":   iso.string(from: createdAt),
-	]
+		  "phoneNumber": phoneNumber,
+		  "dateOfBirth": iso.string(from: dateOfBirth),
+		  "grade":       grade,
+		  "paypalEmail": paypalEmail,
+		  "role":        role,
+		  "createdAt":   iso.string(from: createdAt),
+		]
   }
 }
 
@@ -38,19 +40,23 @@ struct UserProfileSummary {
   let fullName: String
   let phoneNumber: String
   let grade: String
+  let paypalEmail: String
   let role: AuthRole
   let subjects: [String]
   let createdAt: Date?
   let profileImageURL: String
-  
+  let remainingMinutes: Int
+  let totalMinutes: Int
+
   init?(uid: String, data: [String: Any]) {
 	let roleString = data["role"] as? String ?? ""
 	self.uid = uid
 	self.email = data["email"] as? String ?? ""
-	self.fullName = data["fullName"] as? String ?? ""
-	self.phoneNumber = data["phoneNumber"] as? String ?? ""
-	self.grade = data["grade"] as? String ?? ""
-	self.profileImageURL = data["profileImageURL"] as? String
+		self.fullName = data["fullName"] as? String ?? ""
+		self.phoneNumber = data["phoneNumber"] as? String ?? ""
+		self.grade = data["grade"] as? String ?? ""
+		self.paypalEmail = data["paypalEmail"] as? String ?? ""
+		self.profileImageURL = data["profileImageURL"] as? String
 	?? data["profilePhotoURL"] as? String
 	?? data["photoURL"] as? String
 	?? ""
@@ -61,12 +67,15 @@ struct UserProfileSummary {
 	  .flatMap { subject, subtopics in
 		subtopics.sorted().map { "\(subject): \($0)" }
 	  }
-	
+
 	if let createdAtString = data["createdAt"] as? String {
 	  self.createdAt = ISO8601DateFormatter().date(from: createdAtString)
 	} else {
 	  self.createdAt = nil
 	}
+
+	self.remainingMinutes = data["remainingMinutes"] as? Int ?? 0
+	self.totalMinutes = data["totalMinutes"] as? Int ?? 0
   }
   
   var displayName: String {

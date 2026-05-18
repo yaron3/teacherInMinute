@@ -91,3 +91,60 @@ export interface LessonDoc {
   liveKitTokenExpiry: Timestamp;
   endedBy?: "student" | "teacher" | "system";
 }
+
+// ─── Firestore — pricing/{pricingOptionId} ────────────────────────────────────
+
+export type PlanType = "pay_as_you_go" | "unlimited_week" | "unlimited_month" | "unlimited_year";
+
+export interface PricingDoc {
+  name: string;
+  priceCents: number;
+  currency: string;
+  type: PlanType;
+  minutesGranted?: number;   // pay_as_you_go: minutes added to remainingMinutes on purchase
+  description?: string;
+  isHighlighted?: boolean;
+  sortOrder?: number;
+  active?: boolean;
+}
+
+// ─── Firestore — paymentSessions/{sessionId} ─────────────────────────────────
+
+export type PaymentSessionStatus = "created" | "paid" | "cancelled" | "refunded";
+
+export interface PaymentSessionDoc {
+  uid: string;
+  pricingOptionId: string;
+  provider: "paypal";
+  providerOrderId: string;
+  providerCaptureId?: string;
+  status: PaymentSessionStatus;
+  amountCents: number;
+  currency: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  paidAt?: Timestamp;
+}
+
+// ─── Firestore — users/{uid} ─────────────────────────────────────────────────
+
+export interface UserDoc {
+  remainingMinutes: number;  // students: minutes available to use
+  totalMinutes: number;      // teachers: cumulative minutes taught
+  questions?: string[];
+}
+
+// ─── Firestore — users/{uid}/purchases/{purchaseId} ───────────────────────────
+
+export type PurchaseStatus = "active" | "expired" | "refunded";
+
+export interface PurchaseDoc {
+  pricingOptionId: string;
+  provider: "paypal";
+  amountCents: number;
+  currency: string;
+  type: PlanType;
+  status: PurchaseStatus;
+  purchasedAt: Timestamp;
+  expiresAt?: Timestamp;
+}

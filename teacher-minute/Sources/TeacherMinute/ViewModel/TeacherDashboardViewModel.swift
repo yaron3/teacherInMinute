@@ -59,6 +59,7 @@ final class TeacherDashboardViewModel {
   var weekEarningsCents = 0
   var weekMinutesTutored = 0
   var lastWeekEarningsCents = 0
+  var totalMinutes = 0
   var ratePerMinuteCents = 50
   var hasMicAccess = false
   var hasCameraAccess = false
@@ -467,6 +468,7 @@ final class TeacherDashboardViewModel {
       subjects = summary?.subjects ?? []
       isVerified = data["isVerified"] as? Bool ?? false
       ratePerMinuteCents = Self.intValue(data["ratePerMinuteCents"]) ?? 50
+      totalMinutes = summary?.totalMinutes ?? 0
     }
 
     checkPermissions()

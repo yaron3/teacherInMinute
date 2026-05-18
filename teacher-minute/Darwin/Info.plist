@@ -7,12 +7,22 @@
 			<dict>
 				<key>CFBundleTypeRole</key>
 				<string>Editor</string>
-				<key>CFBundleURLSchemes</key>
-				<array>
-					<string>com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m</string>
-				</array>
-			</dict>
-		</array>
+					<key>CFBundleURLSchemes</key>
+					<array>
+						<string>com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m</string>
+					</array>
+				</dict>
+				<dict>
+					<key>CFBundleTypeRole</key>
+					<string>Viewer</string>
+					<key>CFBundleURLName</key>
+					<string>TeacherMinute Payment Return</string>
+					<key>CFBundleURLSchemes</key>
+					<array>
+						<string>teacherminute</string>
+					</array>
+				</dict>
+			</array>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>We need microphone access so students and teachers can talk during live lessons.</string>
 		<key>NSPhotoLibraryUsageDescription</key>

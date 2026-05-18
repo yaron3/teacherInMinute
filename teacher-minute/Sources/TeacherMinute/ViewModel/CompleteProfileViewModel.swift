@@ -23,18 +23,23 @@ final class CompleteProfileViewModel {
   /// Default start = 15 years ago
   var dateOfBirth: Date = Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date()
   var grade = ""
+  var paypalEmail = ""
   
   var isLoading = false
   var isCheckingCompletion = true
+  var showMissingPayoutInfoConfirmation = false
   var errorMessage: String?
   var onContinue: (() -> Void)?
   
   let grades: [String] = (1...12).map { "Grade \($0)" } + ["College", "Adult Learner"]
   
   var canContinue: Bool {
-	!fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+	let hasBaseProfile = !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
 	!phoneNumber.isEmpty &&
 	!isLoading
+	guard role == .teacher else { return hasBaseProfile }
+	let trimmedPayPalEmail = paypalEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+	return hasBaseProfile && (trimmedPayPalEmail.isEmpty || trimmedPayPalEmail.isEmail)
   }
   
   init(role: AuthRole) {
@@ -51,13 +56,14 @@ final class CompleteProfileViewModel {
 	  let hasName  = !(data["fullName"] as? String ?? "").isEmpty
 	  let hasPhone = !(data["phoneNumber"] as? String ?? "").isEmpty
 	  let hasProfile = role == .teacher
-		? (hasName && hasPhone)
-		: (hasName && hasPhone && data["dateOfBirth"] != nil)
+				? (hasName && hasPhone)
+				: (hasName && hasPhone && data["dateOfBirth"] != nil)
 	  if hasProfile {
-		fullName    = data["fullName"]    as? String ?? ""
-		phoneNumber = data["phoneNumber"] as? String ?? ""
-		grade       = data["grade"]       as? String ?? ""
-		onContinue?()
+			fullName    = data["fullName"]    as? String ?? ""
+			phoneNumber = data["phoneNumber"] as? String ?? ""
+			grade       = data["grade"]       as? String ?? ""
+			paypalEmail = data["paypalEmail"] as? String ?? ""
+			onContinue?()
 	  }
 	}
   }
@@ -66,6 +72,19 @@ final class CompleteProfileViewModel {
   
   func continueFlow() {
 	guard canContinue else { return }
+	if role == .teacher && paypalEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+	  showMissingPayoutInfoConfirmation = true
+	  return
+	}
+	saveAndContinue()
+  }
+
+  func continueWithoutPayoutInfo() {
+	showMissingPayoutInfoConfirmation = false
+	saveAndContinue()
+  }
+
+  private func saveAndContinue() {
 	isLoading = true
 	
 	Task {
@@ -80,12 +99,13 @@ final class CompleteProfileViewModel {
 		  uid:         user.uid,
 		  email:       user.email ?? "",
 		  fullName:    fullName,
-		  phoneNumber: phoneNumber,
-		  dateOfBirth: dateOfBirth,
-		  grade:       grade,
-		  role:        role.rawValue,
-		  createdAt:   Date()
-		)
+			  phoneNumber: phoneNumber,
+			  dateOfBirth: dateOfBirth,
+			  grade:       grade,
+			  paypalEmail: paypalEmail.trimmingCharacters(in: .whitespacesAndNewlines),
+			  role:        role.rawValue,
+			  createdAt:   Date()
+			)
 		
 		try await UserService.shared.saveProfile(profile)
 		isLoading = false

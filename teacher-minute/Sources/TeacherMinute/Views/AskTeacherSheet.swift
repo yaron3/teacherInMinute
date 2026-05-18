@@ -62,9 +62,9 @@ struct AskTeacherSheet: View {
                             conversationType = "text"
                         }
                         ConversationTypeChip(title: LocalizationSupport.localized("Audio + Text"), isSelected: false) {}
-                            .opacity(0.45)
+                            .opacity(0.9)
                         ConversationTypeChip(title: LocalizationSupport.localized("Video + Audio + Text"), isSelected: false) {}
-                            .opacity(0.45)
+                            .opacity(0.9)
                     }
                 }
 

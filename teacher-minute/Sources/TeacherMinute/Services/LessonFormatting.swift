@@ -6,12 +6,10 @@
 import Foundation
 
 enum LessonFormatting {
-    static let currencyPreferenceKey = "settings.currency.preference"
     static let defaultCurrencyCode = "USD"
 
     static var selectedCurrencyCode: String {
-        let code = UserDefaults.standard.string(forKey: currencyPreferenceKey) ?? defaultCurrencyCode
-        return code.isEmpty ? defaultCurrencyCode : code
+        defaultCurrencyCode
     }
 
     static func relativeDateText(_ date: Date) -> String {
@@ -48,12 +46,42 @@ enum LessonFormatting {
 
     static func currencyText(cents: Int, currencyCode: String = selectedCurrencyCode) -> String {
         let amount = Double(cents) / 100.0
+        let isWholeAmount = cents % 100 == 0
+        if shouldPlaceCurrencySymbolAfterAmount(currencyCode: currencyCode) {
+            return "\(numberText(amount: amount, maximumFractionDigits: isWholeAmount ? 0 : 2))\(currencySymbol(for: currencyCode))"
+        }
+
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = currencyCode
         formatter.locale = LocalizationSupport.currentLocale
-        formatter.maximumFractionDigits = 2
+        formatter.maximumFractionDigits = isWholeAmount ? 0 : 2
         return formatter.string(from: NSNumber(value: amount)) ?? "\(currencyCode) \(String(format: "%.2f", amount))"
+    }
+
+    private static func numberText(amount: Double, maximumFractionDigits: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = LocalizationSupport.currentLocale
+        formatter.maximumFractionDigits = maximumFractionDigits
+        formatter.minimumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: amount)) ?? String(format: "%.\(maximumFractionDigits)f", amount)
+    }
+
+    private static func shouldPlaceCurrencySymbolAfterAmount(currencyCode: String) -> Bool {
+        currencyCode.uppercased() == "ILS" || LocalizationSupport.layoutDirection == .rightToLeft
+    }
+
+    private static func currencySymbol(for currencyCode: String) -> String {
+        if currencyCode.uppercased() == "ILS" {
+            return "₪"
+        }
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currencyCode
+        formatter.locale = LocalizationSupport.currentLocale
+        return formatter.currencySymbol ?? currencyCode
     }
 
     static func totalDurationText(lessons: [HistoryLesson]) -> String {
@@ -65,8 +93,8 @@ enum LessonFormatting {
             : String(format: LocalizationSupport.localized("%lld min"), Int64(totalMinutes))
     }
 
-    static func totalCostText(lessons: [HistoryLesson]) -> String {
+    static func totalCostText(lessons: [HistoryLesson], currencyCode: String = selectedCurrencyCode) -> String {
         let totalCents = lessons.reduce(0) { $0 + $1.costCents }
-        return currencyText(cents: totalCents)
+        return currencyText(cents: totalCents, currencyCode: currencyCode)
     }
 }

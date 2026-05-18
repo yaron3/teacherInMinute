@@ -34,7 +34,7 @@ final class UserService {
 	let db = Firestore.firestore()
 	try await db.collection("users")
 	  .document(profile.uid)
-	  .setData(profile.firestoreData)
+	  .setData(profile.firestoreData, merge: true)
 	logger.info("Saved profile for uid: \(profile.uid)")
   }
   
@@ -88,10 +88,10 @@ final class UserService {
 	guard !roleString.isEmpty else { return .chooseRole }
 	let role: AuthRole = roleString == "teacher" ? .teacher : .student
 	
-	let hasName  = !(data["fullName"] as? String ?? "").isEmpty
-	let hasPhone = !(data["phoneNumber"] as? String ?? "").isEmpty
+			let hasName  = !(data["fullName"] as? String ?? "").isEmpty
+			let hasPhone = !(data["phoneNumber"] as? String ?? "").isEmpty
 
-	if role == .teacher {
+		if role == .teacher {
 	  let docs = data["uploadedDocuments"] as? [String] ?? []
 	  let hasIdentityDocs = docs.count >= 4
 
@@ -100,8 +100,8 @@ final class UserService {
 
 	  if !hasIdentityDocs { return .teacherIdentityVerification }
 	  if !hasSubjects      { return .teacherSubjects }
-	  if !(hasName && hasPhone) { return .completeProfile(role: .teacher) }
-	  return .home(role: .teacher)
+			  if !(hasName && hasPhone) { return .completeProfile(role: .teacher) }
+		  return .home(role: .teacher)
 	} else {
 	  let hasProfile = hasName && hasPhone && data["dateOfBirth"] != nil
 	  if !hasProfile { return .completeProfile(role: .student) }

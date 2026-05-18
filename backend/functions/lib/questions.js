@@ -11,11 +11,17 @@ const fcm_1 = require("./fcm");
 const types_1 = require("./types");
 const db = admin.database();
 const firestore = admin.firestore();
+async function cleanupRtdb(questionId, alreadyInvited) {
+    await Promise.all([
+        db.ref(`questions/${questionId}`).remove(),
+        ...alreadyInvited.map((tid) => db.ref(`teacherInvites/${tid}/${questionId}`).remove()),
+    ]);
+}
 // ─── createQuestion ───────────────────────────────────────────────────────────
 // FR-B-010: callable — student initiates the question + dispatch pipeline.
 // Writing the Firestore doc triggers dispatchQuestion automatically.
 exports.createQuestion = (0, https_1.onCall)(async (req) => {
-    var _a;
+    var _a, _b, _c;
     const uid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
     if (!uid)
         throw new https_1.HttpsError("unauthenticated", "Sign in required");
@@ -29,6 +35,11 @@ exports.createQuestion = (0, https_1.onCall)(async (req) => {
     }
     if (text.trim().length < 10) {
         throw new https_1.HttpsError("invalid-argument", "Question text must be at least 10 characters");
+    }
+    const studentSnap = await firestore.collection("users").doc(uid).get();
+    const remainingMinutes = (_c = (_b = studentSnap.data()) === null || _b === void 0 ? void 0 : _b.remainingMinutes) !== null && _c !== void 0 ? _c : 0;
+    if (remainingMinutes < 2) {
+        throw new https_1.HttpsError("resource-exhausted", "Not enough time left");
     }
     const qid = (0, uuid_1.v4)();
     const question = Object.assign(Object.assign({ studentUid: uid, topic, text: text.trim(), photoUrls }, (voiceMemoUrl ? { voiceMemoUrl } : {})), { status: "searching", createdAt: firestore_1.Timestamp.now(), updatedAt: firestore_1.Timestamp.now(), dispatchWave: 0, alreadyInvited: [] });
@@ -49,7 +60,9 @@ exports.cancelQuestion = (0, https_1.onCall)(async (req) => {
     if (!questionId)
         throw new https_1.HttpsError("invalid-argument", "questionId required");
     const qRef = firestore.collection("questions").doc(questionId);
+    let alreadyInvited = [];
     await firestore.runTransaction(async (tx) => {
+        var _a;
         const snap = await tx.get(qRef);
         if (!snap.exists)
             throw new https_1.HttpsError("not-found", "Question not found");
@@ -60,11 +73,15 @@ exports.cancelQuestion = (0, https_1.onCall)(async (req) => {
         if (!cancellable.includes(data.status)) {
             throw new https_1.HttpsError("failed-precondition", `Cannot cancel a question with status: ${data.status}`);
         }
+        alreadyInvited = (_a = data.alreadyInvited) !== null && _a !== void 0 ? _a : [];
         tx.update(qRef, {
             status: "cancelled",
+            endedBy: "student",
+            endedAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
     });
+    await cleanupRtdb(questionId, alreadyInvited);
     firebase_functions_1.logger.info(`[questions] cancelled qid=${questionId} by student=${uid}`);
     return { success: true };
 });

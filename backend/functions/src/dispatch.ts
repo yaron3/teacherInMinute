@@ -21,6 +21,18 @@ const firestore = admin.firestore();
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+async function archiveUnanswered(qid: string, alreadyInvited: string[]): Promise<void> {
+  await firestore.collection("questions").doc(qid).update({
+    status: "unanswered",
+    endedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  await Promise.all([
+    db.ref(`questions/${qid}`).remove(),
+    ...alreadyInvited.map((tid) => db.ref(`teacherInvites/${tid}/${qid}`).remove()),
+  ]);
+}
+
 async function allTeachers(): Promise<Record<string, TeacherRecord>> {
   const snap = await db.ref("teachers").once("value");
   return (snap.val() as Record<string, TeacherRecord>) ?? {};
@@ -128,11 +140,7 @@ export const dispatchQuestion = onDocumentCreated(
 
     if (invited.length === 0) {
       // No eligible teachers at all — declare unanswered immediately
-      await firestore.collection("questions").doc(qid).update({
-        status: "unanswered",
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      // Notify student if we have their FCM token
+      await archiveUnanswered(qid, []);
       logger.info(`[dispatch] no teachers found for qid=${qid}, declared unanswered`);
       return;
     }
@@ -181,10 +189,7 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
 
     // FR-B-005: after wave 3 with no acceptance, declare unanswered
     if (nextWave > WAVE_SIZES.length) {
-      await qRef.update({
-        status: "unanswered",
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      await archiveUnanswered(qid, data.alreadyInvited ?? []);
       logger.info(`[evaluateWave] qid=${qid} declared unanswered after wave ${wave}`);
 
       // Notify student
@@ -204,10 +209,7 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
 
     if (invited.length === 0) {
       // Ran out of eligible teachers mid-dispatch
-      await qRef.update({
-        status: "unanswered",
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      await archiveUnanswered(qid, data.alreadyInvited ?? []);
       logger.info(`[evaluateWave] qid=${qid} no teachers for wave=${nextWave}, unanswered`);
       return;
     }

@@ -44,15 +44,13 @@ struct SettingsRow: Identifiable {
         // Map actions that have in-stack destinations to SettingsDestination
         switch action {
         case .accountSecurity:
-			self.destination = .accountSecurity
-			logger.info("\(#fileID) \(#function): \(#file): \(#line)")
+		self.destination = .accountSecurity
         case .changePassword:  self.destination = .changePassword
         case .teacherPayouts:  self.destination = .teacherPayouts
         case .studentPayments: self.destination = .studentPayments
         case .notifications:   self.destination = .notifications
         case .privacyControls: self.destination = .privacyControls
         case .language:        self.destination = .language
-        case .currency:        self.destination = .currency
         case .about:           self.destination = .about
         case .eula:
             // EULA/PrivacyPolicy are opened via remote URL; keep destination nil so viewModel handles it
@@ -78,7 +76,6 @@ enum SettingsAction: Equatable {
     case notifications
     case privacyControls
     case language
-    case currency
     case about
     case contactUs
     case eula
@@ -95,7 +92,6 @@ enum SettingsAction: Equatable {
         case .notifications: "notifications"
         case .privacyControls: "privacyControls"
         case .language: "language"
-        case .currency: "currency"
         case .about: "about"
         case .contactUs: "contactUs"
         case .eula: "eula"
@@ -112,7 +108,6 @@ enum SettingsDestination: Hashable {
     case notifications
     case privacyControls
     case language
-    case currency
     case about
     case webPage(title: String, url: URL)
 
@@ -125,7 +120,6 @@ enum SettingsDestination: Hashable {
         case .notifications: LocalizationSupport.localized("Notification Preferences")
         case .privacyControls: LocalizationSupport.localized("Privacy Controls")
         case .language: LocalizationSupport.localized("Language")
-        case .currency: LocalizationSupport.localized("Currency")
         case .about: LocalizationSupport.localized("About")
         case .webPage(let title, _): title
         }
@@ -143,7 +137,7 @@ enum SettingsDestination: Hashable {
             LocalizationSupport.localized("Notification preferences will be available here.")
         case .privacyControls:
             LocalizationSupport.localized("Privacy controls will be available here.")
-        case .accountSecurity, .language, .currency, .about, .webPage:
+        case .accountSecurity, .language, .about, .webPage:
             ""
         }
     }
@@ -213,28 +207,6 @@ enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
     }
 }
 
-enum SettingsCurrencyChoice: String, CaseIterable, Identifiable {
-    case usd = "$"
-    case ils = "₪"
-    case eur = "€"
-    case gbp = "£"
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .usd: LocalizationSupport.localized("US Dollar")
-        case .ils: LocalizationSupport.localized("Israeli Shekel")
-        case .eur: LocalizationSupport.localized("Euro")
-        case .gbp: LocalizationSupport.localized("British Pound")
-        }
-    }
-
-    var subtitle: String {
-        rawValue
-    }
-}
-
 //enum SettingsIconColor {
 //    case primary
 //    case pink
@@ -272,17 +244,14 @@ class SettingsViewModel {
     var alertTitle = LocalizationSupport.localized("Settings")
     var alertMessage: String?
     var isLoading = false
+    var isOpeningPaymentSettings = false
+    var isSavingPayoutSettings = false
+    var teacherPayPalEmail = ""
     var selectedLanguage: SettingsLanguageChoice {
         didSet {
             UserDefaults.standard.set(selectedLanguage.rawValue, forKey: LocalizationSupport.languagePreferenceKey)
         }
     }
-    var selectedCurrency: SettingsCurrencyChoice {
-        didSet {
-            UserDefaults.standard.set(selectedCurrency.rawValue, forKey: LessonFormatting.currencyPreferenceKey)
-        }
-    }
-    
     private let authService: AuthService
     private let remoteConfigService: SettingsRemoteConfigService
 	let role:AppUserMode
@@ -295,9 +264,7 @@ class SettingsViewModel {
         self.remoteConfigService = remoteConfigService
         let savedLanguage = UserDefaults.standard.string(forKey: LocalizationSupport.languagePreferenceKey)
         self.selectedLanguage = savedLanguage.flatMap(SettingsLanguageChoice.init(rawValue:)) ?? .system
-        let savedCurrency = UserDefaults.standard.string(forKey: LessonFormatting.currencyPreferenceKey)
-        self.selectedCurrency = savedCurrency.flatMap(SettingsCurrencyChoice.init(rawValue:)) ?? .usd
-			self.role = role
+				self.role = role
     }
 
     var sections: [SettingsSection] {
@@ -309,7 +276,7 @@ class SettingsViewModel {
 				  
                     SettingsRow(
                         title: LocalizationSupport.localized("Teacher Payout Settings"),
-                        subtitle: LocalizationSupport.localized("Manage bank details & history"),
+                        subtitle: LocalizationSupport.localized("Update PayPal payout email"),
                         systemImage: "banknote.fill",
                         iconColor: .purple,
                         isDestructive: false,
@@ -321,7 +288,7 @@ class SettingsViewModel {
 			rows: [
                     SettingsRow(
                         title: LocalizationSupport.localized("Student Payment Methods"),
-                        subtitle: LocalizationSupport.localized("Cards & billing history"),
+                        subtitle: LocalizationSupport.localized("PayPal at checkout"),
                         systemImage: "creditcard.fill",
                         iconColor: .pink,
                         isDestructive: false,
@@ -339,14 +306,6 @@ class SettingsViewModel {
                         iconColor: .primary,
                         isDestructive: false,
                         action: .language
-                    ),
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Currency"),
-                        subtitle: selectedCurrency.subtitle,
-                        systemImage: "dollarsign.circle.fill",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .currency
                     ),
                     SettingsRow(
                         title: LocalizationSupport.localized("Notification Preferences"),
@@ -475,8 +434,6 @@ class SettingsViewModel {
             navigationPath.append(.privacyControls)
         case .language:
             navigationPath.append(.language)
-        case .currency:
-            navigationPath.append(.currency)
         case .about:
             navigationPath.append(.about)
         case .contactUs:
@@ -498,6 +455,64 @@ class SettingsViewModel {
             return logOut()
         case .deleteAccount:
             return await deleteAccount()
+        }
+    }
+
+    func openPaymentSettings() {
+        guard !isOpeningPaymentSettings else { return }
+        isOpeningPaymentSettings = true
+
+        Task {
+            defer { isOpeningPaymentSettings = false }
+            do {
+                let result = try await FunctionsService.shared.createPaymentSettingsSession()
+                externalURL = result.settingsURL
+            } catch {
+                alertTitle = LocalizationSupport.localized("Payments")
+                alertMessage = LocalizationSupport.localized("Could not open payment settings.")
+                showAlert = true
+                logger.error("[Settings] failed creating payment settings session: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func loadTeacherPayoutSettings() async {
+        guard role == .teacher, let uid = authService.currentUserID else { return }
+        do {
+            let data = try await UserService.shared.fetchRaw(uid: uid) ?? [:]
+            teacherPayPalEmail = data["paypalEmail"] as? String ?? ""
+        } catch {
+            present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("Could not load PayPal payout settings."))
+            logger.error("[Settings] failed loading teacher payout settings: \(error.localizedDescription)")
+        }
+    }
+
+    func saveTeacherPayoutSettings() {
+        guard !isSavingPayoutSettings else { return }
+        let trimmedEmail = teacherPayPalEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedEmail.isEmail else {
+            present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("Enter a valid PayPal email address."))
+            return
+        }
+        guard let uid = authService.currentUserID else {
+            present(message: SettingsError.missingUser.localizedDescription)
+            return
+        }
+
+        isSavingPayoutSettings = true
+        Task {
+            defer { isSavingPayoutSettings = false }
+            do {
+                try await UserService.shared.updateProfileFields(uid: uid, fields: [
+                    "paypalEmail": trimmedEmail,
+                    "updatedAt": ISO8601DateFormatter().string(from: Date())
+                ])
+                teacherPayPalEmail = trimmedEmail
+                present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("PayPal payout email updated."))
+            } catch {
+                present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("Could not update PayPal payout settings."))
+                logger.error("[Settings] failed saving teacher payout settings: \(error.localizedDescription)")
+            }
         }
     }
     

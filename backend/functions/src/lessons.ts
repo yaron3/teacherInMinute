@@ -219,8 +219,22 @@ async function migrateQuestionToFirestore(
 
   const studentRef = firestore.collection("users").doc(studentUid);
   const teacherRef = firestore.collection("users").doc(teacherUid);
-  batch.set(studentRef, { questions: FieldValue.arrayUnion(questionId) }, { merge: true });
-  batch.set(teacherRef, { questions: FieldValue.arrayUnion(questionId) }, { merge: true });
+  batch.set(
+    studentRef,
+    {
+      questions: FieldValue.arrayUnion(questionId),
+      remainingMinutes: FieldValue.increment(-roundedMinutes),
+    },
+    { merge: true }
+  );
+  batch.set(
+    teacherRef,
+    {
+      questions: FieldValue.arrayUnion(questionId),
+      totalMinutes: FieldValue.increment(roundedMinutes),
+    },
+    { merge: true }
+  );
 
   await batch.commit();
   await questionRef.remove();

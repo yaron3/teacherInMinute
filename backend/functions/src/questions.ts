@@ -11,6 +11,13 @@ import { QuestionDoc, DispatchInviteDoc, CONNECTION_FEE_CENTS } from "./types";
 const db = admin.database();
 const firestore = admin.firestore();
 
+async function cleanupRtdb(questionId: string, alreadyInvited: string[]): Promise<void> {
+  await Promise.all([
+    db.ref(`questions/${questionId}`).remove(),
+    ...alreadyInvited.map((tid) => db.ref(`teacherInvites/${tid}/${questionId}`).remove()),
+  ]);
+}
+
 // ─── createQuestion ───────────────────────────────────────────────────────────
 // FR-B-010: callable — student initiates the question + dispatch pipeline.
 // Writing the Firestore doc triggers dispatchQuestion automatically.
@@ -37,6 +44,12 @@ export const createQuestion = onCall(async (req) => {
 
   if (text.trim().length < 10) {
     throw new HttpsError("invalid-argument", "Question text must be at least 10 characters");
+  }
+
+  const studentSnap = await firestore.collection("users").doc(uid).get();
+  const remainingMinutes: number = (studentSnap.data()?.remainingMinutes as number | undefined) ?? 0;
+  if (remainingMinutes < 2) {
+    throw new HttpsError("resource-exhausted", "Not enough time left");
   }
 
   const qid = uuidv4();
@@ -73,6 +86,7 @@ export const cancelQuestion = onCall(async (req) => {
   if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
 
   const qRef = firestore.collection("questions").doc(questionId);
+  let alreadyInvited: string[] = [];
 
   await firestore.runTransaction(async (tx) => {
     const snap = await tx.get(qRef);
@@ -86,11 +100,17 @@ export const cancelQuestion = onCall(async (req) => {
       throw new HttpsError("failed-precondition", `Cannot cancel a question with status: ${data.status}`);
     }
 
+    alreadyInvited = data.alreadyInvited ?? [];
+
     tx.update(qRef, {
       status: "cancelled",
+      endedBy: "student",
+      endedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
   });
+
+  await cleanupRtdb(questionId, alreadyInvited);
 
   logger.info(`[questions] cancelled qid=${questionId} by student=${uid}`);
   return { success: true };

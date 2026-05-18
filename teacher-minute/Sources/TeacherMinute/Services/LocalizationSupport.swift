@@ -12,6 +12,10 @@ enum LocalizationSupport {
         return locale(languagePreference: rawValue)
     }
 
+    static var preferredFieldPrefix: String? {
+        preferredLanguageCode
+    }
+
     static func localized(_ key: String) -> String {
         #if os(Android)
         if preferredLanguageCode == "he", let translated = hebrewLocalizedValue(for: key) {

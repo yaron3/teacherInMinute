@@ -13,6 +13,17 @@ const types_1 = require("./types");
 const db = admin.database();
 const firestore = admin.firestore();
 // ─── helpers ─────────────────────────────────────────────────────────────────
+async function archiveUnanswered(qid, alreadyInvited) {
+    await firestore.collection("questions").doc(qid).update({
+        status: "unanswered",
+        endedAt: firestore_2.FieldValue.serverTimestamp(),
+        updatedAt: firestore_2.FieldValue.serverTimestamp(),
+    });
+    await Promise.all([
+        db.ref(`questions/${qid}`).remove(),
+        ...alreadyInvited.map((tid) => db.ref(`teacherInvites/${tid}/${qid}`).remove()),
+    ]);
+}
 async function allTeachers() {
     var _a;
     const snap = await db.ref("teachers").once("value");
@@ -94,11 +105,7 @@ exports.dispatchQuestion = (0, firestore_1.onDocumentCreated)("questions/{qid}",
     const invited = await sendWave(qid, data, 1, new Set());
     if (invited.length === 0) {
         // No eligible teachers at all — declare unanswered immediately
-        await firestore.collection("questions").doc(qid).update({
-            status: "unanswered",
-            updatedAt: firestore_2.FieldValue.serverTimestamp(),
-        });
-        // Notify student if we have their FCM token
+        await archiveUnanswered(qid, []);
         firebase_functions_1.logger.info(`[dispatch] no teachers found for qid=${qid}, declared unanswered`);
         return;
     }
@@ -117,7 +124,7 @@ exports.evaluateWave = (0, tasks_1.onTaskDispatched)({
     retryConfig: { maxAttempts: 1 },
     rateLimits: { maxConcurrentDispatches: 50 },
 }, async (req) => {
-    var _a;
+    var _a, _b, _c;
     const { questionId: qid, wave } = req.data;
     const qRef = firestore.collection("questions").doc(qid);
     const qSnap = await qRef.get();
@@ -135,10 +142,7 @@ exports.evaluateWave = (0, tasks_1.onTaskDispatched)({
     const nextWave = wave + 1;
     // FR-B-005: after wave 3 with no acceptance, declare unanswered
     if (nextWave > types_1.WAVE_SIZES.length) {
-        await qRef.update({
-            status: "unanswered",
-            updatedAt: firestore_2.FieldValue.serverTimestamp(),
-        });
+        await archiveUnanswered(qid, (_a = data.alreadyInvited) !== null && _a !== void 0 ? _a : []);
         firebase_functions_1.logger.info(`[evaluateWave] qid=${qid} declared unanswered after wave ${wave}`);
         // Notify student
         const studentFcmToken = await db
@@ -151,14 +155,11 @@ exports.evaluateWave = (0, tasks_1.onTaskDispatched)({
         return;
     }
     // Fan out next wave
-    const alreadyInvited = new Set((_a = data.alreadyInvited) !== null && _a !== void 0 ? _a : []);
+    const alreadyInvited = new Set((_b = data.alreadyInvited) !== null && _b !== void 0 ? _b : []);
     const invited = await sendWave(qid, data, nextWave, alreadyInvited);
     if (invited.length === 0) {
         // Ran out of eligible teachers mid-dispatch
-        await qRef.update({
-            status: "unanswered",
-            updatedAt: firestore_2.FieldValue.serverTimestamp(),
-        });
+        await archiveUnanswered(qid, (_c = data.alreadyInvited) !== null && _c !== void 0 ? _c : []);
         firebase_functions_1.logger.info(`[evaluateWave] qid=${qid} no teachers for wave=${nextWave}, unanswered`);
         return;
     }
