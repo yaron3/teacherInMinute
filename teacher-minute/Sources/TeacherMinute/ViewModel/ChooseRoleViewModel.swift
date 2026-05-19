@@ -16,6 +16,9 @@ final class ChooseRoleViewModel {
     var onContinue: ((AuthRole) -> Void)?
 
     func continueFlow() {
+        let role = String(describing: selectedRole)
+        AnalyticsService.shared.logEvent(AnalyticsEvent.roleSelected, parameters: ["role": role])
+        AnalyticsService.shared.setRole(role)
         onContinue?(selectedRole)
     }
 }

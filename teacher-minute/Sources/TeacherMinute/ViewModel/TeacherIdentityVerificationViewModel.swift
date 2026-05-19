@@ -127,18 +127,21 @@ final class TeacherIdentityVerificationViewModel {
 		uploadedPaths.append(docName)
 		markDone(target: target)
 		try await appendDocumentToUser(uid: uid, docName: docName)
+		AnalyticsService.shared.logEvent(AnalyticsEvent.teacherIdentityUploaded, parameters: ["document_type": String(describing: target)])
 		uploadingTarget = nil
 	  } catch {
+		AnalyticsService.shared.recordError(error, context: "uploadDocument")
 		uploadError = error.localizedDescription
 		uploadingTarget = nil
 	  }
 	}
   }
-  
+
   // MARK: - Submit
-  
+
   func submitForReview() {
 	guard canSubmit else { return }
+	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherIdentityUploaded, parameters: ["action": "submit_for_review"])
 	onSubmit?()
   }
   

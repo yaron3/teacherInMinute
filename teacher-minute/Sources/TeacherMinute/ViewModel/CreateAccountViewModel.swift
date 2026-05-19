@@ -84,26 +84,37 @@ final class CreateAccountViewModel {
   func signup() async {
 	// Validate in order and surface first failure
 	if !isEmailValid {
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "invalid_email"])
 	  present(error: .invalidEmail)
 	  return
 	}
 	if !isPasswordValid {
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "password_too_short"])
 	  present(error: .passwordTooShort)
 	  return
 	}
 	if !agreedToTerms {
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "terms_not_accepted"])
 	  present(error: .termsNotAccepted)
 	  return
 	}
-	
+
 	isLoading = true
 	defer { isLoading = false }
-	
+
+	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpStart, parameters: ["method": "email", "send_updates": sendUpdates])
+
 	do {
 	  _ = try await authService.createUser(email: emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines),
 										   password: password)
+	  if let uid = Auth.auth().currentUser?.uid {
+		AnalyticsService.shared.setUser(uid: uid)
+	  }
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpSuccess, parameters: ["method": "email"])
 	  navigateToChooseRole = true
 	} catch {
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": error.localizedDescription])
+	  AnalyticsService.shared.recordError(error, context: "signup")
 	  alertMessage = error.localizedDescription
 	  showAlert = true
 	}
@@ -112,14 +123,16 @@ final class CreateAccountViewModel {
   // MARK: - Social
   
   func signupWithGoogle() {
+	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpStart, parameters: ["method": "google"])
 #if canImport(UIKit)
 	iOSGoogleSignInProvider().signIn { [weak self] result in
 	  switch result {
 		case .success:
 		  Task { @MainActor in
-			await self?.resolveRouteAfterSocialSignIn()
+			await self?.resolveRouteAfterSocialSignIn(method: "google")
 		  }
 		case .failure(let error):
+		  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 		  Task { @MainActor in
 			self?.alertMessage = error.localizedDescription
 			self?.showAlert = true
@@ -132,24 +145,27 @@ final class CreateAccountViewModel {
 		Task {
 		  do {
 			_ = try await AndroidGoogleAuth().signIn()
-			await resolveRouteAfterSocialSignIn()
+			await resolveRouteAfterSocialSignIn(method: "google")
 		  } catch {
+			AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 			alertMessage = error.localizedDescription
 			showAlert = true
 		  }
 		}
 #endif
   }
-  
+
   func signupWithApple() {
+	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpStart, parameters: ["method": "apple"])
 #if canImport(UIKit)
 		iOSAppleSignInProvider().signIn { [weak self] result in
 		  switch result {
 			case .success:
 			  Task { @MainActor in
-				await self?.resolveRouteAfterSocialSignIn()
+				await self?.resolveRouteAfterSocialSignIn(method: "apple")
 			  }
 			case .failure(let error):
+			  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
 			  Task { @MainActor in
 				self?.alertMessage = error.localizedDescription
 				self?.showAlert = true
@@ -161,8 +177,9 @@ final class CreateAccountViewModel {
 		Task {
 		  do {
 			_ = try await AndroidAppleAuth().signIn()
-			await resolveRouteAfterSocialSignIn()
+			await resolveRouteAfterSocialSignIn(method: "apple")
 		  } catch {
+			AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
 			alertMessage = error.localizedDescription
 			showAlert = true
 		  }
@@ -170,12 +187,15 @@ final class CreateAccountViewModel {
 #endif
   }
 
-  private func resolveRouteAfterSocialSignIn() async {
+  private func resolveRouteAfterSocialSignIn(method: String) async {
 	guard let uid = Auth.auth().currentUser?.uid else {
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": method, "reason": "no_session"])
 	  alertMessage = "Could not retrieve user session. Please try again."
 	  showAlert = true
 	  return
 	}
+	AnalyticsService.shared.setUser(uid: uid)
+	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpSuccess, parameters: ["method": method])
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
 	  destination = AppRoute.resumeDestination(for: resume)

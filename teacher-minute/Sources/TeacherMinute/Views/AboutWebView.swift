@@ -24,6 +24,7 @@ struct AboutWebView: View {
             .ignoresSafeArea(edges: .bottom)
             .navigationTitle(LocalizationSupport.localized(title))
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen(AnalyticsScreen.about)
     }
 }
 
@@ -54,6 +55,7 @@ struct AboutWebView: View {
             .font(.system(size: 16, weight: .semibold))
             .navigationTitle(LocalizationSupport.localized(title))
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen(AnalyticsScreen.about)
     }
 }
 #endif

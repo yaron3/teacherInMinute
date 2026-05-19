@@ -51,6 +51,7 @@ struct NotificationMessagesView: View {
                 await viewModel.loadMessages()
             }
         }
+        .trackScreen(AnalyticsScreen.notificationMessages)
     }
 
     private var emptyState: some View {

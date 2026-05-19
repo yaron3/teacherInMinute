@@ -233,6 +233,11 @@ final class TeacherSubjectsViewModel {
 		"subjectAreas": selectedAreaTitles,
 		"subjectSelections": subjectSelections
 	  ], merge: true)
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.teacherSubjectsSaved, parameters: [
+		"area_count": selectedAreaIDs.count,
+		"subtopic_count": subjectSelections.values.reduce(0) { $0 + $1.count },
+		"areas": selectedAreaTitles.joined(separator: ",")
+	  ])
 	  onContinue?()
 	}
   }

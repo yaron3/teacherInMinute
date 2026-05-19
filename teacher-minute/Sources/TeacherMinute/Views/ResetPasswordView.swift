@@ -63,6 +63,7 @@ struct ResetPasswordView: View {
         .padding(.horizontal, 18)
         .background(Color(.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen(AnalyticsScreen.resetPassword)
     }
 
     var formCard: some View {

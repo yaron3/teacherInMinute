@@ -86,6 +86,7 @@ struct ChatSessionView: View {
     .onDisappear {
       viewModel.stop()
     }
+    .trackScreen(AnalyticsScreen.chatSession)
   }
 
   var sessionBody: some View {

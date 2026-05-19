@@ -73,6 +73,7 @@ struct MainTabView: View {
         case .home:
             if viewModel.userMode == .student {
                 StudentHomeView(hidesTabBar: $hidesTabBar)
+                    .trackScreen(AnalyticsScreen.studentHome)
             } else if let teacherDashboardViewModel {
                 TeacherDashboardView(
                     viewModel: teacherDashboardViewModel,
@@ -80,20 +81,25 @@ struct MainTabView: View {
                     showsSessionOverlay: false,
                     showsIncomingOverlay: false
                 )
+                .trackScreen(AnalyticsScreen.teacherDashboard)
             }
 
         case .lessons:
             if viewModel.userMode == .student {
                 StudentLessonHistoryView()
+                    .trackScreen(AnalyticsScreen.studentLessonHistory)
             } else {
                 TeacherLessonHistoryView()
+                    .trackScreen(AnalyticsScreen.teacherLessonHistory)
             }
 
         case .profile:
             ProfileView(viewModel: ProfileViewModel(roleType: viewModel.userMode == .teacher ? .teacher : .student))
+                .trackScreen(AnalyticsScreen.profile)
 
         case .settings:
 			SettingsView(role: viewModel.userMode, viewModel: nil)
+                    .trackScreen(AnalyticsScreen.settings)
         }
     }
 

@@ -141,6 +141,7 @@ struct AskTeacherSheet: View {
         }
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
         .id(languagePreference)
+        .trackScreen(AnalyticsScreen.askTeacherSheet)
     }
 }
 

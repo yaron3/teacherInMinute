@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.application)
     id("skip-build-plugin")
     id("com.google.gms.google-services") version "4.4.4"
+    id("com.google.firebase.crashlytics") version "3.0.6"
 }
 
 skip {
@@ -96,6 +97,8 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
     implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-crashlytics")
 
     implementation("com.google.android.gms:play-services-auth:21.1.1")
 }

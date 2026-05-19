@@ -53,6 +53,7 @@ struct ConnectionSetupView: View {
 		endPoint: .bottom
 	  )
 	)
+	.trackScreen(AnalyticsScreen.connectionSetup)
   }
   
   var avatarSection: some View {

@@ -110,6 +110,7 @@ struct PermissionsSetupView: View {
         .padding(.horizontal, 18)
         .background(Color(.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen(AnalyticsScreen.permissionsSetup)
     }
 }
 

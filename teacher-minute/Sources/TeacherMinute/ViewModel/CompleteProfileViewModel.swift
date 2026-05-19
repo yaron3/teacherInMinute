@@ -108,9 +108,15 @@ final class CompleteProfileViewModel {
 			)
 		
 		try await UserService.shared.saveProfile(profile)
+		AnalyticsService.shared.logEvent(AnalyticsEvent.profileCompleted, parameters: [
+		  "role": role.rawValue,
+		  "has_grade": !grade.isEmpty,
+		  "has_paypal": !paypalEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+		])
 		isLoading = false
 		onContinue?()
 	  } catch {
+		AnalyticsService.shared.recordError(error, context: "saveProfile")
 		errorMessage = error.localizedDescription
 		isLoading = false
 	  }

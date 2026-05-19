@@ -30,6 +30,10 @@ final class ResetPasswordViewModel {
   }
   
   func sendResetLink() {
+	let typeRest = method == .email ? "email" : "phone"
+	Task { @MainActor in
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.passwordResetSent, parameters: ["method": typeRest])
+	}
 	// TODO: call auth service
   }
 }

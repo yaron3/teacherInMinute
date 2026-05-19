@@ -22,10 +22,12 @@ final class VerifyPhoneViewModel {
 
     func verify() {
         guard canVerify else { return }
+        AnalyticsService.shared.logEvent(AnalyticsEvent.phoneVerified)
         onVerified?()
     }
 
     func resendCode() {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.phoneVerifySent, parameters: ["context": "resend"])
         // TODO: resend SMS
     }
 

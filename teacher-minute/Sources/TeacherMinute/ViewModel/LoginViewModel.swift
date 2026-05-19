@@ -41,28 +41,35 @@ final class LoginViewModel {
   
   func login() async {
 	guard canSubmit else { return }
-	
+
 	isLoading = true
 	defer { isLoading = false }
-	
+
+	AnalyticsService.shared.logEvent(AnalyticsEvent.loginStart, parameters: ["method": "email"])
+
 	do {
 	  // 1. Authenticate
 	  _ = try await authService.signIn(
 		email: emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines),
 		password: password
 	  )
-	  
+
 	  // 2. Get the Firebase UID
 	  guard let uid = Auth.auth().currentUser?.uid else {
 		present(message: "Could not retrieve user session. Please try again.")
+		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "email", "reason": "no_session"])
 		return
 	  }
-	  
+	  AnalyticsService.shared.setUser(uid: uid)
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "email"])
+
 	  // 3. Resolve where in onboarding this user should go
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
 	  destination = AppRoute.resumeDestination(for: resume)
-	  
+
 	} catch {
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "email", "reason": error.localizedDescription])
+	  AnalyticsService.shared.recordError(error, context: "login")
 	  present(message: error.localizedDescription)
 	}
   }
@@ -70,15 +77,19 @@ final class LoginViewModel {
   // MARK: - Social
   
   func loginWithGoogle() {
+	AnalyticsService.shared.logEvent(AnalyticsEvent.loginStart, parameters: ["method": "google"])
 #if canImport(UIKit)
 	iOSGoogleSignInProvider().signIn { [weak self] result in
 	  switch result {
 		case .success:
 		  Task { @MainActor in
 			guard let uid = Auth.auth().currentUser?.uid else {
+			  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": "no_session"])
 			  self?.present(message: "Could not retrieve user session. Please try again.")
 			  return
 			}
+			AnalyticsService.shared.setUser(uid: uid)
+			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
 			do {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
 			  self?.destination = AppRoute.resumeDestination(for: resume)
@@ -87,6 +98,7 @@ final class LoginViewModel {
 			}
 		  }
 		case .failure(let error):
+		  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 		  Task { @MainActor in self?.present(message: error.localizedDescription) }
 	  }
 	}
@@ -97,28 +109,36 @@ final class LoginViewModel {
 		  do {
 			_ = try await AndroidGoogleAuth().signIn()
 			guard let uid = Auth.auth().currentUser?.uid else {
+			  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": "no_session"])
 			  present(message: "Could not retrieve user session. Please try again.")
 			  return
 			}
+			AnalyticsService.shared.setUser(uid: uid)
+			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
 			let resume = try await UserService.shared.resumeRoute(uid: uid)
 			destination = AppRoute.resumeDestination(for: resume)
 		  } catch {
+			AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 			present(message: error.localizedDescription)
 		  }
 		}
 #endif
   }
-  
+
   func loginWithApple() {
+	AnalyticsService.shared.logEvent(AnalyticsEvent.loginStart, parameters: ["method": "apple"])
 #if canImport(UIKit)
 	iOSAppleSignInProvider().signIn { [weak self] result in
 	  switch result {
 		case .success:
 		  Task { @MainActor in
 			guard let uid = Auth.auth().currentUser?.uid else {
+			  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": "no_session"])
 			  self?.present(message: "Could not retrieve user session. Please try again.")
 			  return
 			}
+			AnalyticsService.shared.setUser(uid: uid)
+			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "apple"])
 			do {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
 			  self?.destination = AppRoute.resumeDestination(for: resume)
@@ -127,6 +147,7 @@ final class LoginViewModel {
 			}
 		  }
 		case .failure(let error):
+		  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
 		  Task { @MainActor in self?.present(message: error.localizedDescription) }
 	  }
 	}
@@ -136,12 +157,16 @@ final class LoginViewModel {
 	  do {
 		_ = try await AndroidAppleAuth().signIn()
 		guard let uid = Auth.auth().currentUser?.uid else {
+		  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": "no_session"])
 		  present(message: "Could not retrieve user session. Please try again.")
 		  return
 		}
+		AnalyticsService.shared.setUser(uid: uid)
+		AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "apple"])
 		let resume = try await UserService.shared.resumeRoute(uid: uid)
 		destination = AppRoute.resumeDestination(for: resume)
 	  } catch {
+		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
 		present(message: error.localizedDescription)
 	  }
 	}

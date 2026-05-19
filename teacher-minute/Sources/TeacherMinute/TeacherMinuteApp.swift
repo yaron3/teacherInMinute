@@ -26,26 +26,35 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 		@Bindable var router = router
 		NavigationStack(path: $router.path) {
 		  WelcomeView()
+			.trackScreen(AnalyticsScreen.welcome)
 		.navigationDestination(for: AppRoute.self) { route in
 		  switch route {
 			case .createAccount:
 			  CreateAccountView()
+				.trackScreen(AnalyticsScreen.createAccount)
 			case .login:
 			  LoginView()
+				.trackScreen(AnalyticsScreen.login)
 			case .chooseRole:
 			  ChooseRoleView()
+				.trackScreen(AnalyticsScreen.chooseRole)
 			case .teacherIdentityVerification:
 			  TeacherIdentityVerificationView()
+				.trackScreen(AnalyticsScreen.teacherIdentity)
 			case .teacherSubjects:
 			  TeacherSubjectsView()
+				.trackScreen(AnalyticsScreen.teacherSubjects)
 			case .completeProfile(let role):
 			  CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
+				.trackScreen(AnalyticsScreen.completeProfile)
 			case .mainTabs(let role):
 			  MainTabView(userMode: AppUserMode(role: role))
 			case .studentHome:
 			  StudentHomeView()
+				.trackScreen(AnalyticsScreen.studentHome)
 			case .teacherDashboard:
 			  TeacherDashboardView()
+				.trackScreen(AnalyticsScreen.teacherDashboard)
 		  }
 		}
 			}
@@ -77,11 +86,12 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   
   private init() {
   }
-  /* SKIP @bridge */public func onInit() {
+  /* SKIP @bridge */@MainActor public func onInit() {
 		logger.debug("onInit")
 		if FirebaseApp.app() == nil {
 		  FirebaseApp.configure()
 		  logger.info("Firebase configured")
+		  AnalyticsService.shared.start()
 		}
 	  }
   

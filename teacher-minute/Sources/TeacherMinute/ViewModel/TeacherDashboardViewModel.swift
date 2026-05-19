@@ -189,6 +189,7 @@ final class TeacherDashboardViewModel {
     }
     isOnline.toggle()
     logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+    AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
     let status = isOnline ? "online" : "offline"
     AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
     logger.info("[VM] Android wrote teacher status=\(status)")
@@ -199,6 +200,7 @@ final class TeacherDashboardViewModel {
     }
     isOnline.toggle()
     logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+    AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
     guard let ref = androidTeacherRef else { return }
     let status = isOnline ? "online" : "offline"
     ref.child("status").setValue(status)
@@ -210,6 +212,7 @@ final class TeacherDashboardViewModel {
     }
     isOnline.toggle()
     logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+    AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
 #if os(Android)
     let status = isOnline ? "online" : "offline"
     AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
@@ -324,6 +327,10 @@ final class TeacherDashboardViewModel {
     activeConnectionFeeCents = inviteConnectionFeeCents[questionId] ?? 0
     activePricePerMinuteCents = invitePricePerMinuteCents[questionId] ?? 50
     activeAcceptedAt = Date().timeIntervalSince1970 * 1000.0
+    AnalyticsService.shared.logEvent(AnalyticsEvent.teacherInviteAccepted, parameters: [
+      "question_id": questionId,
+      "price_per_minute_cents": activePricePerMinuteCents
+    ])
     print("TeacherMinute teacherAccept tapped questionId=\(questionId)")
     logger.info("[VM] acceptInvite tapped — questionId=\(questionId)")
 
@@ -370,11 +377,13 @@ final class TeacherDashboardViewModel {
   }
 
   func declineInvite(questionId: String) {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.teacherInviteDeclined, parameters: ["question_id": questionId])
     Task {
       do {
         try await FunctionsService.shared.declineInvite(questionId: questionId)
         logger.info("[VM] declineInvite — qid=\(questionId)")
       } catch {
+        AnalyticsService.shared.recordError(error, context: "declineInvite")
         errorMessage = error.localizedDescription
         logger.error("[VM] declineInvite failed — \(error.localizedDescription)")
       }
