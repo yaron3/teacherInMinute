@@ -83,10 +83,15 @@ enum LessonFormatting {
     static func totalDurationText(lessons: [HistoryLesson]) -> String {
         let totalSeconds = lessons.reduce(0) { $0 + $1.durationSeconds }
         let totalMinutes = max(0, Int((Double(totalSeconds) / 60.0).rounded(.up)))
-        if totalMinutes == 0 { return String(format: LocalizationSupport.localized("%lld min"), Int64(0)) }
-        return totalMinutes == 1
+        return minutesText(totalMinutes)
+    }
+
+    static func minutesText(_ minutes: Int) -> String {
+        let displayMinutes = max(0, minutes)
+        if displayMinutes == 0 { return String(format: LocalizationSupport.localized("%lld min"), Int64(0)) }
+        return displayMinutes == 1
             ? LocalizationSupport.localized("1 min")
-            : String(format: LocalizationSupport.localized("%lld min"), Int64(totalMinutes))
+            : String(format: LocalizationSupport.localized("%lld min"), Int64(displayMinutes))
     }
 
     static func totalCostText(lessons: [HistoryLesson], currencyCode: String? = nil) -> String {

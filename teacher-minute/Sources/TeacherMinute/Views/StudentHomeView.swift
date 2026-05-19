@@ -11,6 +11,7 @@ struct StudentHomeView: View {
     @State var viewModel: any StudentHomeViewModeling
     @State var paymentReturnStore = PaymentReturnStore.shared
     @State var showingAskSheet = false
+    @State var showingLowBalanceAlert = false
     @Binding var hidesTabBar: Bool
     @Environment(\.openURL) var openURL
     @Environment(\.scenePhase) var scenePhase
@@ -121,7 +122,7 @@ struct StudentHomeView: View {
         .task {
             await viewModel.loadProfileIfNeeded()
         }
-        .onChange(of: viewModel.checkoutURL) { url in
+        .onChange(of: viewModel.checkoutURL) { _, url in
             guard let url else { return }
             logger.info("[PaymentReturn] opening checkoutURL=\(url.absoluteString)")
             openURL(url)
@@ -138,6 +139,11 @@ struct StudentHomeView: View {
             guard phase == .active else { return }
             handleActiveAfterExternalCheckout()
         }
+        .alert("Low Balance", isPresented: $showingLowBalanceAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(lowBalanceMessage)
+        }
         .alert(paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"), isPresented: isShowingPaymentReturnResult) {
             Button("OK", role: .cancel) {
                 paymentReturnStore.consumeLatestResult()
@@ -145,6 +151,11 @@ struct StudentHomeView: View {
         } message: {
             Text(paymentReturnStore.latestResult?.message ?? "")
         }
+    }
+
+    var lowBalanceMessage: String {
+        let format = LocalizationSupport.localized("You have %@ remaining. You need at least 2 minutes to ask a teacher. Please buy more minutes to continue.")
+        return String(format: format, LessonFormatting.minutesText(viewModel.remainingMinutes))
     }
 
     var isShowingPaymentReturnResult: Binding<Bool> {
@@ -205,7 +216,10 @@ struct StudentHomeView: View {
                 title: "Teacher",
                 initialDetails: viewModel.chatInitialDetails(questionId: questionId)
             ) {
-                viewModel.resetSearch()
+                Task {
+                    await viewModel.refreshAfterLessonEnded()
+                    viewModel.resetSearch()
+                }
             }
             .onAppear {
                 hidesTabBar = true
@@ -232,9 +246,9 @@ struct StudentHomeView: View {
             )
 
             HistoryMetricCard(
-                title: "Total Spend",
-                value: viewModel.totalSpendText,
-                systemImage: "creditcard.fill",
+                title: "Total Purchased",
+                value: viewModel.totalPurchasedText,
+                systemImage: "clock.badge.checkmark.fill",
                 tint: theme.appPurple
             )
         }
@@ -244,7 +258,11 @@ struct StudentHomeView: View {
 
     var askTeacherCard: some View {
         Button {
-            showingAskSheet = true
+            if viewModel.remainingMinutes >= 2 {
+                showingAskSheet = true
+            } else {
+                showingLowBalanceAlert = true
+            }
         } label: {
             ZStack(alignment: .topTrailing) {
                 LinearGradient(

@@ -51,6 +51,18 @@ final class HistoryModel {
         ) ?? LessonFormatting.defaultCurrencyCode
     }
 
+    func fetchTotalPurchasedMinutes(for uid: String) async throws -> Int {
+        let snapshot = try await Firestore.firestore()
+            .collection("users")
+            .document(uid)
+            .collection("purchases")
+            .getDocuments()
+
+        return snapshot.documents.reduce(0) { total, document in
+            total + max(0, Self.intValue(document.data()["minutesPurchased"]) ?? 0)
+        }
+    }
+
     func fetchRecentLessons(for uid: String, limit: Int = 3) async throws -> [HistoryLesson] {
         let userSnapshot = try await Firestore.firestore().collection("users").document(uid).getDocument()
         guard let userData = userSnapshot.data() else { return [] }
@@ -292,9 +304,15 @@ final class HistoryModel {
             }
         }
         if let rows = value as? [String: Any] {
-            return rows.values.compactMap { value in
-                if let dict = value as? [String: Any] { return dict }
+            return rows.compactMap { key, value in
+                if var dict = value as? [String: Any] {
+                    if packageId(from: dict) == nil {
+                        dict["packageId"] = key
+                    }
+                    return dict
+                }
                 if let id = value as? String { return ["packageId": id] }
+                if let quantity = intValue(value), quantity > 0 { return ["packageId": key, "quantity": quantity] }
                 return nil
             }
         }

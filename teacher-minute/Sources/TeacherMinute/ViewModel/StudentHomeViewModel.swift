@@ -103,7 +103,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var pricingOptions: [PricingOption] { get }
   var recentLessons: [RecentLesson] { get set }
   var totalTimeLearnedText: String { get }
-  var totalSpendText: String { get }
+  var totalPurchasedText: String { get }
   var lessonCount: Int { get }
   var hasUnreadMessages: Bool { get set }
   var profileImageURL: String { get set }
@@ -124,6 +124,7 @@ protocol StudentHomeViewModeling: AnyObject {
   func handleCheckoutReturnWithoutResult() async -> Bool
   func viewAllLessons()
   func loadProfileIfNeeded() async
+  func refreshAfterLessonEnded() async
   func refreshUnreadMessages() async
   func chatInitialDetails(questionId: String?) -> ChatSessionDetails
 }
@@ -145,7 +146,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   var recentLessons: [RecentLesson] = []
   var totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: [])
-  var totalSpendText = LessonFormatting.currencyText(cents: 0)
+  var totalPurchasedText = LessonFormatting.minutesText(0)
   var lessonCount = 0
   var hasUnreadMessages = false
   var profileImageURL = ""
@@ -293,6 +294,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     await loadRecentLessons(uid: uid)
   }
 
+  func refreshAfterLessonEnded() async {
+    guard let uid = Auth.auth().currentUser?.uid else { return }
+    await refreshRemainingMinutes(uid: uid)
+  }
+
   private func refreshRemainingMinutes(uid: String) async {
     if let data = try? await UserService.shared.fetchRaw(uid: uid) {
       remainingMinutes = data["remainingMinutes"] as? Int ?? 0
@@ -318,9 +324,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       let currencyCode = try await HistoryModel.shared.fetchPurchasedCurrencyCode(for: uid)
       purchasedCurrencyCode = currencyCode
       let allLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
+      let totalPurchasedMinutes = try await HistoryModel.shared.fetchTotalPurchasedMinutes(for: uid)
       lessonCount = allLessons.count
       totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: allLessons)
-      totalSpendText = LessonFormatting.totalCostText(lessons: allLessons, currencyCode: currencyCode)
+      totalPurchasedText = LessonFormatting.minutesText(totalPurchasedMinutes)
       let recent = Array(allLessons.prefix(3))
       if !recent.isEmpty {
         recentLessons = recent.map(Self.recentLesson)
@@ -440,7 +447,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   let pricingOptions: [PricingOption]
   var recentLessons: [RecentLesson]
   var totalTimeLearnedText: String
-  var totalSpendText: String
+  var totalPurchasedText: String
   var lessonCount: Int
   var hasUnreadMessages: Bool
   var profileImageURL: String
@@ -497,11 +504,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.questionId = "mock-lesson"
     self.pricingOptions = pricingOptions
     self.recentLessons = recentLessons
-    self.totalTimeLearnedText = String(format: LocalizationSupport.localized("%lld min"), Int64(36))
-    self.totalSpendText = LessonFormatting.currencyText(
-      cents: 2780,
-      currencyCode: pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode
-    )
+    self.totalTimeLearnedText = LessonFormatting.minutesText(36)
+    self.totalPurchasedText = LessonFormatting.minutesText(90)
     self.lessonCount = recentLessons.count
     self.hasUnreadMessages = true
     self.profileImageURL = ""
@@ -552,6 +556,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   func viewAllLessons() {}
 
   func loadProfileIfNeeded() async {}
+
+  func refreshAfterLessonEnded() async {}
 
   func refreshUnreadMessages() async {
     hasUnreadMessages = false
