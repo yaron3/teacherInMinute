@@ -11,7 +11,7 @@ struct ConnectionSetupView: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var connectionTitle: String {
-	hasAudio ? "Connecting\naudio" : "Connecting"
+	hasAudio ? LocalizationSupport.localized("Connecting\naudio") : LocalizationSupport.localized("Connecting")
   }
   
   var body: some View {
@@ -37,7 +37,7 @@ struct ConnectionSetupView: View {
 		.foregroundStyle(theme.appSecondaryText)
 	  
 	  Button(action: onCancel) {
-		Text("Cancel Session")
+		Text(LocalizationSupport.localized("Cancel Session"))
 		  .font(.system(size: 12, weight: .semibold))
 		  .foregroundStyle(theme.appPink)
 		  .frame(height: 36)
@@ -125,7 +125,7 @@ struct ConnectionSetupView: View {
 		}
 		HStack {
 		  Spacer()
-		  Text("Setting up your session")
+		  Text(LocalizationSupport.localized("Setting up your session"))
 			.font(.system(size: 11, weight: .medium))
 			.foregroundStyle(theme.appSecondaryText)
 		  Spacer()
@@ -168,10 +168,10 @@ struct ConnectionSetupView: View {
 		  }
 		
 		VStack(alignment: .leading, spacing: 6) {
-		  Text("Microphone Permission")
+		  Text(LocalizationSupport.localized("Microphone Permission"))
 			.font(.system(size: 14, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
-		  Text("Make sure your microphone is enabled for the best learning experience.")
+		  Text(LocalizationSupport.localized("Make sure your microphone is enabled for the best learning experience."))
 			.font(.system(size: 11, weight: .medium))
 			.foregroundStyle(theme.appSecondaryText)
 			.lineSpacing(3)
@@ -181,7 +181,7 @@ struct ConnectionSetupView: View {
 	  Button {} label: {
 		HStack(spacing: 8) {
 		  PlatformIcon(systemName: "checkmark", size: 11, weight: .bold, color: theme.white)
-		  Text("Allow Microphone")
+		  Text(LocalizationSupport.localized("Allow Microphone"))
 			.font(.system(size: 13, weight: .bold))
 		}
 		.foregroundStyle(theme.appPrimaryText)

@@ -590,7 +590,11 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     let createdAtMilliseconds = ChatSessionService.normalizedMilliseconds(createdAt)
     guard createdAtMilliseconds > 0 else { return LocalizationSupport.localized("Just now") }
     let elapsed = max(0, Int(date.timeIntervalSince1970 - createdAtMilliseconds / 1000.0))
-    if elapsed < 60 { return LocalizationSupport.localized("Just now") }
+    if elapsed < 60 {
+      return elapsed == 1
+        ? LocalizationSupport.localized("1 second ago")
+        : String(format: LocalizationSupport.localized("%lld seconds ago"), Int64(elapsed))
+    }
     let minutes = elapsed / 60
     if minutes < 60 {
       return minutes == 1

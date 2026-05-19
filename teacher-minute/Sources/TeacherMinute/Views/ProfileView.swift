@@ -625,6 +625,8 @@ struct ProfileInfoRow: View {
 			.lineLimit(1)
 			.minimumScaleFactor(0.75)
 			.disabled(!isEditing)
+                .multilineTextAlignment(.leading)
+                .environment(\.layoutDirection, .leftToRight)
 		}
 		
 		Spacer()

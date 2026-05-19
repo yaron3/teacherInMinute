@@ -28,7 +28,9 @@ struct PlatformIcon: View {
   private var resolvedName: String {
 	guard layoutDirection == .rightToLeft else { return systemName }
 	if systemName == "chevron.right" { return "chevron.left" }
+		if systemName == "chevron.left"  { return "chevron.right" }
 	if systemName == "arrow.right"   { return "arrow.left" }
+		if systemName == "arrow.left"    { return "arrow.right" }
 	return systemName
   }
   
@@ -86,6 +88,7 @@ struct PlatformIcon: View {
 	  case "magnifyingglass":                     return "⌕"
 	  case "arrow.up":                            return "↑"
 	  case "arrow.right":							return "➡"
+		  case "arrow.left":							return "←"
 	  case "person.crop.circle.fill":             return "👤"
 	  case "xmark":                               return "✕"
 	  case "wifi":                                return "🛜"
@@ -117,6 +120,7 @@ struct PlatformIcon: View {
 	  case "envelope.open.fill":                  return "📬"
 	  case "phone.fill":							return "📞"
 	  case "globe":                               return "🌍"
+		  case "p.circle.fill":                       return "P"
 		
 	  case "doc.plaintext.fill":					return "txt"
 	  case "hand.raised.fill":					return "✋"

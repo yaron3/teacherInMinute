@@ -723,7 +723,11 @@ struct PricingCard: View {
 					HStack(spacing: 4) {
 					  PlatformIcon(systemName: "clock.fill", size: 28, color: theme.appGreen)
 					  Text(minutesText)
-						.font(.system(size: 28, weight: .bold))
+						#if os(Android)
+                            .font(.system(size: 22, weight: .bold))
+#else
+                            .font(.system(size: 28, weight: .bold))
+#endif
 						.foregroundStyle(theme.appGreen)
 					}
 					.padding(.top, 4)
@@ -746,7 +750,7 @@ struct PricingCard: View {
                     .foregroundStyle(theme.appSecondaryText)
                     .lineSpacing(4)
                     .padding(.top, 8)
-					.frame(height: .infinity, alignment: .top)
+					.frame(maxWidth: .infinity, alignment: .topLeading)
 
                 Button(action: action) {
                     HStack(spacing: 8) {

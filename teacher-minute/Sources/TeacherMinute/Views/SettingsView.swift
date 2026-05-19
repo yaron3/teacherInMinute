@@ -147,8 +147,12 @@ struct SettingsView: View {
             StudentPaymentsSettingsView(viewModel: viewModel)
         case .teacherPayouts:
             TeacherPayoutSettingsView(viewModel: viewModel)
-        case .changePassword, .notifications, .privacyControls:
-            SettingsPlaceholderView(destination: destination)
+        case .changePassword:
+            ChangePasswordSettingsView(viewModel: viewModel)
+        case .notifications:
+            NotificationPreferencesSettingsView()
+        case .privacyControls:
+            PrivacyControlsSettingsView()
         }
     }
 
@@ -574,6 +578,98 @@ struct TeacherPayoutSettingsView: View {
         .task {
             await viewModel.loadTeacherPayoutSettings()
         }
+    }
+}
+
+struct ChangePasswordSettingsView: View {
+    let viewModel: SettingsViewModel
+    @Environment(\.colorScheme) var colorScheme
+
+    var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            RoundedInfoCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(LocalizationSupport.localized("Change Password"))
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(theme.appPrimaryText)
+                    Text(LocalizationSupport.localized("Send a password reset email to the email address on this account."))
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.appSecondaryText)
+                    Button { viewModel.sendPasswordReset() } label: {
+                        Text(LocalizationSupport.localized("Send Reset Email"))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(theme.appPrimaryText)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                            .background(theme.appPink)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 24)
+            Spacer()
+        }
+        .background(Color(.systemBackground))
+    }
+}
+
+struct NotificationPreferencesSettingsView: View {
+    @AppStorage("notifyIncomingTeacherMessage") var notifyIncomingTeacherMessage = true
+    @AppStorage("notifyGeneralAnnouncements") var notifyGeneralAnnouncements = true
+    @AppStorage("appearanceMode") var appearanceMode = "system"
+    @Environment(\.colorScheme) var colorScheme
+
+    var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 12) {
+                Toggle(LocalizationSupport.localized("Notify me when a teacher sends an incoming message"), isOn: $notifyIncomingTeacherMessage)
+                Toggle(LocalizationSupport.localized("Notify me about general announcements"), isOn: $notifyGeneralAnnouncements)
+                Picker(LocalizationSupport.localized("Appearance"), selection: $appearanceMode) {
+                    Text(LocalizationSupport.localized("System")).tag("system")
+                    Text(LocalizationSupport.localized("Light")).tag("light")
+                    Text(LocalizationSupport.localized("Dark")).tag("dark")
+                }
+                .pickerStyle(.segmented)
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.appPrimaryText)
+            .padding(18)
+            .background(theme.appCardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(18)
+        }
+        .background(Color(.systemBackground))
+    }
+}
+
+struct PrivacyControlsSettingsView: View {
+    @AppStorage("showProfileImage") var showProfileImage = true
+    @AppStorage("allowTeacherMessagesOutsideCalls") var allowTeacherMessagesOutsideCalls = true
+    @Environment(\.colorScheme) var colorScheme
+
+    var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 12) {
+                Toggle(LocalizationSupport.localized("Show my profile image"), isOn: $showProfileImage)
+                Toggle(LocalizationSupport.localized("Allow incoming messages from a teacher while not in a call"), isOn: $allowTeacherMessagesOutsideCalls)
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.appPrimaryText)
+            .padding(18)
+            .background(theme.appCardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(18)
+        }
+        .background(Color(.systemBackground))
     }
 }
 

@@ -20,7 +20,8 @@ struct LoginView: View {
 	  Color(.systemBackground)
 		.ignoresSafeArea()
 	  
-	  VStack(alignment: .leading, spacing: 0) {
+	  ScrollView(.vertical, showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 0) {
 //		Text("Welcome Back")
 //		  .font(.system(size: 32, weight: .bold))
 //		  .foregroundStyle(theme.authPrimaryText)
@@ -52,6 +53,7 @@ struct LoginView: View {
 	  }
 	  .padding(.horizontal, 27)
 	  .padding(.top, 8)
+		  }
 	  
 	  // Full-screen loading overlay while checking Firestore
 	  if viewModel.isLoading {
@@ -107,6 +109,8 @@ struct LoginView: View {
 			.keyboardType(.emailAddress)
 			.textInputAutocapitalization(.never)
 			.autocorrectionDisabled()
+                .multilineTextAlignment(.leading)
+                .environment(\.layoutDirection, .leftToRight)
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)
@@ -225,7 +229,9 @@ struct LoginView: View {
   var socialButtons: some View {
 	HStack(spacing: 16) {
 	  socialButton(title: "Google", systemImage: "g.circle.fill") { viewModel.loginWithGoogle() }
-	  socialButton(title: "Apple",  systemImage: "apple.logo")    { viewModel.loginWithApple() }
+	  #if !os(Android)
+		  socialButton(title: "Apple",  systemImage: "apple.logo")    { viewModel.loginWithApple() }
+#endif
 	}
   }
   

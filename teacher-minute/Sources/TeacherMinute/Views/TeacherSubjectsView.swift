@@ -137,8 +137,8 @@ struct TeacherSubjectsView: View {
 	.navigationTitle(isEditing ? LocalizationSupport.localized("Edit Subjects") : "")
 	.toolbar {
 	  if isEditing {
-		ToolbarItem(placement: .cancellationAction) {
-		  Button("Cancel") { dismiss() }
+		ToolbarItem(placement: .topBarLeading) {
+		  Button(LocalizationSupport.localized("Cancel")) { dismiss() }
 		}
 	  }
 	}
@@ -148,7 +148,7 @@ struct TeacherSubjectsView: View {
 		  theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
 		  VStack(spacing: 12) {
 			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.appPrimaryText)
-			Text("Checking your subjects…")
+			Text(LocalizationSupport.localized("Checking your subjects…"))
 			  .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.appPrimaryText)
 		  }
 		}
@@ -164,7 +164,7 @@ struct TeacherSubjectsView: View {
 		color: theme.authIcon
 	  )
 	  
-	  TextField("Search subjects or subtopics", text: $viewModel.searchText)
+	  TextField(LocalizationSupport.localized("Search subjects or subtopics"), text: $viewModel.searchText)
 		.font(.system(size: 13))
 		.foregroundStyle(theme.authPrimaryText)
 		.textInputAutocapitalization(.never)

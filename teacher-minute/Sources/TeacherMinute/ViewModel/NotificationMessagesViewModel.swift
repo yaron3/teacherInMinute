@@ -19,8 +19,12 @@ final class NotificationMessagesViewModel {
     }
 
     func loadMessages() async {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
         isLoading = true
+        guard let uid = Auth.auth().currentUser?.uid else {
+            messages = []
+            isLoading = false
+            return
+        }
         errorMessage = nil
         defer { isLoading = false }
 

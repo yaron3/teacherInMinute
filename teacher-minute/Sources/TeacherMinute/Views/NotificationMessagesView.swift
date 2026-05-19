@@ -16,7 +16,7 @@ struct NotificationMessagesView: View {
                     VStack(spacing: 12) {
                         ProgressView()
                             .tint(theme.appPink)
-                        Text("Loading messages")
+                        Text(LocalizationSupport.localized("Loading messages"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(theme.appSecondaryText)
                     }
@@ -40,8 +40,8 @@ struct NotificationMessagesView: View {
             .navigationTitle(LocalizationSupport.localized("Messages"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(LocalizationSupport.localized("Done")) { dismiss() }
                 }
             }
             .task {
@@ -68,11 +68,11 @@ struct NotificationMessagesView: View {
                     )
                 }
 
-            Text("No messages")
+            Text(LocalizationSupport.localized("No messages"))
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(theme.appPrimaryText)
 
-            Text("New updates and personal messages will appear here.")
+            Text(LocalizationSupport.localized("New updates and personal messages will appear here."))
                 .font(.system(size: 13))
                 .foregroundStyle(theme.appSecondaryText)
                 .multilineTextAlignment(.center)
@@ -154,7 +154,7 @@ struct NotificationMessageRow: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
-        return "Sent \(formatter.string(from: message.timestamp))"
+        return String(format: LocalizationSupport.localized("Sent %@"), formatter.string(from: message.timestamp))
     }
 }
 

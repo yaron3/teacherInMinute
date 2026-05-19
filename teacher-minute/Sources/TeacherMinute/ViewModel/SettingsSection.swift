@@ -423,7 +423,7 @@ class SettingsViewModel {
         case .accountSecurity:
             navigationPath.append(.accountSecurity)
         case .changePassword:
-            navigationPath.append(.changePassword)
+            sendPasswordReset()
         case .teacherPayouts:
             navigationPath.append(.teacherPayouts)
         case .studentPayments:
@@ -455,6 +455,22 @@ class SettingsViewModel {
             return logOut()
         case .deleteAccount:
             return await deleteAccount()
+        }
+    }
+
+    func sendPasswordReset() {
+        guard let email = authService.currentUserEmail, !email.isEmpty else {
+            present(title: LocalizationSupport.localized("Change Password"), message: LocalizationSupport.localized("No email address is attached to this account."))
+            return
+        }
+        Task {
+            do {
+                try await authService.sendPasswordReset(email: email)
+                AnalyticsService.shared.logEvent(AnalyticsEvent.passwordResetSent, parameters: ["method": "email"])
+                present(title: LocalizationSupport.localized("Change Password"), message: LocalizationSupport.localized("Password reset email sent."))
+            } catch {
+                present(title: LocalizationSupport.localized("Change Password"), message: error.localizedDescription)
+            }
         }
     }
 

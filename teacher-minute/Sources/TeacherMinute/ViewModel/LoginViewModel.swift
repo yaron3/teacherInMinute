@@ -172,7 +172,24 @@ final class LoginViewModel {
 	}
 #endif
   }
-  func forgotPassword()  { /* TODO */ }
+  func forgotPassword() {
+    let email = emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !email.isEmpty else {
+      present(message: LocalizationSupport.localized("Enter your email address first."))
+      return
+    }
+
+    Task {
+      do {
+        try await authService.sendPasswordReset(email: email)
+        AnalyticsService.shared.logEvent(AnalyticsEvent.passwordResetSent, parameters: ["method": "email"])
+        present(message: LocalizationSupport.localized("Password reset email sent."))
+      } catch {
+        AnalyticsService.shared.recordError(error, context: "forgotPassword")
+        present(message: error.localizedDescription)
+      }
+    }
+  }
   func back()            { /* TODO */ }
   
   // MARK: - Helpers

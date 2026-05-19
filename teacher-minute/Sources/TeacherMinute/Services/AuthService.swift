@@ -58,11 +58,19 @@ final class AuthService {
   var currentUserID: String? {
     Auth.auth().currentUser?.uid
   }
+
+  var currentUserEmail: String? {
+    Auth.auth().currentUser?.email
+  }
   
   func signIn(email: String, password: String)  async throws -> Bool{
     let result = try await Auth.auth().signIn(withEmail: email, password: password)
     print("got result: \(result)")
     return true
+  }
+
+  func sendPasswordReset(email: String) async throws {
+    try await Auth.auth().sendPasswordReset(withEmail: email)
   }
   
   

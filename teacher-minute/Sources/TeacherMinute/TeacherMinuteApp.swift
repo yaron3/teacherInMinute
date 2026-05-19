@@ -17,9 +17,18 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 /* SKIP @bridge */public struct TeacherMinuteRootView : View {
   @State  var router = AppRouter()
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
+  @AppStorage("appearanceMode") var appearanceMode = "system"
   
   /* SKIP @bridge */public init() {
     TeacherMinuteAppDelegate.shared.onInit()
+  }
+
+  var preferredAppearanceColorScheme: ColorScheme? {
+    switch appearanceMode {
+    case "light": return .light
+    case "dark": return .dark
+    default: return nil
+    }
   }
   
       public var body: some View {
@@ -61,7 +70,8 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				.environment(\.appRouter, router)
             .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
             .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-            .id(languagePreference)
+            .preferredColorScheme(preferredAppearanceColorScheme)
+            .id("\(languagePreference)-\(appearanceMode)")
             .onAppear {
               LocalizationSupport.applyPlatformLayoutDirection(languagePreference: languagePreference)
             }

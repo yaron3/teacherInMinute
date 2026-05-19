@@ -27,12 +27,7 @@ struct ChatInputBar: View {
       }
 
       HStack(spacing: 10) {
-		PlatformIcon(systemName: "photo.fill", size: 15, weight: .semibold, color: theme.appPrimaryText)
-          .frame(width: 36, height: 36)
-          .background(theme.appGrayBackground)
-          .clipShape(Circle())
-
-        TextField("Message", text: $text)
+		TextField("Message", text: $text)
           .focused(isFocused)
           .textFieldStyle(.plain)
           .font(.system(size: 14))

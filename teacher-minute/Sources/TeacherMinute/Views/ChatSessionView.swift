@@ -76,6 +76,7 @@ struct ChatSessionView: View {
       errorMessage = viewModel.errorMessage
       isConnecting = viewModel.isConnecting
       viewModel.start()
+      isMessageFieldFocused = true
     }
     .task {
       while !Task.isCancelled {
@@ -212,12 +213,12 @@ struct ChatSessionView: View {
       .buttonStyle(.plain)
 
       Button {
+        onClose()
         Task {
           await viewModel.endLesson()
-          onClose()
         }
       } label: {
-        Text("End")
+        Text(LocalizationSupport.localized("End"))
           .font(.system(size: 12, weight: .bold))
           .foregroundStyle(theme.appPrimaryText)
           .padding(.horizontal, 12)
@@ -257,13 +258,13 @@ struct ChatSessionView: View {
         .frame(width: 1, height: 54)
 
       VStack(alignment: .trailing, spacing: 4) {
-        Text("Session Time")
+        Text(LocalizationSupport.localized("Session Time"))
           .font(.system(size: 11, weight: .medium))
           .foregroundStyle(theme.appSecondaryText)
         Text(viewModel.sessionTimeText(at: displayDate))
           .font(.system(size: 28, weight: .heavy))
           .foregroundStyle(theme.appPrimaryText)
-        Text("minutes")
+        Text(LocalizationSupport.localized("minutes"))
           .font(.system(size: 10, weight: .medium))
           .foregroundStyle(theme.appSecondaryText)
       }

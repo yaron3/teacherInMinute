@@ -99,7 +99,7 @@ struct AskTeacherSheet: View {
                         MathSymbolRow(text: $questionText, isFocused: $isQuestionFocused)
                     }
 
-                    Text(String(format: LocalizationSupport.localized("%lld / 10 min chars"), questionText.count))
+                    Text(String(format: LocalizationSupport.localized("%lld / 10 minimum characters"), Int64(questionText.count)))
                         .font(.system(size: 11))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
@@ -133,7 +133,7 @@ struct AskTeacherSheet: View {
             .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
 				  Button(LocalizationSupport.localized("Cancel")) { isPresented = false }
                 }
 
@@ -141,6 +141,9 @@ struct AskTeacherSheet: View {
         }
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
         .id(languagePreference)
+        .task {
+            isQuestionFocused = true
+        }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
     }
 }
