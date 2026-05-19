@@ -73,13 +73,7 @@ struct StudentHomeView: View {
                         .padding(.top, 28)
 
                     Group {
-                        if viewModel.lessonCount > viewModel.recentLessons.count {
-                            sectionHeader(title: "Recent Lessons", actionTitle: "View all") {
-                                viewModel.viewAllLessons()
-                            }
-                        } else {
-                            sectionHeader(title: "Recent Lessons")
-                        }
+                            sectionHeader(title: "Recent Lessons", actionTitle: "") {
                     }
                     .padding(.top, 28)
 

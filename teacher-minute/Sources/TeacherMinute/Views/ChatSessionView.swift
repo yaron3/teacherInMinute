@@ -218,20 +218,20 @@ struct ChatSessionView: View {
 
       Spacer()
 
-      Button {} label: {
-        PlatformIcon(systemName: "mic.fill", size: 13, weight: .bold, color: theme.appPrimaryText)
-          .frame(width: 34, height: 34)
-          .background(theme.appGrayBackground)
-          .clipShape(Circle())
-      }
-      .buttonStyle(.plain)
-
-      Button {} label: {
-		PlatformIcon(systemName: "speaker.wave.2.fill", size: 13, weight: .bold, color: theme.appPrimaryText)
-          .frame(width: 34, height: 34)
-          .background(theme.appGrayBackground)
-          .clipShape(Circle())
-      }
+//      Button {} label: {
+//        PlatformIcon(systemName: "mic.fill", size: 13, weight: .bold, color: theme.appPrimaryText)
+//          .frame(width: 34, height: 34)
+//          .background(theme.appGrayBackground)
+//          .clipShape(Circle())
+//      }
+//      .buttonStyle(.plain)
+//
+//      Button {} label: {
+//		PlatformIcon(systemName: "speaker.wave.2.fill", size: 13, weight: .bold, color: theme.appPrimaryText)
+//          .frame(width: 34, height: 34)
+//          .background(theme.appGrayBackground)
+//          .clipShape(Circle())
+//      }
       .buttonStyle(.plain)
 
       Button {
