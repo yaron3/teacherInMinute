@@ -80,6 +80,27 @@ async function getCostPerMinute(teacherUid) {
     }
     throw new https_1.HttpsError("failed-precondition", "costPerMinute is missing for teacher and Remote Config");
 }
+async function getTeacherCommissionRate(teacherUid) {
+    var _a, _b, _c, _d;
+    const userSnap = await firestore.collection("users").doc(teacherUid).get();
+    const userData = userSnap.data();
+    const fromUser = Number((_b = (_a = userData === null || userData === void 0 ? void 0 : userData.teacherCommissionRate) !== null && _a !== void 0 ? _a : userData === null || userData === void 0 ? void 0 : userData.commissionRate) !== null && _b !== void 0 ? _b : userData === null || userData === void 0 ? void 0 : userData.earningsShare);
+    if (Number.isFinite(fromUser) && fromUser > 0 && fromUser <= 1) {
+        return fromUser;
+    }
+    try {
+        const template = await admin.remoteConfig().getTemplate();
+        const rcParam = (_c = template.parameters) === null || _c === void 0 ? void 0 : _c.teacher_earnings_share;
+        const fromRc = Number((_d = rcParam === null || rcParam === void 0 ? void 0 : rcParam.defaultValue) === null || _d === void 0 ? void 0 : _d.value);
+        if (Number.isFinite(fromRc) && fromRc > 0 && fromRc <= 1) {
+            return fromRc;
+        }
+    }
+    catch (error) {
+        firebase_functions_1.logger.warn(`[lessons] failed to read Remote Config teacher_earnings_share for teacher=${teacherUid}`, error);
+    }
+    return 0.75;
+}
 function sanitizeForFirestore(value) {
     if (value === undefined)
         return null;
@@ -124,6 +145,7 @@ async function resolveQuestionContext(questionId) {
     };
 }
 async function migrateQuestionToFirestore(questionId, endedBy, context) {
+    var _a;
     const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs } = context;
     firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`);
     const endedAt = firestore_1.Timestamp.now();
@@ -132,26 +154,79 @@ async function migrateQuestionToFirestore(questionId, endedBy, context) {
     const roundedSeconds = Math.floor(rawSeconds / HALF_MINUTE_SECONDS) * HALF_MINUTE_SECONDS;
     const roundedMinutes = roundedSeconds / 60;
     const costPerMinute = await getCostPerMinute(teacherUid);
+    const commissionRate = await getTeacherCommissionRate(teacherUid);
     const cost = Math.round(roundedMinutes * costPerMinute * 100) / 100;
+    const teacherEarnings = Math.round(cost * commissionRate * 100) / 100;
     const migratedQuestion = sanitizeForFirestore(rtdbQuestion);
     firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`);
-    firebase_functions_1.logger.info(`[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost}`);
+    firebase_functions_1.logger.info(`[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost} commissionRate=${commissionRate} teacherEarnings=${teacherEarnings}`);
+    const roundedMinutesToCharge = Math.max(0, Math.round(roundedMinutes * 100) / 100);
     const batch = firestore.batch();
     const qDocRef = firestore.collection("questions").doc(questionId);
     batch.set(qDocRef, Object.assign(Object.assign({}, migratedQuestion), { state: "ended", status: "completed", studentUid, acceptedByTeacher: teacherUid, teacherId: teacherUid, teachedId: teacherUid, participants: [studentUid, teacherUid], durationSeconds: roundedSeconds, costPerMinute,
         cost,
+        commissionRate,
+        teacherEarnings,
         endedBy,
         endedAt, updatedAt: firestore_1.FieldValue.serverTimestamp() }), { merge: true });
     const studentRef = firestore.collection("users").doc(studentUid);
     const teacherRef = firestore.collection("users").doc(teacherUid);
     batch.set(studentRef, {
         questions: firestore_1.FieldValue.arrayUnion(questionId),
-        remainingMinutes: firestore_1.FieldValue.increment(-roundedMinutes),
+        remainingMinutes: firestore_1.FieldValue.increment(-roundedMinutesToCharge),
+        totalMinutesUsed: firestore_1.FieldValue.increment(roundedMinutesToCharge),
     }, { merge: true });
     batch.set(teacherRef, {
         questions: firestore_1.FieldValue.arrayUnion(questionId),
         totalMinutes: firestore_1.FieldValue.increment(roundedMinutes),
+        totalEarnings: firestore_1.FieldValue.increment(teacherEarnings),
+        earnings: firestore_1.FieldValue.increment(teacherEarnings),
+        totalRevenueGenerated: firestore_1.FieldValue.increment(cost),
     }, { merge: true });
+    if (roundedMinutesToCharge > 0) {
+        const purchasesSnap = await firestore
+            .collection("users")
+            .doc(studentUid)
+            .collection("purchases")
+            .where("status", "==", "active")
+            .limit(50)
+            .get();
+        const sortedPurchases = [...purchasesSnap.docs].sort((a, b) => {
+            var _a, _b, _c, _d, _e, _f;
+            const aTs = (_c = (_b = (_a = a.data().purchasedAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) !== null && _c !== void 0 ? _c : 0;
+            const bTs = (_f = (_e = (_d = b.data().purchasedAt) === null || _d === void 0 ? void 0 : _d.toMillis) === null || _e === void 0 ? void 0 : _e.call(_d)) !== null && _f !== void 0 ? _f : 0;
+            return aTs - bTs;
+        });
+        let minutesToConsume = roundedMinutesToCharge;
+        for (const purchaseDoc of sortedPurchases) {
+            if (minutesToConsume <= 0)
+                break;
+            const purchase = purchaseDoc.data();
+            const purchaseRef = purchaseDoc.ref;
+            const currentRemaining = Math.max(0, Number((_a = purchase.minutesRemaining) !== null && _a !== void 0 ? _a : 0));
+            if (currentRemaining <= 0) {
+                batch.set(purchaseRef, {
+                    status: "expired",
+                    updatedAt: firestore_1.Timestamp.now(),
+                }, { merge: true });
+                continue;
+            }
+            const usedNow = Math.min(currentRemaining, minutesToConsume);
+            const nextRemaining = Math.max(0, Math.round((currentRemaining - usedNow) * 100) / 100);
+            minutesToConsume = Math.max(0, Math.round((minutesToConsume - usedNow) * 100) / 100);
+            batch.set(purchaseRef, {
+                minutesRemaining: nextRemaining,
+                minutesUsed: firestore_1.FieldValue.increment(usedNow),
+                status: nextRemaining === 0 ? "expired" : "active",
+                updatedAt: firestore_1.Timestamp.now(),
+            }, { merge: true });
+        }
+        const consumedFromPurchases = roundedMinutesToCharge - minutesToConsume;
+        batch.set(studentRef, {
+            purchaseMinutesConsumed: firestore_1.FieldValue.increment(consumedFromPurchases),
+        }, { merge: true });
+        firebase_functions_1.logger.info(`[lessons] purchase consumption qid=${questionId} studentUid=${studentUid} roundedMinutes=${roundedMinutesToCharge} consumedFromPurchases=${consumedFromPurchases} remainingUnmapped=${minutesToConsume}`);
+    }
     await batch.commit();
     firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore firestore batch committed qid=${questionId}`);
     const existsBeforeRemove = (await questionRef.once("value")).exists();

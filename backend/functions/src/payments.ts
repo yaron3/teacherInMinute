@@ -64,6 +64,7 @@ export const createCheckoutSession = onCall(async (req) => {
   const checkoutDoc: PaymentCheckoutDoc = {
     uid,
     packageId,
+    packageType: pkg.type,
     priceCents: pkg.priceCents,
     currency: pkg.currency,
     minutes,
@@ -237,6 +238,25 @@ export const paypalSuccess = onRequest(async (req, res) => {
         {
           remainingMinutes: FieldValue.increment(toSafeMinutes(checkout.minutes)),
           totalMinutes: FieldValue.increment(toSafeMinutes(checkout.minutes)),
+        },
+        { merge: true }
+      );
+
+      const purchaseRef = userRef.collection("purchases").doc(checkoutId);
+      tx.set(
+        purchaseRef,
+        {
+          pricingOptionId: checkout.packageId,
+          provider: "paypal",
+          amountCents: checkout.priceCents,
+          currency: checkout.currency,
+          type: checkout.packageType ?? "pay_as_you_go",
+          status: "active",
+          purchasedAt: now,
+          updatedAt: now,
+          minutesPurchased: toSafeMinutes(checkout.minutes),
+          minutesRemaining: toSafeMinutes(checkout.minutes),
+          minutesUsed: 0,
         },
         { merge: true }
       );
@@ -417,6 +437,25 @@ async function handleWebhookEvent(
           {
             remainingMinutes: FieldValue.increment(toSafeMinutes(checkout.minutes)),
             totalMinutes: FieldValue.increment(toSafeMinutes(checkout.minutes)),
+          },
+          { merge: true }
+        );
+
+        const purchaseRef = userRef.collection("purchases").doc(invoiceId);
+        tx.set(
+          purchaseRef,
+          {
+            pricingOptionId: checkout.packageId,
+            provider: "paypal",
+            amountCents: checkout.priceCents,
+            currency: checkout.currency,
+            type: checkout.packageType ?? "pay_as_you_go",
+            status: "active",
+            purchasedAt: now,
+            updatedAt: now,
+            minutesPurchased: toSafeMinutes(checkout.minutes),
+            minutesRemaining: toSafeMinutes(checkout.minutes),
+            minutesUsed: 0,
           },
           { merge: true }
         );

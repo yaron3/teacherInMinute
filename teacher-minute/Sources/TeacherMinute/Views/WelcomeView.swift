@@ -1,5 +1,5 @@
 //
-//  SwiftUIView.swift
+//  WelcomeView.swift
 //  teacher-minute
 //
 //  Created by Yaron Jackoby on 05/05/2026.
@@ -42,7 +42,7 @@ struct WelcomeView: View {
     VStack(alignment: .leading, spacing: 0) {
       header
       
-      Text("Help you any where")
+      Text(LocalizationSupport.localized("Help you any where"))
         .font(.system(size: 35, weight: .bold, design: .default))
         .foregroundStyle(theme.primaryText)
         .lineSpacing(-4)
@@ -53,7 +53,7 @@ struct WelcomeView: View {
         .scaledToFit()
         .padding(.top, 32)
       
-      Text("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise.")
+      Text(LocalizationSupport.localized("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise."))
         .font(.system(size: 16, weight: .regular))
         .foregroundStyle(theme.secondaryText)
         .lineSpacing(7)
@@ -67,7 +67,7 @@ struct WelcomeView: View {
       Button {
         router.push(.createAccount)
       } label: {
-        Text("Sign Up")
+        Text(LocalizationSupport.localized("Sign Up"))
           .font(.system(size: 16, weight: .semibold))
           .foregroundStyle(theme.primaryBackground)
           .frame(maxWidth: .infinity)
@@ -79,7 +79,7 @@ struct WelcomeView: View {
         Button {
           router.push(.login)
         } label: {
-          Text("Already have an account? Log In")
+          Text(LocalizationSupport.localized("Already have an account? Log In"))
             .fontWeight(.semibold)
             .foregroundStyle(theme.primaryText)
         }
@@ -123,7 +123,7 @@ struct WelcomeView: View {
 		  )
 		}
 	  
-	  Text("Teacher in a Minute")
+	  Text(LocalizationSupport.localized("Teacher in a Minute"))
 		.font(.system(size: 16, weight: .semibold))
 		.foregroundStyle(theme.primaryText)
 	  
@@ -148,7 +148,7 @@ struct WelcomeView: View {
 		  color: theme.secondaryText
 		)
 		
-		Text("App Preview")
+		Text(LocalizationSupport.localized("App Preview"))
 		  .font(.system(size: 16))
 		  .foregroundStyle(theme.primaryText)
 	  }
@@ -191,7 +191,7 @@ struct BadgeView: View {
 	  PlatformIcon(systemName: systemImage)
 		.font(.system(size: 12, weight: .medium))
 	  
-	  Text(title)
+	  Text(LocalizationSupport.localized(title))
 		.font(.system(size: 13, weight: .medium))
 	}
 	.foregroundStyle(foreground)

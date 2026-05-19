@@ -116,6 +116,7 @@ export type CheckoutStatus = "created" | "paypal_created" | "completed" | "cance
 export interface PaymentCheckoutDoc {
   uid: string;
   packageId: string;
+  packageType?: PlanType;
   priceCents: number;
   currency: string;
   minutes: number;
@@ -149,4 +150,8 @@ export interface PurchaseDoc {
   status: PurchaseStatus;
   purchasedAt: Timestamp;
   expiresAt?: Timestamp;
+  updatedAt?: Timestamp;
+  minutesPurchased?: number;
+  minutesRemaining?: number;
+  minutesUsed?: number;
 }

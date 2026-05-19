@@ -44,6 +44,7 @@ exports.createCheckoutSession = (0, https_1.onCall)(async (req) => {
     const checkoutDoc = {
         uid,
         packageId,
+        packageType: pkg.type,
         priceCents: pkg.priceCents,
         currency: pkg.currency,
         minutes,
@@ -157,7 +158,7 @@ exports.paypalSuccess = (0, https_1.onRequest)(async (req, res) => {
     const userRef = firestore.collection("users").doc(checkout.uid);
     try {
         await firestore.runTransaction(async (tx) => {
-            var _a;
+            var _a, _b;
             const freshSnap = await tx.get(checkoutRef);
             if (((_a = freshSnap.data()) === null || _a === void 0 ? void 0 : _a.status) === "completed") {
                 firebase_functions_1.logger.info(`[payments] paypalSuccess transaction already completed checkoutId=${checkoutId}`);
@@ -174,6 +175,20 @@ exports.paypalSuccess = (0, https_1.onRequest)(async (req, res) => {
             tx.set(userRef, {
                 remainingMinutes: firestore_1.FieldValue.increment(toSafeMinutes(checkout.minutes)),
                 totalMinutes: firestore_1.FieldValue.increment(toSafeMinutes(checkout.minutes)),
+            }, { merge: true });
+            const purchaseRef = userRef.collection("purchases").doc(checkoutId);
+            tx.set(purchaseRef, {
+                pricingOptionId: checkout.packageId,
+                provider: "paypal",
+                amountCents: checkout.priceCents,
+                currency: checkout.currency,
+                type: (_b = checkout.packageType) !== null && _b !== void 0 ? _b : "pay_as_you_go",
+                status: "active",
+                purchasedAt: now,
+                updatedAt: now,
+                minutesPurchased: toSafeMinutes(checkout.minutes),
+                minutesRemaining: toSafeMinutes(checkout.minutes),
+                minutesUsed: 0,
             }, { merge: true });
         });
     }
@@ -289,7 +304,7 @@ async function handleWebhookEvent(eventType, resource) {
             }
             const userRef = firestore.collection("users").doc(checkout.uid);
             await firestore.runTransaction(async (tx) => {
-                var _a;
+                var _a, _b;
                 const fresh = await tx.get(checkoutRef);
                 if (((_a = fresh.data()) === null || _a === void 0 ? void 0 : _a.status) === "completed")
                     return;
@@ -303,6 +318,20 @@ async function handleWebhookEvent(eventType, resource) {
                 tx.set(userRef, {
                     remainingMinutes: firestore_1.FieldValue.increment(toSafeMinutes(checkout.minutes)),
                     totalMinutes: firestore_1.FieldValue.increment(toSafeMinutes(checkout.minutes)),
+                }, { merge: true });
+                const purchaseRef = userRef.collection("purchases").doc(invoiceId);
+                tx.set(purchaseRef, {
+                    pricingOptionId: checkout.packageId,
+                    provider: "paypal",
+                    amountCents: checkout.priceCents,
+                    currency: checkout.currency,
+                    type: (_b = checkout.packageType) !== null && _b !== void 0 ? _b : "pay_as_you_go",
+                    status: "active",
+                    purchasedAt: now,
+                    updatedAt: now,
+                    minutesPurchased: toSafeMinutes(checkout.minutes),
+                    minutesRemaining: toSafeMinutes(checkout.minutes),
+                    minutesUsed: 0,
                 }, { merge: true });
             });
             firebase_functions_1.logger.info(`[payments] webhook reconciled checkoutId=${invoiceId} captureId=${captureId} uid=${checkout.uid} minutes=${checkout.minutes}`);
