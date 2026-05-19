@@ -81,6 +81,7 @@ final class ProfileViewModel {
         } catch {
             errorMessage = "Could not load profile."
             logger.error("[Profile] failed loading profile: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.loadProfile")
         }
     }
 
@@ -115,6 +116,7 @@ final class ProfileViewModel {
             } catch {
                 errorMessage = "Could not upload profile photo."
                 logger.error("[Profile] failed uploading profile image: \(error.localizedDescription)")
+                AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.uploadProfileImage")
             }
             isUploadingPhoto = false
         }
@@ -185,6 +187,7 @@ final class ProfileViewModel {
         } catch {
             errorMessage = "Could not save profile."
             logger.error("[Profile] failed saving profile edits: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.saveProfileEdits")
         }
     }
 

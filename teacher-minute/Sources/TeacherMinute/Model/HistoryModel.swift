@@ -96,10 +96,14 @@ final class HistoryModel {
         guard let data = snapshot.data() else { return nil }
 
         let studentId = Self.firstString(in: data, keys: ["studentId", "studentUid", "studentUID"])
-        let teacherId = Self.firstString(in: data, keys: ["teacherId", "teacherUid", "teacherUID"])
-        let otherParticipantId = currentUserId == studentId ? teacherId : studentId
-        let otherParticipant = try await profileSummary(uid: otherParticipantId)
-        let fallbackName = currentUserId == studentId ? "Teacher" : "Student"
+        let isCurrentUserStudent = currentUserId == studentId
+        let otherParticipantName: String = isCurrentUserStudent
+            ? Self.firstString(in: data, keys: ["teacherName"])
+            : Self.firstString(in: data, keys: ["studentName"])
+        let otherParticipantImage: String = isCurrentUserStudent
+            ? Self.firstString(in: data, keys: ["teacherImageURL", "teacherProfileImageURL"])
+            : Self.firstString(in: data, keys: ["studentImageURL", "studentProfileImageURL"])
+        let fallbackName = isCurrentUserStudent ? "Teacher" : "Student"
         let acceptedAt = Self.dateValue(data["acceptedAt"])
             ?? Self.dateValue(data["connectedAt"])
             ?? Self.dateValue(data["startedAt"])
@@ -122,23 +126,14 @@ final class HistoryModel {
             id: questionId,
             questionId: questionId,
             title: Self.lessonTitle(from: data),
-            otherParticipantName: otherParticipant?.displayName ?? fallbackName,
-            otherParticipantImageURL: otherParticipant?.profileImageURL ?? "",
+            otherParticipantName: otherParticipantName.isEmpty ? fallbackName : otherParticipantName,
+            otherParticipantImageURL: otherParticipantImage,
             acceptedAt: acceptedAt,
             durationSeconds: durationSeconds,
             costCents: costCents,
             teacherEarningsCents: teacherEarningsCents,
             currencyCode: currencyCode
         )
-    }
-
-    private func profileSummary(uid: String) async throws -> UserProfileSummary? {
-        let trimmed = uid.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let snapshot = try await Firestore.firestore().collection("users").document(trimmed).getDocument()
-        guard let data = snapshot.data() else { return nil }
-        return UserProfileSummary(uid: trimmed, data: data)
     }
 
     private static func lessonTitle(from data: [String: Any]) -> String {
@@ -207,6 +202,7 @@ final class HistoryModel {
             }
         } catch {
             logger.error("[HistoryModel] failed loading pricing currencies: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "HistoryModel.pricingCurrencyById")
             return [:]
         }
     }

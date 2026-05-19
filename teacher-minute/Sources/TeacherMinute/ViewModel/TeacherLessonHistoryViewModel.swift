@@ -21,10 +21,10 @@ final class TeacherLessonHistoryViewModel {
     var query = ""
     var selectedLesson: LessonHistoryItem?
     var selectedLessonDetails: LessonDetails?
+    var isLessonSheetPresented = false
     var playingLessonID: LessonHistoryItem.ID?
     var totalTimeTaughtText = LessonFormatting.totalDurationText(lessons: [])
     var totalEarningsText = LessonFormatting.currencyText(cents: 0)
-    var loadingLessonID: LessonHistoryItem.ID?
     var profileImageURL = ""
 
     var lessons: [LessonHistoryItem] = []
@@ -43,12 +43,10 @@ final class TeacherLessonHistoryViewModel {
         String(format: LocalizationSupport.localized("%lld taught"), Int64(lessons.count))
     }
     
-    func view(_ lesson: LessonHistoryItem) async {
-        guard loadingLessonID == nil else { return }
-        loadingLessonID = lesson.id
-        selectedLessonDetails = await loadDetails(for: lesson)
+    func view(_ lesson: LessonHistoryItem) {
         selectedLesson = lesson
-        loadingLessonID = nil
+        selectedLessonDetails = nil
+        isLessonSheetPresented = true
     }
     
     func toggleAudio(for lesson: LessonHistoryItem) {
@@ -76,23 +74,11 @@ final class TeacherLessonHistoryViewModel {
             lessons = historyLessons.map { Self.lessonHistoryItem($0, currentUserImageURL: profileImageURL) }
         } catch {
             logger.error("[TeacherLessons] failed loading profile: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherLessons.loadProfile")
         }
     }
 
-    func isLoading(_ lesson: LessonHistoryItem) -> Bool {
-        loadingLessonID == lesson.id
-    }
-
-    private func loadDetails(for lesson: LessonHistoryItem) async -> LessonDetails {
-        do {
-            let questionText = try await HistoryModel.shared.fetchQuestionText(questionId: lesson.questionId)
-            let messages = try await HistoryModel.shared.fetchLessonMessages(questionId: lesson.questionId)
-            return LessonDetails(questionText: questionText, messages: messages)
-        } catch {
-            logger.error("[TeacherLessons] failed loading lesson details: \(error.localizedDescription)")
-            return LessonDetails(questionText: "", messages: [])
-        }
-    }
+    func isLoading(_ lesson: LessonHistoryItem) -> Bool { false }
 
     static func lessonHistoryItem(_ lesson: HistoryLesson, currentUserImageURL: String) -> LessonHistoryItem {
         LessonHistoryItem(

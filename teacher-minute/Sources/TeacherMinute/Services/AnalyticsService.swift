@@ -70,6 +70,9 @@ enum AnalyticsEvent {
     static let permissionGranted = "permission_granted"
     static let permissionDenied  = "permission_denied"
     static let notificationOpened = "notification_opened"
+
+    // Backend errors
+    static let firestorePermissionDenied = "firestore_permission_denied"
 }
 
 /// Names for `screen_view` tracking. Used as the `screen_name` parameter.
@@ -213,6 +216,25 @@ final class AnalyticsService {
             Crashlytics.crashlytics().log("error in \(context): \(error.localizedDescription)")
         }
         Crashlytics.crashlytics().record(error: error)
+    }
+
+    /// Emits a `firestore_permission_denied` analytics event when `error`
+    /// looks like a Firestore permission failure. Safe to call on any
+    /// error — non-matching errors are ignored. Cross-platform: matches
+    /// both the iOS NSError domain/code and the message string used on
+    /// Android (Skip) builds.
+    func recordPermissionIfNeeded(_ error: Error, context: String) {
+        let nsError = error as NSError
+        let isFirestoreDomain = nsError.domain == "FIRFirestoreErrorDomain" && nsError.code == 7
+        let message = error.localizedDescription.lowercased()
+        let messageMatches = message.contains("permission_denied")
+            || message.contains("missing or insufficient permissions")
+            || message.contains("insufficient permissions")
+        guard isFirestoreDomain || messageMatches else { return }
+        logEvent(AnalyticsEvent.firestorePermissionDenied, parameters: [
+            "context": context,
+            "message": error.localizedDescription
+        ])
     }
 
     func log(_ message: String) {

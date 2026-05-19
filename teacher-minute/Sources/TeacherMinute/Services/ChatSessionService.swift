@@ -705,6 +705,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       errorMessage = error.localizedDescription
       onErrorUpdated?(errorMessage)
       logger.error("[ChatSession] endLesson failed questionId=\(self.questionId): \(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "ChatSession.endLesson")
     }
   }
 

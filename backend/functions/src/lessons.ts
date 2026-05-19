@@ -13,6 +13,7 @@ import {
   BASE_RATE_PER_MIN_CENTS,
   CONNECTION_FEE_CENTS,
 } from "./types";
+import { backfillPendingQuestionsForTeacher } from "./dispatch";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -181,6 +182,9 @@ async function migrateQuestionToFirestore(
   }
 ): Promise<void> {
   const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs } = context;
+  logger.info(
+    `[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`
+  );
   const endedAt = Timestamp.now();
   const endedAtMs = endedAt.toMillis();
   const rawSeconds = Math.max(0, Math.floor((endedAtMs - acceptedAtMs) / 1000));
@@ -189,6 +193,9 @@ async function migrateQuestionToFirestore(
   const costPerMinute = await getCostPerMinute(teacherUid);
   const cost = Math.round(roundedMinutes * costPerMinute * 100) / 100;
   const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
+  logger.info(
+    `[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`
+  );
 
   logger.info(
     `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost}`
@@ -237,7 +244,14 @@ async function migrateQuestionToFirestore(
   );
 
   await batch.commit();
+  logger.info(`[lessons] migrateQuestionToFirestore firestore batch committed qid=${questionId}`);
+
+  const existsBeforeRemove = (await questionRef.once("value")).exists();
+  logger.info(
+    `[lessons] migrateQuestionToFirestore removing RTDB question qid=${questionId} existsBeforeRemove=${existsBeforeRemove}`
+  );
   await questionRef.remove();
+  logger.info(`[lessons] migrateQuestionToFirestore RTDB question removed qid=${questionId}`);
 }
 
 // ─── startLesson ──────────────────────────────────────────────────────────────
@@ -266,6 +280,10 @@ export const startLesson = onCall(async (req) => {
   if (q.status !== "accepted") {
     throw new HttpsError("failed-precondition", `Cannot start lesson in status: ${q.status}`);
   }
+
+  logger.info(
+    `[lessons] startLesson authorized qid=${questionId} uid=${uid} questionStatus=${q.status} acceptedByTeacher=${q.acceptedByTeacher ?? "none"}`
+  );
 
   // Idempotent: if lesson already exists return it
   if (q.lessonId) {
@@ -308,14 +326,24 @@ export const startLesson = onCall(async (req) => {
     updatedAt: FieldValue.serverTimestamp(),
   });
   await batch.commit();
+  logger.info(`[lessons] startLesson firestore batch committed lessonId=${lessonId} qid=${questionId}`);
 
   // Keep RTDB question state aligned for real-time clients.
+  logger.info(
+    `[lessons] startLesson syncing RTDB question qid=${questionId} status=in_progress teacherId=${q.acceptedByTeacher ?? "none"}`
+  );
   await db.ref(`questions/${questionId}`).update({
-    status: "accepted",
+    status: "in_progress",
+    questionId,
+    studentUid: q.studentUid,
+    teacherUid: q.acceptedByTeacher,
+    acceptedByTeacher: q.acceptedByTeacher,
     teacherId: q.acceptedByTeacher,
     teachedId: q.acceptedByTeacher,
+    startedAt: Date.now(),
     updatedAt: Date.now(),
   });
+  logger.info(`[lessons] startLesson RTDB sync complete qid=${questionId}`);
 
   // Enqueue the hard-cap enforcement task (FR-B-006)
   const capQueue = getFunctions().taskQueue("forceEndLesson");
@@ -377,6 +405,20 @@ export const endLesson = onCall(async (req) => {
     logger.info(
       `[lessons] endLesson migrated qid=${questionId} from RTDB to Firestore and marked ended`
     );
+
+    logger.info(
+      `[lessons] endLesson triggering dispatch backfill for teacher=${context.teacherUid} qid=${questionId} endedBy=${endedBy}`
+    );
+    try {
+      await backfillPendingQuestionsForTeacher(context.teacherUid);
+    } catch (backfillError) {
+      const backfillMessage = backfillError instanceof Error
+        ? backfillError.message
+        : String(backfillError);
+      logger.error(
+        `[lessons] endLesson backfill failed qid=${questionId} teacher=${context.teacherUid} message=${backfillMessage}`
+      );
+    }
 
     return { success: true, questionId, endedBy };
   } catch (error) {

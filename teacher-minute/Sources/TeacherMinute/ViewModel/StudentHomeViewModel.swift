@@ -230,9 +230,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       logger.info("[PaymentReturn] checkout session created url=\(result.checkoutURL.absoluteString)")
     } catch let error as FunctionsError {
       logger.error("[PaymentReturn] createCheckoutSession failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.createCheckoutSession")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     } catch {
       logger.error("[StudentHome] failed creating checkout session: \(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.createCheckoutSession")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     }
   }
@@ -307,6 +309,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       pricingOptions = try await PricingService.shared.fetchPricingOptions()
     } catch {
       logger.error("[StudentHome] failed loading pricing options: \(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.loadPricingOptions")
     }
   }
 
@@ -324,6 +327,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       }
     } catch {
       logger.error("[StudentHome] failed loading recent lessons: \(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.loadRecentLessons")
     }
   }
 

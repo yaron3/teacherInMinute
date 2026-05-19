@@ -11,11 +11,46 @@ import { QuestionDoc, DispatchInviteDoc, CONNECTION_FEE_CENTS } from "./types";
 const db = admin.database();
 const firestore = admin.firestore();
 
+type LiveQuestionStatus = "searching" | "accepted" | "in_progress";
+
+async function upsertLiveQuestion(
+  questionId: string,
+  patch: Record<string, unknown>,
+  status: LiveQuestionStatus,
+  reason: string
+): Promise<void> {
+  const payload = {
+    ...patch,
+    status,
+    updatedAt: Date.now(),
+  };
+
+  logger.info(
+    `[questions] upsertLiveQuestion start qid=${questionId} status=${status} reason=${reason} keys=${Object.keys(payload).sort().join(",")}`
+  );
+  await db.ref(`questions/${questionId}`).update(payload);
+  logger.info(`[questions] upsertLiveQuestion done qid=${questionId} status=${status} reason=${reason}`);
+}
+
 async function cleanupRtdb(questionId: string, alreadyInvited: string[]): Promise<void> {
+  logger.info(
+    `[questions] cleanupRtdb start qid=${questionId} invitesToClear=${alreadyInvited.length}`
+  );
+
+  const questionRef = db.ref(`questions/${questionId}`);
+  const questionExists = (await questionRef.once("value")).exists();
+  logger.info(
+    `[questions] cleanupRtdb precheck qid=${questionId} rtdbQuestionExists=${questionExists}`
+  );
+
   await Promise.all([
-    db.ref(`questions/${questionId}`).remove(),
+    questionRef.remove(),
     ...alreadyInvited.map((tid) => db.ref(`teacherInvites/${tid}/${questionId}`).remove()),
   ]);
+
+  logger.info(
+    `[questions] cleanupRtdb done qid=${questionId} removedQuestion=${questionExists} removedTeacherInvites=${alreadyInvited.length}`
+  );
 }
 
 // ─── createQuestion ───────────────────────────────────────────────────────────
@@ -54,6 +89,8 @@ export const createQuestion = onCall(async (req) => {
 
   const qid = uuidv4();
 
+  logger.info(`[questions] createQuestion start qid=${qid} student=${uid} topic=${topic}`);
+
   const question: QuestionDoc = {
     studentUid: uid,
     topic,
@@ -67,9 +104,26 @@ export const createQuestion = onCall(async (req) => {
     alreadyInvited: [],
   };
 
+  const liveQuestion: Record<string, unknown> = {
+    questionId: qid,
+    studentUid: uid,
+    topic,
+    text: text.trim(),
+    photoUrls,
+    ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
+    dispatchWave: 0,
+    createdAt: Date.now(),
+  };
+
+  await upsertLiveQuestion(qid, liveQuestion, "searching", "createQuestion");
+  logger.info(`[questions] createQuestion RTDB-upsert done qid=${qid}`);
+
   // Writing this doc triggers dispatchQuestion via the Firestore onCreate trigger.
   await firestore.collection("questions").doc(qid).set(question);
 
+  logger.info(
+    `[questions] createQuestion firestore-set done qid=${qid} status=${question.status} dispatchWave=${question.dispatchWave}`
+  );
   logger.info(`[questions] created qid=${qid} topic=${topic} student=${uid}`);
   return { questionId: qid, connectionFeeCents: CONNECTION_FEE_CENTS };
 });
@@ -85,6 +139,8 @@ export const cancelQuestion = onCall(async (req) => {
   const { questionId } = req.data as { questionId: string };
   if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
 
+  logger.info(`[questions] cancelQuestion requested qid=${questionId} by student=${uid}`);
+
   const qRef = firestore.collection("questions").doc(questionId);
   let alreadyInvited: string[] = [];
 
@@ -93,6 +149,9 @@ export const cancelQuestion = onCall(async (req) => {
     if (!snap.exists) throw new HttpsError("not-found", "Question not found");
 
     const data = snap.data() as QuestionDoc;
+    logger.info(
+      `[questions] cancelQuestion tx-read qid=${questionId} status=${data.status} alreadyInvited=${(data.alreadyInvited ?? []).length}`
+    );
     if (data.studentUid !== uid) throw new HttpsError("permission-denied", "Not your question");
 
     const cancellable: QuestionDoc["status"][] = ["searching", "accepted"];
@@ -127,6 +186,8 @@ export const acceptInvite = onCall(async (req) => {
   const { questionId } = req.data as { questionId: string };
   if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
 
+  logger.info(`[questions] acceptInvite requested qid=${questionId} by teacher=${teacherUid}`);
+
   const qRef = firestore.collection("questions").doc(questionId);
   const inviteRef = qRef.collection("invites").doc(teacherUid);
 
@@ -141,6 +202,10 @@ export const acceptInvite = onCall(async (req) => {
 
     const q = qSnap.data() as QuestionDoc;
     const inv = invSnap.data() as DispatchInviteDoc;
+
+    logger.info(
+      `[questions] acceptInvite tx-read qid=${questionId} questionStatus=${q.status} inviteResponse=${inv.response} inviteWave=${inv.wave}`
+    );
 
     // FR-B-004: fail only if someone else already claimed it.
     // "unanswered" means all waves timed out but no one accepted — a teacher with
@@ -177,6 +242,20 @@ export const acceptInvite = onCall(async (req) => {
     tx.update(inviteRef, { response: "accept" });
   });
 
+  await upsertLiveQuestion(
+    questionId,
+    {
+      studentUid,
+      teacherUid,
+      teacherId: teacherUid,
+      teachedId: teacherUid,
+      acceptedByTeacher: teacherUid,
+      acceptedAt: Date.now(),
+    },
+    "accepted",
+    "acceptInvite"
+  );
+
   // Mint LiveKit tokens for both parties
   const channelName = `lesson_${questionId}`;
   const [teacherToken, studentToken] = await Promise.all([
@@ -184,11 +263,23 @@ export const acceptInvite = onCall(async (req) => {
     mintLiveKitToken(channelName, studentUid),
   ]);
 
-  // Push the student's token to them via FCM
-  const [teacherRecord, studentFcmToken] = await Promise.all([
+  // Snapshot both participants' name+image so lesson history can render without
+  // cross-user reads (Firestore rules block students from reading teacher docs
+  // and vice versa). These fields are frozen at accept-time on purpose.
+  const [teacherRecord, studentFcmToken, teacherUserSnap, studentUserSnap] = await Promise.all([
     db.ref(`teachers/${teacherUid}`).once("value").then((s) => s.val()),
     db.ref(`users/${studentUid}/fcmToken`).once("value").then((s) => s.val() as string | null),
+    firestore.collection("users").doc(teacherUid).get(),
+    firestore.collection("users").doc(studentUid).get(),
   ]);
+
+  const teacherUser = teacherUserSnap.data() ?? {};
+  const studentUser = studentUserSnap.data() ?? {};
+  const pickImage = (u: FirebaseFirestore.DocumentData): string =>
+    (u.profileImageURL as string | undefined) ??
+    (u.profilePhotoURL as string | undefined) ??
+    (u.photoURL as string | undefined) ??
+    "";
 
   if (studentFcmToken) {
     await sendAcceptedPush({
@@ -201,15 +292,35 @@ export const acceptInvite = onCall(async (req) => {
     });
   }
 
-  // Store the LiveKit room name on the question for startLesson to use
+  // Store the LiveKit room name + name/image snapshots on the question doc.
   await qRef.update({
     agoraChannel: channelName,
+    teacherName: (teacherUser.fullName as string | undefined) ?? "",
+    teacherImageURL: pickImage(teacherUser),
+    studentName: (studentUser.fullName as string | undefined) ?? "",
+    studentImageURL: pickImage(studentUser),
     updatedAt: FieldValue.serverTimestamp(),
   });
+
+  await upsertLiveQuestion(
+    questionId,
+    {
+      agoraChannel: channelName,
+      teacherName: (teacherUser.fullName as string | undefined) ?? "",
+      teacherImageURL: pickImage(teacherUser),
+      studentName: (studentUser.fullName as string | undefined) ?? "",
+      studentImageURL: pickImage(studentUser),
+    },
+    "accepted",
+    "acceptInvite-profile-sync"
+  );
 
   // Clear RTDB invite signals for ALL teachers who were invited — question is taken
   const qSnap = await qRef.get();
   const alreadyInvited: string[] = (qSnap.data() as QuestionDoc).alreadyInvited ?? [];
+  logger.info(
+    `[questions] acceptInvite clearing teacher RTDB invites qid=${questionId} invitedCount=${alreadyInvited.length}`
+  );
   await Promise.all(
     alreadyInvited.map((uid) => db.ref(`teacherInvites/${uid}/${questionId}`).remove())
   );
@@ -240,6 +351,8 @@ export const getQuestionStatus = onCall(async (req) => {
   const q = qSnap.data() as QuestionDoc;
   if (q.studentUid !== uid) throw new HttpsError("permission-denied", "Not your question");
 
+  logger.info(`[questions] getQuestionStatus qid=${questionId} student=${uid} status=${q.status}`);
+
   if (q.status === "accepted" || q.status === "in_progress") {
     const roomName = `lesson_${questionId}`;
     const token = await mintLiveKitToken(roomName, uid);
@@ -259,6 +372,8 @@ export const declineInvite = onCall(async (req) => {
 
   const { questionId } = req.data as { questionId: string };
   if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
+
+  logger.info(`[questions] declineInvite requested qid=${questionId} by teacher=${teacherUid}`);
 
   const inviteRef = firestore
     .collection("questions")

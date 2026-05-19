@@ -30,6 +30,7 @@ final class NotificationMessagesViewModel {
         } catch {
             errorMessage = "Could not load messages."
             logger.error("[Messages] failed loading messages: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Messages.loadMessages")
         }
     }
 
@@ -43,6 +44,7 @@ final class NotificationMessagesViewModel {
             } catch {
                 errorMessage = "Could not delete message."
                 logger.error("[Messages] failed deleting message: \(error.localizedDescription)")
+                AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Messages.delete")
                 await loadMessages()
             }
         }
@@ -57,6 +59,7 @@ final class NotificationMessagesViewModel {
                 try await NotificationMessageService.shared.markRead(message, uid: uid)
             } catch {
                 logger.error("[Messages] failed marking read: \(error.localizedDescription)")
+                AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Messages.markRead")
             }
         }
     }

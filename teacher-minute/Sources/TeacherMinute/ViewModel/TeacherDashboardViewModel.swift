@@ -240,6 +240,7 @@ final class TeacherDashboardViewModel {
           guard !Task.isCancelled else { return }
           self?.errorMessage = error.localizedDescription
           logger.error("[VM] Android invite polling failed — \(error.localizedDescription)")
+          AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.androidInvitePolling")
         }
 
         try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -372,6 +373,7 @@ final class TeacherDashboardViewModel {
         clearActiveCallState()
         errorMessage = error.localizedDescription
         logger.error("[VM] acceptInvite failed — \(error.localizedDescription)")
+        AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.acceptInvite")
       }
     }
   }
@@ -384,6 +386,7 @@ final class TeacherDashboardViewModel {
         logger.info("[VM] declineInvite — qid=\(questionId)")
       } catch {
         AnalyticsService.shared.recordError(error, context: "declineInvite")
+        AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.declineInvite")
         errorMessage = error.localizedDescription
         logger.error("[VM] declineInvite failed — \(error.localizedDescription)")
       }

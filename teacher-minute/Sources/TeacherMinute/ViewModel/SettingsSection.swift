@@ -472,6 +472,7 @@ class SettingsViewModel {
                 alertMessage = LocalizationSupport.localized("Could not open payment settings.")
                 showAlert = true
                 logger.error("[Settings] failed creating payment settings session: \(error.localizedDescription)")
+                AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Settings.createPaymentSettingsSession")
             }
         }
     }
@@ -484,6 +485,7 @@ class SettingsViewModel {
         } catch {
             present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("Could not load PayPal payout settings."))
             logger.error("[Settings] failed loading teacher payout settings: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Settings.loadTeacherPayoutSettings")
         }
     }
 
@@ -512,6 +514,7 @@ class SettingsViewModel {
             } catch {
                 present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("Could not update PayPal payout settings."))
                 logger.error("[Settings] failed saving teacher payout settings: \(error.localizedDescription)")
+                AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Settings.saveTeacherPayoutSettings")
             }
         }
     }

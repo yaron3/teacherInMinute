@@ -174,6 +174,7 @@ final class TeacherSubjectsViewModel {
 	  }
 	} catch {
 	  logger.error("[TeacherSubjects] failed loading remote subject catalog: \(error.localizedDescription)")
+	  AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherSubjects.loadRemoteCatalog")
 	}
   }
   

@@ -9,6 +9,7 @@ const functions_1 = require("firebase-admin/functions");
 const firestore_1 = require("firebase-admin/firestore");
 const uuid_1 = require("uuid");
 const types_1 = require("./types");
+const dispatch_1 = require("./dispatch");
 const firestore = admin.firestore();
 const db = admin.database();
 const HALF_MINUTE_SECONDS = 30;
@@ -124,6 +125,7 @@ async function resolveQuestionContext(questionId) {
 }
 async function migrateQuestionToFirestore(questionId, endedBy, context) {
     const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs } = context;
+    firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`);
     const endedAt = firestore_1.Timestamp.now();
     const endedAtMs = endedAt.toMillis();
     const rawSeconds = Math.max(0, Math.floor((endedAtMs - acceptedAtMs) / 1000));
@@ -132,6 +134,7 @@ async function migrateQuestionToFirestore(questionId, endedBy, context) {
     const costPerMinute = await getCostPerMinute(teacherUid);
     const cost = Math.round(roundedMinutes * costPerMinute * 100) / 100;
     const migratedQuestion = sanitizeForFirestore(rtdbQuestion);
+    firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`);
     firebase_functions_1.logger.info(`[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost}`);
     const batch = firestore.batch();
     const qDocRef = firestore.collection("questions").doc(questionId);
@@ -150,14 +153,18 @@ async function migrateQuestionToFirestore(questionId, endedBy, context) {
         totalMinutes: firestore_1.FieldValue.increment(roundedMinutes),
     }, { merge: true });
     await batch.commit();
+    firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore firestore batch committed qid=${questionId}`);
+    const existsBeforeRemove = (await questionRef.once("value")).exists();
+    firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore removing RTDB question qid=${questionId} existsBeforeRemove=${existsBeforeRemove}`);
     await questionRef.remove();
+    firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore RTDB question removed qid=${questionId}`);
 }
 // ─── startLesson ──────────────────────────────────────────────────────────────
 // FR-B-006, FR-B-010
 // Called by either client once the Agora audio channel is connected.
 // Creates the /lessons doc and schedules the 30-minute hard-cap task.
 exports.startLesson = (0, https_1.onCall)(async (req) => {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const uid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
     if (!uid)
         throw new https_1.HttpsError("unauthenticated", "Sign in required");
@@ -176,6 +183,7 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
     if (q.status !== "accepted") {
         throw new https_1.HttpsError("failed-precondition", `Cannot start lesson in status: ${q.status}`);
     }
+    firebase_functions_1.logger.info(`[lessons] startLesson authorized qid=${questionId} uid=${uid} questionStatus=${q.status} acceptedByTeacher=${(_b = q.acceptedByTeacher) !== null && _b !== void 0 ? _b : "none"}`);
     // Idempotent: if lesson already exists return it
     if (q.lessonId) {
         return { lessonId: q.lessonId };
@@ -189,7 +197,7 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
         .get()
         .then((s) => s.data());
     // Retrieve the Agora token from acceptInvite's stored channel
-    const liveKitRoom = (_b = agoraTokenSnap.agoraChannel) !== null && _b !== void 0 ? _b : `lesson_${questionId}`;
+    const liveKitRoom = (_c = agoraTokenSnap.agoraChannel) !== null && _c !== void 0 ? _c : `lesson_${questionId}`;
     const lesson = {
         questionId,
         studentUid: q.studentUid,
@@ -211,13 +219,21 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
     });
     await batch.commit();
+    firebase_functions_1.logger.info(`[lessons] startLesson firestore batch committed lessonId=${lessonId} qid=${questionId}`);
     // Keep RTDB question state aligned for real-time clients.
+    firebase_functions_1.logger.info(`[lessons] startLesson syncing RTDB question qid=${questionId} status=in_progress teacherId=${(_d = q.acceptedByTeacher) !== null && _d !== void 0 ? _d : "none"}`);
     await db.ref(`questions/${questionId}`).update({
-        status: "accepted",
+        status: "in_progress",
+        questionId,
+        studentUid: q.studentUid,
+        teacherUid: q.acceptedByTeacher,
+        acceptedByTeacher: q.acceptedByTeacher,
         teacherId: q.acceptedByTeacher,
         teachedId: q.acceptedByTeacher,
+        startedAt: Date.now(),
         updatedAt: Date.now(),
     });
+    firebase_functions_1.logger.info(`[lessons] startLesson RTDB sync complete qid=${questionId}`);
     // Enqueue the hard-cap enforcement task (FR-B-006)
     const capQueue = (0, functions_1.getFunctions)().taskQueue("forceEndLesson");
     await capQueue.enqueue({ lessonId }, { scheduleDelaySeconds: types_1.HARD_CAP_MINUTES * 60 });
@@ -260,6 +276,16 @@ exports.endLesson = (0, https_1.onCall)(async (req) => {
         await migrateQuestionToFirestore(questionId, endedBy, context);
         debugContext.stage = "completed";
         firebase_functions_1.logger.info(`[lessons] endLesson migrated qid=${questionId} from RTDB to Firestore and marked ended`);
+        firebase_functions_1.logger.info(`[lessons] endLesson triggering dispatch backfill for teacher=${context.teacherUid} qid=${questionId} endedBy=${endedBy}`);
+        try {
+            await (0, dispatch_1.backfillPendingQuestionsForTeacher)(context.teacherUid);
+        }
+        catch (backfillError) {
+            const backfillMessage = backfillError instanceof Error
+                ? backfillError.message
+                : String(backfillError);
+            firebase_functions_1.logger.error(`[lessons] endLesson backfill failed qid=${questionId} teacher=${context.teacherUid} message=${backfillMessage}`);
+        }
         return { success: true, questionId, endedBy };
     }
     catch (error) {

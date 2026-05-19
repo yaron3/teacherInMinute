@@ -11,11 +11,22 @@ const fcm_1 = require("./fcm");
 const types_1 = require("./types");
 const db = admin.database();
 const firestore = admin.firestore();
+async function upsertLiveQuestion(questionId, patch, status, reason) {
+    const payload = Object.assign(Object.assign({}, patch), { status, updatedAt: Date.now() });
+    firebase_functions_1.logger.info(`[questions] upsertLiveQuestion start qid=${questionId} status=${status} reason=${reason} keys=${Object.keys(payload).sort().join(",")}`);
+    await db.ref(`questions/${questionId}`).update(payload);
+    firebase_functions_1.logger.info(`[questions] upsertLiveQuestion done qid=${questionId} status=${status} reason=${reason}`);
+}
 async function cleanupRtdb(questionId, alreadyInvited) {
+    firebase_functions_1.logger.info(`[questions] cleanupRtdb start qid=${questionId} invitesToClear=${alreadyInvited.length}`);
+    const questionRef = db.ref(`questions/${questionId}`);
+    const questionExists = (await questionRef.once("value")).exists();
+    firebase_functions_1.logger.info(`[questions] cleanupRtdb precheck qid=${questionId} rtdbQuestionExists=${questionExists}`);
     await Promise.all([
-        db.ref(`questions/${questionId}`).remove(),
+        questionRef.remove(),
         ...alreadyInvited.map((tid) => db.ref(`teacherInvites/${tid}/${questionId}`).remove()),
     ]);
+    firebase_functions_1.logger.info(`[questions] cleanupRtdb done qid=${questionId} removedQuestion=${questionExists} removedTeacherInvites=${alreadyInvited.length}`);
 }
 // ─── createQuestion ───────────────────────────────────────────────────────────
 // FR-B-010: callable — student initiates the question + dispatch pipeline.
@@ -42,9 +53,14 @@ exports.createQuestion = (0, https_1.onCall)(async (req) => {
         throw new https_1.HttpsError("resource-exhausted", "Not enough time left");
     }
     const qid = (0, uuid_1.v4)();
+    firebase_functions_1.logger.info(`[questions] createQuestion start qid=${qid} student=${uid} topic=${topic}`);
     const question = Object.assign(Object.assign({ studentUid: uid, topic, text: text.trim(), photoUrls }, (voiceMemoUrl ? { voiceMemoUrl } : {})), { status: "searching", createdAt: firestore_1.Timestamp.now(), updatedAt: firestore_1.Timestamp.now(), dispatchWave: 0, alreadyInvited: [] });
+    const liveQuestion = Object.assign(Object.assign({ questionId: qid, studentUid: uid, topic, text: text.trim(), photoUrls }, (voiceMemoUrl ? { voiceMemoUrl } : {})), { dispatchWave: 0, createdAt: Date.now() });
+    await upsertLiveQuestion(qid, liveQuestion, "searching", "createQuestion");
+    firebase_functions_1.logger.info(`[questions] createQuestion RTDB-upsert done qid=${qid}`);
     // Writing this doc triggers dispatchQuestion via the Firestore onCreate trigger.
     await firestore.collection("questions").doc(qid).set(question);
+    firebase_functions_1.logger.info(`[questions] createQuestion firestore-set done qid=${qid} status=${question.status} dispatchWave=${question.dispatchWave}`);
     firebase_functions_1.logger.info(`[questions] created qid=${qid} topic=${topic} student=${uid}`);
     return { questionId: qid, connectionFeeCents: types_1.CONNECTION_FEE_CENTS };
 });
@@ -59,21 +75,23 @@ exports.cancelQuestion = (0, https_1.onCall)(async (req) => {
     const { questionId } = req.data;
     if (!questionId)
         throw new https_1.HttpsError("invalid-argument", "questionId required");
+    firebase_functions_1.logger.info(`[questions] cancelQuestion requested qid=${questionId} by student=${uid}`);
     const qRef = firestore.collection("questions").doc(questionId);
     let alreadyInvited = [];
     await firestore.runTransaction(async (tx) => {
-        var _a;
+        var _a, _b;
         const snap = await tx.get(qRef);
         if (!snap.exists)
             throw new https_1.HttpsError("not-found", "Question not found");
         const data = snap.data();
+        firebase_functions_1.logger.info(`[questions] cancelQuestion tx-read qid=${questionId} status=${data.status} alreadyInvited=${((_a = data.alreadyInvited) !== null && _a !== void 0 ? _a : []).length}`);
         if (data.studentUid !== uid)
             throw new https_1.HttpsError("permission-denied", "Not your question");
         const cancellable = ["searching", "accepted"];
         if (!cancellable.includes(data.status)) {
             throw new https_1.HttpsError("failed-precondition", `Cannot cancel a question with status: ${data.status}`);
         }
-        alreadyInvited = (_a = data.alreadyInvited) !== null && _a !== void 0 ? _a : [];
+        alreadyInvited = (_b = data.alreadyInvited) !== null && _b !== void 0 ? _b : [];
         tx.update(qRef, {
             status: "cancelled",
             endedBy: "student",
@@ -89,13 +107,14 @@ exports.cancelQuestion = (0, https_1.onCall)(async (req) => {
 // FR-B-004: atomic Firestore transaction guarantees exactly one teacher wins.
 // Returns Agora token for the teacher; pushes token to student via FCM.
 exports.acceptInvite = (0, https_1.onCall)(async (req) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     const teacherUid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
     if (!teacherUid)
         throw new https_1.HttpsError("unauthenticated", "Sign in required");
     const { questionId } = req.data;
     if (!questionId)
         throw new https_1.HttpsError("invalid-argument", "questionId required");
+    firebase_functions_1.logger.info(`[questions] acceptInvite requested qid=${questionId} by teacher=${teacherUid}`);
     const qRef = firestore.collection("questions").doc(questionId);
     const inviteRef = qRef.collection("invites").doc(teacherUid);
     let studentUid = "";
@@ -108,6 +127,7 @@ exports.acceptInvite = (0, https_1.onCall)(async (req) => {
             throw new https_1.HttpsError("not-found", "Invite not found");
         const q = qSnap.data();
         const inv = invSnap.data();
+        firebase_functions_1.logger.info(`[questions] acceptInvite tx-read qid=${questionId} questionStatus=${q.status} inviteResponse=${inv.response} inviteWave=${inv.wave}`);
         // FR-B-004: fail only if someone else already claimed it.
         // "unanswered" means all waves timed out but no one accepted — a teacher with
         // a still-valid invite (INVITE_EXPIRY_SECONDS > WAVE_TIMEOUT_SECONDS * waves)
@@ -137,35 +157,65 @@ exports.acceptInvite = (0, https_1.onCall)(async (req) => {
         });
         tx.update(inviteRef, { response: "accept" });
     });
+    await upsertLiveQuestion(questionId, {
+        studentUid,
+        teacherUid,
+        teacherId: teacherUid,
+        teachedId: teacherUid,
+        acceptedByTeacher: teacherUid,
+        acceptedAt: Date.now(),
+    }, "accepted", "acceptInvite");
     // Mint LiveKit tokens for both parties
     const channelName = `lesson_${questionId}`;
     const [teacherToken, studentToken] = await Promise.all([
         (0, agora_1.mintLiveKitToken)(channelName, teacherUid),
         (0, agora_1.mintLiveKitToken)(channelName, studentUid),
     ]);
-    // Push the student's token to them via FCM
-    const [teacherRecord, studentFcmToken] = await Promise.all([
+    // Snapshot both participants' name+image so lesson history can render without
+    // cross-user reads (Firestore rules block students from reading teacher docs
+    // and vice versa). These fields are frozen at accept-time on purpose.
+    const [teacherRecord, studentFcmToken, teacherUserSnap, studentUserSnap] = await Promise.all([
         db.ref(`teachers/${teacherUid}`).once("value").then((s) => s.val()),
         db.ref(`users/${studentUid}/fcmToken`).once("value").then((s) => s.val()),
+        firestore.collection("users").doc(teacherUid).get(),
+        firestore.collection("users").doc(studentUid).get(),
     ]);
+    const teacherUser = (_b = teacherUserSnap.data()) !== null && _b !== void 0 ? _b : {};
+    const studentUser = (_c = studentUserSnap.data()) !== null && _c !== void 0 ? _c : {};
+    const pickImage = (u) => {
+        var _a, _b, _c;
+        return (_c = (_b = (_a = u.profileImageURL) !== null && _a !== void 0 ? _a : u.profilePhotoURL) !== null && _b !== void 0 ? _b : u.photoURL) !== null && _c !== void 0 ? _c : "";
+    };
     if (studentFcmToken) {
         await (0, fcm_1.sendAcceptedPush)({
             fcmToken: studentFcmToken,
-            teacherName: (_b = teacherRecord === null || teacherRecord === void 0 ? void 0 : teacherRecord.displayName) !== null && _b !== void 0 ? _b : "Your teacher",
+            teacherName: (_d = teacherRecord === null || teacherRecord === void 0 ? void 0 : teacherRecord.displayName) !== null && _d !== void 0 ? _d : "Your teacher",
             questionId,
             agoraChannel: channelName,
             agoraToken: studentToken.token,
             agoraUid: 0,
         });
     }
-    // Store the LiveKit room name on the question for startLesson to use
+    // Store the LiveKit room name + name/image snapshots on the question doc.
     await qRef.update({
         agoraChannel: channelName,
+        teacherName: (_e = teacherUser.fullName) !== null && _e !== void 0 ? _e : "",
+        teacherImageURL: pickImage(teacherUser),
+        studentName: (_f = studentUser.fullName) !== null && _f !== void 0 ? _f : "",
+        studentImageURL: pickImage(studentUser),
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
     });
+    await upsertLiveQuestion(questionId, {
+        agoraChannel: channelName,
+        teacherName: (_g = teacherUser.fullName) !== null && _g !== void 0 ? _g : "",
+        teacherImageURL: pickImage(teacherUser),
+        studentName: (_h = studentUser.fullName) !== null && _h !== void 0 ? _h : "",
+        studentImageURL: pickImage(studentUser),
+    }, "accepted", "acceptInvite-profile-sync");
     // Clear RTDB invite signals for ALL teachers who were invited — question is taken
     const qSnap = await qRef.get();
-    const alreadyInvited = (_c = qSnap.data().alreadyInvited) !== null && _c !== void 0 ? _c : [];
+    const alreadyInvited = (_j = qSnap.data().alreadyInvited) !== null && _j !== void 0 ? _j : [];
+    firebase_functions_1.logger.info(`[questions] acceptInvite clearing teacher RTDB invites qid=${questionId} invitedCount=${alreadyInvited.length}`);
     await Promise.all(alreadyInvited.map((uid) => db.ref(`teacherInvites/${uid}/${questionId}`).remove()));
     firebase_functions_1.logger.info(`[questions] accepted qid=${questionId} teacher=${teacherUid}`);
     return {
@@ -191,6 +241,7 @@ exports.getQuestionStatus = (0, https_1.onCall)(async (req) => {
     const q = qSnap.data();
     if (q.studentUid !== uid)
         throw new https_1.HttpsError("permission-denied", "Not your question");
+    firebase_functions_1.logger.info(`[questions] getQuestionStatus qid=${questionId} student=${uid} status=${q.status}`);
     if (q.status === "accepted" || q.status === "in_progress") {
         const roomName = `lesson_${questionId}`;
         const token = await (0, agora_1.mintLiveKitToken)(roomName, uid);
@@ -209,6 +260,7 @@ exports.declineInvite = (0, https_1.onCall)(async (req) => {
     const { questionId } = req.data;
     if (!questionId)
         throw new https_1.HttpsError("invalid-argument", "questionId required");
+    firebase_functions_1.logger.info(`[questions] declineInvite requested qid=${questionId} by teacher=${teacherUid}`);
     const inviteRef = firestore
         .collection("questions")
         .doc(questionId)

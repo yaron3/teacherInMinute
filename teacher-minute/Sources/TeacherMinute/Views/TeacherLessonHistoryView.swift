@@ -54,7 +54,7 @@ struct TeacherLessonHistoryView: View {
                             iconName: "person.fill.checkmark",
                             isLoading: viewModel.isLoading(lesson)
                         ) {
-                            Task { await viewModel.view(lesson) }
+                            viewModel.view(lesson)
                         }
                     }
                 }
@@ -67,14 +67,16 @@ struct TeacherLessonHistoryView: View {
         .task {
             await viewModel.loadProfile()
         }
-        .sheet(item: $viewModel.selectedLesson) { lesson in
-            LessonDetailView(
-                lesson: lesson,
-                amountLabel: "Earnings",
-                isPlaying: viewModel.isPlaying(lesson),
-                initialDetails: viewModel.selectedLessonDetails,
-                audioAction: { viewModel.toggleAudio(for: lesson) }
-            )
+        .sheet(isPresented: $viewModel.isLessonSheetPresented) {
+            if let lesson = viewModel.selectedLesson {
+                LessonDetailView(
+                    lesson: lesson,
+                    amountLabel: "Earnings",
+                    isPlaying: viewModel.isPlaying(lesson),
+                    initialDetails: viewModel.selectedLessonDetails,
+                    audioAction: { viewModel.toggleAudio(for: lesson) }
+                )
+            }
         }
     }
     

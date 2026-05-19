@@ -73,6 +73,7 @@ final class UserService {
       return messages.contains { !$0.isRead }
     } catch {
       logger.error("[UserService] failed checking unread messages: \(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "UserService.hasUnreadMessages")
       return false
     }
   }
