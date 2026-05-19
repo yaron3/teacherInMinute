@@ -253,8 +253,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     logger.info("[PaymentReturn] handling result status=\(String(describing: result.status)) rawURL=\(result.rawURL.absoluteString)")
     isAwaitingPaymentReturn = false
     if case .success = result.status, let uid = Auth.auth().currentUser?.uid {
-      await loadRecentLessons(uid: uid)
-      await refreshRemainingMinutes(uid: uid)
+      _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
       logger.info("[PaymentReturn] success handled; refreshed lessons and remaining minutes")
     }
   }
@@ -266,17 +265,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     guard let uid = Auth.auth().currentUser?.uid else { return false }
 
     let startingMinutes = checkoutStartedRemainingMinutes
-    for attempt in 1...6 {
-      await refreshRemainingMinutes(uid: uid)
-      logger.info("[PaymentReturn] balance refresh attempt=\(attempt) startingMinutes=\(startingMinutes) currentMinutes=\(self.remainingMinutes)")
-      if self.remainingMinutes > startingMinutes {
-        await loadRecentLessons(uid: uid)
-        logger.info("[PaymentReturn] balance increased after checkout return without deep link")
-        return true
-      }
-      try? await Task.sleep(nanoseconds: 2_000_000_000)
-    }
-    return false
+    return await refreshAfterPurchase(uid: uid, startingMinutes: startingMinutes)
   }
 
   func viewAllLessons() {}
@@ -288,7 +277,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
-      remainingMinutes = profile.remainingMinutes
     }
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
@@ -296,13 +284,20 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func refreshAfterLessonEnded() async {
     guard let uid = Auth.auth().currentUser?.uid else { return }
-    await refreshRemainingMinutes(uid: uid)
+    await loadRecentLessons(uid: uid)
   }
 
-  private func refreshRemainingMinutes(uid: String) async {
-    if let data = try? await UserService.shared.fetchRaw(uid: uid) {
-      remainingMinutes = data["remainingMinutes"] as? Int ?? 0
+  private func refreshAfterPurchase(uid: String, startingMinutes: Int) async -> Bool {
+    for attempt in 1...8 {
+      await loadRecentLessons(uid: uid)
+      logger.info("[PaymentReturn] balance refresh attempt=\(attempt) startingMinutes=\(startingMinutes) currentMinutes=\(self.remainingMinutes)")
+      if remainingMinutes > startingMinutes {
+        logger.info("[PaymentReturn] balance increased after checkout")
+        return true
+      }
+      try? await Task.sleep(nanoseconds: 2_000_000_000)
     }
+    return false
   }
 
   func refreshUnreadMessages() async {
@@ -328,6 +323,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       lessonCount = allLessons.count
       totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: allLessons)
       totalPurchasedText = LessonFormatting.minutesText(totalPurchasedMinutes)
+      remainingMinutes = max(0, totalPurchasedMinutes - Self.totalUsedMinutes(lessons: allLessons))
       let recent = Array(allLessons.prefix(3))
       if !recent.isEmpty {
         recentLessons = recent.map(Self.recentLesson)
@@ -421,6 +417,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       || status == "matched"
       || status == "connected"
       || status == "active"
+  }
+
+  private static func totalUsedMinutes(lessons: [HistoryLesson]) -> Int {
+    let totalSeconds = lessons.reduce(0) { $0 + $1.durationSeconds }
+    guard totalSeconds > 0 else { return 0 }
+    return Int(ceil(Double(totalSeconds) / 60.0))
   }
 
   private static func recentLesson(_ lesson: HistoryLesson) -> RecentLesson {

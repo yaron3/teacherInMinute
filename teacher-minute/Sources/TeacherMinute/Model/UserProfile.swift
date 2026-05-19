@@ -74,8 +74,17 @@ struct UserProfileSummary {
 	  self.createdAt = nil
 	}
 
-	self.remainingMinutes = data["remainingMinutes"] as? Int ?? 0
-	self.totalMinutes = data["totalMinutes"] as? Int ?? 0
+	self.remainingMinutes = Self.intValue(data["remainingMinutes"]) ?? 0
+	self.totalMinutes = Self.intValue(data["totalMinutes"]) ?? 0
+  }
+
+  private static func intValue(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? Int64 { return Int(value) }
+    if let value = value as? NSNumber { return value.intValue }
+    if let value = value as? String { return Int(value) }
+    if let value = value as? Double { return Int(value) }
+    return nil
   }
   
   var displayName: String {

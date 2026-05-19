@@ -8,6 +8,10 @@ struct ChatSessionView: View {
   @State var errorMessage: String?
   @State var isConnecting: Bool
   @State var selectedTab = "chat"
+  @State var hasUnreadChat = false
+  @State var hasUnreadBoard = false
+  @State var didPrimeMessages = false
+  @State var didPrimeBoard = false
   @State var displayDate = Date()
   @State var sessionDetailsRevision = 0
   @FocusState var isMessageFieldFocused: Bool
@@ -53,10 +57,26 @@ struct ChatSessionView: View {
     .background(Color(.systemBackground))
     .task {
       viewModel.onMessagesUpdated = { rows in
+        let oldCount = messages.count
+        if didPrimeMessages,
+           selectedTab != "chat",
+           rows.count > oldCount,
+           rows.suffix(rows.count - oldCount).contains(where: { !$0.isMine }) {
+          hasUnreadChat = true
+        }
         messages = rows
+        didPrimeMessages = true
       }
       viewModel.onBoardStrokesUpdated = { strokes in
+        let oldCount = boardStrokes.count
+        if didPrimeBoard,
+           selectedTab != "photos",
+           strokes.count > oldCount,
+           strokes.suffix(strokes.count - oldCount).contains(where: { !$0.isMine }) {
+          hasUnreadBoard = true
+        }
         boardStrokes = strokes
+        didPrimeBoard = true
       }
       viewModel.onErrorUpdated = { error in
         errorMessage = error
@@ -73,6 +93,8 @@ struct ChatSessionView: View {
       }
       messages = viewModel.messages
       boardStrokes = viewModel.boardStrokes
+      didPrimeMessages = true
+      didPrimeBoard = true
       errorMessage = viewModel.errorMessage
       isConnecting = viewModel.isConnecting
       viewModel.start()
@@ -300,8 +322,8 @@ struct ChatSessionView: View {
 
   var sessionTabs: some View {
     HStack(spacing: 0) {
-      tabButton(id: "chat", title: "Chat", icon: "bubble.left.fill")
-      tabButton(id: "photos", title: "Photos", icon: "photo.fill")
+      tabButton(id: "chat", title: "Chat", icon: "bubble.left.fill", showsBadge: hasUnreadChat)
+      tabButton(id: "photos", title: "Photos", icon: "photo.fill", showsBadge: hasUnreadBoard)
     }
     .frame(height: 40)
     .background(theme.appCardBackground)
@@ -310,22 +332,34 @@ struct ChatSessionView: View {
     }
   }
 
-  func tabButton(id: String, title: String, icon: String) -> some View {
+  func tabButton(id: String, title: String, icon: String, showsBadge: Bool) -> some View {
     Button {
       if id == "photos" {
         isMessageFieldFocused = false
+        hasUnreadBoard = false
+      } else {
+        isMessageFieldFocused = true
+        hasUnreadChat = false
       }
       selectedTab = id
     } label: {
       VStack(spacing: 8) {
         HStack(spacing: 6) {
-          PlatformIcon(
-            systemName: icon,
-            size: 12,
-            weight: .semibold,
-            color: selectedTab == id ? theme.appPink : theme.appSecondaryText
-          )
-          Text(title)
+          ZStack(alignment: .topTrailing) {
+            PlatformIcon(
+              systemName: icon,
+              size: 12,
+              weight: .semibold,
+              color: selectedTab == id ? theme.appPink : theme.appSecondaryText
+            )
+            if showsBadge {
+              Circle()
+                .fill(theme.red)
+                .frame(width: 7, height: 7)
+                .offset(x: 4, y: -4)
+            }
+          }
+          Text(LocalizationSupport.localized(title))
             .font(.system(size: 12, weight: .bold))
             .foregroundStyle(selectedTab == id ? theme.appPink : theme.appSecondaryText)
         }

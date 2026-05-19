@@ -37,7 +37,7 @@ struct WhiteboardView: View {
 
       GeometryReader { proxy in
         ZStack {
-          theme.white
+          theme.appCardBackground
 
           if visibleStrokes.isEmpty {
             VStack(spacing: 8) {
@@ -61,6 +61,7 @@ struct WhiteboardView: View {
           }
         }
         .id(revision)
+        .environment(\.layoutDirection, .leftToRight)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
           RoundedRectangle(cornerRadius: 14, style: .continuous)
