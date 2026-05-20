@@ -83,9 +83,8 @@ final class FunctionsService {
   static let shared = FunctionsService()
   private init() {}
 
-  // Cloud Functions base URL — us-central1 is the default deploy region.
-  // Change if you deployed to a different region.
-  private let baseURL = "https://us-central1-teacher-in-a-moment.cloudfunctions.net"
+  private let baseURLKey = "baseURL"
+  private let defaultBaseURL = "https://us-central1-teacher-in-a-moment.cloudfunctions.net"
 
   // MARK: - Student callables
 
@@ -179,6 +178,7 @@ final class FunctionsService {
   private func call(function name: String, data: [String: Any]) async throws -> [String: Any] {
     let responseData: Data
     let statusCode: Int?
+    let baseURL = await functionsBaseURL()
 
 #if os(Android)
     print("TeacherMinute FunctionsService calling \(name) data=\(data)")
@@ -188,7 +188,7 @@ final class FunctionsService {
     }
     let responseString = try await Task.detached(priority: .userInitiated) {
       try AndroidFunctionsBridge.callFunction(
-        baseURL: self.baseURL,
+        baseURL: baseURL,
         name: name,
         payloadJSON: payload
       )
@@ -237,6 +237,11 @@ final class FunctionsService {
 
     logger.info("[FunctionsService] \(name) result=\(result)")
     return result
+  }
+
+  private func functionsBaseURL() async -> String {
+    await RemoteConfigService.shared.ready()
+    return RemoteConfigService.shared.getURL(baseURLKey)?.absoluteString ?? defaultBaseURL
   }
 
   private static func firstString(in dict: [String: Any], keys: [String]) -> String? {

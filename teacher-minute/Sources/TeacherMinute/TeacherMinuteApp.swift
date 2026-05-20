@@ -32,47 +32,47 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   }
   
       public var body: some View {
-		@Bindable var router = router
-		Group {
-		  switch router.rootScreen {
-			case .mainTabs(let role):
-			  MainTabView(userMode: AppUserMode(role: role))
-			case .welcome:
-			  NavigationStack(path: $router.path) {
-				WelcomeView()
-				  .trackScreen(AnalyticsScreen.welcome)
-				  .navigationDestination(for: AppRoute.self) { route in
-					switch route {
-					  case .createAccount:
-						CreateAccountView()
-						  .trackScreen(AnalyticsScreen.createAccount)
-					  case .login:
-						LoginView()
-						  .trackScreen(AnalyticsScreen.login)
-					  case .chooseRole:
-						ChooseRoleView()
-						  .trackScreen(AnalyticsScreen.chooseRole)
-					  case .teacherIdentityVerification:
-						TeacherIdentityVerificationView()
-						  .trackScreen(AnalyticsScreen.teacherIdentity)
-					  case .teacherSubjects:
-						TeacherSubjectsView()
-						  .trackScreen(AnalyticsScreen.teacherSubjects)
-					  case .completeProfile(let role):
-						CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
-						  .trackScreen(AnalyticsScreen.completeProfile)
-					  case .studentHome:
-						StudentHomeView()
-						  .trackScreen(AnalyticsScreen.studentHome)
-					  case .teacherDashboard:
-						TeacherDashboardView()
-						  .trackScreen(AnalyticsScreen.teacherDashboard)
-					}
+			@Bindable var router = router
+			Group {
+			  switch router.rootScreen {
+				case .mainTabs(let role):
+				  MainTabView(userMode: AppUserMode(role: role))
+				case .welcome:
+				  NavigationStack(path: $router.path) {
+					WelcomeView()
+					  .trackScreen(AnalyticsScreen.welcome)
+					  .navigationDestination(for: AppRoute.self) { route in
+						switch route {
+						  case .createAccount:
+							CreateAccountView()
+							  .trackScreen(AnalyticsScreen.createAccount)
+						  case .login:
+							LoginView()
+							  .trackScreen(AnalyticsScreen.login)
+						  case .chooseRole:
+							ChooseRoleView()
+							  .trackScreen(AnalyticsScreen.chooseRole)
+						  case .teacherIdentityVerification:
+							TeacherIdentityVerificationView()
+							  .trackScreen(AnalyticsScreen.teacherIdentity)
+						  case .teacherSubjects:
+							TeacherSubjectsView()
+							  .trackScreen(AnalyticsScreen.teacherSubjects)
+						  case .completeProfile(let role):
+							CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
+							  .trackScreen(AnalyticsScreen.completeProfile)
+						  case .studentHome:
+							StudentHomeView()
+							  .trackScreen(AnalyticsScreen.studentHome)
+						  case .teacherDashboard:
+							TeacherDashboardView()
+							  .trackScreen(AnalyticsScreen.teacherDashboard)
+						}
+					  }
 				  }
 			  }
-		  }
-			}
-			.environment(\.appRouter, router)
+				}
+				.environment(\.appRouter, router)
             .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
             .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
             .preferredColorScheme(preferredAppearanceColorScheme)
@@ -87,9 +87,9 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
               logger.info("[PaymentReturn] root onOpenURL received \(url.absoluteString)")
               PaymentReturnStore.shared.handle(url: url)
             }
-				.task {
-		  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
-		}
+					.task {
+			  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
+			}
   }
 }
 
@@ -102,35 +102,36 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   private init() {
   }
   /* SKIP @bridge */@MainActor public func onInit() {
-		logger.debug("onInit")
-		if FirebaseApp.app() == nil {
-		  FirebaseApp.configure()
-		  logger.info("Firebase configured")
-		  AnalyticsService.shared.start()
-		}
-	  }
+			logger.debug("onInit")
+			if FirebaseApp.app() == nil {
+			  FirebaseApp.configure()
+			  logger.info("Firebase configured")
+			  AnalyticsService.shared.start()
+			}
+			RemoteConfigService.shared.start()
+		  }
   
   /* SKIP @bridge */public func onLaunch() {
-	logger.debug("onLaunch")
+		logger.debug("onLaunch")
   }
   
   /* SKIP @bridge */public func onResume() {
-	logger.debug("onResume")
+		logger.debug("onResume")
   }
   
   /* SKIP @bridge */public func onPause() {
-	logger.debug("onPause")
+		logger.debug("onPause")
   }
   
   /* SKIP @bridge */public func onStop() {
-	logger.debug("onStop")
+		logger.debug("onStop")
   }
   
   /* SKIP @bridge */public func onDestroy() {
-	logger.debug("onDestroy")
+		logger.debug("onDestroy")
   }
   
   /* SKIP @bridge */public func onLowMemory() {
-	logger.debug("onLowMemory")
+		logger.debug("onLowMemory")
   }
 }

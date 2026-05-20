@@ -7,12 +7,6 @@
 
 import Foundation
 
-#if !os(Android)
-import FirebaseRemoteConfig
-#else
-import SkipFirebaseRemoteConfig
-#endif
-
 struct RemoteTeachingSubject {
     let title: String
     let subtopics: [String]
@@ -28,11 +22,9 @@ final class SettingsRemoteConfigService {
         static let eulaURL = "eula_url"
         static let privacyPolicyURL = "privacy_policy"
         static let subjects = "subjects"
-        static let baseURL = "baseURL"
         static let defaultCommission = "default_commission"
     }
     
-    private let defaultBaseURL = "https://us-central1-teacher-in-a-moment.cloudfunctions.net"
     private let defaultSupportEmail = "support@tim.app"
     private let defaultTeacherCommission = 0.25
     
@@ -55,68 +47,26 @@ final class SettingsRemoteConfigService {
     }
     
     func fetchSupportEmail() async -> String {
-        let remoteConfig = RemoteConfig.remoteConfig()
-        let settings = RemoteConfigSettings()
-        settings.minimumFetchInterval = 3600
-        settings.fetchTimeout = 15
-        remoteConfig.configSettings = settings
-        
-        _ = try? await remoteConfig.fetchAndActivate()
-        let rawValue = remoteConfig
-            .configValue(forKey: Key.supportEmail)
-            .stringValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        await RemoteConfigService.shared.ready()
+        let rawValue = RemoteConfigService.shared.getString(Key.supportEmail)
         return rawValue.isEmpty ? defaultSupportEmail : rawValue
     }
     
     func fetchTeachingSubjects() async throws -> [RemoteTeachingSubject] {
-        let remoteConfig = RemoteConfig.remoteConfig()
-        let settings = RemoteConfigSettings()
-        settings.minimumFetchInterval = 3600
-        settings.fetchTimeout = 15
-        remoteConfig.configSettings = settings
-        
-        _ = try await remoteConfig.fetchAndActivate()
-        
-        let subjects = stringArray(from: remoteConfig.configValue(forKey: Key.subjects))
+        await RemoteConfigService.shared.ready()
+        let subjects = RemoteConfigService.shared.getStringArray(Key.subjects)
         return subjects.map { subject in
             RemoteTeachingSubject(
                 title: subject,
-                subtopics: stringArray(from: remoteConfig.configValue(forKey: subtopicKey(for: subject)))
+                subtopics: RemoteConfigService.shared.getStringArray(subtopicKey(for: subject))
             )
         }
     }
     
-    func fetchBaseURL() async -> URL {
-        let remoteConfig = RemoteConfig.remoteConfig()
-        let settings = RemoteConfigSettings()
-        settings.minimumFetchInterval = 3600
-        settings.fetchTimeout = 15
-        remoteConfig.configSettings = settings
-        
-        _ = try? await remoteConfig.fetchAndActivate()
-        
-        let rawValue = remoteConfig
-            .configValue(forKey: Key.baseURL)
-            .stringValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let urlString = rawValue.isEmpty ? defaultBaseURL : rawValue
-        return URL(string: urlString) ?? URL(string: defaultBaseURL)!
-    }
-    
     func fetchDefaultCommission() async -> Double {
-        let remoteConfig = RemoteConfig.remoteConfig()
-        let settings = RemoteConfigSettings()
-        settings.minimumFetchInterval = 3600
-        settings.fetchTimeout = 15
-        remoteConfig.configSettings = settings
-        
-        _ = try? await remoteConfig.fetchAndActivate()
-        let rawValue = remoteConfig
-            .configValue(forKey: Key.defaultCommission)
-            .stringValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let commission = Double(rawValue) else {
+        await RemoteConfigService.shared.ready()
+        let commission = RemoteConfigService.shared.getNumber(Key.defaultCommission)
+        guard commission > 0 else {
             return defaultTeacherCommission
         }
         
@@ -124,19 +74,8 @@ final class SettingsRemoteConfigService {
     }
     
     private func fetchURL(forKey key: String, missingError: SettingsError) async throws -> URL {
-        let remoteConfig = RemoteConfig.remoteConfig()
-        let settings = RemoteConfigSettings()
-        settings.minimumFetchInterval = 3600
-        settings.fetchTimeout = 15
-        remoteConfig.configSettings = settings
-        
-        _ = try await remoteConfig.fetchAndActivate()
-        let rawValue = remoteConfig
-            .configValue(forKey: key)
-            .stringValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard let url = URL(string: rawValue), url.scheme != nil else {
+        await RemoteConfigService.shared.ready()
+        guard let url = RemoteConfigService.shared.getURL(key) else {
             throw missingError
         }
         
@@ -147,20 +86,6 @@ final class SettingsRemoteConfigService {
         let normalizedSubject = subject
             .filter { $0.isLetter || $0.isNumber }
         return "subTask\(normalizedSubject)"
-    }
-    
-    private func stringArray(from value: RemoteConfigValue) -> [String] {
-        if let array = value.jsonValue as? [String] {
-            return array
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-        }
-        
-        return value.stringValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(separator: ",")
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
     }
 }
 
