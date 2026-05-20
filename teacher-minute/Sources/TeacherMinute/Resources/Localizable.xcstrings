@@ -3287,6 +3287,17 @@
         }
       }
     },
+    "Phone Number" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מספר טלפון"
+          }
+        }
+      }
+    },
     "Physics" : {
       "extractionState" : "manual",
       "localizations" : {

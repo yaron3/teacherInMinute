@@ -42,8 +42,8 @@ struct CompleteProfileView: View {
 	  .padding(.top, 28)
 
 	  AuthInputField(
-		title: LocalizationSupport.localized("place holder phone number"),
-		placeholder: LocalizationSupport.localized("+972 (52) 000-0000"),
+		title: LocalizationSupport.localized("Phone Number"),
+		placeholder: LocalizationSupport.localized("place holder phone number"),
 		systemImage: "phone",
 		text: $viewModel.phoneNumber,
 		keyboardType: .phonePad,
