@@ -11,6 +11,11 @@ import FirebaseRemoteConfig
 import SkipFirebaseRemoteConfig
 #endif
 
+enum RemoteConfigKey: String {
+    case eulaURL = "eula_url"
+    case privacyPolicyURL = "privacy_policy"
+}
+
 @MainActor
 final class RemoteConfigService {
     static let shared = RemoteConfigService()
@@ -48,6 +53,15 @@ final class RemoteConfigService {
     }
 
     // MARK: - Sync accessors
+
+    static func getLocalizedString(for key: RemoteConfigKey) -> String {
+        shared.getLocalizedString(key.rawValue)
+    }
+
+    func getLocalizedString(_ key: String) -> String {
+        let localizedKey = "\(key)_\(LocalizationSupport.currentLanguageCode)"
+        return getString(localizedKey)
+    }
 
     func getString(_ key: String) -> String {
         RemoteConfig.remoteConfig()

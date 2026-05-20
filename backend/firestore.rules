@@ -70,6 +70,40 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /contactRequests/{requestId} {
+      allow create: if isAuth()
+        && request.resource.data.id == requestId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'title',
+          'description',
+          'userId',
+          'userName',
+          'userEmail',
+          'sentAt',
+          'deviceType',
+          'osVersion',
+          'locale',
+          'role'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 50
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 1024
+        && request.resource.data.userName is string
+        && request.resource.data.userEmail is string
+        && request.resource.data.sentAt is string
+        && request.resource.data.deviceType is string
+        && request.resource.data.osVersion is string
+        && request.resource.data.locale is string
+        && request.resource.data.role in ['student', 'teacher'];
+
+      allow read, update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

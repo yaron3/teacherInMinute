@@ -47,12 +47,12 @@ struct PermissionsSetupView: View {
                     .offset(x: 12, y: 8)
             }
 
-            Text("Connect & Learn")
+            Text(LocalizationSupport.localized("Connect & Learn"))
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(theme.authPrimaryText)
                 .padding(.top, 34)
 
-            Text("To give you the best math tutoring\nexperience, we need a couple of\npermissions to connect you instantly.")
+            Text(LocalizationSupport.localized("To give you the best math tutoring\nexperience, we need a couple of\npermissions to connect you instantly."))
                 .font(.system(size: 14))
                 .foregroundStyle(theme.authSecondaryText)
                 .lineSpacing(6)
@@ -98,7 +98,7 @@ struct PermissionsSetupView: View {
             Button {
                 viewModel.limitedMode()
             } label: {
-                Text("Not now, use limited mode")
+                Text(LocalizationSupport.localized("Not now, use limited mode"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.authSecondaryText)
                     .frame(maxWidth: .infinity)

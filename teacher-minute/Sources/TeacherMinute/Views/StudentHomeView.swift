@@ -86,7 +86,7 @@ struct StudentHomeView: View {
                                     size: 16,
                                     color: theme.appSecondaryText
                                 )
-                                Text("No lessons yet. Ask a teacher to get started!")
+                                Text(LocalizationSupport.localized("No lessons yet. Ask a teacher to get started!"))
                                     .font(.system(size: 13))
                                     .foregroundStyle(theme.appSecondaryText)
                             }
@@ -286,7 +286,7 @@ struct StudentHomeView: View {
 
                     Spacer()
 
-                    Text("Ask a math teacher")
+                    Text(LocalizationSupport.localized("Ask a math teacher"))
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
 
@@ -297,7 +297,7 @@ struct StudentHomeView: View {
                         Text("•")
                             .font(.system(size: 13))
                             .foregroundStyle(theme.appGrayBackground.opacity(0.6))
-                        Text("Per-minute billing")
+                        Text(LocalizationSupport.localized("Per-minute billing"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(theme.appGrayBackground.opacity(0.9))
                     }
@@ -340,7 +340,7 @@ struct StudentHomeView: View {
                     }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Tips for faster matches")
+                    Text(LocalizationSupport.localized("Tips for faster matches"))
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
 
@@ -441,17 +441,17 @@ struct SearchingOverlay: View {
                 avatarRing
 
                 VStack(spacing: 8) {
-                    Text("Searching for a teacher\u{2026}")
+                    Text(LocalizationSupport.localized("Searching for a teacher\u{2026}"))
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(theme.appPrimaryText)
-                    Text("This usually takes under 30 seconds.")
+                    Text(LocalizationSupport.localized("This usually takes under 30 seconds."))
                         .font(.system(size: 13))
                         .foregroundStyle(theme.appSecondaryText)
                         .multilineTextAlignment(.center)
                 }
 
                 Button(action: onCancel) {
-                    Text("Cancel")
+                    Text(LocalizationSupport.localized("Cancel"))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(theme.appPrimaryText)
                         .padding(.horizontal, 32)
@@ -571,7 +571,7 @@ struct MatchedOverlay: View {
                         )
                     }
 
-                Text("Teacher Found!")
+                Text(LocalizationSupport.localized("Teacher Found!"))
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(theme.appPrimaryText)
 
@@ -581,7 +581,7 @@ struct MatchedOverlay: View {
                     .multilineTextAlignment(.center)
 
                 Button(action: onDismiss) {
-                    Text("Done")
+                    Text(LocalizationSupport.localized("Done"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
@@ -619,17 +619,17 @@ struct NoMatchOverlay: View {
                         )
                     }
 
-                Text("No Teachers Available")
+                Text(LocalizationSupport.localized("No Teachers Available"))
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(theme.appPrimaryText)
 
-                Text("All teachers are busy right now.\nTry again in a few minutes.")
+                Text(LocalizationSupport.localized("All teachers are busy right now.\nTry again in a few minutes."))
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.8))
                     .multilineTextAlignment(.center)
 
                 Button(action: onDismiss) {
-                    Text("OK")
+                    Text(LocalizationSupport.localized("OK"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
@@ -668,7 +668,7 @@ struct ErrorOverlay: View {
                         )
                     }
 
-                Text("Could Not Send Question")
+                Text(LocalizationSupport.localized("Could Not Send Question"))
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(theme.appPrimaryText)
 
@@ -678,7 +678,7 @@ struct ErrorOverlay: View {
                     .multilineTextAlignment(.center)
 
                 Button(action: onDismiss) {
-                    Text("OK")
+                    Text(LocalizationSupport.localized("OK"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
@@ -755,7 +755,7 @@ struct PricingCard: View {
                                 .tint(option.isHighlighted ? theme.appCardBackground : theme.appPrimaryText)
                         }
 
-                        Text(isLoading ? LocalizationSupport.localized("Connecting...") : LocalizationSupport.localized("Checkout"))
+                        Text(isLoading ? LocalizationSupport.localized("checkout_connecting") : LocalizationSupport.localized("Checkout"))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(option.isHighlighted ?theme.appCardBackground: theme.appPrimaryText)
                     }

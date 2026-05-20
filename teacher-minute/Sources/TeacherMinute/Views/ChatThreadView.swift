@@ -13,7 +13,7 @@ struct ChatThreadView: View {
       ScrollView(.vertical, showsIndicators: false) {
         LazyVStack(spacing: 8) {
           if messages.isEmpty {
-            Text("Start with a text explanation, then use the board below for the math work.")
+            Text(LocalizationSupport.localized("Start with a text explanation, then use the board below for the math work."))
               .font(.system(size: 13))
               .foregroundStyle(theme.appSecondaryText)
               .multilineTextAlignment(.center)

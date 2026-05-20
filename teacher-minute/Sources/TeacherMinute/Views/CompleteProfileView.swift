@@ -21,20 +21,20 @@ struct CompleteProfileView: View {
   
   var body: some View {
 	VStack(alignment: .leading, spacing: 0) {
-	  Text("Complete your profile")
+	  Text(LocalizationSupport.localized("Complete your profile"))
 		.font(.system(size: 26, weight: .bold))
 		.foregroundStyle(theme.authPrimaryText)
 		.padding(.top, 42)
 	  
-	  Text("Tell us a bit about yourself to get started with\nMath Connect.")
+	  Text(LocalizationSupport.localized("Tell us a bit about yourself to get started with\nMath Connect."))
 		.font(.system(size: 13))
 		.foregroundStyle(theme.authSecondaryText)
 		.lineSpacing(5)
 		.padding(.top, 10)
 	  
 	  AuthInputField(
-		title: "Full Name",
-		placeholder: "John Doe",
+		title: LocalizationSupport.localized("Full Name"),
+		placeholder: LocalizationSupport.localized("place holder name"),
 		systemImage: "person",
 		text: $viewModel.fullName,
 		textContentType: .name
@@ -42,8 +42,8 @@ struct CompleteProfileView: View {
 	  .padding(.top, 28)
 
 	  AuthInputField(
-		title: "Phone Number",
-		placeholder: "+1 (555) 000-0000",
+		title: LocalizationSupport.localized("place holder phone number"),
+		placeholder: LocalizationSupport.localized("+972 (52) 000-0000"),
 		systemImage: "phone",
 		text: $viewModel.phoneNumber,
 		keyboardType: .phonePad,
@@ -79,7 +79,7 @@ struct CompleteProfileView: View {
 	  }
 	  
 	  AuthPrimaryButton(
-		title: "Continue",
+		title: LocalizationSupport.localized("Continue"),
 		systemImage: "arrow.right",
 		isEnabled: viewModel.canContinue
 	  ) {
@@ -102,7 +102,7 @@ struct CompleteProfileView: View {
 		  theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
 		  VStack(spacing: 12) {
 			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.appPrimaryText)
-			Text("Loading your profile…")
+			Text(LocalizationSupport.localized("Loading your profile…"))
 			  .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.appPrimaryText)
 		  }
 		}
@@ -120,7 +120,7 @@ struct CompleteProfileView: View {
   
   var dobPicker: some View {
 	VStack(alignment: .leading, spacing: 10) {
-	  Text("Date of Birth")
+	  Text(LocalizationSupport.localized("Date of Birth"))
 		.font(.system(size: 13, weight: .semibold))
 		.foregroundStyle(theme.authPrimaryText)
 	  
@@ -147,7 +147,7 @@ struct CompleteProfileView: View {
   
   var gradePicker: some View {
 	VStack(alignment: .leading, spacing: 10) {
-	  Text("Your Grade")
+	  Text(LocalizationSupport.localized("Your Grade"))
 		.font(.system(size: 13, weight: .semibold))
 		.foregroundStyle(theme.authPrimaryText)
 	  
@@ -159,7 +159,7 @@ struct CompleteProfileView: View {
 		}
 	  } label: {
 		HStack {
-		  Text(viewModel.grade.isEmpty ? "Select" : viewModel.grade)
+		  Text(viewModel.grade.isEmpty ? LocalizationSupport.localized("Select") : viewModel.grade)
 			.font(.system(size: 15))
 			.foregroundStyle(viewModel.grade.isEmpty ? theme.authSecondaryText : theme.authPrimaryText)
 		  

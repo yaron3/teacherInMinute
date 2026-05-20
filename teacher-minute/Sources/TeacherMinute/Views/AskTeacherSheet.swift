@@ -13,9 +13,9 @@ struct AskTeacherSheet: View {
     let viewModel: any StudentHomeViewModeling
     @Binding var isPresented: Bool
 
-    static let topics = ["algebra", "geometry", "trigonometry", "calculus", "statistics", "arithmetic"]
+    static let topics = [LocalizationSupport.localized("Algebra"), LocalizationSupport.localized("Geometry"), LocalizationSupport.localized("Trigonometry"), LocalizationSupport.localized("Calculus"), LocalizationSupport.localized("Statistics"), LocalizationSupport.localized("Arithmetic")]
 
-    @State  var selectedTopic = "algebra"
+    @State  var selectedTopic = LocalizationSupport.localized("Algebra")
     @State  var questionText = ""
     @State  var conversationType = "text"
     @FocusState var isQuestionFocused: Bool

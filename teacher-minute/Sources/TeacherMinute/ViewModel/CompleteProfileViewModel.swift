@@ -31,7 +31,7 @@ final class CompleteProfileViewModel {
   var errorMessage: String?
   var onContinue: (() -> Void)?
   
-  let grades: [String] = (1...12).map { "Grade \($0)" } + ["College", "Adult Learner"]
+  let grades: [String] = (1...12).map { LocalizationSupport.localized("Grade \($0)") } + [LocalizationSupport.localized("College"), LocalizationSupport.localized("Adult Learner")]
   
   var canContinue: Bool {
 	let hasBaseProfile = !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&

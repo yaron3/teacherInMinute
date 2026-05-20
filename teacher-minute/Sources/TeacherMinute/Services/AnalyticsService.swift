@@ -65,11 +65,16 @@ enum AnalyticsEvent {
     static let purchasePending        = "purchase_pending"
 
     // Settings / misc
-    static let languageChanged   = "language_changed"
-    static let permissionRequest = "permission_request"
-    static let permissionGranted = "permission_granted"
-    static let permissionDenied  = "permission_denied"
-    static let notificationOpened = "notification_opened"
+    static let languageChanged        = "language_changed"
+    static let permissionRequest      = "permission_request"
+    static let permissionGranted      = "permission_granted"
+    static let permissionDenied       = "permission_denied"
+    static let notificationOpened     = "notification_opened"
+    static let contactSupportOpened   = "contact_support_opened"
+    static let contactSupportPreview  = "contact_support_preview"
+    static let contactSupportCancelled = "contact_support_cancelled"
+    static let contactSupportSubmitted = "contact_support_submitted"
+    static let contactSupportFailed    = "contact_support_failed"
 
     // Backend errors
     static let firestorePermissionDenied = "firestore_permission_denied"

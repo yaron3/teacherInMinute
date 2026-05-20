@@ -22,12 +22,12 @@ struct LoginView: View {
 	  
 	  ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 0) {
-//		Text("Welcome Back")
+//		Text(LocalizationSupport.localized("Welcome Back"))
 //		  .font(.system(size: 32, weight: .bold))
 //		  .foregroundStyle(theme.authPrimaryText)
 //		  .padding(.top, 28)
 		
-		Text("Log in to Math Connect to continue your\njourney.")
+		Text(LocalizationSupport.localized("Log in to Math Connect to continue your\njourney."))
 		  .font(.system(size: 16, weight: .regular))
 		  .foregroundStyle(theme.authSecondaryText)
 		  .lineSpacing(6)
@@ -63,7 +63,7 @@ struct LoginView: View {
 			.progressViewStyle(.circular)
 			.scaleEffect(1.8)
 			.tint(theme.appPrimaryText)
-		  Text("Signing in…")
+		  Text(LocalizationSupport.localized("Signing in…"))
 			.font(.system(size: 14, weight: .medium))
 			.foregroundStyle(theme.appPrimaryText)
 		}
@@ -92,7 +92,7 @@ struct LoginView: View {
 	VStack(alignment: .leading, spacing: 22) {
 	  // Email field
 	  VStack(alignment: .leading, spacing: 9) {
-		Text("Email")
+		Text(LocalizationSupport.localized("Email"))
 		  .font(.system(size: 14, weight: .semibold))
 		  .foregroundStyle(theme.authPrimaryText)
 		
@@ -124,7 +124,7 @@ struct LoginView: View {
 	  
 	  // Password field
 	  VStack(alignment: .leading, spacing: 9) {
-		Text("Password")
+		Text(LocalizationSupport.localized("Password"))
 		  .font(.system(size: 14, weight: .semibold))
 		  .foregroundStyle(theme.authPrimaryText)
 		
@@ -169,7 +169,7 @@ struct LoginView: View {
 	  Button {
 		viewModel.forgotPassword()
 	  } label: {
-		Text("Forgot Password?")
+		Text(LocalizationSupport.localized("Forgot Password?"))
 		  .font(.system(size: 14, weight: .medium))
 		  .foregroundStyle(theme.authPink)
 		  .frame(maxWidth: .infinity, alignment: .trailing)
@@ -214,7 +214,7 @@ struct LoginView: View {
 		.fill(theme.authDivider)
 		.frame(height: 1)
 	  
-	  Text("Or continue with")
+	  Text(LocalizationSupport.localized("Or continue with"))
 		.font(.system(size: 14, weight: .regular))
 		.foregroundStyle(theme.authSecondaryText)
 		.lineLimit(1)
@@ -254,13 +254,13 @@ struct LoginView: View {
   
   var bottomSignUp: some View {
 	HStack(spacing: 4) {
-	  Text("Don't have an account?")
+	  Text(LocalizationSupport.localized("Don't have an account?"))
 		.foregroundStyle(theme.authSecondaryText)
 	  
 	  Button {
 		router.push(.createAccount)
 	  } label: {
-		Text("Sign Up")
+		Text(LocalizationSupport.localized("Sign Up"))
 		  .fontWeight(.semibold)
 		  .foregroundStyle(theme.authPink)
 	  }

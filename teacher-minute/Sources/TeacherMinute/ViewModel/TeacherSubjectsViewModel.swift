@@ -37,33 +37,34 @@ final class TeacherSubjectsViewModel {
   private let fallbackSubjectAreas: [TeachingSubjectArea] = [
 	TeachingSubjectArea(
 	  id: "math",
-	  title: "Math",
+	  title: LocalizationSupport.localized("Math"),
 	  systemImage: "function",
+	  // TODO: next version read this data from remoteconfig
 	  subtopics: [
-		SubjectOption(title: "General Math", systemImage: "function"),
-		SubjectOption(title: "Algebra", systemImage: "x.squareroot"),
-		SubjectOption(title: "Geometry", systemImage: "triangle"),
-		SubjectOption(title: "Calculus", systemImage: "chart.xyaxis.line"),
-		SubjectOption(title: "Statistics", systemImage: "chart.pie"),
-		SubjectOption(title: "Trigonometry", systemImage: "angle")
+		SubjectOption(title: LocalizationSupport.localized("General Math"), systemImage: "function"),
+		SubjectOption(title: LocalizationSupport.localized("Algebra"), systemImage: "x.squareroot"),
+		SubjectOption(title: LocalizationSupport.localized("Geometry"), systemImage: "triangle"),
+		SubjectOption(title: LocalizationSupport.localized("Calculus"), systemImage: "chart.xyaxis.line"),
+		SubjectOption(title: LocalizationSupport.localized("Statistics"), systemImage: "chart.pie"),
+		SubjectOption(title: LocalizationSupport.localized("Trigonometry"), systemImage: "angle")
 	  ]
 	),
 	TeachingSubjectArea(
 	  id: "physics",
-	  title: "Physics",
+	  title: LocalizationSupport.localized("Physics"),
 	  systemImage: "atom",
 	  subtopics: [
-		SubjectOption(title: "Mechanics", systemImage: "gearshape.2"),
-		SubjectOption(title: "Electricity", systemImage: "bolt.fill"),
-		SubjectOption(title: "Waves", systemImage: "waveform.path.ecg")
+		SubjectOption(title: LocalizationSupport.localized("Mechanics"), systemImage: "gearshape.2"),
+		SubjectOption(title: LocalizationSupport.localized("Electricity"), systemImage: "bolt.fill"),
+		SubjectOption(title: LocalizationSupport.localized("Waves"), systemImage: "waveform.path.ecg")
 	  ]
 	),
 	TeachingSubjectArea(
 	  id: "computer_science",
-	  title: "Computer Science",
+	  title: LocalizationSupport.localized("Computer Science"),
 	  systemImage: "desktopcomputer",
 	  subtopics: [
-		SubjectOption(title: "Programming", systemImage: "chevron.left.forwardslash.chevron.right")
+		SubjectOption(title: LocalizationSupport.localized("Programming"), systemImage: "chevron.left.forwardslash.chevron.right")
 	  ]
 	)
   ]

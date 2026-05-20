@@ -18,7 +18,7 @@ enum LessonFormatting {
             return "Today, \(formatter.string(from: date))"
         }
         if calendar.isDateInYesterday(date) {
-            return "Yesterday"
+            return LocalizationSupport.localized("Yesterday")
         }
 
         let formatter = DateFormatter()

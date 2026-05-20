@@ -11,7 +11,7 @@ struct ConnectionSetupView: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var connectionTitle: String {
-	hasAudio ? LocalizationSupport.localized("Connecting\naudio") : LocalizationSupport.localized("Connecting")
+	hasAudio ? LocalizationSupport.localized("connection_setup_connecting_audio") : LocalizationSupport.localized("connection_setup_connecting")
   }
   
   var body: some View {
@@ -80,7 +80,7 @@ struct ConnectionSetupView: View {
 		Text("4.9")
 		  .font(.system(size: 11, weight: .bold))
 		  .foregroundStyle(theme.appPrimaryText)
-		Text("(127 reviews)")
+		Text(LocalizationSupport.localized("(127 reviews)"))
 		  .font(.system(size: 11, weight: .medium))
 		  .foregroundStyle(theme.appSecondaryText)
 	  }

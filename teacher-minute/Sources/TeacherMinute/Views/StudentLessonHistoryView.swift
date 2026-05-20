@@ -32,7 +32,7 @@ struct StudentLessonHistoryView: View {
                     .padding(.top, 22)
                 
                 HStack {
-                    Text("Past Lessons")
+                    Text(LocalizationSupport.localized("Past Lessons"))
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
                     
@@ -352,7 +352,7 @@ struct LessonDetailView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack(spacing: 6) {
                                     PlatformIcon(systemName: "pin.fill", size: 12, weight: .semibold, color: theme.appOrange)
-                                    Text("Original Question")
+                                    Text(LocalizationSupport.localized("Original Question"))
                                         .font(.system(size: 13, weight: .bold))
                                         .foregroundStyle(theme.appOrange)
                                 }
@@ -367,7 +367,7 @@ struct LessonDetailView: View {
                     if !lesson.summary.isEmpty {
                         RoundedInfoCard {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("Summary")
+                                Text(LocalizationSupport.localized("Summary"))
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle(theme.appPrimaryText)
 
@@ -381,7 +381,7 @@ struct LessonDetailView: View {
 
                     if !messages.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Chat Messages")
+                            Text(LocalizationSupport.localized("Chat Messages"))
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundStyle(theme.appPrimaryText)
 
@@ -403,7 +403,7 @@ struct LessonDetailView: View {
                     if !lesson.transcriptPreview.isEmpty {
                         RoundedInfoCard {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("Transcript Preview")
+                                Text(LocalizationSupport.localized("Transcript Preview"))
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle(theme.appPrimaryText)
 
@@ -499,7 +499,7 @@ struct LessonMessageBubble: View {
         case "audio":
             HStack(spacing: 6) {
                 PlatformIcon(systemName: "waveform", size: 14, weight: .semibold, color: isMine ? theme.appCardBackground : theme.appPrimaryText)
-                Text("Audio message")
+                Text(LocalizationSupport.localized("Audio message"))
                     .font(.system(size: 14))
                     .foregroundStyle(isMine ? theme.appCardBackground : theme.appPrimaryText)
             }
@@ -511,7 +511,7 @@ struct LessonMessageBubble: View {
         case "video":
             HStack(spacing: 6) {
                 PlatformIcon(systemName: "video.fill", size: 14, weight: .semibold, color: isMine ? theme.appCardBackground : theme.appPrimaryText)
-                Text("Video message")
+                Text(LocalizationSupport.localized("Video message"))
                     .font(.system(size: 14))
                     .foregroundStyle(isMine ? theme.appCardBackground : theme.appPrimaryText)
             }

@@ -21,18 +21,18 @@ struct TeacherSubjectsView: View {
 	ScrollView {
 	  VStack(alignment: .leading, spacing: 0) {
 		if !isEditing {
-		  Text("Step 2 of 2")
+		  Text(LocalizationSupport.localized("Step 2 of 2"))
 			.font(.system(size: 13, weight: .medium))
 			.foregroundStyle(theme.authSecondaryText)
 			.frame(maxWidth: .infinity)
 		}
 		
-			Text("What can you teach?")
+			Text(LocalizationSupport.localized("What can you teach?"))
 			  .font(.system(size: 26, weight: .bold))
 			  .foregroundStyle(theme.authPrimaryText)
 			  .padding(.top, 20)
 			
-			Text("Choose a subject area, then select at least\none subtopic students can request.")
+			Text(LocalizationSupport.localized("Choose a subject area, then select at least\none subtopic students can request."))
 			  .font(.system(size: 13))
 			  .foregroundStyle(theme.authSecondaryText)
 			  .lineSpacing(5)
@@ -42,7 +42,7 @@ struct TeacherSubjectsView: View {
 		  .padding(.top, 24)
 		
 		HStack {
-			  Text("Subject Area")
+			  Text(LocalizationSupport.localized("Subject Area"))
 				.font(.system(size: 15, weight: .bold))
 				.foregroundStyle(theme.authPrimaryText)
 		  
@@ -71,7 +71,7 @@ struct TeacherSubjectsView: View {
 				.padding(.top, 16)
 				
 				if viewModel.shouldShowSubtopicsPrompt {
-				  Text("Choose one or more subjects to see subtopics.")
+				  Text(LocalizationSupport.localized("Choose one or more subjects to see subtopics."))
 					.font(.system(size: 13))
 					.foregroundStyle(theme.authSecondaryText)
 					.padding(.top, 24)
@@ -80,7 +80,7 @@ struct TeacherSubjectsView: View {
 					ForEach(viewModel.selectedAreas) { area in
 					  VStack(alignment: .leading, spacing: 12) {
 						HStack {
-						  Text("\(area.title) subtopics")
+						  Text(String(format: LocalizationSupport.localized("%@ subtopics"), area.title))
 							.font(.system(size: 15, weight: .bold))
 							.foregroundStyle(theme.authPrimaryText)
 						  

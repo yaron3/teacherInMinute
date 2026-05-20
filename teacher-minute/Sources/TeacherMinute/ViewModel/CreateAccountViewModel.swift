@@ -21,11 +21,13 @@ enum SignupValidationError: LocalizedError {
   case passwordTooShort
   case termsNotAccepted
   
+  
+  
   var errorDescription: String? {
 	switch self {
-	  case .invalidEmail:       return "Please enter a valid email address."
-	  case .passwordTooShort:   return "Password must be at least 6 characters."
-	  case .termsNotAccepted:   return "You must agree to the Terms of Service and Privacy Policy to continue."
+	  case .invalidEmail:       return LocalizationSupport.localized("Please enter a valid email address.")
+	  case .passwordTooShort:   return LocalizationSupport.localized("Password must be at least 6 characters.")
+	  case .termsNotAccepted:   return LocalizationSupport.localized("You must agree to the Terms of Service and Privacy Policy to continue.")
 	}
   }
   
@@ -50,13 +52,19 @@ enum SignupField: Hashable {
 final class CreateAccountViewModel {
   var emailOrPhone    = ""
   var password        = ""
-  var agreedToTerms   = true
+  var agreedToTerms   = false
   var sendUpdates     = false
   var isLoading       = false
   var navigateToChooseRole = false
 
   var destination: OnboardingResume?
 
+  var termsURL: URL?
+  var privacyURL: URL?
+  var showingTerms = false
+  var showingPrivacy = false
+  var showLegalAlert = false
+  var legalAlertMessage = ""
   // Alert state
   var alertMessage: String?
   var showAlert       = false
@@ -79,6 +87,27 @@ final class CreateAccountViewModel {
 	isEmailValid && isPasswordValid && agreedToTerms && !isLoading
   }
   
+  func openTerms() {
+	termsURL = URL(string: RemoteConfigService.getLocalizedString(for: .eulaURL))
+	if termsURL != nil {
+	  showingTerms = true
+	  return
+	}
+	
+	legalAlertMessage = SettingsError.missingLegalURL("EULA").localizedDescription
+	showLegalAlert = true
+  }
+  
+   func openPrivacy() {
+	privacyURL = URL(string: RemoteConfigService.getLocalizedString(for: .privacyPolicyURL))
+	if privacyURL != nil {
+	  showingPrivacy = true
+	  return
+	}
+	
+	legalAlertMessage = SettingsError.missingLegalURL(LocalizationSupport.localized("Privacy Policy")).localizedDescription
+	showLegalAlert = true
+  }
   // MARK: - Signup
   
   func signup() async {

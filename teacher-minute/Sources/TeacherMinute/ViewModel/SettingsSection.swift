@@ -68,7 +68,7 @@ struct SettingsRow: Identifiable {
         case .privacyPolicy:
             self.destination = nil
         case .contactUs:
-            self.destination = nil
+            self.destination = .contactUs
         case .logOut, .deleteAccount:
             // Destructive actions handled via confirmation; no navigation
             self.destination = nil
@@ -119,6 +119,7 @@ enum SettingsDestination: Hashable {
     case privacyControls
     case language
     case about
+    case contactUs
     case webPage(title: String, url: URL)
 
     var title: String {
@@ -131,6 +132,7 @@ enum SettingsDestination: Hashable {
         case .privacyControls: LocalizationSupport.localized("Privacy Controls")
         case .language: LocalizationSupport.localized("Language")
         case .about: LocalizationSupport.localized("About")
+        case .contactUs: LocalizationSupport.localized("Contact Us")
         case .webPage(let title, _): title
         }
     }
@@ -147,7 +149,7 @@ enum SettingsDestination: Hashable {
             LocalizationSupport.localized("Notification preferences will be available here.")
         case .privacyControls:
             LocalizationSupport.localized("Privacy controls will be available here.")
-        case .accountSecurity, .language, .about, .webPage:
+        case .accountSecurity, .language, .about, .contactUs, .webPage:
             ""
         }
     }
@@ -283,7 +285,13 @@ class SettingsViewModel {
     var isLoading = false
     var isOpeningPaymentSettings = false
     var isSavingPayoutSettings = false
+    var isSubmittingContactSupport = false
     var teacherPayPalEmail = ""
+    var contactSupportTitle = ""
+    var contactSupportDescription = ""
+    var contactSupportTitleMaxLength = 50
+    var contactSupportDescriptionMaxLength = 1024
+    var contactSupportPreview: ContactSupportRequest?
     var selectedLanguage: SettingsLanguageChoice {
         didSet {
             UserDefaults.standard.set(selectedLanguage.rawValue, forKey: LocalizationSupport.languagePreferenceKey)
@@ -480,7 +488,7 @@ class SettingsViewModel {
         case .about:
             navigationPath.append(.about)
         case .contactUs:
-            Task { await openContactSupport() }
+            navigationPath.append(.contactUs)
         case .eula:
             Task { await openEULA() }
         case .privacyPolicy:
@@ -610,18 +618,89 @@ class SettingsViewModel {
         }
     }
     
-    func openContactSupport() async {
-        isLoading = true
-        defer { isLoading = false }
+    func contactSupportAppeared() {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.contactSupportOpened, parameters: ["role": roleAnalyticsValue])
+        Task { await loadContactSupportLimits() }
+    }
 
-        let email = await remoteConfigService.fetchSupportEmail()
-        guard let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
-              let url = URL(string: "mailto:\(encodedEmail)") else {
-            present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Support email is not configured correctly."))
+    func updateContactSupportTitle(_ value: String) {
+        contactSupportTitle = String(value.prefix(contactSupportTitleMaxLength))
+    }
+
+    func updateContactSupportDescription(_ value: String) {
+        contactSupportDescription = String(value.prefix(contactSupportDescriptionMaxLength))
+    }
+
+    func loadContactSupportLimits() async {
+        let titleLimit = await remoteConfigService.fetchContactSupportTitleMaxLength()
+        let descriptionLimit = await remoteConfigService.fetchContactSupportDescriptionMaxLength()
+        contactSupportTitleMaxLength = titleLimit
+        contactSupportDescriptionMaxLength = descriptionLimit
+        updateContactSupportTitle(contactSupportTitle)
+        updateContactSupportDescription(contactSupportDescription)
+    }
+
+    func previewContactSupport() {
+        let title = contactSupportTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let description = contactSupportDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, !description.isEmpty else {
+            present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Add a title and description before submitting."))
+            return
+        }
+        guard let uid = authService.currentUserID else {
+            present(message: SettingsError.missingUser.localizedDescription)
             return
         }
 
-        externalURL = url
+        AnalyticsService.shared.logEvent(AnalyticsEvent.contactSupportPreview, parameters: ["role": roleAnalyticsValue])
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+            let userData = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+            let name = userDisplayName(from: userData)
+            contactSupportPreview = ContactSupportService.shared.makeRequest(
+                title: title,
+                description: description,
+                userID: uid,
+                userName: name,
+                userEmail: authService.currentUserEmail ?? userData["email"] as? String ?? "",
+                role: role
+            )
+        }
+    }
+
+    func cancelContactSupportPreview() {
+        contactSupportPreview = nil
+        AnalyticsService.shared.logEvent(AnalyticsEvent.contactSupportCancelled, parameters: ["role": roleAnalyticsValue])
+    }
+
+    func submitContactSupport() {
+        guard let request = contactSupportPreview, !isSubmittingContactSupport else { return }
+        isSubmittingContactSupport = true
+        Task {
+            defer { isSubmittingContactSupport = false }
+            do {
+                try await ContactSupportService.shared.save(request)
+                AnalyticsService.shared.logEvent(AnalyticsEvent.contactSupportSubmitted, parameters: [
+                    "role": roleAnalyticsValue,
+                    "request_id": request.id
+                ])
+                contactSupportPreview = nil
+                contactSupportTitle = ""
+                contactSupportDescription = ""
+                if navigationPath.last == .contactUs {
+                    navigationPath.removeLast()
+                }
+                present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Your message was sent."))
+            } catch {
+                AnalyticsService.shared.logEvent(AnalyticsEvent.contactSupportFailed, parameters: [
+                    "role": roleAnalyticsValue,
+                    "reason": error.localizedDescription
+                ])
+                AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Settings.submitContactSupport")
+                present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Could not send your message."))
+            }
+        }
     }
 
     func openEULA() async {
@@ -657,6 +736,18 @@ class SettingsViewModel {
 
     func consumeExternalURL() {
         externalURL = nil
+    }
+
+    private var roleAnalyticsValue: String {
+        role == .teacher ? "teacher" : "student"
+    }
+
+    private func userDisplayName(from data: [String: Any]) -> String {
+        let fullName = data["fullName"] as? String ?? ""
+        if !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return fullName
+        }
+        return authService.currentUserEmail ?? LocalizationSupport.localized("Unknown")
     }
 
     private func openRemoteWebPage(title: String, fetchURL: () async throws -> URL) async {
@@ -698,10 +789,6 @@ final class MockSettingsViewModel: SettingsViewModel {
     override func deleteAccount() async -> Bool {
         present(title: LocalizationSupport.localized("Delete Account"), message: LocalizationSupport.localized("Preview only. No account was deleted."))
         return false
-    }
-
-    override func openContactSupport() async {
-        externalURL = URL(string: "mailto:support@tim.app")
     }
 
     override func openEULA() async {

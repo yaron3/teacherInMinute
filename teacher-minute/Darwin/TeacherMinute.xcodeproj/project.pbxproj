@@ -239,9 +239,10 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access so students and teachers can talk during live lessons.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save verification documents to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photo library to upload your profile photo, teaching credentials, government ID, and selfie for identity verification.";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 0.0.2;
+				MARKETING_VERSION = 0.0.3;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
 			};
@@ -259,9 +260,10 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access so students and teachers can talk during live lessons.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save verification documents to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to your photo library to upload your profile photo, teaching credentials, government ID, and selfie for identity verification.";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 0.0.2;
+				MARKETING_VERSION = 0.0.3;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
 			};

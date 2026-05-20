@@ -19,10 +19,7 @@ struct CreateAccountView: View {
   @Environment(\.appRouter) var router
   @State var isPasswordVisible = false
   @FocusState var focusedField: SignupField?
-  @State var showingTerms = false
-  @State var showingPrivacy = false
-  @State var termsURL = URL(string: "https://www.cnn.com")!
-  @State var privacyURL = URL(string: "https://www.cnn.com")!
+
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -72,19 +69,27 @@ struct CreateAccountView: View {
 	} message: {
 	  Text(viewModel.alertMessage ?? "")
 	}
-	.sheet(isPresented: $showingTerms) {
-	  NavigationStack { AboutWebView(url: termsURL, title: "Terms of Service") }
-	}
-	.sheet(isPresented: $showingPrivacy) {
-	  NavigationStack { AboutWebView(url: privacyURL, title: "Privacy Policy") }
-	}
-	.task {
-	  if let url = try? await SettingsRemoteConfigService.shared.fetchEULAURL() { termsURL = url }
-	  if let url = try? await SettingsRemoteConfigService.shared.fetchPrivacyPolicyURL() { privacyURL = url }
-	}
+	.sheet(isPresented: $viewModel.showingTerms) {
+		  
+		  if let _ = viewModel.termsURL {
+			NavigationStack { AboutWebView(url: viewModel.termsURL!, title: LocalizationSupport.localized("EULA")) }
+		  }
+		}
+		.sheet(isPresented: $viewModel.showingPrivacy) {
+		  if let _ = viewModel.privacyURL {
+			NavigationStack { AboutWebView(url: viewModel.privacyURL!, title: LocalizationSupport.localized("Privacy Policy")) }
+		  }
+		}
+		.alert(LocalizationSupport.localized("Sign Up"), isPresented: $viewModel.showLegalAlert) {
+		  Button(LocalizationSupport.localized("OK"), role: .cancel) {}
+		} message: {
+		  Text(viewModel.legalAlertMessage)
+		}
   }
   
   // MARK: - Sections
+
+
   
   
   var inputCard: some View {
@@ -101,7 +106,7 @@ struct CreateAccountView: View {
 	  fieldSection(
 		title: "Password",
 		icon: "lock.fill",
-		placeholder: "Min. 6 characters",
+		placeholder: LocalizationSupport.localized("Min. 6 characters"),
 		text: $viewModel.password,
 		isSecure: !isPasswordVisible,
 		field: .password,
@@ -173,7 +178,7 @@ struct CreateAccountView: View {
 		)
 	  
 	  if !isValid {
-			Text(field == .email ? "Enter a valid email address." : "Must be at least 6 characters.")
+			Text(field == .email ? LocalizationSupport.localized("Enter a valid email address.") : LocalizationSupport.localized("Must be at least 6 characters."))
 			  .font(.system(size: 11))
 			  .foregroundStyle(theme.red)
 			  .padding(.leading, 4)
@@ -185,7 +190,7 @@ struct CreateAccountView: View {
 	VStack(alignment: .leading, spacing: 18) {
 	  checkboxRow(isOn: $viewModel.agreedToTerms, isTermsRow: true)
 	  checkboxRow(isOn: $viewModel.sendUpdates,
-				  text: "Send me occasional updates and tips about\nMath Connect.",
+				  text: LocalizationSupport.localized("Send me occasional updates and tips about\nMath Connect."),
 				  isTermsRow: false)
 	}
 	.padding(.horizontal, 8)
@@ -227,17 +232,18 @@ struct CreateAccountView: View {
 	func termsTextView() -> some View {
 	  VStack(alignment: .leading, spacing: 2) {
 		HStack(spacing: 0) {
-			Text("I agree to the ").foregroundStyle(theme.authSecondaryText)
-			Button { showingTerms = true } label: {
-			  Text("Terms of Service").foregroundStyle(theme.authPink)
+		  Text(LocalizationSupport.localized("I agree to the ")).foregroundStyle(theme.authSecondaryText)
+		  Button { viewModel.openTerms() } label: {
+			  Text(LocalizationSupport.localized("Terms of Service")).foregroundStyle(theme.authPink)
 			}
 			.buttonStyle(.plain)
-			Text(" and").foregroundStyle(theme.authSecondaryText)
+			Text(LocalizationSupport.localized(" and")).foregroundStyle(theme.authSecondaryText)
+		  Button { viewModel.openPrivacy() } label: {
+			Text(LocalizationSupport.localized("Privacy Policy.")).foregroundStyle(theme.authPink)
+		  }
+		  .buttonStyle(.plain)
 		}
-		Button { showingPrivacy = true } label: {
-		  Text("Privacy Policy.").foregroundStyle(theme.authPink)
-		}
-		.buttonStyle(.plain)
+		
 	  }
 	.font(.system(size: 14))
 	.lineSpacing(4)
@@ -248,7 +254,7 @@ struct CreateAccountView: View {
 	  Task { await viewModel.signup() }
 	} label: {
 	  ZStack {
-		Text("Continue to Role Selection")
+		Text(LocalizationSupport.localized("Continue to Role Selection"))
 		  .font(.system(size: 16, weight: .semibold))
 		  .foregroundStyle(theme.appPrimaryText)
 		  .opacity(viewModel.isLoading ? 0 : 1)
@@ -271,7 +277,7 @@ struct CreateAccountView: View {
 	var dividerSection: some View {
 	  HStack(spacing: 16) {
 		Rectangle().fill(theme.authDivider).frame(height: 1)
-		Text("Or continue with")
+		Text(LocalizationSupport.localized("Or continue with"))
 		  .font(.system(size: 14))
 		  .foregroundStyle(theme.authSecondaryText)
 		  .lineLimit(1)
@@ -311,9 +317,9 @@ struct CreateAccountView: View {
   
 	var bottomLoginSection: some View {
 	  HStack(spacing: 4) {
-		Text("Already have an account?").foregroundStyle(theme.authSecondaryText)
+		Text(LocalizationSupport.localized("Already have an account?")).foregroundStyle(theme.authSecondaryText)
 		Button { router.push(.login) } label: {
-			Text("Log In").foregroundStyle(theme.authPink)
+			Text(LocalizationSupport.localized("Log In")).foregroundStyle(theme.authPink)
 		}
 	}
 	.font(.system(size: 14))

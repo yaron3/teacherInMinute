@@ -211,7 +211,7 @@ struct ChatSessionView: View {
         Text(participantName)
           .font(.system(size: 15, weight: .bold))
           .foregroundStyle(theme.appPrimaryText)
-        Text("Connected")
+        Text(LocalizationSupport.localized("Connected"))
           .font(.system(size: 11, weight: .medium))
           .foregroundStyle(theme.appGreen)
       }
@@ -302,7 +302,7 @@ struct ChatSessionView: View {
 	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.appOrange)
         .padding(.top, 2)
       VStack(alignment: .leading, spacing: 5) {
-        Text("ORIGINAL QUESTION")
+        Text(LocalizationSupport.localized("ORIGINAL QUESTION"))
           .font(.system(size: 10, weight: .bold))
           .foregroundStyle(theme.appOrange)
         Text(viewModel.originalQuestion)

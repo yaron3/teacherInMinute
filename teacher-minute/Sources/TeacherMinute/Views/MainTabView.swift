@@ -29,7 +29,7 @@ struct MainTabView: View {
                 tabContent(.lessons)
                     .tabItem {
                         Label {
-                            Text("Lessons")
+                            Text(LocalizationSupport.localized("Lessons"))
                         } icon: {
                             Image(MainTab.lessons.systemImage, bundle: .module)
                                 .renderingMode(.template)

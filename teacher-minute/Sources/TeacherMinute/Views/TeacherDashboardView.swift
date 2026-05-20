@@ -213,7 +213,7 @@ struct TeacherDashboardView: View {
 		Button {
 		  viewModel.editSubjects()
 		} label: {
-		  Text("Edit Subjects")
+		  Text(LocalizationSupport.localized("Edit Subjects"))
 			.font(.system(size: 12, weight: .medium))
 			.foregroundStyle(theme.appPink)
 		}
@@ -224,7 +224,7 @@ struct TeacherDashboardView: View {
   
   var earningsSnapshot: some View {
 	VStack(alignment: .leading, spacing: 14) {
-	  Text("Earnings Snapshot")
+	  Text(LocalizationSupport.localized("Earnings Snapshot"))
 		.font(.system(size: 18, weight: .bold))
 		.foregroundStyle(theme.appPrimaryText)
 
@@ -249,7 +249,7 @@ struct TeacherDashboardView: View {
 	RoundedInfoCard {
 	  HStack {
 		VStack(alignment: .leading, spacing: 10) {
-		  Text("Live Earnings Today")
+		  Text(LocalizationSupport.localized("Live Earnings Today"))
 			.font(.system(size: 12, weight: .medium))
 			.foregroundStyle(theme.appSecondaryText)
 		  
@@ -287,7 +287,7 @@ struct TeacherDashboardView: View {
   var liveQueue: some View {
 	VStack(alignment: .leading, spacing: 14) {
 	  HStack {
-		Text("Live Queue")
+		Text(LocalizationSupport.localized("Live Queue"))
 		  .font(.system(size: 18, weight: .bold))
 		  .foregroundStyle(theme.appPrimaryText)
 		
@@ -359,7 +359,7 @@ struct TeacherDashboardView: View {
   
   var readinessChecklist: some View {
 	VStack(alignment: .leading, spacing: 14) {
-	  Text("Readiness Checklist")
+	  Text(LocalizationSupport.localized("Readiness Checklist"))
 		.font(.system(size: 16, weight: .bold))
 		.foregroundStyle(theme.appPrimaryText)
 	  
@@ -524,11 +524,11 @@ struct TeacherDashboardView: View {
 		  }
 		
 		VStack(alignment: .leading, spacing: 4) {
-		  Text("Student")
+		  Text(LocalizationSupport.localized("Student"))
 			.font(.system(size: 15, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
 		  
-		  Text("Waiting now")
+		  Text(LocalizationSupport.localized("Waiting now"))
 			.font(.system(size: 11, weight: .medium))
 			.foregroundStyle(theme.appSecondaryText)
 		}
@@ -558,7 +558,7 @@ struct TeacherDashboardView: View {
 			  PlatformIcon(systemName: "questionmark.circle", size: 11, weight: .bold, color: theme.appPink)
 			}
 		  
-		  Text("QUESTION")
+		  Text(LocalizationSupport.localized("QUESTION"))
 			.font(.system(size: 10, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
 		}
@@ -611,7 +611,7 @@ struct TeacherDashboardView: View {
 		  }
 		
 		VStack(alignment: .leading, spacing: 2) {
-		  Text("Voice Message")
+		  Text(LocalizationSupport.localized("Voice Message"))
 			.font(.system(size: 10, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
 		  Text("0:23")
@@ -638,7 +638,7 @@ struct TeacherDashboardView: View {
 	  Button(action: accept) {
 		HStack(spacing: 9) {
 		  PlatformIcon(systemName: "checkmark.circle.fill", size: 14, weight: .bold, color: theme.white)
-		  Text("Accept Question")
+		  Text(LocalizationSupport.localized("Accept Question"))
 			.font(.system(size: 15, weight: .bold))
 		}
 		.foregroundStyle(theme.appPrimaryText)
@@ -655,7 +655,7 @@ struct TeacherDashboardView: View {
 	  Button(action: decline) {
 		HStack(spacing: 6) {
 		  PlatformIcon(systemName: "xmark", size: 10, weight: .semibold, color: theme.appSecondaryText)
-		  Text("Decline")
+		  Text(LocalizationSupport.localized("Decline"))
 			.font(.system(size: 11, weight: .semibold))
 			.foregroundStyle(theme.appSecondaryText)
 		}

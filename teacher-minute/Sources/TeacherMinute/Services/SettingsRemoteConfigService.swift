@@ -23,10 +23,14 @@ final class SettingsRemoteConfigService {
         static let privacyPolicyURL = "privacy_policy"
         static let subjects = "subjects"
         static let defaultCommission = "default_commission"
+        static let contactSupportTitleMaxLength = "contact_support_title_max_length"
+        static let contactSupportDescriptionMaxLength = "contact_support_description_max_length"
     }
     
     private let defaultSupportEmail = "support@tim.app"
     private let defaultTeacherCommission = 0.25
+    private let defaultContactSupportTitleMaxLength = 50
+    private let defaultContactSupportDescriptionMaxLength = 1024
     
     private init() {}
     
@@ -71,6 +75,18 @@ final class SettingsRemoteConfigService {
         }
         
         return min(max(commission, 0), 1)
+    }
+
+    func fetchContactSupportTitleMaxLength() async -> Int {
+        await RemoteConfigService.shared.ready()
+        let limit = Int(RemoteConfigService.shared.getNumber(Key.contactSupportTitleMaxLength))
+        return limit > 0 ? limit : defaultContactSupportTitleMaxLength
+    }
+
+    func fetchContactSupportDescriptionMaxLength() async -> Int {
+        await RemoteConfigService.shared.ready()
+        let limit = Int(RemoteConfigService.shared.getNumber(Key.contactSupportDescriptionMaxLength))
+        return limit > 0 ? limit : defaultContactSupportDescriptionMaxLength
     }
     
     private func fetchURL(forKey key: String, missingError: SettingsError) async throws -> URL {

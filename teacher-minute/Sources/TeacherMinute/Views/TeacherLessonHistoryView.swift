@@ -32,7 +32,7 @@ struct TeacherLessonHistoryView: View {
                     .padding(.top, 22)
                 
                 HStack {
-                    Text("Past Lessons")
+                    Text(LocalizationSupport.localized("Past Lessons"))
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
                     

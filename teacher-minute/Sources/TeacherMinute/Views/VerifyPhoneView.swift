@@ -33,12 +33,12 @@ struct VerifyPhoneView: View {
                     )
                 }
 
-            Text("Verify your number")
+            Text(LocalizationSupport.localized("Verify your number"))
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(theme.authPrimaryText)
                 .padding(.top, 26)
 
-            Text("We've sent a 4-digit security code to")
+            Text(LocalizationSupport.localized("We've sent a 4-digit security code to"))
                 .font(.system(size: 14))
                 .foregroundStyle(theme.authSecondaryText)
                 .padding(.top, 10)
@@ -59,7 +59,7 @@ struct VerifyPhoneView: View {
                         color: theme.authPink
                     )
 
-                    Text("Change contact info")
+                    Text(LocalizationSupport.localized("Change contact info"))
                         .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundStyle(theme.authPink)
@@ -85,7 +85,7 @@ struct VerifyPhoneView: View {
                         color: theme.authPink
                     )
 
-                    Text("Resend Code Now")
+                    Text(LocalizationSupport.localized("Resend Code Now"))
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .foregroundStyle(theme.authPink)
@@ -105,14 +105,14 @@ struct VerifyPhoneView: View {
                 .padding(.horizontal, 18)
 
             HStack(spacing: 4) {
-                Text("Having trouble?")
+                Text(LocalizationSupport.localized("Having trouble?"))
                     .font(.system(size: 12))
                     .foregroundStyle(theme.authSecondaryText)
 
                 Button {
                     viewModel.contactSupport()
                 } label: {
-                    Text("Contact Support")
+                    Text(LocalizationSupport.localized("Contact Support"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(theme.authPrimaryText)
                         .underline()

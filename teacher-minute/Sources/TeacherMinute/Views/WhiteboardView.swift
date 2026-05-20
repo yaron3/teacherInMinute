@@ -20,7 +20,7 @@ struct WhiteboardView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
-        Text("Board")
+        Text(LocalizationSupport.localized("Board"))
           .font(.system(size: 13, weight: .bold))
           .foregroundStyle(theme.appPrimaryText)
 
@@ -42,7 +42,7 @@ struct WhiteboardView: View {
           if visibleStrokes.isEmpty {
             VStack(spacing: 8) {
               PlatformIcon(systemName: "pencil", size: 22, weight: .semibold, color: theme.appSecondaryText)
-              Text("Use your finger to write or sketch.")
+              Text(LocalizationSupport.localized("Use your finger to write or sketch."))
                 .font(.system(size: 12))
                 .foregroundStyle(theme.appSecondaryText)
             }

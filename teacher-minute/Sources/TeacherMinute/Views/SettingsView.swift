@@ -70,6 +70,14 @@ struct SettingsView: View {
         } message: {
             Text(viewModel.alertMessage ?? "")
         }
+        .sheet(item: $viewModel.contactSupportPreview) { request in
+            ContactSupportPreviewSheet(
+                request: request,
+                isSubmitting: viewModel.isSubmittingContactSupport,
+                onCancel: { viewModel.cancelContactSupportPreview() },
+                onSubmit: { viewModel.submitContactSupport() }
+            )
+        }
         .onChange(of: viewModel.externalURL) { _, url in
             guard let url else { return }
             openURL(url)
@@ -86,6 +94,8 @@ struct SettingsView: View {
             LanguageSettingsView(viewModel: viewModel)
         case .about:
             AboutSettingsView(viewModel: viewModel)
+        case .contactUs:
+            ContactSupportSettingsView(viewModel: viewModel)
         case .webPage(let title, let url):
             AboutWebView(url: url, title: title)
         case .studentPayments:
@@ -201,6 +211,128 @@ struct AboutSettingsView: View {
         List {
             SettingsSectionView(section: viewModel.aboutSection) { row in
                 viewModel.select(row)
+            }
+        }
+    }
+}
+
+struct ContactSupportSettingsView: View {
+    @Bindable var viewModel: SettingsViewModel
+
+    var titleBinding: Binding<String> {
+        Binding {
+            viewModel.contactSupportTitle
+        } set: { value in
+            viewModel.updateContactSupportTitle(value)
+        }
+    }
+
+    var descriptionBinding: Binding<String> {
+        Binding {
+            viewModel.contactSupportDescription
+        } set: { value in
+            viewModel.updateContactSupportDescription(value)
+        }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Text(LocalizationSupport.localized("Send a message to support. You will preview the data before it is sent."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section(header: Text(LocalizationSupport.localized("Title"))) {
+                TextField(LocalizationSupport.localized("What can we help with?"), text: titleBinding)
+                    .textInputAutocapitalization(.sentences)
+                Text("\(viewModel.contactSupportTitle.count)/\(viewModel.contactSupportTitleMaxLength)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+            Section(header: Text(LocalizationSupport.localized("Description"))) {
+                TextEditor(text: descriptionBinding)
+                    .frame(minHeight: 160)
+                Text("\(viewModel.contactSupportDescription.count)/\(viewModel.contactSupportDescriptionMaxLength)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+        }
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button {
+                    viewModel.previewContactSupport()
+                } label: {
+                    HStack {
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                        Text(LocalizationSupport.localized("Preview and Submit"))
+                    }
+                }
+                .disabled(viewModel.isLoading || viewModel.isSubmittingContactSupport)
+            }
+        }
+        .onAppear {
+            viewModel.contactSupportAppeared()
+        }
+    }
+}
+
+struct ContactSupportPreviewSheet: View {
+    let request: ContactSupportRequest
+    let isSubmitting: Bool
+    let onCancel: () -> Void
+    let onSubmit: () -> Void
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(request.previewRows, id: \.0) { title, value in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(title)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(value)
+                                .font(.body)
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } header: {
+                    Text(LocalizationSupport.localized("Data to be sent"))
+                }
+            }
+            .navigationTitle(LocalizationSupport.localized("Preview"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(LocalizationSupport.localized("Cancel")) {
+                        onCancel()
+                        dismiss()
+                    }
+                    .disabled(isSubmitting)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        onSubmit()
+                    } label: {
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text(LocalizationSupport.localized("Send"))
+                        }
+                    }
+                    .disabled(isSubmitting)
+                }
             }
         }
     }

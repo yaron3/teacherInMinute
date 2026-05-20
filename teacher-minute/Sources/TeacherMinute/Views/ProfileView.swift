@@ -31,7 +31,7 @@ struct ProfileView: View {
 	ScrollView(.vertical, showsIndicators: false) {
 	  VStack(alignment: .leading, spacing: 0) {
 		HStack {
-		  Text("Profile")
+		  Text(LocalizationSupport.localized("Profile"))
 			.font(.system(size: 24, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
 		  
@@ -56,7 +56,7 @@ struct ProfileView: View {
 		profileHeader
 		  .padding(.top, 26)
 		
-		Text("Account Info")
+		Text(LocalizationSupport.localized("Account Info"))
 		  .font(.system(size: 16, weight: .bold))
 		  .foregroundStyle(theme.appPrimaryText)
 		  .padding(.top, 30)
@@ -70,7 +70,7 @@ struct ProfileView: View {
 		.padding(.top, 14)
 		
 		if viewModel.shouldShowTeachingDetails {
-		  Text("Teaching Details")
+		  Text(LocalizationSupport.localized("Teaching Details"))
 			.font(.system(size: 16, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
 			.padding(.top, 30)
@@ -94,7 +94,7 @@ struct ProfileView: View {
 			  .padding(.top, 18)
 			}
 		
-		Text("Device Permissions")
+		Text(LocalizationSupport.localized("Device Permissions"))
 		  .font(.system(size: 16, weight: .bold))
 		  .foregroundStyle(theme.appPrimaryText)
 		  .padding(.top, 30)
@@ -267,7 +267,7 @@ struct ProfileView: View {
 		  Spacer()
 		  
 		  Button(action: editAction) {
-			Text("Edit")
+			Text(LocalizationSupport.localized("Edit"))
 			  .font(.system(size: 12, weight: .medium))
 			  .foregroundStyle(theme.appPink)
 		  }
@@ -281,7 +281,7 @@ struct ProfileView: View {
 		  
 		  if includeAdd {
 			Button(action: addAction) {
-			  Text("+ Add")
+			  Text(LocalizationSupport.localized("+ Add"))
 				.font(.system(size: 12, weight: .medium))
 				.foregroundStyle(theme.appSecondaryText)
 				.padding(.horizontal, 12)

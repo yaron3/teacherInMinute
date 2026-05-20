@@ -19,12 +19,12 @@ struct ResetPasswordView: View {
             AuthIconHeader(systemImage: "key.fill")
                 .padding(.top, 42)
 
-            Text("Reset Password")
+            Text(LocalizationSupport.localized("Reset Password"))
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(theme.authPrimaryText)
                 .padding(.top, 26)
 
-            Text("Enter your email or phone number and we'll\nsend you instructions to reset your password.")
+            Text(LocalizationSupport.localized("Enter your email or phone number and we'll\nsend you instructions to reset your password."))
                 .font(.system(size: 15))
                 .foregroundStyle(theme.authSecondaryText)
                 .lineSpacing(5)
@@ -51,7 +51,7 @@ struct ResetPasswordView: View {
                         color: theme.authSecondaryText
                     )
 
-                    Text("Back to Log In")
+                    Text(LocalizationSupport.localized("Back to Log In"))
                         .font(.system(size: 14, weight: .medium))
                 }
                 .foregroundStyle(theme.authSecondaryText)
@@ -103,7 +103,7 @@ struct ResetPasswordView: View {
                     viewModel.method = .email
                 }
             } label: {
-                Text("Email")
+                Text(LocalizationSupport.localized("Email"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.authPrimaryText)
                     .frame(maxWidth: .infinity)
@@ -117,7 +117,7 @@ struct ResetPasswordView: View {
                     viewModel.method = .phone
                 }
             } label: {
-                Text("Phone")
+                Text(LocalizationSupport.localized("Phone"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(theme.authSecondaryText)
                     .frame(maxWidth: .infinity)
