@@ -9,6 +9,16 @@ import Observation
 import Foundation
 import SwiftUI
 
+#if !os(Android)
+import FirebaseRemoteConfig
+import FirebaseAnalytics
+
+#else
+import SkipFirebaseRemoteConfig
+import SkipFirebaseAnalytics
+#endif
+
+
 struct SettingsSection: Identifiable {
     let title: String
     let rows: [SettingsRow]
@@ -205,6 +215,19 @@ enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
         case .english, .hebrew: nil
         }
     }
+
+    var remoteConfigLanguageCode: String {
+        switch self {
+        case .english:
+            return "en"
+        case .hebrew:
+            return "he"
+        case .system:
+            return Locale.preferredLanguages
+                .compactMap { Locale(identifier: $0).language.languageCode?.identifier }
+                .first ?? "en"
+        }
+    }
 }
 
 //enum SettingsIconColor {
@@ -235,8 +258,22 @@ enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
 @Observable
 @MainActor
 class SettingsViewModel {
-    let appVersion = "Math Connect App v2.4.1"
-    
+    var appVersion: String {
+        let appName = LocalizationSupport.localized("Teacher in a Minute App")
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+
+        switch (version?.isEmpty == false ? version : nil, build?.isEmpty == false ? build : nil) {
+        case let (.some(version), .some(build)):
+            return "\(appName) - \(version) (\(build))"
+        case let (.some(version), .none):
+            return "\(appName) - \(version)"
+        case let (.none, .some(build)):
+            return "\(appName) - \(build)"
+        case (.none, .none):
+            return appName
+        }
+    }
     var navigationPath: [SettingsDestination] = []
     var activeConfirmation: SettingsConfirmation?
     var externalURL: URL?
@@ -417,6 +454,12 @@ class SettingsViewModel {
             ]
         )
     }
+  
+  func updateLanguage(_ language: SettingsLanguageChoice) {
+    selectedLanguage = language
+	Analytics.setUserProperty(language.remoteConfigLanguageCode, forName: "app_language")
+    
+  }
 
     func select(_ row: SettingsRow) {
         switch row.action {
@@ -582,8 +625,15 @@ class SettingsViewModel {
     }
 
     func openEULA() async {
-        await openRemoteWebPage(title: LocalizationSupport.localized("EULA")) {
-            try await remoteConfigService.fetchEULAURL()
+        let title = LocalizationSupport.localized("EULA")
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let url = try await remoteConfigService.fetchEULAURL()
+            navigationPath.append(.webPage(title: title, url: url))
+        } catch {
+            present(title: title, message: error.localizedDescription)
         }
     }
 

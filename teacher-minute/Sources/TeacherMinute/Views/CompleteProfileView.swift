@@ -92,7 +92,7 @@ struct CompleteProfileView: View {
 	.navigationBarTitleDisplayMode(.inline)
 	.onAppear {
 	  viewModel.onContinue = {
-		router.replace(with: .mainTabs(role: viewModel.role))
+		router.enterMainTabs(role: viewModel.role)
 	  }
 	  viewModel.checkAndAutoAdvance()
 	}

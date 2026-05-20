@@ -27,7 +27,7 @@ final class LoginViewModel {
   var showAlert    = false
   
   // Navigation — set by login() after resolving onboarding state
-  var destination: AppRoute?
+  var destination: OnboardingResume?
   
   let authService = AuthService()
   
@@ -65,7 +65,7 @@ final class LoginViewModel {
 
 	  // 3. Resolve where in onboarding this user should go
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
-	  destination = AppRoute.resumeDestination(for: resume)
+	  destination = resume
 
 	} catch {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "email", "reason": error.localizedDescription])
@@ -92,7 +92,7 @@ final class LoginViewModel {
 			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
 			do {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
-			  self?.destination = AppRoute.resumeDestination(for: resume)
+			  self?.destination = resume
 			} catch {
 			  self?.present(message: error.localizedDescription)
 			}
@@ -116,7 +116,7 @@ final class LoginViewModel {
 			AnalyticsService.shared.setUser(uid: uid)
 			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
 			let resume = try await UserService.shared.resumeRoute(uid: uid)
-			destination = AppRoute.resumeDestination(for: resume)
+			destination = resume
 		  } catch {
 			AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 			present(message: error.localizedDescription)
@@ -141,7 +141,7 @@ final class LoginViewModel {
 			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "apple"])
 			do {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
-			  self?.destination = AppRoute.resumeDestination(for: resume)
+			  self?.destination = resume
 			} catch {
 			  self?.present(message: error.localizedDescription)
 			}
@@ -164,7 +164,7 @@ final class LoginViewModel {
 		AnalyticsService.shared.setUser(uid: uid)
 		AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "apple"])
 		let resume = try await UserService.shared.resumeRoute(uid: uid)
-		destination = AppRoute.resumeDestination(for: resume)
+		destination = resume
 	  } catch {
 		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
 		present(message: error.localizedDescription)

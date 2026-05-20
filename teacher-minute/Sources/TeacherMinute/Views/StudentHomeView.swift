@@ -73,7 +73,8 @@ struct StudentHomeView: View {
                         .padding(.top, 28)
 
                     Group {
-                            sectionHeader(title: "Recent Lessons", actionTitle: "") {
+                            sectionHeader(title: "Recent Lessons", actionTitle: "")
+				
                     }
                     .padding(.top, 28)
 
@@ -133,13 +134,13 @@ struct StudentHomeView: View {
             guard phase == .active else { return }
             handleActiveAfterExternalCheckout()
         }
-        .alert("Low Balance", isPresented: $showingLowBalanceAlert) {
-            Button("OK", role: .cancel) {}
+        .alert(LocalizationSupport.localized("Low Balance"), isPresented: $showingLowBalanceAlert) {
+            Button(LocalizationSupport.localized("OK"), role: .cancel) {}
         } message: {
             Text(lowBalanceMessage)
         }
         .alert(paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"), isPresented: isShowingPaymentReturnResult) {
-            Button("OK", role: .cancel) {
+            Button(LocalizationSupport.localized("OK"), role: .cancel) {
                 paymentReturnStore.consumeLatestResult()
             }
         } message: {
@@ -207,7 +208,7 @@ struct StudentHomeView: View {
             ChatSessionView(
                 questionId: questionId,
                 role: "student",
-                title: "Teacher",
+                title: LocalizationSupport.localized("Teacher"),
                 initialDetails: viewModel.chatInitialDetails(questionId: questionId)
             ) {
                 Task {
@@ -290,7 +291,7 @@ struct StudentHomeView: View {
                         .foregroundStyle(theme.appPrimaryText)
 
                     HStack(spacing: 6) {
-                        Text("\(viewModel.remainingMinutes) min remaining")
+                        Text(String(format: LocalizationSupport.localized("%lld min remaining"), Int64(viewModel.remainingMinutes)))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.95))
                         Text("•")
@@ -395,7 +396,7 @@ struct ConversationTypeChip: View {
   }
     var body: some View {
         Button(action: action) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(isSelected ?theme.appCardBackground: theme.appPrimaryText)
                 .lineLimit(1)
@@ -574,7 +575,7 @@ struct MatchedOverlay: View {
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(theme.appPrimaryText)
 
-                Text("Your session is ready.\nRoom: \(liveKitRoom)")
+                Text(String(format: LocalizationSupport.localized("Your session is ready.\nRoom: %@"), liveKitRoom))
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.8))
                     .multilineTextAlignment(.center)
@@ -739,7 +740,7 @@ struct PricingCard: View {
                 .padding(.top, 8)
 				.padding(.leading, 5)
 			  
-                Text(option.description)
+                Text(LocalizedStringKey(option.description))
                     .font(.system(size: 12))
                     .foregroundStyle(theme.appSecondaryText)
                     .lineSpacing(4)
@@ -805,7 +806,7 @@ struct RecentLessonRow: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
 
-                    Text("\(lesson.teacher) \u{2022} \(lesson.time)")
+                    Text(String(format: LocalizationSupport.localized("%@ • %@"), lesson.teacher, lesson.time))
                         .font(.system(size: 11))
                         .foregroundStyle(theme.appSecondaryText)
                 }

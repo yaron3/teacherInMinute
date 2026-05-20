@@ -39,15 +39,19 @@ final class SettingsRemoteConfigService {
     private init() {}
     
     func fetchAboutURL() async throws -> URL {
-        try await fetchURL(forKey: Key.aboutURL, missingError: .missingAboutURL)
+        try await fetchURL(forKey: localizedKey(Key.aboutURL), missingError: .missingAboutURL)
     }
-    
+
     func fetchEULAURL() async throws -> URL {
-        try await fetchURL(forKey: Key.eulaURL, missingError: .missingLegalURL("EULA"))
+        try await fetchURL(forKey: localizedKey(Key.eulaURL), missingError: .missingLegalURL("EULA"))
     }
-    
+
     func fetchPrivacyPolicyURL() async throws -> URL {
-        try await fetchURL(forKey: Key.privacyPolicyURL, missingError: .missingLegalURL("Privacy policy"))
+        try await fetchURL(forKey: localizedKey(Key.privacyPolicyURL), missingError: .missingLegalURL("Privacy policy"))
+    }
+
+    private func localizedKey(_ base: String) -> String {
+        "\(base)_\(LocalizationSupport.currentLanguageCode)"
     }
     
     func fetchSupportEmail() async -> String {

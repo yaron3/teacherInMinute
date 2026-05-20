@@ -18,9 +18,6 @@ enum LocalizationSupport {
 
     static func localized(_ key: String) -> String {
         #if os(Android)
-        if preferredLanguageCode == "he", let translated = hebrewLocalizedValue(for: key) {
-            return translated
-        }
         return NSLocalizedString(key, comment: "")
         #else
         if let languageCode = preferredLanguageCode,
@@ -44,51 +41,15 @@ enum LocalizationSupport {
         }
     }
 
-    private static func hebrewLocalizedValue(for key: String) -> String? {
-        switch key {
-        case "Completed lesson with %@.":
-            return "שיעור שהושלם עם %@."
-        case "Lesson transcript will appear here when available.":
-            return "תמלול השיעור יופיע כאן כשיהיה זמין."
-        case "%lld completed":
-            return "%lld שיעורים הושלמו"
-        case "%lld taught":
-            return "%lld שיעורים שלימדת"
-        case "1 min":
-            return "דקה אחת"
-        case "%lld min":
-            return "%lld דק׳"
-        case "%lld mins":
-            return "%lld דק׳"
-        case "Question details are loading.":
-            return "פרטי השאלה נטענים."
-        case "Live Earnings":
-            return "הכנסות בזמן אמת"
-        case "Session Cost":
-            return "עלות השיעור"
-        case "Your share (%lld%%)":
-            return "החלק שלך (%lld%%)"
-        case "Total so far":
-            return "סה״כ עד עכשיו"
-        case "Session started - Billing active":
-            return "השיעור התחיל - החיוב פעיל"
-        case "Just now":
-            return "עכשיו"
-        case "1 min ago":
-            return "לפני דקה"
-        case "%lld min ago":
-            return "לפני %lld דק׳"
-        case "1 hr ago":
-            return "לפני שעה"
-        case "%lld hrs ago":
-            return "לפני %lld שעות"
-        case "1 day ago":
-            return "לפני יום"
-        case "%lld days ago":
-            return "לפני %lld ימים"
-        default:
-            return nil
+    /// The current app language code ("en" or "he"), resolving "System" via the device locale.
+    static var currentLanguageCode: String {
+        if let code = preferredLanguageCode {
+            return code
         }
+        let deviceCode = Locale.preferredLanguages.first.flatMap {
+            Locale(identifier: $0).language.languageCode?.identifier
+        }
+        return deviceCode == "he" ? "he" : "en"
     }
 
     static func locale(languagePreference rawValue: String) -> Locale {

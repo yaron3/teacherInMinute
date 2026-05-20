@@ -72,9 +72,9 @@ struct LoginView: View {
 	.navigationBarTitleDisplayMode(.inline)
 	// Push the resolved destination when login completes
 	.navigationTitle(LocalizationSupport.localized("Welcome Back"))
-	.onChange(of: viewModel.destination) { _, route in
-	  guard let route else { return }
-	  router.push(route)
+	.onChange(of: viewModel.destination) { _, resume in
+	  guard let resume else { return }
+	  router.resume(resume)
 	  viewModel.destination = nil
 	}
 	.alert("Sign In Error", isPresented: $viewModel.showAlert) {

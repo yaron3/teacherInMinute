@@ -59,9 +59,9 @@ struct CreateAccountView: View {
 	.onChange(of: viewModel.navigateToChooseRole) { _, newValue in
 	  if newValue { router.push(.chooseRole) }
 	}
-	.onChange(of: viewModel.destination) { _, route in
-	  guard let route else { return }
-	  router.push(route)
+	.onChange(of: viewModel.destination) { _, resume in
+	  guard let resume else { return }
+	  router.resume(resume)
 	  viewModel.destination = nil
 	}
 	.onChange(of: viewModel.focusField) { _, field in

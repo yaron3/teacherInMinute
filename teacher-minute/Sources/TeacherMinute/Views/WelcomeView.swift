@@ -101,7 +101,7 @@ struct WelcomeView: View {
 	
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
-	  router.replace(with: AppRoute.resumeDestination(for: resume))
+	  router.resume(resume)
 	  logger.info("[Auth] auto-login restored session uid=\(uid)")
 	} catch {
 	  logger.error("[Auth] auto-login failed: \(error)")

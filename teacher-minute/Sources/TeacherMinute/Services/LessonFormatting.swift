@@ -6,7 +6,7 @@
 import Foundation
 
 enum LessonFormatting {
-    static let defaultCurrencyCode = "USD"
+    static let defaultCurrencyCode = "ILS"
 
     static func relativeDateText(_ date: Date) -> String {
         guard date > .distantPast else { return "Recently" }

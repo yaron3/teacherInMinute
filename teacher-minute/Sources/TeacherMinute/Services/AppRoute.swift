@@ -15,28 +15,18 @@ enum AppRoute: Hashable {
   case teacherIdentityVerification
   case teacherSubjects
   case completeProfile(role: AuthRole)
-  case mainTabs(role: AuthRole)
   case studentHome
   case teacherDashboard
-  
-  static func resumeDestination(for resume: OnboardingResume) -> AppRoute {
-	 switch resume {
-	   case .chooseRole:
-		 return .chooseRole
-	   case .teacherIdentityVerification:
-		 return .teacherIdentityVerification
-	   case .teacherSubjects:
-		 return .teacherSubjects
-	   case .completeProfile(let role):
-		 return .completeProfile(role: role)
-	   case .home(let role):
-		 return .mainTabs(role: role)
-	 }
-  }
+}
+
+enum RootScreen: Hashable {
+  case welcome
+  case mainTabs(role: AuthRole)
 }
 
 @Observable
 final class AppRouter: @unchecked Sendable {
+  var rootScreen: RootScreen = .welcome
   var path = NavigationPath()
 
   func push(_ route: AppRoute) {
@@ -57,6 +47,31 @@ final class AppRouter: @unchecked Sendable {
   func replace(with route: AppRoute) {
 	path = NavigationPath()
 	path.append(route)
+  }
+
+  func enterMainTabs(role: AuthRole) {
+	path = NavigationPath()
+	rootScreen = .mainTabs(role: role)
+  }
+
+  func signOut() {
+	path = NavigationPath()
+	rootScreen = .welcome
+  }
+
+  func resume(_ resume: OnboardingResume) {
+	switch resume {
+	case .chooseRole:
+	  replace(with: .chooseRole)
+	case .teacherIdentityVerification:
+	  replace(with: .teacherIdentityVerification)
+	case .teacherSubjects:
+	  replace(with: .teacherSubjects)
+	case .completeProfile(let role):
+	  replace(with: .completeProfile(role: role))
+	case .home(let role):
+	  enterMainTabs(role: role)
+	}
   }
 }
 

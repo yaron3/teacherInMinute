@@ -13,14 +13,16 @@ import WebKit
 struct AboutWebView: View {
     let url: URL
     let title: String
-    
+    @Environment(\.colorScheme) private var colorScheme
+
     init(url: URL, title: String = "About") {
         self.url = url
         self.title = title
     }
-    
+
     var body: some View {
-        WebContentView(url: url)
+        WebContentView(url: url, colorScheme: colorScheme)
+            .background(Color(.systemBackground))
             .ignoresSafeArea(edges: .bottom)
             .navigationTitle(LocalizationSupport.localized(title))
             .navigationBarTitleDisplayMode(.inline)
@@ -30,14 +32,21 @@ struct AboutWebView: View {
 
 private struct WebContentView: UIViewRepresentable {
     let url: URL
-    
+    let colorScheme: ColorScheme
+
     func makeUIView(context: Context) -> WKWebView {
-        WKWebView(frame: .zero)
+        let webView = WKWebView(frame: .zero)
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        return webView
     }
-    
+
     func updateUIView(_ webView: WKWebView, context: Context) {
-        guard webView.url != url else { return }
-        webView.load(URLRequest(url: url))
+        webView.overrideUserInterfaceStyle = colorScheme == .dark ? .dark : .light
+        if webView.url != url {
+            webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
+        }
     }
 }
 #else

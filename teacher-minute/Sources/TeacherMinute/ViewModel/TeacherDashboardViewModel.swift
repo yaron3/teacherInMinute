@@ -533,7 +533,6 @@ final class TeacherDashboardViewModel {
   }
 
   private static func formatCents(_ cents: Int) -> String {
-    let dollars = Double(cents) / 100.0
-    return String(format: "$%.2f", dollars)
+    LessonFormatting.currencyText(cents: cents)
   }
 }

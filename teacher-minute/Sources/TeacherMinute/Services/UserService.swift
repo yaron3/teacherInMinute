@@ -15,7 +15,7 @@ import SkipFirebaseFirestore
 
 // MARK: - Completion state returned after login
 
-enum OnboardingResume {
+enum OnboardingResume: Equatable {
   case chooseRole                     // no role set yet
   case teacherIdentityVerification    // teacher: docs not uploaded
   case teacherSubjects                // teacher: subjects not chosen

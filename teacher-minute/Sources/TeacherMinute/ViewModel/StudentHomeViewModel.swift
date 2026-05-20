@@ -428,7 +428,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   private static func recentLesson(_ lesson: HistoryLesson) -> RecentLesson {
     RecentLesson(
       title: lesson.title,
-      teacher: "with \(lesson.otherParticipantName)",
+      teacher: String(format: LocalizationSupport.localized("with %@"), lesson.otherParticipantName),
       teacherImageURL: lesson.otherParticipantImageURL,
       time: LessonFormatting.relativeDateText(lesson.acceptedAt),
       duration: LessonFormatting.durationText(seconds: lesson.durationSeconds)

@@ -262,18 +262,18 @@ struct ChatSessionView: View {
 
   var sessionStats: some View {
     HStack(spacing: 0) {
-      VStack(alignment: .leading, spacing: 6) {
-        Text(viewModel.primaryAmountTitle)
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(theme.appSecondaryText)
-        Text(viewModel.primaryAmountText(at: displayDate))
-          .font(.system(size: 22, weight: .bold))
-          .foregroundStyle(theme.appPink)
-        Text(viewModel.primaryAmountSubtitle)
-          .font(.system(size: 10, weight: .medium))
-          .foregroundStyle(theme.appSecondaryText)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
+//      VStack(alignment: .leading, spacing: 6) {
+//        Text(viewModel.primaryAmountTitle)
+//          .font(.system(size: 11, weight: .medium))
+//          .foregroundStyle(theme.appSecondaryText)
+//        Text(viewModel.primaryAmountText(at: displayDate))
+//          .font(.system(size: 22, weight: .bold))
+//          .foregroundStyle(theme.appPink)
+//        Text(viewModel.primaryAmountSubtitle)
+//          .font(.system(size: 10, weight: .medium))
+//          .foregroundStyle(theme.appSecondaryText)
+//      }
+//      .frame(maxWidth: .infinity, alignment: .leading)
 
       Rectangle()
         .fill(theme.appBorder)

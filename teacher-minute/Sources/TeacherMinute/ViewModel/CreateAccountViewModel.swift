@@ -55,7 +55,7 @@ final class CreateAccountViewModel {
   var isLoading       = false
   var navigateToChooseRole = false
 
-  var destination: AppRoute?
+  var destination: OnboardingResume?
 
   // Alert state
   var alertMessage: String?
@@ -198,7 +198,7 @@ final class CreateAccountViewModel {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpSuccess, parameters: ["method": method])
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
-	  destination = AppRoute.resumeDestination(for: resume)
+	  destination = resume
 	} catch {
 	  alertMessage = error.localizedDescription
 	  showAlert = true

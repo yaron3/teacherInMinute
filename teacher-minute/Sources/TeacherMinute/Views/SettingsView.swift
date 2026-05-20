@@ -9,37 +9,50 @@ import SwiftUI
 
 struct SettingsView: View {
     @State var viewModel: SettingsViewModel
-    @State var activeDestination: SettingsDestination?
     @Environment(\.appRouter) var router
     @Environment(\.openURL) var openURL
-  @Environment(\.colorScheme) var colorScheme
-  var role: AppUserMode
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-  init(role: AppUserMode,viewModel: SettingsViewModel?) {
-	if let viewModel {
-	  self._viewModel = State(wrappedValue: viewModel)
-	} else {
-	  self._viewModel = State(wrappedValue: SettingsViewModel(role:role))
-	}
-	self.role = role
-  }
+    @Environment(\.colorScheme) var colorScheme
+    var role: AppUserMode
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
+    init(role: AppUserMode, viewModel: SettingsViewModel?) {
+        if let viewModel {
+            self._viewModel = State(wrappedValue: viewModel)
+        } else {
+            self._viewModel = State(wrappedValue: SettingsViewModel(role: role))
+        }
+        self.role = role
+    }
 
     var body: some View {
-        GeometryReader { geometry in
+        NavigationStack(path: $viewModel.navigationPath) {
             ZStack {
-                settingsContent
-                    .offset(x: activeDestination != nil ? -geometry.size.width : 0)
+                List {
+                    ForEach(viewModel.sections) { section in
+                        SettingsSectionView(section: section) { row in
+                            viewModel.select(row)
+                        }
+                    }
 
-                if let destination = activeDestination {
-                    destinationContainer(destination)
-                        .transition(.move(edge: .trailing))
+                    Section {
+                        Text(viewModel.appVersion)
+                            .font(.system(size: 11))
+                            .foregroundStyle(theme.appSecondaryText)
+                            .frame(maxWidth: .infinity)
+                            .listRowBackground(Color.clear)
+                    }
                 }
+
+                loadingOverlay
             }
-            .animation(.easeInOut(duration: 0.25), value: activeDestination)
+            .navigationTitle("Settings")
+            .navigationDestination(for: SettingsDestination.self) { destination in
+                destinationView(destination)
+                    .navigationTitle(destination.title)
+                    .navigationBarTitleDisplayMode(.inline)
+            }
         }
-        .background(Color(.systemBackground))
         .alert(viewModel.activeConfirmation?.title ?? "Settings", isPresented: isShowingConfirmation) {
             Button("Cancel", role: .cancel) {
                 viewModel.activeConfirmation = nil
@@ -64,74 +77,6 @@ struct SettingsView: View {
         }
     }
 
-    var settingsContent: some View {
-        ZStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Settings")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
-                        .padding(.top, 24)
-
-                    VStack(spacing: 28) {
-                        ForEach(viewModel.sections) { section in
-                            settingsSection(section)
-                        }
-                    }
-                    .padding(.top, 28)
-
-                    Text(viewModel.appVersion)
-                        .font(.system(size: 11))
-                        .foregroundStyle(theme.appSecondaryText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 28)
-                        .padding(.bottom, 24)
-                }
-                .padding(.horizontal, 18)
-            }
-
-            loadingOverlay
-        }
-        .background(Color(.systemBackground))
-    }
-
-    func destinationContainer(_ destination: SettingsDestination) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button {
-                    activeDestination = nil
-                } label: {
-                    HStack(spacing: 5) {
-                        PlatformIcon(
-                            systemName: "chevron.left",
-                            size: 14,
-                            weight: .semibold,
-                            color: theme.appPink
-                        )
-                        Text("Settings")
-                            .font(.system(size: 16))
-                            .foregroundStyle(theme.appPink)
-                    }
-                }
-
-                Spacer()
-            }
-            .overlay {
-                Text(destination.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(theme.appPrimaryText)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 44)
-
-            Divider()
-
-            destinationView(destination)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .background(Color(.systemBackground))
-    }
-
     @ViewBuilder
     func destinationView(_ destination: SettingsDestination) -> some View {
         switch destination {
@@ -153,39 +98,6 @@ struct SettingsView: View {
             NotificationPreferencesSettingsView()
         case .privacyControls:
             PrivacyControlsSettingsView()
-        }
-    }
-
-    func settingsSection(_ section: SettingsSection) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(section.title)
-                .font(.system(size: 12, weight: .bold))
-                .tracking(1)
-                .foregroundStyle(theme.appSecondaryText)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-                    if let destination = row.destination {
-                        SettingsRowView(row: row) {
-                            activeDestination = destination
-                        }
-                    } else {
-                        SettingsRowView(row: row) {
-                            viewModel.select(row)
-                        }
-                    }
-
-                    if index < section.rows.count - 1 {
-                        Divider()
-                            .padding(.leading, 58)
-                    }
-                }
-            }
-            .padding(.vertical, 8)
-            .background(theme.appCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
         }
     }
 
@@ -215,7 +127,7 @@ struct SettingsView: View {
 
         Task {
             if await viewModel.confirm(confirmation) {
-                router.popToRoot()
+                router.signOut()
             }
         }
     }
@@ -223,19 +135,16 @@ struct SettingsView: View {
 
 struct AccountSecuritySettingsView: View {
     let viewModel: SettingsViewModel
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
     var body: some View {
         ZStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    settingsSection(viewModel.accountSecuritySection)
-                        .padding(.top, 24)
+            List {
+                SettingsSectionView(section: viewModel.accountSecuritySection) { row in
+                    viewModel.select(row)
                 }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 24)
             }
 
             if viewModel.isLoading {
@@ -246,159 +155,53 @@ struct AccountSecuritySettingsView: View {
                     .tint(theme.appPrimaryText)
             }
         }
-        .background(Color(.systemBackground))
-    }
-
-    func settingsSection(_ section: SettingsSection) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(section.title)
-                .font(.system(size: 12, weight: .bold))
-                .tracking(1)
-                .foregroundStyle(theme.appSecondaryText)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-                    SettingsRowView(row: row) {
-                        viewModel.select(row)
-                    }
-
-                    if index < section.rows.count - 1 {
-                        Divider()
-                            .padding(.leading, 58)
-                    }
-                }
-            }
-            .padding(.vertical, 8)
-            .background(theme.appCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
-        }
     }
 }
 
 struct LanguageSettingsView: View {
     let viewModel: SettingsViewModel
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
+
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("LANGUAGE")
-                    .font(.system(size: 12, weight: .bold))
-                    .tracking(1)
-                    .foregroundStyle(theme.appSecondaryText)
-                    .padding(.leading, 4)
-                    .padding(.top, 24)
-
-                VStack(spacing: 0) {
-                    ForEach(Array(SettingsLanguageChoice.allCases.enumerated()), id: \.element.id) { index, language in
-                        Button {
-                            viewModel.selectedLanguage = language
-                        } label: {
-                            HStack(spacing: 14) {
-                                Circle()
-                                    .fill(theme.appGrayBackground)
-                                    .frame(width: 34, height: 34)
-                                    .overlay {
-                                        PlatformIcon(
-                                            systemName: "globe",
-                                            size: 13,
-                                            weight: .semibold,
-                                            color: theme.appPrimaryText
-                                        )
-                                    }
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(language.title)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(theme.appPrimaryText)
-
-                                    if let subtitle = language.subtitle {
-                                        Text(subtitle)
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(theme.appSecondaryText)
-                                    }
-                                }
-
-                                Spacer()
-
-                                if viewModel.selectedLanguage == language {
-                                    PlatformIcon(
-                                        systemName: "checkmark",
-                                        size: 14,
-                                        weight: .bold,
-                                        color: theme.appPink
-                                    )
+        Form {
+            Section(header: Text(LocalizationSupport.localized("Language"))) {
+                ForEach(SettingsLanguageChoice.allCases) { language in
+                    Button {
+                        viewModel.updateLanguage(language)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(language.title)
+                                if let subtitle = language.subtitle {
+                                    Text(subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .frame(height: language.subtitle == nil ? 54 : 64)
-                        }
-                        .buttonStyle(.plain)
-
-                        if index < SettingsLanguageChoice.allCases.count - 1 {
-                            Divider()
-                                .padding(.leading, 58)
+                            Spacer()
+                            if viewModel.selectedLanguage == language {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.tint)
+                            }
                         }
                     }
+                    .foregroundStyle(.primary)
                 }
-                .padding(.vertical, 8)
-                .background(theme.appCardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 24)
         }
-        .background(Color(.systemBackground))
     }
 }
 
 struct AboutSettingsView: View {
     let viewModel: SettingsViewModel
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-    var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                settingsSection(viewModel.aboutSection)
-                    .padding(.top, 24)
-            }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 24)
-        }
-        .background(Color(.systemBackground))
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
     }
-
-    func settingsSection(_ section: SettingsSection) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(section.title)
-                .font(.system(size: 12, weight: .bold))
-                .tracking(1)
-                .foregroundStyle(theme.appSecondaryText)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-                    SettingsRowView(row: row) {
-                        viewModel.select(row)
-                    }
-
-                    if index < section.rows.count - 1 {
-                        Divider()
-                            .padding(.leading, 58)
-                    }
-                }
+    var body: some View {
+        List {
+            SettingsSectionView(section: viewModel.aboutSection) { row in
+                viewModel.select(row)
             }
-            .padding(.vertical, 8)
-            .background(theme.appCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
         }
     }
 }
@@ -441,140 +244,52 @@ struct SettingsPlaceholderView: View {
 
 struct StudentPaymentsSettingsView: View {
     let viewModel: SettingsViewModel
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-    AppTheme(colorScheme: colorScheme)
-  }
 
     var body: some View {
-        VStack(spacing: 18) {
-            RoundedInfoCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Circle()
-                        .fill(theme.appPurpleSoft)
-                        .frame(width: 44, height: 44)
-                        .overlay {
-                            PlatformIcon(
-                                systemName: "creditcard.fill",
-                                size: 18,
-                                weight: .semibold,
-                                color: theme.appPurple
-                            )
-                        }
-
-                    Text(LocalizationSupport.localized("PayPal Checkout"))
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
-
-                    Text(LocalizationSupport.localized("Today we support PayPal only. Students do not need to save a payment method in the app; PayPal asks for the student credentials during each purchase."))
-                        .font(.system(size: 13))
-                        .foregroundStyle(theme.appSecondaryText)
-                        .lineSpacing(4)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+        Form {
+            Section(header: Text(LocalizationSupport.localized("PayPal Checkout"))) {
+                Text(LocalizationSupport.localized("Today we support PayPal only. Students do not need to save a payment method in the app; PayPal asks for the student credentials during each purchase."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 24)
-
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
     }
 }
 
 struct TeacherPayoutSettingsView: View {
     @Bindable var viewModel: SettingsViewModel
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-    AppTheme(colorScheme: colorScheme)
-  }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            RoundedInfoCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    Circle()
-                        .fill(theme.appPurpleSoft)
-                        .frame(width: 44, height: 44)
-                        .overlay {
-                            PlatformIcon(
-                                systemName: "p.circle.fill",
-                                size: 20,
-                                weight: .semibold,
-                                color: theme.appPurple
-                            )
-                        }
-
-                    Text(LocalizationSupport.localized("PayPal Payouts"))
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
-
-                    Text(LocalizationSupport.localized("Teachers must add and keep a valid PayPal email in order to receive payouts. Payments cannot be sent until this information is valid."))
-                        .font(.system(size: 13))
-                        .foregroundStyle(theme.appSecondaryText)
-                        .lineSpacing(4)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(LocalizationSupport.localized("PayPal Email"))
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(theme.appPrimaryText)
-
-                        TextField(LocalizationSupport.localized("teacher@example.com"), text: $viewModel.teacherPayPalEmail)
-                            .font(.system(size: 15))
-                            .foregroundStyle(theme.appPrimaryText)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .padding(.horizontal, 14)
-                            .frame(height: 48)
-                            .background(theme.authFieldBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(theme.authFieldBorder, lineWidth: 1)
-                            }
-                    }
-
-                    Button {
-                        viewModel.saveTeacherPayoutSettings()
-                    } label: {
-                        HStack {
-                            if viewModel.isSavingPayoutSettings {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .tint(theme.appPrimaryText)
-                            } else {
-                                PlatformIcon(
-                                    systemName: "checkmark.circle.fill",
-                                    size: 14,
-                                    weight: .semibold,
-                                    color: theme.appPrimaryText
-                                )
-                            }
-
-                            Text(viewModel.isSavingPayoutSettings ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save PayPal Info"))
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(theme.appPrimaryText)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .background(theme.appPink)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(viewModel.isSavingPayoutSettings)
-                    .padding(.top, 4)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+        Form {
+            Section {
+                Text(LocalizationSupport.localized("Teachers must add and keep a valid PayPal email in order to receive payouts. Payments cannot be sent until this information is valid."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 24)
-            .padding(.bottom, 24)
+
+            Section(header: Text(LocalizationSupport.localized("PayPal Email"))) {
+                TextField(LocalizationSupport.localized("teacher@example.com"), text: $viewModel.teacherPayPalEmail)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+
+            Section {
+                Button {
+                    viewModel.saveTeacherPayoutSettings()
+                } label: {
+                    HStack {
+                        if viewModel.isSavingPayoutSettings {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                        Text(viewModel.isSavingPayoutSettings ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save PayPal Info"))
+                    }
+                }
+                .disabled(viewModel.isSavingPayoutSettings)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
         .task {
             await viewModel.loadTeacherPayoutSettings()
         }
@@ -583,38 +298,21 @@ struct TeacherPayoutSettingsView: View {
 
 struct ChangePasswordSettingsView: View {
     let viewModel: SettingsViewModel
-    @Environment(\.colorScheme) var colorScheme
-
-    var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
 
     var body: some View {
-        VStack(spacing: 18) {
-            RoundedInfoCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(LocalizationSupport.localized("Change Password"))
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
-                    Text(LocalizationSupport.localized("Send a password reset email to the email address on this account."))
-                        .font(.system(size: 13))
-                        .foregroundStyle(theme.appSecondaryText)
-                    Button { viewModel.sendPasswordReset() } label: {
-                        Text(LocalizationSupport.localized("Send Reset Email"))
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(theme.appPrimaryText)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 46)
-                            .background(theme.appPink)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+        Form {
+            Section {
+                Text(LocalizationSupport.localized("Send a password reset email to the email address on this account."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 24)
-            Spacer()
+
+            Section {
+                Button(LocalizationSupport.localized("Send Reset Email")) {
+                    viewModel.sendPasswordReset()
+                }
+            }
         }
-        .background(Color(.systemBackground))
     }
 }
 
@@ -622,15 +320,15 @@ struct NotificationPreferencesSettingsView: View {
     @AppStorage("notifyIncomingTeacherMessage") var notifyIncomingTeacherMessage = true
     @AppStorage("notifyGeneralAnnouncements") var notifyGeneralAnnouncements = true
     @AppStorage("appearanceMode") var appearanceMode = "system"
-    @Environment(\.colorScheme) var colorScheme
-
-    var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 12) {
+        Form {
+            Section(header: Text(LocalizationSupport.localized("Notifications"))) {
                 Toggle(LocalizationSupport.localized("Notify me when a teacher sends an incoming message"), isOn: $notifyIncomingTeacherMessage)
                 Toggle(LocalizationSupport.localized("Notify me about general announcements"), isOn: $notifyGeneralAnnouncements)
+            }
+
+            Section(header: Text(LocalizationSupport.localized("Appearance"))) {
                 Picker(LocalizationSupport.localized("Appearance"), selection: $appearanceMode) {
                     Text(LocalizationSupport.localized("System")).tag("system")
                     Text(LocalizationSupport.localized("Light")).tag("light")
@@ -638,88 +336,81 @@ struct NotificationPreferencesSettingsView: View {
                 }
                 .pickerStyle(.segmented)
             }
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(theme.appPrimaryText)
-            .padding(18)
-            .background(theme.appCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .padding(18)
         }
-        .background(Color(.systemBackground))
     }
 }
 
 struct PrivacyControlsSettingsView: View {
     @AppStorage("showProfileImage") var showProfileImage = true
     @AppStorage("allowTeacherMessagesOutsideCalls") var allowTeacherMessagesOutsideCalls = true
-    @Environment(\.colorScheme) var colorScheme
-
-    var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 12) {
+        Form {
+            Section(header: Text(LocalizationSupport.localized("Privacy"))) {
                 Toggle(LocalizationSupport.localized("Show my profile image"), isOn: $showProfileImage)
                 Toggle(LocalizationSupport.localized("Allow incoming messages from a teacher while not in a call"), isOn: $allowTeacherMessagesOutsideCalls)
             }
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(theme.appPrimaryText)
-            .padding(18)
-            .background(theme.appCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .padding(18)
         }
-        .background(Color(.systemBackground))
+    }
+}
+
+struct SettingsSectionView: View {
+    let section: SettingsSection
+    let onSelect: (SettingsRow) -> Void
+
+    var body: some View {
+        Section {
+            ForEach(section.rows) { row in
+                if let destination = row.destination {
+                    NavigationLink(value: destination) {
+                        SettingsRowView(row: row)
+                    }
+                } else {
+                    Button {
+                        onSelect(row)
+                    } label: {
+                        SettingsRowView(row: row)
+                    }
+                }
+            }
+        } header: {
+            Text(section.title)
+        }
     }
 }
 
 struct SettingsRowView: View {
     let row: SettingsRow
-    let action: () -> Void
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Circle()
-				.fill(theme.primaryBackground)
-                    .frame(width: 34, height: 34)
-                    .overlay {
-                        PlatformIcon(
-                            systemName: row.systemImage,
-                            size: 13,
-                            weight: .semibold,
-							color: theme.primaryText
-                        )
-                    }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(row.title)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(row.isDestructive ? .red : theme.appPrimaryText)
-
-                    if let subtitle = row.subtitle {
-                        Text(subtitle)
-                            .font(.system(size: 11))
-                            .foregroundStyle(theme.appSecondaryText)
-                    }
+        HStack(spacing: 14) {
+            Circle()
+                .fill(theme.primaryBackground)
+                .frame(width: 34, height: 34)
+                .overlay {
+                    PlatformIcon(
+                        systemName: row.systemImage,
+                        size: 13,
+                        weight: .semibold,
+                        color: theme.primaryText
+                    )
                 }
 
-                Spacer()
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(row.isDestructive ? .red : theme.appPrimaryText)
 
-                PlatformIcon(
-                    systemName: "chevron.right",
-                    size: 12,
-                    weight: .semibold,
-                    color: theme.appSecondaryText
-                )
+                if let subtitle = row.subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(theme.appSecondaryText)
+                }
             }
-            .padding(.horizontal, 16)
-            .frame(height: row.subtitle == nil ? 54 : 64)
         }
-        .buttonStyle(.plain)
     }
 }
 
