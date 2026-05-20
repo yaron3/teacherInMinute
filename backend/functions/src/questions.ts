@@ -248,7 +248,6 @@ export const acceptInvite = onCall(async (req) => {
       studentUid,
       teacherUid,
       teacherId: teacherUid,
-      teachedId: teacherUid,
       acceptedByTeacher: teacherUid,
       acceptedAt: Date.now(),
     },

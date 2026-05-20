@@ -161,7 +161,6 @@ exports.acceptInvite = (0, https_1.onCall)(async (req) => {
         studentUid,
         teacherUid,
         teacherId: teacherUid,
-        teachedId: teacherUid,
         acceptedByTeacher: teacherUid,
         acceptedAt: Date.now(),
     }, "accepted", "acceptInvite");

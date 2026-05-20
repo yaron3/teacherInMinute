@@ -39,20 +39,20 @@ final class TeacherPresenceService {
   
   private var injectedStatusWriter: ((String) -> Void)?
   
-  func goOnline() {
+  func goOnline(subjects: [String] = []) {
 	presenceInfo("[Presence] goOnline called uid=\(self.teacherUID)")
-	writeStatus("online")
+	writeStatus("online", subjects: subjects)
 	guard let ref = teacherRef else { return }
 	startListeningToQueue(ref: ref.child("waitingMessages"))
   }
-  
+
   func goOffline() {
 	presenceInfo("[Presence] goOffline called uid=\(self.teacherUID)")
-	writeStatus("offline")
+	writeStatus("offline", subjects: [])
 	stopListeningToQueue()
   }
-  
-  private func writeStatus(_ status: String) {
+
+  private func writeStatus(_ status: String, subjects: [String]) {
 	if let injectedStatusWriter {
 	  injectedStatusWriter(status)
 	  return
@@ -62,7 +62,10 @@ final class TeacherPresenceService {
 	  return
 	}
 	ref.child("status").setValue(status)
-	presenceInfo("[Presence] wrote status=\(status) to DB")
+	if status == "online" {
+	  ref.child("subjects").setValue(subjects)
+	}
+	presenceInfo("[Presence] wrote status=\(status) subjects=\(subjects) to DB")
   }
   
   private func startListeningToQueue(ref: DatabaseReference) {
@@ -149,26 +152,29 @@ final class TeacherPresenceService {
 	}
   }
   
-  func goOnline() {
+  func goOnline(subjects: [String] = []) {
 	logger.info("[Presence] goOnline called uid=\(self.teacherUID)")
-	writeStatus("online")
+	writeStatus("online", subjects: subjects)
 	guard let ref = teacherRef else { return }
 	startListeningToQueue(ref: ref.child("waitingMessages"))
   }
-  
+
   func goOffline() {
 	logger.info("[Presence] goOffline called uid=\(self.teacherUID)")
-	writeStatus("offline")
+	writeStatus("offline", subjects: [])
 	stopListeningToQueue()
   }
-  
-  private func writeStatus(_ status: String) {
+
+  private func writeStatus(_ status: String, subjects: [String]) {
 	if let injectedStatusWriter {
 	  injectedStatusWriter(status)
 	  return
 	}
 	teacherRef?.child("status").setValue(status)
-	logger.info("[Presence] wrote status=\(status) to DB")
+	if status == "online" {
+	  teacherRef?.child("subjects").setValue(subjects)
+	}
+	logger.info("[Presence] wrote status=\(status) subjects=\(subjects) to DB")
   }
   
   private func startListeningToQueue(ref: FirebaseDatabase.DatabaseReference) {

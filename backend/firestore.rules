@@ -42,8 +42,7 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, create, update: if isUser(uid);
-      allow delete: if false;
+      allow read, create, update, delete: if isUser(uid);
 
       match /purchases/{purchaseId} {
         allow read: if isUser(uid);

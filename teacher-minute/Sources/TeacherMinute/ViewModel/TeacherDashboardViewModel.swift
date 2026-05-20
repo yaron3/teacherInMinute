@@ -204,7 +204,10 @@ final class TeacherDashboardViewModel {
     guard let ref = androidTeacherRef else { return }
     let status = isOnline ? "online" : "offline"
     ref.child("status").setValue(status)
-    logger.info("[VM] Android wrote teacher status=\(status)")
+    if isOnline {
+      ref.child("subjects").setValue(subjectKeys)
+    }
+    logger.info("[VM] Android wrote teacher status=\(status) subjectKeys=\(isOnline ? subjectKeys : [])")
 #else
     if presenceService == nil, let uid = Auth.auth().currentUser?.uid {
       logger.info("[VM] toggleOnline — presenceService nil, configuring now uid=\(uid)")
@@ -218,7 +221,7 @@ final class TeacherDashboardViewModel {
     AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
 #else
     if isOnline {
-      presenceService?.goOnline()
+      presenceService?.goOnline(subjects: subjectKeys)
     } else {
       presenceService?.goOffline()
     }
@@ -450,6 +453,16 @@ final class TeacherDashboardViewModel {
       teacherSharePercent: 75,
       currencyCode: LessonFormatting.defaultCurrencyCode
     )
+  }
+
+  // Converts display subject strings to normalized topic keys for RTDB.
+  // "Math: Algebra" → "algebra", "Physics: Mechanics" → "mechanics"
+  // Mirrors the normalizeSubject logic in the backend scoring module.
+  var subjectKeys: [String] {
+    subjects.map { s in
+      let subtopic = s.contains(": ") ? String(s.split(separator: ":", maxSplits: 1).last ?? Substring(s)).trimmingCharacters(in: .whitespaces) : s
+      return subtopic.lowercased().filter { $0.isLetter || $0.isNumber }
+    }
   }
 
   private static func firstString(_ row: [String: Any], keys: [String]) -> String {
