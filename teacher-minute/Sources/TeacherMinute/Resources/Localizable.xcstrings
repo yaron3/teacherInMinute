@@ -1218,9 +1218,15 @@
     "connection_setup_connecting" : {
       "extractionState" : "manual",
       "localizations" : {
-        "he" : {
+        "en" : {
           "stringUnit" : {
             "state" : "translated",
+            "value" : "Connecting "
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
             "value" : "מתחבר"
           }
         }
@@ -1229,9 +1235,15 @@
     "connection_setup_connecting_audio" : {
       "extractionState" : "manual",
       "localizations" : {
-        "he" : {
+        "en" : {
           "stringUnit" : {
             "state" : "translated",
+            "value" : "Connecting Audio"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
             "value" : "מתחבר\nלשמע"
           }
         }

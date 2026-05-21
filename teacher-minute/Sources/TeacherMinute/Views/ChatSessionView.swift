@@ -14,6 +14,7 @@ struct ChatSessionView: View {
   @State var didPrimeBoard = false
   @State var displayDate = Date()
   @State var sessionDetailsRevision = 0
+  @State var isBoardMaximized = false
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let hasAudio: Bool
@@ -114,58 +115,72 @@ struct ChatSessionView: View {
 
   var sessionBody: some View {
     VStack(spacing: 0) {
-      header
+      if !isBoardMaximized {
+        header
 
-      sessionStats
+        sessionStats
 
-      originalQuestionBanner
+       // originalQuestionBanner
 
-      sessionTabs
+        sessionTabs
 
-      if let errorMessage {
-        Text(errorMessage)
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(theme.appPink)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.horizontal, 16)
-          .padding(.top, 6)
+        if let errorMessage {
+          Text(errorMessage)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(theme.appPink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+        }
       }
 
       Group {
-        if selectedTab == "chat" {
+        if isBoardMaximized {
+          whiteboard
+        } else if selectedTab == "chat" {
           VStack(spacing: 0) {
             sessionNotice
             ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
           }
         } else {
-          WhiteboardView(
-            strokes: boardStrokes,
-            revision: boardRevision,
-            onStrokeFinished: { points in
-              let boardPoints = points.map { BoardPoint(x: Double($0.x), y: Double($0.y)) }
-              boardStrokes = boardStrokes + [viewModel.localStroke(points: boardPoints)]
-              viewModel.sendStroke(boardPoints)
-            },
-            onClear: {
-              boardStrokes = []
-              viewModel.clearBoard()
-            }
-          )
+          whiteboard
         }
       }
       .frame(maxHeight: .infinity)
 
 #if os(Android)
-      inputBar
+      if !isBoardMaximized {
+        inputBar
+      }
+
 #endif
     }
     .background(theme.appCardBackground)
 #if !os(Android)
     .safeAreaInset(edge: .bottom) {
-      inputBar
-        .background(theme.appCardBackground)
+      if !isBoardMaximized {
+        inputBar
+          .background(theme.appCardBackground)
+      }
     }
 #endif
+  }
+
+  var whiteboard: some View {
+    WhiteboardView(
+      strokes: boardStrokes,
+      revision: boardRevision,
+      onStrokeFinished: { points in
+        let boardPoints = points.map { BoardPoint(x: Double($0.x), y: Double($0.y)) }
+        boardStrokes = boardStrokes + [viewModel.localStroke(points: boardPoints)]
+        viewModel.sendStroke(boardPoints)
+      },
+      onClear: {
+        boardStrokes = []
+        viewModel.clearBoard()
+      },
+      isMaximized: $isBoardMaximized
+    )
   }
 
   var inputBar: some View {
@@ -262,24 +277,22 @@ struct ChatSessionView: View {
 
   var sessionStats: some View {
     HStack(spacing: 0) {
-//      VStack(alignment: .leading, spacing: 6) {
-//        Text(viewModel.primaryAmountTitle)
-//          .font(.system(size: 11, weight: .medium))
-//          .foregroundStyle(theme.appSecondaryText)
-//        Text(viewModel.primaryAmountText(at: displayDate))
-//          .font(.system(size: 22, weight: .bold))
-//          .foregroundStyle(theme.appPink)
-//        Text(viewModel.primaryAmountSubtitle)
-//          .font(.system(size: 10, weight: .medium))
-//          .foregroundStyle(theme.appSecondaryText)
-//      }
-//      .frame(maxWidth: .infinity, alignment: .leading)
-
-      Rectangle()
-        .fill(theme.appBorder)
-        .frame(width: 1, height: 54)
-
-      VStack(alignment: .trailing, spacing: 4) {
+	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.appOrange)
+		.padding(.top, 2)
+		.padding(.trailing, 8)
+	  VStack(alignment: .leading, spacing: 0) {
+		Text(LocalizationSupport.localized("ORIGINAL QUESTION"))
+		  .font(.system(size: 10, weight: .bold))
+		  .foregroundStyle(theme.appOrange)
+		Text(viewModel.originalQuestion)
+		  .font(.system(size: 12, weight: .medium))
+		  .foregroundStyle(theme.appPrimaryText)
+		  .lineSpacing(3)
+          .frame(maxWidth: .infinity, alignment: .leading)
+	  }
+	  .frame(maxWidth: .infinity, alignment: .leading)
+	  Spacer(minLength: 2)
+      VStack(alignment: .trailing, spacing: 2) {
         Text(LocalizationSupport.localized("Session Time"))
           .font(.system(size: 11, weight: .medium))
           .foregroundStyle(theme.appSecondaryText)
@@ -290,7 +303,9 @@ struct ChatSessionView: View {
           .font(.system(size: 10, weight: .medium))
           .foregroundStyle(theme.appSecondaryText)
       }
-      .frame(maxWidth: .infinity, alignment: .trailing)
+      .fixedSize(horizontal: true, vertical: false)
+	  
+	  
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 16)
@@ -310,6 +325,7 @@ struct ChatSessionView: View {
           .foregroundStyle(theme.appPrimaryText)
           .lineSpacing(3)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
       Spacer(minLength: 0)
     }
     .padding(.horizontal, 16)
@@ -388,33 +404,27 @@ struct ChatSessionView: View {
 }
 
 #if os(iOS)
-struct ChatSessionView_Previews: PreviewProvider {
-  static var previews: some View {
-    ChatSessionView(
-      viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher"),
-      title: "Student",
-      onClose: {}
-    )
-  }
+#Preview {
+  ChatSessionView(
+	viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher"),
+	title: "Student",
+	onClose: {}
+  )
 }
 
-struct ChatSessionProgressView_Previews: PreviewProvider {
-  static var previews: some View {
+#Preview {
     ChatSessionView(
       viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: false),
       title: "Student",
       onClose: {}
     )
-  }
 }
 
-struct ChatSessionConnectingView_Previews: PreviewProvider {
-  static var previews: some View {
+#Preview {
     ChatSessionView(
       viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: true),
       title: "Student",
       onClose: {}
     )
-  }
 }
 #endif
