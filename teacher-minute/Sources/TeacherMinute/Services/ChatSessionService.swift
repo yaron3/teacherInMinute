@@ -127,9 +127,24 @@ final class ChatSessionService {
     sessionHandle = questionRef.observe(.value) { snapshot in
       if !snapshot.exists() {
         onEnded()
+        return
+      }
+      if let dict = snapshot.value as? [String: Any],
+         Self.isTerminalStatus(dict["status"]) {
+        onEnded()
       }
     }
 #endif
+  }
+
+  private static func isTerminalStatus(_ value: Any?) -> Bool {
+    guard let raw = value as? String else { return false }
+    switch raw.lowercased() {
+    case "cancelled", "canceled", "declined", "rejected", "ended", "expired", "completed":
+      return true
+    default:
+      return false
+    }
   }
 
   func startListening(onUpdate: @escaping ([ChatMessage]) -> Void) {

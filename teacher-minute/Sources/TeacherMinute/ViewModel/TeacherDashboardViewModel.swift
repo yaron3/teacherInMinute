@@ -397,11 +397,15 @@ final class TeacherDashboardViewModel {
   }
 
   func cancelAcceptingInvite() {
+    let questionId = acceptingQuestionId
     acceptingTask?.cancel()
     acceptingTask = nil
     acceptingQuestionId = nil
     isAcceptingCalls = false
     clearActiveCallState()
+    if let questionId {
+      declineInvite(questionId: questionId)
+    }
   }
 
   func endCall() {

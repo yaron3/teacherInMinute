@@ -111,7 +111,7 @@ struct AskTeacherSheet: View {
                     isPresented = false
                     Task {
                         await viewModel.askTeacher(
-                            topic: selectedTopic,
+						  topic: selectedTopic.lowercased(),
                             text: questionText.trimmingCharacters(in: .whitespaces),
                             photoUrls: [],
                             conversationType: conversationType
