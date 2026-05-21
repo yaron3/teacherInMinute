@@ -297,13 +297,16 @@ struct ChatSessionView: View {
           .font(.system(size: 11, weight: .medium))
           .foregroundStyle(theme.appSecondaryText)
         Text(viewModel.sessionTimeText(at: displayDate))
-          .font(.system(size: 28, weight: .heavy))
+          .font(.system(size: 28, weight: .heavy, design: .monospaced))
+          .lineLimit(1)
+          .minimumScaleFactor(0.85)
+          .frame(width: 92, alignment: .trailing)
           .foregroundStyle(theme.appPrimaryText)
         Text(LocalizationSupport.localized("minutes"))
           .font(.system(size: 10, weight: .medium))
           .foregroundStyle(theme.appSecondaryText)
       }
-      .fixedSize(horizontal: true, vertical: false)
+      .frame(width: 92, alignment: .trailing)
 	  
 	  
     }
