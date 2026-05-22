@@ -124,6 +124,7 @@ struct PlatformIcon: View {
 		
 	  case "doc.plaintext.fill":					return "txt"
 	  case "hand.raised.fill":					return "✋"
+	  case "clock.badge.checkmark.fill":			return "⏰"
 		
 		
 	  default:

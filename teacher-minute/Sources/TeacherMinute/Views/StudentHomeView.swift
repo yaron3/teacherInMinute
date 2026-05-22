@@ -107,6 +107,12 @@ struct StudentHomeView: View {
             .background(Color(.systemBackground))
 
             searchStateOverlay
+
+#if os(Android)
+            if let result = paymentReturnStore.latestResult {
+                paymentReturnOverlay(result)
+            }
+#endif
         }
         .sheet(isPresented: $showingAskSheet) {
             AskTeacherSheet(viewModel: viewModel, isPresented: $showingAskSheet)
@@ -139,6 +145,7 @@ struct StudentHomeView: View {
         } message: {
             Text(lowBalanceMessage)
         }
+#if !os(Android)
         .alert(paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"), isPresented: isShowingPaymentReturnResult) {
             Button(LocalizationSupport.localized("OK"), role: .cancel) {
                 paymentReturnStore.consumeLatestResult()
@@ -146,7 +153,48 @@ struct StudentHomeView: View {
         } message: {
             Text(paymentReturnStore.latestResult?.message ?? "")
         }
+#endif
     }
+
+#if os(Android)
+    func paymentReturnOverlay(_ result: PaymentReturnResult) -> some View {
+        ZStack {
+            Color.black.opacity(0.34)
+                .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                Text(result.title)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(theme.appPrimaryText)
+                    .multilineTextAlignment(.center)
+
+                Text(result.message)
+                    .font(.system(size: 14))
+                    .foregroundStyle(theme.appSecondaryText)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    paymentReturnStore.consumeLatestResult()
+                } label: {
+                    Text(LocalizationSupport.localized("OK"))
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(theme.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(theme.appPink)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
+            .padding(20)
+            .frame(maxWidth: 320)
+            .background(theme.appCardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, 24)
+        }
+    }
+#endif
 
     var lowBalanceMessage: String {
         let format = LocalizationSupport.localized("You have %@ remaining. You need at least 2 minutes to ask a teacher. Please buy more minutes to continue.")

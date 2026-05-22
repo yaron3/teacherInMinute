@@ -18,6 +18,7 @@ struct AskTeacherSheet: View {
     @State  var selectedTopic = ("Algebra")
     @State  var questionText = ""
     @State  var conversationType = "text"
+    @State  var composerMode: ChatComposerMode = .regular
     @FocusState var isQuestionFocused: Bool
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
     private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 }
@@ -95,7 +96,14 @@ struct AskTeacherSheet: View {
                         .background(theme.appGrayBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                    if isQuestionFocused {
+                    composerModeToggle
+
+                    if composerMode == .algebra {
+                        MathEquationEditorView { latex in
+                            appendEquation(latex)
+                        }
+                        .environment(\.layoutDirection, .leftToRight)
+                    } else if isQuestionFocused {
                         MathSymbolRow(text: $questionText, isFocused: $isQuestionFocused)
                     }
 
@@ -145,6 +153,44 @@ struct AskTeacherSheet: View {
             isQuestionFocused = true
         }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
+    }
+
+    var composerModeToggle: some View {
+        HStack(spacing: 6) {
+            composerModePill(title: "Regular", isSelected: composerMode == .regular) {
+                composerMode = .regular
+                isQuestionFocused = true
+            }
+            composerModePill(title: "Algebra", isSelected: composerMode == .algebra) {
+                composerMode = .algebra
+                isQuestionFocused = false
+            }
+            Spacer()
+        }
+    }
+
+    func composerModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+        } label: {
+            Text(LocalizationSupport.localized(title))
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(isSelected ? theme.white : theme.appPrimaryText)
+                .padding(.horizontal, 14)
+                .frame(height: 28)
+                .background(isSelected ? theme.appPurple : theme.appGrayBackground)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    func appendEquation(_ latex: String) {
+        let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if !questionText.isEmpty && !questionText.hasSuffix(" ") && !questionText.hasSuffix("\n") {
+            questionText += " "
+        }
+        questionText += trimmed
     }
 }
 

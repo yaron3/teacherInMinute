@@ -1,8 +1,14 @@
 import SwiftUI
 
+enum ChatComposerMode {
+  case regular
+  case algebra
+}
+
 struct ChatSessionView: View {
   @State var viewModel: any ChatSessionViewModeling
   @State var draft = ""
+  @State var composerMode: ChatComposerMode = .regular
   @State var messages: [ChatMessage] = []
   @State var boardStrokes: [BoardStroke] = []
   @State var errorMessage: String?
@@ -184,15 +190,61 @@ struct ChatSessionView: View {
   }
 
   var inputBar: some View {
-    ChatInputBar(text: $draft, isFocused: $isMessageFieldFocused) {
-      let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !text.isEmpty else { return }
-      draft = ""
-      messages = messages + [viewModel.localMessage(text: text)]
-      viewModel.send(text)
+    VStack(spacing: 8) {
+      composerModeToggle
+
+      if composerMode == .algebra {
+        MathEquationEditorView { latex in
+          sendComposed(latex)
+        }
+        .environment(\.layoutDirection, .leftToRight)
+      } else {
+        ChatInputBar(text: $draft, isFocused: $isMessageFieldFocused) {
+          let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard !text.isEmpty else { return }
+          draft = ""
+          sendComposed(text)
+        }
+      }
     }
     .padding(.horizontal, 12)
     .padding(.bottom, 10)
+  }
+
+  var composerModeToggle: some View {
+    HStack(spacing: 6) {
+      composerModePill(title: "Regular", isSelected: composerMode == .regular) {
+        composerMode = .regular
+        isMessageFieldFocused = true
+      }
+      composerModePill(title: "Algebra", isSelected: composerMode == .algebra) {
+        composerMode = .algebra
+        isMessageFieldFocused = false
+      }
+      Spacer()
+    }
+  }
+
+  func composerModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    Button {
+      action()
+    } label: {
+      Text(LocalizationSupport.localized(title))
+        .font(.system(size: 12, weight: .bold))
+        .foregroundStyle(isSelected ? theme.white : theme.appPrimaryText)
+        .padding(.horizontal, 14)
+        .frame(height: 28)
+        .background(isSelected ? theme.appPurple : theme.appGrayBackground)
+        .clipShape(Capsule())
+    }
+    .buttonStyle(.plain)
+  }
+
+  func sendComposed(_ text: String) {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    messages = messages + [viewModel.localMessage(text: trimmed)]
+    viewModel.send(trimmed)
   }
 
   var boardRevision: String {
