@@ -9,10 +9,10 @@ const functions_1 = require("firebase-admin/functions");
 const firestore_1 = require("firebase-admin/firestore");
 const uuid_1 = require("uuid");
 const types_1 = require("./types");
+const billing_1 = require("./billing");
 const dispatch_1 = require("./dispatch");
 const firestore = admin.firestore();
 const db = admin.database();
-const HALF_MINUTE_SECONDS = 30;
 function firstString(...values) {
     for (const value of values) {
         if (typeof value === "string" && value.trim().length > 0) {
@@ -127,8 +127,11 @@ async function resolveQuestionContext(questionId) {
     const fsQuestionSnap = await firestore.collection("questions").doc(questionId).get();
     const fsQuestion = ((_b = fsQuestionSnap.data()) !== null && _b !== void 0 ? _b : {});
     const acceptedAtMs = firstNumber(toMillis(rtdbQuestion.acceptedAt), toMillis(fsQuestion.acceptedAt));
+    // Billing starts from when both parties were fully connected (startLesson),
+    // not from when the teacher accepted the invite.
+    const startedAtMs = firstNumber(toMillis(rtdbQuestion.startedAt), toMillis(fsQuestion.startedAt));
     const studentUid = firstString(rtdbQuestion.studentUid, rtdbQuestion.studentId, rtdbQuestion.userId, rtdbQuestion.askerUid, fsQuestion.studentUid);
-    const teacherUid = firstString(rtdbQuestion.teacherUid, rtdbQuestion.teacherId, rtdbQuestion.teachedId, rtdbQuestion.acceptedByTeacher, rtdbQuestion.tutorUid, rtdbQuestion.responderUid, fsQuestion.acceptedByTeacher, fsQuestion.teacherUid);
+    const teacherUid = firstString(rtdbQuestion.teacherUid, rtdbQuestion.teacherId, rtdbQuestion.acceptedByTeacher, rtdbQuestion.tutorUid, rtdbQuestion.responderUid, fsQuestion.acceptedByTeacher, fsQuestion.teacherUid);
     if (!studentUid || !teacherUid) {
         const keys = Object.keys(rtdbQuestion).sort().join(", ") || "none";
         throw new https_1.HttpsError("failed-precondition", `Question is missing participants (RTDB keys: ${keys})`);
@@ -142,28 +145,27 @@ async function resolveQuestionContext(questionId) {
         studentUid,
         teacherUid,
         acceptedAtMs,
+        startedAtMs,
     };
 }
 async function migrateQuestionToFirestore(questionId, endedBy, context) {
     var _a;
-    const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs } = context;
+    const { questionRef, rtdbQuestion, studentUid, teacherUid, startedAtMs } = context;
     firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`);
     const endedAt = firestore_1.Timestamp.now();
     const endedAtMs = endedAt.toMillis();
-    const rawSeconds = Math.max(0, Math.floor((endedAtMs - acceptedAtMs) / 1000));
-    const roundedSeconds = Math.floor(rawSeconds / HALF_MINUTE_SECONDS) * HALF_MINUTE_SECONDS;
-    const roundedMinutes = roundedSeconds / 60;
     const costPerMinute = await getCostPerMinute(teacherUid);
     const commissionRate = await getTeacherCommissionRate(teacherUid);
-    const cost = Math.round(roundedMinutes * costPerMinute * 100) / 100;
-    const teacherEarnings = Math.round(cost * commissionRate * 100) / 100;
+    // Bill from the moment both parties were fully connected (startedAt).
+    // If startLesson was never called the lesson never properly began — charge 0.
+    const billingStartMs = startedAtMs !== null && startedAtMs !== void 0 ? startedAtMs : endedAtMs;
+    const { rawSeconds, roundedSeconds, roundedMinutes, minutesToCharge: roundedMinutesToCharge, cost, teacherEarnings, } = (0, billing_1.calculateBilling)(billingStartMs, endedAtMs, costPerMinute, commissionRate);
     const migratedQuestion = sanitizeForFirestore(rtdbQuestion);
     firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`);
     firebase_functions_1.logger.info(`[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost} commissionRate=${commissionRate} teacherEarnings=${teacherEarnings}`);
-    const roundedMinutesToCharge = Math.max(0, Math.round(roundedMinutes * 100) / 100);
     const batch = firestore.batch();
     const qDocRef = firestore.collection("questions").doc(questionId);
-    batch.set(qDocRef, Object.assign(Object.assign({}, migratedQuestion), { state: "ended", status: "completed", studentUid, acceptedByTeacher: teacherUid, teacherId: teacherUid, teachedId: teacherUid, participants: [studentUid, teacherUid], durationSeconds: roundedSeconds, costPerMinute,
+    batch.set(qDocRef, Object.assign(Object.assign({}, migratedQuestion), { state: "ended", status: "completed", studentUid, acceptedByTeacher: teacherUid, teacherId: teacherUid, participants: [studentUid, teacherUid], durationSeconds: roundedSeconds, costPerMinute,
         cost,
         commissionRate,
         teacherEarnings,
@@ -304,7 +306,6 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
         teacherUid: q.acceptedByTeacher,
         acceptedByTeacher: q.acceptedByTeacher,
         teacherId: q.acceptedByTeacher,
-        teachedId: q.acceptedByTeacher,
         startedAt: Date.now(),
         updatedAt: Date.now(),
     });
