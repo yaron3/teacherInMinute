@@ -114,6 +114,20 @@ struct AppTheme {
         )
     }
 
+    var appTeal: Color {
+        adaptive(
+            light: (20, 184, 166),
+            dark: (45, 212, 191)
+        )
+    }
+
+    var appTealSoft: Color {
+        adaptive(
+            light: (224, 247, 244),
+            dark: (15, 56, 52)
+        )
+    }
+
     // MARK: - Backgrounds & Surfaces
 
     var appGrayBackground: Color {
@@ -337,7 +351,9 @@ private struct AppThemePreviewView: View {
                     ("appPurpleSoft", theme.appPurpleSoft),
                     ("appGreen", theme.appGreen),
                     ("appGreenSoft", theme.appGreenSoft),
-                    ("appOrange", theme.appOrange)
+                    ("appOrange", theme.appOrange),
+                    ("appTeal", theme.appTeal),
+                    ("appTealSoft", theme.appTealSoft)
                 ])
 
                 section("Backgrounds & Surfaces", swatches: [

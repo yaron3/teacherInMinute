@@ -50,10 +50,10 @@ enum LocalizationSupport {
         #if !os(Android)
         let inAppRaw = UserDefaults.standard.string(forKey: languagePreferenceKey) ?? "<unset>"
         let appleLanguages = (UserDefaults.standard.array(forKey: "AppleLanguages") as? [String]) ?? []
-        logger.info("[Localization] resolve — inAppPref='\(inAppRaw)' AppleLanguages=\(appleLanguages) Locale.preferredLanguages=\(Locale.preferredLanguages) Bundle.main.preferredLocalizations=\(Bundle.main.preferredLocalizations) Bundle.main.localizations=\(Bundle.main.localizations)")
+        //logger.info("[Localization] resolve — inAppPref='\(inAppRaw)' AppleLanguages=\(appleLanguages) Locale.preferredLanguages=\(Locale.preferredLanguages) Bundle.main.preferredLocalizations=\(Bundle.main.preferredLocalizations) Bundle.main.localizations=\(Bundle.main.localizations)")
         #endif
         if let code = preferredLanguageCode {
-            logger.info("[Localization] using in-app preference → \(code)")
+            //logger.info("[Localization] using in-app preference → \(code)")
             return code
         }
         return systemLanguageCode
@@ -70,11 +70,11 @@ enum LocalizationSupport {
         // not advertise Hebrew and would incorrectly fall back to "en".
         for identifier in Locale.preferredLanguages {
             if let code = normalizedSupportedLanguageCode(for: identifier) {
-                logger.info("[Localization] matched Locale.preferredLanguages entry '\(identifier)' → \(code)")
+             //   logger.info("[Localization] matched Locale.preferredLanguages entry '\(identifier)' → \(code)")
                 return code
             }
         }
-        logger.info("[Localization] no Locale.preferredLanguages entry matched supported codes \(supportedLanguageCodes); falling back to 'en'")
+       // logger.info("[Localization] no Locale.preferredLanguages entry matched supported codes \(supportedLanguageCodes); falling back to 'en'")
         #endif
         return "en"
     }
