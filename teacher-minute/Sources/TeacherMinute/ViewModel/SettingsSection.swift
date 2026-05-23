@@ -225,9 +225,7 @@ enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
         case .hebrew:
             return "he"
         case .system:
-            return Locale.preferredLanguages
-                .compactMap { Locale(identifier: $0).language.languageCode?.identifier }
-                .first ?? "en"
+            return LocalizationSupport.currentLanguageCode
         }
     }
 }
@@ -599,11 +597,12 @@ class SettingsViewModel {
             try await UserService.shared.deleteUserData(uid: uid)
             try await authService.deleteCurrentUser()
             return true
-        } catch {
+        } catch (let error){
             present(
                 title: LocalizationSupport.localized("Delete Account"),
                 message: "\(error.localizedDescription) " + LocalizationSupport.localized("You may need to log in again before deleting your account.")
             )
+			Analytics.logEvent("Delete Account error", parameters: ["error" : error])
             return false
         }
     }

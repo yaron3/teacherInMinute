@@ -42,7 +42,9 @@ struct CompleteProfileView: View {
 	  .padding(.top, 28)
 
 	  AuthInputField(
-		title: LocalizationSupport.localized("Phone Number"),
+		title: viewModel.role == .student
+		  ? LocalizationSupport.localized("Phone Number (Optional)")
+		  : LocalizationSupport.localized("Phone Number"),
 		placeholder: LocalizationSupport.localized("place holder phone number"),
 		systemImage: "phone",
 		text: $viewModel.phoneNumber,
@@ -96,6 +98,12 @@ struct CompleteProfileView: View {
 	  }
 	  viewModel.checkAndAutoAdvance()
 	}
+	.onChange(of: viewModel.dateOfBirth) { _, _ in
+	  viewModel.suggestGradeFromDOB()
+	}
+	.onChange(of: viewModel.grade) { _, _ in
+	  viewModel.suggestDOBFromGrade()
+	}
 	.overlay {
 	  if viewModel.isCheckingCompletion {
 		ZStack {
@@ -127,7 +135,7 @@ struct CompleteProfileView: View {
 	  DatePicker(
 		"",
 		selection: $viewModel.dateOfBirth,
-		in: Date.distantPast...Date(),
+		in: Date.distantPast...viewModel.maxDateOfBirth,
 		displayedComponents: .date
 	  )
 	  .labelsHidden()

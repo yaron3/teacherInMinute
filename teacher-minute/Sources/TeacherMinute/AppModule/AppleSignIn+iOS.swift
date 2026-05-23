@@ -71,6 +71,18 @@ extension iOSAppleSignInProvider: ASAuthorizationControllerDelegate {
             fullName: appleIDCredential.fullName
         )
 
+        // Apple only returns the user's name on the FIRST sign-in for this
+        // Apple ID + app. Capture it now so we can persist it on the Firebase
+        // user — Firebase doesn't reliably copy the fullName from the
+        // credential into `displayName`.
+        let appleDisplayName: String = {
+            guard let components = appleIDCredential.fullName else { return "" }
+            let formatter = PersonNameComponentsFormatter()
+            return formatter
+                .string(from: components)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }()
+
         Auth.auth().signIn(with: credential) { [weak self] authResult, error in
             if let error {
                 self?.finish(.failure(error))
@@ -82,7 +94,18 @@ extension iOSAppleSignInProvider: ASAuthorizationControllerDelegate {
                 return
             }
 
-            self?.finish(.success(authResult))
+            let user = authResult.user
+            let currentDisplayName = user.displayName ?? ""
+            guard !appleDisplayName.isEmpty, currentDisplayName != appleDisplayName else {
+                self?.finish(.success(authResult))
+                return
+            }
+
+            let changeRequest = user.createProfileChangeRequest()
+            changeRequest.displayName = appleDisplayName
+            changeRequest.commitChanges { _ in
+                self?.finish(.success(authResult))
+            }
         }
     }
 

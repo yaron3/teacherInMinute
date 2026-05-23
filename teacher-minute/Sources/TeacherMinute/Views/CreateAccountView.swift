@@ -95,16 +95,16 @@ struct CreateAccountView: View {
   var inputCard: some View {
 	VStack(alignment: .leading, spacing: 22) {
 	  fieldSection(
-		title: "Email",
+		title: LocalizationSupport.localized("Email"),
 		icon: "envelope",
-		placeholder: "Enter your email",
+		placeholder: LocalizationSupport.localized("Enter your email"),
 		text: $viewModel.emailOrPhone,
 		isSecure: false,
 		field: .email,
 		isValid: viewModel.emailOrPhone.isEmpty || viewModel.isEmailValid
 	  )
 	  fieldSection(
-		title: "Password",
+		title: LocalizationSupport.localized("Password"),
 		icon: "lock.fill",
 		placeholder: LocalizationSupport.localized("Min. 6 characters"),
 		text: $viewModel.password,
@@ -230,23 +230,25 @@ struct CreateAccountView: View {
   }
   
 	func termsTextView() -> some View {
-	  VStack(alignment: .leading, spacing: 2) {
-		HStack(spacing: 0) {
-		  Text(LocalizationSupport.localized("I agree to the ")).foregroundStyle(theme.authSecondaryText)
-		  Button { viewModel.openTerms() } label: {
-			  Text(LocalizationSupport.localized("Terms of Service")).foregroundStyle(theme.authPink)
-			}
-			.buttonStyle(.plain)
-			Text(LocalizationSupport.localized(" and")).foregroundStyle(theme.authSecondaryText)
-		  Button { viewModel.openPrivacy() } label: {
-			Text(LocalizationSupport.localized("Privacy Policy.")).foregroundStyle(theme.authPink)
+	  let markdown = LocalizationSupport.localized("I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)")
+
+	  return Text(LocalizedStringKey(markdown))
+		.font(.system(size: 14))
+		.lineSpacing(4)
+		.foregroundStyle(theme.authSecondaryText)
+		.tint(theme.authPink)
+		.environment(\.openURL, OpenURLAction { url in
+		  switch url.absoluteString {
+		  case "teacherminute://terms":
+			viewModel.openTerms()
+			return .handled
+		  case "teacherminute://privacy":
+			viewModel.openPrivacy()
+			return .handled
+		  default:
+			return .systemAction
 		  }
-		  .buttonStyle(.plain)
-		}
-		
-	  }
-	.font(.system(size: 14))
-	.lineSpacing(4)
+		})
   }
   
   var continueButton: some View {
