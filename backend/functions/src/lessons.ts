@@ -14,12 +14,11 @@ import {
   CONNECTION_FEE_CENTS,
   PurchaseDoc,
 } from "./types";
+import { calculateBilling } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
 
 const firestore = admin.firestore();
 const db = admin.database();
-
-const HALF_MINUTE_SECONDS = 30;
 
 function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
@@ -171,7 +170,6 @@ async function resolveQuestionContext(questionId: string): Promise<{
   const teacherUid = firstString(
     rtdbQuestion.teacherUid,
     rtdbQuestion.teacherId,
-    rtdbQuestion.teachedId,
     rtdbQuestion.acceptedByTeacher,
     rtdbQuestion.tutorUid,
     rtdbQuestion.responderUid,
@@ -217,13 +215,16 @@ async function migrateQuestionToFirestore(
   );
   const endedAt = Timestamp.now();
   const endedAtMs = endedAt.toMillis();
-  const rawSeconds = Math.max(0, Math.floor((endedAtMs - acceptedAtMs) / 1000));
-  const roundedSeconds = Math.floor(rawSeconds / HALF_MINUTE_SECONDS) * HALF_MINUTE_SECONDS;
-  const roundedMinutes = roundedSeconds / 60;
   const costPerMinute = await getCostPerMinute(teacherUid);
   const commissionRate = await getTeacherCommissionRate(teacherUid);
-  const cost = Math.round(roundedMinutes * costPerMinute * 100) / 100;
-  const teacherEarnings = Math.round(cost * commissionRate * 100) / 100;
+  const {
+    rawSeconds,
+    roundedSeconds,
+    roundedMinutes,
+    minutesToCharge: roundedMinutesToCharge,
+    cost,
+    teacherEarnings,
+  } = calculateBilling(acceptedAtMs, endedAtMs, costPerMinute, commissionRate);
   const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
   logger.info(
     `[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`
@@ -232,8 +233,6 @@ async function migrateQuestionToFirestore(
   logger.info(
     `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost} commissionRate=${commissionRate} teacherEarnings=${teacherEarnings}`
   );
-
-  const roundedMinutesToCharge = Math.max(0, Math.round(roundedMinutes * 100) / 100);
 
   const batch = firestore.batch();
   const qDocRef = firestore.collection("questions").doc(questionId);
@@ -246,7 +245,6 @@ async function migrateQuestionToFirestore(
       studentUid,
       acceptedByTeacher: teacherUid,
       teacherId: teacherUid,
-      teachedId: teacherUid,
       participants: [studentUid, teacherUid],
       durationSeconds: roundedSeconds,
       costPerMinute,
@@ -444,7 +442,6 @@ export const startLesson = onCall(async (req) => {
     teacherUid: q.acceptedByTeacher,
     acceptedByTeacher: q.acceptedByTeacher,
     teacherId: q.acceptedByTeacher,
-    teachedId: q.acceptedByTeacher,
     startedAt: Date.now(),
     updatedAt: Date.now(),
   });
