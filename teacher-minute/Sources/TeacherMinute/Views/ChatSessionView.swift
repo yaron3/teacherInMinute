@@ -21,10 +21,23 @@ struct ChatSessionView: View {
   @State var displayDate = Date()
   @State var sessionDetailsRevision = 0
   @State var isBoardMaximized = false
+  @State var isMicMuted = false
+  @State var isCameraOff = false
+  @State var conversationType: String
   @FocusState var isMessageFieldFocused: Bool
   let title: String
-  let hasAudio: Bool
+  let liveKitRoom: String
+  let liveKitToken: String
   let onClose: @MainActor @Sendable () -> Void
+
+  var hasAudio: Bool { conversationType == "audio" || conversationType == "video" }
+  var hasVideo: Bool { conversationType == "video" }
+  var isStudent: Bool { viewModel.role == "student" }
+  var connectionModeText: String {
+    if hasVideo { return LocalizationSupport.localized("Connected - Video session") }
+    if hasAudio { return LocalizationSupport.localized("Connected - Audio session") }
+    return LocalizationSupport.localized("Connected")
+  }
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -33,30 +46,52 @@ struct ChatSessionView: View {
     questionId: String,
     role: String,
     title: String,
-    hasAudio: Bool = false,
+    conversationType: String = "text",
+    liveKitRoom: String = "",
+    liveKitToken: String = "",
     initialDetails: ChatSessionDetails? = nil,
     onClose: @escaping @MainActor @Sendable () -> Void
   ) {
     let viewModel = ChatSessionViewModel(questionId: questionId, role: role, initialDetails: initialDetails)
     self._viewModel = State(initialValue: viewModel)
     self._isConnecting = State(initialValue: viewModel.isConnecting)
+    self._conversationType = State(initialValue: conversationType)
+    self._selectedTab = State(initialValue: conversationType == "video" ? "video" : "chat")
     self.title = title
-    self.hasAudio = hasAudio
+    self.liveKitRoom = liveKitRoom
+    self.liveKitToken = liveKitToken
     self.onClose = onClose
   }
 
-  init(viewModel: any ChatSessionViewModeling, title: String, hasAudio: Bool = false, onClose: @escaping @MainActor @Sendable () -> Void) {
+  init(viewModel: any ChatSessionViewModeling, title: String, conversationType: String = "text", liveKitRoom: String = "", liveKitToken: String = "", onClose: @escaping @MainActor @Sendable () -> Void) {
     self._viewModel = State(initialValue: viewModel)
     self._isConnecting = State(initialValue: viewModel.isConnecting)
+    self._conversationType = State(initialValue: conversationType)
+    self._selectedTab = State(initialValue: conversationType == "video" ? "video" : "chat")
     self.title = title
-    self.hasAudio = hasAudio
+    self.liveKitRoom = liveKitRoom
+    self.liveKitToken = liveKitToken
     self.onClose = onClose
   }
 
   var body: some View {
     Group {
       if isConnecting {
-        ConnectionSetupView(participantName: participantName, hasAudio: hasAudio, onCancel: onClose)
+        ConnectionSetupView(
+          participantName: participantName,
+          conversationType: conversationType,
+          viewModel: viewModel,
+          liveKitRoom: liveKitRoom,
+          liveKitToken: liveKitToken,
+          onCancel: onClose,
+          onSessionStarted: { @MainActor @Sendable in
+            logger.info("[ChatSessionView] setup complete qid=\(viewModel.questionId) role=\(viewModel.role) conversationType=\(conversationType)")
+            isConnecting = false
+          },
+          onContinueAsText: isStudent && hasAudio ? { @MainActor @Sendable in
+            conversationType = "text"
+          } : nil
+        )
       } else {
         sessionBody
       }
@@ -88,9 +123,6 @@ struct ChatSessionView: View {
       viewModel.onErrorUpdated = { error in
         errorMessage = error
       }
-      viewModel.onConnectingUpdated = { value in
-        isConnecting = value
-      }
       viewModel.onSessionDetailsUpdated = {
         sessionDetailsRevision += 1
         displayDate = Date()
@@ -104,7 +136,6 @@ struct ChatSessionView: View {
       didPrimeBoard = true
       errorMessage = viewModel.errorMessage
       isConnecting = viewModel.isConnecting
-      viewModel.start()
       isMessageFieldFocused = true
     }
     .task {
@@ -148,6 +179,8 @@ struct ChatSessionView: View {
             sessionNotice
             ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
           }
+        } else if selectedTab == "video" {
+          videoFeed
         } else {
           whiteboard
         }
@@ -187,6 +220,58 @@ struct ChatSessionView: View {
       },
       isMaximized: $isBoardMaximized
     )
+  }
+
+  var videoFeed: some View {
+    // Placeholder for the live video stream. Once the LiveKit client SDK is
+    // wired up, swap this for the publisher/subscriber view. Mic + camera
+    // controls live in the header (student) and the teacher sees a badge there.
+    RoundedRectangle(cornerRadius: 18, style: .continuous)
+      .fill(theme.appGrayBackground)
+      .overlay {
+        VStack(spacing: 10) {
+          PlatformIcon(
+            systemName: isCameraOff && isStudent ? "video.slash.fill" : "video.fill",
+            size: 32,
+            weight: .semibold,
+            color: theme.appSecondaryText
+          )
+          Text(LocalizationSupport.localized(
+            isCameraOff && isStudent ? "Camera off" : "Connecting video…"
+          ))
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(theme.appSecondaryText)
+        }
+      }
+      .padding(16)
+  }
+
+  func headerToggle(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      PlatformIcon(
+        systemName: systemName,
+        size: 13,
+        weight: .bold,
+        color: isActive ? theme.white : theme.appPrimaryText
+      )
+      .frame(width: 34, height: 34)
+      .background(isActive ? theme.appPink : theme.appGrayBackground)
+      .clipShape(Circle())
+    }
+    .buttonStyle(.plain)
+  }
+
+  var videoBadge: some View {
+    HStack(spacing: 4) {
+      PlatformIcon(systemName: "video.fill", size: 10, weight: .bold, color: theme.white)
+      Text(LocalizationSupport.localized("Video"))
+        .font(.system(size: 11, weight: .bold))
+        .foregroundStyle(theme.white)
+    }
+    .padding(.horizontal, 10)
+    .frame(height: 26)
+    .background(theme.appTeal)
+    .clipShape(Capsule())
   }
 
   var inputBar: some View {
@@ -278,28 +363,38 @@ struct ChatSessionView: View {
         Text(participantName)
           .font(.system(size: 15, weight: .bold))
           .foregroundStyle(theme.appPrimaryText)
-        Text(LocalizationSupport.localized("Connected"))
+        Text(connectionModeText)
           .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(theme.appGreen)
+          .foregroundStyle(hasVideo ? theme.appTeal : theme.appGreen)
       }
 
       Spacer()
 
-//      Button {} label: {
-//        PlatformIcon(systemName: "mic.fill", size: 13, weight: .bold, color: theme.appPrimaryText)
-//          .frame(width: 34, height: 34)
-//          .background(theme.appGrayBackground)
-//          .clipShape(Circle())
-//      }
-//      .buttonStyle(.plain)
-//
-//      Button {} label: {
-//		PlatformIcon(systemName: "speaker.wave.2.fill", size: 13, weight: .bold, color: theme.appPrimaryText)
-//          .frame(width: 34, height: 34)
-//          .background(theme.appGrayBackground)
-//          .clipShape(Circle())
-//      }
-      .buttonStyle(.plain)
+      if hasVideo {
+        if isStudent {
+          headerToggle(
+            systemName: isMicMuted ? "mic.slash.fill" : "mic.fill",
+            isActive: isMicMuted
+          ) {
+            isMicMuted.toggle()
+          }
+          headerToggle(
+            systemName: isCameraOff ? "video.slash.fill" : "video.fill",
+            isActive: isCameraOff
+          ) {
+            isCameraOff.toggle()
+          }
+        } else {
+          videoBadge
+        }
+      } else if hasAudio {
+        headerToggle(
+          systemName: isMicMuted ? "mic.slash.fill" : "mic.fill",
+          isActive: isMicMuted
+        ) {
+          isMicMuted.toggle()
+        }
+      }
 
       Button {
         onClose()
@@ -395,6 +490,9 @@ struct ChatSessionView: View {
     HStack(spacing: 0) {
       tabButton(id: "chat", title: "Chat", icon: "bubble.left.fill", showsBadge: hasUnreadChat)
       tabButton(id: "photos", title: "Photos", icon: "photo.fill", showsBadge: hasUnreadBoard)
+      if hasVideo {
+        tabButton(id: "video", title: "Video", icon: "video.fill", showsBadge: false)
+      }
     }
     .frame(height: 40)
     .background(theme.appCardBackground)

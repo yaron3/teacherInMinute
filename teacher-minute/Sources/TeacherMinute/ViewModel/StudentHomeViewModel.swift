@@ -98,6 +98,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var searchState: StudentSearchState { get set }
   var activeQuestionText: String { get set }
   var activeConnectionFeeCents: Int { get set }
+  var activeConversationType: String { get set }
   var selectedPricePerMinuteCents: Int { get set }
   var questionId: String? { get set }
   var pricingOptions: [PricingOption] { get }
@@ -139,6 +140,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var searchState: StudentSearchState = .idle
   var activeQuestionText = ""
   var activeConnectionFeeCents = 0
+  var activeConversationType = "text"
   var selectedPricePerMinuteCents = 50
   var questionId: String?
 
@@ -166,6 +168,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   func askTeacher(topic: String, text: String, photoUrls: [String] = [], conversationType: String = "text") async {
     guard case .idle = searchState else { return }
 	logger.info("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
+    activeConversationType = conversationType
     searchState = .searching(questionId: "")
     do {
       let result = try await FunctionsService.shared.createQuestion(
@@ -365,11 +368,18 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 		  logger.info("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
 
           if isAcceptedStatus(status) {
+            let room = result.liveKitRoom ?? ""
+            let token = result.liveKitToken ?? ""
+            if self.requiresMediaConnection(conversationType: self.activeConversationType), (room.isEmpty || token.isEmpty) {
+              logger.info("TeacherMinute questionStatus accepted but media credentials missing questionId=\(questionId) roomEmpty=\(room.isEmpty) tokenEmpty=\(token.isEmpty) conversationType=\(self.activeConversationType)")
+              try? await Task.sleep(nanoseconds: 1_000_000_000)
+              continue
+            }
 			self.questionId = result.questionId
             searchState = .matched(
               questionId: questionId,
-              liveKitRoom: result.liveKitRoom ?? "",
-              liveKitToken: result.liveKitToken ?? ""
+              liveKitRoom: room,
+              liveKitToken: token
             )
             return
           }
@@ -411,6 +421,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     return functionResult
   }
 
+  private func requiresMediaConnection(conversationType: String) -> Bool {
+    conversationType == "audio" || conversationType == "video"
+  }
+
   private func isAcceptedStatus(_ status: String) -> Bool {
     status == "accepted"
       || status == "in_progress"
@@ -443,6 +457,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var searchState: StudentSearchState
   var activeQuestionText: String
   var activeConnectionFeeCents: Int
+  var activeConversationType: String = "text"
   var selectedPricePerMinuteCents: Int
   var questionId: String?
 
@@ -516,6 +531,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {
     activeQuestionText = text
     activeConnectionFeeCents = 50
+    activeConversationType = conversationType
     searchState = .searching(questionId: "mock-question")
   }
 

@@ -4,9 +4,16 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { v4 as uuidv4 } from "uuid";
 
-import { mintLiveKitToken } from "./agora";
+import { mintLiveKitToken } from "./livekit";
 import { sendAcceptedPush } from "./fcm";
-import { QuestionDoc, DispatchInviteDoc, CONNECTION_FEE_CENTS } from "./types";
+import {
+  QuestionDoc,
+  DispatchInviteDoc,
+  CONNECTION_FEE_CENTS,
+  ConversationType,
+  CONVERSATION_TYPES,
+  DEFAULT_CONVERSATION_TYPE,
+} from "./types";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -61,12 +68,24 @@ export const createQuestion = onCall(async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
-  const { topic, text, photoUrls = [], voiceMemoUrl } = req.data as {
+  const {
+    topic,
+    text,
+    photoUrls = [],
+    voiceMemoUrl,
+    conversationType: rawConversationType,
+  } = req.data as {
     topic: string;
     text: string;
     photoUrls?: string[];
     voiceMemoUrl?: string;
+    conversationType?: string;
   };
+
+  const conversationType: ConversationType =
+    CONVERSATION_TYPES.includes(rawConversationType as ConversationType)
+      ? (rawConversationType as ConversationType)
+      : DEFAULT_CONVERSATION_TYPE;
 
   if (!topic || !text?.trim()) {
     throw new HttpsError("invalid-argument", "topic and text are required");
@@ -89,7 +108,9 @@ export const createQuestion = onCall(async (req) => {
 
   const qid = uuidv4();
 
-  logger.info(`[questions] createQuestion start qid=${qid} student=${uid} topic=${topic}`);
+  logger.info(
+    `[questions] createQuestion start qid=${qid} student=${uid} topic=${topic} conversationType=${conversationType}`
+  );
 
   const question: QuestionDoc = {
     studentUid: uid,
@@ -97,6 +118,7 @@ export const createQuestion = onCall(async (req) => {
     text: text.trim(),
     photoUrls,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
+    conversationType,
     status: "searching",
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
@@ -111,6 +133,7 @@ export const createQuestion = onCall(async (req) => {
     text: text.trim(),
     photoUrls,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
+    conversationType,
     dispatchWave: 0,
     createdAt: Date.now(),
   };

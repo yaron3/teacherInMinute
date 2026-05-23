@@ -33,7 +33,7 @@ struct TeacherDashboardView: View {
 	if showsSessionOverlay, viewModel.isAcceptingCalls, viewModel.acceptingQuestionId != nil {
 	  ConnectionSetupView(
 		participantName: viewModel.activeStudentName,
-		hasAudio: false,
+		conversationType: viewModel.activeConversationType,
 		footerText: LocalizationSupport.localized("Setting up the session"),
 		onCancel: {
 		  viewModel.cancelAcceptingInvite()
@@ -48,10 +48,13 @@ struct TeacherDashboardView: View {
 	} else if showsSessionOverlay, let questionId = viewModel.activeQuestionId {
 	  ChatSessionView(
 		questionId: questionId,
-		role: "teacher",
-		title: LocalizationSupport.localized("Student"),
-		initialDetails: viewModel.activeChatInitialDetails()
-	  ) {
+			role: "teacher",
+			title: LocalizationSupport.localized("Student"),
+			conversationType: viewModel.activeConversationType,
+            liveKitRoom: viewModel.activeCallRoom ?? "",
+            liveKitToken: viewModel.activeCallToken ?? "",
+			initialDetails: viewModel.activeChatInitialDetails()
+		  ) {
 		viewModel.endCall()
 	  }
 	  .onAppear {
@@ -304,7 +307,8 @@ struct TeacherDashboardView: View {
 		  expiresAt: viewModel.inviteExpiresAt[inviteID] ?? 0.0,
 		  wave: viewModel.inviteWaves[inviteID] ?? 1,
 		  photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
-		  hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false
+		  hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
+		  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
 		) {
 		  viewModel.acceptInvite(questionId: inviteID)
 		} decline: {
@@ -331,7 +335,8 @@ struct TeacherDashboardView: View {
 			expiresAt: viewModel.inviteExpiresAt[inviteID] ?? 0.0,
 			wave: viewModel.inviteWaves[inviteID] ?? 1,
 			photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
-			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false
+			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
+			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
 		  ) {
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {
@@ -449,8 +454,17 @@ struct TeacherDashboardView: View {
 	let wave: Int
 	let photoUrls: [String]
 	let hasVoiceMessage: Bool
+	var conversationType: String = "text"
 	let accept: () -> Void
 	let decline: () -> Void
+
+	private var sessionIcon: String? {
+	  switch conversationType {
+	  case "audio": return "mic.fill"
+	  case "video": return "video.fill"
+	  default: return nil
+	  }
+	}
 	@State var now = Date().timeIntervalSince1970 * 1000.0
 	
 	private var isFirstWave: Bool { wave == 1 }
@@ -535,13 +549,23 @@ struct TeacherDashboardView: View {
 		
 		Spacer()
 		
-		Text(LocalizationSupport.localized(topic.capitalized))
-		  .font(.system(size: 10, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
-		  .padding(.horizontal, 12)
-		  .padding(.vertical, 8)
-		  .background(theme.appPurple)
-		  .clipShape(Capsule())
+		HStack(spacing: 6) {
+		  if let icon = sessionIcon {
+			Circle()
+			  .fill(theme.appTeal)
+			  .frame(width: 26, height: 26)
+			  .overlay {
+				PlatformIcon(systemName: icon, size: 11, weight: .bold, color: theme.white)
+			  }
+		  }
+		  Text(LocalizationSupport.localized(topic.capitalized))
+			.font(.system(size: 10, weight: .bold))
+			.foregroundStyle(theme.appPrimaryText)
+			.padding(.horizontal, 12)
+			.padding(.vertical, 8)
+			.background(theme.appPurple)
+			.clipShape(Capsule())
+		}
 	  }
 	  .padding(14)
 	  .background(theme.appCardBackground)
@@ -689,7 +713,8 @@ struct TeacherIncomingQuestionOverlay: View {
 			expiresAt: viewModel.inviteExpiresAt[inviteID] ?? 0.0,
 			wave: viewModel.inviteWaves[inviteID] ?? 1,
 			photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
-			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false
+			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
+			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
 		  ) {
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {

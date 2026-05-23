@@ -143,6 +143,7 @@ async function resolveQuestionContext(questionId: string): Promise<{
   studentUid: string;
   teacherUid: string;
   acceptedAtMs: number;
+  startedAtMs: number | undefined;
 }> {
   const questionRef = db.ref(`questions/${questionId}`);
   const questionSnap = await questionRef.once("value");
@@ -157,6 +158,13 @@ async function resolveQuestionContext(questionId: string): Promise<{
   const acceptedAtMs = firstNumber(
     toMillis(rtdbQuestion.acceptedAt),
     toMillis(fsQuestion.acceptedAt)
+  );
+
+  // Billing starts from when both parties were fully connected (startLesson),
+  // not from when the teacher accepted the invite.
+  const startedAtMs = firstNumber(
+    toMillis(rtdbQuestion.startedAt),
+    toMillis(fsQuestion.startedAt)
   );
 
   const studentUid = firstString(
@@ -195,6 +203,7 @@ async function resolveQuestionContext(questionId: string): Promise<{
     studentUid,
     teacherUid,
     acceptedAtMs,
+    startedAtMs,
   };
 }
 
@@ -207,9 +216,10 @@ async function migrateQuestionToFirestore(
     studentUid: string;
     teacherUid: string;
     acceptedAtMs: number;
+    startedAtMs: number | undefined;
   }
 ): Promise<void> {
-  const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs } = context;
+  const { questionRef, rtdbQuestion, studentUid, teacherUid, startedAtMs } = context;
   logger.info(
     `[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`
   );
@@ -217,6 +227,11 @@ async function migrateQuestionToFirestore(
   const endedAtMs = endedAt.toMillis();
   const costPerMinute = await getCostPerMinute(teacherUid);
   const commissionRate = await getTeacherCommissionRate(teacherUid);
+
+  // Bill from the moment both parties were fully connected (startedAt).
+  // If startLesson was never called the lesson never properly began — charge 0.
+  const billingStartMs = startedAtMs ?? endedAtMs;
+
   const {
     rawSeconds,
     roundedSeconds,
@@ -224,7 +239,7 @@ async function migrateQuestionToFirestore(
     minutesToCharge: roundedMinutesToCharge,
     cost,
     teacherEarnings,
-  } = calculateBilling(acceptedAtMs, endedAtMs, costPerMinute, commissionRate);
+  } = calculateBilling(billingStartMs, endedAtMs, costPerMinute, commissionRate);
   const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
   logger.info(
     `[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`

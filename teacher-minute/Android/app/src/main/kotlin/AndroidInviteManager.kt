@@ -62,6 +62,7 @@ object AndroidInviteManager {
                 ?: child.child("ratePerMinuteCents").value.asIntOrNull()
                 ?: child.child("costPerMinuteCents").value.asIntOrNull()
                 ?: 50
+            val conversationType = child.child("conversationType").getValue(String::class.java) ?: "text"
 
             if (topic == null || text == null) {
                 Log.w(
@@ -89,6 +90,7 @@ object AndroidInviteManager {
                     .put("studentName", studentName)
                     .put("connectionFeeCents", connectionFeeCents)
                     .put("pricePerMinuteCents", pricePerMinuteCents)
+                    .put("conversationType", conversationType)
             )
         }
 

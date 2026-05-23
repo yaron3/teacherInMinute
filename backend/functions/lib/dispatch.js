@@ -79,6 +79,7 @@ async function sendWave(qid, questionData, wave, exclude) {
             expiresAt,
             response: "pending",
             wave,
+            conversationType: questionData.conversationType,
         };
         firestoreBatch.set(inviteRef, invite);
     }
@@ -93,6 +94,7 @@ async function sendWave(qid, questionData, wave, exclude) {
             text: questionData.text.slice(0, 300),
             expiresAt: Date.now() + types_1.INVITE_EXPIRY_SECONDS * 1000,
             wave,
+            conversationType: questionData.conversationType,
         });
         // FCM on top of RTDB — best-effort, no-op if no token
         const t = teacherRecords[uid];
@@ -156,6 +158,7 @@ async function tryInviteTeacherForQuestionWave(teacherUid, teacher, qid) {
             expiresAt,
             response: "pending",
             wave,
+            conversationType: question.conversationType,
         };
         tx.set(inviteRef, invite);
         tx.update(qRef, {
@@ -169,6 +172,7 @@ async function tryInviteTeacherForQuestionWave(teacherUid, teacher, qid) {
             text: question.text,
             studentUid: question.studentUid,
             wave,
+            conversationType: question.conversationType,
         };
     });
     if (!result.invited) {
@@ -181,6 +185,7 @@ async function tryInviteTeacherForQuestionWave(teacherUid, teacher, qid) {
         text: invitePayload.text.slice(0, 300),
         expiresAt: Date.now() + types_1.INVITE_EXPIRY_SECONDS * 1000,
         wave: invitePayload.wave,
+        conversationType: invitePayload.conversationType,
     });
     if (teacher.fcmToken) {
         await (0, fcm_1.sendInvitePush)({

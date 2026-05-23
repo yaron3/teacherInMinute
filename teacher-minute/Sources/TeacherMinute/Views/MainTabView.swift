@@ -109,7 +109,7 @@ struct MainTabView: View {
             if teacherDashboardViewModel.isAcceptingCalls, teacherDashboardViewModel.acceptingQuestionId != nil {
                 ConnectionSetupView(
                     participantName: teacherDashboardViewModel.activeStudentName,
-                    hasAudio: false,
+                    conversationType: teacherDashboardViewModel.activeConversationType,
                     footerText: "Setting up the session"
                 ) {
                     teacherDashboardViewModel.cancelAcceptingInvite()
@@ -127,6 +127,9 @@ struct MainTabView: View {
                     questionId: questionId,
                     role: "teacher",
                     title: "Student",
+                    conversationType: teacherDashboardViewModel.activeConversationType,
+                    liveKitRoom: teacherDashboardViewModel.activeCallRoom ?? "",
+                    liveKitToken: teacherDashboardViewModel.activeCallToken ?? "",
                     initialDetails: teacherDashboardViewModel.activeChatInitialDetails()
                 ) {
                     teacherDashboardViewModel.endCall()

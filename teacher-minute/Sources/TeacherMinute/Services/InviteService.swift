@@ -59,6 +59,7 @@ final class InviteService {
           ?? Self.intValue(dict["ratePerMinuteCents"])
           ?? Self.intValue(dict["costPerMinuteCents"])
           ?? 50
+        let conversationType = (dict["conversationType"] as? String) ?? "text"
         let invite = IncomingInvite(
           id: snap.key,
           topic: topic,
@@ -70,7 +71,8 @@ final class InviteService {
           studentId: studentId,
           studentName: studentName,
           connectionFeeCents: connectionFeeCents,
-          pricePerMinuteCents: pricePerMinuteCents
+          pricePerMinuteCents: pricePerMinuteCents,
+          conversationType: conversationType
         )
         if !invite.isExpired { invites.append(invite) }
       }
@@ -148,6 +150,8 @@ final class InviteService {
           ?? Self.intValue(dict["ratePerMinuteCents"])
           ?? Self.intValue(dict["costPerMinuteCents"])
           ?? 50
+        let conversationType = (dict["conversationType"] as? String) ?? "text"
+        logger.info("[InviteService] invite qid=\(snap.key) conversationType=\(conversationType) rawKeys=\(Array(dict.keys))")
         let invite = IncomingInvite(
           id: snap.key,
           topic: topic,
@@ -159,7 +163,8 @@ final class InviteService {
           studentId: studentId,
           studentName: studentName,
           connectionFeeCents: connectionFeeCents,
-          pricePerMinuteCents: pricePerMinuteCents
+          pricePerMinuteCents: pricePerMinuteCents,
+          conversationType: conversationType
         )
         if !invite.isExpired { invites.append(invite) }
       }

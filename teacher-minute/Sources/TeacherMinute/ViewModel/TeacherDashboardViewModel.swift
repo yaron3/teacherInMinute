@@ -38,6 +38,7 @@ final class TeacherDashboardViewModel {
   var inviteStudentUids: [String: String] = [:]
   var inviteConnectionFeeCents: [String: Int] = [:]
   var invitePricePerMinuteCents: [String: Int] = [:]
+  var inviteConversationTypes: [String: String] = [:]
   var activeCallRoom: String? = nil
   var activeCallToken: String? = nil
   var activeCallStudentUid: String? = nil
@@ -48,6 +49,7 @@ final class TeacherDashboardViewModel {
   var activeStudentImageURL = ""
   var activeConnectionFeeCents = 0
   var activePricePerMinuteCents = 50
+  var activeConversationType = "text"
   var activeAcceptedAt = 0.0
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
@@ -169,6 +171,7 @@ final class TeacherDashboardViewModel {
             "studentName": $0.studentName,
             "connectionFeeCents": $0.connectionFeeCents,
             "pricePerMinuteCents": $0.pricePerMinuteCents,
+            "conversationType": $0.conversationType,
           ]
         }
       )
@@ -264,6 +267,7 @@ final class TeacherDashboardViewModel {
     var studentIds: [String: String] = [:]
     var connectionFees: [String: Int] = [:]
     var pricesPerMinute: [String: Int] = [:]
+    var conversationTypes: [String: String] = [:]
 
     for row in rows {
       guard let id = row["id"] as? String,
@@ -304,6 +308,7 @@ final class TeacherDashboardViewModel {
         ?? Self.intValue(row["ratePerMinuteCents"])
         ?? Self.intValue(row["costPerMinuteCents"])
         ?? 50
+      conversationTypes[id] = (row["conversationType"] as? String) ?? "text"
     }
 
     inviteIDs = ids
@@ -317,6 +322,7 @@ final class TeacherDashboardViewModel {
     inviteStudentUids = studentIds
     inviteConnectionFeeCents = connectionFees
     invitePricePerMinuteCents = pricesPerMinute
+    inviteConversationTypes = conversationTypes
   }
 
   // MARK: - Invite Actions
@@ -324,23 +330,47 @@ final class TeacherDashboardViewModel {
   func acceptInvite(questionId: String) {
     guard acceptingQuestionId == nil, activeQuestionId == nil else { return }
     errorMessage = nil
-    acceptingQuestionId = questionId
-    isAcceptingCalls = true
-    activeQuestionText = inviteTexts[questionId] ?? ""
-    activeStudentName = inviteStudentNames[questionId]?.isEmpty == false ? inviteStudentNames[questionId] ?? "Student" : "Student"
-    activeConnectionFeeCents = inviteConnectionFeeCents[questionId] ?? 0
-    activePricePerMinuteCents = invitePricePerMinuteCents[questionId] ?? 50
-    activeAcceptedAt = Date().timeIntervalSince1970 * 1000.0
-    AnalyticsService.shared.logEvent(AnalyticsEvent.teacherInviteAccepted, parameters: [
-      "question_id": questionId,
-      "price_per_minute_cents": activePricePerMinuteCents
-    ])
-    print("TeacherMinute teacherAccept tapped questionId=\(questionId)")
-    logger.info("[VM] acceptInvite tapped — questionId=\(questionId)")
+    let conversationType = inviteConversationTypes[questionId] ?? "text"
 
     acceptingTask?.cancel()
     acceptingTask = Task { [weak self] in
       guard let self else { return }
+
+      if conversationType == "audio" || conversationType == "video" {
+        let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+        if !micState.isGranted {
+          errorMessage = conversationType == "video"
+            ? LocalizationSupport.localized("Microphone and camera access are required to accept a video session.")
+            : LocalizationSupport.localized("Microphone access is required to accept an audio session.")
+          logger.info("[VM] acceptInvite blocked — mic permission denied qid=\(questionId)")
+          return
+        }
+      }
+      if conversationType == "video" {
+        let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+        if !cameraState.isGranted {
+          errorMessage = LocalizationSupport.localized("Microphone and camera access are required to accept a video session.")
+          logger.info("[VM] acceptInvite blocked — camera permission denied qid=\(questionId)")
+          return
+        }
+      }
+
+      guard self.acceptingQuestionId == nil, self.activeQuestionId == nil else { return }
+      acceptingQuestionId = questionId
+      isAcceptingCalls = true
+      activeQuestionText = inviteTexts[questionId] ?? ""
+      activeStudentName = inviteStudentNames[questionId]?.isEmpty == false ? inviteStudentNames[questionId] ?? "Student" : "Student"
+      activeConnectionFeeCents = inviteConnectionFeeCents[questionId] ?? 0
+      activePricePerMinuteCents = invitePricePerMinuteCents[questionId] ?? 50
+      activeConversationType = conversationType
+      activeAcceptedAt = Date().timeIntervalSince1970 * 1000.0
+      AnalyticsService.shared.logEvent(AnalyticsEvent.teacherInviteAccepted, parameters: [
+        "question_id": questionId,
+        "price_per_minute_cents": activePricePerMinuteCents
+      ])
+      print("TeacherMinute teacherAccept tapped questionId=\(questionId)")
+      logger.info("[VM] acceptInvite tapped — questionId=\(questionId) conversationType=\(conversationType)")
+
       do {
         let result = try await FunctionsService.shared.acceptInvite(questionId: questionId)
         try Task.checkCancellation()
@@ -351,6 +381,15 @@ final class TeacherDashboardViewModel {
         try Task.checkCancellation()
         activeCallRoom = result.liveKitRoom
         activeCallToken = result.liveKitToken
+        if (conversationType == "audio" || conversationType == "video"),
+           (activeCallRoom?.isEmpty ?? true || activeCallToken?.isEmpty ?? true) {
+          acceptingQuestionId = nil
+          isAcceptingCalls = false
+          clearActiveCallState()
+          errorMessage = LocalizationSupport.localized("Could not start the audio/video connection. Please try again.")
+          logger.error("[VM] acceptInvite missing media credentials questionId=\(questionId) conversationType=\(conversationType) roomEmpty=\(result.liveKitRoom?.isEmpty ?? true) tokenEmpty=\(result.liveKitToken?.isEmpty ?? true)")
+          return
+        }
         activeCallStudentUid = result.studentId ?? inviteStudentUids[questionId]
         activeLessonId = result.questionId
         if let studentId = activeCallStudentUid, !studentId.isEmpty,
@@ -423,6 +462,7 @@ final class TeacherDashboardViewModel {
     activeStudentImageURL = ""
     activeConnectionFeeCents = 0
     activePricePerMinuteCents = 50
+    activeConversationType = "text"
     activeAcceptedAt = 0
   }
 

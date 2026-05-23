@@ -37,12 +37,17 @@ export type QuestionStatus =
   | "cancelled"
   | "unanswered";
 
+export type ConversationType = "text" | "audio" | "video";
+export const CONVERSATION_TYPES: ConversationType[] = ["text", "audio", "video"];
+export const DEFAULT_CONVERSATION_TYPE: ConversationType = "text";
+
 export interface QuestionDoc {
   studentUid: string;
   topic: string;             // one of the six math sub-topics
   text: string;
   photoUrls: string[];
   voiceMemoUrl?: string;
+  conversationType: ConversationType;
   status: QuestionStatus;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -69,6 +74,7 @@ export interface DispatchInviteDoc {
   expiresAt: Timestamp;
   response: InviteResponse;
   wave: number;
+  conversationType: ConversationType;
 }
 
 // ─── Firestore — lessons/{lid} ───────────────────────────────────────────────

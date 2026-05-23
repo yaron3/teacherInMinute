@@ -19,6 +19,8 @@ struct AskTeacherSheet: View {
     @State  var questionText = ""
     @State  var conversationType = "text"
     @State  var composerMode: ChatComposerMode = .regular
+    @State  var permissionAlertMessage: String? = nil
+    @State  var isRequestingPermission = false
     @FocusState var isQuestionFocused: Bool
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
     private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 }
@@ -30,6 +32,42 @@ struct AskTeacherSheet: View {
     var body: some View {
         NavigationStack {
 		  VStack(alignment: .leading, spacing: 24) {
+			VStack(alignment: .leading, spacing: 10) {
+                    Text(LocalizationSupport.localized("Session type"))
+                        .font(.system(size: 14, weight: .semibold))
+						.multilineTextAlignment(.leading)
+						.frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(theme.appPrimaryText)
+
+                    HStack(spacing: 10) {
+                        ConversationTypeChip(
+                            title: LocalizationSupport.localized("Text"),
+                            isSelected: conversationType == "text",
+                            systemIcons: ["bubble.left.fill"],
+                            accent: .teal
+                        ) {
+                            conversationType = "text"
+                        }
+                        ConversationTypeChip(
+                            title: LocalizationSupport.localized("Audio"),
+                            isSelected: conversationType == "audio",
+                            systemIcons: ["mic.fill"],
+                            accent: .teal
+                        ) {
+                            conversationType = "audio"
+                        }
+                        ConversationTypeChip(
+                            title: LocalizationSupport.localized("Video"),
+                            isSelected: conversationType == "video",
+                            systemIcons: ["video.fill"],
+                            accent: .teal
+                        ) {
+                            conversationType = "video"
+                        }
+                    }
+					.frame(maxWidth: .infinity, alignment: .leading)
+                }
+
 			VStack(alignment: .leading, spacing: 10) {
                     Text(LocalizationSupport.localized("Topic"))
                         .font(.system(size: 14, weight: .semibold))
@@ -56,25 +94,6 @@ struct AskTeacherSheet: View {
                         }
 						.frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
-
-			VStack(alignment: .leading, spacing: 10) {
-                    Text(LocalizationSupport.localized("Session type"))
-                        .font(.system(size: 14, weight: .semibold))
-						.multilineTextAlignment(.leading)
-						.frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(theme.appPrimaryText)
-
-                    HStack(spacing: 10) {
-                        ConversationTypeChip(title: LocalizationSupport.localized("Text"), isSelected: true) {
-                            conversationType = "text"
-                        }
-                        ConversationTypeChip(title: LocalizationSupport.localized("Audio + Text"), isSelected: false) {}
-                            .opacity(0.9)
-                        ConversationTypeChip(title: LocalizationSupport.localized("Video + Audio + Text"), isSelected: false) {}
-                            .opacity(0.9)
-                    }
-					.frame(maxWidth: .infinity, alignment: .leading)
                 }
 
 			  VStack(alignment: .leading, spacing: 10) {
@@ -116,15 +135,7 @@ struct AskTeacherSheet: View {
 
 
                 Button {
-                    isPresented = false
-                    Task {
-                        await viewModel.askTeacher(
-						  topic: selectedTopic.lowercased(),
-                            text: questionText.trimmingCharacters(in: .whitespaces),
-                            photoUrls: [],
-                            conversationType: conversationType
-                        )
-                    }
+                    Task { await findTeacherTapped() }
                 } label: {
                     Text(LocalizationSupport.localized("Find a Teacher"))
                         .font(.system(size: 16, weight: .bold))
@@ -135,7 +146,7 @@ struct AskTeacherSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(!canSubmit)
+                .disabled(!canSubmit || isRequestingPermission)
             }
             .padding(10)
             .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
@@ -153,6 +164,49 @@ struct AskTeacherSheet: View {
             isQuestionFocused = true
         }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
+        .alert(
+            LocalizationSupport.localized("Permission required"),
+            isPresented: Binding(
+                get: { permissionAlertMessage != nil },
+                set: { if !$0 { permissionAlertMessage = nil } }
+            )
+        ) {
+            Button(LocalizationSupport.localized("OK"), role: .cancel) {}
+        } message: {
+            Text(permissionAlertMessage ?? "")
+        }
+    }
+
+    func findTeacherTapped() async {
+        guard !isRequestingPermission else { return }
+        isRequestingPermission = true
+        defer { isRequestingPermission = false }
+
+        if conversationType == "audio" || conversationType == "video" {
+            let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+            if !micState.isGranted {
+                permissionAlertMessage = conversationType == "video"
+                    ? LocalizationSupport.localized("Microphone and camera access are required for a video session.")
+                    : LocalizationSupport.localized("Microphone access is required for an audio session.")
+                return
+            }
+        }
+
+        if conversationType == "video" {
+            let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+            if !cameraState.isGranted {
+                permissionAlertMessage = LocalizationSupport.localized("Microphone and camera access are required for a video session.")
+                return
+            }
+        }
+
+        isPresented = false
+        await viewModel.askTeacher(
+            topic: selectedTopic.lowercased(),
+            text: questionText.trimmingCharacters(in: .whitespaces),
+            photoUrls: [],
+            conversationType: conversationType
+        )
     }
 
     var composerModeToggle: some View {

@@ -508,29 +508,50 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   func start() {
+    logger.info("[ChatSession] start requested questionId=\(self.questionId) role=\(self.role)")
     isConnecting = true
     onConnectingUpdated?(true)
     Task {
-      await loadSessionDetails()
+      let didLoadSession = await loadSessionDetails()
+      guard didLoadSession else {
+        logger.info("[ChatSession] start blocked: session details unavailable questionId=\(self.questionId) role=\(self.role)")
+        return
+      }
       try? await Task.sleep(nanoseconds: 1_400_000_000)
-      guard !Task.isCancelled else { return }
+      guard !Task.isCancelled else {
+        logger.info("[ChatSession] start cancelled before connected questionId=\(self.questionId) role=\(self.role)")
+        return
+      }
       isConnecting = false
       onConnectingUpdated?(false)
+      logger.info("[ChatSession] connected questionId=\(self.questionId) role=\(self.role)")
       beginListening()
     }
   }
 
-  private func loadSessionDetails() async {
+  private func loadSessionDetails() async -> Bool {
     do {
       if let updated = try await service.fetchSessionDetails() {
         didObserveActiveSession = true
         details = mergedDetails(current: details, updated: updated)
         await loadParticipantProfiles()
         onSessionDetailsUpdated?()
+        logger.info("[ChatSession] details loaded questionId=\(self.questionId) role=\(self.role)")
+        return true
       }
+      if details != nil {
+        logger.info("[ChatSession] using initial details questionId=\(self.questionId) role=\(self.role)")
+        return true
+      }
+      errorMessage = LocalizationSupport.localized("Session is no longer available.")
+      onErrorUpdated?(errorMessage)
+      logger.info("[ChatSession] details missing questionId=\(self.questionId) role=\(self.role)")
+      return false
     } catch {
       errorMessage = error.localizedDescription
       onErrorUpdated?(errorMessage)
+      logger.error("[ChatSession] details failed questionId=\(self.questionId) role=\(self.role): \(error.localizedDescription)")
+      return false
     }
   }
 
@@ -699,12 +720,14 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func endLesson() async {
     await reportLessonEnded()
+    await LiveKitService.shared.disconnect()
     stop()
   }
 
   private func handleRemoteSessionEnded() async {
     guard didObserveActiveSession || details != nil else { return }
     await reportLessonEnded()
+    await LiveKitService.shared.disconnect()
     stop()
     onSessionEnded?()
   }

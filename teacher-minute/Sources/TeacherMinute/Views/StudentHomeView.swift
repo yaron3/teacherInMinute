@@ -252,11 +252,14 @@ struct StudentHomeView: View {
             SearchingOverlay {
                 Task { await viewModel.cancelSearch() }
             }
-        case .matched(let questionId, _, _):
+        case .matched(let questionId, let liveKitRoom, let liveKitToken):
             ChatSessionView(
                 questionId: questionId,
                 role: "student",
                 title: LocalizationSupport.localized("Teacher"),
+                conversationType: viewModel.activeConversationType,
+                liveKitRoom: liveKitRoom,
+                liveKitToken: liveKitToken,
                 initialDetails: viewModel.chatInitialDetails(questionId: questionId)
             ) {
                 Task {
@@ -437,25 +440,48 @@ struct StudentHomeView: View {
 struct ConversationTypeChip: View {
     let title: String
     let isSelected: Bool
+    var systemIcons: [String] = []
+    var accent: ConversationTypeChipAccent = .pink
     let action: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
+    var accentColor: Color {
+        switch accent {
+        case .pink: return theme.appPink
+        case .teal: return theme.appTeal
+        }
+    }
     var body: some View {
         Button(action: action) {
-            Text(LocalizedStringKey(title))
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isSelected ?theme.appCardBackground: theme.appPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(isSelected ? theme.appPink : theme.appGrayBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            HStack(spacing: 6) {
+                ForEach(systemIcons, id: \.self) { icon in
+                    PlatformIcon(
+                        systemName: icon,
+                        size: 12,
+                        weight: .semibold,
+                        color: isSelected ? theme.appCardBackground : theme.appPrimaryText
+                    )
+                }
+                Text(LocalizedStringKey(title))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isSelected ? theme.appCardBackground : theme.appPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? accentColor : theme.appGrayBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
     }
+}
+
+enum ConversationTypeChipAccent {
+    case pink
+    case teal
 }
 
 // MARK: - State Overlays

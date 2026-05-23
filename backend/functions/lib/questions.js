@@ -6,7 +6,7 @@ const firebase_functions_1 = require("firebase-functions");
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const uuid_1 = require("uuid");
-const agora_1 = require("./agora");
+const livekit_1 = require("./livekit");
 const fcm_1 = require("./fcm");
 const types_1 = require("./types");
 const db = admin.database();
@@ -36,7 +36,10 @@ exports.createQuestion = (0, https_1.onCall)(async (req) => {
     const uid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
     if (!uid)
         throw new https_1.HttpsError("unauthenticated", "Sign in required");
-    const { topic, text, photoUrls = [], voiceMemoUrl } = req.data;
+    const { topic, text, photoUrls = [], voiceMemoUrl, conversationType: rawConversationType, } = req.data;
+    const conversationType = types_1.CONVERSATION_TYPES.includes(rawConversationType)
+        ? rawConversationType
+        : types_1.DEFAULT_CONVERSATION_TYPE;
     if (!topic || !(text === null || text === void 0 ? void 0 : text.trim())) {
         throw new https_1.HttpsError("invalid-argument", "topic and text are required");
     }
@@ -53,9 +56,9 @@ exports.createQuestion = (0, https_1.onCall)(async (req) => {
         throw new https_1.HttpsError("resource-exhausted", "Not enough time left");
     }
     const qid = (0, uuid_1.v4)();
-    firebase_functions_1.logger.info(`[questions] createQuestion start qid=${qid} student=${uid} topic=${topic}`);
-    const question = Object.assign(Object.assign({ studentUid: uid, topic, text: text.trim(), photoUrls }, (voiceMemoUrl ? { voiceMemoUrl } : {})), { status: "searching", createdAt: firestore_1.Timestamp.now(), updatedAt: firestore_1.Timestamp.now(), dispatchWave: 0, alreadyInvited: [] });
-    const liveQuestion = Object.assign(Object.assign({ questionId: qid, studentUid: uid, topic, text: text.trim(), photoUrls }, (voiceMemoUrl ? { voiceMemoUrl } : {})), { dispatchWave: 0, createdAt: Date.now() });
+    firebase_functions_1.logger.info(`[questions] createQuestion start qid=${qid} student=${uid} topic=${topic} conversationType=${conversationType}`);
+    const question = Object.assign(Object.assign({ studentUid: uid, topic, text: text.trim(), photoUrls }, (voiceMemoUrl ? { voiceMemoUrl } : {})), { conversationType, status: "searching", createdAt: firestore_1.Timestamp.now(), updatedAt: firestore_1.Timestamp.now(), dispatchWave: 0, alreadyInvited: [] });
+    const liveQuestion = Object.assign(Object.assign({ questionId: qid, studentUid: uid, topic, text: text.trim(), photoUrls }, (voiceMemoUrl ? { voiceMemoUrl } : {})), { conversationType, dispatchWave: 0, createdAt: Date.now() });
     await upsertLiveQuestion(qid, liveQuestion, "searching", "createQuestion");
     firebase_functions_1.logger.info(`[questions] createQuestion RTDB-upsert done qid=${qid}`);
     // Writing this doc triggers dispatchQuestion via the Firestore onCreate trigger.
@@ -167,8 +170,8 @@ exports.acceptInvite = (0, https_1.onCall)(async (req) => {
     // Mint LiveKit tokens for both parties
     const channelName = `lesson_${questionId}`;
     const [teacherToken, studentToken] = await Promise.all([
-        (0, agora_1.mintLiveKitToken)(channelName, teacherUid),
-        (0, agora_1.mintLiveKitToken)(channelName, studentUid),
+        (0, livekit_1.mintLiveKitToken)(channelName, teacherUid),
+        (0, livekit_1.mintLiveKitToken)(channelName, studentUid),
     ]);
     // Snapshot both participants' name+image so lesson history can render without
     // cross-user reads (Firestore rules block students from reading teacher docs
@@ -243,7 +246,7 @@ exports.getQuestionStatus = (0, https_1.onCall)(async (req) => {
     firebase_functions_1.logger.info(`[questions] getQuestionStatus qid=${questionId} student=${uid} status=${q.status}`);
     if (q.status === "accepted" || q.status === "in_progress") {
         const roomName = `lesson_${questionId}`;
-        const token = await (0, agora_1.mintLiveKitToken)(roomName, uid);
+        const token = await (0, livekit_1.mintLiveKitToken)(roomName, uid);
         return { status: q.status, liveKitRoom: roomName, liveKitToken: token.token };
     }
     return { status: q.status };
