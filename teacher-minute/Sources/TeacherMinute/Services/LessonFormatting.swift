@@ -9,13 +9,15 @@ enum LessonFormatting {
     static let defaultCurrencyCode = "ILS"
 
     static func relativeDateText(_ date: Date) -> String {
-        guard date > .distantPast else { return "Recently" }
+        guard date > .distantPast else { return LocalizationSupport.localized("Recently") }
 
         let calendar = Calendar.current
         if calendar.isDateInToday(date) {
             let formatter = DateFormatter()
-            formatter.dateFormat = "h:mm a"
-            return "Today, \(formatter.string(from: date))"
+            formatter.locale = LocalizationSupport.currentLocale
+            formatter.dateStyle = .none
+            formatter.timeStyle = .short
+            return "\(LocalizationSupport.localized("Today")), \(formatter.string(from: date))"
         }
         if calendar.isDateInYesterday(date) {
             return LocalizationSupport.localized("Yesterday")
@@ -23,7 +25,7 @@ enum LessonFormatting {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
+	  return formatter.string(from: date)
     }
 
     static func durationText(seconds: Int) -> String {

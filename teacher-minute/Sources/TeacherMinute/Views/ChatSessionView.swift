@@ -11,6 +11,12 @@ enum ChatComposerMode {
 }
 
 struct ChatSessionView: View {
+  
+  enum TAB_TYPE: String {
+	case CHAT
+	case BOARD
+	case VIDEO
+  }
   @State var viewModel: any ChatSessionViewModeling
   @State var draft = ""
   @State var composerMode: ChatComposerMode = .regular
@@ -18,7 +24,7 @@ struct ChatSessionView: View {
   @State var boardStrokes: [BoardStroke] = []
   @State var errorMessage: String?
   @State var isConnecting: Bool
-  @State var selectedTab = "chat"
+  @State var selectedTab:TAB_TYPE = .CHAT
   @State var hasUnreadChat = false
   @State var hasUnreadBoard = false
   @State var didPrimeMessages = false
@@ -62,7 +68,7 @@ struct ChatSessionView: View {
     self._viewModel = State(initialValue: viewModel)
     self._isConnecting = State(initialValue: viewModel.isConnecting)
     self._conversationType = State(initialValue: conversationType)
-    self._selectedTab = State(initialValue: conversationType == "video" ? "video" : "chat")
+	self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
     self.title = title
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
@@ -73,7 +79,7 @@ struct ChatSessionView: View {
     self._viewModel = State(initialValue: viewModel)
     self._isConnecting = State(initialValue: viewModel.isConnecting)
     self._conversationType = State(initialValue: conversationType)
-    self._selectedTab = State(initialValue: conversationType == "video" ? "video" : "chat")
+    self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
     self.title = title
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
@@ -107,7 +113,7 @@ struct ChatSessionView: View {
       viewModel.onMessagesUpdated = { rows in
         let oldCount = messages.count
         if didPrimeMessages,
-           selectedTab != "chat",
+		   selectedTab != .CHAT,
            rows.count > oldCount,
            rows.suffix(rows.count - oldCount).contains(where: { !$0.isMine }) {
           hasUnreadChat = true
@@ -118,7 +124,7 @@ struct ChatSessionView: View {
       viewModel.onBoardStrokesUpdated = { strokes in
         let oldCount = boardStrokes.count
         if didPrimeBoard,
-           selectedTab != "photos",
+		   selectedTab != .BOARD,
            strokes.count > oldCount,
            strokes.suffix(strokes.count - oldCount).contains(where: { !$0.isMine }) {
           hasUnreadBoard = true
@@ -185,12 +191,12 @@ struct ChatSessionView: View {
       Group {
         if isBoardMaximized {
           whiteboard
-        } else if selectedTab == "chat" {
+		} else if selectedTab == .CHAT {
           VStack(spacing: 0) {
             sessionNotice
             ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
           }
-        } else if selectedTab == "video" {
+		} else if selectedTab == .VIDEO {
           videoFeed
         } else {
           whiteboard
@@ -382,11 +388,11 @@ struct ChatSessionView: View {
 
   var composerModeToggle: some View {
     HStack(spacing: 6) {
-      composerModePill(title: "Regular", isSelected: composerMode == .regular) {
+      composerModePill(title: LocalizationSupport.localized("Regular"), isSelected: composerMode == .regular) {
         composerMode = .regular
         isMessageFieldFocused = true
       }
-      composerModePill(title: "Algebra", isSelected: composerMode == .algebra) {
+      composerModePill(title: LocalizationSupport.localized("Algebra"), isSelected: composerMode == .algebra) {
         composerMode = .algebra
         isMessageFieldFocused = false
       }
@@ -572,10 +578,10 @@ struct ChatSessionView: View {
 
   var sessionTabs: some View {
     HStack(spacing: 0) {
-      tabButton(id: "chat", title: "Chat", icon: "bubble.left.fill", showsBadge: hasUnreadChat)
-      tabButton(id: "photos", title: "Photos", icon: "photo.fill", showsBadge: hasUnreadBoard)
+	  tabButton(id: .CHAT, title: LocalizationSupport.localized("Chat"), icon: "bubble.left.fill", showsBadge: hasUnreadChat)
+	  tabButton(id: .BOARD, title: LocalizationSupport.localized("Board"), icon: "pencil.and.list.clipboard", showsBadge: hasUnreadBoard)
       if hasVideo {
-        tabButton(id: "video", title: "Video", icon: "video.fill", showsBadge: false)
+		tabButton(id: .VIDEO, title: LocalizationSupport.localized("Video"), icon: "video.fill", showsBadge: false)
       }
     }
     .frame(height: 40)
@@ -585,9 +591,9 @@ struct ChatSessionView: View {
     }
   }
 
-  func tabButton(id: String, title: String, icon: String, showsBadge: Bool) -> some View {
+  func tabButton(id: TAB_TYPE, title: String, icon: String, showsBadge: Bool) -> some View {
     Button {
-      if id == "photos" {
+	  if id == .BOARD {
         isMessageFieldFocused = false
         hasUnreadBoard = false
       } else {

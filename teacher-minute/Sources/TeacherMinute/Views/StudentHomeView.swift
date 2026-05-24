@@ -888,7 +888,7 @@ struct RecentLessonRow: View {
                 Spacer()
 
                 VStack(spacing: 6) {
-                    SmallPill(title: "Solved", foreground: theme.appGreen, background: theme.appGreenSoft)
+                    SmallPill(title: LocalizationSupport.localized("Solved"), foreground: theme.appGreen, background: theme.appGreenSoft)
 
                     Text(lesson.duration)
                         .font(.system(size: 11, weight: .semibold))

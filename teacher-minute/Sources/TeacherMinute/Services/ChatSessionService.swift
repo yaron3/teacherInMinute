@@ -813,14 +813,15 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   private func loadParticipantProfiles() async {
-    guard let current = details else { return }
+    guard let current = details,
+          let currentUserId = nonEmpty(Auth.auth().currentUser?.uid) else { return }
     var studentName = current.studentName
     var teacherName = current.teacherName
     var studentImageURL = current.studentImageURL
     var teacherImageURL = current.teacherImageURL
 
-    if let uid = nonEmpty(current.studentId),
-       let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+    if currentUserId == nonEmpty(current.studentId),
+       let profile = try? await UserService.shared.fetchProfileSummary(uid: currentUserId) {
       if nonEmpty(studentName) == nil {
         studentName = profile.displayName
       }
@@ -829,8 +830,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       }
     }
 
-    if let uid = nonEmpty(current.teacherId),
-       let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+    if currentUserId == nonEmpty(current.teacherId),
+       let profile = try? await UserService.shared.fetchProfileSummary(uid: currentUserId) {
       if nonEmpty(teacherName) == nil {
         teacherName = profile.displayName
       }

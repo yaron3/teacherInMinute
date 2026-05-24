@@ -149,7 +149,8 @@ final class HistoryModel {
     }
 
     private static func lessonTitle(from data: [String: Any]) -> String {
-        let title = firstString(in: data, keys: ["topic", "subject", "title", "questionText", "text", "message"])
+        let title = LocalizationSupport.localized(firstString(in: data, keys: ["topic", "subject", "title", "questionText", "text", "message"]))
+												  
         return title.isEmpty ? "Lesson" : title
     }
 

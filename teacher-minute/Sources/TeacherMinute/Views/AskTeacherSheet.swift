@@ -23,7 +23,7 @@ struct AskTeacherSheet: View {
     @State  var isRequestingPermission = false
     @FocusState var isQuestionFocused: Bool
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
-    private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 }
+  private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 || composerMode == .algebra}
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -122,9 +122,7 @@ struct AskTeacherSheet: View {
                             appendEquation(latex)
                         }
                         .environment(\.layoutDirection, .leftToRight)
-                    } else if isQuestionFocused {
-                        MathSymbolRow(text: $questionText, isFocused: $isQuestionFocused)
-                    }
+                    } 
 
                     Text(String(format: LocalizationSupport.localized("%lld / 10 minimum characters"), Int64(questionText.count)))
                         .font(.system(size: 11))
@@ -211,11 +209,11 @@ struct AskTeacherSheet: View {
 
     var composerModeToggle: some View {
         HStack(spacing: 6) {
-            composerModePill(title: "Regular", isSelected: composerMode == .regular) {
+            composerModePill(title: LocalizationSupport.localized("Regular"), isSelected: composerMode == .regular) {
                 composerMode = .regular
                 isQuestionFocused = true
             }
-            composerModePill(title: "Algebra", isSelected: composerMode == .algebra) {
+            composerModePill(title: LocalizationSupport.localized("Algebra"), isSelected: composerMode == .algebra) {
                 composerMode = .algebra
                 isQuestionFocused = false
             }

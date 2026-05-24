@@ -603,6 +603,24 @@
         }
       }
     },
+    "algebra" : {
+      "comment" : "A math topic chip label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algebra"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "אלגברה"
+          }
+        }
+      }
+    },
     "Algebra" : {
       "comment" : "A math topic chip label.",
       "localizations" : {
@@ -3603,6 +3621,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "שיעורים אחרונים"
+          }
+        }
+      }
+    },
+    "Recently" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לאחרונה"
+          }
+        }
+      }
+    },
+    "Regular" : {
+      "comment" : "Composer mode pill for typing regular text messages.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "רגיל"
           }
         }
       }
