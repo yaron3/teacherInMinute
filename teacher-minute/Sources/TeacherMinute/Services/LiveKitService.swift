@@ -36,7 +36,20 @@ final class LiveKitService {
 
 #if !os(Android)
   private(set) var room: Room?
+  private var roomDelegateAdapter: RoomDelegateAdapter?
   private var diagnosticsTask: Task<Void, Never>?
+
+  /// Notified on the main actor whenever local or remote tracks change.
+  var onTracksUpdated: (@MainActor @Sendable () -> Void)?
+
+  var localCameraVideoTrack: VideoTrack? {
+    room?.localParticipant.firstCameraVideoTrack
+  }
+
+  var remoteCameraVideoTrack: VideoTrack? {
+    guard let room else { return nil }
+    return room.remoteParticipants.values.lazy.compactMap { $0.firstCameraVideoTrack }.first
+  }
 #endif
 
   private init() {}
@@ -50,6 +63,11 @@ final class LiveKitService {
     await disconnect()
 
     let newRoom = Room()
+    let adapter = RoomDelegateAdapter { [weak self] in
+      self?.onTracksUpdated?()
+    }
+    newRoom.add(delegate: adapter)
+
     logger.info("[LiveKit] connecting room=\(roomName) video=\(enableVideo) url=\(Self.serverUrl)")
     try await newRoom.connect(url: Self.serverUrl, token: token)
     logger.info("[LiveKit] room.connect returned state=\(String(describing: newRoom.connectionState)) localIdentity=\(String(describing: newRoom.localParticipant.identity)) remoteCount=\(newRoom.remoteParticipants.count)")
@@ -63,6 +81,8 @@ final class LiveKitService {
     }
 
     room = newRoom
+    roomDelegateAdapter = adapter
+    onTracksUpdated?()
     startDiagnostics(roomName: roomName)
 #else
     let serverUrl = Self.serverUrl
@@ -85,8 +105,13 @@ final class LiveKitService {
     diagnosticsTask = nil
     guard let room else { return }
     logger.info("[LiveKit] disconnecting room")
+    if let adapter = roomDelegateAdapter {
+      room.remove(delegate: adapter)
+    }
+    roomDelegateAdapter = nil
     await room.disconnect()
     self.room = nil
+    onTracksUpdated?()
 #else
     do {
       try await Task.detached(priority: .userInitiated) {
@@ -94,6 +119,32 @@ final class LiveKitService {
       }.value
     } catch {
       logger.error("[LiveKit] Android disconnect failed: \(error.localizedDescription)")
+    }
+#endif
+  }
+
+  func setMicrophoneEnabled(_ enabled: Bool) async {
+#if !os(Android)
+    guard let room else { return }
+    do {
+      _ = try await room.localParticipant.setMicrophone(enabled: enabled)
+      logger.info("[LiveKit] setMicrophone enabled=\(enabled)")
+      onTracksUpdated?()
+    } catch {
+      logger.error("[LiveKit] setMicrophone failed enabled=\(enabled) error=\(error.localizedDescription)")
+    }
+#endif
+  }
+
+  func setCameraEnabled(_ enabled: Bool) async {
+#if !os(Android)
+    guard let room else { return }
+    do {
+      _ = try await room.localParticipant.setCamera(enabled: enabled)
+      logger.info("[LiveKit] setCamera enabled=\(enabled)")
+      onTracksUpdated?()
+    } catch {
+      logger.error("[LiveKit] setCamera failed enabled=\(enabled) error=\(error.localizedDescription)")
     }
 #endif
   }
@@ -112,6 +163,30 @@ final class LiveKitService {
   }
 #endif
 }
+
+#if !os(Android)
+/// Bridges LiveKit `RoomDelegate` callbacks (which can fire on background
+/// threads) onto the main actor so the SwiftUI layer can re-read tracks.
+final class RoomDelegateAdapter: NSObject, RoomDelegate, @unchecked Sendable {
+  private let onUpdate: @MainActor @Sendable () -> Void
+
+  init(onUpdate: @escaping @MainActor @Sendable () -> Void) {
+    self.onUpdate = onUpdate
+  }
+
+  private func notify() {
+    Task { @MainActor in onUpdate() }
+  }
+
+  func room(_ room: Room, participantDidConnect participant: RemoteParticipant) { notify() }
+  func room(_ room: Room, participantDidDisconnect participant: RemoteParticipant) { notify() }
+  func room(_ room: Room, participant: RemoteParticipant, didSubscribeTrack publication: RemoteTrackPublication) { notify() }
+  func room(_ room: Room, participant: RemoteParticipant, didUnsubscribeTrack publication: RemoteTrackPublication) { notify() }
+  func room(_ room: Room, participant: LocalParticipant, didPublishTrack publication: LocalTrackPublication) { notify() }
+  func room(_ room: Room, participant: LocalParticipant, didUnpublishTrack publication: LocalTrackPublication) { notify() }
+  func room(_ room: Room, participant: Participant, trackPublication: TrackPublication, didUpdateIsMuted isMuted: Bool) { notify() }
+}
+#endif
 
 #if os(Android)
 private enum AndroidLiveKitBridge {
