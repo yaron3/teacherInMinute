@@ -34,7 +34,6 @@ struct MathEquationEditorView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            MathKeyboardView(onAction: handleKeyboardAction)
 
             HStack(spacing: 10) {
                 inputCapsule
@@ -56,6 +55,7 @@ struct MathEquationEditorView: View {
                 .buttonStyle(.plain)
                 .disabled(!canSend)
             }
+		  MathKeyboardView(onAction: handleKeyboardAction)
         }
         .padding(.top, 10)
         .environment(\.layoutDirection, .leftToRight)

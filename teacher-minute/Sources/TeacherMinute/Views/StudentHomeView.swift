@@ -111,6 +111,8 @@ struct StudentHomeView: View {
 #if os(Android)
             if let result = paymentReturnStore.latestResult {
                 paymentReturnOverlay(result)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .zIndex(10)
             }
 #endif
         }

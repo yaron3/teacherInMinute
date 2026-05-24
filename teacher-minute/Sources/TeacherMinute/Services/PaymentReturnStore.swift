@@ -72,6 +72,15 @@ struct PaymentReturnResult: Identifiable {
         )
     }
 
+    static func cancelledWithoutReturnURL() -> PaymentReturnResult {
+        PaymentReturnResult(
+            status: .cancelled,
+            sessionID: nil,
+            orderID: nil,
+            rawURL: URL(string: "teacherminute://payment-return?status=cancelled&source=missing_return") ?? URL(fileURLWithPath: "/")
+        )
+    }
+
     static func confirmedWithoutReturnURL() -> PaymentReturnResult {
         PaymentReturnResult(
             status: .success,
@@ -141,8 +150,8 @@ final class PaymentReturnStore {
     }
 
     func handleMissingReturn() {
-        logger.info("[PaymentReturn] no deep link result received; storing noResponse")
-        latestResult = .noResponse()
+        logger.info("[PaymentReturn] no deep link result received; storing cancelledWithoutReturnURL")
+        latestResult = .cancelledWithoutReturnURL()
         resultVersion += 1
     }
 
@@ -155,5 +164,6 @@ final class PaymentReturnStore {
     func consumeLatestResult() {
         logger.info("[PaymentReturn] consuming latest result")
         latestResult = nil
+        resultVersion += 1
     }
 }

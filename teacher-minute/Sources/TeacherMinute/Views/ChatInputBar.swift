@@ -21,10 +21,6 @@ struct ChatInputBar: View {
   }
 
   var body: some View {
-    VStack(spacing: 8) {
-      if isFocused.wrappedValue {
-        MathSymbolRow(text: $text, isFocused: isFocused)
-      }
 
       HStack(spacing: 10) {
 		TextField("Message", text: $text)
@@ -54,40 +50,4 @@ struct ChatInputBar: View {
         .buttonStyle(.plain)
       }
     }
-    .padding(.top, 10)
-  }
-}
-
-struct MathSymbolRow: View {
-  @Binding var text: String
-  let isFocused: FocusState<Bool>.Binding
-
-  private let mathSymbols = [
-    "=", "+", "−", "×", "÷", "^", "√", "π", "∞", "≈", "≠", "≤", "≥", "∫", "∑", "θ", "α", "β"
-  ]
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-  var body: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: 8) {
-        ForEach(mathSymbols, id: \.self) { symbol in
-          Button {
-            text.append(symbol)
-            isFocused.wrappedValue = true
-          } label: {
-            Text(symbol)
-              .font(.system(size: 15, weight: .semibold))
-              .foregroundStyle(theme.appPrimaryText)
-              .frame(width: 34, height: 32)
-              .background(theme.appGrayBackground)
-              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-          }
-          .buttonStyle(.plain)
-        }
-      }
-      .padding(.horizontal, 2)
-    }
-  }
 }
