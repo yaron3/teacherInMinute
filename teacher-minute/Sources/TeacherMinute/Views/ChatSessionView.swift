@@ -1,4 +1,9 @@
 import SwiftUI
+#if !os(Android)
+import LiveKit
+#else
+import SkipBridge
+#endif
 
 enum ChatComposerMode {
   case regular
@@ -23,6 +28,7 @@ struct ChatSessionView: View {
   @State var isBoardMaximized = false
   @State var isMicMuted = false
   @State var isCameraOff = false
+  @State var liveKitRevision = 0
   @State var conversationType: String
   @FocusState var isMessageFieldFocused: Bool
   let title: String
@@ -130,6 +136,11 @@ struct ChatSessionView: View {
       viewModel.onSessionEnded = {
         onClose()
       }
+#if !os(Android)
+      LiveKitService.shared.onTracksUpdated = { @MainActor @Sendable in
+        liveKitRevision &+= 1
+      }
+#endif
       messages = viewModel.messages
       boardStrokes = viewModel.boardStrokes
       didPrimeMessages = true
@@ -223,27 +234,100 @@ struct ChatSessionView: View {
   }
 
   var videoFeed: some View {
-    // Placeholder for the live video stream. Once the LiveKit client SDK is
-    // wired up, swap this for the publisher/subscriber view. Mic + camera
-    // controls live in the header (student) and the teacher sees a badge there.
-    RoundedRectangle(cornerRadius: 18, style: .continuous)
-      .fill(theme.appGrayBackground)
+#if !os(Android)
+    let remoteTrack = LiveKitService.shared.remoteCameraVideoTrack
+    let localTrack = LiveKitService.shared.localCameraVideoTrack
+    return RoundedRectangle(cornerRadius: 18, style: .continuous)
+      .fill(Color.black)
       .overlay {
-        VStack(spacing: 10) {
-          PlatformIcon(
-            systemName: isCameraOff && isStudent ? "video.slash.fill" : "video.fill",
-            size: 32,
-            weight: .semibold,
-            color: theme.appSecondaryText
-          )
-          Text(LocalizationSupport.localized(
-            isCameraOff && isStudent ? "Camera off" : "Connecting video…"
-          ))
-          .font(.system(size: 13, weight: .medium))
-          .foregroundStyle(theme.appSecondaryText)
+        ZStack {
+          if let remoteTrack {
+            SwiftUIVideoView(remoteTrack, layoutMode: .fit)
+              .id(ObjectIdentifier(remoteTrack))
+              .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+          } else {
+            videoPlaceholder(
+              icon: "video.fill",
+              text: LocalizationSupport.localized("Waiting for video…")
+            )
+          }
+          if isStudent {
+            VStack {
+              Spacer()
+              HStack {
+                Spacer()
+                localPreview(localTrack: localTrack)
+              }
+            }
+            .padding(12)
+          }
         }
       }
       .padding(16)
+      .id(liveKitRevision)
+#else
+    return AndroidVideoFeed(isStudent: isStudent, isCameraOff: isCameraOff, theme: theme)
+      .padding(16)
+#endif
+  }
+
+  func videoPlaceholder(icon: String, text: String) -> some View {
+    VStack(spacing: 10) {
+      PlatformIcon(
+        systemName: icon,
+        size: 32,
+        weight: .semibold,
+        color: theme.appSecondaryText
+      )
+      Text(text)
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(theme.appSecondaryText)
+    }
+  }
+
+#if !os(Android)
+  @ViewBuilder
+  func localPreview(localTrack: VideoTrack?) -> some View {
+    Group {
+      if let localTrack, !isCameraOff {
+        SwiftUIVideoView(localTrack, layoutMode: .fill, mirrorMode: .mirror)
+          .id(ObjectIdentifier(localTrack))
+      } else {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .fill(Color.black.opacity(0.6))
+          .overlay {
+            PlatformIcon(
+              systemName: isCameraOff ? "video.slash.fill" : "video.fill",
+              size: 18,
+              weight: .semibold,
+              color: theme.white
+            )
+          }
+      }
+    }
+    .frame(width: 96, height: 132)
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .stroke(.white.opacity(0.4), lineWidth: 1)
+    }
+  }
+#endif
+
+  func toggleMicrophone() {
+    let newValue = !isMicMuted
+    isMicMuted = newValue
+    Task {
+      await LiveKitService.shared.setMicrophoneEnabled(!newValue)
+    }
+  }
+
+  func toggleCamera() {
+    let newValue = !isCameraOff
+    isCameraOff = newValue
+    Task {
+      await LiveKitService.shared.setCameraEnabled(!newValue)
+    }
   }
 
   func headerToggle(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
@@ -376,13 +460,13 @@ struct ChatSessionView: View {
             systemName: isMicMuted ? "mic.slash.fill" : "mic.fill",
             isActive: isMicMuted
           ) {
-            isMicMuted.toggle()
+            toggleMicrophone()
           }
           headerToggle(
             systemName: isCameraOff ? "video.slash.fill" : "video.fill",
             isActive: isCameraOff
           ) {
-            isCameraOff.toggle()
+            toggleCamera()
           }
         } else {
           videoBadge
@@ -392,7 +476,7 @@ struct ChatSessionView: View {
           systemName: isMicMuted ? "mic.slash.fill" : "mic.fill",
           isActive: isMicMuted
         ) {
-          isMicMuted.toggle()
+          toggleMicrophone()
         }
       }
 

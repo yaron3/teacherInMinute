@@ -133,6 +133,15 @@ final class LiveKitService {
     } catch {
       logger.error("[LiveKit] setMicrophone failed enabled=\(enabled) error=\(error.localizedDescription)")
     }
+#else
+    do {
+      try await Task.detached(priority: .userInitiated) {
+        try AndroidLiveKitBridge.setMicrophoneEnabled(enabled)
+      }.value
+      logger.info("[LiveKit] Android setMicrophone enabled=\(enabled)")
+    } catch {
+      logger.error("[LiveKit] Android setMicrophone failed enabled=\(enabled) error=\(error.localizedDescription)")
+    }
 #endif
   }
 
@@ -145,6 +154,15 @@ final class LiveKitService {
       onTracksUpdated?()
     } catch {
       logger.error("[LiveKit] setCamera failed enabled=\(enabled) error=\(error.localizedDescription)")
+    }
+#else
+    do {
+      try await Task.detached(priority: .userInitiated) {
+        try AndroidLiveKitBridge.setCameraEnabled(enabled)
+      }.value
+      logger.info("[LiveKit] Android setCamera enabled=\(enabled)")
+    } catch {
+      logger.error("[LiveKit] Android setCamera failed enabled=\(enabled) error=\(error.localizedDescription)")
     }
 #endif
   }
@@ -189,8 +207,26 @@ final class RoomDelegateAdapter: NSObject, RoomDelegate, @unchecked Sendable {
 #endif
 
 #if os(Android)
-private enum AndroidLiveKitBridge {
+/// Wraps an arbitrary Kotlin object pointer so it can travel through the
+/// `JConvertible` machinery and be embedded into the SwiftUI view tree via
+/// `JavaBackedView`.
+final class AndroidJavaObject: JObject, JConvertible, @unchecked Sendable {
+  static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> AndroidJavaObject {
+    AndroidJavaObject(obj!)
+  }
+
+  func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+    safePointer()
+  }
+}
+
+enum AndroidLiveKitBridge {
   private static let managerClass = try! JClass(name: "teacher/minute/AndroidLiveKitManager")
+  private static let videoViewClass = try! JClass(name: "teacher/minute/AndroidLiveKitVideoView")
+  private static let createVideoViewMethod = videoViewClass.getStaticMethodID(
+    name: "create",
+    sig: "(Ljava/lang/String;Z)Lskip/ui/ComposeView;"
+  )!
   private static let connectMethod = managerClass.getStaticMethodID(
     name: "connect",
     sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V"
@@ -198,6 +234,14 @@ private enum AndroidLiveKitBridge {
   private static let disconnectMethod = managerClass.getStaticMethodID(
     name: "disconnect",
     sig: "()V"
+  )!
+  private static let setMicrophoneEnabledMethod = managerClass.getStaticMethodID(
+    name: "setMicrophoneEnabled",
+    sig: "(Z)V"
+  )!
+  private static let setCameraEnabledMethod = managerClass.getStaticMethodID(
+    name: "setCameraEnabled",
+    sig: "(Z)V"
   )!
 
   static func connect(serverUrl: String, roomName: String, token: String, enableVideo: Bool) throws {
@@ -221,6 +265,39 @@ private enum AndroidLiveKitBridge {
         method: disconnectMethod,
         options: [.kotlincompat],
         args: []
+      )
+    }
+  }
+
+  static func setMicrophoneEnabled(_ enabled: Bool) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setMicrophoneEnabledMethod,
+        options: [.kotlincompat],
+        args: [enabled.toJavaParameter(options: [.kotlincompat])]
+      )
+    }
+  }
+
+  static func setCameraEnabled(_ enabled: Bool) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setCameraEnabledMethod,
+        options: [.kotlincompat],
+        args: [enabled.toJavaParameter(options: [.kotlincompat])]
+      )
+    }
+  }
+
+  static func makeVideoComposer(mode: String, mirror: Bool) throws -> AndroidJavaObject {
+    try jniContext {
+      try videoViewClass.callStatic(
+        method: createVideoViewMethod,
+        options: [.kotlincompat],
+        args: [
+          mode.toJavaParameter(options: [.kotlincompat]),
+          mirror.toJavaParameter(options: [.kotlincompat])
+        ]
       )
     }
   }
