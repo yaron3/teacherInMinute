@@ -32,6 +32,7 @@ struct WelcomeView: View {
           .progressViewStyle(.circular)
           .scaleEffect(1.4)
       } else {
+	  
         welcomeContent
       }
 	}
@@ -39,43 +40,45 @@ struct WelcomeView: View {
   }
 
   private var welcomeContent: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      header
-      
-      Text(LocalizationSupport.localized("Help you any where"))
-        .font(.system(size: 35, weight: .bold, design: .default))
-        .foregroundStyle(theme.primaryText)
-        .lineSpacing(-4)
-        .padding(.top, 42)
-      
-      Image("student")
-        .resizable()
-        .scaledToFit()
-        .padding(.top, 32)
-      
-      Text(LocalizationSupport.localized("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise."))
-        .font(.system(size: 16, weight: .regular))
-        .foregroundStyle(theme.secondaryText)
-        .lineSpacing(7)
-        .padding(.top, 36)
-      
-      badges
-        .padding(.top, 44)
-      
-      Spacer(minLength: 24)
-      
-      Button {
-        router.push(.createAccount)
-      } label: {
-        Text(LocalizationSupport.localized("Sign Up"))
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(theme.primaryBackground)
-          .frame(maxWidth: .infinity)
-          .frame(height: 62)
-          .background(theme.primaryText)
-          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-      }
-      
+    GeometryReader { proxy in
+      ScrollView(.vertical, showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 0) {
+          header
+          
+          Text(LocalizationSupport.localized("Help you any where"))
+            .font(.system(size: 35, weight: .bold, design: .default))
+            .foregroundStyle(theme.primaryText)
+            .lineSpacing(-4)
+            .padding(.top, 42)
+          
+          Image("student")
+            .resizable()
+            .scaledToFit()
+            .padding(.top, 32)
+          
+          Text(LocalizationSupport.localized("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise."))
+            .font(.system(size: 16, weight: .regular))
+            .foregroundStyle(theme.secondaryText)
+            .lineSpacing(7)
+            .padding(.top, 36)
+          
+          badges
+            .padding(.top, 44)
+          
+          Spacer(minLength: 24)
+          
+          Button {
+            router.push(.createAccount)
+          } label: {
+            Text(LocalizationSupport.localized("Sign Up"))
+              .font(.system(size: 16, weight: .semibold))
+              .foregroundStyle(theme.primaryBackground)
+              .frame(maxWidth: .infinity)
+              .frame(height: 62)
+              .background(theme.primaryText)
+              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+          }
+          
         Button {
           router.push(.login)
         } label: {
@@ -88,9 +91,13 @@ struct WelcomeView: View {
       .frame(maxWidth: .infinity)
       .padding(.top, 20)
       .padding(.bottom, 28)
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 50)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: proxy.size.height, alignment: .top)
+      }
     }
-    .padding(.horizontal, 28)
-    .padding(.top, 50)
   }
   
   private func resumeExistingSessionIfNeeded() async {

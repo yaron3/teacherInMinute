@@ -101,4 +101,5 @@ dependencies {
     implementation("com.google.firebase:firebase-crashlytics")
 
     implementation("com.google.android.gms:play-services-auth:21.1.1")
+    implementation("io.livekit:livekit-android:2.25.3")
 }

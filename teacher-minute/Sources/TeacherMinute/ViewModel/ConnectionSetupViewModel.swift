@@ -11,7 +11,9 @@ final class ConnectionSetupViewModel {
   let footerText: String
   let liveKitRoom: String
   let liveKitToken: String
+  private let onSessionStarted: (@MainActor @Sendable () -> Void)?
   private let sessionViewModel: (any ChatSessionViewModeling)?
+  private var didNotifySessionStarted = false
 
   var hasTimedOut = false
   var attempt = 0
@@ -27,7 +29,8 @@ final class ConnectionSetupViewModel {
     footerText: String = "Your teacher will join shortly",
     sessionViewModel: (any ChatSessionViewModeling)? = nil,
     liveKitRoom: String = "",
-    liveKitToken: String = ""
+    liveKitToken: String = "",
+    onSessionStarted: (@MainActor @Sendable () -> Void)? = nil
   ) {
     self.participantName = participantName
     self.conversationType = conversationType
@@ -35,6 +38,7 @@ final class ConnectionSetupViewModel {
     self.sessionViewModel = sessionViewModel
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
+    self.onSessionStarted = onSessionStarted
   }
 
   var hasAudio: Bool { conversationType == "audio" || conversationType == "video" }
@@ -120,9 +124,16 @@ final class ConnectionSetupViewModel {
       hasTimedOut = false
       setupStatusText = LocalizationSupport.localized("Session connected")
       didStartSession = true
+      notifySessionStartedIfNeeded()
     }
     logger.info("[ConnectionSetup] invoking ChatSessionViewModel.start qid=\(sessionViewModel.questionId) role=\(sessionViewModel.role) conversationType=\(self.conversationType)")
     sessionViewModel.start()
+  }
+
+  private func notifySessionStartedIfNeeded() {
+    guard !didNotifySessionStarted else { return }
+    didNotifySessionStarted = true
+    onSessionStarted?()
   }
 
   private func connectMediaSessionIfNeeded(questionId: String) async -> Bool {

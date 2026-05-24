@@ -29,7 +29,8 @@ struct ConnectionSetupView: View {
         footerText: footerText,
         sessionViewModel: sessionViewModel,
         liveKitRoom: liveKitRoom,
-        liveKitToken: liveKitToken
+        liveKitToken: liveKitToken,
+        onSessionStarted: onSessionStarted
       )
     )
     self.onCancel = onCancel
@@ -50,10 +51,6 @@ struct ConnectionSetupView: View {
     }
     .task(id: viewModel.timerKey) {
       await viewModel.startTimeoutTimer()
-    }
-    .onChange(of: viewModel.didStartSession) { _, didStartSession in
-      guard didStartSession else { return }
-      onSessionStarted?()
     }
     .trackScreen(AnalyticsScreen.connectionSetup)
   }
