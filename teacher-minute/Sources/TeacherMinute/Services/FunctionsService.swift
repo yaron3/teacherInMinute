@@ -104,6 +104,17 @@ final class FunctionsService {
     _ = try await call(function: "cancelQuestion", data: ["questionId": questionId])
   }
 
+  func rateTeacher(questionId: String, teacherId: String, rating: Int) async throws {
+    _ = try await call(
+      function: "rateTeacher",
+      data: [
+        "questionId": questionId,
+        "teacherId": teacherId,
+        "rating": rating
+      ]
+    )
+  }
+
   func getQuestionStatus(questionId: String) async throws -> QuestionStatusResult {
     let result = try await call(function: "getQuestionStatus", data: ["questionId": questionId])
     guard let status = result["status"] as? String else { throw FunctionsError.decodingError() }

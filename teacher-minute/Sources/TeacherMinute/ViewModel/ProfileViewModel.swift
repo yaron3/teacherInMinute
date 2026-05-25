@@ -124,30 +124,30 @@ final class ProfileViewModel {
 
     func requestMicrophonePermission() {
         Task {
-            if microphoneState == .denied {
-                PermissionService.shared.openAppSettings()
-            } else {
+            if microphoneState == .notDetermined {
                 microphoneState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+            } else {
+                PermissionService.shared.openAppSettings()
             }
         }
     }
 
     func requestCameraPermission() {
         Task {
-            if cameraState == .denied {
-                PermissionService.shared.openAppSettings()
-            } else {
+            if cameraState == .notDetermined {
                 cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+            } else {
+                PermissionService.shared.openAppSettings()
             }
         }
     }
 
     func manageNotifications() {
         Task {
-            if notificationsState == .denied {
-                PermissionService.shared.openAppSettings()
-            } else {
+            if notificationsState == .notDetermined {
                 notificationsState = await PermissionService.shared.requestNotifications()
+            } else {
+                PermissionService.shared.openAppSettings()
             }
         }
     }

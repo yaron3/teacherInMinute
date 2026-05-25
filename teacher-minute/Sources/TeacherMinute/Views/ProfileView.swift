@@ -104,15 +104,15 @@ struct ProfileView: View {
 				icon: "mic.fill",
 				title: LocalizationSupport.localized("Microphone"),
 				state: viewModel.microphoneState,
-				iconColor: viewModel.microphoneState.isGranted ? theme.appGreen : theme.appSecondaryText,
+				iconColor: permissionColor(viewModel.microphoneState),
                 action: viewModel.requestMicrophonePermission
               )
-			  
+
 			  ProfilePermissionRow(
 				icon: "camera.fill",
 				title: LocalizationSupport.localized("Camera"),
 				state: viewModel.cameraState,
-				iconColor: viewModel.cameraState.isGranted ? theme.appGreen : theme.appSecondaryText,
+				iconColor: permissionColor(viewModel.cameraState),
                 action: viewModel.requestCameraPermission
               )
 
@@ -120,7 +120,7 @@ struct ProfileView: View {
 				icon: "bell.fill",
 				title: LocalizationSupport.localized("Notifications"),
 				state: viewModel.notificationsState,
-				iconColor: viewModel.notificationsState.isGranted ? theme.appGreen : theme.appSecondaryText,
+				iconColor: permissionColor(viewModel.notificationsState),
                 action: viewModel.manageNotifications
               )
 			}
@@ -250,6 +250,14 @@ struct ProfileView: View {
       }
   }
   
+  func permissionColor(_ state: PermissionState) -> Color {
+	switch state {
+	case .granted: return theme.appGreen
+	case .denied: return theme.red
+	case .notDetermined: return theme.appSecondaryText
+	}
+  }
+
   func teachingCard(
 	title: String,
 	chips: [String],
@@ -425,7 +433,7 @@ struct ProfileTeachingGradePicker: View {
 
         Spacer()
 
-        Text(selectedGrades.isEmpty ? LocalizationSupport.localized("Choose grades") : String(format: LocalizationSupport.localized("%lld selected"), selectedGrades.count))
+        Text(selectedGrades.isEmpty ? LocalizationSupport.localized("Choose grades") : String(format: LocalizationSupport.localized("%d selected"), selectedGrades.count))
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(theme.authSecondaryText)
           .padding(.horizontal, 10)

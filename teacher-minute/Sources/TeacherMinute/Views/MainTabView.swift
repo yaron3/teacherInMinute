@@ -65,6 +65,9 @@ struct MainTabView: View {
         .background(Color(.systemBackground))
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
+        .task {
+            PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
+        }
     }
 
     @ViewBuilder

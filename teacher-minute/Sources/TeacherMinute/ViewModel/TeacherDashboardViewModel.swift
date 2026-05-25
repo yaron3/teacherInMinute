@@ -311,6 +311,15 @@ final class TeacherDashboardViewModel {
       conversationTypes[id] = (row["conversationType"] as? String) ?? "text"
     }
 
+    let newInviteIDs = Set(ids).subtracting(Set(inviteIDs))
+    for id in newInviteIDs {
+      LocalNotificationService.shared.scheduleTeacherQuestion(
+        questionId: id,
+        topic: topics[id] ?? "",
+        text: texts[id] ?? ""
+      )
+    }
+
     inviteIDs = ids
     inviteTopics = topics
     inviteTexts = texts

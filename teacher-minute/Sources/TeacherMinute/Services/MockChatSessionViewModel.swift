@@ -13,6 +13,7 @@ import Observation
 final class MockChatSessionViewModel: ChatSessionViewModeling {
   let questionId: String
   let role: String
+  let teacherId: String
   var messages: [ChatMessage]
   var boardStrokes: [BoardStroke]
   var errorMessage: String?
@@ -40,6 +41,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   init(
     questionId: String = "mock-question",
     role: String = "student",
+    teacherId: String = "mock-teacher",
     messages: [ChatMessage] = [],
     boardStrokes: [BoardStroke] = [],
     isConnecting: Bool = true,
@@ -55,6 +57,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   ) {
     self.questionId = questionId
     self.role = role
+    self.teacherId = teacherId
     self.messages = messages.isEmpty ? Self.defaultMessages(currentRole: role) : messages
     self.boardStrokes = boardStrokes
     self.isConnecting = isConnecting
@@ -180,7 +183,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "teacher"
   }
 
-  private func sessionDurationSeconds(at date: Date) -> Int {
+  func sessionDurationSeconds(at date: Date) -> Int {
     max(0, Int(date.timeIntervalSince1970 - sessionStartedAt / 1000.0))
   }
 }
