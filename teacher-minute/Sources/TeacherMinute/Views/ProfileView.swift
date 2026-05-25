@@ -548,7 +548,7 @@ struct ProfileTeachingGradeChip: View {
         PlatformIcon(systemName: "graduationcap")
           .font(.system(size: 12, weight: .semibold))
 
-        Text(LocalizedStringKey(title))
+        Text(LocalizationSupport.localized(title))
           .font(.system(size: 13, weight: .medium))
       }
       .foregroundStyle(theme.authPrimaryText)

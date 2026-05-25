@@ -23,13 +23,6 @@ struct ChooseRoleView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      AuthIconHeader(systemImage: "person.3.fill")
-        .padding(.top, 40)
-
-      Text(LocalizationSupport.localized("Choose Your Role"))
-        .font(.system(size: 29, weight: .bold))
-        .foregroundStyle(theme.authPrimaryText)
-        .padding(.top, 24)
 
       Text(LocalizationSupport.localized("How do you want to use Math Connect? You\ncan change this later in settings."))
         .font(.system(size: 15))
@@ -105,6 +98,7 @@ struct ChooseRoleView: View {
         NavigationStack { AboutWebView(url: termsURL, title: LocalizationSupport.localized("EULA")) }
       }
     }
+	.navigationTitle(LocalizationSupport.localized("Choose Your Role"))
     .sheet(isPresented: $showingPrivacy) {
       if let privacyURL {
         NavigationStack { AboutWebView(url: privacyURL, title: LocalizationSupport.localized("Privacy Policy")) }

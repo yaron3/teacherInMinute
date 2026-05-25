@@ -125,6 +125,7 @@ struct PlatformIcon: View {
 	  case "hand.raised.fill":					return "✋"
 	  case "clock.badge.checkmark.fill":		return "⏰"
 	  case "pencil.and.list.clipboard":			return "📝"
+	  case "person.crop.rectangle":				return "👤"
 		
 		
 	  default:

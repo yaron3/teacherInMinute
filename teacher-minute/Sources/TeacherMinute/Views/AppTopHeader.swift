@@ -102,7 +102,7 @@ struct SmallPill: View {
   var background: Color?
   
   var body: some View {
-	Text(LocalizedStringKey(title))
+	Text(LocalizationSupport.localized(title))
 	  .font(.system(size: 11, weight: .semibold))
 	  .foregroundStyle(foreground ?? theme.appPink)
 	  .padding(.horizontal, 10)

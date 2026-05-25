@@ -151,7 +151,7 @@ struct HistoryMetricCard: View {
                         )
                     }
                 
-                Text(LocalizedStringKey(title))
+                Text(LocalizationSupport.localized(title))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.appSecondaryText)
                 

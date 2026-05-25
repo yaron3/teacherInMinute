@@ -411,7 +411,7 @@ struct StudentHomeView: View {
             PlatformIcon(systemName: "checkmark", size: 10, weight: .bold,
 						 color: theme.appGreen)
 
-            Text(LocalizedStringKey(text))
+            Text(LocalizationSupport.localized(text))
                 .font(.system(size: 12))
                 .foregroundStyle(theme.appSecondaryText)
         }
@@ -419,7 +419,7 @@ struct StudentHomeView: View {
 
     func sectionHeader(title: String, actionTitle: String? = nil, action: (@MainActor @Sendable () -> Void)? = nil) -> some View {
         HStack {
-            Text(LocalizedStringKey(title))
+            Text(LocalizationSupport.localized(title))
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(theme.appPrimaryText)
 
@@ -427,7 +427,7 @@ struct StudentHomeView: View {
 
             if let actionTitle, let action {
                 Button(action: action) {
-                    Text(LocalizedStringKey(actionTitle))
+                    Text(LocalizationSupport.localized(actionTitle))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(theme.appPink)
                 }
@@ -466,7 +466,7 @@ struct ConversationTypeChip: View {
                         color: isSelected ? theme.appCardBackground : theme.appPrimaryText
                     )
                 }
-                Text(LocalizedStringKey(title))
+                Text(LocalizationSupport.localized(title))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isSelected ? theme.appCardBackground : theme.appPrimaryText)
                     .lineLimit(1)
@@ -816,7 +816,7 @@ struct PricingCard: View {
                 .padding(.top, 8)
 				.padding(.leading, 5)
 			  
-                Text(LocalizedStringKey(option.description))
+                Text(LocalizationSupport.localized(option.description))
                     .font(.system(size: 12))
                     .foregroundStyle(theme.appSecondaryText)
                     .lineSpacing(4)

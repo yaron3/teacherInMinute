@@ -26,11 +26,7 @@ struct TeacherSubjectsView: View {
 			.foregroundStyle(theme.authSecondaryText)
 			.frame(maxWidth: .infinity)
 		}
-		
-			Text(LocalizationSupport.localized("What can you teach?"))
-			  .font(.system(size: 26, weight: .bold))
-			  .foregroundStyle(theme.authPrimaryText)
-			  .padding(.top, 20)
+
 			
 			Text(LocalizationSupport.localized("Choose a subject area, then select at least\none subtopic students can request."))
 			  .font(.system(size: 13))
@@ -125,6 +121,7 @@ struct TeacherSubjectsView: View {
 	}
 	.background(Color(.systemBackground))
 	.navigationBarTitleDisplayMode(.inline)
+	.navigationTitle(LocalizationSupport.localized("What can you teach?"))
 	.onAppear {
 	  if isEditing {
 		viewModel.onContinue = { dismiss() }
@@ -196,7 +193,7 @@ struct SubjectAreaChip: View {
 		PlatformIcon(systemName: area.systemImage)
 		  .font(.system(size: 12, weight: .semibold))
 		
-		Text(LocalizedStringKey(area.title))
+		Text(LocalizationSupport.localized(area.title))
 		  .font(.system(size: 13, weight: .medium))
 	  }
 	  .foregroundStyle(theme.authPrimaryText)

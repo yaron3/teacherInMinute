@@ -163,7 +163,7 @@ struct TeacherDashboardView: View {
 	  } label: {
 		HStack(spacing: 10) {
 		  if viewModel.isOnline {
-			Text(LocalizedStringKey("ON"))
+			Text(LocalizationSupport.localized("ON"))
 			  .font(.system(size: 12, weight: .bold))
 			  .foregroundStyle(theme.appPrimaryText)
 			  .padding(.leading, 16)
@@ -174,7 +174,7 @@ struct TeacherDashboardView: View {
 			Circle()
 			  .fill(theme.primaryText)
 			  .frame(width: 44, height: 44)
-			Text(LocalizedStringKey("OFF"))
+			Text(LocalizationSupport.localized("OFF"))
 			  .font(.system(size: 12, weight: .bold))
 			  .foregroundStyle(theme.appSecondaryText)
 			  .padding(.trailing, 14)

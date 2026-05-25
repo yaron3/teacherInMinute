@@ -195,7 +195,7 @@ struct SubjectChip: View {
                 PlatformIcon(systemName: subject.systemImage)
                     .font(.system(size: 14, weight: .semibold))
 
-                Text(LocalizedStringKey(subject.title))
+                Text(LocalizationSupport.localized(subject.title))
                     .font(.system(size: 15, weight: .medium))
             }
 			.foregroundStyle(theme.authPrimaryText)

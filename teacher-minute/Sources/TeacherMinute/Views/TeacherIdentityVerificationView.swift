@@ -37,10 +37,7 @@ struct TeacherIdentityVerificationView: View {
 			.foregroundStyle(theme.authSecondaryText)
 			.frame(maxWidth: .infinity)
 		  
-		  Text(LocalizationSupport.localized("Verify Your Identity"))
-			.font(.system(size: 26, weight: .bold))
-			.foregroundStyle(theme.authPrimaryText)
-			.padding(.top, 20)
+
 		  
 		  Text(LocalizationSupport.localized("To maintain a high-quality learning environment,\nwe need to verify your teaching credentials and\nidentity."))
 			.font(.system(size: 13))
@@ -238,6 +235,8 @@ struct TeacherIdentityVerificationView: View {
 	  viewModel.onSubmit = { router.push(.teacherSubjects) }
 	  viewModel.checkAndAutoAdvance()
 	}
+	.navigationTitle(LocalizationSupport.localized("Verify Your Identity"))
+
   }
   
   // MARK: - Picker label helpers (Android / preview)
