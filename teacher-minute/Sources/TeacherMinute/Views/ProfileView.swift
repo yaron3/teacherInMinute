@@ -15,7 +15,9 @@ import SkipBridge
 
 struct ProfileView: View {
   @State var viewModel: ProfileViewModel
+  @State var isShowingProfileEditor = false
   @State var isShowingSubjectEditor = false
+  @State var hasProfileDataForDisplay = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
 #if !os(Android)
   @State private var profilePhotoItem: PhotosPickerItem?
@@ -29,6 +31,7 @@ struct ProfileView: View {
   }
   var body: some View {
 	ScrollView(.vertical, showsIndicators: false) {
+      if hasProfileDataForDisplay {
 	  VStack(alignment: .leading, spacing: 0) {
 		HStack {
 		  Text(LocalizationSupport.localized("Profile"))
@@ -38,7 +41,7 @@ struct ProfileView: View {
 		  Spacer()
 		  
 		  Button {
-			viewModel.editProfile()
+		    showProfileEditor()
 		  } label: {
 			Circle()
 			  .fill(theme.appPrimaryText)
@@ -79,8 +82,8 @@ struct ProfileView: View {
 			title: LocalizationSupport.localized("Grade Levels Taught"),
 			chips: viewModel.gradeLevels,
 			includeAdd: viewModel.gradeLevels.isEmpty,
-			editAction: viewModel.editGradeLevels,
-			addAction: viewModel.addGradeLevel
+			editAction: showProfileEditor,
+			addAction: showProfileEditor
 		  )
 		  .padding(.top, 14)
 		  
@@ -127,12 +130,15 @@ struct ProfileView: View {
 	  }
 	  .padding(.horizontal, 18)
 	  .padding(.bottom, 24)
+      } else {
+        profileLoadingView
+      }
 	}
 		.background(Color(.systemBackground))
 			.task {
-			  await viewModel.loadProfile()
+              await loadProfileForDisplay()
 			}
-            .sheet(isPresented: $viewModel.isEditing, onDismiss: {
+            .sheet(isPresented: $isShowingProfileEditor, onDismiss: {
               viewModel.cancelProfileEditing()
             }) {
               NavigationStack {
@@ -159,6 +165,34 @@ struct ProfileView: View {
 #endif
 	  }
 	  
+  var profileLoadingView: some View {
+    VStack(spacing: 12) {
+      if let error = viewModel.errorMessage {
+        Text(error)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.red)
+
+        Button {
+          Task { await loadProfileForDisplay() }
+        } label: {
+          Text(LocalizationSupport.localized("Retry"))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.appPink)
+        }
+        .buttonStyle(.plain)
+      } else {
+        ProgressView()
+          .tint(theme.appPink)
+
+        Text(LocalizationSupport.localized("Loading profile..."))
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.appSecondaryText)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 420)
+    .padding(.horizontal, 18)
+  }
+
 	  var profileHeader: some View {
 	VStack(spacing: 0) {
 		  ZStack(alignment: .bottomTrailing) {
@@ -173,8 +207,12 @@ struct ProfileView: View {
 	  HStack(spacing: 8) {
 		SmallPill(title: viewModel.role, foreground: theme.appPurple, background: theme.appPurpleSoft)
 		
-		if viewModel.isVerified {
-		  SmallPill(title: LocalizationSupport.localized("Verified"), foreground: theme.appGreen, background: theme.appGreenSoft)
+		if viewModel.roleType == .teacher {
+		  SmallPill(
+		    title: LocalizationSupport.localized(viewModel.isVerified ? "Verified" : "Not Verified"),
+		    foreground: viewModel.isVerified ? theme.appGreen : theme.red,
+		    background: viewModel.isVerified ? theme.appGreenSoft : theme.red.opacity(0.12)
+		  )
 		}
 	  }
 	  .padding(.top, 8)
@@ -256,6 +294,34 @@ struct ProfileView: View {
 	case .denied: return theme.red
 	case .notDetermined: return theme.appSecondaryText
 	}
+  }
+
+  private func showProfileEditor() {
+    viewModel.editProfile()
+    isShowingProfileEditor = true
+  }
+
+  private func loadProfileForDisplay() async {
+    if viewModel.hasDisplayableProfileData {
+      hasProfileDataForDisplay = true
+      return
+    }
+
+    hasProfileDataForDisplay = false
+    var didStartLoad = false
+    while !Task.isCancelled {
+      if viewModel.hasDisplayableProfileData {
+        hasProfileDataForDisplay = true
+        return
+      }
+
+      if !didStartLoad || !viewModel.isLoading {
+        didStartLoad = true
+        Task { await viewModel.loadProfile() }
+      }
+
+      try? await Task.sleep(for: .seconds(1))
+    }
   }
 
   func teachingCard(
@@ -618,23 +684,32 @@ struct ProfileInfoRow: View {
 		  .frame(width: 42, height: 42)
 		  .overlay {
 			PlatformIcon(systemName: parameter.image)
-			  .font(.system(size: 15, weight: .semibold))
+			  .font(.system(size: 17, weight: .semibold))
 			  .foregroundStyle(theme.appPurple)
 		  }
 		
 		VStack(alignment: .leading, spacing: 4) {
 		  Text(parameter.description)
-			.font(.system(size: 12))
-			.foregroundStyle(theme.appSecondaryText)
-		  
-		  TextField(parameter.description, text: $parameter.value)
-			.font(.system(size: 14, weight: .bold))
+			.font(.system(size: 14))
 			.foregroundStyle(theme.appPrimaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.75)
-			.disabled(!isEditing)
-                .multilineTextAlignment(.leading)
-                .environment(\.layoutDirection, .leftToRight)
+		  
+		  if isEditing {
+		    TextField(parameter.description, text: $parameter.value)
+		      .font(.system(size: 16, weight: .bold))
+		      .foregroundStyle(theme.appPrimaryText)
+		      .lineLimit(1)
+		      .minimumScaleFactor(0.75)
+		      .multilineTextAlignment(.leading)
+		      .environment(\.layoutDirection, .leftToRight)
+		  } else {
+		    Text(parameter.value.isEmpty ? "-" : parameter.value)
+		      .font(.system(size: 16, weight: .bold))
+		      .foregroundStyle(theme.appPrimaryText)
+		      .lineLimit(1)
+		      .minimumScaleFactor(0.75)
+		      .frame(maxWidth: .infinity, alignment: .trailing)
+		      .multilineTextAlignment(.trailing)
+		  }
 		}
 		
 		Spacer()

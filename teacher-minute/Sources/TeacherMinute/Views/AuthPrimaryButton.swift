@@ -25,10 +25,10 @@ struct AuthPrimaryButton: View {
 
                 if let systemImage {
                     PlatformIcon(systemName: systemImage)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                 }
             }
-            .font(.system(size: 16, weight: .semibold))
+            .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(theme.appPrimaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
@@ -53,7 +53,7 @@ struct AuthIconHeader: View {
             .frame(width: 54, height: 54)
             .overlay {
                 PlatformIcon(systemName: systemImage)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(theme.authPink)
             }
     }
@@ -81,7 +81,7 @@ struct AuthInputField: View {
     var body: some View {
 	  VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(theme.authPrimaryText)
 
             HStack(spacing: 12) {
@@ -106,13 +106,13 @@ struct AuthInputField: View {
 
     var fieldIcon: some View {
         PlatformIcon(systemName: systemImage)
-            .font(.system(size: 14))
+            .font(.system(size: 18))
             .foregroundStyle(theme.authIcon)
     }
 
     var inputField: some View {
         TextField(placeholder, text: $text)
-            .font(.system(size: 15))
+            .font(.system(size: 17))
             .foregroundStyle(theme.authPrimaryText)
             .keyboardType(keyboardType)
             .textContentType(textContentType)
@@ -149,7 +149,7 @@ struct AuthSegmentedRolePicker: View {
             }
         } label: {
             Text(role.title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(isSelected ? theme.authPrimaryText : theme.authSecondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
@@ -193,10 +193,10 @@ struct SubjectChip: View {
         Button(action: action) {
             HStack(spacing: 7) {
                 PlatformIcon(systemName: subject.systemImage)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
 
                 Text(LocalizedStringKey(subject.title))
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 15, weight: .medium))
             }
 			.foregroundStyle(theme.authPrimaryText)
             .padding(.horizontal, 14)
@@ -212,9 +212,7 @@ struct SubjectChip: View {
     }
 }
 #if os(iOS)
-struct SubjectChipScreens_Previews: PreviewProvider {
-  static var previews: some View {
-	SubjectChip(subject: SubjectOption(title: "test", systemImage: "test"), isSelected: true, action: {})
-  }
+#Preview {
+  SubjectChip(subject: SubjectOption(title: "test", systemImage: "test"), isSelected: true, action: {})
 }
 #endif

@@ -51,7 +51,7 @@ struct AppTheme {
   }
 	var appPrimaryText: Color {
         adaptive(
-            light: (17, 24, 39),
+            light: (17, 17, 17),
             dark: (243, 244, 246)
         )
     }

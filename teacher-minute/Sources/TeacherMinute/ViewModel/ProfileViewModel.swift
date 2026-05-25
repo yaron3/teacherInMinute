@@ -28,6 +28,7 @@ final class ProfileViewModel {
     var profileImageURL = ""
     var roleType: AuthRole
     var isLoading = false
+    var isProfileLoaded = false
     var isEditing = false
     var isUploadingPhoto = false
     var errorMessage: String?
@@ -61,25 +62,46 @@ final class ProfileViewModel {
         subjects.isEmpty ? ["No subjects added yet"] : subjects
     }
 
+    var hasDisplayableProfileData: Bool {
+        name != "Profile" && role != "User" && !contactRows.isEmpty
+    }
+
     init(roleType: AuthRole = .student) {
         self.roleType = roleType
         role = roleType == .teacher ? "Math Teacher" : "Student"
-        isVerified = roleType == .teacher
+        isVerified = false
         rebuildContactRows()
     }
 
     func loadProfile() async {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
+        guard let uid = Auth.auth().currentUser?.uid else {
+            errorMessage = "Could not load profile."
+            isProfileLoaded = false
+			isLoading = false
+            return
+        }
         isLoading = true
+        isProfileLoaded = false
+        errorMessage = nil
         defer { isLoading = false }
 
         await refreshPermissions()
 
         do {
-            guard let profile = try await UserService.shared.fetchProfileSummary(uid: uid) else { return }
+		  logger.info("[Profile] loading profile")
+		  isProfileLoaded = false
+            guard let profile = try await UserService.shared.fetchProfileSummary(uid: uid) else {
+                errorMessage = "Could not load profile."
+                return
+            }
             apply(profile)
+            if profile.role == .teacher {
+                isVerified = (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
+            }
+            isProfileLoaded = true
         } catch {
             errorMessage = "Could not load profile."
+            isProfileLoaded = false
             logger.error("[Profile] failed loading profile: \(error.localizedDescription)")
             AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.loadProfile")
         }
@@ -207,7 +229,7 @@ final class ProfileViewModel {
         subjects = profile.subjects
         profileImageURL = profile.profileImageURL
         roleType = profile.role
-        isVerified = profile.role == .teacher
+        isVerified = false
         rebuildContactRows()
     }
 

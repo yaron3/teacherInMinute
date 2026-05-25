@@ -48,8 +48,24 @@ final class UserService {
   }
   
   func fetchProfileSummary(uid: String) async throws -> UserProfileSummary? {
-		guard let data = try await fetchRaw(uid: uid) else { return nil }
-		return UserProfileSummary(uid: uid, data: data)
+			guard let data = try await fetchRaw(uid: uid) else { return nil }
+			return UserProfileSummary(uid: uid, data: data)
+  }
+
+  func isTeacherVerified(uid: String) async throws -> Bool {
+    let db = Firestore.firestore()
+    let snap = try await db.collection("teachers").document(uid).getDocument()
+    guard snap.exists, let verifiedAt = snap.data()?["verifiedAt"] else { return false }
+
+    if let value = verifiedAt as? String {
+      return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    if verifiedAt is NSNull {
+      return false
+    }
+
+    return true
   }
 
   func updateProfileFields(uid: String, fields: [String: String]) async throws {
