@@ -108,10 +108,10 @@ final class TeacherSubjectsViewModel {
 	guard areaCount > 0 else { return LocalizationSupport.localized("Choose subjects") }
 	let subjectPart = areaCount == 1
 	  ? LocalizationSupport.localized("1 subject")
-	  : String(format: LocalizationSupport.localized("%lld subjects"), areaCount)
+	  : String(format: LocalizationSupport.localized("%d subjects"), areaCount)
 	let subtopicPart = subtopicCount == 1
 	  ? LocalizationSupport.localized("1 subtopic")
-	  : String(format: LocalizationSupport.localized("%lld subtopics"), subtopicCount)
+	  : String(format: LocalizationSupport.localized("%d subtopics"), subtopicCount)
 	return "\(subjectPart), \(subtopicPart)"
   }
   

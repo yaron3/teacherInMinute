@@ -36,6 +36,7 @@ struct ChatSessionView: View {
   @State var isCameraOff = false
   @State var liveKitRevision = 0
   @State var conversationType: String
+  @State var isRatingPromptVisible = false
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let liveKitRoom: String
@@ -112,11 +113,22 @@ struct ChatSessionView: View {
     .task {
       viewModel.onMessagesUpdated = { rows in
         let oldCount = messages.count
+        let previousMessageIDs = Set(messages.map(\.id))
+        let newIncomingMessages = didPrimeMessages
+          ? rows.filter { !$0.isMine && !previousMessageIDs.contains($0.id) }
+          : []
         if didPrimeMessages,
 		   selectedTab != .CHAT,
            rows.count > oldCount,
            rows.suffix(rows.count - oldCount).contains(where: { !$0.isMine }) {
           hasUnreadChat = true
+        }
+        for message in newIncomingMessages {
+          LocalNotificationService.shared.scheduleChatMessage(
+            questionId: viewModel.questionId,
+            message: message,
+            currentRole: viewModel.role
+          )
         }
         messages = rows
         didPrimeMessages = true
@@ -140,7 +152,7 @@ struct ChatSessionView: View {
         displayDate = Date()
       }
       viewModel.onSessionEnded = {
-        onClose()
+        closeWithOptionalRating()
       }
 #if !os(Android)
       LiveKitService.shared.onTracksUpdated = { @MainActor @Sendable in
@@ -164,7 +176,31 @@ struct ChatSessionView: View {
     .onDisappear {
       viewModel.stop()
     }
+    .sheet(isPresented: $isRatingPromptVisible) {
+      RateSessionView(
+        teacherName: viewModel.participantName,
+        teacherImageURL: viewModel.participantImageURL,
+        subject: viewModel.originalQuestion,
+        teacherId: viewModel.teacherId,
+        questionId: viewModel.questionId,
+        onFinish: {
+          isRatingPromptVisible = false
+          onClose()
+        }
+      )
+      .interactiveDismissDisabled(false)
+    }
     .trackScreen(AnalyticsScreen.chatSession)
+  }
+
+  @MainActor
+  private func closeWithOptionalRating() {
+    let durationSeconds = viewModel.sessionDurationSeconds(at: Date())
+    if isStudent && durationSeconds >= 30 && !viewModel.teacherId.isEmpty {
+      isRatingPromptVisible = true
+    } else {
+      onClose()
+    }
   }
 
   var sessionBody: some View {
@@ -193,7 +229,9 @@ struct ChatSessionView: View {
           whiteboard
 		} else if selectedTab == .CHAT {
           VStack(spacing: 0) {
-            sessionNotice
+			if messages.count == 0 {
+			  sessionNotice
+			}
             ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
           }
 		} else if selectedTab == .VIDEO {
@@ -487,9 +525,9 @@ struct ChatSessionView: View {
       }
 
       Button {
-        onClose()
         Task {
           await viewModel.endLesson()
+          closeWithOptionalRating()
         }
       } label: {
         Text(LocalizationSupport.localized("End"))

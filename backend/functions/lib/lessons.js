@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.forceEndLesson = exports.endLesson = exports.startLesson = void 0;
+exports.forceEndLesson = exports.rateTeacher = exports.endLesson = exports.startLesson = void 0;
 const admin = require("firebase-admin");
 const firebase_functions_1 = require("firebase-functions");
 const https_1 = require("firebase-functions/v2/https");
@@ -13,6 +13,28 @@ const billing_1 = require("./billing");
 const dispatch_1 = require("./dispatch");
 const firestore = admin.firestore();
 const db = admin.database();
+function toTimestamp(value) {
+    if (value instanceof firestore_1.Timestamp)
+        return value;
+    if (value instanceof Date)
+        return firestore_1.Timestamp.fromDate(value);
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return firestore_1.Timestamp.fromMillis(value);
+    }
+    if (typeof value === "object" &&
+        value !== null &&
+        typeof value.toMillis === "function") {
+        try {
+            const millis = Number(value.toMillis());
+            if (Number.isFinite(millis))
+                return firestore_1.Timestamp.fromMillis(millis);
+        }
+        catch (_a) {
+            // ignore invalid timestamp-like values
+        }
+    }
+    return undefined;
+}
 function firstString(...values) {
     for (const value of values) {
         if (typeof value === "string" && value.trim().length > 0) {
@@ -320,7 +342,7 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
 // FR-B-007, FR-B-010
 // Called by student or teacher when they tap End.
 exports.endLesson = (0, https_1.onCall)(async (req) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const debugContext = { stage: "init" };
     try {
         const uid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
@@ -350,6 +372,17 @@ exports.endLesson = (0, https_1.onCall)(async (req) => {
         debugContext.stage = "committing-firestore";
         firebase_functions_1.logger.info(`[lessons] endLesson committing Firestore writes qid=${questionId}`);
         await migrateQuestionToFirestore(questionId, endedBy, context);
+        const questionDoc = await firestore.collection("questions").doc(questionId).get();
+        const lessonId = (_b = questionDoc.data()) === null || _b === void 0 ? void 0 : _b.lessonId;
+        if (lessonId) {
+            await firestore.collection("lessons").doc(lessonId).set({
+                status: "completed",
+                endedBy,
+                endedAt: firestore_1.FieldValue.serverTimestamp(),
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            }, { merge: true });
+            firebase_functions_1.logger.info(`[lessons] endLesson lesson completed lessonId=${lessonId} qid=${questionId}`);
+        }
         debugContext.stage = "completed";
         firebase_functions_1.logger.info(`[lessons] endLesson migrated qid=${questionId} from RTDB to Firestore and marked ended`);
         firebase_functions_1.logger.info(`[lessons] endLesson triggering dispatch backfill for teacher=${context.teacherUid} qid=${questionId} endedBy=${endedBy}`);
@@ -367,7 +400,7 @@ exports.endLesson = (0, https_1.onCall)(async (req) => {
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const stack = error instanceof Error ? error.stack : undefined;
-        firebase_functions_1.logger.error(`[lessons] endLesson failed stage=${String(debugContext.stage)} qid=${String((_b = debugContext.questionId) !== null && _b !== void 0 ? _b : "unknown")} uid=${String((_c = debugContext.uid) !== null && _c !== void 0 ? _c : "unknown")} message=${message}`);
+        firebase_functions_1.logger.error(`[lessons] endLesson failed stage=${String(debugContext.stage)} qid=${String((_c = debugContext.questionId) !== null && _c !== void 0 ? _c : "unknown")} uid=${String((_d = debugContext.uid) !== null && _d !== void 0 ? _d : "unknown")} message=${message}`);
         firebase_functions_1.logger.error(`[lessons] endLesson debugContext=${JSON.stringify(debugContext)}`);
         if (stack) {
             firebase_functions_1.logger.error(`[lessons] endLesson stack=${stack}`);
@@ -376,6 +409,94 @@ exports.endLesson = (0, https_1.onCall)(async (req) => {
             throw error;
         throw new https_1.HttpsError("internal", `endLesson failed: ${message}`);
     }
+});
+// ─── rateTeacher ────────────────────────────────────────────────────────────
+// FR-B-010: callable — student rates the teacher for a finished lesson.
+exports.rateTeacher = (0, https_1.onCall)(async (req) => {
+    var _a;
+    const uid = (_a = req.auth) === null || _a === void 0 ? void 0 : _a.uid;
+    if (!uid)
+        throw new https_1.HttpsError("unauthenticated", "Sign in required");
+    const data = req.data;
+    const questionId = data.questionId;
+    const teacherId = data.teacherId;
+    const rating = Number(data.rating);
+    if (!questionId)
+        throw new https_1.HttpsError("invalid-argument", "questionId required");
+    if (!teacherId)
+        throw new https_1.HttpsError("invalid-argument", "teacherId required");
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        throw new https_1.HttpsError("invalid-argument", "rating must be an integer from 1 to 5");
+    }
+    const questionRef = firestore.collection("questions").doc(questionId);
+    const teacherRef = firestore.collection("teachers").doc(teacherId);
+    const ratingRef = teacherRef.collection("ratings").doc(questionId);
+    const liveQuestionSnap = await db.ref(`questions/${questionId}`).once("value");
+    if (liveQuestionSnap.exists()) {
+        throw new https_1.HttpsError("failed-precondition", "Lesson is still being finalized. Try rating again in a few seconds");
+    }
+    await firestore.runTransaction(async (tx) => {
+        var _a, _b, _c, _d, _e;
+        const [questionSnap, teacherSnap, existingRatingSnap] = await Promise.all([
+            tx.get(questionRef),
+            tx.get(teacherRef),
+            tx.get(ratingRef),
+        ]);
+        if (!questionSnap.exists) {
+            throw new https_1.HttpsError("not-found", "Question not found");
+        }
+        const question = questionSnap.data();
+        if (question.studentUid !== uid) {
+            throw new https_1.HttpsError("permission-denied", "Only the student in this lesson can rate it");
+        }
+        const ratedTeacherId = question.teacherUid;
+        if (question.acceptedByTeacher !== teacherId && ratedTeacherId !== teacherId) {
+            throw new https_1.HttpsError("failed-precondition", "teacherId does not match this question");
+        }
+        const q = question;
+        let lessonForRating;
+        if (typeof q.lessonId === "string" && q.lessonId.trim().length > 0) {
+            const lessonSnap = await tx.get(firestore.collection("lessons").doc(q.lessonId));
+            if (lessonSnap.exists) {
+                lessonForRating = lessonSnap.data();
+            }
+        }
+        const lessonFinished = Boolean(lessonForRating && (lessonForRating.status === "completed" ||
+            toTimestamp(lessonForRating.endedAt)));
+        const questionFinished = q.status === "completed" || q.state === "ended";
+        if (!questionFinished && !lessonFinished) {
+            throw new https_1.HttpsError("failed-precondition", "Lesson must be completed before rating");
+        }
+        if (existingRatingSnap.exists) {
+            return;
+        }
+        const teacherData = ((_a = teacherSnap.data()) !== null && _a !== void 0 ? _a : {});
+        const ratingsSnap = await tx.get(teacherRef.collection("ratings"));
+        const ratingCount = ratingsSnap.size;
+        const currentAverage = Number.isFinite(Number(teacherData.averageRate))
+            ? Number(teacherData.averageRate)
+            : 0;
+        const nextAverage = ratingCount === 0
+            ? rating
+            : ((ratingCount * currentAverage) + rating) / (ratingCount + 1);
+        let startedAt = (_c = (_b = toTimestamp(q.startedAt)) !== null && _b !== void 0 ? _b : toTimestamp(q.acceptedAt)) !== null && _c !== void 0 ? _c : toTimestamp(q.createdAt);
+        let endedAt = toTimestamp(q.endedAt);
+        if (lessonForRating) {
+            startedAt = (_d = toTimestamp(lessonForRating.startedAt)) !== null && _d !== void 0 ? _d : startedAt;
+            endedAt = (_e = toTimestamp(lessonForRating.endedAt)) !== null && _e !== void 0 ? _e : endedAt;
+        }
+        const safeEndedAt = endedAt !== null && endedAt !== void 0 ? endedAt : firestore_1.Timestamp.now();
+        const safeStartedAt = startedAt !== null && startedAt !== void 0 ? startedAt : safeEndedAt;
+        const ratingDoc = {
+            startedAt: safeStartedAt,
+            endedAt: safeEndedAt,
+            studentId: uid,
+            studentRate: rating,
+        };
+        tx.set(ratingRef, ratingDoc);
+        tx.set(teacherRef, { averageRate: nextAverage }, { merge: true });
+    });
+    return { success: true };
 });
 // ─── forceEndLesson — Cloud Tasks handler ────────────────────────────────────
 // FR-B-006: fires at hardCapAt (30 min after lesson start).

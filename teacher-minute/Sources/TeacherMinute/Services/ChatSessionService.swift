@@ -408,6 +408,7 @@ final class ChatSessionService {
 protocol ChatSessionViewModeling: AnyObject {
   var questionId: String { get }
   var role: String { get }
+  var teacherId: String { get }
   var messages: [ChatMessage] { get set }
   var boardStrokes: [BoardStroke] { get set }
   var errorMessage: String? { get set }
@@ -430,6 +431,7 @@ protocol ChatSessionViewModeling: AnyObject {
   func stop()
   func primaryAmountText(at date: Date) -> String
   func sessionTimeText(at date: Date) -> String
+  func sessionDurationSeconds(at date: Date) -> Int
   func messageTimeText(createdAt: Double, at date: Date) -> String
   func localMessage(text: String) -> ChatMessage
   func localStroke(points: [BoardPoint]) -> BoardStroke
@@ -478,8 +480,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var primaryAmountSubtitle: String {
     if isTeacherRole {
       return String(
-        format: LocalizationSupport.localized("Your share (%lld%%)"),
-        Int64(teacherSharePercent)
+        format: LocalizationSupport.localized("Your share (%d%%)"),
+        teacherSharePercent
       )
     }
     return LocalizationSupport.localized("Total so far")
@@ -629,24 +631,24 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     if elapsed < 60 {
       return elapsed == 1
         ? LocalizationSupport.localized("1 second ago")
-        : String(format: LocalizationSupport.localized("%lld seconds ago"), Int64(elapsed))
+        : String(format: LocalizationSupport.localized("%d seconds ago"), elapsed)
     }
     let minutes = elapsed / 60
     if minutes < 60 {
       return minutes == 1
         ? LocalizationSupport.localized("1 min ago")
-        : String(format: LocalizationSupport.localized("%lld min ago"), Int64(minutes))
+        : String(format: LocalizationSupport.localized("%d min ago"), minutes)
     }
     let hours = minutes / 60
     if hours < 24 {
       return hours == 1
         ? LocalizationSupport.localized("1 hr ago")
-        : String(format: LocalizationSupport.localized("%lld hrs ago"), Int64(hours))
+        : String(format: LocalizationSupport.localized("%d hrs ago"), hours)
     }
     let days = hours / 24
     return days == 1
       ? LocalizationSupport.localized("1 day ago")
-      : String(format: LocalizationSupport.localized("%lld days ago"), Int64(days))
+      : String(format: LocalizationSupport.localized("%d days ago"), days)
   }
 
   func localMessage(text: String) -> ChatMessage {
@@ -775,10 +777,14 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     details?.teacherSharePercent ?? 75
   }
 
-  private func sessionDurationSeconds(at date: Date) -> Int {
+  func sessionDurationSeconds(at date: Date) -> Int {
     let startMilliseconds = details?.acceptedAt ?? 0
     guard startMilliseconds > 0 else { return 0 }
     return max(0, Int(date.timeIntervalSince1970 - startMilliseconds / 1000.0))
+  }
+
+  var teacherId: String {
+    nonEmpty(details?.teacherId) ?? ""
   }
 
   private func currencyText(cents: Double) -> String {

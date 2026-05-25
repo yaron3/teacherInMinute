@@ -20,6 +20,38 @@ import { backfillPendingQuestionsForTeacher } from "./dispatch";
 const firestore = admin.firestore();
 const db = admin.database();
 
+interface TeacherRatingDoc {
+  startedAt: Timestamp;
+  endedAt: Timestamp;
+  studentId: string;
+  studentRate: number;
+}
+
+interface TeacherAggregateDoc {
+  averageRate?: number;
+}
+
+function toTimestamp(value: unknown): Timestamp | undefined {
+  if (value instanceof Timestamp) return value;
+  if (value instanceof Date) return Timestamp.fromDate(value);
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Timestamp.fromMillis(value);
+  }
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { toMillis?: unknown }).toMillis === "function"
+  ) {
+    try {
+      const millis = Number((value as { toMillis: () => unknown }).toMillis());
+      if (Number.isFinite(millis)) return Timestamp.fromMillis(millis);
+    } catch {
+      // ignore invalid timestamp-like values
+    }
+  }
+  return undefined;
+}
+
 function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === "string" && value.trim().length > 0) {
@@ -518,6 +550,21 @@ export const endLesson = onCall(async (req) => {
     logger.info(`[lessons] endLesson committing Firestore writes qid=${questionId}`);
     await migrateQuestionToFirestore(questionId, endedBy, context);
 
+    const questionDoc = await firestore.collection("questions").doc(questionId).get();
+    const lessonId = (questionDoc.data() as { lessonId?: string } | undefined)?.lessonId;
+    if (lessonId) {
+      await firestore.collection("lessons").doc(lessonId).set(
+        {
+          status: "completed",
+          endedBy,
+          endedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      logger.info(`[lessons] endLesson lesson completed lessonId=${lessonId} qid=${questionId}`);
+    }
+
     debugContext.stage = "completed";
     logger.info(
       `[lessons] endLesson migrated qid=${questionId} from RTDB to Firestore and marked ended`
@@ -551,6 +598,132 @@ export const endLesson = onCall(async (req) => {
     if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", `endLesson failed: ${message}`);
   }
+});
+
+// ─── rateTeacher ────────────────────────────────────────────────────────────
+// FR-B-010: callable — student rates the teacher for a finished lesson.
+
+export const rateTeacher = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const data = req.data as {
+    questionId?: string;
+    teacherId?: string;
+    rating?: number;
+  };
+
+  const questionId = data.questionId;
+  const teacherId = data.teacherId;
+  const rating = Number(data.rating);
+
+  if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
+  if (!teacherId) throw new HttpsError("invalid-argument", "teacherId required");
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new HttpsError("invalid-argument", "rating must be an integer from 1 to 5");
+  }
+
+  const questionRef = firestore.collection("questions").doc(questionId);
+  const teacherRef = firestore.collection("teachers").doc(teacherId);
+  const ratingRef = teacherRef.collection("ratings").doc(questionId);
+
+  const liveQuestionSnap = await db.ref(`questions/${questionId}`).once("value");
+  if (liveQuestionSnap.exists()) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Lesson is still being finalized. Try rating again in a few seconds"
+    );
+  }
+
+  await firestore.runTransaction(async (tx) => {
+    const [questionSnap, teacherSnap, existingRatingSnap] = await Promise.all([
+      tx.get(questionRef),
+      tx.get(teacherRef),
+      tx.get(ratingRef),
+    ]);
+
+    if (!questionSnap.exists) {
+      throw new HttpsError("not-found", "Question not found");
+    }
+
+    const question = questionSnap.data() as QuestionDoc;
+    if (question.studentUid !== uid) {
+      throw new HttpsError("permission-denied", "Only the student in this lesson can rate it");
+    }
+
+    const ratedTeacherId = (question as QuestionDoc & { teacherUid?: string }).teacherUid;
+    if (question.acceptedByTeacher !== teacherId && ratedTeacherId !== teacherId) {
+      throw new HttpsError("failed-precondition", "teacherId does not match this question");
+    }
+
+    const q = question as QuestionDoc & {
+      state?: string;
+      acceptedAt?: unknown;
+      createdAt?: unknown;
+      startedAt?: unknown;
+      endedAt?: unknown;
+      lessonId?: string;
+    };
+
+    let lessonForRating: (LessonDoc & { endedAt?: unknown; status?: string }) | undefined;
+    if (typeof q.lessonId === "string" && q.lessonId.trim().length > 0) {
+      const lessonSnap = await tx.get(firestore.collection("lessons").doc(q.lessonId));
+      if (lessonSnap.exists) {
+        lessonForRating = lessonSnap.data() as LessonDoc & { endedAt?: unknown; status?: string };
+      }
+    }
+
+    const lessonFinished = Boolean(
+      lessonForRating && (
+        lessonForRating.status === "completed" ||
+        toTimestamp(lessonForRating.endedAt)
+      )
+    );
+    const questionFinished = q.status === "completed" || q.state === "ended";
+    if (!questionFinished && !lessonFinished) {
+      throw new HttpsError("failed-precondition", "Lesson must be completed before rating");
+    }
+
+    if (existingRatingSnap.exists) {
+      return;
+    }
+
+    const teacherData = (teacherSnap.data() ?? {}) as TeacherAggregateDoc;
+    const ratingsSnap = await tx.get(teacherRef.collection("ratings"));
+    const ratingCount = ratingsSnap.size;
+    const currentAverage = Number.isFinite(Number(teacherData.averageRate))
+      ? Number(teacherData.averageRate)
+      : 0;
+    const nextAverage = ratingCount === 0
+      ? rating
+      : ((ratingCount * currentAverage) + rating) / (ratingCount + 1);
+
+    let startedAt =
+      toTimestamp(q.startedAt) ??
+      toTimestamp(q.acceptedAt) ??
+      toTimestamp(q.createdAt);
+    let endedAt = toTimestamp(q.endedAt);
+
+    if (lessonForRating) {
+      startedAt = toTimestamp(lessonForRating.startedAt) ?? startedAt;
+      endedAt = toTimestamp(lessonForRating.endedAt) ?? endedAt;
+    }
+
+    const safeEndedAt = endedAt ?? Timestamp.now();
+    const safeStartedAt = startedAt ?? safeEndedAt;
+
+    const ratingDoc: TeacherRatingDoc = {
+      startedAt: safeStartedAt,
+      endedAt: safeEndedAt,
+      studentId: uid,
+      studentRate: rating,
+    };
+
+    tx.set(ratingRef, ratingDoc);
+    tx.set(teacherRef, { averageRate: nextAverage }, { merge: true });
+  });
+
+  return { success: true };
 });
 
 // ─── forceEndLesson — Cloud Tasks handler ────────────────────────────────────

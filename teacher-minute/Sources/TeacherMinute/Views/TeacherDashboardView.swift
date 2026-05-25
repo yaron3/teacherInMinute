@@ -232,15 +232,15 @@ struct TeacherDashboardView: View {
 		.foregroundStyle(theme.appPrimaryText)
 
 	  HStack(spacing: 16) {
-		EarningsCard(title: LocalizationSupport.localized("Today"), amount: viewModel.formattedTodayEarnings, subtitle: String(format: LocalizationSupport.localized("%lld mins tutored"), viewModel.todayMinutesTutored))
+		EarningsCard(title: LocalizationSupport.localized("Today"), amount: viewModel.formattedTodayEarnings, subtitle: String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
 		  .frame(maxWidth: .infinity)
-		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%lld mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.appGreen : nil)
+		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.appGreen : nil)
 		  .frame(maxWidth: .infinity)
 	  }
 
 	  EarningsCard(
 		title: LocalizationSupport.localized("All Time"),
-		amount: String(format: LocalizationSupport.localized("%lld min"), viewModel.totalMinutes),
+		amount: String(format: LocalizationSupport.localized("%d min"), viewModel.totalMinutes),
 		subtitle: LocalizationSupport.localized("Total minutes tutored"),
 		subtitleColor: theme.appGreen
 	  )
@@ -266,7 +266,7 @@ struct TeacherDashboardView: View {
 		VStack(alignment: .trailing, spacing: 8) {
 		  SmallPill(title: String(format: LocalizationSupport.localized("⚡ %@/min"), viewModel.formattedRate), foreground: theme.appPink, background: theme.appPinkSoft)
 		  
-		  Text(String(format: LocalizationSupport.localized("%lld mins tutored"), viewModel.todayMinutesTutored))
+		  Text(String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
 			.font(.system(size: 11))
 			.foregroundStyle(theme.appSecondaryText)
 		}
@@ -296,7 +296,7 @@ struct TeacherDashboardView: View {
 		
 		Spacer()
 		
-		SmallPill(title: String(format: LocalizationSupport.localized("%lld Waiting"), viewModel.inviteIDs.count), foreground: theme.appPrimaryText, background: theme.appGrayBackground)
+		SmallPill(title: String(format: LocalizationSupport.localized("%d Waiting"), viewModel.inviteIDs.count), foreground: theme.appPrimaryText, background: theme.appGrayBackground)
 	  }
 	  
 	  ForEach(viewModel.inviteIDs, id: \.self) { inviteID in

@@ -11,7 +11,7 @@ export { dispatchQuestion, evaluateWave } from "./dispatch";
 export { createQuestion, cancelQuestion, acceptInvite, declineInvite, getQuestionStatus } from "./questions";
 
 // Lesson lifecycle (all callable — FR-B-010)
-export { startLesson, endLesson, forceEndLesson } from "./lessons";
+export { startLesson, endLesson, forceEndLesson, rateTeacher } from "./lessons";
 
 // Payments — PayPal Checkout
 export {

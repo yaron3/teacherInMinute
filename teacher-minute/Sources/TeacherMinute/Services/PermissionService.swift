@@ -104,6 +104,12 @@ final class PermissionService {
 #if os(iOS)
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
+#elseif os(Android)
+        do {
+            try AndroidPermissionBridge.openAppSettings()
+        } catch {
+            logger.error("[Permissions] Android openAppSettings failed: \(error.localizedDescription)")
+        }
 #endif
     }
 }
@@ -166,6 +172,20 @@ private enum AndroidPermissionBridge {
         name: "requestPermission",
         sig: "(Ljava/lang/String;)Z"
     )!
+    private static let openAppSettingsMethod = managerClass.getStaticMethodID(
+        name: "openAppSettings",
+        sig: "()V"
+    )!
+
+    static func openAppSettings() throws {
+        try jniContext {
+            try managerClass.callStatic(
+                method: openAppSettingsMethod,
+                options: [.kotlincompat],
+                args: []
+            )
+        }
+    }
 
     static func hasPermission(_ permission: String) -> Bool {
         (try? jniContext {

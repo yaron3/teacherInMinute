@@ -44,6 +44,7 @@ open class AndroidAppMain: Application {
         super.onCreate()
         logger.info("starting app")
         ProcessInfo.launch(applicationContext)
+        AndroidLocalNotificationManager.initialize(this)
         AppDelegate.shared.onInit()
     }
 

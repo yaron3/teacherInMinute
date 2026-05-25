@@ -344,7 +344,7 @@ struct StudentHomeView: View {
                         .foregroundStyle(theme.appPrimaryText)
 
                     HStack(spacing: 6) {
-                        Text(String(format: LocalizationSupport.localized("%lld min remaining"), Int64(viewModel.remainingMinutes)))
+                        Text(String(format: LocalizationSupport.localized("%d min remaining"), viewModel.remainingMinutes))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.95))
                         Text("•")

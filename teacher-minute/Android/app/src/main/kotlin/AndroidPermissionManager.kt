@@ -1,8 +1,11 @@
 package teacher.minute
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -22,6 +25,22 @@ object AndroidPermissionManager {
 
     private val lock = Any()
     private var pendingRequest: PendingRequest? = null
+
+    @JvmStatic
+    fun openAppSettings() {
+        val activity = MainActivity.currentActivity ?: return
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", activity.packageName, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        activity.runOnUiThread {
+            try {
+                activity.startActivity(intent)
+            } catch (t: Throwable) {
+                Log.e(TAG, "openAppSettings failed", t)
+            }
+        }
+    }
 
     @JvmStatic
     fun hasPermission(permission: String): Boolean {

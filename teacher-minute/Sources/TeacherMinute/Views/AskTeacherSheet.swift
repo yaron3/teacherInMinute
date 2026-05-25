@@ -124,7 +124,7 @@ struct AskTeacherSheet: View {
                         .environment(\.layoutDirection, .leftToRight)
                     } 
 
-                    Text(String(format: LocalizationSupport.localized("%lld / 10 minimum characters"), Int64(questionText.count)))
+                    Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
                         .font(.system(size: 11))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)

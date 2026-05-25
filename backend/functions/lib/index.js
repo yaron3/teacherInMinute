@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.billingPage = exports.paypalWebhook = exports.paypalCancel = exports.paypalSuccess = exports.createPaymentSettingsSession = exports.createCheckoutSession = exports.forceEndLesson = exports.endLesson = exports.startLesson = exports.getQuestionStatus = exports.declineInvite = exports.acceptInvite = exports.cancelQuestion = exports.createQuestion = exports.evaluateWave = exports.dispatchQuestion = exports.onUserCreate = void 0;
+exports.billingPage = exports.paypalWebhook = exports.paypalCancel = exports.paypalSuccess = exports.createPaymentSettingsSession = exports.createCheckoutSession = exports.rateTeacher = exports.forceEndLesson = exports.endLesson = exports.startLesson = exports.getQuestionStatus = exports.declineInvite = exports.acceptInvite = exports.cancelQuestion = exports.createQuestion = exports.evaluateWave = exports.dispatchQuestion = exports.onUserCreate = void 0;
 const admin = require("firebase-admin");
 admin.initializeApp();
 // Auth lifecycle
@@ -22,6 +22,7 @@ var lessons_1 = require("./lessons");
 Object.defineProperty(exports, "startLesson", { enumerable: true, get: function () { return lessons_1.startLesson; } });
 Object.defineProperty(exports, "endLesson", { enumerable: true, get: function () { return lessons_1.endLesson; } });
 Object.defineProperty(exports, "forceEndLesson", { enumerable: true, get: function () { return lessons_1.forceEndLesson; } });
+Object.defineProperty(exports, "rateTeacher", { enumerable: true, get: function () { return lessons_1.rateTeacher; } });
 // Payments — PayPal Checkout
 var payments_1 = require("./payments");
 Object.defineProperty(exports, "createCheckoutSession", { enumerable: true, get: function () { return payments_1.createCheckoutSession; } });

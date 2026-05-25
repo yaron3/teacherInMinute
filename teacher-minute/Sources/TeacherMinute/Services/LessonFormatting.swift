@@ -32,14 +32,14 @@ enum LessonFormatting {
         let minutes = max(1, Int((Double(max(0, seconds)) / 60.0).rounded(.up)))
         return minutes == 1
             ? LocalizationSupport.localized("1 min")
-            : String(format: LocalizationSupport.localized("%lld mins"), Int64(minutes))
+            : String(format: LocalizationSupport.localized("%d mins"), minutes)
     }
 
     static func shortDurationText(seconds: Int) -> String {
         let minutes = max(1, Int((Double(max(0, seconds)) / 60.0).rounded(.up)))
         return minutes == 1
             ? LocalizationSupport.localized("1 min")
-            : String(format: LocalizationSupport.localized("%lld min"), Int64(minutes))
+            : String(format: LocalizationSupport.localized("%d min"), minutes)
     }
 
     static func currencyText(cents: Int, currencyCode: String = defaultCurrencyCode) -> String {
@@ -90,10 +90,10 @@ enum LessonFormatting {
 
     static func minutesText(_ minutes: Int) -> String {
         let displayMinutes = max(0, minutes)
-        if displayMinutes == 0 { return String(format: LocalizationSupport.localized("%lld min"), Int64(0)) }
+        if displayMinutes == 0 { return String(format: LocalizationSupport.localized("%d min"), 0) }
         return displayMinutes == 1
             ? LocalizationSupport.localized("1 min")
-            : String(format: LocalizationSupport.localized("%lld min"), Int64(displayMinutes))
+            : String(format: LocalizationSupport.localized("%d min"), displayMinutes)
     }
 
     static func totalCostText(lessons: [HistoryLesson], currencyCode: String? = nil) -> String {

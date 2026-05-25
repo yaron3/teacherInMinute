@@ -77,7 +77,7 @@ struct PricingOption: Identifiable {
 
   var minutesText: String? {
     guard let minutes = minutesGranted, minutes > 0 else { return nil }
-    return String(format: LocalizationSupport.localized("%lld min"), Int64(minutes))
+    return String(format: LocalizationSupport.localized("%d min"), minutes)
   }
 }
 

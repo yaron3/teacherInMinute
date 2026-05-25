@@ -68,6 +68,7 @@ typealias AppType = NSApplication
     // support for SkipNotify.fetchNotificationToken()
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        TeacherMinute.PushNotificationService.shared.handleAPNSToken(deviceToken)
         NotificationCenter.default.post(name: NSNotification.Name("didRegisterForRemoteNotificationsWithDeviceToken"), object: application, userInfo: ["deviceToken": deviceToken])
     }
 

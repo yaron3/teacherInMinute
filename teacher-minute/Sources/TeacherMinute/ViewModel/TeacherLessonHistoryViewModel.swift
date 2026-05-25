@@ -40,7 +40,7 @@ final class TeacherLessonHistoryViewModel {
     }
     
     var completedCountText: String {
-        String(format: LocalizationSupport.localized("%lld taught"), Int64(lessons.count))
+        String(format: LocalizationSupport.localized("%d taught"), lessons.count)
     }
     
     func view(_ lesson: LessonHistoryItem) {

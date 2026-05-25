@@ -26,6 +26,7 @@ let package = Package(
                 .product(name: "SkipFirebaseFirestore", package: "skip-firebase"),
                 .product(name: "SkipFirebaseStorage", package: "skip-firebase"),
                 .product(name: "SkipFirebaseDatabase", package: "skip-firebase"),
+                .product(name: "SkipFirebaseMessaging", package: "skip-firebase"),
                 .product(name: "SkipFirebaseRemoteConfig", package: "skip-firebase"),
                 .product(name: "SkipFirebaseAnalytics", package: "skip-firebase"),
                 .product(name: "SkipFirebaseCrashlytics", package: "skip-firebase"),

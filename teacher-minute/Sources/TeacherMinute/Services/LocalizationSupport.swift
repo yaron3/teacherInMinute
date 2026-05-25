@@ -18,7 +18,11 @@ enum LocalizationSupport {
 
     static func localized(_ key: String) -> String {
         #if os(Android)
-        return NSLocalizedString(key, comment: "")
+        // On Skip Fuse Android the module's `.strings` files are shipped as
+        // Android assets (not in the Swift resource bundle that
+        // swift-corelibs-foundation's Bundle can see), so we load them via the
+        // `asset://` URL protocol that Skip registers at app startup.
+        return androidLocalized(key)
         #else
         let languageCode = currentLanguageCode
         if let bundleURL = Bundle.module.url(forResource: languageCode, withExtension: "lproj"),
@@ -28,6 +32,48 @@ enum LocalizationSupport {
         return Bundle.module.localizedString(forKey: key, value: key, table: nil)
         #endif
     }
+
+    #if os(Android)
+    // Module assets are nested under the Android package path. For this app the
+    // ANDROID_PACKAGE_NAME (`teacher.minute`) becomes `teacher/minute/Resources`.
+    private static let androidAssetsModulePath = "teacher/minute/Resources"
+
+    private final class AndroidTranslationsStorage: @unchecked Sendable {
+        private let lock = NSLock()
+        private var cache: [String: [String: String]] = [:]
+
+        func translations(for languageCode: String) -> [String: String] {
+            lock.lock()
+            defer { lock.unlock() }
+            if let cached = cache[languageCode] { return cached }
+            let table = LocalizationSupport.loadAndroidStrings(for: languageCode) ?? [:]
+            cache[languageCode] = table
+            return table
+        }
+    }
+
+    private static let androidTranslationsStorage = AndroidTranslationsStorage()
+
+    private static func androidLocalized(_ key: String) -> String {
+        let languageCode = currentLanguageCode
+        let table = androidTranslationsStorage.translations(for: languageCode)
+        if let value = table[key], !value.isEmpty { return value }
+        if languageCode != "en" {
+            let fallback = androidTranslationsStorage.translations(for: "en")
+            if let value = fallback[key], !value.isEmpty { return value }
+        }
+        return key
+    }
+
+    fileprivate static func loadAndroidStrings(for languageCode: String) -> [String: String]? {
+        let path = "\(androidAssetsModulePath)/\(languageCode).lproj/Localizable.strings"
+        guard let url = URL(string: "asset:///\(path)"),
+              let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String]
+        else { return nil }
+        return plist
+    }
+    #endif
 
     private static var preferredLanguageCode: String? {
         let rawValue = UserDefaults.standard.string(forKey: languagePreferenceKey) ?? SettingsLanguageChoice.system.rawValue

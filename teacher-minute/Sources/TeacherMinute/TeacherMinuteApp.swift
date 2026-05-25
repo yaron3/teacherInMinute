@@ -99,6 +99,8 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 /* SKIP @bridge */public final class TeacherMinuteAppDelegate : Sendable {
   /* SKIP @bridge */public static let shared = TeacherMinuteAppDelegate()
   
+  nonisolated(unsafe) private(set) var isInForeground = true
+  
   private init() {
   }
   /* SKIP @bridge */@MainActor public func onInit() {
@@ -116,15 +118,21 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   }
   
   /* SKIP @bridge */public func onResume() {
-		logger.debug("onResume")
+			logger.debug("onResume")
+    isInForeground = true
+    Task { @MainActor in
+      LocalNotificationService.shared.resetDeliveredCache()
+    }
   }
   
   /* SKIP @bridge */public func onPause() {
-		logger.debug("onPause")
+			logger.debug("onPause")
+    isInForeground = false
   }
   
   /* SKIP @bridge */public func onStop() {
-		logger.debug("onStop")
+			logger.debug("onStop")
+    isInForeground = false
   }
   
   /* SKIP @bridge */public func onDestroy() {
