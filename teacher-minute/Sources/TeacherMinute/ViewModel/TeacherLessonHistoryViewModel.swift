@@ -67,10 +67,17 @@ final class TeacherLessonHistoryViewModel {
             }
             let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
             totalTimeTaughtText = LessonFormatting.totalDurationText(lessons: historyLessons)
-            totalEarningsText = LessonFormatting.currencyText(
-                cents: historyLessons.reduce(0) { $0 + $1.teacherEarningsCents },
-                currencyCode: historyLessons.first?.currencyCode ?? LessonFormatting.defaultCurrencyCode
-            )
+            var earningsByCurrency: [String: Int] = [:]
+            for lesson in historyLessons {
+                earningsByCurrency[lesson.currencyCode, default: 0] += lesson.teacherEarningsCents
+            }
+            let earningsFormatted = earningsByCurrency
+                .sorted { $0.key < $1.key }
+                .map { LessonFormatting.currencyText(cents: $0.value, currencyCode: $0.key) }
+                .joined(separator: " + ")
+            totalEarningsText = earningsFormatted.isEmpty
+                ? LessonFormatting.currencyText(cents: 0)
+                : earningsFormatted
             lessons = historyLessons.map { Self.lessonHistoryItem($0, currentUserImageURL: profileImageURL) }
         } catch {
             logger.error("[TeacherLessons] failed loading profile: \(error.localizedDescription)")

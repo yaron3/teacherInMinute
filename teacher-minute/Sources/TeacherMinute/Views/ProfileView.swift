@@ -428,6 +428,11 @@ struct ProfileEditView: View {
             ProfileEditInfoRow(parameter: $row)
           }
 
+          ProfileCurrencyPicker(
+            title: LocalizationSupport.localized("Currency"),
+            selectedCurrency: $viewModel.currency
+          )
+
           if viewModel.roleType == .teacher {
             ProfileTeachingGradePicker(
               title: LocalizationSupport.localized("Grade Levels Taught"),
@@ -530,6 +535,82 @@ struct ProfileTeachingGradePicker: View {
     } else {
       selectedGrades.insert(grade)
     }
+  }
+}
+
+struct ProfileCurrencyPicker: View {
+  let title: String
+  @Binding var selectedCurrency: String
+  @Environment(\.colorScheme) var colorScheme
+  @Environment(\.layoutDirection) var layoutDirection
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+  var contentAlignment: HorizontalAlignment {
+    layoutDirection == .rightToLeft ? .trailing : .leading
+  }
+
+  let currencies = ProfileViewModel.availableCurrencies
+
+  var body: some View {
+    VStack(alignment: contentAlignment, spacing: 10) {
+      HStack {
+        Text(title)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.authPrimaryText)
+
+        Spacer()
+
+        Text(selectedCurrency)
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(theme.authSecondaryText)
+          .padding(.horizontal, 10)
+          .frame(height: 24)
+          .background(theme.authFieldBorder.opacity(0.7))
+          .clipShape(Capsule())
+      }
+      HStack {
+        Spacer()
+        FlowLayout(spacing: 10) {
+          ForEach(currencies, id: \.self) { code in
+            ProfileCurrencyChip(
+              title: code,
+              isSelected: selectedCurrency == code
+            ) {
+              selectedCurrency = code
+            }
+          }
+        }
+        Spacer()
+      }
+    }
+  }
+}
+
+struct ProfileCurrencyChip: View {
+  let title: String
+  let isSelected: Bool
+  let action: () -> Void
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    Button(action: action) {
+      Text(title)
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(theme.authPrimaryText)
+        .padding(.horizontal, 18)
+        .frame(height: 34)
+        .background(isSelected ? theme.authPink : theme.authPinkSoft)
+        .clipShape(Capsule())
+        .overlay {
+          Capsule()
+            .stroke(isSelected ? theme.authPink : theme.authFieldBorder, lineWidth: 1)
+        }
+    }
+    .buttonStyle(.plain)
   }
 }
 

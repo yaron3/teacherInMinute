@@ -21,6 +21,29 @@ This project is both a stand-alone Swift Package Manager module,
 as well as an Xcode project that builds and translates the project
 into a Kotlin Gradle project for Android using the skipstone plugin.
 
+### Google Play signing
+
+Create a local upload keystore before building a Play release:
+
+```sh
+keytool -genkeypair \
+    -v \
+    -keystore Android/app/keystore.jks \
+    -storetype JKS \
+    -keyalg RSA \
+    -keysize 2048 \
+    -validity 10000 \
+    -alias upload
+cp Android/app/keystore.properties.example Android/app/keystore.properties
+```
+
+Edit `Android/app/keystore.properties` with the passwords used for the upload
+key, then build the signed Android App Bundle by running the Gradle task
+`:app:bundleRelease` from Android Studio.
+
+The signed bundle is created at `Android/app/build/outputs/bundle/release/`.
+`keystore.jks` and `keystore.properties` are intentionally ignored by Git.
+
 ## Running
 
 Xcode and Android Studio must be downloaded and installed in order to

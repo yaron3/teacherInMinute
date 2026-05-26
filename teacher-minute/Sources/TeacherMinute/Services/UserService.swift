@@ -74,6 +74,14 @@ final class UserService {
     try await db.collection("users").document(uid).setData(fields, merge: true)
     logger.info("Updated profile fields for uid: \(uid)")
   }
+
+  func updateCurrency(uid: String, currency: String) async throws {
+    let normalized = currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    guard normalized.count == 3 else { return }
+    let db = Firestore.firestore()
+    try await db.collection("users").document(uid).setData(["currency": normalized], merge: true)
+    logger.info("Updated currency for uid: \(uid) currency=\(normalized)")
+  }
   
   func deleteUserData(uid: String) async throws {
 	let db = Firestore.firestore()

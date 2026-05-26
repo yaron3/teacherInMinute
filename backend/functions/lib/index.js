@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.billingPage = exports.paypalWebhook = exports.paypalCancel = exports.paypalSuccess = exports.createPaymentSettingsSession = exports.createCheckoutSession = exports.redeemCoupon = exports.rateTeacher = exports.forceEndLesson = exports.endLesson = exports.startLesson = exports.getQuestionStatus = exports.declineInvite = exports.acceptInvite = exports.cancelQuestion = exports.createQuestion = exports.evaluateWave = exports.dispatchQuestion = exports.onUserCreate = void 0;
+exports.billingPage = exports.paypalWebhook = exports.paypalCancel = exports.paypalSuccess = exports.createPaymentSettingsSession = exports.createCheckoutSession = exports.adminSendTeacherMessage = exports.adminVerifyTeacher = exports.adminGetTeacherDocs = exports.adminListPendingTeachers = exports.adminListContactRequests = exports.adminListPayments = exports.adminDeleteCoupon = exports.adminCreateCoupon = exports.adminListCoupons = exports.adminListQuestions = exports.adminMutateUser = exports.adminGetUserDetail = exports.adminListUsers = exports.adminDashboardStatus = exports.redeemCoupon = exports.rateTeacher = exports.forceEndLesson = exports.endLesson = exports.startLesson = exports.getQuestionStatus = exports.declineInvite = exports.acceptInvite = exports.cancelQuestion = exports.createQuestion = exports.evaluateWave = exports.dispatchQuestion = exports.onUserCreate = void 0;
 const admin = require("firebase-admin");
 admin.initializeApp();
 // Auth lifecycle
@@ -26,6 +26,22 @@ Object.defineProperty(exports, "rateTeacher", { enumerable: true, get: function 
 // Coupons
 var coupons_1 = require("./coupons");
 Object.defineProperty(exports, "redeemCoupon", { enumerable: true, get: function () { return coupons_1.redeemCoupon; } });
+// Admin dashboard
+var admin_1 = require("./admin");
+Object.defineProperty(exports, "adminDashboardStatus", { enumerable: true, get: function () { return admin_1.adminDashboardStatus; } });
+Object.defineProperty(exports, "adminListUsers", { enumerable: true, get: function () { return admin_1.adminListUsers; } });
+Object.defineProperty(exports, "adminGetUserDetail", { enumerable: true, get: function () { return admin_1.adminGetUserDetail; } });
+Object.defineProperty(exports, "adminMutateUser", { enumerable: true, get: function () { return admin_1.adminMutateUser; } });
+Object.defineProperty(exports, "adminListQuestions", { enumerable: true, get: function () { return admin_1.adminListQuestions; } });
+Object.defineProperty(exports, "adminListCoupons", { enumerable: true, get: function () { return admin_1.adminListCoupons; } });
+Object.defineProperty(exports, "adminCreateCoupon", { enumerable: true, get: function () { return admin_1.adminCreateCoupon; } });
+Object.defineProperty(exports, "adminDeleteCoupon", { enumerable: true, get: function () { return admin_1.adminDeleteCoupon; } });
+Object.defineProperty(exports, "adminListPayments", { enumerable: true, get: function () { return admin_1.adminListPayments; } });
+Object.defineProperty(exports, "adminListContactRequests", { enumerable: true, get: function () { return admin_1.adminListContactRequests; } });
+Object.defineProperty(exports, "adminListPendingTeachers", { enumerable: true, get: function () { return admin_1.adminListPendingTeachers; } });
+Object.defineProperty(exports, "adminGetTeacherDocs", { enumerable: true, get: function () { return admin_1.adminGetTeacherDocs; } });
+Object.defineProperty(exports, "adminVerifyTeacher", { enumerable: true, get: function () { return admin_1.adminVerifyTeacher; } });
+Object.defineProperty(exports, "adminSendTeacherMessage", { enumerable: true, get: function () { return admin_1.adminSendTeacherMessage; } });
 // Payments — PayPal Checkout
 var payments_1 = require("./payments");
 Object.defineProperty(exports, "createCheckoutSession", { enumerable: true, get: function () { return payments_1.createCheckoutSession; } });

@@ -51,6 +51,7 @@ final class TeacherDashboardViewModel {
   var activePricePerMinuteCents = 50
   var activeConversationType = "text"
   var activeAcceptedAt = 0.0
+  var activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
   var isAcceptingCalls = false
@@ -68,11 +69,11 @@ final class TeacherDashboardViewModel {
   var showsSubjectEditor = false
 
   var formattedTodayEarnings: String {
-    Self.formatCents(todayEarningsCents)
+    Self.formatCents(todayEarningsCents, currency: earningsCurrencyCode)
   }
 
   var formattedWeekEarnings: String {
-    Self.formatCents(weekEarningsCents)
+    Self.formatCents(weekEarningsCents, currency: earningsCurrencyCode)
   }
 
   var formattedRate: String {
@@ -407,6 +408,7 @@ final class TeacherDashboardViewModel {
             activeStudentName = profile.displayName
           }
           activeStudentImageURL = profile.profileImageURL
+          activeCurrencyCode = profile.currency
         }
         inviteIDs = inviteIDs.filter { $0 != questionId }
         acceptingQuestionId = nil
@@ -473,6 +475,7 @@ final class TeacherDashboardViewModel {
     activePricePerMinuteCents = 50
     activeConversationType = "text"
     activeAcceptedAt = 0
+    activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   }
 
   func editSubjects() {
@@ -504,7 +507,7 @@ final class TeacherDashboardViewModel {
       connectionFeeCents: activeConnectionFeeCents,
       pricePerMinuteCents: activePricePerMinuteCents,
       teacherSharePercent: 75,
-      currencyCode: LessonFormatting.defaultCurrencyCode
+      currencyCode: activeCurrencyCode
     )
   }
 
@@ -545,14 +548,16 @@ final class TeacherDashboardViewModel {
       teacherName = summary?.displayName ?? "Teacher"
       teacherImageURL = summary?.profileImageURL ?? ""
       subjects = summary?.subjects ?? []
-      isVerified = data["isVerified"] as? Bool ?? false
       ratePerMinuteCents = Self.intValue(data["ratePerMinuteCents"]) ?? 50
       totalMinutes = summary?.totalMinutes ?? 0
     }
 
+    isVerified = (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
     checkPermissions()
     await loadEarnings(uid: uid)
   }
+
+  private var earningsCurrencyCode = LessonFormatting.defaultCurrencyCode
 
   private func loadEarnings(uid: String) async {
     let lessons = (try? await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)) ?? []
@@ -584,6 +589,7 @@ final class TeacherDashboardViewModel {
       }
     }
 
+    earningsCurrencyCode = lessons.first?.currencyCode ?? LessonFormatting.defaultCurrencyCode
     todayEarningsCents = todayEarnings
     todayMinutesTutored = todayMinutes
     weekEarningsCents = weekEarnings
@@ -598,7 +604,7 @@ final class TeacherDashboardViewModel {
 #endif
   }
 
-  private static func formatCents(_ cents: Int) -> String {
-    LessonFormatting.currencyText(cents: cents)
+  private static func formatCents(_ cents: Int, currency: String = LessonFormatting.defaultCurrencyCode) -> String {
+    LessonFormatting.currencyText(cents: cents, currencyCode: currency)
   }
 }

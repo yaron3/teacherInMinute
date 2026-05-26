@@ -69,9 +69,7 @@ final class HistoryModel {
 
         let questionIds = Self.stringArray(userData["questions"])
         guard !questionIds.isEmpty else { return [] }
-        let defaultCommission = await SettingsRemoteConfigService.shared.fetchDefaultCommission()
-        let commission = Self.doubleValue(userData["commission"])
-        let teacherMultiplier = max(0, 1.0 - (commission ?? defaultCommission))
+        let defaultTeacherShare = await SettingsRemoteConfigService.shared.fetchTeacherShare()
         let pricingCurrencyById = await Self.pricingCurrencyById()
         let purchasedCurrencyCode = Self.purchasedPackageCurrencyCode(
             from: userData,
@@ -83,7 +81,7 @@ final class HistoryModel {
             guard let lesson = try await fetchLesson(
                 questionId: questionId,
                 currentUserId: uid,
-                teacherMultiplier: teacherMultiplier,
+                defaultTeacherShare: defaultTeacherShare,
                 pricingCurrencyById: pricingCurrencyById,
                 fallbackCurrencyCode: purchasedCurrencyCode
             ) else { continue }
@@ -100,7 +98,7 @@ final class HistoryModel {
     private func fetchLesson(
         questionId: String,
         currentUserId: String,
-        teacherMultiplier: Double,
+        defaultTeacherShare: Double,
         pricingCurrencyById: [String: String],
         fallbackCurrencyCode: String
     ) async throws -> HistoryLesson? {
@@ -127,7 +125,11 @@ final class HistoryModel {
             ?? Self.dateValue(data["finishedAt"])
         let durationSeconds = endedAt.map { max(0, Int($0.timeIntervalSince(createdAt))) } ?? 0
         let costCents = Self.costCents(from: data)
-        let teacherEarningsCents = Int((Double(costCents) * teacherMultiplier).rounded())
+        let teacherEarningsCents = Self.teacherEarningsCents(
+            from: data,
+            costCents: costCents,
+            defaultTeacherShare: defaultTeacherShare
+        )
         let currencyCode = Self.currencyCode(
             from: data,
             pricingCurrencyById: pricingCurrencyById,
@@ -339,6 +341,27 @@ final class HistoryModel {
         }
 
         return 0
+    }
+
+    /// Reads the authoritative `teacherEarnings` written by the backend, falling
+    /// back to `costCents * teacherShare` only when the backend value is absent
+    /// (legacy lessons predating the unified billing pipeline).
+    private static func teacherEarningsCents(
+        from data: [String: Any],
+        costCents: Int,
+        defaultTeacherShare: Double
+    ) -> Int {
+        if let cents = intValue(data["teacherEarningsCents"]) {
+            return cents
+        }
+        if let amount = doubleValue(data["teacherEarnings"]) {
+            return Int((amount * 100.0).rounded())
+        }
+        let share = doubleValue(data["teacherShare"])
+            ?? doubleValue(data["teacherSharePercent"]).map { $0 / 100.0 }
+            ?? defaultTeacherShare
+        let multiplier = max(0, min(1, share))
+        return Int((Double(costCents) * multiplier).rounded())
     }
 
     func fetchQuestionText(questionId: String) async throws -> String {

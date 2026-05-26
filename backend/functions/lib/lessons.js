@@ -11,6 +11,7 @@ const uuid_1 = require("uuid");
 const types_1 = require("./types");
 const billing_1 = require("./billing");
 const dispatch_1 = require("./dispatch");
+const pricing_1 = require("./pricing");
 const firestore = admin.firestore();
 const db = admin.database();
 function toTimestamp(value) {
@@ -81,47 +82,43 @@ function toMillis(value) {
     }
     return undefined;
 }
-async function getCostPerMinute(teacherUid) {
-    var _a, _b;
-    const userSnap = await firestore.collection("users").doc(teacherUid).get();
-    const userData = userSnap.data();
-    const userCost = Number(userData === null || userData === void 0 ? void 0 : userData.costPerMinute);
-    if (Number.isFinite(userCost) && userCost > 0) {
-        return userCost;
+function readStampedPricing(lesson) {
+    if (!lesson)
+        return undefined;
+    const currency = typeof lesson.currencyCode === "string" ? lesson.currencyCode.trim().toUpperCase() : "";
+    const pricePerMinute = Number(lesson.pricePerMinute);
+    const teacherShare = Number(lesson.teacherShare);
+    const exchangeRate = Number(lesson.exchangeRateToUsd);
+    if (currency.length === 3 &&
+        Number.isFinite(pricePerMinute) && pricePerMinute > 0 &&
+        Number.isFinite(teacherShare) && teacherShare > 0 && teacherShare <= 1 &&
+        Number.isFinite(exchangeRate) && exchangeRate > 0) {
+        return { currencyCode: currency, pricePerMinute, teacherShare, exchangeRateToUsd: exchangeRate };
     }
-    try {
-        const template = await admin.remoteConfig().getTemplate();
-        const rcParam = (_a = template.parameters) === null || _a === void 0 ? void 0 : _a.cost_per_minute;
-        const rcCost = Number((_b = rcParam === null || rcParam === void 0 ? void 0 : rcParam.defaultValue) === null || _b === void 0 ? void 0 : _b.value);
-        if (Number.isFinite(rcCost) && rcCost > 0) {
-            return rcCost;
-        }
-    }
-    catch (error) {
-        firebase_functions_1.logger.warn(`[lessons] failed to read Remote Config costPerMinute for teacher=${teacherUid}`, error);
-    }
-    throw new https_1.HttpsError("failed-precondition", "costPerMinute is missing for teacher and Remote Config");
+    return undefined;
 }
-async function getTeacherCommissionRate(teacherUid) {
-    var _a, _b, _c, _d;
-    const userSnap = await firestore.collection("users").doc(teacherUid).get();
-    const userData = userSnap.data();
-    const fromUser = Number((_b = (_a = userData === null || userData === void 0 ? void 0 : userData.teacherCommissionRate) !== null && _a !== void 0 ? _a : userData === null || userData === void 0 ? void 0 : userData.commissionRate) !== null && _b !== void 0 ? _b : userData === null || userData === void 0 ? void 0 : userData.earningsShare);
-    if (Number.isFinite(fromUser) && fromUser > 0 && fromUser <= 1) {
-        return fromUser;
-    }
-    try {
-        const template = await admin.remoteConfig().getTemplate();
-        const rcParam = (_c = template.parameters) === null || _c === void 0 ? void 0 : _c.teacher_earnings_share;
-        const fromRc = Number((_d = rcParam === null || rcParam === void 0 ? void 0 : rcParam.defaultValue) === null || _d === void 0 ? void 0 : _d.value);
-        if (Number.isFinite(fromRc) && fromRc > 0 && fromRc <= 1) {
-            return fromRc;
-        }
-    }
-    catch (error) {
-        firebase_functions_1.logger.warn(`[lessons] failed to read Remote Config teacher_earnings_share for teacher=${teacherUid}`, error);
-    }
-    return 0.75;
+async function resolveLessonPricing(studentUid, lesson) {
+    const stamped = readStampedPricing(lesson);
+    if (stamped)
+        return stamped;
+    const resolved = await (0, pricing_1.resolvePricingForStudent)(studentUid);
+    return {
+        currencyCode: resolved.currency,
+        pricePerMinute: resolved.pricePerMinute,
+        teacherShare: resolved.teacherShare,
+        exchangeRateToUsd: resolved.exchangeRateToUsd,
+    };
+}
+async function loadLessonDocByQuestionId(questionId) {
+    const snap = await firestore
+        .collection("lessons")
+        .where("questionId", "==", questionId)
+        .limit(1)
+        .get();
+    if (snap.empty)
+        return undefined;
+    const doc = snap.docs[0];
+    return { ref: doc.ref, data: doc.data() };
 }
 function sanitizeForFirestore(value) {
     if (value === undefined)
@@ -176,23 +173,42 @@ async function migrateQuestionToFirestore(questionId, endedBy, context) {
     firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`);
     const endedAt = firestore_1.Timestamp.now();
     const endedAtMs = endedAt.toMillis();
-    const costPerMinute = await getCostPerMinute(teacherUid);
-    const commissionRate = await getTeacherCommissionRate(teacherUid);
+    const lessonRecord = await loadLessonDocByQuestionId(questionId);
+    const pricing = await resolveLessonPricing(studentUid, lessonRecord === null || lessonRecord === void 0 ? void 0 : lessonRecord.data);
+    const { currencyCode, pricePerMinute, teacherShare, exchangeRateToUsd } = pricing;
     // Bill from the moment both parties were fully connected (startedAt).
     // If startLesson was never called the lesson never properly began — charge 0.
     const billingStartMs = startedAtMs !== null && startedAtMs !== void 0 ? startedAtMs : endedAtMs;
-    const { rawSeconds, roundedSeconds, roundedMinutes, minutesToCharge: roundedMinutesToCharge, cost, teacherEarnings, } = (0, billing_1.calculateBilling)(billingStartMs, endedAtMs, costPerMinute, commissionRate);
+    const { rawSeconds, roundedSeconds, roundedMinutes, minutesToCharge: roundedMinutesToCharge, cost, teacherEarnings, } = (0, billing_1.calculateBilling)(billingStartMs, endedAtMs, pricePerMinute, teacherShare);
     const migratedQuestion = sanitizeForFirestore(rtdbQuestion);
     firebase_functions_1.logger.info(`[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`);
-    firebase_functions_1.logger.info(`[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} costPerMinute=${costPerMinute} cost=${cost} commissionRate=${commissionRate} teacherEarnings=${teacherEarnings}`);
+    firebase_functions_1.logger.info(`[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} teacherEarnings=${teacherEarnings}`);
     const batch = firestore.batch();
     const qDocRef = firestore.collection("questions").doc(questionId);
-    batch.set(qDocRef, Object.assign(Object.assign({}, migratedQuestion), { state: "ended", status: "completed", studentUid, acceptedByTeacher: teacherUid, teacherId: teacherUid, participants: [studentUid, teacherUid], durationSeconds: roundedSeconds, costPerMinute,
+    batch.set(qDocRef, Object.assign(Object.assign({}, migratedQuestion), { state: "ended", status: "completed", studentUid, acceptedByTeacher: teacherUid, teacherId: teacherUid, participants: [studentUid, teacherUid], durationSeconds: roundedSeconds, currencyCode,
+        pricePerMinute,
+        exchangeRateToUsd,
+        teacherShare,
         cost,
-        commissionRate,
-        teacherEarnings,
-        endedBy,
+        teacherEarnings, 
+        // Legacy aliases for clients still reading the old field names.
+        costPerMinute: pricePerMinute, commissionRate: teacherShare, endedBy,
         endedAt, updatedAt: firestore_1.FieldValue.serverTimestamp() }), { merge: true });
+    if (lessonRecord) {
+        batch.set(lessonRecord.ref, {
+            currencyCode,
+            pricePerMinute,
+            teacherShare,
+            exchangeRateToUsd,
+            cost,
+            teacherEarnings,
+            billedSeconds: roundedSeconds,
+            durationSeconds: roundedSeconds,
+            endedBy,
+            endedAt,
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+        }, { merge: true });
+    }
     const studentRef = firestore.collection("users").doc(studentUid);
     const teacherRef = firestore.collection("users").doc(teacherUid);
     batch.set(studentRef, {
@@ -297,14 +313,23 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
         .then((s) => s.data());
     // Retrieve the Agora token from acceptInvite's stored channel
     const liveKitRoom = (_c = agoraTokenSnap.agoraChannel) !== null && _c !== void 0 ? _c : `lesson_${questionId}`;
+    // Lock pricing at the moment the lesson starts so RC changes mid-lesson
+    // do not retroactively shift the price. Currency is resolved from the
+    // student's profile (/users/{uid}.currency).
+    const pricing = await (0, pricing_1.resolvePricingForStudent)(q.studentUid);
+    const pricePerMinuteCents = Math.round(pricing.pricePerMinute * 100);
     const lesson = {
         questionId,
         studentUid: q.studentUid,
         teacherUid: q.acceptedByTeacher,
         startedAt: firestore_1.Timestamp.fromDate(now),
         hardCapAt: firestore_1.Timestamp.fromDate(hardCapAt),
-        baseRatePerMinCents: types_1.BASE_RATE_PER_MIN_CENTS,
+        baseRatePerMinCents: pricePerMinuteCents,
         connectionFeeCents: types_1.CONNECTION_FEE_CENTS,
+        currencyCode: pricing.currency,
+        pricePerMinute: pricing.pricePerMinute,
+        teacherShare: pricing.teacherShare,
+        exchangeRateToUsd: pricing.exchangeRateToUsd,
         status: "in_progress",
         liveKitRoom,
         liveKitTokenExpiry: firestore_1.Timestamp.fromDate(new Date(now.getTime() + 3600 * 1000)),
@@ -315,11 +340,18 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
         status: "in_progress",
         startedAt: firestore_1.Timestamp.fromDate(now),
         lessonId,
+        currencyCode: pricing.currency,
+        pricePerMinute: pricing.pricePerMinute,
+        teacherShare: pricing.teacherShare,
+        exchangeRateToUsd: pricing.exchangeRateToUsd,
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
     });
     await batch.commit();
-    firebase_functions_1.logger.info(`[lessons] startLesson firestore batch committed lessonId=${lessonId} qid=${questionId}`);
+    firebase_functions_1.logger.info(`[lessons] startLesson firestore batch committed lessonId=${lessonId} qid=${questionId} currency=${pricing.currency} pricePerMinute=${pricing.pricePerMinute} teacherShare=${pricing.teacherShare}`);
     // Keep RTDB question state aligned for real-time clients.
+    // Mirror the pricing snapshot so the in-progress UI can render live
+    // earnings / cost without re-querying Firestore mid-call.
+    const teacherSharePercent = Math.round(pricing.teacherShare * 100);
     firebase_functions_1.logger.info(`[lessons] startLesson syncing RTDB question qid=${questionId} status=in_progress teacherId=${(_d = q.acceptedByTeacher) !== null && _d !== void 0 ? _d : "none"}`);
     await db.ref(`questions/${questionId}`).update({
         status: "in_progress",
@@ -330,6 +362,13 @@ exports.startLesson = (0, https_1.onCall)(async (req) => {
         teacherId: q.acceptedByTeacher,
         startedAt: Date.now(),
         updatedAt: Date.now(),
+        currencyCode: pricing.currency,
+        pricePerMinute: pricing.pricePerMinute,
+        pricePerMinuteCents,
+        teacherShare: pricing.teacherShare,
+        teacherSharePercent,
+        exchangeRateToUsd: pricing.exchangeRateToUsd,
+        connectionFeeCents: types_1.CONNECTION_FEE_CENTS,
     });
     firebase_functions_1.logger.info(`[lessons] startLesson RTDB sync complete qid=${questionId}`);
     // Enqueue the hard-cap enforcement task (FR-B-006)

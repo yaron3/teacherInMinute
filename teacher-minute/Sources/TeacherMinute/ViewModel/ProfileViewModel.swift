@@ -36,6 +36,9 @@ final class ProfileViewModel {
     var cameraState: PermissionState = .notDetermined
     var notificationsState: PermissionState = .notDetermined
     var contactRows: [Parameter] = []
+    var currency: String = LessonFormatting.defaultCurrencyCode
+
+    static let availableCurrencies: [String] = ["ILS", "USD"]
 
     var shouldShowTeachingDetails: Bool {
         roleType == .teacher
@@ -202,6 +205,7 @@ final class ProfileViewModel {
                 "email": email,
                 "phoneNumber": phoneNumber,
                 "grade": grade,
+                "currency": currency,
                 "updatedAt": ISO8601DateFormatter().string(from: Date())
             ])
             isEditing = false
@@ -229,6 +233,7 @@ final class ProfileViewModel {
         subjects = profile.subjects
         profileImageURL = profile.profileImageURL
         roleType = profile.role
+        currency = profile.currency
         isVerified = false
         rebuildContactRows()
     }

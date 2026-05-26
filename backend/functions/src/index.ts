@@ -16,6 +16,24 @@ export { startLesson, endLesson, forceEndLesson, rateTeacher } from "./lessons";
 // Coupons
 export { redeemCoupon } from "./coupons";
 
+// Admin dashboard
+export {
+  adminDashboardStatus,
+  adminListUsers,
+  adminGetUserDetail,
+  adminMutateUser,
+  adminListQuestions,
+  adminListCoupons,
+  adminCreateCoupon,
+  adminDeleteCoupon,
+  adminListPayments,
+  adminListContactRequests,
+  adminListPendingTeachers,
+  adminGetTeacherDocs,
+  adminVerifyTeacher,
+  adminSendTeacherMessage,
+} from "./admin";
+
 // Payments — PayPal Checkout
 export {
   createCheckoutSession,

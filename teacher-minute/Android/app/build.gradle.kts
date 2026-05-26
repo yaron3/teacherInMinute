@@ -1,3 +1,4 @@
+import org.gradle.api.GradleException
 import java.util.Properties
 
 plugins {
@@ -11,6 +12,29 @@ plugins {
 
 skip {
 }
+
+val keystorePropertiesFile = file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.isFile) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun signingValue(propertyName: String, environmentName: String): String? {
+    return keystoreProperties.getProperty(propertyName)
+        ?: System.getenv(environmentName)
+}
+
+val releaseStoreFile = signingValue("storeFile", "TEACHER_MINUTE_UPLOAD_STORE_FILE")
+val releaseKeyAlias = signingValue("keyAlias", "TEACHER_MINUTE_UPLOAD_KEY_ALIAS")
+val releaseStorePassword = signingValue("storePassword", "TEACHER_MINUTE_UPLOAD_STORE_PASSWORD")
+val releaseKeyPassword = signingValue("keyPassword", "TEACHER_MINUTE_UPLOAD_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseKeyAlias,
+    releaseStorePassword,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
 
 kotlin {
     compilerOptions {
@@ -59,20 +83,17 @@ android {
         includeInBundle = false
     }
 
-    // default signing configuration tries to load from keystore.properties
-    // see: https://skip.dev/docs/deployment/#export-signing
+    // Release signing uses app/keystore.properties or matching environment variables.
+    // See keystore.properties.example for the local Google Play upload key format.
     signingConfigs {
-        val keystorePropertiesFile = file("keystore.properties")
         create("release") {
-            if (keystorePropertiesFile.isFile) {
-                val keystoreProperties = Properties()
-                keystoreProperties.load(keystorePropertiesFile.inputStream())
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
+            if (hasReleaseSigning) {
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
             } else {
-                // when there is no keystore.properties file, fall back to signing with debug config
+                // Keep debug builds/configuration working, but fail release tasks below.
                 keyAlias = signingConfigs.getByName("debug").keyAlias
                 keyPassword = signingConfigs.getByName("debug").keyPassword
                 storeFile = signingConfigs.getByName("debug").storeFile
@@ -91,6 +112,28 @@ android {
         }
     }
 }
+
+gradle.taskGraph.whenReady {
+    val isReleaseBuild = allTasks.any { task ->
+        task.name.contains("Release", ignoreCase = true)
+    }
+
+    if (isReleaseBuild && !hasReleaseSigning) {
+        throw GradleException(
+            """
+            Google Play release signing is not configured.
+
+            Create Android/app/keystore.properties from keystore.properties.example,
+            or provide these environment variables:
+            TEACHER_MINUTE_UPLOAD_STORE_FILE
+            TEACHER_MINUTE_UPLOAD_KEY_ALIAS
+            TEACHER_MINUTE_UPLOAD_STORE_PASSWORD
+            TEACHER_MINUTE_UPLOAD_KEY_PASSWORD
+            """.trimIndent()
+        )
+    }
+}
+
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
 

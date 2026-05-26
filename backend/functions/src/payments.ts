@@ -44,8 +44,10 @@ export const createCheckoutSession = onCall(async (req) => {
 
   const pkg = packageSnap.data() as PricingDoc;
   const minutes = toSafeMinutes(pkg.minutes ?? pkg.minutesGranted);
+  // Coerce to number — Firestore may return string if field was set via console
+  const priceCents = Math.floor(Number(pkg.priceCents));
 
-  if (!pkg.priceCents || pkg.priceCents <= 0)
+  if (!priceCents || priceCents <= 0)
     throw new HttpsError("internal", "Invalid package price");
   if (!pkg.currency)
     throw new HttpsError("internal", "Invalid package currency");
@@ -53,7 +55,7 @@ export const createCheckoutSession = onCall(async (req) => {
     throw new HttpsError("internal", "Invalid package minutes");
 
   logger.info(
-    `[payments] package fetched packageId=${packageId} priceCents=${pkg.priceCents} currency=${pkg.currency} minutes=${minutes}`
+    `[payments] package fetched packageId=${packageId} priceCents=${priceCents} currency=${pkg.currency} minutes=${minutes}`
   );
 
   const checkoutId = uuidv4();
@@ -65,7 +67,7 @@ export const createCheckoutSession = onCall(async (req) => {
     uid,
     packageId,
     packageType: pkg.type,
-    priceCents: pkg.priceCents,
+    priceCents,
     currency: pkg.currency,
     minutes,
     status: "created",

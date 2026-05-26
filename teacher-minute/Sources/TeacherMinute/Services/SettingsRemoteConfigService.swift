@@ -22,13 +22,13 @@ final class SettingsRemoteConfigService {
         static let eulaURL = "eula_url"
         static let privacyPolicyURL = "privacy_policy"
         static let subjects = "subjects"
-        static let defaultCommission = "default_commission"
+        static let teacherShare = "teacher_share"
         static let contactSupportTitleMaxLength = "contact_support_title_max_length"
         static let contactSupportDescriptionMaxLength = "contact_support_description_max_length"
     }
-    
+
     private let defaultSupportEmail = "support@tim.app"
-    private let defaultTeacherCommission = 0.25
+    private let defaultTeacherShare = 0.75
     private let defaultContactSupportTitleMaxLength = 50
     private let defaultContactSupportDescriptionMaxLength = 1024
     
@@ -67,14 +67,16 @@ final class SettingsRemoteConfigService {
         }
     }
     
-    func fetchDefaultCommission() async -> Double {
+    /// Returns the teacher's share of the lesson revenue (0–1).
+    /// Source of truth: Remote Config key `teacher_share` (default 0.75).
+    func fetchTeacherShare() async -> Double {
         await RemoteConfigService.shared.ready()
-        let commission = RemoteConfigService.shared.getNumber(Key.defaultCommission)
-        guard commission > 0 else {
-            return defaultTeacherCommission
+        let share = RemoteConfigService.shared.getNumber(Key.teacherShare)
+        guard share > 0 else {
+            return defaultTeacherShare
         }
-        
-        return min(max(commission, 0), 1)
+
+        return min(max(share, 0), 1)
     }
 
     func fetchContactSupportTitleMaxLength() async -> Int {

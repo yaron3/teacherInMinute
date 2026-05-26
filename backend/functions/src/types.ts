@@ -1,12 +1,13 @@
 import { Timestamp } from "firebase-admin/firestore";
 
-// ─── Pricing / dispatch constants (pilot hard-coded; move to Remote Config later) ───
+// ─── Pricing / dispatch constants ───
+// Per-minute pricing now lives in Remote Config (see pricing.ts); these
+// constants remain only for dispatch sizing and connection-fee fallback.
 
 export const WAVE_SIZES = [3, 5, 10] as const;
 export const WAVE_TIMEOUT_SECONDS = 12;
 export const INVITE_EXPIRY_SECONDS = 90;
 export const HARD_CAP_MINUTES = 30;
-export const BASE_RATE_PER_MIN_CENTS = 99;
 export const CONNECTION_FEE_CENTS = 50;
 export const MIN_BILLABLE_SECONDS = 30;
 export const ROUND_UP_SECONDS = 30;
@@ -91,6 +92,12 @@ export interface LessonDoc {
   billedSeconds?: number;
   baseRatePerMinCents: number;
   connectionFeeCents: number;
+  // Currency-aware pricing snapshot — frozen at startLesson so RC changes
+  // mid-lesson do not retroactively alter the price.
+  currencyCode: string;          // e.g. "ILS", "USD"
+  pricePerMinute: number;        // in major units of currencyCode
+  teacherShare: number;          // 0–1, e.g. 0.75
+  exchangeRateToUsd: number;     // multiplicative rate USD → currencyCode
   totalCents?: number;
   status: LessonStatus;
   liveKitRoom: string;          // "lesson_<questionId>"
@@ -141,6 +148,7 @@ export interface UserDoc {
   remainingMinutes: number;  // students: minutes available to use
   totalMinutes: number;      // teachers: cumulative minutes taught
   questions?: string[];
+  currency?: string;         // ISO 4217 code; controls pricing for students and display for teachers
 }
 
 // ─── Firestore — coupons/{couponId} ──────────────────────────────────────────

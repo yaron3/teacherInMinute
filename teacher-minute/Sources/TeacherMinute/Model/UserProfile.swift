@@ -17,7 +17,8 @@ struct UserProfile: Codable {
   let paypalEmail: String
   let role: String   // "student" | "teacher"
   let createdAt: Date
-  
+  var currency: String = LessonFormatting.defaultCurrencyCode
+
   var firestoreData: [String: Any] {
 	let iso = ISO8601DateFormatter()
 	return [
@@ -30,6 +31,7 @@ struct UserProfile: Codable {
 		  "paypalEmail": paypalEmail,
 		  "role":        role,
 		  "createdAt":   iso.string(from: createdAt),
+		  "currency":    currency,
 		]
   }
 }
@@ -47,6 +49,7 @@ struct UserProfileSummary {
   let profileImageURL: String
   let remainingMinutes: Int
   let totalMinutes: Int
+  let currency: String
 
   init?(uid: String, data: [String: Any]) {
 	let roleString = data["role"] as? String ?? ""
@@ -76,6 +79,8 @@ struct UserProfileSummary {
 
 	self.remainingMinutes = Self.intValue(data["remainingMinutes"]) ?? 0
 	self.totalMinutes = Self.intValue(data["totalMinutes"]) ?? 0
+	let rawCurrency = (data["currency"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
+	self.currency = rawCurrency.count == 3 ? rawCurrency : LessonFormatting.defaultCurrencyCode
   }
 
   private static func intValue(_ value: Any?) -> Int? {
