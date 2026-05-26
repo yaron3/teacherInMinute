@@ -30,6 +30,14 @@ struct BoardStroke: Identifiable, Equatable {
   let isMine: Bool
 }
 
+struct BoardViewport: Equatable {
+  let x: Double
+  let y: Double
+  let width: Double
+  let height: Double
+  let updatedAt: Double
+}
+
 struct ChatSessionDetails: Equatable {
   let questionId: String
   let studentId: String
@@ -55,9 +63,11 @@ final class ChatSessionService {
   private let questionRef: FirebaseDatabase.DatabaseReference
   private let messagesRef: FirebaseDatabase.DatabaseReference
   private let boardRef: FirebaseDatabase.DatabaseReference
+  private let boardViewportsRef: FirebaseDatabase.DatabaseReference
   private var sessionHandle: DatabaseHandle?
   private var messagesHandle: DatabaseHandle?
   private var boardHandle: DatabaseHandle?
+  private var boardViewportsHandle: DatabaseHandle?
 #endif
 
   init(questionId: String, currentUserUid: String? = nil) {
@@ -68,6 +78,7 @@ final class ChatSessionService {
     self.questionRef = questionRef
     self.messagesRef = questionRef.child("messages")
     self.boardRef = questionRef.child("board/strokes")
+    self.boardViewportsRef = questionRef.child("board/viewports")
 #endif
   }
 
@@ -179,6 +190,21 @@ final class ChatSessionService {
 #endif
   }
 
+  func startBoardViewportListening(onUpdate: @escaping ([String: BoardViewport]) -> Void) {
+#if !os(Android)
+    boardViewportsHandle = boardViewportsRef.observe(.value) { snapshot in
+      var viewports: [String: BoardViewport] = [:]
+      for child in snapshot.children {
+        guard let snap = child as? DataSnapshot,
+              let dict = snap.value as? [String: Any],
+              let viewport = Self.viewport(from: dict) else { continue }
+        viewports[snap.key] = viewport
+      }
+      onUpdate(viewports)
+    }
+#endif
+  }
+
   func stopListening() {
 #if !os(Android)
     if let sessionHandle {
@@ -192,6 +218,10 @@ final class ChatSessionService {
     if let boardHandle {
       boardRef.removeObserver(withHandle: boardHandle)
       self.boardHandle = nil
+    }
+    if let boardViewportsHandle {
+      boardViewportsRef.removeObserver(withHandle: boardViewportsHandle)
+      self.boardViewportsHandle = nil
     }
 #endif
   }
@@ -260,6 +290,38 @@ final class ChatSessionService {
 #endif
   }
 
+  func updateBoardViewport(_ viewport: BoardViewport, role: String) async throws {
+    let trimmedRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let key = trimmedRole.isEmpty ? "participant" : trimmedRole
+
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.updateBoardViewport(
+        questionId: self.questionId,
+        role: key,
+        x: viewport.x,
+        y: viewport.y,
+        width: viewport.width,
+        height: viewport.height
+      )
+    }.value
+#else
+    let payload: [String: Any] = [
+      "x": viewport.x,
+      "y": viewport.y,
+      "width": viewport.width,
+      "height": viewport.height,
+      "updatedAt": Date().timeIntervalSince1970 * 1000.0
+    ]
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      boardViewportsRef.child(key).setValue(payload) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
 #if os(Android)
   func fetchMessages() async throws -> [ChatMessage] {
     let json = try await Task.detached(priority: .userInitiated) {
@@ -287,6 +349,23 @@ final class ChatSessionService {
       guard let id = row["id"] as? String else { return nil }
       return Self.stroke(from: id, dict: row, currentUserUid: currentUserUid)
     }.sorted { $0.createdAt < $1.createdAt }
+  }
+
+  func fetchBoardViewports() async throws -> [String: BoardViewport] {
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchBoardViewports(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let rows = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return [:]
+    }
+    var viewports: [String: BoardViewport] = [:]
+    for (key, value) in rows {
+      guard let dict = value as? [String: Any],
+            let viewport = Self.viewport(from: dict) else { continue }
+      viewports[key] = viewport
+    }
+    return viewports
   }
 #endif
 
@@ -326,6 +405,22 @@ final class ChatSessionService {
       points: points,
       createdAt: doubleValue(dict["createdAt"]) ?? 0,
       isMine: !senderUid.isEmpty && senderUid == currentUserUid
+    )
+  }
+
+  private static func viewport(from dict: [String: Any]) -> BoardViewport? {
+    guard let x = doubleValue(dict["x"]),
+          let y = doubleValue(dict["y"]),
+          let width = doubleValue(dict["width"]),
+          let height = doubleValue(dict["height"]),
+          width > 0,
+          height > 0 else { return nil }
+    return BoardViewport(
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      updatedAt: doubleValue(dict["updatedAt"]) ?? 0
     )
   }
 
@@ -411,6 +506,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var teacherId: String { get }
   var messages: [ChatMessage] { get set }
   var boardStrokes: [BoardStroke] { get set }
+  var boardViewports: [String: BoardViewport] { get set }
   var errorMessage: String? { get set }
   var isConnecting: Bool { get set }
   var participantName: String { get }
@@ -422,6 +518,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var sessionNoticeText: String { get }
   var onMessagesUpdated: (([ChatMessage]) -> Void)? { get set }
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)? { get set }
+  var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)? { get set }
   var onErrorUpdated: ((String?) -> Void)? { get set }
   var onConnectingUpdated: ((Bool) -> Void)? { get set }
   var onSessionDetailsUpdated: (() -> Void)? { get set }
@@ -438,6 +535,7 @@ protocol ChatSessionViewModeling: AnyObject {
   func send(_ messageText: String)
   func sendStroke(_ points: [BoardPoint])
   func clearBoard()
+  func updateBoardViewport(_ viewport: BoardViewport)
   func endLesson() async
 }
 
@@ -448,6 +546,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   let role: String
   var messages: [ChatMessage] = []
   var boardStrokes: [BoardStroke] = []
+  var boardViewports: [String: BoardViewport] = [:]
   var draft = ""
   var errorMessage: String?
   var isConnecting = true
@@ -489,6 +588,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   let sessionNoticeText = LocalizationSupport.localized("Session started - Billing active")
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
+  var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
@@ -571,11 +671,14 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           didObserveActiveSession = true
           let rows = try await service.fetchMessages()
           let strokes = try await service.fetchBoardStrokes()
+          let viewports = try await service.fetchBoardViewports()
           guard !Task.isCancelled else { return }
           messages = rows
           boardStrokes = strokes
+          boardViewports = viewports
           onMessagesUpdated?(rows)
           onBoardStrokesUpdated?(strokes)
+          onBoardViewportsUpdated?(viewports)
         } catch {
           errorMessage = error.localizedDescription
           onErrorUpdated?(errorMessage)
@@ -596,6 +699,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     service.startBoardListening { [weak self] strokes in
       self?.boardStrokes = strokes
       self?.onBoardStrokesUpdated?(strokes)
+    }
+    service.startBoardViewportListening { [weak self] viewports in
+      self?.boardViewports = viewports
+      self?.onBoardViewportsUpdated?(viewports)
     }
 #endif
   }
@@ -716,6 +823,16 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         errorMessage = error.localizedDescription
         onErrorUpdated?(errorMessage)
         print("Board clear failed: \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func updateBoardViewport(_ viewport: BoardViewport) {
+    Task {
+      do {
+        try await service.updateBoardViewport(viewport, role: role)
+      } catch {
+        print("Board viewport update failed: \(error.localizedDescription)")
       }
     }
   }
@@ -894,6 +1011,14 @@ private enum AndroidChatBridge {
     name: "clearBoard",
     sig: "(Ljava/lang/String;)V"
   )!
+  private static let fetchBoardViewportsMethod = managerClass.getStaticMethodID(
+    name: "fetchBoardViewportsJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
+  private static let updateBoardViewportMethod = managerClass.getStaticMethodID(
+    name: "updateBoardViewport",
+    sig: "(Ljava/lang/String;Ljava/lang/String;DDDD)V"
+  )!
   private static let markQuestionAcceptedMethod = managerClass.getStaticMethodID(
     name: "markQuestionAccepted",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
@@ -956,6 +1081,40 @@ private enum AndroidChatBridge {
         method: clearBoardMethod,
         options: [.kotlincompat],
         args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    }
+  }
+
+  static func fetchBoardViewports(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchBoardViewportsMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
+  }
+
+  static func updateBoardViewport(
+    questionId: String,
+    role: String,
+    x: Double,
+    y: Double,
+    width: Double,
+    height: Double
+  ) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: updateBoardViewportMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat]),
+          x.toJavaParameter(options: [.kotlincompat]),
+          y.toJavaParameter(options: [.kotlincompat]),
+          width.toJavaParameter(options: [.kotlincompat]),
+          height.toJavaParameter(options: [.kotlincompat])
+        ]
       )
     }
   }

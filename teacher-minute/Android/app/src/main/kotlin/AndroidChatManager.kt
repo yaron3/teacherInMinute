@@ -148,6 +148,65 @@ object AndroidChatManager {
     }
 
     @JvmStatic
+    fun fetchBoardViewportsJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance(DATABASE_URL)
+                .getReference("questions")
+                .child(questionId)
+                .child("board")
+                .child("viewports")
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+
+        val rows = JSONObject()
+        for (child in snapshot.children) {
+            val key = child.key ?: continue
+            val width = child.child("width").value.asDoubleOrNull() ?: continue
+            val height = child.child("height").value.asDoubleOrNull() ?: continue
+            if (width <= 0.0 || height <= 0.0) continue
+            rows.put(
+                key,
+                JSONObject()
+                    .put("x", child.child("x").value.asDoubleOrNull() ?: 0.0)
+                    .put("y", child.child("y").value.asDoubleOrNull() ?: 0.0)
+                    .put("width", width)
+                    .put("height", height)
+                    .put("updatedAt", child.child("updatedAt").value.asDoubleOrNull() ?: 0.0)
+            )
+        }
+        return rows.toString()
+    }
+
+    @JvmStatic
+    fun updateBoardViewport(
+        questionId: String,
+        role: String,
+        x: Double,
+        y: Double,
+        width: Double,
+        height: Double
+    ) {
+        if (width <= 0.0 || height <= 0.0) return
+        val key = role.trim().lowercase().ifBlank { "participant" }
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+            .child("board")
+            .child("viewports")
+            .child(key)
+        val payload = mapOf(
+            "x" to x,
+            "y" to y,
+            "width" to width,
+            "height" to height,
+            "updatedAt" to System.currentTimeMillis().toDouble()
+        )
+        Tasks.await(ref.setValue(payload), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    @JvmStatic
     fun markQuestionAccepted(questionId: String, teacherId: String) {
         val values = mutableMapOf<String, Any>(
             "status" to "accepted",

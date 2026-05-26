@@ -22,6 +22,8 @@ struct ChatSessionView: View {
   @State var composerMode: ChatComposerMode = .regular
   @State var messages: [ChatMessage] = []
   @State var boardStrokes: [BoardStroke] = []
+  @State var boardViewports: [String: BoardViewport] = [:]
+  @State var lastSentBoardViewport: BoardViewport?
   @State var errorMessage: String?
   @State var isConnecting: Bool
   @State var selectedTab:TAB_TYPE = .CHAT
@@ -144,6 +146,9 @@ struct ChatSessionView: View {
         boardStrokes = strokes
         didPrimeBoard = true
       }
+      viewModel.onBoardViewportsUpdated = { viewports in
+        boardViewports = viewports
+      }
       viewModel.onErrorUpdated = { error in
         errorMessage = error
       }
@@ -161,6 +166,7 @@ struct ChatSessionView: View {
 #endif
       messages = viewModel.messages
       boardStrokes = viewModel.boardStrokes
+      boardViewports = viewModel.boardViewports
       didPrimeMessages = true
       didPrimeBoard = true
       errorMessage = viewModel.errorMessage
@@ -273,6 +279,19 @@ struct ChatSessionView: View {
         boardStrokes = []
         viewModel.clearBoard()
       },
+      onViewportChanged: { rect in
+        let viewport = BoardViewport(
+          x: Double(rect.origin.x),
+          y: Double(rect.origin.y),
+          width: Double(rect.width),
+          height: Double(rect.height),
+          updatedAt: Date().timeIntervalSince1970 * 1000.0
+        )
+        guard shouldSendBoardViewport(viewport) else { return }
+        lastSentBoardViewport = viewport
+        viewModel.updateBoardViewport(viewport)
+      },
+      peerViewport: peerBoardViewport,
       isMaximized: $isBoardMaximized
     )
   }
@@ -462,6 +481,25 @@ struct ChatSessionView: View {
 
   var boardRevision: String {
     boardStrokes.map { "\($0.id):\($0.points.count)" }.joined(separator: "|")
+  }
+
+  var peerBoardViewport: CGRect? {
+    let localRole = viewModel.role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard let viewport = boardViewports
+      .filter({ $0.key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() != localRole })
+      .map(\.value)
+      .sorted(by: { $0.updatedAt > $1.updatedAt })
+      .first else {
+      return nil
+    }
+    return CGRect(x: viewport.x, y: viewport.y, width: viewport.width, height: viewport.height)
+  }
+
+  func shouldSendBoardViewport(_ viewport: BoardViewport) -> Bool {
+    guard let previous = lastSentBoardViewport else { return true }
+    let positionDelta = abs(previous.x - viewport.x) + abs(previous.y - viewport.y)
+    let sizeDelta = abs(previous.width - viewport.width) + abs(previous.height - viewport.height)
+    return positionDelta > 2 || sizeDelta > 2
   }
 
   var participantName: String {

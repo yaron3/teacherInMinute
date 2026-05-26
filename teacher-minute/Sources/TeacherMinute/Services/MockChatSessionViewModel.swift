@@ -16,6 +16,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   let teacherId: String
   var messages: [ChatMessage]
   var boardStrokes: [BoardStroke]
+  var boardViewports: [String: BoardViewport] = [:]
   var errorMessage: String?
   var isConnecting: Bool
   let participantName: String
@@ -31,6 +32,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   let teacherSharePercent: Double
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
+  var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
@@ -85,6 +87,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
       }
       onMessagesUpdated?(messages)
       onBoardStrokesUpdated?(boardStrokes)
+      onBoardViewportsUpdated?(boardViewports)
       onErrorUpdated?(errorMessage)
     }
   }
@@ -153,6 +156,11 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func clearBoard() {
     boardStrokes.removeAll()
     onBoardStrokesUpdated?([])
+  }
+
+  func updateBoardViewport(_ viewport: BoardViewport) {
+    boardViewports[role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] = viewport
+    onBoardViewportsUpdated?(boardViewports)
   }
 
   func endLesson() async {

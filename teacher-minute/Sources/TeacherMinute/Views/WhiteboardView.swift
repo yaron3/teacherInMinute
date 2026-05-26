@@ -129,10 +129,10 @@ struct WhiteboardView: View {
 		.stroke(theme.appPrimaryText, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
 	  }
 	  
-	  if let peerViewport, !isCompact {
+      if let peerViewport, !isCompact {
 		let rect = logicalRectToView(peerViewport, viewSize: viewSize)
 		Rectangle()
-		  .stroke(theme.appPink, lineWidth: 2)
+		  .stroke(theme.appPink.opacity(0.55), lineWidth: 2)
 		  .frame(width: max(0, rect.width), height: max(0, rect.height))
 		  .position(x: rect.midX, y: rect.midY)
 		  .allowsHitTesting(false)
