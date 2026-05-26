@@ -143,6 +143,17 @@ export interface UserDoc {
   questions?: string[];
 }
 
+// ─── Firestore — coupons/{couponId} ──────────────────────────────────────────
+
+export interface CouponDoc {
+  price: number;            // price amount (e.g. USD)
+  numberOfMinutes: number;
+  createdAt: Timestamp;
+  activatedAt?: Timestamp;  // set when redeemed
+  studentUserId: string;    // the student this coupon is for
+  createdBy: string;        // display name of the creator
+}
+
 // ─── Firestore — users/{uid}/purchases/{purchaseId} ───────────────────────────
 
 export type PurchaseStatus = "active" | "expired" | "refunded";

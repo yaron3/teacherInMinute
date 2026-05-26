@@ -90,6 +90,17 @@ struct RecentLesson: Identifiable {
   let duration: String
 }
 
+// MARK: - Coupon State
+
+enum CouponRedemptionState: Equatable {
+  case idle
+  case loading
+  case success(minutesAdded: Int)
+  case alreadyActivated(date: String)
+  case invalid
+  case error(String)
+}
+
 // MARK: - ViewModel Protocol
 
 @MainActor
@@ -113,6 +124,8 @@ protocol StudentHomeViewModeling: AnyObject {
   var isStartingCheckout: Bool { get set }
   var checkoutPricingOptionID: String? { get set }
   var isAwaitingPaymentReturn: Bool { get set }
+  var couponCode: String { get set }
+  var couponState: CouponRedemptionState { get set }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
   func cancelSearch() async
@@ -128,6 +141,8 @@ protocol StudentHomeViewModeling: AnyObject {
   func refreshAfterLessonEnded() async
   func refreshUnreadMessages() async
   func chatInitialDetails(questionId: String?) -> ChatSessionDetails
+  func redeemCoupon() async
+  func resetCouponState()
 }
 
 // MARK: - ViewModel
@@ -157,6 +172,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var isStartingCheckout = false
   var checkoutPricingOptionID: String?
   var isAwaitingPaymentReturn = false
+  var couponCode = ""
+  var couponState: CouponRedemptionState = .idle
 
   private var pollingTask: Task<Void, Never>?
   private var didLoadProfile = false
@@ -269,6 +286,42 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
     let startingMinutes = checkoutStartedRemainingMinutes
     return await refreshAfterPurchase(uid: uid, startingMinutes: startingMinutes)
+  }
+
+  func redeemCoupon() async {
+    let code = couponCode.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !code.isEmpty else { return }
+    couponState = .loading
+    do {
+      let result = try await FunctionsService.shared.redeemCoupon(couponCode: code)
+      couponCode = ""
+      couponState = .success(minutesAdded: result.minutesAdded)
+      if let uid = Auth.auth().currentUser?.uid {
+        await loadRecentLessons(uid: uid)
+      }
+      logger.info("[Coupon] redeemed minutesAdded=\(result.minutesAdded)")
+    } catch let err as FunctionsError {
+      if case .serverError(let message, let status) = err {
+        switch status {
+        case "NOT_FOUND":
+          couponState = .invalid
+        case "FAILED_PRECONDITION":
+          couponState = .alreadyActivated(date: message)
+        default:
+          couponState = .error(err.localizedDescription)
+        }
+      } else {
+        couponState = .error(err.localizedDescription)
+      }
+      logger.error("[Coupon] redeem failed error=\(err.localizedDescription)")
+    } catch {
+      couponState = .error(error.localizedDescription)
+      logger.error("[Coupon] redeem failed error=\(error.localizedDescription)")
+    }
+  }
+
+  func resetCouponState() {
+    couponState = .idle
   }
 
   func viewAllLessons() {}
@@ -473,6 +526,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var isStartingCheckout = false
   var checkoutPricingOptionID: String?
   var isAwaitingPaymentReturn = false
+  var couponCode = ""
+  var couponState: CouponRedemptionState = .idle
 
   init(
     name: String = "Sarah Jenkins",
@@ -569,6 +624,14 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     isAwaitingPaymentReturn = false
     logger.info("[PaymentReturn] mock checkout returned without result")
     return false
+  }
+
+  func redeemCoupon() async {
+    couponState = .success(minutesAdded: 30)
+  }
+
+  func resetCouponState() {
+    couponState = .idle
   }
 
   func viewAllLessons() {}

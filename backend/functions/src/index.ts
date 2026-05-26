@@ -13,6 +13,9 @@ export { createQuestion, cancelQuestion, acceptInvite, declineInvite, getQuestio
 // Lesson lifecycle (all callable — FR-B-010)
 export { startLesson, endLesson, forceEndLesson, rateTeacher } from "./lessons";
 
+// Coupons
+export { redeemCoupon } from "./coupons";
+
 // Payments — PayPal Checkout
 export {
   createCheckoutSession,

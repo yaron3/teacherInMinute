@@ -76,6 +76,10 @@ struct PaymentSettingsSessionResult {
   let settingsURL: URL
 }
 
+struct RedeemCouponResult {
+  let minutesAdded: Int
+}
+
 // MARK: - Service
 
 @MainActor
@@ -124,6 +128,14 @@ final class FunctionsService {
       liveKitToken: result["liveKitToken"] as? String,
 	  questionId: Self.firstString(in: result, keys: ["questionId", "questionID", "id"])
     )
+  }
+
+  func redeemCoupon(couponCode: String) async throws -> RedeemCouponResult {
+    let result = try await call(function: "redeemCoupon", data: ["couponCode": couponCode])
+    guard let minutes = result["minutesAdded"] as? Int else {
+      throw FunctionsError.decodingError(function: "redeemCoupon")
+    }
+    return RedeemCouponResult(minutesAdded: minutes)
   }
 
   func createCheckoutSession(pricingOptionID: String) async throws -> CheckoutSessionResult {

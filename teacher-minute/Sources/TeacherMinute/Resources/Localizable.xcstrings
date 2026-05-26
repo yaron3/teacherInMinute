@@ -5279,6 +5279,105 @@
           }
         }
       }
+    },
+    "Have a code?" : {
+      "comment" : "Placeholder for the coupon code input field on the Student Home screen.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "יש לך קוד?"
+          }
+        }
+      }
+    },
+    "Redeem" : {
+      "comment" : "Label for the button that submits a coupon code for redemption.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מימוש"
+          }
+        }
+      }
+    },
+    "Success" : {
+      "comment" : "Title for the alert shown when a coupon code is successfully redeemed.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הצלחה"
+          }
+        }
+      }
+    },
+    "Code Already Used" : {
+      "comment" : "Title for the alert shown when the user enters a coupon code that has already been redeemed.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הקוד כבר נוצל"
+          }
+        }
+      }
+    },
+    "Invalid Code" : {
+      "comment" : "Title for the alert shown when the user enters a coupon code that does not exist.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "קוד לא תקין"
+          }
+        }
+      }
+    },
+    "Error" : {
+      "comment" : "Generic title for an error alert.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "שגיאה"
+          }
+        }
+      }
+    },
+    "Code applied! Added %d minutes." : {
+      "comment" : "Body message of the success alert shown after redeeming a coupon code, with the number of minutes added.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הקוד הוחל! נוספו %d דקות."
+          }
+        }
+      }
+    },
+    "This code was already activated on %@." : {
+      "comment" : "Body message of the alert shown when a coupon code has already been redeemed, with the activation date.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הקוד הזה כבר מומש בתאריך %@."
+          }
+        }
+      }
+    },
+    "This code is not valid." : {
+      "comment" : "Body message of the alert shown when the entered coupon code is not recognized.",
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "קוד זה אינו תקין."
+          }
+        }
+      }
     }
   },
   "version" : "1.2"
