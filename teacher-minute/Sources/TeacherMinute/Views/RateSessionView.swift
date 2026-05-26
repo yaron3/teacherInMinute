@@ -6,6 +6,7 @@ struct RateSessionView: View {
   let subject: String
   let teacherId: String
   let questionId: String
+  let prepareForRating: @MainActor () async -> Void
   let onFinish: @MainActor () -> Void
 
   @State var rating: Int = 0
@@ -14,6 +15,24 @@ struct RateSessionView: View {
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
+  }
+
+  init(
+    teacherName: String,
+    teacherImageURL: String,
+    subject: String,
+    teacherId: String,
+    questionId: String,
+    prepareForRating: @escaping @MainActor () async -> Void = {},
+    onFinish: @escaping @MainActor () -> Void
+  ) {
+    self.teacherName = teacherName
+    self.teacherImageURL = teacherImageURL
+    self.subject = subject
+    self.teacherId = teacherId
+    self.questionId = questionId
+    self.prepareForRating = prepareForRating
+    self.onFinish = onFinish
   }
 
   var body: some View {
@@ -162,11 +181,8 @@ struct RateSessionView: View {
     errorMessage = nil
     Task {
       do {
-        try await FunctionsService.shared.rateTeacher(
-          questionId: questionId,
-          teacherId: teacherId,
-          rating: rating
-        )
+        await prepareForRating()
+        try await sendRatingWhenFinalized()
         isSending = false
         onFinish()
       } catch {
@@ -175,5 +191,32 @@ struct RateSessionView: View {
         logger.error("[RateSession] rateTeacher failed: \(error.localizedDescription)")
       }
     }
+  }
+
+  private func sendRatingWhenFinalized() async throws {
+    for attempt in 0..<4 {
+      do {
+        try await FunctionsService.shared.rateTeacher(
+          questionId: questionId,
+          teacherId: teacherId,
+          rating: rating
+        )
+        return
+      } catch {
+        guard error.isLessonFinalizingError, attempt < 3 else { throw error }
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+      }
+    }
+  }
+}
+
+private extension Error {
+  var isLessonFinalizingError: Bool {
+    guard let functionError = self as? FunctionsError else { return false }
+    if case .serverError(let message, let status) = functionError {
+      return status == "FAILED_PRECONDITION"
+        && message.localizedCaseInsensitiveContains("finaliz")
+    }
+    return false
   }
 }

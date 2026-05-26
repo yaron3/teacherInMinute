@@ -39,6 +39,7 @@ struct ChatSessionView: View {
   @State var liveKitRevision = 0
   @State var conversationType: String
   @State var isRatingPromptVisible = false
+  @State var didRequestLessonEnd = false
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let liveKitRoom: String
@@ -180,6 +181,12 @@ struct ChatSessionView: View {
       }
     }
     .onDisappear {
+      if !didRequestLessonEnd, !isConnecting {
+        didRequestLessonEnd = true
+        Task {
+          await viewModel.endLesson()
+        }
+      }
       viewModel.stop()
     }
     .sheet(isPresented: $isRatingPromptVisible) {
@@ -189,6 +196,10 @@ struct ChatSessionView: View {
         subject: viewModel.originalQuestion,
         teacherId: viewModel.teacherId,
         questionId: viewModel.questionId,
+        prepareForRating: {
+          didRequestLessonEnd = true
+          await viewModel.endLesson()
+        },
         onFinish: {
           isRatingPromptVisible = false
           onClose()
@@ -564,6 +575,7 @@ struct ChatSessionView: View {
 
       Button {
         Task {
+          didRequestLessonEnd = true
           await viewModel.endLesson()
           closeWithOptionalRating()
         }
