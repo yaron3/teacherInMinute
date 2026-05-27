@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delete Account - Teacher in Minute</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Integration -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Assistant', 'Inter', 'sans-serif'] },
+          colors: {
+            brand: { pink: '#EC4899', accent: '#8B5CF6' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #0D0D0E; color: #F4F4F5; font-family: 'Assistant', 'Inter', sans-serif; }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+  
+  <!-- Background decoration -->
+  <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-brand-accent/10 via-transparent to-transparent pointer-events-none"></div>
+
+  <div class="max-w-md w-full bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl relative z-10" id="app-container">
+    
+    <!-- Login View -->
+    <div id="view-login" class="space-y-6">
+      <div class="text-center">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-brand-pink to-brand-accent flex items-center justify-center shadow-lg shadow-brand-pink/20 mx-auto mb-4">
+          <i class="ph ph-trash text-white text-2xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-white mb-2">Account Deletion</h1>
+        <p class="text-zinc-400 text-sm">Please sign in to verify your identity before deleting your account.</p>
+      </div>
+
+      <button onclick="doGoogleLogin()" class="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-black py-3 rounded-xl font-bold transition">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+        Sign in with Google
+      </button>
+
+      <div class="flex items-center gap-4">
+        <div class="flex-1 h-px bg-zinc-800"></div>
+        <span class="text-zinc-500 text-xs font-semibold uppercase tracking-wider">OR EMAIL</span>
+        <div class="flex-1 h-px bg-zinc-800"></div>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">Email</label>
+          <input type="email" id="email" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-pink transition" placeholder="you@example.com">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">Password</label>
+          <input type="password" id="password" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-pink transition" placeholder="••••••••" onkeydown="if(event.key === 'Enter') doEmailLogin()">
+        </div>
+        <button onclick="doEmailLogin()" class="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white py-3 rounded-xl font-bold transition">Sign In</button>
+      </div>
+      
+      <p id="login-error" class="text-red-500 text-sm text-center hidden font-medium"></p>
+    </div>
+
+    <!-- Options View -->
+    <div id="view-options" class="hidden space-y-6">
+      <div class="text-center">
+        <h2 class="text-xl font-bold text-white mb-1">Account Options</h2>
+        <p class="text-zinc-400 text-sm">Logged in as <span id="user-email-display" class="font-semibold text-white"></span></p>
+      </div>
+
+      <div id="balance-warning" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-200">
+        <div class="flex items-start gap-3">
+          <i class="ph-fill ph-warning-circle text-xl mt-0.5"></i>
+          <div>
+            <strong>Attention:</strong> You have <span id="balance-amount" class="font-bold underline"></span> unused minutes in your account. Deleting your account will permanently forfeit these minutes.
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-3 pt-2">
+        <button onclick="selectOption('history')" class="w-full flex items-center justify-between p-4 bg-zinc-950 border border-zinc-800 hover:border-brand-accent/50 rounded-xl transition text-left group">
+          <div>
+            <div class="font-bold text-white group-hover:text-brand-accent transition">Delete History Only</div>
+            <div class="text-xs text-zinc-500 mt-1">Remove all your past lesson records but keep the account.</div>
+          </div>
+          <i class="ph-bold ph-caret-right text-zinc-600 group-hover:text-brand-accent transition"></i>
+        </button>
+
+        <button onclick="selectOption('account')" class="w-full flex items-center justify-between p-4 bg-zinc-950 border border-red-900/50 hover:border-red-500/80 rounded-xl transition text-left group">
+          <div>
+            <div class="font-bold text-red-500">Delete Account Completely</div>
+            <div class="text-xs text-zinc-500 mt-1">Permanently delete your account and all associated data.</div>
+          </div>
+          <i class="ph-bold ph-caret-right text-red-900 group-hover:text-red-500 transition"></i>
+        </button>
+      </div>
+      
+      <div class="pt-4 text-center">
+        <button onclick="doSignOut()" class="text-zinc-500 hover:text-white text-sm font-medium transition underline underline-offset-4">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Reason & Confirm View -->
+    <div id="view-reason" class="hidden space-y-6">
+      <div class="text-center">
+        <h2 id="reason-title" class="text-xl font-bold text-white mb-2">Confirm Deletion</h2>
+        <p class="text-zinc-400 text-sm">Please tell us why you are leaving.</p>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">Reason for deletion (Required)</label>
+          <textarea id="delete-reason" rows="4" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-pink transition resize-none" placeholder="Please share your reason..."></textarea>
+        </div>
+
+        <label class="flex items-start gap-3 p-4 bg-zinc-950 border border-zinc-800 rounded-xl cursor-pointer hover:border-zinc-700 transition">
+          <input type="checkbox" id="agree-checkbox" class="mt-1 w-4 h-4 accent-brand-pink rounded cursor-pointer shrink-0">
+          <span class="text-xs text-zinc-400 leading-relaxed select-none">
+            I understand this action cannot be undone. I agree that my request and reason will be sent to customer support via email and my account data will be permanently deleted.
+          </span>
+        </label>
+
+        <div class="pt-2 space-y-3">
+          <button onclick="executeDeletion()" id="btn-execute" class="w-full bg-red-600 hover:bg-red-500 text-white py-3.5 rounded-xl font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">
+            Permanently Delete
+          </button>
+          <button onclick="goBack()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-white text-sm py-3 rounded-xl font-semibold transition">
+            Cancel & Go Back
+          </button>
+        </div>
+      </div>
+      
+      <p id="action-error" class="text-red-500 text-sm text-center hidden font-medium"></p>
+    </div>
+
+    <!-- Success View -->
+    <div id="view-success" class="hidden space-y-6 text-center py-8">
+      <div class="w-20 h-20 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center mx-auto text-green-500 text-4xl mb-6 shadow-[0_0_30px_rgba(34,197,94,0.2)]">
+        <i class="ph-bold ph-check"></i>
+      </div>
+      <h2 class="text-2xl font-bold text-white mb-2">Request Successful</h2>
+      <p id="success-message" class="text-zinc-400 text-sm leading-relaxed max-w-[250px] mx-auto">
+        Your account has been successfully deleted.
+      </p>
+    </div>
+
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCPZN55YDMuLc8R8vXfpJ0yPaoU7b30BWU",
+      authDomain: "teacher-in-a-moment.firebaseapp.com",
+      databaseURL: "https://teacher-in-a-moment-default-rtdb.firebaseio.com",
+      projectId: "teacher-in-a-moment",
+      storageBucket: "teacher-in-a-moment.firebasestorage.app",
+      messagingSenderId: "922632930084",
+      appId: "1:922632930084:web:b33a89cf2d985cd7fde9b1",
+      measurementId: "G-3DTL1NDEHQ"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let selectedAction = null; // 'history' or 'account'
+    let userRemainingMinutes = 0;
+    let userRole = 'student';
+
+    function switchView(viewId) {
+      ['view-login', 'view-options', 'view-reason', 'view-success'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(viewId).classList.remove('hidden');
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        currentUser = user;
+        document.getElementById('user-email-display').textContent = user.email || user.uid;
+        
+        try {
+          const doc = await db.collection('users').doc(user.uid).get();
+          if (doc.exists) {
+            const data = doc.data();
+            userRemainingMinutes = data.remainingMinutes || 0;
+            if (data.isTeacher) userRole = 'teacher';
+            
+            if (userRole === 'student' && userRemainingMinutes > 0) {
+              document.getElementById('balance-warning').classList.remove('hidden');
+              document.getElementById('balance-amount').textContent = userRemainingMinutes;
+            } else {
+              document.getElementById('balance-warning').classList.add('hidden');
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching user data", err);
+        }
+
+        switchView('view-options');
+      } else {
+        currentUser = null;
+        switchView('view-login');
+      }
+    });
+
+    async function doGoogleLogin() {
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        await auth.signInWithPopup(provider);
+      } catch (err) {
+        showError('login-error', err.message);
+      }
+    }
+
+    async function doEmailLogin() {
+      const email = document.getElementById('email').value.trim();
+      const pass = document.getElementById('password').value;
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+      
+      if(!email || !pass) return showError('login-error', 'Please enter both email and password.');
+      try {
+        await auth.signInWithEmailAndPassword(email, pass);
+      } catch (err) {
+        showError('login-error', err.message);
+      }
+    }
+
+    async function doSignOut() {
+      await auth.signOut();
+    }
+
+    function selectOption(action) {
+      selectedAction = action;
+      document.getElementById('reason-title').textContent = action === 'history' ? 'Delete History' : 'Delete Account';
+      document.getElementById('btn-execute').textContent = action === 'history' ? 'Submit Request' : 'Permanently Delete';
+      switchView('view-reason');
+    }
+
+    function goBack() {
+      switchView('view-options');
+      document.getElementById('action-error').classList.add('hidden');
+    }
+
+    function showError(elementId, msg) {
+      const el = document.getElementById(elementId);
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    document.getElementById('agree-checkbox').addEventListener('change', (e) => {
+      document.getElementById('btn-execute').disabled = !e.target.checked;
+    });
+    document.getElementById('btn-execute').disabled = true;
+
+    async function executeDeletion() {
+      const reason = document.getElementById('delete-reason').value.trim();
+      const agreed = document.getElementById('agree-checkbox').checked;
+
+      if (!reason) {
+        return showError('action-error', 'Please provide a reason for deletion.');
+      }
+      if (!agreed) {
+        return showError('action-error', 'You must agree to the terms.');
+      }
+
+      const btn = document.getElementById('btn-execute');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+      document.getElementById('action-error').classList.add('hidden');
+
+      try {
+        const title = selectedAction === 'history' ? 'History Deletion Request' : 'Account Deletion Request';
+        let safeReason = reason.substring(0, 900);
+        if (selectedAction === 'account' && userRemainingMinutes > 0) {
+          safeReason += `\n\n[Balance: ${userRemainingMinutes} mins]`;
+        }
+
+        const reqRef = db.collection('contactRequests').doc();
+        await reqRef.set({
+          id: reqRef.id,
+          title: title,
+          description: safeReason,
+          userId: currentUser.uid,
+          userName: currentUser.displayName || 'Unknown',
+          userEmail: currentUser.email || 'no-email@provided.com',
+          sentAt: new Date().toISOString(),
+          deviceType: 'Web Portal',
+          osVersion: 'Web',
+          locale: (navigator.language || 'en').substring(0, 10),
+          role: userRole === 'teacher' ? 'teacher' : 'student'
+        });
+
+        if (selectedAction === 'account') {
+          // Delete user document safely if permission allows
+          try {
+            await db.collection('users').doc(currentUser.uid).delete();
+          } catch(e) {
+            console.warn("Could not delete user doc directly", e);
+          }
+          
+          // Delete auth account
+          await currentUser.delete();
+          document.getElementById('success-message').textContent = "Your account and data have been permanently deleted.";
+        } else {
+          document.getElementById('success-message').textContent = "Your request to delete history has been submitted to support and will be processed shortly.";
+          await auth.signOut();
+        }
+
+        switchView('view-success');
+
+      } catch (err) {
+        console.error(err);
+        let msg = err.message;
+        if (err.code === 'auth/requires-recent-login') {
+          msg = "For your security, please sign out and sign in again before deleting your account.";
+        }
+        showError('action-error', msg);
+        btn.disabled = false;
+        btn.textContent = selectedAction === 'history' ? 'Submit Request' : 'Permanently Delete';
+      }
+    }
+  </script>
+</body>
+</html>
