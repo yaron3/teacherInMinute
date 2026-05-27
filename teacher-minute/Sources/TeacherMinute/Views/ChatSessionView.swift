@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit) && !os(Android)
+import UIKit
+#endif
 #if !os(Android)
 import LiveKit
 #else
@@ -8,6 +11,10 @@ import SkipBridge
 enum ChatComposerMode {
   case regular
   case algebra
+}
+
+enum EndSessionPrompt {
+  case confirmEnd, saveBoard
 }
 
 struct ChatSessionView: View {
@@ -39,6 +46,8 @@ struct ChatSessionView: View {
   @State var liveKitRevision = 0
   @State var conversationType: String
   @State var isRatingPromptVisible = false
+  @State var endSessionPrompt: EndSessionPrompt?
+  @State var isEndingSession = false
   @State var didRequestLessonEnd = false
   @FocusState var isMessageFieldFocused: Bool
   let title: String
@@ -91,25 +100,35 @@ struct ChatSessionView: View {
   }
 
   var body: some View {
-    Group {
-      if isConnecting {
-        ConnectionSetupView(
-          participantName: participantName,
-          conversationType: conversationType,
-          viewModel: viewModel,
-          liveKitRoom: liveKitRoom,
-          liveKitToken: liveKitToken,
-          onCancel: onClose,
-          onSessionStarted: { @MainActor @Sendable in
-            logger.info("[ChatSessionView] setup complete qid=\(viewModel.questionId) role=\(viewModel.role) conversationType=\(conversationType)")
-            isConnecting = false
-          },
-          onContinueAsText: isStudent && hasAudio ? { @MainActor @Sendable in
-            conversationType = "text"
-          } : nil
-        )
-      } else {
-        sessionBody
+    ZStack {
+      Group {
+        if isConnecting {
+          ConnectionSetupView(
+            participantName: participantName,
+            conversationType: conversationType,
+            viewModel: viewModel,
+            liveKitRoom: liveKitRoom,
+            liveKitToken: liveKitToken,
+            onCancel: onClose,
+            onSessionStarted: { @MainActor @Sendable in
+              logger.info("[ChatSessionView] setup complete qid=\(viewModel.questionId) role=\(viewModel.role) conversationType=\(conversationType)")
+              isConnecting = false
+            },
+            onContinueAsText: isStudent && hasAudio ? { @MainActor @Sendable in
+              conversationType = "text"
+            } : nil
+          )
+        } else {
+          sessionBody
+        }
+      }
+
+      if let endSessionPrompt {
+        endSessionPromptOverlay(endSessionPrompt)
+      }
+
+      if isRatingPromptVisible {
+        ratingPromptOverlay
       }
     }
     .background(Color(.systemBackground))
@@ -172,7 +191,7 @@ struct ChatSessionView: View {
       didPrimeBoard = true
       errorMessage = viewModel.errorMessage
       isConnecting = viewModel.isConnecting
-      isMessageFieldFocused = true
+      isMessageFieldFocused = selectedTab == .CHAT && composerMode == .regular
     }
     .task {
       while !Task.isCancelled {
@@ -189,35 +208,213 @@ struct ChatSessionView: View {
       }
       viewModel.stop()
     }
-    .sheet(isPresented: $isRatingPromptVisible) {
-      RateSessionView(
-        teacherName: viewModel.participantName,
-        teacherImageURL: viewModel.participantImageURL,
-        subject: viewModel.originalQuestion,
-        teacherId: viewModel.teacherId,
-        questionId: viewModel.questionId,
-        prepareForRating: {
-          didRequestLessonEnd = true
-          await viewModel.endLesson()
-        },
-        onFinish: {
-          isRatingPromptVisible = false
-          onClose()
-        }
-      )
-      .interactiveDismissDisabled(false)
-    }
     .trackScreen(AnalyticsScreen.chatSession)
+  }
+
+  func endSessionPromptOverlay(_ prompt: EndSessionPrompt) -> some View {
+    ZStack {
+      Color.black.opacity(0.35)
+        .ignoresSafeArea()
+
+      VStack(spacing: 14) {
+        Text(endSessionPromptTitle(prompt))
+          .font(.system(size: 18, weight: .bold))
+          .foregroundStyle(theme.appPrimaryText)
+          .multilineTextAlignment(.center)
+
+        Text(endSessionPromptMessage(prompt))
+          .font(.system(size: 13))
+          .foregroundStyle(theme.appSecondaryText)
+          .multilineTextAlignment(.center)
+
+        VStack(spacing: 10) {
+          Button {
+            handleEndSessionPrimaryAction(prompt)
+          } label: {
+            HStack {
+              Spacer()
+              if isEndingSession {
+                ProgressView()
+              } else {
+                Text(endSessionPromptPrimaryTitle(prompt))
+                  .font(.system(size: 15, weight: .bold))
+              }
+              Spacer()
+            }
+            .frame(height: 46)
+            .foregroundStyle(theme.white)
+            .background(theme.appPink)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+          }
+          .buttonStyle(.plain)
+          .disabled(isEndingSession)
+
+          if prompt == .saveBoard {
+            Button {
+              finalizeEndSession()
+            } label: {
+              Text(LocalizationSupport.localized("Continue without saving"))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.appPrimaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .background(theme.appGrayBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(isEndingSession)
+          }
+
+          Button {
+            endSessionPrompt = nil
+          } label: {
+            Text(LocalizationSupport.localized("Cancel"))
+              .font(.system(size: 14, weight: .semibold))
+              .foregroundStyle(theme.appSecondaryText)
+              .frame(maxWidth: .infinity)
+              .frame(height: 38)
+          }
+          .buttonStyle(.plain)
+          .disabled(isEndingSession)
+        }
+      }
+      .padding(18)
+      .frame(maxWidth: 340)
+      .background(theme.appCardBackground)
+      .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .padding(.horizontal, 24)
+    }
+    .zIndex(25)
+  }
+
+  var ratingPromptOverlay: some View {
+    RateSessionView(
+      teacherName: viewModel.participantName,
+      teacherImageURL: viewModel.participantImageURL,
+      subject: viewModel.originalQuestion,
+      teacherId: viewModel.teacherId,
+      questionId: viewModel.questionId,
+      prepareForRating: {
+        didRequestLessonEnd = true
+        await viewModel.endLesson()
+      },
+      onFinish: {
+        isRatingPromptVisible = false
+        onClose()
+      }
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Color(.systemBackground))
+    .zIndex(30)
   }
 
   @MainActor
   private func closeWithOptionalRating() {
+    endSessionPrompt = nil
+    isEndingSession = false
     let durationSeconds = viewModel.sessionDurationSeconds(at: Date())
     if isStudent && durationSeconds >= 30 && !viewModel.teacherId.isEmpty {
       isRatingPromptVisible = true
     } else {
       onClose()
     }
+  }
+
+  func endSessionPromptTitle(_ prompt: EndSessionPrompt) -> String {
+    switch prompt {
+    case .confirmEnd:
+      return LocalizationSupport.localized("End session?")
+    case .saveBoard:
+      return LocalizationSupport.localized("Save the board?")
+    }
+  }
+
+  func endSessionPromptMessage(_ prompt: EndSessionPrompt) -> String {
+    switch prompt {
+    case .confirmEnd:
+      return LocalizationSupport.localized("Are you sure you want to end this session?")
+    case .saveBoard:
+      return LocalizationSupport.localized("There are board changes. Save them as a photo before ending?")
+    }
+  }
+
+  func endSessionPromptPrimaryTitle(_ prompt: EndSessionPrompt) -> String {
+    switch prompt {
+    case .confirmEnd:
+      return LocalizationSupport.localized("End session")
+    case .saveBoard:
+      return LocalizationSupport.localized("Save and continue")
+    }
+  }
+
+  func handleEndSessionPrimaryAction(_ prompt: EndSessionPrompt) {
+    switch prompt {
+    case .confirmEnd:
+      if boardStrokes.isEmpty {
+        finalizeEndSession()
+      } else {
+        endSessionPrompt = .saveBoard
+      }
+    case .saveBoard:
+      saveBoardSnapshot()
+      finalizeEndSession()
+    }
+  }
+
+  func requestEndSession() {
+    guard !isEndingSession else { return }
+    dismissChatInput()
+    endSessionPrompt = .confirmEnd
+  }
+
+  func finalizeEndSession() {
+    guard !isEndingSession else { return }
+    endSessionPrompt = nil
+    isEndingSession = true
+    didRequestLessonEnd = true
+    Task {
+      await viewModel.endLesson()
+      closeWithOptionalRating()
+    }
+  }
+
+  func saveBoardSnapshot() {
+#if canImport(UIKit) && !os(Android)
+    let strokesSnapshot = boardStrokes
+    guard !strokesSnapshot.isEmpty else { return }
+
+    let renderSize = CGSize(width: 1080, height: 1080)
+    let logical = WhiteboardView.logicalSize
+    let strokeColor = theme.appPrimaryText
+    let background = theme.appCardBackground
+
+    let snapshot = ZStack {
+      background
+      ForEach(strokesSnapshot.indices, id: \.self) { index in
+        Path { path in
+          let points = strokesSnapshot[index].points.map { point in
+            CGPoint(
+              x: point.x * renderSize.width / logical.width,
+              y: point.y * renderSize.height / logical.height
+            )
+          }
+          guard let first = points.first else { return }
+          path.move(to: first)
+          for point in points.dropFirst() {
+            path.addLine(to: point)
+          }
+        }
+        .stroke(strokeColor, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+      }
+    }
+    .frame(width: renderSize.width, height: renderSize.height)
+
+    let renderer = ImageRenderer(content: snapshot)
+    renderer.scale = UIScreen.main.scale
+    if let image = renderer.uiImage {
+      UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+    }
+#endif
   }
 
   var sessionBody: some View {
@@ -260,7 +457,7 @@ struct ChatSessionView: View {
       .frame(maxHeight: .infinity)
 
 #if os(Android)
-      if !isBoardMaximized {
+      if selectedTab == .CHAT && !isBoardMaximized {
         inputBar
       }
 
@@ -269,7 +466,7 @@ struct ChatSessionView: View {
     .background(theme.appCardBackground)
 #if !os(Android)
     .safeAreaInset(edge: .bottom) {
-      if !isBoardMaximized {
+      if selectedTab == .CHAT && !isBoardMaximized {
         inputBar
           .background(theme.appCardBackground)
       }
@@ -575,13 +772,9 @@ struct ChatSessionView: View {
       }
 
       Button {
-        Task {
-          didRequestLessonEnd = true
-          await viewModel.endLesson()
-          closeWithOptionalRating()
-        }
+        requestEndSession()
       } label: {
-        Text(LocalizationSupport.localized("End"))
+        Text(isEndingSession ? LocalizationSupport.localized("Ending...") : LocalizationSupport.localized("End"))
           .font(.system(size: 12, weight: .bold))
           .foregroundStyle(theme.appPrimaryText)
           .padding(.horizontal, 12)
@@ -590,6 +783,7 @@ struct ChatSessionView: View {
           .clipShape(Capsule())
       }
       .buttonStyle(.plain)
+      .disabled(isEndingSession)
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
@@ -665,6 +859,29 @@ struct ChatSessionView: View {
     }
   }
 
+  func selectSessionTab(_ tab: TAB_TYPE) {
+    selectedTab = tab
+
+    switch tab {
+    case .CHAT:
+      hasUnreadChat = false
+      isMessageFieldFocused = composerMode == .regular
+    case .BOARD:
+      hasUnreadBoard = false
+      dismissChatInput()
+    case .VIDEO:
+      dismissChatInput()
+    }
+  }
+
+  func dismissChatInput() {
+    isMessageFieldFocused = false
+    composerMode = .regular
+#if canImport(UIKit) && !os(Android)
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+#endif
+  }
+
   var sessionTabs: some View {
     HStack(spacing: 0) {
 	  tabButton(id: .CHAT, title: LocalizationSupport.localized("Chat"), icon: "bubble.left.fill", showsBadge: hasUnreadChat)
@@ -682,14 +899,7 @@ struct ChatSessionView: View {
 
   func tabButton(id: TAB_TYPE, title: String, icon: String, showsBadge: Bool) -> some View {
     Button {
-	  if id == .BOARD {
-        isMessageFieldFocused = false
-        hasUnreadBoard = false
-      } else {
-        isMessageFieldFocused = true
-        hasUnreadChat = false
-      }
-      selectedTab = id
+      selectSessionTab(id)
     } label: {
       VStack(spacing: 8) {
         HStack(spacing: 6) {

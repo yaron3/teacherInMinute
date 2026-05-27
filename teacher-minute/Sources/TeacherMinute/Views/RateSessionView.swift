@@ -187,7 +187,7 @@ struct RateSessionView: View {
         onFinish()
       } catch {
         isSending = false
-        errorMessage = LocalizationSupport.localized("Could not send rating. Please try again.")
+        errorMessage = LocalizationSupport.localized("Could not send rating. Please try again next time.")
         logger.error("[RateSession] rateTeacher failed: \(error.localizedDescription)")
       }
     }

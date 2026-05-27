@@ -470,10 +470,6 @@ exports.rateTeacher = (0, https_1.onCall)(async (req) => {
     const questionRef = firestore.collection("questions").doc(questionId);
     const teacherRef = firestore.collection("teachers").doc(teacherId);
     const ratingRef = teacherRef.collection("ratings").doc(questionId);
-    const liveQuestionSnap = await db.ref(`questions/${questionId}`).once("value");
-    if (liveQuestionSnap.exists()) {
-        throw new https_1.HttpsError("failed-precondition", "Lesson is still being finalized. Try rating again in a few seconds");
-    }
     await firestore.runTransaction(async (tx) => {
         var _a, _b, _c, _d, _e;
         const [questionSnap, teacherSnap, existingRatingSnap] = await Promise.all([

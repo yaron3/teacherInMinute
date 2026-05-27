@@ -55,11 +55,6 @@ struct WaitingMessage: Identifiable {
   
   var isWaiting: Bool { statusRaw == "waiting" }
   
-  var waitingTimeLabel: String {
-	let elapsed = Date().timeIntervalSince1970 - createdAt
-	let minutes = Int(elapsed / 60.0)
-	return minutes <= 0 ? "Just now" : "Waiting \(minutes)m"
-  }
 }
 
 #elseif !SKIP_BRIDGE
@@ -138,45 +133,7 @@ struct WaitingMessage: Identifiable, Codable {
 	]
   }
   
-  var waitingTimeLabel: String {
-	let elapsed = Date().timeIntervalSince1970 - createdAt
-	let minutes = Int(elapsed / 60)
-	return minutes <= 0 ? "Just now" : "Waiting \(minutes)m"
-  }
 }
 
-//#else
-//
-//// ── Android bridge-mode stub ──────────────────────────────────────────────
-//// Minimal definition so the Swift JNI binary compiles.
-//// Firebase queue data flows through the transpiled Kotlin path (#if SKIP).
-//
-//struct WaitingMessage: Identifiable {
-//  let id: String
-//  let studentUID: String
-//  let studentName: String
-//  let topic: String
-//  let subject: String
-//  let isHighPriority: Bool
-//  let createdAt: Double
-//  var status: MessageStatus
-//  
-//  enum MessageStatus: String {
-//	case waiting, accepted, rejected
-//  }
-//  
-//  init(id: String, studentUID: String, studentName: String, topic: String,
-//	   subject: String, isHighPriority: Bool, createdAt: Double, statusRaw: String) {
-//	self.id = id; self.studentUID = studentUID; self.studentName = studentName
-//	self.topic = topic; self.subject = subject; self.isHighPriority = isHighPriority
-//	self.createdAt = createdAt
-//	self.status = MessageStatus(rawValue: statusRaw) ?? .waiting
-//  }
-//  
-//  init?(id: String, data: [String: Any]) { return nil }
-//  
-//  var waitingTimeLabel: String { "" }
-//  var firebaseData: [String: Any] { [:] }
-//}
 
 #endif // SKIP / !SKIP_BRIDGE / else

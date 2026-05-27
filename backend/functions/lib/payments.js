@@ -30,13 +30,15 @@ exports.createCheckoutSession = (0, https_1.onCall)(async (req) => {
         throw new https_1.HttpsError("not-found", "Pricing package not found");
     const pkg = packageSnap.data();
     const minutes = toSafeMinutes((_f = pkg.minutes) !== null && _f !== void 0 ? _f : pkg.minutesGranted);
-    if (!pkg.priceCents || pkg.priceCents <= 0)
+    // Coerce to number — Firestore may return string if field was set via console
+    const priceCents = Math.floor(Number(pkg.priceCents));
+    if (!priceCents || priceCents <= 0)
         throw new https_1.HttpsError("internal", "Invalid package price");
     if (!pkg.currency)
         throw new https_1.HttpsError("internal", "Invalid package currency");
     if (minutes <= 0)
         throw new https_1.HttpsError("internal", "Invalid package minutes");
-    firebase_functions_1.logger.info(`[payments] package fetched packageId=${packageId} priceCents=${pkg.priceCents} currency=${pkg.currency} minutes=${minutes}`);
+    firebase_functions_1.logger.info(`[payments] package fetched packageId=${packageId} priceCents=${priceCents} currency=${pkg.currency} minutes=${minutes}`);
     const checkoutId = (0, uuid_1.v4)();
     const returnUrl = `${FUNCTIONS_BASE_URL}/paypalSuccess?checkoutId=${checkoutId}`;
     const cancelUrl = `${FUNCTIONS_BASE_URL}/paypalCancel?checkoutId=${checkoutId}`;
@@ -45,7 +47,7 @@ exports.createCheckoutSession = (0, https_1.onCall)(async (req) => {
         uid,
         packageId,
         packageType: pkg.type,
-        priceCents: pkg.priceCents,
+        priceCents,
         currency: pkg.currency,
         minutes,
         status: "created",

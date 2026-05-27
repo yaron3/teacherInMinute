@@ -17,6 +17,10 @@ enum DrawingTool: CaseIterable, Hashable {
   }
 }
 
+enum ClearDialogReason {
+  case local, remote
+}
+
 enum BoardColor: CaseIterable, Hashable {
   case `default`, pink, purple, green, orange, teal, red, yellow
 
@@ -83,9 +87,9 @@ struct WhiteboardView: View {
   @State var lastMoveDragTranslation: CGSize = .zero
   @State var selectedTool: DrawingTool = .pen
   @State var selectedColor: BoardColor
-  @State var showClearDialog = false
   @State var showColorPicker = false
-  @State var showRemoteClearDialog = false
+  @State var isClearDialogPresented = false
+  @State var clearDialogReason: ClearDialogReason = .local
   @State var localClearInitiated = false
   @State var pendingClearSnapshot: [BoardStroke] = []
   @State var localStrokeColors: [BoardStrokeKey: BoardColor] = [:]
@@ -115,6 +119,15 @@ struct WhiteboardView: View {
   
   var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
   var isCompact: Bool { hSizeClass != .regular }
+
+  var clearDialogTitle: String {
+	switch clearDialogReason {
+	case .local:
+	  return LocalizationSupport.localized("Clear board?")
+	case .remote:
+	  return LocalizationSupport.localized("The other side cleared the board")
+	}
+  }
 
   func usesScrollableViewport(viewSize: CGSize) -> Bool {
 	guard viewSize.width > 0, viewSize.height > 0 else { return isCompact }
@@ -149,32 +162,30 @@ struct WhiteboardView: View {
 	.padding(.top, isMaximized ? 0 : 10)
 	.background(theme.appGrayBackground.opacity(0.35))
 	.confirmationDialog(
-	  LocalizationSupport.localized("Clear board?"),
-	  isPresented: $showClearDialog,
+	  clearDialogTitle,
+	  isPresented: $isClearDialogPresented,
 	  titleVisibility: .visible
 	) {
-	  Button(LocalizationSupport.localized("Save as photo and clear")) {
-		saveBoardAsPhoto()
-		performClear()
-	  }
-	  Button(LocalizationSupport.localized("Clear"), role: .destructive) {
-		performClear()
-	  }
-	  Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
-	}
-	.confirmationDialog(
-	  LocalizationSupport.localized("The other side cleared the board"),
-	  isPresented: $showRemoteClearDialog,
-	  titleVisibility: .visible
-	) {
-	  Button(LocalizationSupport.localized("Save as photo")) {
-		saveBoardAsPhoto(strokesToSave: pendingClearSnapshot)
-		pendingClearSnapshot = []
-		localStrokeColors.removeAll()
-	  }
-	  Button(LocalizationSupport.localized("Dismiss"), role: .cancel) {
-		pendingClearSnapshot = []
-		localStrokeColors.removeAll()
+	  switch clearDialogReason {
+	  case .local:
+		Button(LocalizationSupport.localized("Save as photo and clear")) {
+		  saveBoardAsPhoto()
+		  performClear()
+		}
+		Button(LocalizationSupport.localized("Clear"), role: .destructive) {
+		  performClear()
+		}
+		Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+	  case .remote:
+		Button(LocalizationSupport.localized("Save as photo")) {
+		  saveBoardAsPhoto(strokesToSave: pendingClearSnapshot)
+		  pendingClearSnapshot = []
+		  localStrokeColors.removeAll()
+		}
+		Button(LocalizationSupport.localized("Dismiss"), role: .cancel) {
+		  pendingClearSnapshot = []
+		  localStrokeColors.removeAll()
+		}
 	  }
 	}
 	.onChange(of: strokes) { oldStrokes, newStrokes in
@@ -184,7 +195,8 @@ struct WhiteboardView: View {
 		  localStrokeColors.removeAll()
 		} else {
 		  pendingClearSnapshot = oldStrokes
-		  showRemoteClearDialog = true
+		  clearDialogReason = .remote
+		  isClearDialogPresented = true
 		}
 	  }
 	}
@@ -235,7 +247,8 @@ struct WhiteboardView: View {
 	  }
 
 	  Button {
-		showClearDialog = true
+		clearDialogReason = .local
+		isClearDialogPresented = true
 	  } label: {
 		PlatformIcon(
 		  systemName: "trash",
@@ -804,7 +817,6 @@ private struct BoardGestureLayer: UIViewRepresentable {
 		  case .changed:
 			guard allowPanZoom else { return }
 			let translation = gesture.translation(in: view)
-			logger.info("translation x: \(translation.x), y: \(translation.y)")
 			onPan(CGSize(width: translation.x, height: translation.y))
 			gesture.setTranslation(.zero, in: view)
 		  default:

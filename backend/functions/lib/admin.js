@@ -48,7 +48,7 @@ function serializeDoc(data) {
 }
 // ─── adminDashboardStatus ─────────────────────────────────────────────────────
 exports.adminDashboardStatus = (0, https_1.onCall)(async (req) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     assertAdmin(req);
     const [teachersSnap, rtdbQsSnap, searchingCount, inProgressCount, completedCount, unansweredCount, cancelledCount, userCountSnap, activeLessonsSnap, pendingTeacherUsersSnap,] = await Promise.all([
         db.ref("teachers").once("value"),
@@ -114,13 +114,26 @@ exports.adminDashboardStatus = (0, https_1.onCall)(async (req) => {
         .collection("paymentCheckouts")
         .where("status", "==", "completed")
         .get();
-    const totalRevenueCents = completedPaymentsSnap.docs.reduce((sum, d) => { var _a; return sum + ((_a = d.data().priceCents) !== null && _a !== void 0 ? _a : 0); }, 0);
-    const currencyCount = {};
+    const totalCentsByCurrency = {};
+    let maxPaymentCents = 0;
+    let maxPaymentId = "";
+    const paymentValues = [];
     for (const d of completedPaymentsSnap.docs) {
         const c = d.data().currency || "USD";
-        currencyCount[c] = ((_c = currencyCount[c]) !== null && _c !== void 0 ? _c : 0) + 1;
+        const cents = Number(d.data().priceCents) || 0;
+        totalCentsByCurrency[c] = ((_c = totalCentsByCurrency[c]) !== null && _c !== void 0 ? _c : 0) + cents;
+        paymentValues.push(cents);
+        if (cents > maxPaymentCents) {
+            maxPaymentCents = cents;
+            maxPaymentId = d.id;
+        }
     }
-    const revenueCurrency = (_e = (_d = Object.entries(currencyCount).sort((a, b) => b[1] - a[1])[0]) === null || _d === void 0 ? void 0 : _d[0]) !== null && _e !== void 0 ? _e : "USD";
+    const avgPaymentCents = paymentValues.length
+        ? Math.round(paymentValues.reduce((a, b) => a + b, 0) / paymentValues.length)
+        : 0;
+    const sortedCurrencies = Object.entries(totalCentsByCurrency).sort((a, b) => b[1] - a[1]);
+    const revenueCurrency = (_e = (_d = sortedCurrencies[0]) === null || _d === void 0 ? void 0 : _d[0]) !== null && _e !== void 0 ? _e : "USD";
+    const totalRevenueCents = (_g = (_f = sortedCurrencies[0]) === null || _f === void 0 ? void 0 : _f[1]) !== null && _g !== void 0 ? _g : 0;
     const activeLessons = activeLessonsSnap.docs.map((d) => (Object.assign({ id: d.id }, serializeDoc(d.data()))));
     return {
         pendingVerifications: pendingVerificationCount,
@@ -148,7 +161,11 @@ exports.adminDashboardStatus = (0, https_1.onCall)(async (req) => {
         revenue: {
             totalCents: totalRevenueCents,
             currency: revenueCurrency,
+            byCurrency: totalCentsByCurrency,
             completedPayments: completedPaymentsSnap.size,
+            avgPaymentCents,
+            maxPaymentCents,
+            maxPaymentId,
         },
     };
 });
