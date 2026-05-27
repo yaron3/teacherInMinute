@@ -3,6 +3,65 @@ import SwiftUI
 import UIKit
 #endif
 
+enum DrawingTool: CaseIterable, Hashable {
+  case pen, line, triangle, circle, rectangle
+
+  var iconName: String {
+	switch self {
+	case .pen: return "pencil"
+	case .line: return "line.diagonal"
+	case .triangle: return "triangle"
+	case .circle: return "circle"
+	case .rectangle: return "square"
+	}
+  }
+}
+
+enum BoardColor: CaseIterable, Hashable {
+  case `default`, pink, purple, green, orange, teal, red, yellow
+
+  func color(theme: AppTheme) -> Color {
+	switch self {
+	case .default: return theme.appPrimaryText
+	case .pink: return theme.appPink
+	case .purple: return theme.appPurple
+	case .green: return theme.appGreen
+	case .orange: return theme.appOrange
+	case .teal: return theme.appTeal
+	case .red: return theme.red
+	case .yellow: return theme.yellow
+	}
+  }
+
+  static func initial(forRole role: String) -> BoardColor {
+	role.lowercased() == "student" ? .pink : .default
+  }
+}
+
+struct BoardStrokeKey: Hashable {
+  let firstX: Double
+  let firstY: Double
+  let lastX: Double
+  let lastY: Double
+  let count: Int
+
+  init(points: [BoardPoint]) {
+	self.firstX = points.first?.x ?? 0
+	self.firstY = points.first?.y ?? 0
+	self.lastX = points.last?.x ?? 0
+	self.lastY = points.last?.y ?? 0
+	self.count = points.count
+  }
+
+  init(cgPoints: [CGPoint]) {
+	self.firstX = Double(cgPoints.first?.x ?? 0)
+	self.firstY = Double(cgPoints.first?.y ?? 0)
+	self.lastX = Double(cgPoints.last?.x ?? 0)
+	self.lastY = Double(cgPoints.last?.y ?? 0)
+	self.count = cgPoints.count
+  }
+}
+
 struct WhiteboardView: View {
   static let logicalSize = CGSize(width: 2000, height: 2000)
   static let minZoom: CGFloat = 1.0
@@ -17,10 +76,19 @@ struct WhiteboardView: View {
   @Binding var isMaximized: Bool
   
   @State var activeStroke: [CGPoint] = []
+  @State var shapeStartLogical: CGPoint?
   @State var viewport: CGRect = CGRect(origin: .zero, size: WhiteboardView.logicalSize)
   @State var viewportInitialized = false
   @State var isMoveMode = false
   @State var lastMoveDragTranslation: CGSize = .zero
+  @State var selectedTool: DrawingTool = .pen
+  @State var selectedColor: BoardColor
+  @State var showClearDialog = false
+  @State var showColorPicker = false
+  @State var showRemoteClearDialog = false
+  @State var localClearInitiated = false
+  @State var pendingClearSnapshot: [BoardStroke] = []
+  @State var localStrokeColors: [BoardStrokeKey: BoardColor] = [:]
   
   @Environment(\.horizontalSizeClass) var hSizeClass
   @Environment(\.colorScheme) var colorScheme
@@ -32,7 +100,8 @@ struct WhiteboardView: View {
 	onClear: @escaping () -> Void,
 	onViewportChanged: @escaping (CGRect) -> Void = { _ in },
 	peerViewport: CGRect? = nil,
-	isMaximized: Binding<Bool> = .constant(false)
+	isMaximized: Binding<Bool> = .constant(false),
+	role: String = "teacher"
   ) {
 	self.strokes = strokes
 	self.revision = revision
@@ -41,17 +110,11 @@ struct WhiteboardView: View {
 	self.onViewportChanged = onViewportChanged
 	self.peerViewport = peerViewport
 	self._isMaximized = isMaximized
+	self._selectedColor = State(initialValue: BoardColor.initial(forRole: role))
   }
   
   var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
   var isCompact: Bool { hSizeClass != .regular }
-  
-  var visibleStrokes: [[CGPoint]] {
-	let remote = strokes.map { stroke in
-	  stroke.points.map { CGPoint(x: $0.x, y: $0.y) }
-	}
-	return activeStroke.isEmpty ? remote : remote + [activeStroke]
-  }
 
   func usesScrollableViewport(viewSize: CGSize) -> Bool {
 	guard viewSize.width > 0, viewSize.height > 0 else { return isCompact }
@@ -66,9 +129,13 @@ struct WhiteboardView: View {
   }
   
   var body: some View {
-	VStack(alignment: .leading, spacing: 8) {
+	VStack(alignment: .leading, spacing: 6) {
 	  header
-	  
+
+	  if showColorPicker {
+		colorPalettePanel
+	  }
+
 	  GeometryReader { proxy in
 		canvas(viewSize: proxy.size)
 		  .onAppear { initializeViewportIfNeeded(viewSize: proxy.size) }
@@ -81,26 +148,63 @@ struct WhiteboardView: View {
 	}
 	.padding(.top, isMaximized ? 0 : 10)
 	.background(theme.appGrayBackground.opacity(0.35))
-  }
-  
-  var header: some View {
-	HStack {
-	  Text(LocalizationSupport.localized("Board"))
-		.font(.system(size: 13, weight: .bold))
-		.foregroundStyle(theme.appPrimaryText)
-	  
-	  Spacer()
-	  
-	  Button("Clear") {
-		activeStroke.removeAll()
-		onClear()
+	.confirmationDialog(
+	  LocalizationSupport.localized("Clear board?"),
+	  isPresented: $showClearDialog,
+	  titleVisibility: .visible
+	) {
+	  Button(LocalizationSupport.localized("Save as photo and clear")) {
+		saveBoardAsPhoto()
+		performClear()
 	  }
-	  .font(.system(size: 12, weight: .semibold))
-	  .foregroundStyle(theme.appPink)
-	  
+	  Button(LocalizationSupport.localized("Clear"), role: .destructive) {
+		performClear()
+	  }
+	  Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+	}
+	.confirmationDialog(
+	  LocalizationSupport.localized("The other side cleared the board"),
+	  isPresented: $showRemoteClearDialog,
+	  titleVisibility: .visible
+	) {
+	  Button(LocalizationSupport.localized("Save as photo")) {
+		saveBoardAsPhoto(strokesToSave: pendingClearSnapshot)
+		pendingClearSnapshot = []
+		localStrokeColors.removeAll()
+	  }
+	  Button(LocalizationSupport.localized("Dismiss"), role: .cancel) {
+		pendingClearSnapshot = []
+		localStrokeColors.removeAll()
+	  }
+	}
+	.onChange(of: strokes) { oldStrokes, newStrokes in
+	  if !oldStrokes.isEmpty && newStrokes.isEmpty {
+		if localClearInitiated {
+		  localClearInitiated = false
+		  localStrokeColors.removeAll()
+		} else {
+		  pendingClearSnapshot = oldStrokes
+		  showRemoteClearDialog = true
+		}
+	  }
+	}
+  }
+
+  var header: some View {
+	HStack(spacing: 4) {
+	  ForEach(DrawingTool.allCases, id: \.self) { tool in
+		toolButton(tool)
+	  }
+
+	  colorPickerButton
+		.padding(.leading, 6)
+
+	  Spacer()
+
 	  if isCompact {
 		Button {
 		  activeStroke.removeAll()
+		  shapeStartLogical = nil
 		  lastMoveDragTranslation = .zero
 		  isMoveMode.toggle()
 		} label: {
@@ -115,8 +219,7 @@ struct WhiteboardView: View {
 		  .clipShape(Circle())
 		}
 		.buttonStyle(.plain)
-		.padding(.leading, 4)
-		
+
 		Button {
 		  isMaximized.toggle()
 		} label: {
@@ -129,18 +232,199 @@ struct WhiteboardView: View {
 		  .frame(width: 28, height: 28)
 		}
 		.buttonStyle(.plain)
-		.padding(.leading, 4)
+	  }
+
+	  Button {
+		showClearDialog = true
+	  } label: {
+		PlatformIcon(
+		  systemName: "trash",
+		  size: 14,
+		  weight: .semibold,
+		  color: theme.appPink
+		)
+		.frame(width: 28, height: 28)
+	  }
+	  .buttonStyle(.plain)
+	}
+	.padding(.horizontal, 12)
+  }
+
+  var colorPickerButton: some View {
+	Button {
+	  showColorPicker.toggle()
+	} label: {
+	  Circle()
+		.fill(selectedColor.color(theme: theme))
+		.frame(width: 24, height: 24)
+		.overlay(
+		  Circle().stroke(theme.appBorder, lineWidth: 1.5)
+		)
+	}
+	.buttonStyle(.plain)
+  }
+
+  var colorPalettePanel: some View {
+	HStack(spacing: 10) {
+	  ForEach(BoardColor.allCases, id: \.self) { color in
+		Button {
+		  selectedColor = color
+		  showColorPicker = false
+		} label: {
+		  Circle()
+			.fill(color.color(theme: theme))
+			.frame(width: 28, height: 28)
+			.overlay(
+			  Circle().stroke(
+				selectedColor == color ? theme.appPink : theme.appBorder,
+				lineWidth: selectedColor == color ? 2.5 : 1
+			  )
+			)
+		}
+		.buttonStyle(.plain)
+	  }
+	  Spacer()
+	}
+	.padding(.horizontal, 12)
+	.padding(.vertical, 6)
+	.background(theme.appCardBackground)
+	.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+	.overlay(
+	  RoundedRectangle(cornerRadius: 10, style: .continuous)
+		.stroke(theme.appBorder, lineWidth: 0.5)
+	)
+	.padding(.horizontal, 12)
+  }
+
+  func toolButton(_ tool: DrawingTool) -> some View {
+	let isActive = selectedTool == tool && !isMoveMode
+	return Button {
+	  selectedTool = tool
+	  activeStroke.removeAll()
+	  shapeStartLogical = nil
+	  if isMoveMode {
+		isMoveMode = false
+		lastMoveDragTranslation = .zero
+	  }
+	} label: {
+	  PlatformIcon(
+		systemName: tool.iconName,
+		size: 14,
+		weight: .semibold,
+		color: isActive ? theme.white : theme.appPrimaryText
+	  )
+	  .frame(width: 28, height: 28)
+	  .background(isActive ? theme.appPink : Color.clear)
+	  .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+	}
+	.buttonStyle(.plain)
+  }
+
+  func performClear() {
+	activeStroke.removeAll()
+	shapeStartLogical = nil
+	localStrokeColors.removeAll()
+	localClearInitiated = true
+	onClear()
+  }
+
+  func colorForStroke(_ stroke: BoardStroke) -> Color {
+	let key = BoardStrokeKey(points: stroke.points)
+	if let bc = localStrokeColors[key] {
+	  return bc.color(theme: theme)
+	}
+	return theme.appPrimaryText
+  }
+
+  func recordLocalColor(for points: [CGPoint]) {
+	let key = BoardStrokeKey(cgPoints: points)
+	localStrokeColors[key] = selectedColor
+  }
+
+  func saveBoardAsPhoto(strokesToSave: [BoardStroke]? = nil) {
+#if canImport(UIKit) && !os(Android)
+	let renderSize = CGSize(width: 1080, height: 1080)
+	let defaultColor = theme.appPrimaryText
+	let background = theme.appCardBackground
+	let logical = Self.logicalSize
+	let strokesSnapshot = strokesToSave ?? strokes
+	let colorMap = localStrokeColors
+	let currentTheme = theme
+
+	let snapshot = ZStack {
+	  background
+	  ForEach(strokesSnapshot.indices, id: \.self) { idx in
+		let stroke = strokesSnapshot[idx]
+		let key = BoardStrokeKey(points: stroke.points)
+		let strokeColor = colorMap[key]?.color(theme: currentTheme) ?? defaultColor
+		Path { path in
+		  let pts = stroke.points.map { p in
+			CGPoint(
+			  x: p.x * renderSize.width / logical.width,
+			  y: p.y * renderSize.height / logical.height
+			)
+		  }
+		  guard let first = pts.first else { return }
+		  path.move(to: first)
+		  for pt in pts.dropFirst() { path.addLine(to: pt) }
+		}
+		.stroke(strokeColor, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
 	  }
 	}
-	.padding(.horizontal, 16)
+	.frame(width: renderSize.width, height: renderSize.height)
+
+	let renderer = ImageRenderer(content: snapshot)
+	renderer.scale = UIScreen.main.scale
+	if let image = renderer.uiImage {
+	  UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+	}
+#endif
+  }
+
+  func shapePoints(from start: CGPoint, to end: CGPoint, tool: DrawingTool) -> [CGPoint] {
+	switch tool {
+	case .pen, .line:
+	  return [start, end]
+	case .rectangle:
+	  return [
+		start,
+		CGPoint(x: end.x, y: start.y),
+		end,
+		CGPoint(x: start.x, y: end.y),
+		start
+	  ]
+	case .triangle:
+	  let midX = (start.x + end.x) / 2
+	  return [
+		CGPoint(x: midX, y: start.y),
+		CGPoint(x: end.x, y: end.y),
+		CGPoint(x: start.x, y: end.y),
+		CGPoint(x: midX, y: start.y)
+	  ]
+	case .circle:
+	  let cx = (start.x + end.x) / 2
+	  let cy = (start.y + end.y) / 2
+	  let rx = abs(end.x - start.x) / 2
+	  let ry = abs(end.y - start.y) / 2
+	  let segments = 48
+	  var points: [CGPoint] = []
+	  for i in 0...segments {
+		let theta = Double(i) * 2 * .pi / Double(segments)
+		points.append(CGPoint(
+		  x: cx + rx * CGFloat(cos(theta)),
+		  y: cy + ry * CGFloat(sin(theta))
+		))
+	  }
+	  return points
+	}
   }
   
   @ViewBuilder
   func canvas(viewSize: CGSize) -> some View {
 	ZStack {
 	  theme.appCardBackground
-	  
-	  if visibleStrokes.isEmpty {
+
+	  if strokes.isEmpty && activeStroke.isEmpty {
 		VStack(spacing: 8) {
 		  PlatformIcon(systemName: "pencil", size: 22, weight: .semibold, color: theme.appSecondaryText)
 		  Text(LocalizationSupport.localized("Use your finger to write or sketch."))
@@ -148,19 +432,33 @@ struct WhiteboardView: View {
 			.foregroundStyle(theme.appSecondaryText)
 		}
 	  }
-	  
-	  ForEach(visibleStrokes.indices, id: \.self) { index in
+
+	  ForEach(strokes.indices, id: \.self) { index in
 		Path { path in
-		  let points = visibleStrokes[index].map { logicalToView($0, viewSize: viewSize) }
+		  let points = strokes[index].points
+			.map { CGPoint(x: $0.x, y: $0.y) }
+			.map { logicalToView($0, viewSize: viewSize) }
 		  guard let first = points.first else { return }
 		  path.move(to: first)
 		  for point in points.dropFirst() {
 			path.addLine(to: point)
 		  }
 		}
-		.stroke(theme.appPrimaryText, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+		.stroke(colorForStroke(strokes[index]), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
 	  }
-	  
+
+	  if !activeStroke.isEmpty {
+		Path { path in
+		  let points = activeStroke.map { logicalToView($0, viewSize: viewSize) }
+		  guard let first = points.first else { return }
+		  path.move(to: first)
+		  for point in points.dropFirst() {
+			path.addLine(to: point)
+		  }
+		}
+		.stroke(selectedColor.color(theme: theme), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+	  }
+
       if let peerViewport, !isCompact {
 		let rect = logicalRectToView(peerViewport, viewSize: viewSize)
 		Rectangle()
@@ -190,20 +488,32 @@ struct WhiteboardView: View {
 	  isMoveMode: isMoveMode,
 	  onDrawBegin: { viewPoint in
 		let logical = viewToLogical(viewPoint, viewSize: viewSize)
-		activeStroke = [logical]
+		if selectedTool == .pen {
+		  activeStroke = [logical]
+		} else {
+		  shapeStartLogical = logical
+		  activeStroke = [logical]
+		}
 	  },
 	  onDrawChanged: { viewPoint in
 		let logical = viewToLogical(viewPoint, viewSize: viewSize)
-		activeStroke = activeStroke + [logical]
+		if selectedTool == .pen {
+		  activeStroke = activeStroke + [logical]
+		} else if let start = shapeStartLogical {
+		  activeStroke = shapePoints(from: start, to: logical, tool: selectedTool)
+		}
 	  },
 	  onDrawEnded: {
 		let completed = activeStroke
 		activeStroke.removeAll()
-		guard !completed.isEmpty else { return }
+		shapeStartLogical = nil
+		guard completed.count > 1 else { return }
+		recordLocalColor(for: completed)
 		onStrokeFinished(completed)
 	  },
 	  onDrawCancelled: {
 		activeStroke.removeAll()
+		shapeStartLogical = nil
 	  },
 	  onPan: { translation in
 		applyPan(translation: translation, viewSize: viewSize)
@@ -227,25 +537,38 @@ struct WhiteboardView: View {
 			  applyPan(translation: delta, viewSize: viewSize)
 			  return
 			}
-			
+
 			let clamped = CGPoint(
 			  x: min(max(value.location.x, 0), viewSize.width),
 			  y: min(max(value.location.y, 0), viewSize.height)
 			)
 			let logical = viewToLogical(clamped, viewSize: viewSize)
-			if activeStroke.isEmpty {
-			  activeStroke = [logical]
+			if selectedTool == .pen {
+			  if activeStroke.isEmpty {
+				activeStroke = [logical]
+			  } else {
+				activeStroke = activeStroke + [logical]
+			  }
 			} else {
-			  activeStroke = activeStroke + [logical]
+			  if shapeStartLogical == nil {
+				shapeStartLogical = logical
+				activeStroke = [logical]
+			  } else if let start = shapeStartLogical {
+				activeStroke = shapePoints(from: start, to: logical, tool: selectedTool)
+			  }
 			}
 		  }
 		  .onEnded { _ in
 			lastMoveDragTranslation = .zero
-			guard !isMoveMode else { return }
-			
+			guard !isMoveMode else {
+			  return
+			}
+
 			let completed = activeStroke
 			activeStroke.removeAll()
-			guard !completed.isEmpty else { return }
+			shapeStartLogical = nil
+			guard completed.count > 1 else { return }
+			recordLocalColor(for: completed)
 			onStrokeFinished(completed)
 		  }
 	  )

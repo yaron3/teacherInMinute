@@ -126,8 +126,12 @@ struct PlatformIcon: View {
 	  case "clock.badge.checkmark.fill":		return "⏰"
 	  case "pencil.and.list.clipboard":			return "📝"
 	  case "person.crop.rectangle":				return "👤"
-		
-		
+		  case "triangle":							return "▲"
+		  case "circle":							return "○"
+		  case "line.diagonal":						return "╱"
+		  case "trash":							return "🗑"
+
+
 	  default:
 		logger.error("!!! icon: \(systemName) is missing !!!")
 		return "●"

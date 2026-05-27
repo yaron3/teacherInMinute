@@ -303,7 +303,8 @@ struct ChatSessionView: View {
         viewModel.updateBoardViewport(viewport)
       },
       peerViewport: peerBoardViewport,
-      isMaximized: $isBoardMaximized
+      isMaximized: $isBoardMaximized,
+      role: viewModel.role
     )
   }
 
