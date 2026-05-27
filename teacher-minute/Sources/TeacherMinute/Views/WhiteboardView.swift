@@ -4,7 +4,7 @@ import UIKit
 #endif
 
 struct WhiteboardView: View {
-  static let logicalSize = CGSize(width: 2000, height: 1500)
+  static let logicalSize = CGSize(width: 2000, height: 2000)
   static let minZoom: CGFloat = 1.0
   static let maxZoom: CGFloat = 6.0
   
@@ -19,6 +19,8 @@ struct WhiteboardView: View {
   @State var activeStroke: [CGPoint] = []
   @State var viewport: CGRect = CGRect(origin: .zero, size: WhiteboardView.logicalSize)
   @State var viewportInitialized = false
+  @State var isMoveMode = false
+  @State var lastMoveDragTranslation: CGSize = .zero
   
   @Environment(\.horizontalSizeClass) var hSizeClass
   @Environment(\.colorScheme) var colorScheme
@@ -50,6 +52,18 @@ struct WhiteboardView: View {
 	}
 	return activeStroke.isEmpty ? remote : remote + [activeStroke]
   }
+
+  func usesScrollableViewport(viewSize: CGSize) -> Bool {
+	guard viewSize.width > 0, viewSize.height > 0 else { return isCompact }
+	let shortSide = min(viewSize.width, viewSize.height)
+	return isCompact || shortSide < 700
+  }
+  
+  var logicalBounds: CGRect {
+	let base = CGRect(origin: .zero, size: Self.logicalSize)
+	guard let peerViewport else { return base }
+	return base.union(peerViewport)
+  }
   
   var body: some View {
 	VStack(alignment: .leading, spacing: 8) {
@@ -62,8 +76,8 @@ struct WhiteboardView: View {
 			initializeViewportIfNeeded(viewSize: newSize, force: true)
 		  }
 	  }
-	  .padding(.horizontal, isMaximized ? 0 : 16)
-	  .padding(.bottom, isMaximized ? 0 : 14)
+	  .padding(.horizontal, isMaximized ? 0 : 4)
+	  .padding(.bottom, isMaximized ? 0 : 6)
 	}
 	.padding(.top, isMaximized ? 0 : 10)
 	.background(theme.appGrayBackground.opacity(0.35))
@@ -85,6 +99,24 @@ struct WhiteboardView: View {
 	  .foregroundStyle(theme.appPink)
 	  
 	  if isCompact {
+		Button {
+		  activeStroke.removeAll()
+		  lastMoveDragTranslation = .zero
+		  isMoveMode.toggle()
+		} label: {
+		  PlatformIcon(
+			systemName: "hand.raised.fill",
+			size: 14,
+			weight: .semibold,
+			color: isMoveMode ? theme.white : theme.appPrimaryText
+		  )
+		  .frame(width: 28, height: 28)
+		  .background(isMoveMode ? theme.appPink : Color.clear)
+		  .clipShape(Circle())
+		}
+		.buttonStyle(.plain)
+		.padding(.leading, 4)
+		
 		Button {
 		  isMaximized.toggle()
 		} label: {
@@ -151,10 +183,11 @@ struct WhiteboardView: View {
   }
   
   @ViewBuilder
-  func gestureLayer(viewSize: CGSize) -> some View {
+	func gestureLayer(viewSize: CGSize) -> some View {
 #if canImport(UIKit) && !os(Android)
 	BoardGestureLayer(
-	  allowPanZoom: isCompact,
+	  allowPanZoom: usesScrollableViewport(viewSize: viewSize),
+	  isMoveMode: isMoveMode,
 	  onDrawBegin: { viewPoint in
 		let logical = viewToLogical(viewPoint, viewSize: viewSize)
 		activeStroke = [logical]
@@ -185,6 +218,16 @@ struct WhiteboardView: View {
 	  .gesture(
 		DragGesture(minimumDistance: 0)
 		  .onChanged { value in
+			if isMoveMode {
+			  let delta = CGSize(
+				width: value.translation.width - lastMoveDragTranslation.width,
+				height: value.translation.height - lastMoveDragTranslation.height
+			  )
+			  lastMoveDragTranslation = value.translation
+			  applyPan(translation: delta, viewSize: viewSize)
+			  return
+			}
+			
 			let clamped = CGPoint(
 			  x: min(max(value.location.x, 0), viewSize.width),
 			  y: min(max(value.location.y, 0), viewSize.height)
@@ -197,6 +240,9 @@ struct WhiteboardView: View {
 			}
 		  }
 		  .onEnded { _ in
+			lastMoveDragTranslation = .zero
+			guard !isMoveMode else { return }
+			
 			let completed = activeStroke
 			activeStroke.removeAll()
 			guard !completed.isEmpty else { return }
@@ -243,17 +289,25 @@ struct WhiteboardView: View {
 	viewportInitialized = true
 	
 	let logical = Self.logicalSize
+	let bounds = logicalBounds
 	let viewAspect = viewSize.width / viewSize.height
 	let boardAspect = logical.width / logical.height
 	
 	let viewportSize: CGSize
-	if isCompact {
-	  // Phone: fit the board height inside the view so the user can see top-to-bottom,
-	  // panning horizontally if board is wider than aspect.
+	if usesScrollableViewport(viewSize: viewSize) {
+	  // Keep the visible board window smaller than the full board on both axes
+	  // so move mode can pan vertically as well as horizontally.
+	  let moveModeScale: CGFloat = 0.45
 	  if viewAspect > boardAspect {
-		viewportSize = CGSize(width: logical.width, height: logical.width / viewAspect)
+		viewportSize = CGSize(
+		  width: logical.width * moveModeScale,
+		  height: logical.width * moveModeScale / viewAspect
+		)
 	  } else {
-		viewportSize = CGSize(width: logical.height * viewAspect, height: logical.height)
+		viewportSize = CGSize(
+		  width: logical.height * moveModeScale * viewAspect,
+		  height: logical.height * moveModeScale
+		)
 	  }
 	} else {
 	  // iPad / regular size class: show full board letterboxed.
@@ -264,9 +318,14 @@ struct WhiteboardView: View {
 	  }
 	}
 	
+	let viewportOriginY: CGFloat = usesScrollableViewport(viewSize: viewSize)
+	  ? bounds.minY
+	  : (logical.height - viewportSize.height) / 2
 	viewport = CGRect(
-	  x: (logical.width - viewportSize.width) / 2,
-	  y: (logical.height - viewportSize.height) / 2,
+	  x: usesScrollableViewport(viewSize: viewSize)
+		? bounds.midX - viewportSize.width / 2
+		: (logical.width - viewportSize.width) / 2,
+	  y: viewportOriginY,
 	  width: viewportSize.width,
 	  height: viewportSize.height
 	)
@@ -274,7 +333,7 @@ struct WhiteboardView: View {
   }
   
   func applyPan(translation: CGSize, viewSize: CGSize) {
-	guard isCompact, viewSize.width > 0, viewSize.height > 0 else { return }
+	guard usesScrollableViewport(viewSize: viewSize), viewSize.width > 0, viewSize.height > 0 else { return }
 	let dxLogical = -translation.width * viewport.width / viewSize.width
 	let dyLogical = -translation.height * viewport.height / viewSize.height
 	let proposed = CGRect(
@@ -288,7 +347,7 @@ struct WhiteboardView: View {
   }
   
   func applyPinch(scale: CGFloat, center: CGPoint, viewSize: CGSize) {
-	guard isCompact, viewSize.width > 0, viewSize.height > 0 else { return }
+	guard usesScrollableViewport(viewSize: viewSize), viewSize.width > 0, viewSize.height > 0 else { return }
 	let logical = Self.logicalSize
 	let currentZoom = logical.width / viewport.width
 	let targetZoom = max(Self.minZoom, min(Self.maxZoom, currentZoom * scale))
@@ -310,12 +369,12 @@ struct WhiteboardView: View {
   }
   
   func clampedViewport(_ rect: CGRect) -> CGRect {
-	let logical = Self.logicalSize
+	let bounds = logicalBounds
 	var r = rect
-	let maxX = max(0, logical.width - r.width)
-	let maxY = max(0, logical.height - r.height)
-	r.origin.x = min(max(r.origin.x, 0), maxX)
-	r.origin.y = min(max(r.origin.y, 0), maxY)
+	let maxX = max(bounds.minX, bounds.maxX - r.width)
+	let maxY = max(bounds.minY, bounds.maxY - r.height)
+	r.origin.x = min(max(r.origin.x, bounds.minX), maxX)
+	r.origin.y = min(max(r.origin.y, bounds.minY), maxY)
 	return r
   }
 }
@@ -323,6 +382,7 @@ struct WhiteboardView: View {
 #if canImport(UIKit) && !os(Android)
 private struct BoardGestureLayer: UIViewRepresentable {
   let allowPanZoom: Bool
+  let isMoveMode: Bool
   let onDrawBegin: (CGPoint) -> Void
   let onDrawChanged: (CGPoint) -> Void
   let onDrawEnded: () -> Void
@@ -371,6 +431,7 @@ private struct BoardGestureLayer: UIViewRepresentable {
   
   func updateUIView(_ uiView: UIView, context: Context) {
 	context.coordinator.allowPanZoom = allowPanZoom
+	context.coordinator.isMoveMode = isMoveMode
 	context.coordinator.onDrawBegin = onDrawBegin
 	context.coordinator.onDrawChanged = onDrawChanged
 	context.coordinator.onDrawEnded = onDrawEnded
@@ -383,6 +444,7 @@ private struct BoardGestureLayer: UIViewRepresentable {
   
   final class Coordinator: NSObject, UIGestureRecognizerDelegate {
 	var allowPanZoom: Bool = true
+	var isMoveMode: Bool = false
 	var onDrawBegin: (CGPoint) -> Void
 	var onDrawChanged: (CGPoint) -> Void
 	var onDrawEnded: () -> Void
@@ -411,6 +473,23 @@ private struct BoardGestureLayer: UIViewRepresentable {
 	
 	@objc func handleDraw(_ gesture: UIPanGestureRecognizer) {
 	  guard let view = gesture.view else { return }
+	  if isMoveMode {
+		switch gesture.state {
+		  case .began:
+			onDrawCancelled()
+			gesture.setTranslation(.zero, in: view)
+		  case .changed:
+			guard allowPanZoom else { return }
+			let translation = gesture.translation(in: view)
+			logger.info("translation x: \(translation.x), y: \(translation.y)")
+			onPan(CGSize(width: translation.x, height: translation.y))
+			gesture.setTranslation(.zero, in: view)
+		  default:
+			break
+		}
+		return
+	  }
+	  
 	  let point = gesture.location(in: view)
 	  switch gesture.state {
 		case .began:
