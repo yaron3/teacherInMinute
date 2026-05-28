@@ -418,7 +418,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
         do {
           let result = try await currentQuestionStatus(questionId: questionId)
           let status = result.status.lowercased()
-		  logger.info("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
+          logger.info("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
 
           if isAcceptedStatus(status) {
             let room = result.liveKitRoom ?? ""
@@ -428,7 +428,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
               try? await Task.sleep(nanoseconds: 1_000_000_000)
               continue
             }
-			self.questionId = result.questionId
+            self.questionId = result.questionId
             searchState = .matched(
               questionId: questionId,
               liveKitRoom: room,
@@ -443,12 +443,17 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
           case "cancelled", "canceled", "expired":
             searchState = .noMatch
             return
+          case "completed":
+            // Completed without an AI answer means the question was force-ended
+            // or cancelled server-side before a teacher connected.
+            searchState = .noMatch
+            return
           default:
             break
           }
         } catch {
           guard !Task.isCancelled else { return }
-		  logger.error("TeacherMinute questionStatus polling error=\(error)")
+          logger.error("TeacherMinute questionStatus polling error=\(error)")
         }
 
         try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -466,7 +471,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     if let realtimeResult = try? await QuestionStatusStore.fetch(questionId: questionId) {
       let realtimeStatus = realtimeResult.status.lowercased()
       if isAcceptedStatus(realtimeStatus) || realtimeStatus == "cancelled" || realtimeStatus == "canceled" {
-		logger.info("TeacherMinute questionStatus realtimeOverride questionId=\(questionId) status=\(realtimeResult.status)")
+        logger.info("TeacherMinute questionStatus realtimeOverride questionId=\(questionId) status=\(realtimeResult.status)")
         return realtimeResult
       }
     }

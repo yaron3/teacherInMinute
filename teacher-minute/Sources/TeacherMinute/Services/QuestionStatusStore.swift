@@ -23,7 +23,9 @@ enum QuestionStatusStore {
       status: status,
       liveKitRoom: row["liveKitRoom"] as? String,
       liveKitToken: row["liveKitToken"] as? String,
-      questionId: firstString(in: row, keys: ["questionId", "questionID", "id"])
+      questionId: firstString(in: row, keys: ["questionId", "questionID", "id"]),
+      aiAnswer: row["aiAnswer"] as? String,
+      aiAnswered: row["aiAnswered"] as? Bool ?? false
     )
 #else
     let ref = FirebaseDatabase.Database.database().reference(withPath: "questions/\(questionId)")
@@ -41,7 +43,9 @@ enum QuestionStatusStore {
             status: status,
             liveKitRoom: dict["liveKitRoom"] as? String,
             liveKitToken: dict["liveKitToken"] as? String,
-            questionId: firstString(in: dict, keys: ["questionId", "questionID", "id"])
+            questionId: firstString(in: dict, keys: ["questionId", "questionID", "id"]),
+            aiAnswer: dict["aiAnswer"] as? String,
+            aiAnswered: dict["aiAnswered"] as? Bool ?? false
           )
         )
       } withCancel: { error in

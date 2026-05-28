@@ -89,12 +89,16 @@ struct CompleteProfileView: View {
 	  .padding(.horizontal, 18)
 	  .background(Color(.systemBackground))
 	  .navigationBarTitleDisplayMode(.inline)
-	  .onAppear {
-		viewModel.onContinue = {
-		  router.enterMainTabs(role: viewModel.role)
-		}
-		viewModel.checkAndAutoAdvance()
-	  }
+		  .onAppear {
+			viewModel.onContinue = {
+			  if viewModel.shouldShowPermissionsOnContinue && PermissionsSetupStore.shouldShowForCurrentUser() {
+				router.replace(with: .permissionsSetup(role: viewModel.role))
+			  } else {
+				router.enterMainTabs(role: viewModel.role)
+			  }
+			}
+			viewModel.checkAndAutoAdvance()
+		  }
 	  .navigationTitle(LocalizationSupport.localized("Complete your profile"))
 	  .onChange(of: viewModel.dateOfBirth) { _, _ in
 		viewModel.suggestGradeFromDOB()

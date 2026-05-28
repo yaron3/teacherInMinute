@@ -66,6 +66,7 @@ struct MainTabView: View {
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
         .task {
+            print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
             PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
         }
     }

@@ -45,6 +45,8 @@ export async function getAccessToken(): Promise<string> {
   return cachedToken.token;
 }
 
+export type PaymentSource = "paypal" | "apple_pay" | "google_pay";
+
 export interface CreateOrderParams {
   amountCents: number;
   currency: string;
@@ -53,6 +55,7 @@ export interface CreateOrderParams {
   sessionId: string;
   returnUrl: string;
   cancelUrl: string;
+  paymentSource?: PaymentSource;
 }
 
 export interface PayPalLink {
@@ -72,6 +75,32 @@ export async function createOrder(params: CreateOrderParams): Promise<PayPalOrde
   const token = await getAccessToken();
   const value = (params.amountCents / 100).toFixed(2);
 
+  const source = params.paymentSource ?? "paypal";
+  let paymentSourceBody: Record<string, unknown>;
+  if (source === "apple_pay") {
+    paymentSourceBody = {
+      apple_pay: {
+        experience_context: { return_url: params.returnUrl, cancel_url: params.cancelUrl },
+      },
+    };
+  } else if (source === "google_pay") {
+    paymentSourceBody = {
+      google_pay: {
+        experience_context: { return_url: params.returnUrl, cancel_url: params.cancelUrl },
+      },
+    };
+  } else {
+    paymentSourceBody = {
+      paypal: {
+        experience_context: {
+          return_url: params.returnUrl,
+          cancel_url: params.cancelUrl,
+          user_action: "PAY_NOW",
+        },
+      },
+    };
+  }
+
   const orderBody = {
     intent: "CAPTURE",
     purchase_units: [
@@ -82,15 +111,7 @@ export async function createOrder(params: CreateOrderParams): Promise<PayPalOrde
         description: params.description,
       },
     ],
-    payment_source: {
-      paypal: {
-        experience_context: {
-          return_url: params.returnUrl,
-          cancel_url: params.cancelUrl,
-          user_action: "PAY_NOW",
-        },
-      },
-    },
+    payment_source: paymentSourceBody,
   };
 
   logger.info(

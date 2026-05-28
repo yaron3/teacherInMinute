@@ -170,7 +170,7 @@ final class CreateAccountViewModel {
 	}
 #endif
 #if os(Android)
-		print("Android Google sign-up tapped")
+		logger.info("Android Google sign-up tapped")
 		Task {
 		  do {
 			_ = try await AndroidGoogleAuth().signIn()
@@ -202,7 +202,7 @@ final class CreateAccountViewModel {
 		  }
 		}
 #elseif os(Android)
-		print("Android Apple sign-up tapped")
+		logger.info("Android Apple sign-up tapped")
 		Task {
 		  do {
 			_ = try await AndroidAppleAuth().signIn()

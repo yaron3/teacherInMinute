@@ -452,12 +452,26 @@ struct NotificationPreferencesSettingsView: View {
     @AppStorage("notifyIncomingTeacherMessage") var notifyIncomingTeacherMessage = true
     @AppStorage("notifyGeneralAnnouncements") var notifyGeneralAnnouncements = true
     @AppStorage("appearanceMode") var appearanceMode = "system"
+    @State var notificationState: PermissionState = .notDetermined
+    @State var isRequesting = false
 
     var body: some View {
         Form {
+            Section(header: Text(LocalizationSupport.localized("System Permission"))) {
+                HStack {
+                    Text(LocalizationSupport.localized("Push Notifications"))
+                    Spacer()
+                    Text(notificationState.subtitle)
+                        .foregroundStyle(.secondary)
+                }
+                actionButton
+            }
+
             Section(header: Text(LocalizationSupport.localized("Notifications"))) {
                 Toggle(LocalizationSupport.localized("Notify me when a teacher sends an incoming message"), isOn: $notifyIncomingTeacherMessage)
+                    .disabled(!notificationState.isGranted)
                 Toggle(LocalizationSupport.localized("Notify me about general announcements"), isOn: $notifyGeneralAnnouncements)
+                    .disabled(!notificationState.isGranted)
             }
 
             Section(header: Text(LocalizationSupport.localized("Appearance"))) {
@@ -469,6 +483,44 @@ struct NotificationPreferencesSettingsView: View {
                 .pickerStyle(.segmented)
             }
         }
+        .task {
+            notificationState = await PermissionService.shared.notificationStatus()
+            if notificationState == .notDetermined {
+                await requestNotifications()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionButton: some View {
+        switch notificationState {
+        case .notDetermined:
+            Button {
+                Task { await requestNotifications() }
+            } label: {
+                HStack {
+                    Text(LocalizationSupport.localized("Enable Notifications"))
+                    Spacer()
+                    if isRequesting {
+                        ProgressView().scaleEffect(0.8)
+                    }
+                }
+            }
+            .disabled(isRequesting)
+        case .denied:
+            Button(LocalizationSupport.localized("Open System Settings")) {
+                PermissionService.shared.openAppSettings()
+            }
+        case .granted:
+            EmptyView()
+        }
+    }
+
+    private func requestNotifications() async {
+        isRequesting = true
+        defer { isRequesting = false }
+        let result = await PermissionService.shared.requestNotifications()
+        notificationState = result
     }
 }
 

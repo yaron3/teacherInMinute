@@ -29,6 +29,7 @@ final class CompleteProfileViewModel {
   var isCheckingCompletion = true
   var showMissingPayoutInfoConfirmation = false
   var errorMessage: String?
+  var shouldShowPermissionsOnContinue = true
   var onContinue: (() -> Void)?
   
   let grades: [String] = (1...12).map { LocalizationSupport.localized("Grade \($0)") } + [LocalizationSupport.localized("College"), LocalizationSupport.localized("Adult Learner")]
@@ -68,7 +69,8 @@ final class CompleteProfileViewModel {
 			phoneNumber = savedPhone
 			grade       = data["grade"]       as? String ?? ""
 			paypalEmail = data["paypalEmail"] as? String ?? ""
-			onContinue?()
+				shouldShowPermissionsOnContinue = false
+				onContinue?()
 	  } else {
 			if fullName.isEmpty {
 			  if hasName {
@@ -218,9 +220,10 @@ final class CompleteProfileViewModel {
 		  "role": role.rawValue,
 		  "has_grade": !grade.isEmpty,
 		  "has_paypal": !paypalEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-		])
-		isLoading = false
-		onContinue?()
+			])
+			isLoading = false
+			shouldShowPermissionsOnContinue = true
+			onContinue?()
 	  } catch {
 		AnalyticsService.shared.recordError(error, context: "saveProfile")
 		errorMessage = error.localizedDescription

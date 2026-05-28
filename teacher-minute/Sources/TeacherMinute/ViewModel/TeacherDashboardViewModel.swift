@@ -378,7 +378,7 @@ final class TeacherDashboardViewModel {
         "question_id": questionId,
         "price_per_minute_cents": activePricePerMinuteCents
       ])
-      print("TeacherMinute teacherAccept tapped questionId=\(questionId)")
+      logger.info("TeacherMinute teacherAccept tapped questionId=\(questionId)")
       logger.info("[VM] acceptInvite tapped — questionId=\(questionId) conversationType=\(conversationType)")
 
       do {

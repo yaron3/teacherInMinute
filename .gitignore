@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# TypeScript build output
+lib/
+dist/
+build/
+*.js.map
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*firebase-adminsdk*.json
+
+# Firebase tooling
+.firebase/
+.firebaserc
+
+# IDE / editor
+.vscode/
+.idea/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+
+# Claude Code
+.claude/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Xcode derived data / archives
+DerivedData/
+*.xcarchive
+teacher-minute/TeacherMinute App */

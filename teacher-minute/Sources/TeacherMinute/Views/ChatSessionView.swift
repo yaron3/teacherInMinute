@@ -152,6 +152,9 @@ struct ChatSessionView: View {
             currentRole: viewModel.role
           )
         }
+        if newIncomingMessages.contains(where: { ChatBubble.containsFormula($0.text) }) {
+          dismissChatInput()
+        }
         messages = rows
         didPrimeMessages = true
       }

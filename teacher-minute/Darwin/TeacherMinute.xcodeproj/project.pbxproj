@@ -231,7 +231,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
@@ -243,7 +243,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 0.0.3;
+				MARKETING_VERSION = 0.0.4;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
 			};
@@ -253,7 +253,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
@@ -265,7 +265,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 0.0.3;
+				MARKETING_VERSION = 0.0.4;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
 			};

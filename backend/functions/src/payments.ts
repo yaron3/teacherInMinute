@@ -4,7 +4,7 @@ import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { v4 as uuidv4 } from "uuid";
 
-import { createOrder, captureOrder, verifyWebhookSignature } from "./paypal";
+import { createOrder, captureOrder, verifyWebhookSignature, PaymentSource } from "./paypal";
 import { PricingDoc, PaymentCheckoutDoc } from "./types";
 
 const firestore = admin.firestore();
@@ -38,6 +38,24 @@ export const createCheckoutSession = onCall(async (req) => {
   );
 
   if (!packageId) throw new HttpsError("invalid-argument", "Missing pricing package id");
+
+  const rawWallet = (data.paymentMethod ?? data.preferredPaymentMethod ?? data.wallet) as string | undefined;
+  const rawPlatform = data.platform as string | undefined;
+  const SUPPORTED_WALLETS = ["apple_pay", "google_pay"] as const;
+  let paypalSource: PaymentSource = "paypal";
+  if (rawWallet !== undefined) {
+    if (!(SUPPORTED_WALLETS as readonly string[]).includes(rawWallet)) {
+      throw new HttpsError("invalid-argument", `Unsupported paymentMethod "${rawWallet}"`);
+    }
+    if (rawWallet === "apple_pay" && rawPlatform === "android") {
+      throw new HttpsError("invalid-argument", "Apple Pay is not supported on Android");
+    }
+    if (rawWallet === "apple_pay") {
+      paypalSource = "apple_pay";
+    } else if (rawWallet === "google_pay") {
+      paypalSource = "google_pay";
+    }
+  }
 
   const packageSnap = await firestore.collection("pricing").doc(packageId).get();
   if (!packageSnap.exists) throw new HttpsError("not-found", "Pricing package not found");
@@ -89,6 +107,7 @@ export const createCheckoutSession = onCall(async (req) => {
       sessionId: checkoutId,
       returnUrl,
       cancelUrl,
+      paymentSource: paypalSource,
     });
   } catch (err) {
     logger.error(`[payments] PayPal createOrder failed checkoutId=${checkoutId}`, err);

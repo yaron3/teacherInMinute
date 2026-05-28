@@ -350,43 +350,39 @@ struct StudentHomeView: View {
   
   @ViewBuilder
   var searchStateOverlay: some View {
-	switch viewModel.searchState {
-	  case .idle:
-		EmptyView()
-	  case .error(let message):
-		ErrorOverlay(message: message) {
-		  viewModel.resetSearch()
-		}
-	  case .searching:
-		SearchingOverlay {
-		  Task { await viewModel.cancelSearch() }
-		}
-	  case .matched(let questionId, let liveKitRoom, let liveKitToken):
-		ChatSessionView(
-		  questionId: questionId,
-		  role: "student",
-		  title: LocalizationSupport.localized("Teacher"),
-		  conversationType: viewModel.activeConversationType,
-		  liveKitRoom: liveKitRoom,
-		  liveKitToken: liveKitToken,
-		  initialDetails: viewModel.chatInitialDetails(questionId: questionId)
-		) {
-		  Task {
-			await viewModel.refreshAfterLessonEnded()
-			viewModel.resetSearch()
-		  }
-		}
-		.onAppear {
-		  hidesTabBar = true
-		}
-		.onDisappear {
-		  hidesTabBar = false
-		}
-	  case .noMatch:
-		NoMatchOverlay {
-		  viewModel.resetSearch()
-		}
-	}
+    switch viewModel.searchState {
+    case .idle:
+      EmptyView()
+    case .error(let message):
+      ErrorOverlay(message: message) {
+        viewModel.resetSearch()
+      }
+    case .searching:
+      SearchingOverlay {
+        Task { await viewModel.cancelSearch() }
+      }
+    case .matched(let questionId, let liveKitRoom, let liveKitToken):
+      ChatSessionView(
+        questionId: questionId,
+        role: "student",
+        title: LocalizationSupport.localized("Teacher"),
+        conversationType: viewModel.activeConversationType,
+        liveKitRoom: liveKitRoom,
+        liveKitToken: liveKitToken,
+        initialDetails: viewModel.chatInitialDetails(questionId: questionId)
+      ) {
+        Task {
+          await viewModel.refreshAfterLessonEnded()
+          viewModel.resetSearch()
+        }
+      }
+      .onAppear { hidesTabBar = true }
+      .onDisappear { hidesTabBar = false }
+    case .noMatch:
+      NoMatchOverlay {
+        viewModel.resetSearch()
+      }
+    }
   }
   
   // MARK: - Stats

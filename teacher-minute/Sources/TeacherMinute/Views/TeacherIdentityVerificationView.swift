@@ -282,23 +282,23 @@ struct TeacherIdentityVerificationView: View {
   private func pickAndUploadAndroidImage(for target: UploadTarget) {
 	Task {
 	  do {
-		print("TeacherMinute Android image pick requested target=\(target)")
+		logger.info("TeacherMinute Android image pick requested target=\(target)")
 		let base64 = try await Task.detached(priority: .userInitiated) {
 		  try AndroidImagePickerBridge.pickImageBase64()
 		}.value
-		print("TeacherMinute Android image pick returned target=\(target) base64Length=\(base64.count)")
+		logger.info("TeacherMinute Android image pick returned target=\(target) base64Length=\(base64.count)")
 		guard !base64.isEmpty else {
-		  print("TeacherMinute Android image pick cancelled target=\(target)")
+		  logger.info("TeacherMinute Android image pick cancelled target=\(target)")
 		  return
 		}
 		guard let data = Data(base64Encoded: base64) else {
 		  viewModel.uploadError = LocalizationSupport.localized("Could not read selected image")
 		  return
 		}
-		print("TeacherMinute Android image decoded target=\(target) bytes=\(data.count)")
+		logger.info("TeacherMinute Android image decoded target=\(target) bytes=\(data.count)")
 		viewModel.handlePickedImage(data, for: target)
 	  } catch {
-		print("TeacherMinute Android image pick failed target=\(target) error=\(error)")
+		logger.info("TeacherMinute Android image pick failed target=\(target) error=\(error)")
 		viewModel.uploadError = error.localizedDescription
 	  }
 	}

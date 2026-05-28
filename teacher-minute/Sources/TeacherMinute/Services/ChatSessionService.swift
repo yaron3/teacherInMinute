@@ -166,6 +166,8 @@ final class ChatSessionService {
         guard let snap = child as? DataSnapshot,
               let dict = snap.value as? [String: Any],
               let message = Self.message(from: snap.key, dict: dict, currentUserUid: self.currentUserUid) else { continue }
+		logger.info("[ChatSession] message: \(message.senderRole):\(message.text)")
+
         messages.append(message)
       }
       messages.sort { $0.createdAt < $1.createdAt }
@@ -790,7 +792,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       } catch {
         errorMessage = error.localizedDescription
         onErrorUpdated?(errorMessage)
-        print("Chat send failed: \(error.localizedDescription)")
+		logger.error("[ChatSession] Chat send failed: \(error.localizedDescription)")
       }
     }
   }
@@ -806,7 +808,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       } catch {
         errorMessage = error.localizedDescription
         onErrorUpdated?(errorMessage)
-        print("Board stroke send failed: \(error.localizedDescription)")
+		logger.error("[ChatSession] Board stroke send failed: \(error.localizedDescription)")
       }
     }
   }
@@ -822,7 +824,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       } catch {
         errorMessage = error.localizedDescription
         onErrorUpdated?(errorMessage)
-        print("Board clear failed: \(error.localizedDescription)")
+		logger.error("[ChatSession] Board clear failed: \(error.localizedDescription)")
       }
     }
   }
@@ -832,7 +834,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       do {
         try await service.updateBoardViewport(viewport, role: role)
       } catch {
-        print("Board viewport update failed: \(error.localizedDescription)")
+		logger.error("[ChatSession] Board viewport update failed: \(error.localizedDescription)")
       }
     }
   }
@@ -844,6 +846,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   private func handleRemoteSessionEnded() async {
+	logger.info("[ChatSession] handleRemoteSessionEnded")
     guard didObserveActiveSession || details != nil else { return }
     await reportLessonEnded()
     await LiveKitService.shared.disconnect()

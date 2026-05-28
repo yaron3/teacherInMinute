@@ -15,6 +15,7 @@ enum AppRoute: Hashable {
   case teacherIdentityVerification
   case teacherSubjects
   case completeProfile(role: AuthRole)
+  case permissionsSetup(role: AuthRole)
   case studentHome
   case teacherDashboard
 }

@@ -104,7 +104,7 @@ final class LoginViewModel {
 	}
 #endif
 #if os(Android)
-		print("Android Google login tapped")
+		logger.info("Android Google login tapped")
 		Task {
 		  do {
 			_ = try await AndroidGoogleAuth().signIn()
@@ -152,7 +152,7 @@ final class LoginViewModel {
 	  }
 	}
 #elseif os(Android)
-	print("Android Apple login tapped")
+	logger.info("Android Apple login tapped")
 	Task {
 	  do {
 		_ = try await AndroidAppleAuth().signIn()

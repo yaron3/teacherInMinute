@@ -13,7 +13,7 @@ struct AndroidGoogleAuth {
         let result = try await Task.detached(priority: .userInitiated) {
             try AndroidGoogleSignInBridge.signIn()
         }.value
-        print("Android Google sign-in result: \(result)")
+        logger.info("Android Google sign-in result: \(result)")
         return result
     }
 }

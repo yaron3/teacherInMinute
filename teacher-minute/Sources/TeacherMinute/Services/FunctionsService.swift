@@ -66,6 +66,8 @@ struct QuestionStatusResult {
   let liveKitRoom: String?
   let liveKitToken: String?
   let questionId: String?
+  let aiAnswer: String?
+  let aiAnswered: Bool
 }
 
 struct CheckoutSessionResult {
@@ -126,7 +128,9 @@ final class FunctionsService {
       status: status,
       liveKitRoom: result["liveKitRoom"] as? String,
       liveKitToken: result["liveKitToken"] as? String,
-	  questionId: Self.firstString(in: result, keys: ["questionId", "questionID", "id"])
+      questionId: Self.firstString(in: result, keys: ["questionId", "questionID", "id"]),
+      aiAnswer: nil,
+      aiAnswered: false
     )
   }
 
@@ -204,7 +208,7 @@ final class FunctionsService {
     let baseURL = await functionsBaseURL()
 
 #if os(Android)
-    print("TeacherMinute FunctionsService calling \(name) data=\(data)")
+    logger.info("TeacherMinute FunctionsService calling \(name) data=\(data)")
     let payloadData = try JSONSerialization.data(withJSONObject: ["data": data])
     guard let payload = String(data: payloadData, encoding: .utf8) else {
       throw FunctionsError.decodingError()
@@ -218,7 +222,7 @@ final class FunctionsService {
     }.value
     responseData = Data(responseString.utf8)
     statusCode = nil
-    print("TeacherMinute FunctionsService received \(name) bytes=\(responseData.count) response=\(responseString)")
+    logger.info("TeacherMinute FunctionsService received \(name) bytes=\(responseData.count) response=\(responseString)")
 #else
     guard let url = URL(string: "\(baseURL)/\(name)") else {
       throw FunctionsError.decodingError()

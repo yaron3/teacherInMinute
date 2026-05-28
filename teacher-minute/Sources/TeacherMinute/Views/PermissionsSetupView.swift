@@ -9,10 +9,16 @@
 import SwiftUI
 
 struct PermissionsSetupView: View {
+    let role: AuthRole
     @State var viewModel = PermissionsSetupViewModel()
+  @Environment(\.appRouter) var router
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
+  }
+
+  init(role: AuthRole = .student) {
+    self.role = role
   }
     var body: some View {
         VStack(spacing: 0) {
@@ -110,7 +116,14 @@ struct PermissionsSetupView: View {
         .padding(.horizontal, 18)
         .background(Color(.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .trackScreen(AnalyticsScreen.permissionsSetup)
+        .onAppear {
+            viewModel.onContinue = {
+                PermissionsSetupStore.markCompletedForCurrentUser()
+                router.enterMainTabs(role: role)
+            }
+        }
     }
 }
 

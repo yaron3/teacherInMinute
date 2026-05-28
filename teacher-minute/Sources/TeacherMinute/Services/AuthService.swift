@@ -65,7 +65,7 @@ final class AuthService {
   
   func signIn(email: String, password: String)  async throws -> Bool{
     let result = try await Auth.auth().signIn(withEmail: email, password: password)
-    print("got result: \(result)")
+    logger.info("got result: \(result)")
     return true
   }
 
@@ -78,7 +78,7 @@ final class AuthService {
 //    // Get the client ID from your Firebase configuration.
 //    guard let clientID = FirebaseApp.app()?.options.clientID else {
 //        // Handle error: clientID not found
-//        print("Error: Google Client ID not found in FirebaseApp.options.")
+//        logger.info("Error: Google Client ID not found in FirebaseApp.options.")
 //        return false
 //    }
 //#if os(iOS)
@@ -91,7 +91,7 @@ final class AuthService {
 //    GIDSignIn.sharedInstance.signIn(withPresenting: self) { [unowned self] result, error in
 //        guard error == nil else {
 //            // Handle the error if Google Sign-In fails (e.g., user cancels)
-//            print("Google Sign-In error: \(error?.localizedDescription ?? "Unknown error")")
+//            logger.info("Google Sign-In error: \(error?.localizedDescription ?? "Unknown error")")
 //            return false
 //        }
 //
@@ -100,7 +100,7 @@ final class AuthService {
 //              let accessToken = user.accessToken.tokenString
 //        else {
 //            // Handle missing user, ID token, or access token
-//            print("Error: Missing Google user, ID token, or access token.")
+//            logger.info("Error: Missing Google user, ID token, or access token.")
 //            return false
 //        }
 //
@@ -113,12 +113,12 @@ final class AuthService {
 //        Auth.auth().signIn(with: firebaseCredential) { firebaseAuthResult, firebaseAuthError in
 //            guard firebaseAuthError == nil else {
 //                // Handle Firebase Authentication error
-//                print("Firebase Authentication error: \(firebaseAuthError?.localizedDescription ?? "Unknown error")")
+//                logger.info("Firebase Authentication error: \(firebaseAuthError?.localizedDescription ?? "Unknown error")")
 //                return false
 //            }
 //
 //            // User is successfully signed in to Firebase with Google!
-//            print("Successfully signed in to Firebase with Google! User: \(firebaseAuthResult?.user.uid ?? "N/A")")
+//            logger.info("Successfully signed in to Firebase with Google! User: \(firebaseAuthResult?.user.uid ?? "N/A")")
 //          return true
 //            // Proceed with your app's logic, e.g., navigate to your main content.
 //        }
@@ -133,7 +133,7 @@ final class AuthService {
   
   func createUser(email: String, password: String) async throws -> Bool{
       let result = try await Auth.auth().createUser(withEmail: email, password: password)
-      print("got result: \(result)")
+      logger.info("got result: \(result)")
     return true
     }
   

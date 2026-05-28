@@ -13,7 +13,7 @@ struct AndroidAppleAuth {
         let result = try await Task.detached(priority: .userInitiated) {
             try AndroidAppleSignInBridge.signIn()
         }.value
-        print("Android Apple sign-in result: \(result)")
+        logger.info("Android Apple sign-in result: \(result)")
         return result
     }
 }
