@@ -11,7 +11,6 @@ import SwiftUI
 
 struct AskTeacherSheet: View {
     let viewModel: any StudentHomeViewModeling
-    @Binding var isPresented: Bool
 
     static let topics = [("Algebra"), ("Geometry"), ("Trigonometry"), ("Calculus"), ("Statistics"), ("Arithmetic")]
 
@@ -23,16 +22,57 @@ struct AskTeacherSheet: View {
     @State  var isRequestingPermission = false
     @FocusState var isQuestionFocused: Bool
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
+    @Environment(\.dismiss) var dismiss
   private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 || composerMode == .algebra}
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
 
+  private var sheetSpacing: CGFloat {
+#if os(Android)
+    12
+#else
+    20
+#endif
+  }
+
+  private var sectionSpacing: CGFloat {
+#if os(Android)
+    7
+#else
+    10
+#endif
+  }
+
+  private var sheetPadding: CGFloat {
+#if os(Android)
+    8
+#else
+    10
+#endif
+  }
+
+  private var editorMinHeight: CGFloat {
+#if os(Android)
+    120
+#else
+    120
+#endif
+  }
+
+  private var findButtonHeight: CGFloat {
+#if os(Android)
+    46
+#else
+    52
+#endif
+  }
+
     var body: some View {
-        NavigationStack {
-		  VStack(alignment: .leading, spacing: 24) {
-			VStack(alignment: .leading, spacing: 10) {
+        ScrollView(.vertical, showsIndicators: false) {
+			  VStack(alignment: .leading, spacing: sheetSpacing) {
+			VStack(alignment: .leading, spacing: sectionSpacing) {
                     Text(LocalizationSupport.localized("Session type"))
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
@@ -68,7 +108,7 @@ struct AskTeacherSheet: View {
 					.frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-			VStack(alignment: .leading, spacing: 10) {
+			VStack(alignment: .leading, spacing: sectionSpacing) {
                     Text(LocalizationSupport.localized("Topic"))
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
@@ -96,7 +136,7 @@ struct AskTeacherSheet: View {
                     }
                 }
 
-			  VStack(alignment: .leading, spacing: 10) {
+			  VStack(alignment: .leading, spacing: sectionSpacing) {
                     Text(LocalizationSupport.localized("Your question"))
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
@@ -105,13 +145,15 @@ struct AskTeacherSheet: View {
 
                     TextEditor(text: $questionText)
                         .focused($isQuestionFocused)
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled(true)
                         .font(.system(size: 14))
 						.multilineTextAlignment(.leading)
                         .foregroundStyle(theme.appPrimaryText)
                         .tint(theme.appPink)
                         .scrollContentBackground(.hidden)
                         .padding(12)
-						.frame(minHeight: 120, alignment: .leading)
+						.frame(minHeight: editorMinHeight, alignment: .leading)
                         .background(theme.appGrayBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
@@ -139,23 +181,25 @@ struct AskTeacherSheet: View {
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 52)
+                        .frame(height: findButtonHeight)
                         .background( theme.appPink)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSubmit || isRequestingPermission)
             }
-            .padding(10)
+            .padding(sheetPadding)
+
             .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-				  Button(LocalizationSupport.localized("Cancel")) { isPresented = false }
+					  Button(LocalizationSupport.localized("Cancel")) { closeAskTeacher() }
                 }
 
             }
         }
+        .scrollDismissesKeyboard(.immediately)
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
         .id(languagePreference)
         .task {
@@ -198,13 +242,17 @@ struct AskTeacherSheet: View {
             }
         }
 
-        isPresented = false
+        closeAskTeacher()
         await viewModel.askTeacher(
             topic: selectedTopic.lowercased(),
             text: questionText.trimmingCharacters(in: .whitespaces),
             photoUrls: [],
             conversationType: conversationType
         )
+    }
+
+    func closeAskTeacher() {
+        dismiss()
     }
 
     var composerModeToggle: some View {
@@ -260,11 +308,8 @@ struct AskTeacherSheet_Previews: PreviewProvider {
 private struct AskTeacherSheetLanguagePreview: View {
   let language: SettingsLanguageChoice
 
-  var body: some View {
-    AskTeacherSheet(
-      viewModel: MockStudentHomeViewModel(),
-      isPresented: .constant(true)
-    )
+    var body: some View {
+    AskTeacherSheet(viewModel: MockStudentHomeViewModel())
     .environment(\.locale, LocalizationSupport.locale(languagePreference: language.rawValue))
     .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: language.rawValue))
     .onAppear {

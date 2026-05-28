@@ -10,9 +10,9 @@ import SwiftUI
 struct StudentHomeView: View {
   @State var viewModel: any StudentHomeViewModeling
   @State var paymentReturnStore = PaymentReturnStore.shared
-  @State var showingAskSheet = false
   @State var showingLowBalanceAlert = false
   @State var showingCouponAlert = false
+  @State var showsAskTeacher = false
   @Binding var hidesTabBar: Bool
   @Environment(\.openURL) var openURL
   @Environment(\.scenePhase) var scenePhase
@@ -43,10 +43,10 @@ struct StudentHomeView: View {
 			  Task { await viewModel.refreshUnreadMessages() }
 			}
 		  )
-		  .padding(.top, 18)
-		  
+		  .padding(.top, 6)
+
 		  askTeacherCard
-			.padding(.top, 20)
+			.padding(.top, 14)
 		  
 		  redeemCouponRow
 			.padding(.top, 12)
@@ -120,11 +120,13 @@ struct StudentHomeView: View {
 	  }
 #endif
 	}
-	.sheet(isPresented: $showingAskSheet) {
-	  AskTeacherSheet(viewModel: viewModel, isPresented: $showingAskSheet)
-		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-		.id(languagePreference)
+	.fullScreenCover(isPresented: $showsAskTeacher) {
+	  NavigationStack {
+		AskTeacherSheet(viewModel: viewModel)
+		  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		  .id(languagePreference)
+	  }
 	}
 	.task {
 	  await viewModel.loadProfileIfNeeded()
@@ -407,14 +409,26 @@ struct StudentHomeView: View {
   
   // MARK: - Ask card
   
+  @ViewBuilder
   var askTeacherCard: some View {
-	Button {
-	  if viewModel.remainingMinutes >= 2 {
-		showingAskSheet = true
-	  } else {
-		showingLowBalanceAlert = true
+	if viewModel.remainingMinutes >= 2 {
+	  Button {
+		showsAskTeacher = true
+	  } label: {
+		askTeacherCardContent
 	  }
-	} label: {
+	  .buttonStyle(.plain)
+	} else {
+	  Button {
+		showingLowBalanceAlert = true
+	  } label: {
+		askTeacherCardContent
+	  }
+	  .buttonStyle(.plain)
+  }
+  }
+
+  var askTeacherCardContent: some View {
 	  ZStack(alignment: .topTrailing) {
 		LinearGradient(
 		  colors: [theme.appPink, theme.appPurple],
@@ -480,8 +494,6 @@ struct StudentHomeView: View {
 	  .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 	  .shadow(color: theme.appPink.opacity(0.25), radius: 18, x: 0, y: 10)
 	}
-	.buttonStyle(.plain)
-  }
   
   // MARK: - Supporting views
   
@@ -1006,12 +1018,16 @@ struct RecentLessonRow: View {
 }
 
 #if os(iOS)
+#Preview {
+  StudentHomeView(viewModel: MockStudentHomeViewModel())
+}
 struct StudentHomeView_Previews: PreviewProvider {
   static var previews: some View {
 	StudentHomeView(viewModel: MockStudentHomeViewModel())
   }
 }
 
+/*
 struct StudentSearchHomeView_Previews: PreviewProvider {
   static var previews: some View {
 	
@@ -1074,6 +1090,7 @@ struct PricingCard_Previews: PreviewProvider {
 	.background(Color(.systemBackground))
   }
 }
+ */
 #endif
 
 // RedeemCouponSheet view (assumed to be inside this file or imported)
@@ -1166,4 +1183,3 @@ enum RedeemCouponState: Equatable {
   case success(Int) // Int = minutes added
   case error(String)
 }
-

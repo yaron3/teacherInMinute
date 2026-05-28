@@ -64,9 +64,23 @@ object AndroidTeacherPresenceManager {
     }
 
     private fun updateTeacherRecord(uid: String, status: String, values: Map<String, Any>) {
-        FirebaseDatabase.getInstance(DATABASE_URL)
+        val teacherRef = FirebaseDatabase.getInstance(DATABASE_URL)
             .getReference("teachers")
             .child(uid)
+
+        if (status == "online") {
+            teacherRef.onDisconnect().updateChildren(
+                mapOf(
+                    "status" to "offline",
+                    "isOnline" to false,
+                    "updatedAt" to ServerValue.TIMESTAMP
+                )
+            )
+        } else {
+            teacherRef.onDisconnect().cancel()
+        }
+
+        teacherRef
             .updateChildren(values)
             .addOnSuccessListener {
                 Log.i(TAG, "Wrote teacher status=$status uid=$uid keys=${values.keys}")

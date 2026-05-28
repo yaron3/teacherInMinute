@@ -143,7 +143,9 @@ final class TeacherDashboardViewModel {
     logger.info("[VM] configurePresence — uid=\(uid)")
 #if os(Android)
     presenceService = nil
-    logger.info("[VM] configurePresence — Android path")
+    isOnline = false
+    AndroidTeacherPresenceWriter.setCurrentTeacherStatus("offline")
+    logger.info("[VM] configurePresence — Android path initialized offline")
     startAndroidInvitePolling(uid: uid)
     logger.info("[VM] configurePresence — Android invite polling uid=\(uid)")
     return
