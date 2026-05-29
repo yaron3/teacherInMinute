@@ -1,0 +1,74 @@
+Skip project build summary
+
+This is a conventional Skip dual-platform app.
+
+Build structure
+
+- Root Package.swift is the SwiftPM package.
+- Shared app/module code is in Sources/TeacherMinute.
+- The Swift package builds a dynamic library product named TeacherMinute.
+- Skip's skipstone plugin is attached to the TeacherMinute target.
+- Sources/TeacherMinute/Skip/skip.yml sets skip.mode: native, so Android uses native-compiled Swift artifacts plus Kotlin/Android host code.
+
+iOS code
+
+- The iOS/macOS host project is under Darwin.
+- Xcode project: Darwin/TeacherMinute.xcodeproj
+- Workspace to open: Project.xcworkspace
+- iOS entry point: Darwin/Sources/Main.swift
+- iOS assets/config: Darwin/Assets.xcassets, Darwin/Info.plist, Darwin/Entitlements.plist, Darwin/GoogleService-Info.plist
+- iOS-specific Swift also appears in shared sources behind conditions like #if canImport(UIKit), for example Sources/TeacherMinute/AppModule/GoogleSignIn+iOS.swift.
+
+Build iOS
+
+xcodebuild \
+  -workspace Project.xcworkspace \
+  -scheme "TeacherMinute App" \
+  -configuration Debug \
+  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  build
+
+Or open Project.xcworkspace in Xcode and run the TeacherMinute App scheme.
+
+Android code
+
+- Android host code is under Android.
+- Gradle project: Android/settings.gradle.kts
+- App Gradle config: Android/app/build.gradle.kts
+- Android manifest: Android/app/src/main/AndroidManifest.xml
+- Android app entry points: Android/app/src/main/kotlin/Main.kt
+- Android-native bridge/managers: Android/app/src/main/kotlin/Android*Manager.kt
+- Android-specific Swift bridge code lives in shared sources behind #if os(Android), for example Sources/TeacherMinute/AppModule/GoogleAuth+Android.swift.
+
+Build Android debug APK
+
+cd Android
+./gradlew :app:assembleDebug
+
+Install/run Android debug
+
+cd Android
+./gradlew :app:installDebug
+
+Build Android release bundle
+
+cd Android
+./gradlew :app:bundleRelease
+
+Release requires signing via Android/app/keystore.properties or the TEACHER_MINUTE_UPLOAD_* environment variables.
+
+Skip/Xcode Android hook
+
+The Xcode target has a Run Script phase that runs Android through Skip:
+
+skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
+
+Running TeacherMinute App from Xcode also tries to build/launch Android by default because Darwin/TeacherMinute.xcconfig sets:
+
+SKIP_ACTION = launch
+
+Set SKIP_ACTION = build to build Android without launching, or SKIP_ACTION = none to disable the Android side during Xcode builds.
+
+Note
+
+Skip.env says MARKETING_VERSION = 1.0.0 and CURRENT_PROJECT_VERSION = 11, while the Xcode project file still has explicit 0.0.4 / 7 build settings. Android appears to derive metadata from Skip.env; iOS may be using the Xcode target override unless cleaned up.
