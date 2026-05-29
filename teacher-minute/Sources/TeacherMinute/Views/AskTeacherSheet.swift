@@ -70,6 +70,7 @@ struct AskTeacherSheet: View {
   }
 
     var body: some View {
+        VStack(spacing: 0) {
         ScrollView(.vertical, showsIndicators: false) {
 			  VStack(alignment: .leading, spacing: sheetSpacing) {
 			VStack(alignment: .leading, spacing: sectionSpacing) {
@@ -143,28 +144,35 @@ struct AskTeacherSheet: View {
 						.frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(theme.appPrimaryText)
 
-                    TextEditor(text: $questionText)
-                        .focused($isQuestionFocused)
-                        .textInputAutocapitalization(.sentences)
-                        .autocorrectionDisabled(true)
-                        .font(.system(size: 14))
-						.multilineTextAlignment(.leading)
-                        .foregroundStyle(theme.appPrimaryText)
-                        .tint(theme.appPink)
-                        .scrollContentBackground(.hidden)
-                        .padding(12)
-						.frame(minHeight: editorMinHeight, alignment: .leading)
-                        .background(theme.appGrayBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    if composerMode == .regular {
+                        TextEditor(text: $questionText)
+                            .focused($isQuestionFocused)
+                            .textInputAutocapitalization(.sentences)
+                            .autocorrectionDisabled(true)
+                            .font(.system(size: 14))
+                            .multilineTextAlignment(.leading)
+                            .foregroundStyle(theme.appPrimaryText)
+                            .tint(theme.appPink)
+                            .scrollContentBackground(.hidden)
+                            .padding(12)
+                            .frame(minHeight: editorMinHeight, alignment: .leading)
+                            .background(theme.appGrayBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    } else {
+                        Text(questionText.isEmpty
+                             ? LocalizationSupport.localized("Tap math keys, then send to add to your question.")
+                             : questionText)
+                            .font(.system(size: 14))
+                            .multilineTextAlignment(.leading)
+                            .foregroundStyle(questionText.isEmpty ? theme.appSecondaryText : theme.appPrimaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .frame(minHeight: editorMinHeight, alignment: .leading)
+                            .background(theme.appGrayBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
 
                     composerModeToggle
-
-                    if composerMode == .algebra {
-                        MathEquationEditorView { latex in
-                            appendEquation(latex)
-                        }
-                        .environment(\.layoutDirection, .leftToRight)
-                    } 
 
                     Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
                         .font(.system(size: 11))
@@ -189,17 +197,26 @@ struct AskTeacherSheet: View {
                 .disabled(!canSubmit || isRequestingPermission)
             }
             .padding(sheetPadding)
-
-            .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-					  Button(LocalizationSupport.localized("Cancel")) { closeAskTeacher() }
-                }
-
-            }
         }
         .scrollDismissesKeyboard(.immediately)
+
+        if composerMode == .algebra {
+            MathEquationEditorView { latex in
+                appendEquation(latex)
+            }
+            .environment(\.layoutDirection, .leftToRight)
+            .padding(.horizontal, sheetPadding)
+            .padding(.bottom, sheetPadding)
+            .background(theme.appCardBackground)
+        }
+        }
+        .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(LocalizationSupport.localized("Cancel")) { closeAskTeacher() }
+            }
+        }
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
         .id(languagePreference)
         .task {

@@ -127,6 +127,7 @@ struct StudentHomeView: View {
 		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
 		  .id(languagePreference)
 	  }
+	  .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
 	}
 	.task {
 	  await viewModel.loadProfileIfNeeded()

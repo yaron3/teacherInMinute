@@ -36,6 +36,73 @@ val hasReleaseSigning = listOf(
     releaseKeyPassword
 ).all { !it.isNullOrBlank() }
 
+val generatedManifestEntriesToRemove = listOf(
+    "com.google.android.gms.permission.AD_ID",
+    "android.permission.ACCESS_ADSERVICES_AD_ID",
+    "android.permission.FOREGROUND_SERVICE",
+    "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
+    "androidx.work.impl.foreground.SystemForegroundService"
+)
+
+fun generatedManifestSearchRoots(): List<File> {
+    return listOf(
+        layout.buildDirectory.get().asFile,
+        file("build"),
+        file("intermediates"),
+        file("outputs")
+    ).distinctBy { it.absolutePath }
+        .filter { it.exists() }
+}
+
+fun generatedAndroidManifests(): Sequence<File> {
+    return generatedManifestSearchRoots()
+        .asSequence()
+        .flatMap { root -> root.walkTopDown().asSequence() }
+        .filter { file -> file.isFile && file.name == "AndroidManifest.xml" }
+}
+
+fun stripForegroundServiceEntriesFromGeneratedManifests() {
+    val permissionElements = generatedManifestEntriesToRemove
+        .filter { entry -> entry.contains(".permission.") }
+        .map { permission ->
+            Regex("""\s*<uses-permission(?:-sdk-23)?\s+[^>]*android:name="$permission"[^>]*/>\s*""")
+        }
+    val workManagerForegroundServiceElement = Regex(
+        """\s*<service\b[^>]*android:name="androidx\.work\.impl\.foreground\.SystemForegroundService"[^>]*(?:/>\s*|>.*?</service>\s*)""",
+        setOf(RegexOption.DOT_MATCHES_ALL)
+    )
+
+    generatedAndroidManifests()
+        .forEach { manifest ->
+            val original = manifest.readText()
+            var stripped = original
+            permissionElements.forEach { permissionElement ->
+                stripped = stripped.replace(permissionElement, "\n")
+            }
+            stripped = stripped.replace(workManagerForegroundServiceElement, "\n")
+            if (stripped != original) {
+                manifest.writeText(stripped)
+                logger.lifecycle("Removed foreground service manifest entries from ${manifest.relativeTo(projectDir)}")
+            }
+        }
+}
+
+fun verifyNoForegroundServiceEntriesInGeneratedManifests() {
+    val offenders = generatedAndroidManifests()
+        .filter { manifest ->
+            val text = manifest.readText()
+            generatedManifestEntriesToRemove.any { entry -> text.contains(entry) }
+        }
+        .map { manifest -> manifest.relativeTo(projectDir).path }
+        .toList()
+
+    if (offenders.isNotEmpty()) {
+        throw GradleException(
+            "Generated manifest still contains foreground service entries: ${offenders.joinToString()}"
+        )
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get().toString())
@@ -108,6 +175,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             isDebuggable = false // can be set to true for debugging release build, but needs to be false when uploading to store
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
     }
@@ -131,6 +201,25 @@ gradle.taskGraph.whenReady {
             TEACHER_MINUTE_UPLOAD_KEY_PASSWORD
             """.trimIndent()
         )
+    }
+}
+
+tasks.configureEach {
+    if (name.contains("Manifest", ignoreCase = true)) {
+        doLast("stripForegroundServiceEntries") {
+            stripForegroundServiceEntriesFromGeneratedManifests()
+        }
+    }
+
+    if (name.contains("Release", ignoreCase = true) &&
+        (name.contains("Bundle", ignoreCase = true) ||
+            name.contains("Package", ignoreCase = true) ||
+            name.contains("Assemble", ignoreCase = true))
+    ) {
+        doFirst("verifyNoForegroundServiceEntries") {
+            stripForegroundServiceEntriesFromGeneratedManifests()
+            verifyNoForegroundServiceEntriesInGeneratedManifests()
+        }
     }
 }
 

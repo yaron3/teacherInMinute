@@ -11,18 +11,14 @@ import SwiftUI
 
 struct MathEquationEditorView: View {
     @State var model = MathEquationViewModel()
+    // Skip's @Observable bridge doesn't recompose when class properties
+    // mutate on Android. Bumping this counter from every mutation forces
+    // SwiftUI to re-evaluate body and pick up the new model state.
+    @State var modelTick: Int = 0
     let onSend: (String) -> Void
     @Environment(\.colorScheme) var colorScheme
 
     var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
-
-    var exportedLatex: String {
-        model.exportLatex()
-    }
-
-    var canSend: Bool {
-        !exportedLatex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
 
     var inputCapsuleHeight: CGFloat {
 #if os(Android)
@@ -33,13 +29,30 @@ struct MathEquationEditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        // Reading modelTick is what actually subscribes this body to
+        // recomposition — Skip's @Observable bridge on Android does not
+        // recompose on class property mutations, so we drive it with an Int.
+        _ = modelTick
+        let latex = model.currentLatex
+        let cursor = model.cursorIndex
+        let preview = model.latexWithCursorMarker()
+        let exported = model.exportLatex()
+        let canSend = !exported.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        logger.info("[MathEditor] body eval tick=\(modelTick) latex='\(latex)' cursor=\(cursor) preview='\(preview)'")
+
+        return VStack(spacing: 8) {
 
             HStack(spacing: 10) {
-                inputCapsule
+                MathFormulaView(latex: preview, displayMode: false)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: inputCapsuleHeight)
+                    .padding(.horizontal, 6)
+                    .background(theme.appGrayBackground)
+                    .clipShape(Capsule())
 
                 Button {
-                    sendCurrent()
+                    sendCurrent(exported: exported)
+                    modelTick &+= 1
                 } label: {
                     PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.white)
                         .frame(width: 42, height: 42)
@@ -61,27 +74,15 @@ struct MathEquationEditorView: View {
         .environment(\.layoutDirection, .leftToRight)
     }
 
-    var inputCapsule: some View {
-        MathFormulaView(latex: previewLatex, displayMode: false)
-            .frame(maxWidth: .infinity)
-            .frame(height: inputCapsuleHeight)
-            .padding(.horizontal, 6)
-            .background(theme.appGrayBackground)
-            .clipShape(Capsule())
-    }
-
-    var previewLatex: String {
-        model.latexWithCursorMarker()
-    }
-
-    func sendCurrent() {
-        let latex = exportedLatex.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !latex.isEmpty else { return }
-        onSend(latex)
+    func sendCurrent(exported: String) {
+        let trimmed = exported.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        onSend(trimmed)
         model.clear()
     }
 
     func handleKeyboardAction(_ action: MathKeyboardAction) {
+        logger.info("[MathEditor] handleKeyboardAction received action, before latex='\(model.currentLatex)' cursor=\(model.cursorIndex)")
         switch action {
         case .insert(let token):
             model.insertToken(token)
@@ -96,6 +97,8 @@ struct MathEquationEditorView: View {
         case .fraction:
             model.wrapPreviousAsNumerator()
         }
+        modelTick &+= 1
+        logger.info("[MathEditor] after action tick=\(modelTick) latex='\(model.currentLatex)' cursor=\(model.cursorIndex)")
     }
 }
 
