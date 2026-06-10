@@ -38,7 +38,9 @@ final class ProfileViewModel {
     var contactRows: [Parameter] = []
     var currency: String = LessonFormatting.defaultCurrencyCode
 
-    static let availableCurrencies: [String] = ["ILS", "USD"]
+  var availableCurrencies: [String] {
+	[LocalizationSupport.localized("ils"), LocalizationSupport.localized("usd")]
+  }
 
     var shouldShowTeachingDetails: Bool {
         roleType == .teacher

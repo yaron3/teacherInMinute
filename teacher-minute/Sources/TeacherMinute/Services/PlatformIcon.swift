@@ -120,18 +120,18 @@ struct PlatformIcon: View {
 	  case "envelope.open.fill":                return "📬"
 	  case "phone.fill":						return "📞"
 	  case "globe":                             return "🌍"
-	  case "p.circle.fill":                     return "P"
+	  case "p.circle.fill":                     return "P" 
 	  case "doc.plaintext.fill":				return "txt"
 	  case "hand.raised.fill":					return "✋"
 	  case "clock.badge.checkmark.fill":		return "⏰"
 	  case "pencil.and.list.clipboard":			return "📝"
 	  case "person.crop.rectangle":				return "👤"
-		  case "triangle":							return "▲"
-		  case "circle":							return "○"
-		  case "line.diagonal":						return "╱"
-		  case "trash":							return "🗑"
-
-
+	  case "triangle":							return "▲"
+	  case "circle":							return "○"
+	  case "line.diagonal":						return "╱"
+	  case "trash":								return "🗑"
+	  case "arrow.up.arrow.down": 				return "↕"
+		
 	  default:
 		logger.error("!!! icon: \(systemName) is missing !!!")
 		return "●"

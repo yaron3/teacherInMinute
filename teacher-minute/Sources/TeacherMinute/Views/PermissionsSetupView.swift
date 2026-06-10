@@ -71,7 +71,7 @@ struct PermissionsSetupView: View {
                     iconColor: theme.authPink,
                     iconBackground: theme.authPinkSoft,
                     title: "Microphone",
-                    subtitle: "Talk live with\nteachers to solve\nmath problems\ntogether in real-\ntime.",
+                    subtitle: LocalizationSupport.localized("Talk live with\nteachers to solve\nmath problems\ntogether in real-\ntime."),
                     isOn: $viewModel.microphoneEnabled
                 )
 
@@ -80,7 +80,7 @@ struct PermissionsSetupView: View {
                     iconColor: theme.authGreen,
                     iconBackground: theme.authGreen.opacity(0.14),
                     title: "Camera",
-                    subtitle: "Use video in live\\nlessons and update\\nyour profile photo\\nwhen needed.",
+                    subtitle: LocalizationSupport.localized("Use video in live\\nlessons and update\\nyour profile photo\\nwhen needed."),
                     isOn: $viewModel.cameraEnabled
                 )
 
@@ -89,7 +89,7 @@ struct PermissionsSetupView: View {
 					iconColor: theme.authPurple,
 					iconBackground: theme.authPurpleSoft,
                     title: "Notifications",
-                    subtitle: "Get instant alerts\nwhen a teacher\naccepts your\nrequest or replies.",
+                    subtitle: LocalizationSupport.localized("Get instant alerts\nwhen a teacher\naccepts your\nrequest or replies."),
                     isOn: $viewModel.notificationsEnabled
                 )
             }
@@ -97,7 +97,7 @@ struct PermissionsSetupView: View {
 
             Spacer()
 
-            AuthPrimaryButton(title: "Continue Setup", systemImage: "arrow.right") {
+            AuthPrimaryButton(title: LocalizationSupport.localized("Continue Setup"), systemImage: "arrow.right") {
                 viewModel.continueSetup()
             }
 

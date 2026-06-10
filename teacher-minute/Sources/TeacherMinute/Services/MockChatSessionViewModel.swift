@@ -68,7 +68,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.currentUserImageURL = currentUserImageURL
     self.originalQuestion = originalQuestion
     let isTeacherRole = Self.isTeacherRole(role)
-    self.primaryAmountTitle = isTeacherRole ? "Live Earnings" : "Session Cost"
+    self.primaryAmountTitle = isTeacherRole ? LocalizationSupport.localized("Live Earnings") : LocalizationSupport.localized("Session Cost")
     self.primaryAmountSubtitle = isTeacherRole ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
     self.sessionNoticeText = sessionNoticeText
     self.sessionStartedAt = sessionStartedAt

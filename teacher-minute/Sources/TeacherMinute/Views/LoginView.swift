@@ -77,10 +77,10 @@ struct LoginView: View {
 	  router.resume(resume)
 	  viewModel.destination = nil
 	}
-	.alert("Sign In Error", isPresented: $viewModel.showAlert) {
-	  Button("OK", role: .cancel) { viewModel.showAlert = false }
+	.alert(LocalizationSupport.localized("Sign In Error"), isPresented: $viewModel.showAlert) {
+	  Button(LocalizationSupport.localized("OK"), role: .cancel) { viewModel.showAlert = false }
 	} message: {
-	  Text(viewModel.alertMessage ?? "An unexpected error occurred.")
+	  Text(viewModel.alertMessage ?? LocalizationSupport.localized("An unexpected error occurred."))
 	}
   }
   
@@ -103,7 +103,7 @@ struct LoginView: View {
 			color: theme.authIcon
 		  )
 		  
-		  TextField("Enter your email", text: $viewModel.emailOrPhone)
+		  TextField(LocalizationSupport.localized("Enter your email"), text: $viewModel.emailOrPhone)
 			.font(.system(size: 16))
 			.foregroundStyle(theme.authPrimaryText)
 			.keyboardType(.emailAddress)
@@ -137,9 +137,9 @@ struct LoginView: View {
 		  
 		  Group {
 			if viewModel.isPasswordVisible {
-			  TextField("Enter your password", text: $viewModel.password)
+			  TextField(LocalizationSupport.localized("Enter your password"), text: $viewModel.password)
 			} else {
-			  SecureField("Enter your password", text: $viewModel.password)
+			  SecureField(LocalizationSupport.localized("Enter your password"), text: $viewModel.password)
 			}
 		  }
 		  .font(.system(size: 16))
@@ -194,7 +194,7 @@ struct LoginView: View {
 		  ProgressView().tint(theme.appPrimaryText)
 		}
 		
-		Text(viewModel.isLoading ? "Signing In…" : "Log In")
+		Text(viewModel.isLoading ? LocalizationSupport.localized("Signing In…") : LocalizationSupport.localized("Log In"))
 		  .font(.system(size: 16, weight: .semibold))
 	  }
 	  .foregroundStyle(theme.appPrimaryText)
@@ -228,9 +228,9 @@ struct LoginView: View {
   
   var socialButtons: some View {
 	HStack(spacing: 16) {
-	  socialButton(title: "Google", systemImage: "g.circle.fill") { viewModel.loginWithGoogle() }
+	  socialButton(title: LocalizationSupport.localized("Google"), systemImage: "g.circle.fill") { viewModel.loginWithGoogle() }
 	  #if !os(Android)
-		  socialButton(title: "Apple",  systemImage: "apple.logo")    { viewModel.loginWithApple() }
+		  socialButton(title: LocalizationSupport.localized("Apple"),  systemImage: "apple.logo")    { viewModel.loginWithApple() }
 #endif
 	}
   }

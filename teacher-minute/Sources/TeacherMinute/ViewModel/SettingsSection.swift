@@ -464,7 +464,20 @@ class SettingsViewModel {
   func updateLanguage(_ language: SettingsLanguageChoice) {
     selectedLanguage = language
 	Analytics.setUserProperty(language.remoteConfigLanguageCode, forName: "app_language")
-    
+    let managerCode = localizationManagerCode(for: language)
+    Task { await LocalizationManager.shared.updateLanguageCode(to: managerCode) }
+  }
+
+  /// Bridges `SettingsLanguageChoice` to the `LocalizationManager` convention
+  /// where empty string means "follow system" and an ISO code pins the
+  /// language. Keeping it private to this view-model avoids leaking the new
+  /// manager's vocabulary into the rest of the settings layer.
+  private func localizationManagerCode(for language: SettingsLanguageChoice) -> String {
+    switch language {
+    case .system: return ""
+    case .english: return "en"
+    case .hebrew: return "he"
+    }
   }
 
     func select(_ row: SettingsRow) {

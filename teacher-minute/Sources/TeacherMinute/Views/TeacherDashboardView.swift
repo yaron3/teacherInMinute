@@ -308,6 +308,7 @@ struct TeacherDashboardView: View {
 		  wave: viewModel.inviteWaves[inviteID] ?? 1,
 		  photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
 		  hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
+		  voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 		  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
 		) {
 		  viewModel.acceptInvite(questionId: inviteID)
@@ -336,6 +337,7 @@ struct TeacherDashboardView: View {
 			wave: viewModel.inviteWaves[inviteID] ?? 1,
 			photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
 			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
+			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
 		  ) {
 			viewModel.acceptInvite(questionId: inviteID)
@@ -454,6 +456,7 @@ struct TeacherDashboardView: View {
 	let wave: Int
 	let photoUrls: [String]
 	let hasVoiceMessage: Bool
+	let voiceMessageDurationSeconds: Int?
 	var conversationType: String = "text"
 	let accept: () -> Void
 	let decline: () -> Void
@@ -464,6 +467,11 @@ struct TeacherDashboardView: View {
 	  case "video": return "video.fill"
 	  default: return nil
 	  }
+	}
+
+	private var formattedVoiceMessageDuration: String? {
+	  guard let seconds = voiceMessageDurationSeconds, seconds >= 0 else { return nil }
+	  return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
 	}
 	@State var now = Date().timeIntervalSince1970 * 1000.0
 	
@@ -638,9 +646,11 @@ struct TeacherDashboardView: View {
 		  Text(LocalizationSupport.localized("Voice Message"))
 			.font(.system(size: 10, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
-		  Text("0:23")
-			.font(.system(size: 9, weight: .medium))
-			.foregroundStyle(theme.appSecondaryText)
+		  if let formatted = formattedVoiceMessageDuration {
+			Text(formatted)
+			  .font(.system(size: 9, weight: .medium))
+			  .foregroundStyle(theme.appSecondaryText)
+		  }
 		}
 		
 		Spacer()
@@ -714,6 +724,7 @@ struct TeacherIncomingQuestionOverlay: View {
 			wave: viewModel.inviteWaves[inviteID] ?? 1,
 			photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
 			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
+			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
 		  ) {
 			viewModel.acceptInvite(questionId: inviteID)

@@ -168,7 +168,7 @@ struct WelcomeView: View {
   private var badges: some View {
 	HStack(spacing: 12) {
 	  BadgeView(
-		title: "Verified Tutors",
+		title: LocalizationSupport.localized("Verified Tutors"),
 		systemImage: "checkmark.seal",
 		foreground: theme.greenText,
 		background: theme.greenBackground,
@@ -176,7 +176,7 @@ struct WelcomeView: View {
 	  )
 	  Spacer()
 	  BadgeView(
-		title: "Privacy Protected",
+		title: LocalizationSupport.localized("Privacy Protected"),
 		systemImage: "lock.fill",
 		foreground: theme.badgeGrayText,
 		background: theme.grayBadgeBackground,

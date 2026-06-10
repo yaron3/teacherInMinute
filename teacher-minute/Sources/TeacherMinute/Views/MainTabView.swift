@@ -22,7 +22,7 @@ struct MainTabView: View {
             TabView(selection: $viewModel.selectedTab) {
                 tabContent(.home)
                     .tabItem {
-                        Label("Home", systemImage: MainTab.home.systemImage)
+                        Label(LocalizationSupport.localized("Home"), systemImage: MainTab.home.systemImage)
                     }
                     .tag(MainTab.home)
 
@@ -43,13 +43,13 @@ struct MainTabView: View {
 
                 tabContent(.profile)
                     .tabItem {
-                        Label("Profile", systemImage: MainTab.profile.systemImage)
+                        Label(LocalizationSupport.localized("Profile"), systemImage: MainTab.profile.systemImage)
                     }
                     .tag(MainTab.profile)
 
                 tabContent(.settings)
                     .tabItem {
-                        Label("Settings", systemImage: MainTab.settings.systemImage)
+                        Label(LocalizationSupport.localized("Settings"), systemImage: MainTab.settings.systemImage)
                     }
                     .tag(MainTab.settings)
             }

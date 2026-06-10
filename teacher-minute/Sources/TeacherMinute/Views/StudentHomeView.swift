@@ -465,7 +465,7 @@ struct StudentHomeView: View {
 			Text(String(format: LocalizationSupport.localized("%d min remaining"), viewModel.remainingMinutes))
 			  .font(.system(size: 13, weight: .semibold))
 			  .foregroundStyle(.white.opacity(0.95))
-			Text("•")
+			Text(LocalizationSupport.localized("•"))
 			  .font(.system(size: 13))
 			  .foregroundStyle(theme.appGrayBackground.opacity(0.6))
 			Text(LocalizationSupport.localized("Per-minute billing"))

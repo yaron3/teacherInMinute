@@ -39,9 +39,14 @@ final class RemoteConfigService {
         await firstFetch?.value
     }
 
-    /// Force a refresh, ignoring the minimum fetch interval.
+    /// Force a refresh, ignoring the minimum fetch interval. Uses
+    /// `fetch(withExpirationDuration: 0)` so the SDK actually re-pulls the
+    /// template — `fetchAndActivate()` alone honors `minimumFetchInterval`
+    /// and would otherwise serve cached values for up to an hour.
     func refresh() async {
-        _ = try? await RemoteConfig.remoteConfig().fetchAndActivate()
+        let remoteConfig = RemoteConfig.remoteConfig()
+        _ = try? await remoteConfig.fetch(withExpirationDuration: 0)
+        _ = try? await remoteConfig.activate()
     }
 
     private func configureRemoteConfig() {
@@ -64,6 +69,13 @@ final class RemoteConfigService {
     }
 
     func getString(_ key: String) -> String {
+        Self.readString(key)
+    }
+
+    /// Non-isolated read for callers (e.g. `LocalizationSupport.localized`) that
+    /// run outside the main actor. Firebase Remote Config reads are thread-safe
+    /// once `start()` has activated the initial fetch.
+    nonisolated static func readString(_ key: String) -> String {
         RemoteConfig.remoteConfig()
             .configValue(forKey: key)
             .stringValue

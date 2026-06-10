@@ -14,7 +14,7 @@ struct ConnectionSetupView: View {
   init(
     participantName: String,
     conversationType: String,
-    footerText: String = "Your teacher will join shortly",
+    footerText: String = LocalizationSupport.localized("Your teacher will join shortly"),
     viewModel sessionViewModel: (any ChatSessionViewModeling)? = nil,
     liveKitRoom: String = "",
     liveKitToken: String = "",
@@ -202,7 +202,7 @@ struct ConnectionSetupView: View {
         ForEach(0..<5, id: \.self) { _ in
           PlatformIcon(systemName: "star.fill", size: 11, weight: .bold, color: theme.yellow)
         }
-        Text("4.9")
+        Text(LocalizationSupport.localized("4.9"))
           .font(.system(size: 11, weight: .bold))
           .foregroundStyle(theme.appPrimaryText)
         Text(LocalizationSupport.localized("(127 reviews)"))
@@ -285,8 +285,8 @@ struct ConnectionSetupView: View {
   var microphonePermissionCard: some View {
     permissionCard(
       icon: "mic.fill",
-      title: "Microphone Permission",
-      message: "Make sure your microphone is enabled for the best learning experience.",
+      title: LocalizationSupport.localized("Microphone Permission"),
+      message: LocalizationSupport.localized("Make sure your microphone is enabled for the best learning experience."),
       buttonTitle: viewModel.microphoneButtonTitle,
       buttonIcon: viewModel.microphoneState.isGranted ? "checkmark" : "mic.fill"
     ) {

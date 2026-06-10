@@ -18,7 +18,7 @@ struct StudentLessonHistoryView: View {
             VStack(alignment: .leading, spacing: 0) {
                 AppTopHeader(
                     avatarSystemImage: "person.crop.circle.fill",
-                    eyebrow: "Lesson History",
+                    eyebrow: LocalizationSupport.localized("Lesson History"),
                     name: viewModel.studentName,
                     avatarImageURL: viewModel.profileImageURL,
                     showNotificationBadge: false
@@ -91,7 +91,7 @@ struct StudentLessonHistoryView: View {
 			.frame(maxWidth: .infinity)
             
             HistoryMetricCard(
-                title: "Total Spend",
+                title: LocalizationSupport.localized("Total Spend"),
                 value: viewModel.totalSpendText,
                 systemImage: "creditcard.fill",
                 tint: theme.appPurple
@@ -109,7 +109,7 @@ struct StudentLessonHistoryView: View {
                 color: theme.appSecondaryText
             )
             
-            TextField("Search lessons or teachers", text: $viewModel.query)
+            TextField(LocalizationSupport.localized("Search lessons or teachers"), text: $viewModel.query)
                 .font(.system(size: 14))
                 .foregroundStyle(theme.appPrimaryText)
                 .textInputAutocapitalization(.never)
@@ -204,7 +204,7 @@ struct LessonHistoryRow: View {
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(theme.appPrimaryText)
 
-                    Text(isLoading ? "Loading session details" : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
+                    Text(isLoading ? LocalizationSupport.localized("Loading session details") : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
                         .font(.system(size: 11))
                         .foregroundStyle(theme.appSecondaryText)
                 }

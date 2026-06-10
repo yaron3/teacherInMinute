@@ -17,10 +17,10 @@ enum MainTab: Hashable, CaseIterable {
   
   var title: String {
 	switch self {
-	  case .home: "Home"
-	  case .lessons: "Lessons"
-	  case .profile: "Profile"
-	  case .settings: "Settings"
+	  case .home: LocalizationSupport.localized("Home")
+	  case .lessons: LocalizationSupport.localized("Lessons")
+	  case .profile: LocalizationSupport.localized("Profile")
+	  case .settings: LocalizationSupport.localized("Settings")
 	}
   }
   

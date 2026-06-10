@@ -46,7 +46,7 @@ struct SettingsView: View {
 
                 loadingOverlay
             }
-            .navigationTitle("Settings")
+            .navigationTitle(LocalizationSupport.localized("Settings"))
             .navigationDestination(for: SettingsDestination.self) { destination in
                 destinationView(destination)
                     .navigationTitle(destination.title)
@@ -54,7 +54,7 @@ struct SettingsView: View {
             }
         }
         .alert(viewModel.activeConfirmation?.title ?? "Settings", isPresented: isShowingConfirmation) {
-            Button("Cancel", role: .cancel) {
+            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
                 viewModel.activeConfirmation = nil
             }
             if let confirmation = viewModel.activeConfirmation {
@@ -66,7 +66,7 @@ struct SettingsView: View {
             Text(viewModel.activeConfirmation?.message ?? "")
         }
         .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
-            Button("OK", role: .cancel) {}
+            Button(LocalizationSupport.localized("OK"), role: .cancel) {}
         } message: {
             Text(viewModel.alertMessage ?? "")
         }
@@ -95,7 +95,7 @@ struct SettingsView: View {
         case .about:
             AboutSettingsView(viewModel: viewModel)
         case .contactUs:
-            ContactSupportSettingsView(viewModel: viewModel)
+            ContactSupportView(viewModel: viewModel)
         case .webPage(let title, let url):
             AboutWebView(url: url, title: title)
         case .studentPayments:
@@ -170,18 +170,28 @@ struct AccountSecuritySettingsView: View {
 
 struct LanguageSettingsView: View {
     let viewModel: SettingsViewModel
+    @State var localizationManager = LocalizationManager.shared
+
+    var service: any LocalizationServiceProtocol {
+        localizationManager.service
+    }
 
     var body: some View {
+        // Reading these triggers a re-render once the Remote Config refresh
+        // following a language change has completed.
+        let _ = localizationManager.languageCode
+        let _ = localizationManager.dataFetched
+
         Form {
-            Section(header: Text(LocalizationSupport.localized("Language"))) {
+            Section(header: Text(service.localized("Language"))) {
                 ForEach(SettingsLanguageChoice.allCases) { language in
                     Button {
                         viewModel.updateLanguage(language)
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(language.title)
-                                if let subtitle = language.subtitle {
+                                Text(localizedTitle(for: language))
+                                if let subtitle = localizedSubtitle(for: language) {
                                     Text(subtitle)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -197,6 +207,21 @@ struct LanguageSettingsView: View {
                     .foregroundStyle(.primary)
                 }
             }
+        }
+    }
+
+    private func localizedTitle(for language: SettingsLanguageChoice) -> String {
+        switch language {
+        case .system: service.localized("System Language")
+        case .english: service.localized("English")
+        case .hebrew: service.localized("Hebrew")
+        }
+    }
+
+    private func localizedSubtitle(for language: SettingsLanguageChoice) -> String? {
+        switch language {
+        case .system: service.localized("Use the device language")
+        case .english, .hebrew: nil
         }
     }
 }
@@ -216,7 +241,7 @@ struct AboutSettingsView: View {
     }
 }
 
-struct ContactSupportSettingsView: View {
+struct ContactSupportView: View {
     @Bindable var viewModel: SettingsViewModel
 
     var titleBinding: Binding<String> {

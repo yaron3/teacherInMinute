@@ -424,7 +424,7 @@ struct StatusRow: View {
 		.frame(width: 10, height: 10)
 		.overlay {
 		  if !isDone {
-			Text("!")
+			Text(LocalizationSupport.localized("!"))
 			  .font(.system(size: 7, weight: .bold))
 			  .foregroundStyle(theme.appPrimaryText)
 		  }

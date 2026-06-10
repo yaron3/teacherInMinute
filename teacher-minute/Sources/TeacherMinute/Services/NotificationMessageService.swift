@@ -170,7 +170,7 @@ final class NotificationMessageService {
         return NotificationMessage(
             id: id,
             source: source,
-            title: title.isEmpty ? "Message" : title,
+            title: title.isEmpty ? LocalizationSupport.localized("Message") : title,
             text: text,
             timestamp: dateValue(data["createdAt"])
                 ?? dateValue(data["timestamp"])

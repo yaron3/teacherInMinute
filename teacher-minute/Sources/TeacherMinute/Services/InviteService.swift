@@ -52,6 +52,7 @@ final class InviteService {
         let hasVoiceMessage = (dict["voiceMessageUrl"] as? String)?.isEmpty == false
           || (dict["audioUrl"] as? String)?.isEmpty == false
           || (dict["voiceUrl"] as? String)?.isEmpty == false
+        let voiceMessageDurationSeconds = Self.intValue(dict["voiceMessageDurationSeconds"])
         let studentName = Self.firstString(dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
         let studentId = Self.firstString(dict, keys: ["studentId", "studentUID", "studentId"])
         let connectionFeeCents = Self.intValue(dict["connectionFeeCents"]) ?? Self.intValue(dict["connectionFee"]) ?? 0
@@ -68,6 +69,7 @@ final class InviteService {
           wave: wave,
           photoUrls: photoUrls,
           hasVoiceMessage: hasVoiceMessage,
+          voiceMessageDurationSeconds: voiceMessageDurationSeconds,
           studentId: studentId,
           studentName: studentName,
           connectionFeeCents: connectionFeeCents,
@@ -143,6 +145,7 @@ final class InviteService {
         let hasVoiceMessage = (dict["voiceMessageUrl"] as? String)?.isEmpty == false
           || (dict["audioUrl"] as? String)?.isEmpty == false
           || (dict["voiceUrl"] as? String)?.isEmpty == false
+        let voiceMessageDurationSeconds = Self.intValue(dict["voiceMessageDurationSeconds"])
         let studentName = Self.firstString(dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
         let studentId = Self.firstString(dict, keys: ["studentId", "studentUID", "studentId"])
         let connectionFeeCents = Self.intValue(dict["connectionFeeCents"]) ?? Self.intValue(dict["connectionFee"]) ?? 0
@@ -160,6 +163,7 @@ final class InviteService {
           wave: wave,
           photoUrls: photoUrls,
           hasVoiceMessage: hasVoiceMessage,
+          voiceMessageDurationSeconds: voiceMessageDurationSeconds,
           studentId: studentId,
           studentName: studentName,
           connectionFeeCents: connectionFeeCents,

@@ -26,7 +26,7 @@ final class ConnectionSetupViewModel {
   init(
     participantName: String,
     conversationType: String,
-    footerText: String = "Your teacher will join shortly",
+    footerText: String = LocalizationSupport.localized("Your teacher will join shortly"),
     sessionViewModel: (any ChatSessionViewModeling)? = nil,
     liveKitRoom: String = "",
     liveKitToken: String = "",

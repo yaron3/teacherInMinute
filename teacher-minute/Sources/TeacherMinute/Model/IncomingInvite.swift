@@ -24,6 +24,7 @@ struct IncomingInvite: Identifiable {
   let wave: Int
   let photoUrls: [String]
   let hasVoiceMessage: Bool
+  let voiceMessageDurationSeconds: Int?
   let studentId: String
   let studentName: String
   let connectionFeeCents: Int
@@ -49,6 +50,7 @@ struct IncomingInvite: Identifiable {
   let wave: Int
   let photoUrls: [String]
   let hasVoiceMessage: Bool
+  let voiceMessageDurationSeconds: Int?
   let studentId: String
   let studentName: String
   let connectionFeeCents: Int

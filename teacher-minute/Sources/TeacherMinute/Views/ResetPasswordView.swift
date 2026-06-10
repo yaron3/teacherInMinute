@@ -33,7 +33,7 @@ struct ResetPasswordView: View {
             formCard
                 .padding(.top, 34)
 
-            AuthPrimaryButton(title: "Send Reset Link", isEnabled: viewModel.canSubmit) {
+            AuthPrimaryButton(title: LocalizationSupport.localized("Send Reset Link"), isEnabled: viewModel.canSubmit) {
                 viewModel.sendResetLink()
             }
             .padding(.top, 22)

@@ -82,7 +82,7 @@ struct TeacherSubjectsView: View {
 						  
 						  Spacer()
 						  
-						  Text(viewModel.selectedSubtopicTitles(for: area).isEmpty ? "Required" : "\(viewModel.selectedSubtopicTitles(for: area).count) selected")
+						  Text(viewModel.selectedSubtopicTitles(for: area).isEmpty ? LocalizationSupport.localized("Required") : "\(viewModel.selectedSubtopicTitles(for: area).count) selected")
 							.font(.system(size: 11, weight: .semibold))
 							.foregroundStyle(theme.authSecondaryText)
 							.padding(.horizontal, 10)

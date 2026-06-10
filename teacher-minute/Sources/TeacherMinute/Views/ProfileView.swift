@@ -430,7 +430,8 @@ struct ProfileEditView: View {
 
           ProfileCurrencyPicker(
             title: LocalizationSupport.localized("Currency"),
-            selectedCurrency: $viewModel.currency
+            selectedCurrency: $viewModel.currency,
+			availableCurrencies: viewModel.availableCurrencies
           )
 
           if viewModel.roleType == .teacher {
@@ -467,7 +468,7 @@ struct ProfileEditView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
-        Button("Cancel") {
+        Button(LocalizationSupport.localized("Cancel")) {
           viewModel.cancelProfileEditing()
           dismiss()
         }
@@ -541,6 +542,7 @@ struct ProfileTeachingGradePicker: View {
 struct ProfileCurrencyPicker: View {
   let title: String
   @Binding var selectedCurrency: String
+  var availableCurrencies:[String]
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.layoutDirection) var layoutDirection
   var theme: AppTheme {
@@ -550,7 +552,6 @@ struct ProfileCurrencyPicker: View {
     layoutDirection == .rightToLeft ? .trailing : .leading
   }
 
-  let currencies = ProfileViewModel.availableCurrencies
 
   var body: some View {
     VStack(alignment: contentAlignment, spacing: 10) {
@@ -572,7 +573,7 @@ struct ProfileCurrencyPicker: View {
       HStack {
         Spacer()
         FlowLayout(spacing: 10) {
-          ForEach(currencies, id: \.self) { code in
+          ForEach(availableCurrencies, id: \.self) { code in
             ProfileCurrencyChip(
               title: code,
               isSelected: selectedCurrency == code

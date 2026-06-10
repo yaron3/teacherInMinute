@@ -23,7 +23,7 @@ struct ChatInputBar: View {
   var body: some View {
 
       HStack(spacing: 10) {
-		TextField("Message", text: $text)
+		TextField(LocalizationSupport.localized("Message"), text: $text)
           .focused(isFocused)
           .textFieldStyle(.plain)
           .font(.system(size: 14))

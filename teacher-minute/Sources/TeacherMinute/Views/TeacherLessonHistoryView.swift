@@ -107,7 +107,7 @@ struct TeacherLessonHistoryView: View {
                 color: theme.appSecondaryText
             )
             
-            TextField("Search lessons or students", text: $viewModel.query)
+            TextField(LocalizationSupport.localized("Search lessons or students"), text: $viewModel.query)
                 .font(.system(size: 14))
                 .foregroundStyle(theme.appPrimaryText)
                 .textInputAutocapitalization(.never)

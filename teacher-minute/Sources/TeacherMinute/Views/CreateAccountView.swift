@@ -64,8 +64,8 @@ struct CreateAccountView: View {
 	.onChange(of: viewModel.focusField) { _, field in
 	  focusedField = field
 	}
-	.alert("Sign Up", isPresented: $viewModel.showAlert) {
-	  Button("OK", role: .cancel) { viewModel.showAlert = false }
+	.alert(LocalizationSupport.localized("Sign Up"), isPresented: $viewModel.showAlert) {
+	  Button(LocalizationSupport.localized("OK"), role: .cancel) { viewModel.showAlert = false }
 	} message: {
 	  Text(viewModel.alertMessage ?? "")
 	}
@@ -302,7 +302,7 @@ struct CreateAccountView: View {
 	  HStack(spacing: 10) {
 		PlatformIcon(systemName: type == .google ? "g.circle.fill" : "apple.logo")
 		  .font(.system(size: 20, weight: .semibold))
-		Text(type == .google ? "Google" : "Apple")
+		Text(type == .google ? LocalizationSupport.localized("Google") : LocalizationSupport.localized("Apple"))
 		  .font(.system(size: 15, weight: .semibold))
 	  }
 	  .foregroundStyle(theme.authPrimaryText)

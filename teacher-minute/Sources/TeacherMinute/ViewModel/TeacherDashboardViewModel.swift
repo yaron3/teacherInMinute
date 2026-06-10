@@ -34,6 +34,7 @@ final class TeacherDashboardViewModel {
   var inviteWaves: [String: Int] = [:]
   var invitePhotoUrls: [String: [String]] = [:]
   var inviteHasVoiceMessage: [String: Bool] = [:]
+  var inviteVoiceMessageDurations: [String: Int] = [:]
   var inviteStudentNames: [String: String] = [:]
   var inviteStudentUids: [String: String] = [:]
   var inviteConnectionFeeCents: [String: Int] = [:]
@@ -170,6 +171,7 @@ final class TeacherDashboardViewModel {
             "wave": $0.wave,
             "photoUrls": $0.photoUrls,
             "hasVoiceMessage": $0.hasVoiceMessage,
+            "voiceMessageDurationSeconds": $0.voiceMessageDurationSeconds as Any,
             "studentId": $0.studentId,
             "studentName": $0.studentName,
             "connectionFeeCents": $0.connectionFeeCents,
@@ -266,6 +268,7 @@ final class TeacherDashboardViewModel {
     var waves: [String: Int] = [:]
     var photoUrlsByID: [String: [String]] = [:]
     var hasVoiceByID: [String: Bool] = [:]
+    var voiceDurationsByID: [String: Int] = [:]
     var studentNames: [String: String] = [:]
     var studentIds: [String: String] = [:]
     var connectionFees: [String: Int] = [:]
@@ -304,6 +307,9 @@ final class TeacherDashboardViewModel {
       waves[id] = wave
       photoUrlsByID[id] = row["photoUrls"] as? [String] ?? []
       hasVoiceByID[id] = row["hasVoiceMessage"] as? Bool ?? false
+      if let duration = Self.intValue(row["voiceMessageDurationSeconds"]) {
+        voiceDurationsByID[id] = duration
+      }
       studentNames[id] = Self.firstString(row, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
       studentIds[id] = Self.firstString(row, keys: ["studentId", "studentUID", "studentId"])
       connectionFees[id] = Self.intValue(row["connectionFeeCents"]) ?? Self.intValue(row["connectionFee"]) ?? 0
@@ -330,6 +336,7 @@ final class TeacherDashboardViewModel {
     inviteWaves = waves
     invitePhotoUrls = photoUrlsByID
     inviteHasVoiceMessage = hasVoiceByID
+    inviteVoiceMessageDurations = voiceDurationsByID
     inviteStudentNames = studentNames
     inviteStudentUids = studentIds
     inviteConnectionFeeCents = connectionFees
