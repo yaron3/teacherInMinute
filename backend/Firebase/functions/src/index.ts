@@ -5,7 +5,7 @@ admin.initializeApp();
 export { onUserCreate } from "./users";
 
 // Dispatch pipeline
-export { dispatchQuestion, evaluateWave } from "./dispatch";
+export { dispatchQuestion, evaluateWave, onTeacherStatusChange } from "./dispatch";
 
 // Question lifecycle (all callable — FR-B-010)
 export { createQuestion, cancelQuestion, acceptInvite, declineInvite, getQuestionStatus } from "./questions";

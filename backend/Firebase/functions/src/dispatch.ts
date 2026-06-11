@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
+import { onValueWritten } from "firebase-functions/v2/database";
 import { getFunctions } from "firebase-admin/functions";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
@@ -455,5 +456,24 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
 
     await enqueueWaveEvaluation(qid, nextWave);
     logger.info(`[evaluateWave] qid=${qid} wave=${nextWave} enqueued`);
+  }
+);
+
+// ─── onTeacherStatusChange — RTDB trigger ────────────────────────────────────
+// Fires when teachers/{uid}/status is written. When a teacher comes online,
+// immediately check for any searching questions they can be backfilled into.
+// This is the counterpart to dispatchQuestion: it handles the case where a
+// teacher goes online *after* a question is already waiting.
+
+export const onTeacherStatusChange = onValueWritten(
+  "teachers/{uid}/status",
+  async (event) => {
+    const uid = event.params.uid;
+    const newStatus = event.data.after.val() as string | null;
+
+    if (newStatus !== "online") return;
+
+    logger.info(`[dispatch] teacher came online uid=${uid}, checking for waiting questions`);
+    await backfillPendingQuestionsForTeacher(uid);
   }
 );

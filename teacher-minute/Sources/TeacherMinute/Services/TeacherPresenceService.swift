@@ -173,6 +173,11 @@ final class TeacherPresenceService {
 	teacherRef?.child("status").setValue(status)
 	if status == "online" {
 	  teacherRef?.child("subjects").setValue(subjects)
+	  // Dead man's switch: Firebase server sets status offline if the connection drops
+	  // (app killed, crash, network loss) without an explicit goOffline() call
+	  teacherRef?.onDisconnectUpdateChildValues(["status": "offline"])
+	} else {
+	  teacherRef?.cancelDisconnectOperations()
 	}
 	logger.info("[Presence] wrote status=\(status) subjects=\(subjects) to DB")
   }
