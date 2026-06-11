@@ -16,6 +16,7 @@ object AndroidGoogleSignInManager {
     private const val TAG = "AndroidGoogleSignIn"
     private const val RC_SIGN_IN = 9001
     private const val TIMEOUT_SECONDS = 300L
+    private const val FALLBACK_WEB_CLIENT_ID = "922632930084-7md141m795p7c3hkkj8ri3na4h2r1a06.apps.googleusercontent.com"
 
     private data class PendingSignIn(
         val latch: CountDownLatch = CountDownLatch(1),
@@ -127,7 +128,7 @@ object AndroidGoogleSignInManager {
             return activity.getString(resourceId)
         }
 
-        return ""
+        return FALLBACK_WEB_CLIENT_ID
     }
 
     private fun completePending(result: String = "", error: Throwable? = null) {

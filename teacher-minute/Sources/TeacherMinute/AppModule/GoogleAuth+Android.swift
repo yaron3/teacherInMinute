@@ -16,6 +16,14 @@ struct AndroidGoogleAuth {
         logger.info("Android Google sign-in result: \(result)")
         return result
     }
+
+    static func uid(from signInResult: String) -> String? {
+        let parts = signInResult.split(separator: "|", omittingEmptySubsequences: false)
+        guard parts.count >= 2, parts[0] == "success", !parts[1].isEmpty else {
+            return nil
+        }
+        return String(parts[1])
+    }
 }
 
 private enum AndroidGoogleSignInBridge {

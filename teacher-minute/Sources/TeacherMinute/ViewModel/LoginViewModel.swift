@@ -78,7 +78,7 @@ final class LoginViewModel {
   
   func loginWithGoogle() {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.loginStart, parameters: ["method": "google"])
-#if canImport(UIKit)
+#if os(iOS)
 	iOSGoogleSignInProvider().signIn { [weak self] result in
 	  switch result {
 		case .success:
@@ -104,30 +104,30 @@ final class LoginViewModel {
 	}
 #endif
 #if os(Android)
-		logger.info("Android Google login tapped")
-		Task {
-		  do {
-			_ = try await AndroidGoogleAuth().signIn()
-			guard let uid = Auth.auth().currentUser?.uid else {
-			  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": "no_session"])
-			  present(message: "Could not retrieve user session. Please try again.")
-			  return
-			}
-			AnalyticsService.shared.setUser(uid: uid)
-			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
-			let resume = try await UserService.shared.resumeRoute(uid: uid)
-			destination = resume
-		  } catch {
-			AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
-			present(message: error.localizedDescription)
-		  }
+	logger.info("Android Google login tapped")
+	Task {
+	  do {
+		let signInResult = try await AndroidGoogleAuth().signIn()
+		guard let uid = Auth.auth().currentUser?.uid ?? AndroidGoogleAuth.uid(from: signInResult) else {
+		  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": "no_session"])
+		  present(message: "Could not retrieve user session. Please try again.")
+		  return
 		}
+		AnalyticsService.shared.setUser(uid: uid)
+		AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
+		let resume = try await UserService.shared.resumeRoute(uid: uid)
+		destination = resume
+	  } catch {
+		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
+		present(message: error.localizedDescription)
+	  }
+	}
 #endif
   }
 
   func loginWithApple() {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.loginStart, parameters: ["method": "apple"])
-#if canImport(UIKit)
+#if os(iOS)
 	iOSAppleSignInProvider().signIn { [weak self] result in
 	  switch result {
 		case .success:
@@ -151,27 +151,9 @@ final class LoginViewModel {
 		  Task { @MainActor in self?.present(message: error.localizedDescription) }
 	  }
 	}
-#elseif os(Android)
-	logger.info("Android Apple login tapped")
-	Task {
-	  do {
-		_ = try await AndroidAppleAuth().signIn()
-		guard let uid = Auth.auth().currentUser?.uid else {
-		  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": "no_session"])
-		  present(message: "Could not retrieve user session. Please try again.")
-		  return
-		}
-		AnalyticsService.shared.setUser(uid: uid)
-		AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "apple"])
-		let resume = try await UserService.shared.resumeRoute(uid: uid)
-		destination = resume
-	  } catch {
-		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
-		present(message: error.localizedDescription)
-	  }
-	}
 #endif
   }
+
   func forgotPassword() {
     let email = emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !email.isEmpty else {

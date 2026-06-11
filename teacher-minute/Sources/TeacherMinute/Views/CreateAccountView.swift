@@ -291,7 +291,9 @@ struct CreateAccountView: View {
   var socialButtons: some View {
 	HStack(spacing: 16) {
 	  socialButton(type: .google)
-	  socialButton(type: .apple)
+	  #if !os(Android)
+		  socialButton(type: .apple)
+#endif
 	}
   }
   

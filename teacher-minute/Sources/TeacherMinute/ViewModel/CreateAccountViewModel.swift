@@ -153,7 +153,7 @@ final class CreateAccountViewModel {
   
   func signupWithGoogle() {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpStart, parameters: ["method": "google"])
-#if canImport(UIKit)
+#if os(iOS)
 	iOSGoogleSignInProvider().signIn { [weak self] result in
 	  switch result {
 		case .success:
@@ -170,54 +170,42 @@ final class CreateAccountViewModel {
 	}
 #endif
 #if os(Android)
-		logger.info("Android Google sign-up tapped")
-		Task {
-		  do {
-			_ = try await AndroidGoogleAuth().signIn()
-			await resolveRouteAfterSocialSignIn(method: "google")
-		  } catch {
-			AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
-			alertMessage = error.localizedDescription
-			showAlert = true
-		  }
-		}
+	logger.info("Android Google sign-up tapped")
+	Task {
+	  do {
+		let signInResult = try await AndroidGoogleAuth().signIn()
+		await resolveRouteAfterSocialSignIn(method: "google", uidOverride: AndroidGoogleAuth.uid(from: signInResult))
+	  } catch {
+		AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
+		alertMessage = error.localizedDescription
+		showAlert = true
+	  }
+	}
 #endif
   }
 
   func signupWithApple() {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpStart, parameters: ["method": "apple"])
-#if canImport(UIKit)
-		iOSAppleSignInProvider().signIn { [weak self] result in
-		  switch result {
-			case .success:
-			  Task { @MainActor in
-				await self?.resolveRouteAfterSocialSignIn(method: "apple")
-			  }
-			case .failure(let error):
-			  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
-			  Task { @MainActor in
-				self?.alertMessage = error.localizedDescription
-				self?.showAlert = true
-			  }
+#if os(iOS)
+	iOSAppleSignInProvider().signIn { [weak self] result in
+	  switch result {
+		case .success:
+		  Task { @MainActor in
+			await self?.resolveRouteAfterSocialSignIn(method: "apple")
 		  }
-		}
-#elseif os(Android)
-		logger.info("Android Apple sign-up tapped")
-		Task {
-		  do {
-			_ = try await AndroidAppleAuth().signIn()
-			await resolveRouteAfterSocialSignIn(method: "apple")
-		  } catch {
-			AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
-			alertMessage = error.localizedDescription
-			showAlert = true
+		case .failure(let error):
+		  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
+		  Task { @MainActor in
+			self?.alertMessage = error.localizedDescription
+			self?.showAlert = true
 		  }
-		}
+	  }
+	}
 #endif
   }
 
-  private func resolveRouteAfterSocialSignIn(method: String) async {
-	guard let uid = Auth.auth().currentUser?.uid else {
+  private func resolveRouteAfterSocialSignIn(method: String, uidOverride: String? = nil) async {
+	guard let uid = Auth.auth().currentUser?.uid ?? uidOverride else {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": method, "reason": "no_session"])
 	  alertMessage = "Could not retrieve user session. Please try again."
 	  showAlert = true
