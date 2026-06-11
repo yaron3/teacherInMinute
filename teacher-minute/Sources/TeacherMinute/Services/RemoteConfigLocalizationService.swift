@@ -7,9 +7,33 @@ import Foundation
 struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
     func localized(_ english: String) -> String {
         let key = LocalizationKey.key(for: english)
+        let languageCode = LocalizationSupport.currentLanguageCode
         let value = RemoteConfigService.readString(key)
-        return value.isEmpty ? english : value
+        let fallback = Self.localFallback(for: english, languageCode: languageCode)
+        let shouldUseFallback = value.isEmpty || (languageCode != "en" && value == english)
+        let resolvedValue = shouldUseFallback ? (fallback ?? english) : value
+        #if os(Android)
+        logger.info("[Localization][Android] english='\(Self.debugSnippet(english))' key='\(key)' language=\(languageCode) fallback=\(shouldUseFallback) value='\(Self.debugSnippet(resolvedValue))'")
+        #endif
+        return resolvedValue
     }
+
+    private static func localFallback(for english: String, languageCode: String) -> String? {
+        guard languageCode == "he" else { return nil }
+        return hebrewFallbacks[english]
+    }
+
+    private static let hebrewFallbacks: [String: String] = [
+        "I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)": "אני מסכים/ה ל[תנאי השירות](teacherminute://terms) ול[מדיניות הפרטיות.](teacherminute://privacy)",
+        "Terms of Service": "תנאי השירות"
+    ]
+
+    #if os(Android)
+    private static func debugSnippet(_ value: String) -> String {
+        let sanitized = value.replacingOccurrences(of: "\n", with: "\\n")
+        return sanitized.count > 80 ? String(sanitized.prefix(80)) + "..." : sanitized
+    }
+    #endif
 }
 
 /// Mapping from human-readable English source strings to the snake-case keys
@@ -51,6 +75,7 @@ enum LocalizationKey {
         "ACCOUNT & SECURITY": "account_security_caps",
         "Algebra": "algebra_a",
         "Already have an account?": "already_have_account_qmark",
+        "I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)": "agree_terms_privacy_markdown",
         "Are you sure you want to end this session?": "are_you_sure_end_session",
         "Audio": "audio_title",
         "Could not send rating. Please try again next time.": "could_not_send_dot_a",
@@ -103,6 +128,7 @@ enum LocalizationKey {
         "Student": "student_b",
         "Subjects": "subjects_title",
         "Teacher": "teacher_b",
+        "Terms of Service": "terms_of_service",
         "Upload a clear photo of your passport, driver's license,\nor national ID.": "upload_clear_photo_dot",
         "Use the device language": "use_the_device_language",
         "WAITING": "waiting_caps",

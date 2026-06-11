@@ -7,6 +7,7 @@ import UIKit
 enum LocalizationSupport {
     static let languagePreferenceKey = "settings.language.preference"
     private static let supportedLanguageCodes = ["en", "he"]
+    private static let legacyLanguageCodeAliases = ["iw": "he"]
 
     static var currentLocale: Locale {
         Locale(identifier: currentLanguageCode)
@@ -38,30 +39,33 @@ enum LocalizationSupport {
     /// 3. Device language (Settings → General → Language & Region)
     /// 4. English fallback
     static var currentLanguageCode: String {
-        #if !os(Android)
-        let inAppRaw = UserDefaults.standard.string(forKey: languagePreferenceKey) ?? "<unset>"
-        let appleLanguages = (UserDefaults.standard.array(forKey: "AppleLanguages") as? [String]) ?? []
-        //logger.info("[Localization] resolve — inAppPref='\(inAppRaw)' AppleLanguages=\(appleLanguages) Locale.preferredLanguages=\(Locale.preferredLanguages) Bundle.main.preferredLocalizations=\(Bundle.main.preferredLocalizations) Bundle.main.localizations=\(Bundle.main.localizations)")
-        #endif
         if let code = preferredLanguageCode {
-            //logger.info("[Localization] using in-app preference → \(code)")
+            //logger.info("[Localization] using in-app preference -> \(code)")
             return code
         }
         return systemLanguageCode
     }
 
     private static var systemLanguageCode: String {
-        #if !os(Android)
+        #if os(Android)
+        if let code = normalizedSupportedLanguageCode(for: Locale.current.identifier) {
+            return code
+        }
+        if let languageCode = Locale.current.language.languageCode?.identifier,
+           let code = normalizedSupportedLanguageCode(for: languageCode) {
+            return code
+        }
+        #else
         // `Locale.preferredLanguages` reads `AppleLanguages` from the app's
         // UserDefaults. iOS prepends the per-app language override (if set in
-        // Settings → App → Language) to that list, so iterating naturally
+        // Settings -> App -> Language) to that list, so iterating naturally
         // applies the per-app choice first, then the device language list.
         // We avoid `Bundle.main.preferredLocalizations` because the app's
         // localized strings live in `Bundle.module`, so the main bundle may
         // not advertise Hebrew and would incorrectly fall back to "en".
         for identifier in Locale.preferredLanguages {
             if let code = normalizedSupportedLanguageCode(for: identifier) {
-             //   logger.info("[Localization] matched Locale.preferredLanguages entry '\(identifier)' → \(code)")
+             //   logger.info("[Localization] matched Locale.preferredLanguages entry '\(identifier)' -> \(code)")
                 return code
             }
         }
@@ -72,7 +76,8 @@ enum LocalizationSupport {
 
     private static func normalizedSupportedLanguageCode(for identifier: String) -> String? {
         let languageCode = Locale(identifier: identifier).language.languageCode?.identifier ?? identifier
-        return supportedLanguageCodes.contains(languageCode) ? languageCode : nil
+        let normalizedCode = legacyLanguageCodeAliases[languageCode] ?? languageCode
+        return supportedLanguageCodes.contains(normalizedCode) ? normalizedCode : nil
     }
 
     static func locale(languagePreference rawValue: String) -> Locale {

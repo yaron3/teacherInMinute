@@ -44,6 +44,7 @@ open class AndroidAppMain: Application {
         super.onCreate()
         logger.info("starting app")
         ProcessInfo.launch(applicationContext)
+        AndroidLocaleManager.initialize(this)
         AndroidLocalNotificationManager.initialize(this)
         AndroidPushTokenManager.initialize(this)
         AppDelegate.shared.onInit()

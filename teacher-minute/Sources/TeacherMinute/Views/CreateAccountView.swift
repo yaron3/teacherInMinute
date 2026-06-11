@@ -232,7 +232,7 @@ struct CreateAccountView: View {
 	func termsTextView() -> some View {
 	  let markdown = LocalizationSupport.localized("I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)")
 
-	  return Text(LocalizationSupport.localized(markdown))
+	  return Text(markdown)
 		.font(.system(size: 14))
 		.lineSpacing(4)
 		.foregroundStyle(theme.authSecondaryText)

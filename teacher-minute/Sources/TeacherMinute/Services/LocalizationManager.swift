@@ -1,4 +1,9 @@
 import SwiftUI
+#if !os(Android)
+import FirebaseAnalytics
+#else
+import SkipFirebaseAnalytics
+#endif
 #if SKIP
 import SkipFuseUI
 #endif
@@ -41,6 +46,7 @@ final class LocalizationManager {
         // Config evaluates `device.language` against the user's chosen app
         // language rather than the JVM/system default.
         Self.applySystemLocaleOverride(for: savedCode)
+        Self.applyRemoteConfigLanguageSignal(resolvedCode)
     }
 
     /// Applies the new language to the process-wide locale, then awaits the
@@ -62,6 +68,7 @@ final class LocalizationManager {
         UserDefaults.standard.synchronize()
 
         Self.applySystemLocaleOverride(for: newLanguageCode)
+        Self.applyRemoteConfigLanguageSignal(resolvedCode)
 
         isLoading = true
         dataFetched = false
@@ -94,15 +101,19 @@ final class LocalizationManager {
     /// Aligns the process-wide locale with the user's chosen language so the
     /// Firebase Remote Config SDK sends the matching `device.language` on its
     /// next fetch. iOS reads from `AppleLanguages` automatically (we wrote it
-    /// to `UserDefaults` above), so this is currently a no-op outside Android.
-    /// The Android branch needs a Kotlin `LocaleBridge` helper added before it
-    /// can override `java.util.Locale.getDefault()`.
+    /// to `UserDefaults` above), while Android needs an explicit JVM default
+    /// locale update before fetching Remote Config.
     private static func applySystemLocaleOverride(for code: String) {
         #if os(Android)
-        // TODO: Add a Kotlin `LocaleBridge` static helper under
-        // Android/app/src/main/kotlin and dispatch to it here so the JVM
-        // default locale matches the chosen language on Android.
-        _ = code
+        AndroidLocaleBridge.applyLanguageCode(resolvedLanguageCode(for: code))
         #endif
+    }
+
+    static func applyRemoteConfigLanguageSignal(_ languageCode: String = LocalizationSupport.currentLanguageCode) {
+        Analytics.setUserProperty(languageCode, forName: "app_language")
+        #if os(Android)
+        AndroidLocaleBridge.applyRemoteConfigLanguageSignal(languageCode)
+        #endif
+        logger.info("[Localization] applied Remote Config language signal app_language=\(languageCode)")
     }
 }

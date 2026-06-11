@@ -27,10 +27,30 @@ final class RemoteConfigService {
     /// Configure Remote Config and kick off the first fetch.
     /// Call once at app launch. Subsequent reads are served from memory.
     func start() {
-        guard firstFetch == nil else { return }
+        guard firstFetch == nil else {
+            #if os(Android)
+            logger.info("[RemoteConfig][Android] start skipped; first fetch task already exists")
+            #endif
+            return
+        }
+        LocalizationManager.applyRemoteConfigLanguageSignal()
+        #if os(Android)
+        AndroidLocaleBridge.applyLanguageCode(LocalizationSupport.currentLanguageCode)
+        #endif
         configureRemoteConfig()
+        #if os(Android)
+        logger.info("[RemoteConfig][Android] start; language=\(LocalizationSupport.currentLanguageCode) locale=\(LocalizationSupport.currentLocale.identifier)")
+        #endif
         firstFetch = Task { @MainActor in
-            _ = try? await RemoteConfig.remoteConfig().fetchAndActivate()
+            let remoteConfig = RemoteConfig.remoteConfig()
+            do {
+                let status = try await remoteConfig.fetchAndActivate()
+                #if os(Android)
+                Self.logFetchState(remoteConfig, context: "initial fetchAndActivate", activateStatus: status)
+                #endif
+            } catch {
+                logger.error("[RemoteConfig] initial fetchAndActivate failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -44,9 +64,23 @@ final class RemoteConfigService {
     /// template — `fetchAndActivate()` alone honors `minimumFetchInterval`
     /// and would otherwise serve cached values for up to an hour.
     func refresh() async {
+        LocalizationManager.applyRemoteConfigLanguageSignal()
+        #if os(Android)
+        AndroidLocaleBridge.applyLanguageCode(LocalizationSupport.currentLanguageCode)
+        #endif
         let remoteConfig = RemoteConfig.remoteConfig()
-        _ = try? await remoteConfig.fetch(withExpirationDuration: 0)
-        _ = try? await remoteConfig.activate()
+        #if os(Android)
+        logger.info("[RemoteConfig][Android] refresh; language=\(LocalizationSupport.currentLanguageCode) locale=\(LocalizationSupport.currentLocale.identifier)")
+        #endif
+        do {
+            let fetchStatus = try await remoteConfig.fetch(withExpirationDuration: 0)
+            let activated = try await remoteConfig.activate()
+            #if os(Android)
+            Self.logFetchState(remoteConfig, context: "refresh", fetchStatus: fetchStatus, activated: activated)
+            #endif
+        } catch {
+            logger.error("[RemoteConfig] refresh failed: \(error.localizedDescription)")
+        }
     }
 
     private func configureRemoteConfig() {
@@ -55,6 +89,9 @@ final class RemoteConfigService {
         settings.minimumFetchInterval = 3600
         settings.fetchTimeout = 15
         remoteConfig.configSettings = settings
+        #if os(Android)
+        logger.info("[RemoteConfig][Android] configured; minimumFetchInterval=\(settings.minimumFetchInterval) fetchTimeout=\(settings.fetchTimeout)")
+        #endif
     }
 
     // MARK: - Sync accessors
@@ -76,10 +113,13 @@ final class RemoteConfigService {
     /// run outside the main actor. Firebase Remote Config reads are thread-safe
     /// once `start()` has activated the initial fetch.
     nonisolated static func readString(_ key: String) -> String {
-        RemoteConfig.remoteConfig()
-            .configValue(forKey: key)
-            .stringValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = RemoteConfig.remoteConfig().configValue(forKey: key)
+        let stringValue = value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        #if os(Android)
+        let source = Self.debugSourceName(value.source)
+        logger.info("[RemoteConfig][Android] read key='\(key)' source=\(source) empty=\(stringValue.isEmpty) length=\(stringValue.count)")
+        #endif
+        return stringValue
     }
 
     func getNumber(_ key: String) -> Double {
@@ -100,6 +140,9 @@ final class RemoteConfigService {
 
     func getStringArray(_ key: String) -> [String] {
         let value = RemoteConfig.remoteConfig().configValue(forKey: key)
+        #if os(Android)
+        logger.info("[RemoteConfig][Android] read array key='\(key)' source=\(Self.debugSourceName(value.source)) rawLength=\(value.stringValue.count)")
+        #endif
         if let array = value.jsonValue as? [String] {
             return array
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -111,4 +154,47 @@ final class RemoteConfigService {
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
     }
+
+    #if os(Android)
+    private static func logFetchState(
+        _ remoteConfig: RemoteConfig,
+        context: String,
+        fetchStatus: RemoteConfigFetchStatus? = nil,
+        activateStatus: RemoteConfigFetchAndActivateStatus? = nil,
+        activated: Bool? = nil
+    ) {
+        let keys = remoteConfig.allKeys(from: .remote).sorted()
+        let sampleKeys = keys.prefix(12).joined(separator: ",")
+        let fetchStatusText = fetchStatus.map { debugFetchStatusName($0) } ?? "nil"
+        let activateStatusText = activateStatus.map { debugActivateStatusName($0) } ?? "nil"
+        let activatedText = activated.map { String($0) } ?? "nil"
+        let lastFetchTime = remoteConfig.lastFetchTime?.description ?? "nil"
+        logger.info("[RemoteConfig][Android] \(context); fetchStatus=\(fetchStatusText) activateStatus=\(activateStatusText) activated=\(activatedText) lastFetchStatus=\(debugFetchStatusName(remoteConfig.lastFetchStatus)) lastFetchTime=\(lastFetchTime) keyCount=\(keys.count) sampleKeys=\(sampleKeys)")
+    }
+
+    nonisolated private static func debugSourceName(_ source: RemoteConfigSource) -> String {
+        switch source {
+        case .remote: return "remote"
+        case .default: return "default"
+        case .static: return "static"
+        }
+    }
+
+    private static func debugFetchStatusName(_ status: RemoteConfigFetchStatus) -> String {
+        switch status {
+        case .noFetchYet: return "noFetchYet"
+        case .success: return "success"
+        case .failure: return "failure"
+        case .throttled: return "throttled"
+        }
+    }
+
+    private static func debugActivateStatusName(_ status: RemoteConfigFetchAndActivateStatus) -> String {
+        switch status {
+        case .successFetchedFromRemote: return "successFetchedFromRemote"
+        case .successUsingPreFetchedData: return "successUsingPreFetchedData"
+        case .error: return "error"
+        }
+    }
+    #endif
 }
