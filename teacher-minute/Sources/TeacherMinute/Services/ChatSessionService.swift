@@ -64,10 +64,12 @@ final class ChatSessionService {
   private let messagesRef: FirebaseDatabase.DatabaseReference
   private let boardRef: FirebaseDatabase.DatabaseReference
   private let boardViewportsRef: FirebaseDatabase.DatabaseReference
+  private let chatPausedRef: FirebaseDatabase.DatabaseReference
   private var sessionHandle: DatabaseHandle?
   private var messagesHandle: DatabaseHandle?
   private var boardHandle: DatabaseHandle?
   private var boardViewportsHandle: DatabaseHandle?
+  private var chatPausedHandle: DatabaseHandle?
 #endif
 
   init(questionId: String, currentUserUid: String? = nil) {
@@ -79,6 +81,7 @@ final class ChatSessionService {
     self.messagesRef = questionRef.child("messages")
     self.boardRef = questionRef.child("board/strokes")
     self.boardViewportsRef = questionRef.child("board/viewports")
+    self.chatPausedRef = questionRef.child("chatPaused")
 #endif
   }
 
@@ -207,6 +210,23 @@ final class ChatSessionService {
 #endif
   }
 
+  func startChatPausedListening(onUpdate: @escaping ([String: Bool]) -> Void) {
+#if !os(Android)
+    chatPausedHandle = chatPausedRef.observe(.value) { snapshot in
+      var states: [String: Bool] = [:]
+      for child in snapshot.children {
+        guard let snap = child as? DataSnapshot else { continue }
+        if let flag = snap.value as? Bool {
+          states[snap.key] = flag
+        } else if let num = snap.value as? NSNumber {
+          states[snap.key] = num.boolValue
+        }
+      }
+      onUpdate(states)
+    }
+#endif
+  }
+
   func stopListening() {
 #if !os(Android)
     if let sessionHandle {
@@ -224,6 +244,10 @@ final class ChatSessionService {
     if let boardViewportsHandle {
       boardViewportsRef.removeObserver(withHandle: boardViewportsHandle)
       self.boardViewportsHandle = nil
+    }
+    if let chatPausedHandle {
+      chatPausedRef.removeObserver(withHandle: chatPausedHandle)
+      self.chatPausedHandle = nil
     }
 #endif
   }
@@ -324,7 +348,48 @@ final class ChatSessionService {
 #endif
   }
 
+  func setChatPaused(_ paused: Bool, role: String) async throws {
+    let trimmedRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let key = trimmedRole.isEmpty ? "participant" : trimmedRole
+
 #if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.setChatPaused(
+        questionId: self.questionId,
+        role: key,
+        paused: paused
+      )
+    }.value
+#else
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      chatPausedRef.child(key).setValue(paused) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
+#if os(Android)
+  func fetchChatPaused() async throws -> [String: Bool] {
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchChatPaused(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let rows = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return [:]
+    }
+    var states: [String: Bool] = [:]
+    for (key, value) in rows {
+      if let flag = value as? Bool {
+        states[key] = flag
+      } else if let num = value as? NSNumber {
+        states[key] = num.boolValue
+      }
+    }
+    return states
+  }
+
   func fetchMessages() async throws -> [ChatMessage] {
     let json = try await Task.detached(priority: .userInitiated) {
       try AndroidChatBridge.fetchMessages(questionId: self.questionId)
@@ -509,6 +574,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var messages: [ChatMessage] { get set }
   var boardStrokes: [BoardStroke] { get set }
   var boardViewports: [String: BoardViewport] { get set }
+  var chatPausedStates: [String: Bool] { get set }
   var errorMessage: String? { get set }
   var isConnecting: Bool { get set }
   var participantName: String { get }
@@ -521,6 +587,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var onMessagesUpdated: (([ChatMessage]) -> Void)? { get set }
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)? { get set }
   var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)? { get set }
+  var onChatPausedUpdated: (([String: Bool]) -> Void)? { get set }
   var onErrorUpdated: ((String?) -> Void)? { get set }
   var onConnectingUpdated: ((Bool) -> Void)? { get set }
   var onSessionDetailsUpdated: (() -> Void)? { get set }
@@ -538,6 +605,8 @@ protocol ChatSessionViewModeling: AnyObject {
   func sendStroke(_ points: [BoardPoint])
   func clearBoard()
   func updateBoardViewport(_ viewport: BoardViewport)
+  func setSelfChatPaused(_ paused: Bool)
+  func peerChatPaused() -> Bool
   func endLesson() async
 }
 
@@ -549,6 +618,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var messages: [ChatMessage] = []
   var boardStrokes: [BoardStroke] = []
   var boardViewports: [String: BoardViewport] = [:]
+  var chatPausedStates: [String: Bool] = [:]
   var draft = ""
   var errorMessage: String?
   var isConnecting = true
@@ -591,6 +661,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
   var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
+  var onChatPausedUpdated: (([String: Bool]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
@@ -603,6 +674,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private var pollingTask: Task<Void, Never>?
   private var hasReportedLessonEnd = false
   private var didObserveActiveSession = false
+  private var lastSentChatPaused: Bool?
 
   init(questionId: String, role: String, initialDetails: ChatSessionDetails? = nil) {
     self.questionId = questionId
@@ -674,13 +746,16 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           let rows = try await service.fetchMessages()
           let strokes = try await service.fetchBoardStrokes()
           let viewports = try await service.fetchBoardViewports()
+          let paused = try await service.fetchChatPaused()
           guard !Task.isCancelled else { return }
           messages = rows
           boardStrokes = strokes
           boardViewports = viewports
+          chatPausedStates = paused
           onMessagesUpdated?(rows)
           onBoardStrokesUpdated?(strokes)
           onBoardViewportsUpdated?(viewports)
+          onChatPausedUpdated?(paused)
         } catch {
           errorMessage = error.localizedDescription
           onErrorUpdated?(errorMessage)
@@ -705,6 +780,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     service.startBoardViewportListening { [weak self] viewports in
       self?.boardViewports = viewports
       self?.onBoardViewportsUpdated?(viewports)
+    }
+    service.startChatPausedListening { [weak self] states in
+      self?.chatPausedStates = states
+      self?.onChatPausedUpdated?(states)
     }
 #endif
   }
@@ -839,7 +918,35 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     }
   }
 
+  func setSelfChatPaused(_ paused: Bool) {
+    if lastSentChatPaused == paused { return }
+    lastSentChatPaused = paused
+    let selfKey = roleKey(role)
+    chatPausedStates[selfKey] = paused
+    Task {
+      do {
+        try await service.setChatPaused(paused, role: role)
+      } catch {
+        logger.error("[ChatSession] setChatPaused failed paused=\(paused): \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func peerChatPaused() -> Bool {
+    let selfKey = roleKey(role)
+    for (key, value) in chatPausedStates where key != selfKey && value {
+      return true
+    }
+    return false
+  }
+
+  private func roleKey(_ role: String) -> String {
+    let trimmed = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    return trimmed.isEmpty ? "participant" : trimmed
+  }
+
   func endLesson() async {
+    setSelfChatPaused(false)
     await reportLessonEnded()
     await LiveKitService.shared.disconnect()
     stop()
@@ -1022,6 +1129,14 @@ private enum AndroidChatBridge {
     name: "updateBoardViewport",
     sig: "(Ljava/lang/String;Ljava/lang/String;DDDD)V"
   )!
+  private static let setChatPausedMethod = managerClass.getStaticMethodID(
+    name: "setChatPaused",
+    sig: "(Ljava/lang/String;Ljava/lang/String;Z)V"
+  )!
+  private static let fetchChatPausedMethod = managerClass.getStaticMethodID(
+    name: "fetchChatPausedJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
   private static let markQuestionAcceptedMethod = managerClass.getStaticMethodID(
     name: "markQuestionAccepted",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
@@ -1120,6 +1235,30 @@ private enum AndroidChatBridge {
         ]
       )
     }
+  }
+
+  static func setChatPaused(questionId: String, role: String, paused: Bool) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setChatPausedMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat]),
+          paused.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func fetchChatPaused(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchChatPausedMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
   }
 
   static func markQuestionAccepted(questionId: String, teacherId: String) throws {

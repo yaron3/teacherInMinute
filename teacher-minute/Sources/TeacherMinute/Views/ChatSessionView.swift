@@ -44,6 +44,9 @@ struct ChatSessionView: View {
   @State var isMicMuted = false
   @State var isCameraOff = false
   @State var liveKitRevision = 0
+  @State var peerChatPaused = false
+  @State var teacherPreviewOffset: CGSize = .zero
+  @State var teacherPreviewAccumOffset: CGSize = .zero
   @State var conversationType: String
   @State var isRatingPromptVisible = false
   @State var endSessionPrompt: EndSessionPrompt?
@@ -173,6 +176,13 @@ struct ChatSessionView: View {
       }
       viewModel.onBoardViewportsUpdated = { viewports in
         boardViewports = viewports
+      }
+      viewModel.onChatPausedUpdated = { _ in
+        let newValue = viewModel.peerChatPaused()
+        if peerChatPaused != newValue {
+          peerChatPaused = newValue
+          applyVideoPauseState()
+        }
       }
       viewModel.onErrorUpdated = { error in
         errorMessage = error
@@ -552,24 +562,28 @@ struct ChatSessionView: View {
 
   @ViewBuilder
   var compactVideoSessionLayout: some View {
-    if selectedTab == .VIDEO {
+    if selectedTab == .CHAT {
+      ZStack(alignment: .bottomTrailing) {
+        VStack(spacing: 0) {
+          if messages.count == 0 {
+            sessionNotice
+          }
+          ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        if !isStudent && !peerChatPaused {
+          draggableTeacherPreview
+            .padding(12)
+        }
+      }
+    } else if selectedTab == .VIDEO {
       compactBottomVideoStrip
         .frame(maxHeight: .infinity)
     } else {
       VStack(spacing: 0) {
-        Group {
-          if selectedTab == .CHAT {
-            VStack(spacing: 0) {
-              if messages.count == 0 {
-                sessionNotice
-              }
-              ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
-            }
-          } else {
-            whiteboard
-          }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        whiteboard
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         compactBottomVideoStrip
           .frame(height: 220)
@@ -585,7 +599,9 @@ struct ChatSessionView: View {
     ZStack(alignment: .bottomTrailing) {
       VStack(spacing: 0) {
         Spacer(minLength: 0)
-        if let remoteTrack {
+        if peerChatPaused {
+          peerPausedPanel
+        } else if let remoteTrack {
           SwiftUIVideoView(remoteTrack, layoutMode: .fit)
             .id(ObjectIdentifier(remoteTrack))
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -597,7 +613,7 @@ struct ChatSessionView: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
       }
-      if isStudent {
+      if isStudent && !peerChatPaused {
         localPreview(localTrack: localTrack)
           .padding(10)
       }
@@ -607,9 +623,82 @@ struct ChatSessionView: View {
     .padding(.bottom, 8)
     .id(liveKitRevision)
 #else
-    AndroidVideoFeed(isStudent: isStudent, isCameraOff: isCameraOff, theme: theme)
-      .padding(.horizontal, 12)
-      .padding(.bottom, 8)
+    if peerChatPaused {
+      peerPausedPanel
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    } else {
+      AndroidVideoFeed(isStudent: isStudent, isCameraOff: isCameraOff, theme: theme)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    }
+#endif
+  }
+
+  var peerPausedPanel: some View {
+    RoundedRectangle(cornerRadius: 18, style: .continuous)
+      .fill(Color.black.opacity(0.85))
+      .overlay {
+        VStack(spacing: 10) {
+          PlatformIcon(
+            systemName: "video.slash.fill",
+            size: 30,
+            weight: .semibold,
+            color: theme.white.opacity(0.9)
+          )
+          Text(peerPausedMessage)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.white)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 18)
+        }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  var peerPausedMessage: String {
+    if isStudent {
+      return LocalizationSupport.localized("Teacher is reading chat — video paused")
+    }
+    return LocalizationSupport.localized("Student is reading chat — video paused")
+  }
+
+  @ViewBuilder
+  var draggableTeacherPreview: some View {
+#if !os(Android)
+    let localTrack = LiveKitService.shared.localCameraVideoTrack
+    localPreview(localTrack: localTrack)
+      .offset(teacherPreviewOffset)
+      .gesture(
+        DragGesture()
+          .onChanged { value in
+            teacherPreviewOffset = CGSize(
+              width: teacherPreviewAccumOffset.width + value.translation.width,
+              height: teacherPreviewAccumOffset.height + value.translation.height
+            )
+          }
+          .onEnded { _ in
+            teacherPreviewAccumOffset = teacherPreviewOffset
+          }
+      )
+      .id(liveKitRevision)
+#else
+    AndroidVideoFeed(isStudent: false, isCameraOff: isCameraOff, theme: theme)
+      .frame(width: 96, height: 132)
+      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .offset(teacherPreviewOffset)
+      .gesture(
+        DragGesture()
+          .onChanged { value in
+            teacherPreviewOffset = CGSize(
+              width: teacherPreviewAccumOffset.width + value.translation.width,
+              height: teacherPreviewAccumOffset.height + value.translation.height
+            )
+          }
+          .onEnded { _ in
+            teacherPreviewAccumOffset = teacherPreviewOffset
+          }
+      )
 #endif
   }
 
@@ -941,6 +1030,32 @@ struct ChatSessionView: View {
       dismissChatInput()
     case .VIDEO:
       dismissChatInput()
+    }
+
+    applyVideoPauseState()
+  }
+
+  var selfChatPaused: Bool {
+    hasVideo && isCompact && selectedTab == .CHAT
+  }
+
+  func applyVideoPauseState() {
+    guard hasVideo, isCompact else {
+      viewModel.setSelfChatPaused(false)
+      return
+    }
+    viewModel.setSelfChatPaused(selfChatPaused)
+
+    // Keep self camera on while we're on CHAT so the floating self-preview can
+    // render the live track. Turn it off only when the peer is in chat (they're
+    // not watching, so no point streaming).
+    let shouldCameraBeOff = peerChatPaused
+
+    if shouldCameraBeOff != isCameraOff {
+      isCameraOff = shouldCameraBeOff
+      Task {
+        await LiveKitService.shared.setCameraEnabled(!shouldCameraBeOff)
+      }
     }
   }
 

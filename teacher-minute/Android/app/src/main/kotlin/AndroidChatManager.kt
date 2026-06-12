@@ -207,6 +207,38 @@ object AndroidChatManager {
     }
 
     @JvmStatic
+    fun setChatPaused(questionId: String, role: String, paused: Boolean) {
+        val key = role.trim().lowercase().ifBlank { "participant" }
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+            .child("chatPaused")
+            .child(key)
+        Tasks.await(ref.setValue(paused), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    @JvmStatic
+    fun fetchChatPausedJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance(DATABASE_URL)
+                .getReference("questions")
+                .child(questionId)
+                .child("chatPaused")
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+
+        val rows = JSONObject()
+        for (child in snapshot.children) {
+            val key = child.key ?: continue
+            val value = child.getValue(Boolean::class.java) ?: continue
+            rows.put(key, value)
+        }
+        return rows.toString()
+    }
+
+    @JvmStatic
     fun markQuestionAccepted(questionId: String, teacherId: String) {
         val values = mutableMapOf<String, Any>(
             "status" to "accepted",

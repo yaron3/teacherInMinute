@@ -17,6 +17,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var messages: [ChatMessage]
   var boardStrokes: [BoardStroke]
   var boardViewports: [String: BoardViewport] = [:]
+  var chatPausedStates: [String: Bool] = [:]
   var errorMessage: String?
   var isConnecting: Bool
   let participantName: String
@@ -33,6 +34,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
   var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
+  var onChatPausedUpdated: (([String: Bool]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
@@ -161,6 +163,20 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func updateBoardViewport(_ viewport: BoardViewport) {
     boardViewports[role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] = viewport
     onBoardViewportsUpdated?(boardViewports)
+  }
+
+  func setSelfChatPaused(_ paused: Bool) {
+    let key = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    chatPausedStates[key.isEmpty ? "participant" : key] = paused
+    onChatPausedUpdated?(chatPausedStates)
+  }
+
+  func peerChatPaused() -> Bool {
+    let selfKey = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    for (key, value) in chatPausedStates where key != selfKey && value {
+      return true
+    }
+    return false
   }
 
   func endLesson() async {
