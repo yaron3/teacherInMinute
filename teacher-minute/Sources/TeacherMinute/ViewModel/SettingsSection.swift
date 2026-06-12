@@ -290,11 +290,7 @@ class SettingsViewModel {
     var contactSupportTitleMaxLength = 50
     var contactSupportDescriptionMaxLength = 1024
     var contactSupportPreview: ContactSupportRequest?
-    var selectedLanguage: SettingsLanguageChoice {
-        didSet {
-            UserDefaults.standard.set(selectedLanguage.rawValue, forKey: LocalizationSupport.languagePreferenceKey)
-        }
-    }
+    var selectedLanguage: SettingsLanguageChoice
     private let authService: AuthService
     private let remoteConfigService: SettingsRemoteConfigService
 	let role:AppUserMode
@@ -465,7 +461,13 @@ class SettingsViewModel {
     selectedLanguage = language
 	Analytics.setUserProperty(language.remoteConfigLanguageCode, forName: "app_language")
     let managerCode = localizationManagerCode(for: language)
-    Task { await LocalizationManager.shared.updateLanguageCode(to: managerCode) }
+    Task {
+      await LocalizationManager.shared.updateLanguageCode(to: managerCode)
+      // Write the @AppStorage-observed key only after Remote Config has the
+      // new translations cached, so the root view's locale/layout flip and
+      // the localized text refresh happen in the same render pass.
+      UserDefaults.standard.set(language.rawValue, forKey: LocalizationSupport.languagePreferenceKey)
+    }
   }
 
   /// Bridges `SettingsLanguageChoice` to the `LocalizationManager` convention

@@ -171,6 +171,10 @@ struct AccountSecuritySettingsView: View {
 struct LanguageSettingsView: View {
     let viewModel: SettingsViewModel
     @State var localizationManager = LocalizationManager.shared
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
 
     var service: any LocalizationServiceProtocol {
         localizationManager.service
@@ -182,30 +186,41 @@ struct LanguageSettingsView: View {
         let _ = localizationManager.languageCode
         let _ = localizationManager.dataFetched
 
-        Form {
-            Section(header: Text(service.localized("Language"))) {
-                ForEach(SettingsLanguageChoice.allCases) { language in
-                    Button {
-                        viewModel.updateLanguage(language)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(localizedTitle(for: language))
-                                if let subtitle = localizedSubtitle(for: language) {
-                                    Text(subtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+        ZStack {
+            Form {
+                Section(header: Text(service.localized("Language"))) {
+                    ForEach(SettingsLanguageChoice.allCases) { language in
+                        Button {
+                            viewModel.updateLanguage(language)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(localizedTitle(for: language))
+                                    if let subtitle = localizedSubtitle(for: language) {
+                                        Text(subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                if viewModel.selectedLanguage == language {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.tint)
                                 }
                             }
-                            Spacer()
-                            if viewModel.selectedLanguage == language {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.tint)
-                            }
                         }
+                        .foregroundStyle(.primary)
                     }
-                    .foregroundStyle(.primary)
                 }
+            }
+            .disabled(localizationManager.isLoading)
+
+            if localizationManager.isLoading {
+                theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .scaleEffect(1.4)
+                    .tint(theme.appPrimaryText)
             }
         }
     }
