@@ -236,6 +236,7 @@
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera for profile photos, identity verification, and live lessons.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access so students and teachers can talk during live lessons.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save verification documents to your photo library.";
@@ -258,6 +259,7 @@
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera for profile photos, identity verification, and live lessons.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access so students and teachers can talk during live lessons.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "We need access to save verification documents to your photo library.";

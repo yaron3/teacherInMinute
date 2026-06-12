@@ -196,40 +196,6 @@ enum SettingsConfirmation: Identifiable {
     }
 }
 
-enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
-    case system
-    case english
-    case hebrew
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .system: LocalizationSupport.localized("System Language")
-        case .english: LocalizationSupport.localized("English")
-        case .hebrew: LocalizationSupport.localized("Hebrew")
-        }
-    }
-
-    var subtitle: String? {
-        switch self {
-        case .system: LocalizationSupport.localized("Use the device language")
-        case .english, .hebrew: nil
-        }
-    }
-
-    var remoteConfigLanguageCode: String {
-        switch self {
-        case .english:
-            return "en"
-        case .hebrew:
-            return "he"
-        case .system:
-            return LocalizationSupport.currentLanguageCode
-        }
-    }
-}
-
 //enum SettingsIconColor {
 //    case primary
 //    case pink
