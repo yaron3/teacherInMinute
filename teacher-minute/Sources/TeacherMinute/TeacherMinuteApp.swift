@@ -6,6 +6,11 @@ import FirebaseCore
 #else
 import SkipFirebaseCore
 #endif
+#if !os(Android)
+import FirebaseAuth
+#else
+import SkipFirebaseAuth
+#endif
 
 
 /// A logger for the TeacherMinute module.
@@ -16,9 +21,10 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 /// The default implementation merely loads the `ContentView` for the app and logs a message.
 /* SKIP @bridge */public struct TeacherMinuteRootView : View {
   @State  var router = AppRouter()
+  @State var isLaunching = true
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @AppStorage("appearanceMode") var appearanceMode = "system"
-  
+
   /* SKIP @bridge */public init() {
     TeacherMinuteAppDelegate.shared.onInit()
   }
@@ -33,6 +39,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   
       public var body: some View {
 			@Bindable var router = router
+			ZStack {
 			Group {
 			  switch router.rootScreen {
 				case .mainTabs(let role):
@@ -75,6 +82,12 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				  }
 			  }
 				}
+
+				if isLaunching {
+				  LaunchSplashView()
+					.transition(.opacity)
+				}
+				}
 				.environment(\.appRouter, router)
             .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
             .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
@@ -92,7 +105,25 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
             }
 					.task {
 			  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
+			  await performLaunchSessionResume()
+			  withAnimation(.easeOut(duration: 0.25)) {
+				isLaunching = false
+			  }
 			}
+  }
+
+  private func performLaunchSessionResume() async {
+	#if !targetEnvironment(preview)
+	guard router.path.isEmpty else { return }
+	guard let uid = Auth.auth().currentUser?.uid else { return }
+	do {
+	  let resume = try await UserService.shared.resumeRoute(uid: uid)
+	  router.resume(resume)
+	  logger.info("[Auth] auto-login restored session uid=\(uid)")
+	} catch {
+	  logger.error("[Auth] auto-login failed: \(error)")
+	}
+	#endif
   }
 }
 

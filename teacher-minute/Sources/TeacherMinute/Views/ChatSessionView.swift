@@ -64,6 +64,8 @@ struct ChatSessionView: View {
     return LocalizationSupport.localized("Connected")
   }
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.horizontalSizeClass) var hSizeClass
+  var isCompact: Bool { hSizeClass != .regular }
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
@@ -444,6 +446,8 @@ struct ChatSessionView: View {
       Group {
         if isBoardMaximized {
           whiteboard
+        } else if hasVideo && isCompact {
+          compactVideoSessionLayout
 		} else if selectedTab == .CHAT {
           VStack(spacing: 0) {
 			if messages.count == 0 {
@@ -546,6 +550,69 @@ struct ChatSessionView: View {
 #endif
   }
 
+  @ViewBuilder
+  var compactVideoSessionLayout: some View {
+    if selectedTab == .VIDEO {
+      compactBottomVideoStrip
+        .frame(maxHeight: .infinity)
+    } else {
+      VStack(spacing: 0) {
+        Group {
+          if selectedTab == .CHAT {
+            VStack(spacing: 0) {
+              if messages.count == 0 {
+                sessionNotice
+              }
+              ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
+            }
+          } else {
+            whiteboard
+          }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        compactBottomVideoStrip
+          .frame(height: 220)
+      }
+    }
+  }
+
+  @ViewBuilder
+  var compactBottomVideoStrip: some View {
+#if !os(Android)
+    let remoteTrack = LiveKitService.shared.remoteCameraVideoTrack
+    let localTrack = LiveKitService.shared.localCameraVideoTrack
+    ZStack(alignment: .bottomTrailing) {
+      VStack(spacing: 0) {
+        Spacer(minLength: 0)
+        if let remoteTrack {
+          SwiftUIVideoView(remoteTrack, layoutMode: .fit)
+            .id(ObjectIdentifier(remoteTrack))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        } else {
+          videoPlaceholder(
+            icon: "video.fill",
+            text: LocalizationSupport.localized("Waiting for video…")
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+      }
+      if isStudent {
+        localPreview(localTrack: localTrack)
+          .padding(10)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(.horizontal, 12)
+    .padding(.bottom, 8)
+    .id(liveKitRevision)
+#else
+    AndroidVideoFeed(isStudent: isStudent, isCameraOff: isCameraOff, theme: theme)
+      .padding(.horizontal, 12)
+      .padding(.bottom, 8)
+#endif
+  }
+
   func videoPlaceholder(icon: String, text: String) -> some View {
     VStack(spacing: 10) {
       PlatformIcon(
@@ -580,7 +647,7 @@ struct ChatSessionView: View {
           }
       }
     }
-    .frame(width: 96, height: 132)
+    .frame(width: isCompact ? 72 : 96, height: isCompact ? 99 : 132)
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 12, style: .continuous)

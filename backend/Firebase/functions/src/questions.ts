@@ -177,7 +177,7 @@ export const cancelQuestion = onCall(async (req) => {
     );
     if (data.studentUid !== uid) throw new HttpsError("permission-denied", "Not your question");
 
-    const cancellable: QuestionDoc["status"][] = ["searching", "accepted"];
+    const cancellable: QuestionDoc["status"][] = ["searching", "accepted", "unanswered"];
     if (!cancellable.includes(data.status)) {
       throw new HttpsError("failed-precondition", `Cannot cancel a question with status: ${data.status}`);
     }

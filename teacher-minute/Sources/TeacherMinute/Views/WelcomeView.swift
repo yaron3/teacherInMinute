@@ -7,36 +7,21 @@
 
 import SwiftUI
 
-#if !os(Android)
-import FirebaseAuth
-#else
-import SkipFirebaseAuth
-#endif
-
 struct WelcomeView: View {
   @Environment(\.appRouter) var router
-  @State var isCheckingSession = true
-  
+
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
-  
+
   var body: some View {
 	ZStack {
 	  Color(.systemBackground)
 		.ignoresSafeArea()
-	  
-      if isCheckingSession {
-        ProgressView()
-          .progressViewStyle(.circular)
-          .scaleEffect(1.4)
-      } else {
-	  
-        welcomeContent
-      }
+
+	  welcomeContent
 	}
-	  .task { await resumeExistingSessionIfNeeded() }
   }
 
   private var welcomeContent: some View {
@@ -98,22 +83,6 @@ struct WelcomeView: View {
         .frame(minHeight: proxy.size.height, alignment: .top)
       }
     }
-  }
-  
-  private func resumeExistingSessionIfNeeded() async {
-	#if !targetEnvironment(preview)
-	defer { isCheckingSession = false }
-	guard router.path.isEmpty else { return }
-	guard let uid = Auth.auth().currentUser?.uid else { return }
-	
-	do {
-	  let resume = try await UserService.shared.resumeRoute(uid: uid)
-	  router.resume(resume)
-	  logger.info("[Auth] auto-login restored session uid=\(uid)")
-	} catch {
-	  logger.error("[Auth] auto-login failed: \(error)")
-	}
-	#endif
   }
   
   private var header: some View {

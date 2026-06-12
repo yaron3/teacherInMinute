@@ -166,6 +166,14 @@ async function enqueueWaveEvaluation(qid: string, wave: number): Promise<void> {
   );
 }
 
+async function enqueueQuestionWatchdog(qid: string): Promise<void> {
+  const queue = getFunctions().taskQueue("questionWatchdog");
+  await queue.enqueue(
+    { questionId: qid },
+    { scheduleDelaySeconds: INVITE_EXPIRY_SECONDS }
+  );
+}
+
 async function tryInviteTeacherForQuestionWave(
   teacherUid: string,
   teacher: TeacherRecord,
@@ -366,7 +374,10 @@ export const dispatchQuestion = onDocumentCreated(
 
     logger.info(`[dispatch] qid=${qid} dispatchWave updated to 1 invitedNow=${invited.length}`);
 
-    await enqueueWaveEvaluation(qid, 1);
+    await Promise.all([
+      enqueueWaveEvaluation(qid, 1),
+      enqueueQuestionWatchdog(qid),
+    ]);
   }
 );
 
@@ -456,6 +467,48 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
 
     await enqueueWaveEvaluation(qid, nextWave);
     logger.info(`[evaluateWave] qid=${qid} wave=${nextWave} enqueued`);
+  }
+);
+
+// ─── questionWatchdog — Cloud Task ───────────────────────────────────────────
+// Enqueued at question creation with INVITE_EXPIRY_SECONDS delay (90s).
+// Fires regardless of wave outcome — absolute safety net ensuring no question
+// stays "searching" longer than 90 seconds.
+
+export const questionWatchdog = onTaskDispatched<{ questionId: string }>(
+  {
+    retryConfig: { maxAttempts: 2 },
+    rateLimits: { maxConcurrentDispatches: 50 },
+  },
+  async (req) => {
+    const { questionId: qid } = req.data;
+
+    logger.info(`[watchdog] fired qid=${qid}`);
+
+    const qSnap = await firestore.collection("questions").doc(qid).get();
+    if (!qSnap.exists) {
+      logger.info(`[watchdog] qid=${qid} not found, skipping`);
+      return;
+    }
+
+    const data = qSnap.data() as QuestionDoc;
+    if (data.status !== "searching") {
+      logger.info(`[watchdog] qid=${qid} already ${data.status}, no action needed`);
+      return;
+    }
+
+    logger.warn(`[watchdog] qid=${qid} still searching after ${INVITE_EXPIRY_SECONDS}s — archiving`);
+    const archived = await archiveUnanswered(qid, data.alreadyInvited ?? []);
+
+    if (archived) {
+      const studentFcmToken = await db
+        .ref(`users/${data.studentUid}/fcmToken`)
+        .once("value")
+        .then((s) => s.val() as string | null);
+      if (studentFcmToken) {
+        await sendNoMatchPush({ fcmToken: studentFcmToken, questionId: qid });
+      }
+    }
   }
 );
 
