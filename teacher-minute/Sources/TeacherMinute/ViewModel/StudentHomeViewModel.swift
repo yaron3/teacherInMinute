@@ -187,6 +187,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 	logger.info("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
     activeConversationType = conversationType
     searchState = .searching(questionId: "")
+
+    let hasOnlineTeacher = await TeacherAvailabilityStore.hasOnlineTeacher()
+    if !hasOnlineTeacher {
+      logger.info("TeacherMinute askTeacher aborted: no online teachers")
+      searchState = .noMatch
+      return
+    }
+
     do {
       let result = try await FunctionsService.shared.createQuestion(
         topic: topic,
@@ -411,8 +419,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   // MARK: - Polling
 
+  private static let noTeacherTimeoutSeconds: Double = 60
+
   private func startPolling(questionId: String) {
     pollingTask?.cancel()
+    let startedAt = Date().timeIntervalSince1970
     pollingTask = Task {
       while !Task.isCancelled {
         do {
@@ -450,6 +461,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
             return
           default:
             break
+          }
+
+          let elapsed = Date().timeIntervalSince1970 - startedAt
+          if elapsed >= Self.noTeacherTimeoutSeconds {
+            logger.info("TeacherMinute questionStatus timed out after \(Int(elapsed))s questionId=\(questionId); transitioning to noMatch")
+            try? await FunctionsService.shared.cancelQuestion(questionId: questionId)
+            searchState = .noMatch
+            return
           }
         } catch {
           guard !Task.isCancelled else { return }

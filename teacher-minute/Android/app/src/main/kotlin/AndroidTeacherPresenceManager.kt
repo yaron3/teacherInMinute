@@ -1,14 +1,42 @@
 package teacher.minute
 
 import android.util.Log
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
 import com.google.firebase.firestore.FirebaseFirestore
+import java.util.concurrent.TimeUnit
 
 object AndroidTeacherPresenceManager {
     private const val TAG = "TeacherPresence"
     private const val DATABASE_URL = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
+    private const val AVAILABILITY_TIMEOUT_SECONDS = 5L
+
+    @JvmStatic
+    fun hasOnlineTeacher(): Boolean {
+        return try {
+            val snapshot = Tasks.await(
+                FirebaseDatabase.getInstance(DATABASE_URL)
+                    .getReference("teachers")
+                    .get(),
+                AVAILABILITY_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            for (child in snapshot.children) {
+                val status = child.child("status").getValue(String::class.java)
+                if (status == "online") {
+                    Log.i(TAG, "hasOnlineTeacher=true uid=${child.key}")
+                    return true
+                }
+            }
+            Log.i(TAG, "hasOnlineTeacher=false (none of ${snapshot.childrenCount} teachers online)")
+            false
+        } catch (error: Throwable) {
+            Log.e(TAG, "hasOnlineTeacher check failed; assuming available", error)
+            true
+        }
+    }
 
     @JvmStatic
     fun setCurrentTeacherStatus(status: String) {

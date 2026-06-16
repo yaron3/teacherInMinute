@@ -1176,13 +1176,24 @@ struct ChatSessionView: View {
             if showsBadge {
               Circle()
                 .fill(theme.red)
-                .frame(width: 7, height: 7)
-                .offset(x: 4, y: -4)
+                .overlay {
+                  Circle().stroke(theme.appCardBackground, lineWidth: 2)
+                }
+                .frame(width: 14, height: 14)
+                .offset(x: 8, y: -6)
             }
           }
           Text(LocalizationSupport.localized(title))
             .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(selectedTab == id ? theme.appPink : theme.appSecondaryText)
+            .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.appPink : theme.appSecondaryText))
+            .padding(.horizontal, showsBadge ? 18 : 0)
+            .padding(.vertical, showsBadge ? 3 : 0)
+            .background {
+              if showsBadge {
+                Capsule().fill(theme.red)
+				  .frame(height: 28)
+              }
+            }
         }
         Rectangle()
           .fill(selectedTab == id ? theme.appPink : Color.clear)
