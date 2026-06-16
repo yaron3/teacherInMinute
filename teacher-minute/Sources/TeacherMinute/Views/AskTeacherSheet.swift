@@ -182,19 +182,21 @@ struct AskTeacherSheet: View {
                 }
 
 
+                let isFindDisabled = !canSubmit || isRequestingPermission
                 Button {
                     Task { await findTeacherTapped() }
                 } label: {
                     Text(LocalizationSupport.localized("Find a Teacher"))
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
+                        .foregroundStyle(isFindDisabled ? theme.appSecondaryText : theme.appPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: findButtonHeight)
-                        .background( theme.appPink)
+                        .background(isFindDisabled ? theme.appGrayBackground : theme.appPink)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .opacity(isFindDisabled ? 0.6 : 1.0)
                 }
                 .buttonStyle(.plain)
-                .disabled(!canSubmit || isRequestingPermission)
+                .disabled(isFindDisabled)
             }
             .padding(sheetPadding)
         }

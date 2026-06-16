@@ -278,6 +278,28 @@ final class ChatSessionService {
 #endif
   }
 
+#if !os(Android)
+  func sendImage(downloadURL: String, senderRole: String) async throws {
+    guard let uid = Auth.auth().currentUser?.uid else { throw FunctionsError.notSignedIn }
+    let trimmed = downloadURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+
+    let payload: [String: Any] = [
+      "text": trimmed,
+      "senderUid": uid,
+      "senderRole": senderRole,
+      "createdAt": Date().timeIntervalSince1970 * 1000.0,
+      "kind": "image"
+    ]
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      messagesRef.childByAutoId().setValue(payload) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+  }
+#endif
+
   func sendStroke(_ points: [BoardPoint]) async throws {
     guard !points.isEmpty else { return }
 

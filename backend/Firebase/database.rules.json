@@ -15,7 +15,7 @@
     "questions": {
       "$qid": {
         ".read": "auth != null",
-        ".write": "auth != null && (data.child('teacherUid').val() == auth.uid || data.child('studentUid').val() == auth.uid)"
+        ".write": "auth != null && (data.child('teacherUid').val() == auth.uid || data.child('studentUid').val() == auth.uid || data.child('teacherId').val() == auth.uid || data.child('studentId').val() == auth.uid)"
       }
     },
     "users": {

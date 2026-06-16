@@ -486,14 +486,14 @@ struct LessonMessageBubble: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                 default:
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    Rectangle()
                         .fill(theme.appGrayBackground)
                         .overlay {
-                            PlatformIcon(systemName: "photo", size: 24, weight: .medium, color: theme.appSecondaryText)
+                            PlatformIcon(systemName: "photo", size: 28, weight: .medium, color: theme.appSecondaryText)
                         }
                 }
             }
-            .frame(maxWidth: 220, maxHeight: 220)
+            .frame(width: 220, height: 220)
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
         case "audio":

@@ -1,6 +1,7 @@
 import SwiftUI
 #if canImport(UIKit) && !os(Android)
 import UIKit
+import Photos
 #endif
 #if !os(Android)
 import LiveKit
@@ -25,7 +26,6 @@ struct ChatSessionView: View {
 	case VIDEO
   }
   @State var viewModel: any ChatSessionViewModeling
-  @State var draft = ""
   @State var composerMode: ChatComposerMode = .regular
   @State var messages: [ChatMessage] = []
   @State var boardStrokes: [BoardStroke] = []
@@ -52,6 +52,7 @@ struct ChatSessionView: View {
   @State var endSessionPrompt: EndSessionPrompt?
   @State var isEndingSession = false
   @State var didRequestLessonEnd = false
+  @State var saveBoardIsRemoteInitiated = false
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let liveKitRoom: String
@@ -192,7 +193,12 @@ struct ChatSessionView: View {
         displayDate = Date()
       }
       viewModel.onSessionEnded = {
-        closeWithOptionalRating()
+        if !boardStrokes.isEmpty && !didRequestLessonEnd && !isEndingSession {
+          saveBoardIsRemoteInitiated = true
+          endSessionPrompt = .saveBoard
+        } else {
+          closeWithOptionalRating()
+        }
       }
 #if !os(Android)
       LiveKitService.shared.onTracksUpdated = { @MainActor @Sendable in
@@ -266,9 +272,9 @@ struct ChatSessionView: View {
 
           if prompt == .saveBoard {
             Button {
-              finalizeEndSession()
+              endSessionAfterSnapshot(saveToChat: !saveBoardIsRemoteInitiated, saveToGallery: false)
             } label: {
-              Text(LocalizationSupport.localized("Continue without saving"))
+              Text(LocalizationSupport.localized(saveBoardIsRemoteInitiated ? "Skip" : "Save to chat only"))
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(theme.appPrimaryText)
                 .frame(maxWidth: .infinity)
@@ -280,17 +286,19 @@ struct ChatSessionView: View {
             .disabled(isEndingSession)
           }
 
-          Button {
-            endSessionPrompt = nil
-          } label: {
-            Text(LocalizationSupport.localized("Cancel"))
-              .font(.system(size: 14, weight: .semibold))
-              .foregroundStyle(theme.appSecondaryText)
-              .frame(maxWidth: .infinity)
-              .frame(height: 38)
+          if !(prompt == .saveBoard && saveBoardIsRemoteInitiated) {
+            Button {
+              endSessionPrompt = nil
+            } label: {
+              Text(LocalizationSupport.localized("Cancel"))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.appSecondaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+            }
+            .buttonStyle(.plain)
+            .disabled(isEndingSession)
           }
-          .buttonStyle(.plain)
-          .disabled(isEndingSession)
         }
       }
       .padding(18)
@@ -340,7 +348,7 @@ struct ChatSessionView: View {
     case .confirmEnd:
       return LocalizationSupport.localized("End session?")
     case .saveBoard:
-      return LocalizationSupport.localized("Save the board?")
+      return LocalizationSupport.localized("Save board to gallery?")
     }
   }
 
@@ -349,7 +357,10 @@ struct ChatSessionView: View {
     case .confirmEnd:
       return LocalizationSupport.localized("Are you sure you want to end this session?")
     case .saveBoard:
-      return LocalizationSupport.localized("There are board changes. Save them as a photo before ending?")
+      if saveBoardIsRemoteInitiated {
+        return LocalizationSupport.localized("The session ended. Do you want to save the board image to your device gallery?")
+      }
+      return LocalizationSupport.localized("The board will be saved to the chat. Do you also want to save it to your device gallery?")
     }
   }
 
@@ -358,7 +369,7 @@ struct ChatSessionView: View {
     case .confirmEnd:
       return LocalizationSupport.localized("End session")
     case .saveBoard:
-      return LocalizationSupport.localized("Save and continue")
+      return LocalizationSupport.localized("Save to gallery")
     }
   }
 
@@ -368,11 +379,11 @@ struct ChatSessionView: View {
       if boardStrokes.isEmpty {
         finalizeEndSession()
       } else {
+        saveBoardIsRemoteInitiated = false
         endSessionPrompt = .saveBoard
       }
     case .saveBoard:
-      saveBoardSnapshot()
-      finalizeEndSession()
+      endSessionAfterSnapshot(saveToChat: !saveBoardIsRemoteInitiated, saveToGallery: true)
     }
   }
 
@@ -393,12 +404,29 @@ struct ChatSessionView: View {
     }
   }
 
-  func saveBoardSnapshot() {
-#if canImport(UIKit) && !os(Android)
+  @MainActor
+  func endSessionAfterSnapshot(saveToChat: Bool, saveToGallery: Bool) {
+    guard !isEndingSession else { return }
+    isEndingSession = true
+    endSessionPrompt = nil
+    didRequestLessonEnd = true
+    Task {
+      await saveBoardSnapshotAndShare(saveToChat: saveToChat, saveToGallery: saveToGallery)
+      await viewModel.endLesson()
+      closeWithOptionalRating()
+    }
+  }
+
+  @MainActor
+  func saveBoardSnapshotAndShare(saveToChat: Bool, saveToGallery: Bool) async {
     let strokesSnapshot = boardStrokes
     guard !strokesSnapshot.isEmpty else { return }
 
-    let renderSize = CGSize(width: 1080, height: 1080)
+    let questionId = viewModel.questionId
+    let senderRole = viewModel.role
+
+#if canImport(UIKit) && !os(Android)
+    let renderSize = CGSize(width: 500, height: 500)
     let logical = WhiteboardView.logicalSize
     let strokeColor = theme.appPrimaryText
     let background = theme.appCardBackground
@@ -425,11 +453,67 @@ struct ChatSessionView: View {
     .frame(width: renderSize.width, height: renderSize.height)
 
     let renderer = ImageRenderer(content: snapshot)
-    renderer.scale = UIScreen.main.scale
-    if let image = renderer.uiImage {
-      UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+    renderer.scale = 1
+    guard let image = renderer.uiImage,
+          let data = image.jpegData(compressionQuality: 0.88) else { return }
+
+    if saveToChat {
+      do {
+        let url = try await StorageService.shared.uploadBoardSnapshot(data: data, questionId: questionId)
+        let service = ChatSessionService(questionId: questionId)
+        try await service.sendImage(downloadURL: url, senderRole: senderRole)
+      } catch {
+        logger.error("Board snapshot save failed: \(error.localizedDescription)")
+      }
+    }
+
+    if saveToGallery {
+      PHPhotoLibrary.shared().performChanges {
+        let request = PHAssetCreationRequest.forAsset()
+        request.addResource(with: .photo, data: data, options: nil)
+      } completionHandler: { _, error in
+        if let error {
+          logger.error("Failed to save board snapshot to photo library: \(error.localizedDescription)")
+        }
+      }
+    }
+#elseif os(Android)
+    let strokesJson = Self.boardStrokesJson(strokesSnapshot)
+    let logical = WhiteboardView.logicalSize
+    let logicalWidth = Double(logical.width)
+    let logicalHeight = Double(logical.height)
+    let strokeColorArgb: Int32 = Int32(truncatingIfNeeded: 0xFF111827 as Int)
+    let backgroundColorArgb: Int32 = Int32(truncatingIfNeeded: 0xFFFFFFFF as Int)
+
+    do {
+      _ = try await Task.detached(priority: .userInitiated) {
+        try AndroidBoardImageBridge.saveBoardSnapshotToChat(
+          questionId: questionId,
+          senderRole: senderRole,
+          strokesJson: strokesJson,
+          width: 500,
+          height: 500,
+          logicalWidth: logicalWidth,
+          logicalHeight: logicalHeight,
+          strokeColorArgb: strokeColorArgb,
+          backgroundColorArgb: backgroundColorArgb,
+          saveToChat: saveToChat,
+          saveToGallery: saveToGallery
+        )
+      }.value
+    } catch {
+      logger.error("Board snapshot save failed: \(error.localizedDescription)")
     }
 #endif
+  }
+
+  static func boardStrokesJson(_ strokes: [BoardStroke]) -> String {
+    let rows: [[String: Any]] = strokes.map { stroke in
+      ["points": stroke.points.map { ["x": $0.x, "y": $0.y] }]
+    }
+    guard let data = try? JSONSerialization.data(withJSONObject: rows),
+          let json = String(data: data, encoding: .utf8) else { return "[]" }
+    return json
   }
 
   var sessionBody: some View {
@@ -572,8 +656,8 @@ struct ChatSessionView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        if !isStudent && !peerChatPaused {
-          draggableTeacherPreview
+        if !peerChatPaused {
+          draggableSelfPreview
             .padding(12)
         }
       }
@@ -664,7 +748,7 @@ struct ChatSessionView: View {
   }
 
   @ViewBuilder
-  var draggableTeacherPreview: some View {
+  var draggableSelfPreview: some View {
 #if !os(Android)
     let localTrack = LiveKitService.shared.localCameraVideoTrack
     localPreview(localTrack: localTrack)
@@ -683,7 +767,7 @@ struct ChatSessionView: View {
       )
       .id(liveKitRevision)
 #else
-    AndroidVideoFeed(isStudent: false, isCameraOff: isCameraOff, theme: theme)
+    AndroidVideoFeed(isStudent: true, isCameraOff: isCameraOff, theme: theme)
       .frame(width: 96, height: 132)
       .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
       .offset(teacherPreviewOffset)
@@ -799,10 +883,7 @@ struct ChatSessionView: View {
         }
         .environment(\.layoutDirection, .leftToRight)
       } else {
-        ChatInputBar(text: $draft, isFocused: $isMessageFieldFocused) {
-          let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-          guard !text.isEmpty else { return }
-          draft = ""
+        MessageComposer(isFocused: $isMessageFieldFocused) { text in
           sendComposed(text)
         }
       }
@@ -1036,20 +1117,17 @@ struct ChatSessionView: View {
   }
 
   var selfChatPaused: Bool {
-    hasVideo && isCompact && selectedTab == .CHAT
+    hasVideo && selectedTab == .CHAT
   }
 
   func applyVideoPauseState() {
-    guard hasVideo, isCompact else {
+    guard hasVideo else {
       viewModel.setSelfChatPaused(false)
       return
     }
     viewModel.setSelfChatPaused(selfChatPaused)
 
-    // Keep self camera on while we're on CHAT so the floating self-preview can
-    // render the live track. Turn it off only when the peer is in chat (they're
-    // not watching, so no point streaming).
-    let shouldCameraBeOff = peerChatPaused
+    let shouldCameraBeOff = selfChatPaused || peerChatPaused
 
     if shouldCameraBeOff != isCameraOff {
       isCameraOff = shouldCameraBeOff
@@ -1129,6 +1207,50 @@ struct ChatSessionView: View {
       .padding(.top, 12)
   }
 }
+
+#if os(Android)
+private enum AndroidBoardImageBridge {
+  private static let saverClass = try! JClass(name: "teacher/minute/AndroidBoardImageSaver")
+  private static let saveMethod = saverClass.getStaticMethodID(
+    name: "saveBoardSnapshotToChat",
+    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIDDIIZZ)Ljava/lang/String;"
+  )!
+
+  static func saveBoardSnapshotToChat(
+    questionId: String,
+    senderRole: String,
+    strokesJson: String,
+    width: Int32,
+    height: Int32,
+    logicalWidth: Double,
+    logicalHeight: Double,
+    strokeColorArgb: Int32,
+    backgroundColorArgb: Int32,
+    saveToChat: Bool,
+    saveToGallery: Bool
+  ) throws -> String {
+    try jniContext {
+      try saverClass.callStatic(
+        method: saveMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          senderRole.toJavaParameter(options: [.kotlincompat]),
+          strokesJson.toJavaParameter(options: [.kotlincompat]),
+          width.toJavaParameter(options: [.kotlincompat]),
+          height.toJavaParameter(options: [.kotlincompat]),
+          logicalWidth.toJavaParameter(options: [.kotlincompat]),
+          logicalHeight.toJavaParameter(options: [.kotlincompat]),
+          strokeColorArgb.toJavaParameter(options: [.kotlincompat]),
+          backgroundColorArgb.toJavaParameter(options: [.kotlincompat]),
+          saveToChat.toJavaParameter(options: [.kotlincompat]),
+          saveToGallery.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    } as String
+  }
+}
+#endif
 
 #if os(iOS)
 #Preview {

@@ -1,5 +1,20 @@
 import SwiftUI
 
+struct MessageComposer: View {
+  let isFocused: FocusState<Bool>.Binding
+  let onSend: (String) -> Void
+  @State var draft = ""
+
+  var body: some View {
+    ChatInputBar(text: $draft, isFocused: isFocused) {
+      let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !text.isEmpty else { return }
+      draft = ""
+      onSend(text)
+    }
+  }
+}
+
 struct ChatInputBar: View {
   @Binding var text: String
   let isFocused: FocusState<Bool>.Binding
@@ -46,8 +61,10 @@ struct ChatInputBar: View {
               )
             )
             .clipShape(Circle())
+            .opacity(canSend ? 1.0 : 0.6)
         }
         .buttonStyle(.plain)
+        .disabled(!canSend)
       }
     }
 }

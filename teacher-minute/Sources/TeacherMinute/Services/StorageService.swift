@@ -100,4 +100,21 @@ final class StorageService {
     return data
 #endif
   }
+
+#if !os(Android)
+  func uploadBoardSnapshot(
+    data: Data,
+    questionId: String
+  ) async throws -> String {
+    let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+    let path = "boardSnapshots/\(questionId)/\(timestamp).jpg"
+    let ref = Storage.storage().reference().child(path)
+    let metadata = StorageMetadata()
+    metadata.contentType = "image/jpeg"
+    _ = try await ref.putDataAsync(data, metadata: metadata)
+    let url = try await ref.downloadURL()
+    logger.info("Uploaded board snapshot: \(path)")
+    return url.absoluteString
+  }
+#endif
 }
