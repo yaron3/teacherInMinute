@@ -9,74 +9,90 @@ import SwiftUI
 
 struct StudentLessonHistoryView: View {
     @State var viewModel = StudentLessonHistoryViewModel()
+    @State var isLoading = true
+    @State var presentingLesson: LessonHistoryItem?
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                AppTopHeader(
-                    avatarSystemImage: "person.crop.circle.fill",
-                    eyebrow: LocalizationSupport.localized("Lesson History"),
-                    name: viewModel.studentName,
-                    avatarImageURL: viewModel.profileImageURL,
-                    showNotificationBadge: false
-                )
-                .padding(.top, 18)
-                
-                summaryStrip
-                    .padding(.top, 22)
-                
-                searchField
-                    .padding(.top, 22)
-                
-                HStack {
-                    Text(LocalizationSupport.localized("Past Lessons"))
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
-                    
-                    Spacer()
-                    
-                    SmallPill(
-                        title: viewModel.completedCountText,
-                        foreground: theme.appPurple,
-                        background: theme.appPurpleSoft
+        NavigationStack {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    AppTopHeader(
+                        avatarSystemImage: "person.crop.circle.fill",
+                        eyebrow: LocalizationSupport.localized("Lesson History"),
+                        name: viewModel.studentName,
+                        avatarImageURL: viewModel.profileImageURL,
+                        showNotificationBadge: false
                     )
-                }
-                .padding(.top, 26)
-                
-                VStack(spacing: 12) {
-                    ForEach(viewModel.filteredLessons) { lesson in
-                        LessonHistoryRow(
-                            lesson: lesson,
-                            accentColor: theme.appPink,
-                            iconName: "function",
-                            isLoading: viewModel.isLoading(lesson)
-                        ) {
-                            viewModel.view(lesson)
+                    .padding(.top, 18)
+
+                    summaryStrip
+                        .padding(.top, 22)
+
+                    searchField
+                        .padding(.top, 22)
+
+                    HStack {
+                        Text(LocalizationSupport.localized("Past Lessons"))
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(theme.appPrimaryText)
+
+                        Spacer()
+
+                        SmallPill(
+                            title: viewModel.completedCountText,
+                            foreground: theme.appPurple,
+                            background: theme.appPurpleSoft
+                        )
+                    }
+                    .padding(.top, 26)
+
+                    if isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .scaleEffect(1.4)
+                                .tint(theme.appPink)
+                                .padding(.vertical, 40)
+                            Spacer()
                         }
+                        .padding(.top, 14)
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(viewModel.filteredLessons) { lesson in
+                                LessonHistoryRow(
+                                    lesson: lesson,
+                                    accentColor: theme.appPink,
+                                    iconName: "function",
+                                    isLoading: viewModel.isLoading(lesson)
+                                ) {
+                                    presentingLesson = lesson
+                                }
+                            }
+                        }
+                        .padding(.top, 14)
                     }
                 }
-                .padding(.top, 14)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 24)
+            .background(Color(.systemBackground))
         }
-        .background(Color(.systemBackground))
         .task {
             await viewModel.loadProfile()
+            isLoading = false
         }
-        .sheet(isPresented: $viewModel.isLessonSheetPresented) {
-            if let lesson = viewModel.selectedLesson {
-                LessonDetailView(
-                    lesson: lesson,
-                    amountLabel: "Cost",
-                    isPlaying: viewModel.isPlaying(lesson),
-                    initialDetails: viewModel.selectedLessonDetails,
-                    audioAction: { viewModel.toggleAudio(for: lesson) }
-                )
-            }
+        .sheet(item: $presentingLesson) { lesson in
+            LessonDetailView(
+                lesson: lesson,
+                amountLabel: "Cost",
+                isPlaying: viewModel.isPlaying(lesson),
+                initialDetails: nil,
+                audioAction: { viewModel.toggleAudio(for: lesson) }
+            )
         }
     }
     

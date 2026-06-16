@@ -21,11 +21,11 @@ final class TeacherLessonHistoryViewModel {
     var query = ""
     var selectedLesson: LessonHistoryItem?
     var selectedLessonDetails: LessonDetails?
-    var isLessonSheetPresented = false
     var playingLessonID: LessonHistoryItem.ID?
     var totalTimeTaughtText = LessonFormatting.totalDurationText(lessons: [])
     var totalEarningsText = LessonFormatting.currencyText(cents: 0)
     var profileImageURL = ""
+    var isInitialLoading = true
 
     var lessons: [LessonHistoryItem] = []
     
@@ -44,9 +44,8 @@ final class TeacherLessonHistoryViewModel {
     }
     
     func view(_ lesson: LessonHistoryItem) {
-        selectedLesson = lesson
         selectedLessonDetails = nil
-        isLessonSheetPresented = true
+        selectedLesson = lesson
     }
     
     func toggleAudio(for lesson: LessonHistoryItem) {
@@ -59,6 +58,7 @@ final class TeacherLessonHistoryViewModel {
     }
     
     func loadProfile() async {
+        defer { isInitialLoading = false }
         guard let uid = Auth.auth().currentUser?.uid else { return }
         do {
             if let profile = try await UserService.shared.fetchProfileSummary(uid: uid) {

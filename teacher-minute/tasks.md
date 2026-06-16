@@ -11,18 +11,20 @@
 - Ensure the disabled visual state matches the iOS appearance.
 - Also apply the same disabled visual state to the chat send button when there is no text to send.
 
-## 3. Show "No teacher available" message to student
+## 3. Show "No teacher available" message to student — DONE
 - When no teacher is available, the student should see a clear "No teacher available" message instead of waiting indefinitely.
 
-## 4. Badge on Chat / Board is too small
+## 4. Badge on Chat / Board is too small — DONE
 - Increase the badge size so it is easily readable.
+- make tab title background red
 
-## 5. Show spinner when navigating to the Lessons tab
+## 5. Show spinner when navigating to the Lessons tab — DONE
 - While the Lessons tab is loading, display a spinner until the content is ready.
 
 ## 6. Tapping a specific lesson on Android shows nothing
 - Tapping a lesson row on Android does not open the lesson details.
 - Should navigate to the lesson detail screen (matching iOS behavior).
+- Fix: switched `.sheet(isPresented:)` (with optional `if let` inside) to `.sheet(item:)` driven by `selectedLesson`, which is Skip/Android-compatible.
 
 ## 7. Allow sending an image as a question
 - Add the ability for a student to send an image as part of a question.
