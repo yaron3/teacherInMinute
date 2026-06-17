@@ -487,8 +487,8 @@ struct ChatSessionView: View {
     let logical = WhiteboardView.logicalSize
     let logicalWidth = Double(logical.width)
     let logicalHeight = Double(logical.height)
-    let strokeColorArgb: Int32 = Int32(truncatingIfNeeded: 0xFF111827 as Int)
-    let backgroundColorArgb: Int32 = Int32(truncatingIfNeeded: 0xFFFFFFFF as Int)
+    let strokeColorArgb = Int32(bitPattern: 0xFF111827 as UInt32)
+    let backgroundColorArgb = Int32(bitPattern: 0xFFFFFFFF as UInt32)
 
     do {
       _ = try await Task.detached(priority: .userInitiated) {
