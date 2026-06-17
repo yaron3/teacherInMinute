@@ -142,7 +142,8 @@ enum LocalizationKey {
         "video": "video_lower",
         "•": "bullet",
         "⚡ %@/min": "min_b",
-		"Loading profile...": "loading_profile"
+		"Loading profile...": "loading_profile",
+		"%d completed": "completed_count",
     ]
 
     /// Deterministic three-word snake-case slug for any source string that

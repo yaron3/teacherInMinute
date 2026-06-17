@@ -301,6 +301,7 @@ struct LessonDetailView: View {
     }
     @State var messages: [LessonMessage]
     @State var questionText: String
+    @State var questionPhotoUrls: [String]
     @State var isLoading: Bool
 
     init(
@@ -317,6 +318,7 @@ struct LessonDetailView: View {
         self.audioAction = audioAction
         _messages = State(initialValue: initialDetails?.messages ?? [])
         _questionText = State(initialValue: initialDetails?.questionText ?? "")
+        _questionPhotoUrls = State(initialValue: initialDetails?.questionPhotoUrls ?? lesson.questionPhotoUrls)
         _isLoading = State(initialValue: initialDetails == nil)
     }
 
@@ -363,19 +365,26 @@ struct LessonDetailView: View {
                     )
                     .disabled(!lesson.hasAudio)
 
-                    if !questionText.isEmpty {
+                    if !questionText.isEmpty || !questionPhotoUrls.isEmpty {
                         RoundedInfoCard {
-                            VStack(alignment: .leading, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 6) {
                                     PlatformIcon(systemName: "pin.fill", size: 12, weight: .semibold, color: theme.appOrange)
                                     Text(LocalizationSupport.localized("Original Question"))
                                         .font(.system(size: 13, weight: .bold))
                                         .foregroundStyle(theme.appOrange)
                                 }
-                                Text(questionText)
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(theme.appPrimaryText)
-                                    .lineSpacing(4)
+                                if !questionText.isEmpty {
+                                    Text(questionText)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(theme.appPrimaryText)
+                                        .lineSpacing(4)
+                                }
+                                ForEach(questionPhotoUrls, id: \.self) { url in
+                                    CachedRemoteImage(url: url, contentMode: .fit)
+                                        .frame(maxWidth: .infinity)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
                             }
                         }
                     }
@@ -455,7 +464,9 @@ struct LessonDetailView: View {
 
     private func loadLessonDetails() async {
         do {
-            questionText = try await HistoryModel.shared.fetchQuestionText(questionId: lesson.questionId)
+            let details = try await HistoryModel.shared.fetchQuestionDetails(questionId: lesson.questionId)
+            questionText = details.text
+            questionPhotoUrls = details.photoUrls
             messages = try await HistoryModel.shared.fetchLessonMessages(questionId: lesson.questionId)
         } catch {
             // Basic lesson info is already displayed
@@ -495,22 +506,9 @@ struct LessonMessageBubble: View {
     private var messageContent: some View {
         switch message.kind {
         case "image":
-            AsyncImage(url: URL(string: message.text)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                default:
-                    Rectangle()
-                        .fill(theme.appGrayBackground)
-                        .overlay {
-                            PlatformIcon(systemName: "photo", size: 28, weight: .medium, color: theme.appSecondaryText)
-                        }
-                }
-            }
-            .frame(width: 220, height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            CachedRemoteImage(url: message.text, contentMode: .fit)
+                .frame(width: 220, height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
         case "audio":
             HStack(spacing: 6) {

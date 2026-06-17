@@ -28,10 +28,12 @@ struct LessonHistoryItem: Identifiable, Hashable {
     let summary: String
     let transcriptPreview: String
     let hasAudio: Bool
+    let questionPhotoUrls: [String]
 }
 
 struct LessonDetails {
     let questionText: String
+    let questionPhotoUrls: [String]
     let messages: [LessonMessage]
 }
 
@@ -60,9 +62,12 @@ final class StudentLessonHistoryViewModel {
         }
     }
     
-    var completedCountText: String {
-        String(format: LocalizationSupport.localized("%d completed"), lessons.count)
-    }
+	var completedCountText: String {
+	  if isInitialLoading {
+		return String(LocalizationSupport.localized("Loading..."))
+	  }
+	  return String(format: LocalizationSupport.localized("%d completed"), lessons.count)
+	}
     
     func view(_ lesson: LessonHistoryItem) {
         selectedLessonDetails = nil
@@ -115,7 +120,8 @@ final class StudentLessonHistoryViewModel {
                 lesson.otherParticipantName
             ),
             transcriptPreview: LocalizationSupport.localized("Lesson transcript will appear here when available."),
-            hasAudio: false
+            hasAudio: false,
+            questionPhotoUrls: lesson.questionPhotoUrls
         )
     }
 }

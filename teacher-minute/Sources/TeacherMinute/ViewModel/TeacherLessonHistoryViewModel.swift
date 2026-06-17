@@ -103,7 +103,8 @@ final class TeacherLessonHistoryViewModel {
                 lesson.otherParticipantName
             ),
             transcriptPreview: LocalizationSupport.localized("Lesson transcript will appear here when available."),
-            hasAudio: false
+            hasAudio: false,
+            questionPhotoUrls: lesson.questionPhotoUrls
         )
     }
 }

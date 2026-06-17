@@ -5937,6 +5937,17 @@
         }
       }
     },
+  "completed_count": {
+      "defaultValue": {
+        "value": "%d completed"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d הושלמו"
+        }
+      }
+    },
     "teacher_lower": {
       "defaultValue": {
         "value": "teacher"

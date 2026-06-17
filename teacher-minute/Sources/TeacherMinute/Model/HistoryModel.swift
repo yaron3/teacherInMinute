@@ -19,6 +19,8 @@ struct HistoryLesson: Identifiable, Hashable {
     let title: String
     let otherParticipantName: String
     let otherParticipantImageURL: String
+    let questionText: String
+    let questionPhotoUrls: [String]
     let acceptedAt: Date
     let durationSeconds: Int
     let costCents: Int
@@ -136,12 +138,17 @@ final class HistoryModel {
             fallbackCurrencyCode: fallbackCurrencyCode
         )
 
+        let questionText = Self.firstString(in: data, keys: ["text", "questionText", "originalQuestion", "message"])
+        let questionPhotoUrls = Self.stringArray(data["photoUrls"])
+
         return HistoryLesson(
             id: questionId,
             questionId: questionId,
-            title: Self.lessonTitle(from: data),
+            title: Self.lessonTitle(from: data, questionText: questionText, questionPhotoUrls: questionPhotoUrls),
             otherParticipantName: otherParticipantName.isEmpty ? fallbackName : otherParticipantName,
             otherParticipantImageURL: otherParticipantImage,
+            questionText: questionText,
+            questionPhotoUrls: questionPhotoUrls,
             acceptedAt: acceptedAt,
             durationSeconds: durationSeconds,
             costCents: costCents,
@@ -150,10 +157,18 @@ final class HistoryModel {
         )
     }
 
-    private static func lessonTitle(from data: [String: Any]) -> String {
-        let title = LocalizationSupport.localized(firstString(in: data, keys: ["topic", "subject", "title", "questionText", "text", "message"]))
-												  
-        return title.isEmpty ? "Lesson" : title
+    private static func lessonTitle(from data: [String: Any], questionText: String, questionPhotoUrls: [String]) -> String {
+        if !questionText.isEmpty {
+            return questionText
+        }
+        if !questionPhotoUrls.isEmpty {
+            return LocalizationSupport.localized("Image")
+        }
+        let topic = firstString(in: data, keys: ["topic", "subject", "title"])
+        if !topic.isEmpty {
+            return LocalizationSupport.localized(topic)
+        }
+        return LocalizationSupport.localized("Lesson")
     }
 
     private static func firstString(in data: [String: Any], keys: [String]) -> String {
@@ -369,6 +384,15 @@ final class HistoryModel {
             .collection("questions").document(questionId).getDocument()
         guard let data = snapshot.data() else { return "" }
         return Self.firstString(in: data, keys: ["text", "questionText", "originalQuestion", "message"])
+    }
+
+    func fetchQuestionDetails(questionId: String) async throws -> (text: String, photoUrls: [String]) {
+        let snapshot = try await Firestore.firestore()
+            .collection("questions").document(questionId).getDocument()
+        guard let data = snapshot.data() else { return ("", []) }
+        let text = Self.firstString(in: data, keys: ["text", "questionText", "originalQuestion", "message"])
+        let photoUrls = Self.stringArray(data["photoUrls"])
+        return (text, photoUrls)
     }
 
     func fetchLessonMessages(questionId: String) async throws -> [LessonMessage] {
