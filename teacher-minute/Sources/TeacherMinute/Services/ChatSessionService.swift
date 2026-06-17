@@ -47,6 +47,7 @@ struct ChatSessionDetails: Equatable {
   let studentImageURL: String
   let teacherImageURL: String
   let questionText: String
+  let questionPhotoUrls: [String]
   let createdAt: Double
   let acceptedAt: Double
   let connectionFeeCents: Int
@@ -541,6 +542,7 @@ final class ChatSessionService {
       studentImageURL: firstString(in: dict, keys: ["studentImageURL", "studentProfileImageURL", "studentPhotoURL"]),
       teacherImageURL: firstString(in: dict, keys: ["teacherImageURL", "teacherProfileImageURL", "teacherPhotoURL"]),
       questionText: firstString(in: dict, keys: ["text", "questionText", "originalQuestion", "message", "topic"]),
+      questionPhotoUrls: stringArray(dict["photoUrls"]),
       createdAt: normalizedMilliseconds(doubleValue(dict["createdAt"]) ?? 0),
       acceptedAt: normalizedMilliseconds(
         doubleValue(dict["acceptedAt"])
@@ -556,6 +558,17 @@ final class ChatSessionService {
       teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75,
       currencyCode: currencyCode(from: dict)
     )
+  }
+
+  private static func stringArray(_ value: Any?) -> [String] {
+    if let arr = value as? [String] { return arr.filter { !$0.isEmpty } }
+    if let arr = value as? [Any] {
+      return arr.compactMap { $0 as? String }.filter { !$0.isEmpty }
+    }
+    if let dict = value as? [String: Any] {
+      return dict.values.compactMap { $0 as? String }.filter { !$0.isEmpty }
+    }
+    return []
   }
 
   private static func currencyCode(from dict: [String: Any]) -> String {
@@ -603,6 +616,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var participantImageURL: String { get }
   var currentUserImageURL: String { get }
   var originalQuestion: String { get }
+  var questionPhotoUrls: [String] { get }
   var primaryAmountTitle: String { get }
   var primaryAmountSubtitle: String { get }
   var sessionNoticeText: String { get }
@@ -666,6 +680,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
   var originalQuestion: String {
     nonEmpty(details?.questionText) ?? LocalizationSupport.localized("Question details are loading.")
+  }
+  var questionPhotoUrls: [String] {
+    details?.questionPhotoUrls ?? []
   }
   var primaryAmountTitle: String {
     LocalizationSupport.localized(isTeacherRole ? "Live Earnings" : "Session Cost")
@@ -1058,6 +1075,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       studentImageURL: nonEmpty(updated.studentImageURL) ?? current.studentImageURL,
       teacherImageURL: nonEmpty(updated.teacherImageURL) ?? current.teacherImageURL,
       questionText: nonEmpty(updated.questionText) ?? current.questionText,
+      questionPhotoUrls: updated.questionPhotoUrls.isEmpty ? current.questionPhotoUrls : updated.questionPhotoUrls,
       createdAt: updated.createdAt > 0 ? updated.createdAt : current.createdAt,
       acceptedAt: updated.acceptedAt > 0 ? updated.acceptedAt : current.acceptedAt,
       connectionFeeCents: updated.connectionFeeCents > 0 ? updated.connectionFeeCents : current.connectionFeeCents,
@@ -1108,6 +1126,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       studentImageURL: studentImageURL,
       teacherImageURL: teacherImageURL,
       questionText: current.questionText,
+      questionPhotoUrls: current.questionPhotoUrls,
       createdAt: current.createdAt,
       acceptedAt: current.acceptedAt,
       connectionFeeCents: current.connectionFeeCents,

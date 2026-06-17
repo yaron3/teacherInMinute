@@ -87,8 +87,14 @@ export const createQuestion = onCall(async (req) => {
       ? (rawConversationType as ConversationType)
       : DEFAULT_CONVERSATION_TYPE;
 
-  if (!topic || !text?.trim()) {
-    throw new HttpsError("invalid-argument", "topic and text are required");
+  const hasText = !!text?.trim();
+  const hasPhoto = Array.isArray(photoUrls) && photoUrls.length > 0;
+
+  if (!topic) {
+    throw new HttpsError("invalid-argument", "topic is required");
+  }
+  if (!hasText && !hasPhoto) {
+    throw new HttpsError("invalid-argument", "Provide question text or attach at least one photo");
   }
 
   const validTopics = ["algebra", "geometry", "trigonometry", "calculus", "statistics", "arithmetic"];
@@ -96,7 +102,7 @@ export const createQuestion = onCall(async (req) => {
     throw new HttpsError("invalid-argument", `topic must be one of: ${validTopics.join(", ")}`);
   }
 
-  if (text.trim().length < 10) {
+  if (hasText && text.trim().length < 10 && !hasPhoto) {
     throw new HttpsError("invalid-argument", "Question text must be at least 10 characters");
   }
 
@@ -112,10 +118,12 @@ export const createQuestion = onCall(async (req) => {
     `[questions] createQuestion start qid=${qid} student=${uid} topic=${topic} conversationType=${conversationType}`
   );
 
+  const trimmedText = text?.trim() ?? "";
+
   const question: QuestionDoc = {
     studentUid: uid,
     topic,
-    text: text.trim(),
+    text: trimmedText,
     photoUrls,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
     conversationType,
@@ -130,7 +138,7 @@ export const createQuestion = onCall(async (req) => {
     questionId: qid,
     studentUid: uid,
     topic,
-    text: text.trim(),
+    text: trimmedText,
     photoUrls,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
     conversationType,

@@ -24,6 +24,7 @@ struct ChatSessionView: View {
 	case CHAT
 	case BOARD
 	case VIDEO
+	case IMAGES
   }
   @State var viewModel: any ChatSessionViewModeling
   @State var composerMode: ChatComposerMode = .regular
@@ -53,6 +54,7 @@ struct ChatSessionView: View {
   @State var isEndingSession = false
   @State var didRequestLessonEnd = false
   @State var saveBoardIsRemoteInitiated = false
+  @State var sessionFrozenDate: Date?
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let liveKitRoom: String
@@ -193,6 +195,7 @@ struct ChatSessionView: View {
         displayDate = Date()
       }
       viewModel.onSessionEnded = {
+        if sessionFrozenDate == nil { sessionFrozenDate = Date() }
         if !boardStrokes.isEmpty && !didRequestLessonEnd && !isEndingSession {
           saveBoardIsRemoteInitiated = true
           endSessionPrompt = .saveBoard
@@ -335,7 +338,7 @@ struct ChatSessionView: View {
   private func closeWithOptionalRating() {
     endSessionPrompt = nil
     isEndingSession = false
-    let durationSeconds = viewModel.sessionDurationSeconds(at: Date())
+    let durationSeconds = viewModel.sessionDurationSeconds(at: sessionFrozenDate ?? Date())
     if isStudent && durationSeconds >= 30 && !viewModel.teacherId.isEmpty {
       isRatingPromptVisible = true
     } else {
@@ -398,6 +401,7 @@ struct ChatSessionView: View {
     endSessionPrompt = nil
     isEndingSession = true
     didRequestLessonEnd = true
+    if sessionFrozenDate == nil { sessionFrozenDate = Date() }
     Task {
       await viewModel.endLesson()
       closeWithOptionalRating()
@@ -410,6 +414,7 @@ struct ChatSessionView: View {
     isEndingSession = true
     endSessionPrompt = nil
     didRequestLessonEnd = true
+    if sessionFrozenDate == nil { sessionFrozenDate = Date() }
     Task {
       await saveBoardSnapshotAndShare(saveToChat: saveToChat, saveToGallery: saveToGallery)
       await viewModel.endLesson()
@@ -551,6 +556,8 @@ struct ChatSessionView: View {
           }
 		} else if selectedTab == .VIDEO {
           videoFeed
+        } else if selectedTab == .IMAGES {
+          questionImagesGallery
         } else {
           whiteboard
         }
@@ -604,6 +611,37 @@ struct ChatSessionView: View {
       isMaximized: $isBoardMaximized,
       role: viewModel.role
     )
+  }
+
+  var questionImagesGallery: some View {
+    ScrollView(.vertical, showsIndicators: true) {
+      VStack(spacing: 14) {
+        ForEach(viewModel.questionPhotoUrls, id: \.self) { url in
+          questionImageTile(url: url)
+        }
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 16)
+      .frame(maxWidth: CGFloat.infinity)
+    }
+    .background(theme.appCardBackground)
+  }
+
+  func questionImageTile(url: String) -> some View {
+    let minSide: CGFloat = hSizeClass == .regular ? 700 : 500
+    return RoundedRectangle(cornerRadius: 14, style: .continuous)
+      .fill(theme.appGrayBackground)
+      .frame(maxWidth: CGFloat.infinity)
+      .frame(minHeight: minSide)
+      .overlay {
+        CachedRemoteImage(url: url, contentMode: .fit)
+          .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+      }
+      .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .stroke(theme.appBorder, lineWidth: 1)
+      }
   }
 
   var videoFeed: some View {
@@ -1056,7 +1094,7 @@ struct ChatSessionView: View {
         Text(LocalizationSupport.localized("Session Time"))
           .font(.system(size: 11, weight: .medium))
           .foregroundStyle(theme.appSecondaryText)
-        Text(viewModel.sessionTimeText(at: displayDate))
+        Text(viewModel.sessionTimeText(at: sessionFrozenDate ?? displayDate))
           .font(.system(size: 28, weight: .heavy, design: .monospaced))
           .lineLimit(1)
           .minimumScaleFactor(0.85)
@@ -1111,6 +1149,8 @@ struct ChatSessionView: View {
       dismissChatInput()
     case .VIDEO:
       dismissChatInput()
+    case .IMAGES:
+      dismissChatInput()
     }
 
     applyVideoPauseState()
@@ -1151,6 +1191,9 @@ struct ChatSessionView: View {
 	  tabButton(id: .BOARD, title: LocalizationSupport.localized("Board"), icon: "pencil.and.list.clipboard", showsBadge: hasUnreadBoard)
       if hasVideo {
 		tabButton(id: .VIDEO, title: LocalizationSupport.localized("Video"), icon: "video.fill", showsBadge: false)
+      }
+      if !viewModel.questionPhotoUrls.isEmpty {
+        tabButton(id: .IMAGES, title: LocalizationSupport.localized("Images"), icon: "photo.fill", showsBadge: false)
       }
     }
     .frame(height: 40)

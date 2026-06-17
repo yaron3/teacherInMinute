@@ -8,11 +8,19 @@
 
 // MARK: - Ask Teacher Sheet
 import SwiftUI
+#if !os(Android)
+@preconcurrency import PhotosUI
+import FirebaseAuth
+#else
+import SkipBridge
+import SkipFirebaseAuth
+#endif
 
 struct AskTeacherSheet: View {
     let viewModel: any StudentHomeViewModeling
 
     static let topics = [("Algebra"), ("Geometry"), ("Trigonometry"), ("Calculus"), ("Statistics"), ("Arithmetic")]
+    static let maxPhotoCount = 4
 
     @State  var selectedTopic = ("Algebra")
     @State  var questionText = ""
@@ -20,10 +28,20 @@ struct AskTeacherSheet: View {
     @State  var composerMode: ChatComposerMode = .regular
     @State  var permissionAlertMessage: String? = nil
     @State  var isRequestingPermission = false
+    @State  var uploadedPhotoUrls: [String] = []
+    @State  var isUploadingPhoto = false
+    @State  var photoUploadError: String? = nil
+#if !os(Android)
+    @State  var pickedPhotoItem: PhotosPickerItem?
+#endif
     @FocusState var isQuestionFocused: Bool
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
     @Environment(\.dismiss) var dismiss
-  private var canSubmit: Bool { questionText.trimmingCharacters(in: .whitespaces).count >= 10 || composerMode == .algebra}
+  private var canSubmit: Bool {
+    questionText.trimmingCharacters(in: .whitespaces).count >= 10
+      || composerMode == .algebra
+      || !uploadedPhotoUrls.isEmpty
+  }
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -174,12 +192,16 @@ struct AskTeacherSheet: View {
 
                     composerModeToggle
 
-                    Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
-                        .font(.system(size: 11))
-						.multilineTextAlignment(.leading)
-						.frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(canSubmit ? theme.appGreen : theme.appSecondaryText)
+                    if uploadedPhotoUrls.isEmpty && composerMode == .regular {
+                        Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
+                            .font(.system(size: 11))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .foregroundStyle(canSubmit ? theme.appGreen : theme.appSecondaryText)
+                    }
                 }
+
+                photoAttachmentSection
 
 
                 let isFindDisabled = !canSubmit || isRequestingPermission
@@ -265,10 +287,166 @@ struct AskTeacherSheet: View {
         await viewModel.askTeacher(
             topic: selectedTopic.lowercased(),
             text: questionText.trimmingCharacters(in: .whitespaces),
-            photoUrls: [],
+            photoUrls: uploadedPhotoUrls,
             conversationType: conversationType
         )
     }
+
+    var photoAttachmentSection: some View {
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            Text(LocalizationSupport.localized("Attach a photo (optional)"))
+                .font(.system(size: 14, weight: .semibold))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(theme.appPrimaryText)
+
+            HStack(spacing: 10) {
+                ForEach(uploadedPhotoUrls, id: \.self) { url in
+                    photoThumbnail(url: url)
+                }
+
+                if uploadedPhotoUrls.count < AskTeacherSheet.maxPhotoCount {
+                    addPhotoButton
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            if let photoUploadError {
+                Text(photoUploadError)
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.appPink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    @ViewBuilder
+    var addPhotoButton: some View {
+#if !os(Android)
+        PhotosPicker(selection: $pickedPhotoItem, matching: .images) {
+            addPhotoLabel
+        }
+        .buttonStyle(.plain)
+        .disabled(isUploadingPhoto)
+        .onChange(of: pickedPhotoItem) { _, item in
+            MainActor.assumeIsolated { loadPickedPhoto(item) }
+        }
+#else
+        Button {
+            pickAndroidPhoto()
+        } label: {
+            addPhotoLabel
+        }
+        .buttonStyle(.plain)
+        .disabled(isUploadingPhoto)
+#endif
+    }
+
+    var addPhotoLabel: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(theme.appGrayBackground)
+            .frame(width: 64, height: 64)
+            .overlay {
+                if isUploadingPhoto {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(theme.appPrimaryText)
+                } else {
+                    PlatformIcon(systemName: "camera.fill", size: 20, weight: .semibold, color: theme.appSecondaryText)
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(theme.appBorder, lineWidth: 1)
+            }
+    }
+
+    func photoThumbnail(url: String) -> some View {
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(theme.appGrayBackground)
+                .frame(width: 64, height: 64)
+                .overlay {
+                    CachedRemoteImage(url: url, contentMode: .fill)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(theme.appBorder, lineWidth: 1)
+                }
+
+            Button {
+                removePhoto(url: url)
+            } label: {
+                Circle()
+                    .fill(theme.appPrimaryText.opacity(0.85))
+                    .frame(width: 20, height: 20)
+                    .overlay {
+                        PlatformIcon(systemName: "xmark", size: 10, weight: .bold, color: theme.appCardBackground)
+                    }
+            }
+            .buttonStyle(.plain)
+            .offset(x: 6, y: -6)
+        }
+    }
+
+    func removePhoto(url: String) {
+        uploadedPhotoUrls.removeAll { $0 == url }
+    }
+
+#if !os(Android)
+    func loadPickedPhoto(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        Task {
+            do {
+                isUploadingPhoto = true
+                photoUploadError = nil
+                defer {
+                    isUploadingPhoto = false
+                    pickedPhotoItem = nil
+                }
+                guard let data = try await item.loadTransferable(type: Data.self) else { return }
+                guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
+                    photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
+                    return
+                }
+                let url = try await StorageService.shared.uploadQuestionImage(data: data, uid: uid)
+                uploadedPhotoUrls.append(url)
+            } catch {
+                logger.error("AskTeacherSheet photo upload failed: \(error.localizedDescription)")
+                photoUploadError = error.localizedDescription
+            }
+        }
+    }
+#else
+    func pickAndroidPhoto() {
+        Task {
+            do {
+                isUploadingPhoto = true
+                photoUploadError = nil
+                defer { isUploadingPhoto = false }
+                let base64 = try await Task.detached(priority: .userInitiated) {
+                    try AndroidAskTeacherImagePickerBridge.pickImageBase64()
+                }.value
+                guard !base64.isEmpty else { return }
+                guard let data = Data(base64Encoded: base64) else {
+                    photoUploadError = LocalizationSupport.localized("Could not read selected image")
+                    return
+                }
+                guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
+                    photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
+                    return
+                }
+                let url = try await StorageService.shared.uploadQuestionImage(data: data, uid: uid)
+                uploadedPhotoUrls.append(url)
+            } catch {
+                logger.error("AskTeacherSheet photo upload failed: \(error.localizedDescription)")
+                photoUploadError = error.localizedDescription
+            }
+        }
+    }
+#endif
 
     func closeAskTeacher() {
         dismiss()
@@ -312,6 +490,26 @@ struct AskTeacherSheet: View {
         questionText += trimmed
     }
 }
+
+#if os(Android)
+private enum AndroidAskTeacherImagePickerBridge {
+  private static let managerClass = try! JClass(name: "teacher/minute/AndroidImagePickerManager")
+  private static let pickImageBase64Method = managerClass.getStaticMethodID(
+    name: "pickImageBase64",
+    sig: "()Ljava/lang/String;"
+  )!
+
+  static func pickImageBase64() throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: pickImageBase64Method,
+        options: [.kotlincompat],
+        args: []
+      )
+    }
+  }
+}
+#endif
 
 #if os(iOS)
 struct AskTeacherSheet_Previews: PreviewProvider {

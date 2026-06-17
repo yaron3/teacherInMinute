@@ -117,4 +117,36 @@ final class StorageService {
     return url.absoluteString
   }
 #endif
+
+  func uploadQuestionImage(
+    data: Data,
+    uid: String,
+    mimeType: String = "image/jpeg"
+  ) async throws -> String {
+    let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+    let path = "questionImages/\(uid)/\(timestamp).jpg"
+
+#if os(iOS)
+    final class BGTaskBox { var id = UIBackgroundTaskIdentifier.invalid }
+    let box = BGTaskBox()
+    box.id = UIApplication.shared.beginBackgroundTask(withName: "upload-question-image") {
+      UIApplication.shared.endBackgroundTask(box.id)
+      box.id = .invalid
+    }
+    defer {
+      if box.id != .invalid {
+        UIApplication.shared.endBackgroundTask(box.id)
+        box.id = .invalid
+      }
+    }
+#endif
+
+    let ref = Storage.storage().reference().child(path)
+    let metadata = StorageMetadata()
+    metadata.contentType = mimeType
+    _ = try await ref.putDataAsync(data, metadata: metadata)
+    let downloadURL = try await ref.downloadURL()
+    logger.info("Uploaded question image: \(path)")
+    return downloadURL.absoluteString
+  }
 }

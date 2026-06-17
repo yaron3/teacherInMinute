@@ -24,6 +24,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   let participantImageURL: String
   let currentUserImageURL: String
   let originalQuestion: String
+  let questionPhotoUrls: [String]
   let primaryAmountTitle: String
   let primaryAmountSubtitle: String
   let sessionNoticeText: String
@@ -53,6 +54,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     participantImageURL: String = "",
     currentUserImageURL: String = "",
     originalQuestion: String = "How do I solve quadratic equations using the quadratic formula? I'm confused about the discriminant.",
+    questionPhotoUrls: [String] = [],
     sessionNoticeText: String = "Session started - Billing active",
     sessionStartedAt: Double = Date().timeIntervalSince1970 * 1000.0 - 83_000.0,
     connectionFeeCents: Int = 0,
@@ -69,6 +71,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.participantImageURL = participantImageURL
     self.currentUserImageURL = currentUserImageURL
     self.originalQuestion = originalQuestion
+    self.questionPhotoUrls = questionPhotoUrls
     let isTeacherRole = Self.isTeacherRole(role)
     self.primaryAmountTitle = isTeacherRole ? LocalizationSupport.localized("Live Earnings") : LocalizationSupport.localized("Session Cost")
     self.primaryAmountSubtitle = isTeacherRole ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"

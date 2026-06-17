@@ -21,12 +21,12 @@
 ## 5. Show spinner when navigating to the Lessons tab — DONE
 - While the Lessons tab is loading, display a spinner until the content is ready.
 
-## 6. Tapping a specific lesson on Android shows nothing
+## 6. Tapping a specific lesson on Android shows nothing - DONE
 - Tapping a lesson row on Android does not open the lesson details.
 - Should navigate to the lesson detail screen (matching iOS behavior).
 - Fix: switched `.sheet(isPresented:)` (with optional `if let` inside) to `.sheet(item:)` driven by `selectedLesson`, which is Skip/Android-compatible.
 
-## 7. Allow sending an image as a question
+## 7. Allow sending an image as a question — DONE
 - Add the ability for a student to send an image as part of a question.
 - The teacher should be able to see the image when receiving the question.
 

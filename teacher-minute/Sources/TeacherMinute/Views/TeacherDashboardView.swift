@@ -488,10 +488,11 @@ struct TeacherDashboardView: View {
 	  now <= expiresAt ? LocalizationSupport.localized("SECONDS") : LocalizationSupport.localized("WAITING")
 	}
 	@Environment(\.colorScheme) var colorScheme
+	@Environment(\.horizontalSizeClass) var hSizeClass
 	var theme: AppTheme {
 	  AppTheme(colorScheme: colorScheme)
 	}
-	
+
 	var body: some View {
 	  VStack(spacing: 16) {
 		timerView
@@ -603,11 +604,10 @@ struct TeacherDashboardView: View {
 		  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
 		
 		if !photoUrls.isEmpty {
-		  HStack(spacing: 8) {
-			ForEach(photoUrls.prefix(2), id: \.self) { _ in
-			  attachmentTile
+		  VStack(spacing: 10) {
+			ForEach(photoUrls.prefix(4), id: \.self) { url in
+			  attachmentTile(url: url)
 			}
-			Spacer()
 		  }
 		}
 		
@@ -620,15 +620,19 @@ struct TeacherDashboardView: View {
 	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 	}
 	
-	var attachmentTile: some View {
-	  RoundedRectangle(cornerRadius: 9, style: .continuous)
+	func attachmentTile(url: String) -> some View {
+	  let minSide: CGFloat = hSizeClass == .regular ? 700 : 500
+	  return RoundedRectangle(cornerRadius: 12, style: .continuous)
 		.fill(theme.appGrayBackground)
-		.frame(width: 56, height: 56)
+		.frame(maxWidth: CGFloat.infinity)
+		.frame(minHeight: minSide)
 		.overlay {
-		  PlatformIcon(systemName: "photo.fill", size: 16, weight: .semibold, color: theme.appSecondaryText)
+		  CachedRemoteImage(url: url, contentMode: .fit)
+			.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
 		}
+		.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 		.overlay {
-		  RoundedRectangle(cornerRadius: 9, style: .continuous)
+		  RoundedRectangle(cornerRadius: 12, style: .continuous)
 			.stroke(theme.appBorder, lineWidth: 1)
 		}
 	}

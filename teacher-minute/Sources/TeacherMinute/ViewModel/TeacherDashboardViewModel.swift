@@ -46,6 +46,7 @@ final class TeacherDashboardViewModel {
   var activeLessonId: String? = nil
   var activeQuestionId: String? = nil
   var activeQuestionText = ""
+  var activeQuestionPhotoUrls: [String] = []
   var activeStudentName = "Student"
   var activeStudentImageURL = ""
   var activeConnectionFeeCents = 0
@@ -378,6 +379,7 @@ final class TeacherDashboardViewModel {
       acceptingQuestionId = questionId
       isAcceptingCalls = true
       activeQuestionText = inviteTexts[questionId] ?? ""
+      activeQuestionPhotoUrls = invitePhotoUrls[questionId] ?? []
       activeStudentName = inviteStudentNames[questionId]?.isEmpty == false ? inviteStudentNames[questionId] ?? "Student" : "Student"
       activeConnectionFeeCents = inviteConnectionFeeCents[questionId] ?? 0
       activePricePerMinuteCents = invitePricePerMinuteCents[questionId] ?? 50
@@ -478,6 +480,7 @@ final class TeacherDashboardViewModel {
     activeCallStudentUid = nil
     activeLessonId = nil
     activeQuestionText = ""
+    activeQuestionPhotoUrls = []
     activeStudentName = "Student"
     activeStudentImageURL = ""
     activeConnectionFeeCents = 0
@@ -511,6 +514,7 @@ final class TeacherDashboardViewModel {
       studentImageURL: activeStudentImageURL,
       teacherImageURL: teacherImageURL,
       questionText: activeQuestionText,
+      questionPhotoUrls: activeQuestionPhotoUrls,
       createdAt: 0,
       acceptedAt: activeAcceptedAt > 0 ? activeAcceptedAt : Date().timeIntervalSince1970 * 1000.0,
       connectionFeeCents: activeConnectionFeeCents,

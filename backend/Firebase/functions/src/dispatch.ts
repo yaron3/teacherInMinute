@@ -133,6 +133,7 @@ async function sendWave(
       await db.ref(`teacherInvites/${uid}/${qid}`).set({
         topic: questionData.topic,
         text: questionData.text.slice(0, 300),
+        photoUrls: questionData.photoUrls ?? [],
         expiresAt: Date.now() + INVITE_EXPIRY_SECONDS * 1000,
         wave,
         conversationType: questionData.conversationType,
@@ -238,6 +239,7 @@ async function tryInviteTeacherForQuestionWave(
       reason: `wave-backfill-${wave}`,
       topic: question.topic,
       text: question.text,
+      photoUrls: question.photoUrls ?? [],
       studentUid: question.studentUid,
       wave,
       conversationType: question.conversationType,
@@ -256,6 +258,7 @@ async function tryInviteTeacherForQuestionWave(
     reason: string;
     topic: string;
     text: string;
+    photoUrls: string[];
     studentUid: string;
     wave: number;
     conversationType: ConversationType;
@@ -264,6 +267,7 @@ async function tryInviteTeacherForQuestionWave(
   await db.ref(`teacherInvites/${teacherUid}/${qid}`).set({
     topic: invitePayload.topic,
     text: invitePayload.text.slice(0, 300),
+    photoUrls: invitePayload.photoUrls,
     expiresAt: Date.now() + INVITE_EXPIRY_SECONDS * 1000,
     wave: invitePayload.wave,
     conversationType: invitePayload.conversationType,
