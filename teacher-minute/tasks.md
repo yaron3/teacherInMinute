@@ -30,8 +30,10 @@
 - Add the ability for a student to send an image as part of a question.
 - The teacher should be able to see the image when receiving the question.
 
-## 8. Show spinner when transitioning from video chat to text chat
+## 8. Show spinner when transitioning from video chat to text chat — DONE
 - After a video chat ends and the user is moved to text chat, show a spinner blocking input until everything is ready and the user can type.
+- Implementation: `ChatSessionView` now tracks `isTransitioningToText`; when the student picks "Continue with text only" from the connection setup timeout, a spinner overlay replaces the setup view until the text session reports it's connected.
 
-** 9. Disable back on Android
-- disable the option to use system back from the main tab
+## 9. Disable back on Android — DONE
+- disable the option to use system back from the main tab to the onboarding phase
+- Implementation: `MainActivity` registers an `OnBackPressedCallback` that, when enabled, calls `moveTaskToBack(true)` instead of letting the system back unwind to onboarding. `MainTabView` enables/disables the callback via `AndroidBackNavigationBridge` in `onAppear`/`onDisappear`, so nested NavigationStacks inside tabs keep their normal back behavior.

@@ -69,6 +69,16 @@ struct MainTabView: View {
             print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
             PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
         }
+        .onAppear {
+            #if os(Android)
+            AndroidBackNavigationBridge.setSystemBackBlocked(true)
+            #endif
+        }
+        .onDisappear {
+            #if os(Android)
+            AndroidBackNavigationBridge.setSystemBackBlocked(false)
+            #endif
+        }
     }
 
     @ViewBuilder

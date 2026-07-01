@@ -8,6 +8,7 @@ import skip.ui.*
 import android.Manifest
 import android.app.Application
 import android.graphics.Color as AndroidColor
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
@@ -59,12 +60,23 @@ open class MainActivity: AppCompatActivity {
     constructor() {
     }
 
+    private var blockBackCallback: OnBackPressedCallback? = null
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         currentActivity = this
         logger.info("starting activity")
         UIApplication.launch(this)
         enableEdgeToEdge()
+
+        val callback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                logger.info("[BackNav] suppressing system back on main tabs")
+                moveTaskToBack(true)
+            }
+        }
+        blockBackCallback = callback
+        onBackPressedDispatcher.addCallback(this, callback)
 
         setContent {
             val saveableStateHolder = rememberSaveableStateHolder()
@@ -155,6 +167,14 @@ open class MainActivity: AppCompatActivity {
     companion object {
         @JvmStatic
         var currentActivity: MainActivity? = null
+
+        @JvmStatic
+        fun setSystemBackBlocked(blocked: Boolean) {
+            val activity = currentActivity ?: return
+            activity.runOnUiThread {
+                activity.blockBackCallback?.isEnabled = blocked
+            }
+        }
     }
 }
 

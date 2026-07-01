@@ -51,11 +51,13 @@ object AndroidBoardImageSaver {
             Log.w(TAG, "Rendered bytes are empty; aborting save")
             return ""
         }
+        Log.i(TAG, "[BoardSnapshot] jpeg ready bytes=${bytes.size} pixelSize=${width}x${height}")
 
         val timestamp = System.currentTimeMillis()
         var downloadUrl = ""
 
         if (saveToChat) {
+            Log.i(TAG, "[BoardSnapshot] uploading to chat bytes=${bytes.size} qid=$questionId")
             downloadUrl = uploadJpegBytes(
                 questionId = questionId,
                 bytes = bytes,
@@ -72,6 +74,7 @@ object AndroidBoardImageSaver {
         }
 
         if (saveToGallery) {
+            Log.i(TAG, "[BoardSnapshot] saving to gallery bytes=${bytes.size}")
             saveBytesToGallery(bytes = bytes, filename = "TeacherMinute_$timestamp.jpg")
         }
 

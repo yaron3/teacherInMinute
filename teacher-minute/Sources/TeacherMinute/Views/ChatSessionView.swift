@@ -55,6 +55,7 @@ struct ChatSessionView: View {
   @State var didRequestLessonEnd = false
   @State var saveBoardIsRemoteInitiated = false
   @State var sessionFrozenDate: Date?
+  @State var isTransitioningToText = false
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let liveKitRoom: String
@@ -111,24 +112,32 @@ struct ChatSessionView: View {
     ZStack {
       Group {
         if isConnecting {
-          ConnectionSetupView(
-            participantName: participantName,
-            conversationType: conversationType,
-            viewModel: viewModel,
-            liveKitRoom: liveKitRoom,
-            liveKitToken: liveKitToken,
-            onCancel: onClose,
-            onSessionStarted: { @MainActor @Sendable in
-              logger.info("[ChatSessionView] setup complete qid=\(viewModel.questionId) role=\(viewModel.role) conversationType=\(conversationType)")
-              isConnecting = false
-            },
-            onContinueAsText: isStudent && hasAudio ? { @MainActor @Sendable in
-              conversationType = "text"
-            } : nil
-          )
+          if isTransitioningToText {
+            textTransitionOverlay
+          } else {
+            ConnectionSetupView(
+              participantName: participantName,
+              conversationType: conversationType,
+              viewModel: viewModel,
+              liveKitRoom: liveKitRoom,
+              liveKitToken: liveKitToken,
+              onCancel: onClose,
+              onSessionStarted: { @MainActor @Sendable in
+                logger.info("[ChatSessionView] setup complete qid=\(viewModel.questionId) role=\(viewModel.role) conversationType=\(conversationType)")
+                isConnecting = false
+              },
+              onContinueAsText: isStudent && hasAudio ? { @MainActor @Sendable in
+                isTransitioningToText = true
+                conversationType = "text"
+              } : nil
+            )
+          }
         } else {
           sessionBody
         }
+      }
+      .onChange(of: isConnecting) { _, newValue in
+        if !newValue { isTransitioningToText = false }
       }
 
       if let endSessionPrompt {
@@ -313,6 +322,19 @@ struct ChatSessionView: View {
     .zIndex(25)
   }
 
+  var textTransitionOverlay: some View {
+    VStack(spacing: 16) {
+      ProgressView()
+        .progressViewStyle(.circular)
+        .tint(theme.appPink)
+      Text(LocalizationSupport.localized("Switching to text chat…"))
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(theme.appSecondaryText)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(theme.appCardBackground)
+  }
+
   var ratingPromptOverlay: some View {
     RateSessionView(
       teacherName: viewModel.participantName,
@@ -461,9 +483,11 @@ struct ChatSessionView: View {
     renderer.scale = 1
     guard let image = renderer.uiImage,
           let data = image.jpegData(compressionQuality: 0.88) else { return }
+    logger.info("[BoardSnapshot] jpeg ready bytes=\(data.count) pixelSize=\(Int(image.size.width))x\(Int(image.size.height))")
 
     if saveToChat {
       do {
+        logger.info("[BoardSnapshot] uploading to chat bytes=\(data.count) qid=\(questionId)")
         let url = try await StorageService.shared.uploadBoardSnapshot(data: data, questionId: questionId)
         let service = ChatSessionService(questionId: questionId)
         try await service.sendImage(downloadURL: url, senderRole: senderRole)
@@ -473,6 +497,7 @@ struct ChatSessionView: View {
     }
 
     if saveToGallery {
+      logger.info("[BoardSnapshot] saving to gallery bytes=\(data.count)")
       PHPhotoLibrary.shared().performChanges {
         let request = PHAssetCreationRequest.forAsset()
         request.addResource(with: .photo, data: data, options: nil)

@@ -10,6 +10,11 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    function authUidInThreadId(threadId) {
+      return isAuth()
+        && threadId.matches('^(' + request.auth.uid + '_[^_]+|[^_]+_' + request.auth.uid + ')$');
+    }
+
     match /questions/{qid} {
       allow create: if isAuth()
         && request.resource.data.studentUid == request.auth.uid;
@@ -105,6 +110,19 @@ service cloud.firestore {
         && request.resource.data.role in ['student', 'teacher'];
 
       allow read, update, delete: if false;
+    }
+
+    match /messages/{threadId} {
+      allow create: if isAuth()
+        && authUidInThreadId(threadId);
+
+      allow read, update, delete: if isAuth()
+        && authUidInThreadId(threadId);
+
+      match /{document=**} {
+        allow read, write: if isAuth()
+          && authUidInThreadId(threadId);
+      }
     }
 
     match /{document=**} {
