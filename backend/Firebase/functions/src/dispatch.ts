@@ -134,6 +134,8 @@ async function sendWave(
         topic: questionData.topic,
         text: questionData.text.slice(0, 300),
         photoUrls: questionData.photoUrls ?? [],
+        studentName: questionData.studentName ?? "",
+        studentImageURL: questionData.studentImageURL ?? "",
         expiresAt: Date.now() + INVITE_EXPIRY_SECONDS * 1000,
         wave,
         conversationType: questionData.conversationType,
@@ -146,7 +148,7 @@ async function sendWave(
           fcmToken: t.fcmToken,
           questionId: qid,
           topic: questionData.topic,
-          studentName: questionData.studentUid,
+          studentName: questionData.studentName || questionData.studentUid,
           questionText: questionData.text,
           wave,
           ttlSeconds: INVITE_EXPIRY_SECONDS,
@@ -241,6 +243,8 @@ async function tryInviteTeacherForQuestionWave(
       text: question.text,
       photoUrls: question.photoUrls ?? [],
       studentUid: question.studentUid,
+      studentName: question.studentName ?? "",
+      studentImageURL: question.studentImageURL ?? "",
       wave,
       conversationType: question.conversationType,
     };
@@ -260,6 +264,8 @@ async function tryInviteTeacherForQuestionWave(
     text: string;
     photoUrls: string[];
     studentUid: string;
+    studentName: string;
+    studentImageURL: string;
     wave: number;
     conversationType: ConversationType;
   };
@@ -268,6 +274,8 @@ async function tryInviteTeacherForQuestionWave(
     topic: invitePayload.topic,
     text: invitePayload.text.slice(0, 300),
     photoUrls: invitePayload.photoUrls,
+    studentName: invitePayload.studentName,
+    studentImageURL: invitePayload.studentImageURL,
     expiresAt: Date.now() + INVITE_EXPIRY_SECONDS * 1000,
     wave: invitePayload.wave,
     conversationType: invitePayload.conversationType,
@@ -278,7 +286,7 @@ async function tryInviteTeacherForQuestionWave(
       fcmToken: teacher.fcmToken,
       questionId: qid,
       topic: invitePayload.topic,
-      studentName: invitePayload.studentUid,
+      studentName: invitePayload.studentName || invitePayload.studentUid,
       questionText: invitePayload.text,
       wave: invitePayload.wave,
       ttlSeconds: INVITE_EXPIRY_SECONDS,

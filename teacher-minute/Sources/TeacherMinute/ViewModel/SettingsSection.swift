@@ -55,6 +55,7 @@ struct SettingsRow: Identifiable {
         switch action {
         case .accountSecurity:
 		self.destination = .accountSecurity
+        case .appPreferences:  self.destination = .appPreferences
         case .changePassword:  self.destination = .changePassword
         case .teacherPayouts:  self.destination = .teacherPayouts
         case .studentPayments: self.destination = .studentPayments
@@ -78,6 +79,7 @@ struct SettingsRow: Identifiable {
 
 enum SettingsAction: Equatable {
     case accountSecurity
+    case appPreferences
     case changePassword
     case logOut
     case deleteAccount
@@ -94,6 +96,7 @@ enum SettingsAction: Equatable {
     var id: String {
         switch self {
         case .accountSecurity: "accountSecurity"
+        case .appPreferences: "appPreferences"
         case .changePassword: "changePassword"
         case .logOut: "logOut"
         case .deleteAccount: "deleteAccount"
@@ -112,6 +115,7 @@ enum SettingsAction: Equatable {
 
 enum SettingsDestination: Hashable {
     case accountSecurity
+    case appPreferences
     case changePassword
     case teacherPayouts
     case studentPayments
@@ -125,6 +129,7 @@ enum SettingsDestination: Hashable {
     var title: String {
         switch self {
         case .accountSecurity: LocalizationSupport.localized("Account & Security")
+        case .appPreferences: LocalizationSupport.localized("Preferences")
         case .changePassword: LocalizationSupport.localized("Change Password")
         case .teacherPayouts: LocalizationSupport.localized("Teacher Payout Settings")
         case .studentPayments: LocalizationSupport.localized("Student Payment Methods")
@@ -149,7 +154,7 @@ enum SettingsDestination: Hashable {
             LocalizationSupport.localized("Notification preferences will be available here.")
         case .privacyControls:
             LocalizationSupport.localized("Privacy controls will be available here.")
-        case .accountSecurity, .language, .about, .contactUs, .webPage:
+        case .accountSecurity, .appPreferences, .language, .about, .contactUs, .webPage:
             ""
         }
     }
@@ -305,6 +310,16 @@ class SettingsViewModel {
                 title: LocalizationSupport.localized("PREFERENCES"),
                 rows: [
                     SettingsRow(
+                        title: LocalizationSupport.localized("Preferences"),
+                        subtitle: role == .teacher
+                            ? LocalizationSupport.localized("Currency")
+                            : LocalizationSupport.localized("Default session type and currency"),
+                        systemImage: "slider.horizontal.3",
+                        iconColor: .primary,
+                        isDestructive: false,
+                        action: .appPreferences
+                    ),
+                    SettingsRow(
                         title: LocalizationSupport.localized("Language"),
                         subtitle: selectedLanguage.title,
                         systemImage: "globe",
@@ -452,6 +467,8 @@ class SettingsViewModel {
         switch row.action {
         case .accountSecurity:
             navigationPath.append(.accountSecurity)
+        case .appPreferences:
+            navigationPath.append(.appPreferences)
         case .changePassword:
             sendPasswordReset()
         case .teacherPayouts:

@@ -13,7 +13,6 @@ import Observation
 final class PermissionsSetupViewModel {
     var microphoneEnabled = true
     var cameraEnabled = true
-    var notificationsEnabled = true
 
     var onContinue: (() -> Void)?
 
@@ -25,9 +24,9 @@ final class PermissionsSetupViewModel {
             if cameraEnabled {
                 cameraEnabled = await PermissionService.shared.requestCapturePermission(for: .camera) == .granted
             }
-            if notificationsEnabled {
-                notificationsEnabled = await PermissionService.shared.requestNotifications() == .granted
-            }
+            // Notification permission is intentionally NOT requested here. It is
+            // requested only after the student's first lesson, behind a custom
+            // explanatory prompt. See NotificationPromptStore.
             onContinue?()
         }
     }

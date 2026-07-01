@@ -83,15 +83,8 @@ struct PermissionsSetupView: View {
                     subtitle: LocalizationSupport.localized("Use video in live\\nlessons and update\\nyour profile photo\\nwhen needed."),
                     isOn: $viewModel.cameraEnabled
                 )
-
-                PermissionCard(
-                    icon: "bell.fill",
-					iconColor: theme.authPurple,
-					iconBackground: theme.authPurpleSoft,
-                    title: "Notifications",
-                    subtitle: LocalizationSupport.localized("Get instant alerts\nwhen a teacher\naccepts your\nrequest or replies."),
-                    isOn: $viewModel.notificationsEnabled
-                )
+                // Notifications are requested after the first lesson (with a
+                // dedicated explanation), so they are not shown here.
             }
             .padding(.top, 34)
 

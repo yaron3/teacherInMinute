@@ -57,6 +57,16 @@ final class StorageService {
     return path
   }
 
+  /// Resolves the download URL for a previously uploaded document.
+  /// `name` matches the value stored in the user's `uploadedDocuments`
+  /// (e.g. "govId_<uid>_front", "credentials_<uid>", "selfie_<uid>").
+  func documentDownloadURL(name: String, uid: String) async throws -> String {
+	let path = "documents/\(uid)/\(name).jpg"
+	let ref = Storage.storage().reference().child(path)
+	let downloadURL = try await ref.downloadURL()
+	return downloadURL.absoluteString
+  }
+
   func uploadProfileImage(
     data: Data,
     uid: String,

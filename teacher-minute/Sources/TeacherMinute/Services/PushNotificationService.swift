@@ -46,8 +46,17 @@ public final class PushNotificationService: NSObject {
 	  logger.info("[Push] registerCurrentDevice uid=\(uid) role=\(role.rawValue)")
 
         Task {
-            let state = await PermissionService.shared.requestNotifications()
+            // Do NOT prompt here. Notification permission is requested only after
+            // the student's first lesson, behind a custom explanation. We only
+            // register the device token if permission has already been granted;
+            // otherwise we defer until a later `registerCurrentDevice` call once
+            // the user has granted it.
+            let state = await PermissionService.shared.notificationStatus()
             logger.info("[Push] notification permission state=\(state.rawValue)")
+            guard state == .granted else {
+                logger.info("[Push] notifications not granted — deferring token registration")
+                return
+            }
 #if os(iOS)
             // APNS registration is async — the FCM token write happens later
             // in handleAPNSToken once the APNS token actually arrives.

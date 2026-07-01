@@ -23,12 +23,15 @@ final class SettingsRemoteConfigService {
         static let privacyPolicyURL = "privacy_policy"
         static let subjects = "subjects"
         static let teacherShare = "teacher_share"
+        static let pricePerMinutePrefix = "price_per_minute"
+        static let costPerMinute = "cost_per_minute"
         static let contactSupportTitleMaxLength = "contact_support_title_max_length"
         static let contactSupportDescriptionMaxLength = "contact_support_description_max_length"
     }
 
     private let defaultSupportEmail = "support@tim.app"
     private let defaultTeacherShare = 0.75
+    private let defaultPricePerMinuteByCurrency: [String: Double] = ["ILS": 2.0, "USD": 0.5]
     private let defaultContactSupportTitleMaxLength = 50
     private let defaultContactSupportDescriptionMaxLength = 1024
     
@@ -77,6 +80,24 @@ final class SettingsRemoteConfigService {
         }
 
         return min(max(share, 0), 1)
+    }
+
+    /// Per-minute lesson price (in cents) for the given currency. Lessons are
+    /// billed per minute, so this is the source of truth for deriving a lesson's
+    /// cost and the teacher's earnings when the question document doesn't carry
+    /// an explicit amount. Source: Remote Config `price_per_minute_<currency>`
+    /// (e.g. `price_per_minute_ils`), falling back to `cost_per_minute`.
+    func fetchPricePerMinuteCents(currencyCode: String) async -> Int {
+        await RemoteConfigService.shared.ready()
+        let normalizedCode = currencyCode.uppercased()
+        var amount = RemoteConfigService.shared.getNumber("\(Key.pricePerMinutePrefix)_\(normalizedCode.lowercased())")
+        if amount <= 0 {
+            amount = RemoteConfigService.shared.getNumber(Key.costPerMinute)
+        }
+        if amount <= 0 {
+            amount = defaultPricePerMinuteByCurrency[normalizedCode] ?? 0
+        }
+        return Int((amount * 100.0).rounded())
     }
 
     func fetchContactSupportTitleMaxLength() async -> Int {

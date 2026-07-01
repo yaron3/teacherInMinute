@@ -14,6 +14,9 @@ import SkipFirebaseRemoteConfig
 enum RemoteConfigKey: String {
     case eulaURL = "eula_url"
     case privacyPolicyURL = "privacy_policy"
+    case teacherIdGovIdDescription = "teacher_id_govid_description"
+    case teacherIdCredentialsDescription = "teacher_id_credentials_description"
+    case teacherIdSelfieDescription = "teacher_id_selfie_description"
 }
 
 @MainActor
@@ -98,6 +101,14 @@ final class RemoteConfigService {
 
     static func getLocalizedString(for key: RemoteConfigKey) -> String {
         shared.getLocalizedString(key.rawValue)
+    }
+
+    /// Like `getLocalizedString(for:)` but returns `fallback` when Remote Config
+    /// has no value for the key yet (missing key, or before the first fetch).
+    /// Use this for display text so the UI is never blank.
+    static func getLocalizedString(for key: RemoteConfigKey, fallback: String) -> String {
+        let value = shared.getLocalizedString(key.rawValue)
+        return value.isEmpty ? fallback : value
     }
 
     func getLocalizedString(_ key: String) -> String {

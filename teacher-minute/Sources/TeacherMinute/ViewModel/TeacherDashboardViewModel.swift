@@ -36,6 +36,7 @@ final class TeacherDashboardViewModel {
   var inviteHasVoiceMessage: [String: Bool] = [:]
   var inviteVoiceMessageDurations: [String: Int] = [:]
   var inviteStudentNames: [String: String] = [:]
+  var inviteStudentImageURLs: [String: String] = [:]
   var inviteStudentUids: [String: String] = [:]
   var inviteConnectionFeeCents: [String: Int] = [:]
   var invitePricePerMinuteCents: [String: Int] = [:]
@@ -175,6 +176,7 @@ final class TeacherDashboardViewModel {
             "voiceMessageDurationSeconds": $0.voiceMessageDurationSeconds as Any,
             "studentId": $0.studentId,
             "studentName": $0.studentName,
+            "studentImageURL": $0.studentImageURL,
             "connectionFeeCents": $0.connectionFeeCents,
             "pricePerMinuteCents": $0.pricePerMinuteCents,
             "conversationType": $0.conversationType,
@@ -271,6 +273,7 @@ final class TeacherDashboardViewModel {
     var hasVoiceByID: [String: Bool] = [:]
     var voiceDurationsByID: [String: Int] = [:]
     var studentNames: [String: String] = [:]
+    var studentImageURLs: [String: String] = [:]
     var studentIds: [String: String] = [:]
     var connectionFees: [String: Int] = [:]
     var pricesPerMinute: [String: Int] = [:]
@@ -312,6 +315,7 @@ final class TeacherDashboardViewModel {
         voiceDurationsByID[id] = duration
       }
       studentNames[id] = Self.firstString(row, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
+      studentImageURLs[id] = Self.firstString(row, keys: ["studentImageURL", "studentImageUrl", "studentPhotoUrl", "studentPhotoURL"])
       studentIds[id] = Self.firstString(row, keys: ["studentId", "studentUID", "studentId"])
       connectionFees[id] = Self.intValue(row["connectionFeeCents"]) ?? Self.intValue(row["connectionFee"]) ?? 0
       pricesPerMinute[id] = Self.intValue(row["pricePerMinuteCents"])
@@ -339,6 +343,7 @@ final class TeacherDashboardViewModel {
     inviteHasVoiceMessage = hasVoiceByID
     inviteVoiceMessageDurations = voiceDurationsByID
     inviteStudentNames = studentNames
+    inviteStudentImageURLs = studentImageURLs
     inviteStudentUids = studentIds
     inviteConnectionFeeCents = connectionFees
     invitePricePerMinuteCents = pricesPerMinute

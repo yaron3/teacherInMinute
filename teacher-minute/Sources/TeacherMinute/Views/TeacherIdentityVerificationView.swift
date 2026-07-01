@@ -48,48 +48,10 @@ struct TeacherIdentityVerificationView: View {
 		  verificationStatus
 			.padding(.top, 20)
 		  
-		  sectionTitle(LocalizationSupport.localized("Teaching Credentials"))
-			.padding(.top, 22)
-		  
-		  Text(LocalizationSupport.localized("Upload your degree, teaching license, or relevant\ncertifications."))
-			.font(.system(size: 11))
-			.foregroundStyle(theme.authSecondaryText)
-			.lineSpacing(4)
-			.padding(.top, 8)
-		  
-#if !os(Android)
-		  let hasCredentials      = viewModel.hasTeachingCredentials
-		  let credentialsSpinning = viewModel.isUploading(for: .teachingCredentials)
-		  PhotosPicker(selection: $credentialsItem,
-					   matching: .any(of: [.images, .livePhotos])) {
-			UploadLargeBox(
-			  title: LocalizationSupport.localized("Tap to upload document"),
-			  subtitle: LocalizationSupport.localized("PDF, JPG or PNG (Max 5MB)"),
-			  icon: "icloud.and.arrow.up.fill",
-			  isCompleted: hasCredentials,
-			  isUploading: credentialsSpinning,
-			  action: {}
-			)
-		  }
-					   .onChange(of: credentialsItem) { _, item in
-						 MainActor.assumeIsolated {
-						   loadAndUpload(item, for: .teachingCredentials)
-						 }
-					   }
-					   .padding(.top, 12)
-#else
-			  Button {
-				pickAndUploadAndroidImage(for: .teachingCredentials)
-			  } label: {
-				credentialsPickerLabel
-			  }
-			  .buttonStyle(.plain)
-#endif
-		  
 		  sectionTitle(LocalizationSupport.localized("Government ID"))
 			.padding(.top, 22)
 		  
-		  Text(LocalizationSupport.localized("Upload a clear photo of your passport, driver's license,\nor national ID."))
+		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdGovIdDescription, fallback: LocalizationSupport.localized("Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.")))
 			.font(.system(size: 11))
 			.foregroundStyle(theme.authSecondaryText)
 			.lineSpacing(4)
@@ -144,10 +106,48 @@ struct TeacherIdentityVerificationView: View {
 		  }
 		  .padding(.top, 12)
 		  
+		  sectionTitle(LocalizationSupport.localized("Teaching Credentials"))
+			.padding(.top, 22)
+		  
+		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdCredentialsDescription, fallback: LocalizationSupport.localized("Optional. Upload your degree, teaching license, or\ncertifications — it helps us verify you as a teacher\nfaster.")))
+			.font(.system(size: 11))
+			.foregroundStyle(theme.authSecondaryText)
+			.lineSpacing(4)
+			.padding(.top, 8)
+		  
+#if !os(Android)
+		  let hasCredentials      = viewModel.hasTeachingCredentials
+		  let credentialsSpinning = viewModel.isUploading(for: .teachingCredentials)
+		  PhotosPicker(selection: $credentialsItem,
+					   matching: .any(of: [.images, .livePhotos])) {
+			UploadLargeBox(
+			  title: LocalizationSupport.localized("Tap to upload document"),
+			  subtitle: LocalizationSupport.localized("PDF, JPG or PNG (Max 5MB)"),
+			  icon: "icloud.and.arrow.up.fill",
+			  isCompleted: hasCredentials,
+			  isUploading: credentialsSpinning,
+			  action: {}
+			)
+		  }
+					   .onChange(of: credentialsItem) { _, item in
+						 MainActor.assumeIsolated {
+						   loadAndUpload(item, for: .teachingCredentials)
+						 }
+					   }
+					   .padding(.top, 12)
+#else
+			  Button {
+				pickAndUploadAndroidImage(for: .teachingCredentials)
+			  } label: {
+				credentialsPickerLabel
+			  }
+			  .buttonStyle(.plain)
+#endif
+		  
 		  sectionTitle(LocalizationSupport.localized("Selfie Verification"))
 			.padding(.top, 22)
 		  
-		  Text(LocalizationSupport.localized("Take a clear selfie to match with your Government ID."))
+		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdSelfieDescription, fallback: LocalizationSupport.localized("Optional. Take a clear selfie to match your Government\nID — it helps us verify you faster.")))
 			.font(.system(size: 11))
 			.foregroundStyle(theme.authSecondaryText)
 			.padding(.top, 8)
@@ -321,9 +321,9 @@ struct TeacherIdentityVerificationView: View {
 		  .background((viewModel.canSubmit ? theme.authGreen : theme.authOrange).opacity(0.12))
 		  .clipShape(Capsule())
 	  }
-	  StatusRow(title: LocalizationSupport.localized("Teaching Credentials"), isDone: viewModel.hasTeachingCredentials, isMandatory: false)
 	  StatusRow(title: LocalizationSupport.localized("Government ID – Front"), isDone: viewModel.hasGovernmentIDFront, isMandatory: true)
 	  StatusRow(title: LocalizationSupport.localized("Government ID – Back"),  isDone: viewModel.hasGovernmentIDBack,  isMandatory: false)
+	  StatusRow(title: LocalizationSupport.localized("Teaching Credentials"), isDone: viewModel.hasTeachingCredentials, isMandatory: false)
 	  StatusRow(title: LocalizationSupport.localized("Selfie Verification"),   isDone: viewModel.hasSelfie,            isMandatory: false)
 	}
 	.padding(16)

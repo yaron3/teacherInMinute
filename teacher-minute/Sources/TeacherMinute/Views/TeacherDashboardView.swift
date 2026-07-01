@@ -309,7 +309,9 @@ struct TeacherDashboardView: View {
 		  photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
 		  hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
 		  voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
-		  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+		  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
+			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
 		) {
 		  viewModel.acceptInvite(questionId: inviteID)
 		} decline: {
@@ -338,7 +340,9 @@ struct TeacherDashboardView: View {
 			photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
 			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
 			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
-			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
+			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
 		  ) {
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {
@@ -458,8 +462,15 @@ struct TeacherDashboardView: View {
 	let hasVoiceMessage: Bool
 	let voiceMessageDurationSeconds: Int?
 	var conversationType: String = "text"
+	var studentName: String = ""
+	var studentImageURL: String = ""
 	let accept: () -> Void
 	let decline: () -> Void
+
+	private var displayStudentName: String {
+	  let trimmed = studentName.trimmingCharacters(in: .whitespacesAndNewlines)
+	  return trimmed.isEmpty ? LocalizationSupport.localized("Student") : trimmed
+	}
 
 	private var sessionIcon: String? {
 	  switch conversationType {
@@ -539,18 +550,19 @@ struct TeacherDashboardView: View {
 	
 	var studentCard: some View {
 	  HStack(spacing: 12) {
-		Circle()
-		  .fill(theme.appPurpleSoft)
-		  .frame(width: 44, height: 44)
-		  .overlay {
-			PlatformIcon(systemName: "person.crop.circle.fill", size: 24, color: theme.appPurple)
-		  }
-		
+		ProfileAvatarView(
+		  imageURL: studentImageURL,
+		  size: 44,
+		  fallbackSystemImage: "person.crop.circle.fill",
+		  background: theme.appPurpleSoft,
+		  tint: theme.appPurple
+		)
+
 		VStack(alignment: .leading, spacing: 4) {
-		  Text(LocalizationSupport.localized("Student"))
+		  Text(displayStudentName)
 			.font(.system(size: 15, weight: .bold))
 			.foregroundStyle(theme.appPrimaryText)
-		  
+
 		  Text(LocalizationSupport.localized("Waiting now"))
 			.font(.system(size: 11, weight: .medium))
 			.foregroundStyle(theme.appSecondaryText)
@@ -729,7 +741,9 @@ struct TeacherIncomingQuestionOverlay: View {
 			photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
 			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
 			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
-			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
+			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
 		  ) {
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {

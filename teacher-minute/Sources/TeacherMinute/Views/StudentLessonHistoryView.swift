@@ -67,7 +67,8 @@ struct StudentLessonHistoryView: View {
                                     lesson: lesson,
                                     accentColor: theme.appPink,
                                     iconName: "function",
-                                    isLoading: viewModel.isLoading(lesson)
+                                    isLoading: viewModel.isLoading(lesson),
+                                    showsAmount: false
                                 ) {
                                     presentingLesson = lesson
                                 }
@@ -91,26 +92,21 @@ struct StudentLessonHistoryView: View {
                 amountLabel: "Cost",
                 isPlaying: viewModel.isPlaying(lesson),
                 initialDetails: nil,
+                showsAmount: false,
                 audioAction: { viewModel.toggleAudio(for: lesson) }
             )
         }
     }
     
     private var summaryStrip: some View {
+        // Students only see the time they consumed — spend/cost is intentionally
+        // omitted here.
         HStack(spacing: 14) {
             HistoryMetricCard(
                 title: "Time Learned",
                 value: viewModel.totalTimeLearnedText,
                 systemImage: "clock.fill",
                 tint: theme.appPink
-            )
-			.frame(maxWidth: .infinity)
-            
-            HistoryMetricCard(
-                title: LocalizationSupport.localized("Total Spend"),
-                value: viewModel.totalSpendText,
-                systemImage: "creditcard.fill",
-                tint: theme.appPurple
             )
 			.frame(maxWidth: .infinity)
         }
@@ -190,6 +186,9 @@ struct LessonHistoryRow: View {
     let accentColor: Color
     let iconName: String
     var isLoading = false
+    /// Students are only shown the time they consumed, so the monetary amount is
+    /// hidden for them and shown only to teachers (their earnings).
+    var showsAmount = true
     let action: () -> Void
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
@@ -231,7 +230,7 @@ struct LessonHistoryRow: View {
                         ProgressView()
                             .scaleEffect(0.8)
                             .tint(accentColor)
-                    } else {
+                    } else if showsAmount {
                         Text(lesson.amount)
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(theme.appPrimaryText)
@@ -294,6 +293,9 @@ struct LessonDetailView: View {
     let amountLabel: String
     let isPlaying: Bool
     let initialDetails: LessonDetails?
+    /// Whether to show the monetary amount card. Hidden for students, who only
+    /// see the time they consumed.
+    var showsAmount = true
     let audioAction: () -> Void
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
@@ -309,12 +311,14 @@ struct LessonDetailView: View {
         amountLabel: String,
         isPlaying: Bool,
         initialDetails: LessonDetails?,
+        showsAmount: Bool = true,
         audioAction: @escaping () -> Void
     ) {
         self.lesson = lesson
         self.amountLabel = amountLabel
         self.isPlaying = isPlaying
         self.initialDetails = initialDetails
+        self.showsAmount = showsAmount
         self.audioAction = audioAction
         _messages = State(initialValue: initialDetails?.messages ?? [])
         _questionText = State(initialValue: initialDetails?.questionText ?? "")
@@ -341,12 +345,14 @@ struct LessonDetailView: View {
                     }
 
                     HStack(spacing: 14) {
-                        HistoryMetricCard(
-                            title: amountLabel,
-                            value: lesson.amount,
-                            systemImage: "creditcard.fill",
-                            tint: theme.appPurple
-                        )
+                        if showsAmount {
+                            HistoryMetricCard(
+                                title: amountLabel,
+                                value: lesson.amount,
+                                systemImage: "creditcard.fill",
+                                tint: theme.appPurple
+                            )
+                        }
 
                         HistoryMetricCard(
                             title: "Duration",

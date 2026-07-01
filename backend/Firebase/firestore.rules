@@ -59,6 +59,15 @@ service cloud.firestore {
       }
     }
 
+    // Teacher verification records. Written server-side (Cloud Functions with
+    // the Admin SDK); a teacher may read their own record so the app can show
+    // verification status. This fixes the "Missing or insufficient permissions"
+    // listen error on teachers/{uid}.
+    match /teachers/{uid} {
+      allow read: if isUser(uid);
+      allow write: if false;
+    }
+
     match /pricing/{pricingOptionId} {
       allow read: if true;
       allow write: if false;

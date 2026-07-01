@@ -75,6 +75,18 @@ final class UserService {
     logger.info("Updated profile fields for uid: \(uid)")
   }
 
+  /// Persists the "Show my profile image" privacy preference as a boolean so
+  /// the backend can decide whether to share the user's photo with the other
+  /// session participant.
+  func updateShowProfileImage(uid: String, enabled: Bool) async throws {
+    let db = Firestore.firestore()
+    try await db.collection("users").document(uid).setData([
+      "showProfileImage": enabled,
+      "updatedAt": ISO8601DateFormatter().string(from: Date())
+    ], merge: true)
+    logger.info("Updated showProfileImage for uid: \(uid) enabled=\(enabled)")
+  }
+
   func updateCurrency(uid: String, currency: String) async throws {
     let normalized = currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     guard normalized.count == 3 else { return }

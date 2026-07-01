@@ -42,6 +42,11 @@ final class ProfileViewModel {
 	[LocalizationSupport.localized("ils"), LocalizationSupport.localized("usd")]
   }
 
+  var availableStudentGrades: [String] {
+	(1...12).map { LocalizationSupport.localized("Grade \($0)") }
+	  + [LocalizationSupport.localized("College"), LocalizationSupport.localized("Adult Learner")]
+  }
+
     var shouldShowTeachingDetails: Bool {
         roleType == .teacher
     }

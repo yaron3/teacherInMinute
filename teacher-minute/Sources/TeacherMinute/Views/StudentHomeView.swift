@@ -13,6 +13,7 @@ struct StudentHomeView: View {
   @State var showingLowBalanceAlert = false
   @State var showingCouponAlert = false
   @State var showsAskTeacher = false
+  @State var showsNotificationExplainer = false
   @Binding var hidesTabBar: Bool
   @Environment(\.openURL) var openURL
   @Environment(\.scenePhase) var scenePhase
@@ -128,6 +129,15 @@ struct StudentHomeView: View {
 		  .id(languagePreference)
 	  }
 	  .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
+	}
+	.sheet(isPresented: $showsNotificationExplainer) {
+	  NotificationPermissionExplainerView {
+		NotificationPromptStore.markExplanationShown()
+		showsNotificationExplainer = false
+	  }
+	  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+	  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+	  .id(languagePreference)
 	}
 	.task {
 	  await viewModel.loadProfileIfNeeded()
@@ -377,6 +387,11 @@ struct StudentHomeView: View {
         Task {
           await viewModel.refreshAfterLessonEnded()
           viewModel.resetSearch()
+          // After the student's first lesson, offer notifications behind a
+          // custom explanation (the system prompt only appears if they opt in).
+          if await NotificationPromptStore.shouldPresentExplanation() {
+            showsNotificationExplainer = true
+          }
         }
       }
       .onAppear { hidesTabBar = true }

@@ -917,6 +917,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func sendStroke(_ points: [BoardPoint]) {
     guard !points.isEmpty else { return }
+    guard !hasReportedLessonEnd else { return }
     errorMessage = nil
 #if os(Android)
 #endif
@@ -948,6 +949,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   func updateBoardViewport(_ viewport: BoardViewport) {
+    // Once the lesson has ended the RTDB question node is removed/finalized by the
+    // backend, so a late viewport write races into a permission_denied. Suppress
+    // any board writes after the session has been reported ended.
+    guard !hasReportedLessonEnd else { return }
     Task {
       do {
         try await service.updateBoardViewport(viewport, role: role)

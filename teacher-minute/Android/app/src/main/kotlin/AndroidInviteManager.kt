@@ -54,6 +54,7 @@ object AndroidInviteManager {
                     !child.child("audioUrl").getValue(String::class.java).isNullOrBlank() ||
                     !child.child("voiceUrl").getValue(String::class.java).isNullOrBlank()
             val studentName = child.firstString("studentName", "studentFullName", "studentDisplayName", "name")
+            val studentImageURL = child.firstString("studentImageURL", "studentImageUrl", "studentPhotoUrl", "studentPhotoURL")
             val studentId = child.firstString("studentId", "studentUID", "studentId")
             val connectionFeeCents = child.child("connectionFeeCents").value.asIntOrNull()
                 ?: child.child("connectionFee").value.asIntOrNull()
@@ -88,6 +89,7 @@ object AndroidInviteManager {
                     .put("hasVoiceMessage", hasVoiceMessage)
                     .put("studentId", studentId)
                     .put("studentName", studentName)
+                    .put("studentImageURL", studentImageURL)
                     .put("connectionFeeCents", connectionFeeCents)
                     .put("pricePerMinuteCents", pricePerMinuteCents)
                     .put("conversationType", conversationType)

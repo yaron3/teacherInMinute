@@ -77,6 +77,16 @@ final class HistoryModel {
             from: userData,
             pricingCurrencyById: pricingCurrencyById
         ) ?? LessonFormatting.defaultCurrencyCode
+        // Lessons are billed per minute, and question documents don't always
+        // carry an explicit cost. Prefetch the per-minute price for the
+        // currencies we support so a lesson's cost (and the teacher's earnings)
+        // can be derived from its duration.
+        var pricePerMinuteCentsByCurrency: [String: Int] = [:]
+        for code in ["ILS", "USD", purchasedCurrencyCode.uppercased()] {
+            if pricePerMinuteCentsByCurrency[code] == nil {
+                pricePerMinuteCentsByCurrency[code] = await SettingsRemoteConfigService.shared.fetchPricePerMinuteCents(currencyCode: code)
+            }
+        }
 
         var lessons: [HistoryLesson] = []
         for questionId in questionIds {
@@ -85,7 +95,8 @@ final class HistoryModel {
                 currentUserId: uid,
                 defaultTeacherShare: defaultTeacherShare,
                 pricingCurrencyById: pricingCurrencyById,
-                fallbackCurrencyCode: purchasedCurrencyCode
+                fallbackCurrencyCode: purchasedCurrencyCode,
+                pricePerMinuteCentsByCurrency: pricePerMinuteCentsByCurrency
             ) else { continue }
             lessons.append(lesson)
         }
@@ -102,7 +113,8 @@ final class HistoryModel {
         currentUserId: String,
         defaultTeacherShare: Double,
         pricingCurrencyById: [String: String],
-        fallbackCurrencyCode: String
+        fallbackCurrencyCode: String,
+        pricePerMinuteCentsByCurrency: [String: Int]
     ) async throws -> HistoryLesson? {
         let snapshot = try await Firestore.firestore().collection("questions").document(questionId).getDocument()
         guard let data = snapshot.data() else { return nil }
@@ -126,16 +138,21 @@ final class HistoryModel {
             ?? Self.dateValue(data["completedAt"])
             ?? Self.dateValue(data["finishedAt"])
         let durationSeconds = endedAt.map { max(0, Int($0.timeIntervalSince(createdAt))) } ?? 0
-        let costCents = Self.costCents(from: data)
-        let teacherEarningsCents = Self.teacherEarningsCents(
-            from: data,
-            costCents: costCents,
-            defaultTeacherShare: defaultTeacherShare
-        )
         let currencyCode = Self.currencyCode(
             from: data,
             pricingCurrencyById: pricingCurrencyById,
             fallbackCurrencyCode: fallbackCurrencyCode
+        )
+        let pricePerMinuteCents = pricePerMinuteCentsByCurrency[currencyCode.uppercased()] ?? 0
+        let costCents = Self.costCents(
+            from: data,
+            durationSeconds: durationSeconds,
+            pricePerMinuteCents: pricePerMinuteCents
+        )
+        let teacherEarningsCents = Self.teacherEarningsCents(
+            from: data,
+            costCents: costCents,
+            defaultTeacherShare: defaultTeacherShare
         )
 
         let questionText = Self.firstString(in: data, keys: ["text", "questionText", "originalQuestion", "message"])
@@ -340,7 +357,15 @@ final class HistoryModel {
         return []
     }
 
-    private static func costCents(from data: [String: Any]) -> Int {
+    /// Resolves a lesson's cost in cents. Prefers an explicit amount written on
+    /// the question document; otherwise derives it from the billed minutes and
+    /// the per-minute price (rounding partial minutes up, matching how minutes
+    /// are consumed during a live session).
+    private static func costCents(
+        from data: [String: Any],
+        durationSeconds: Int,
+        pricePerMinuteCents: Int
+    ) -> Int {
         if let cents = intValue(data["costCents"])
             ?? intValue(data["totalCostCents"])
             ?? intValue(data["priceCents"])
@@ -355,7 +380,9 @@ final class HistoryModel {
             return Int((amount * 100.0).rounded())
         }
 
-        return 0
+        guard pricePerMinuteCents > 0, durationSeconds > 0 else { return 0 }
+        let billedMinutes = Int((Double(durationSeconds) / 60.0).rounded(.up))
+        return billedMinutes * pricePerMinuteCents
     }
 
     /// Reads the authoritative `teacherEarnings` written by the backend, falling

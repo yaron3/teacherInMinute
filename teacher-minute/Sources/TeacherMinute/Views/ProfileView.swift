@@ -17,6 +17,7 @@ struct ProfileView: View {
   @State var viewModel: ProfileViewModel
   @State var isShowingProfileEditor = false
   @State var isShowingSubjectEditor = false
+  @State var isShowingDocuments = false
   @State var hasProfileDataForDisplay = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
 #if !os(Android)
@@ -95,6 +96,9 @@ struct ProfileView: View {
 				addAction: { isShowingSubjectEditor = true }
 			  )
 			  .padding(.top, 18)
+
+			  documentsButton
+				.padding(.top, 14)
 			}
 		
 		Text(LocalizationSupport.localized("Device Permissions"))
@@ -158,6 +162,14 @@ struct ProfileView: View {
               .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
               .id(languagePreference)
             }
+            .sheet(isPresented: $isShowingDocuments) {
+              NavigationStack {
+                TeacherDocumentsView()
+              }
+              .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+              .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+              .id(languagePreference)
+            }
 #if !os(Android)
         .onChange(of: profilePhotoItem) { _, item in
           loadProfilePhoto(item)
@@ -207,13 +219,7 @@ struct ProfileView: View {
 	  HStack(spacing: 8) {
 		SmallPill(title: viewModel.role, foreground: theme.appPurple, background: theme.appPurpleSoft)
 		
-		if viewModel.roleType == .teacher {
-		  SmallPill(
-		    title: LocalizationSupport.localized(viewModel.isVerified ? "Verified" : "Not Verified"),
-		    foreground: viewModel.isVerified ? theme.appGreen : theme.red,
-		    background: viewModel.isVerified ? theme.appGreenSoft : theme.red.opacity(0.12)
-		  )
-		}
+		// Teacher verification badge is intentionally hidden for now.
 	  }
 	  .padding(.top, 8)
 	  
@@ -324,6 +330,42 @@ struct ProfileView: View {
     }
   }
 
+  var documentsButton: some View {
+	Button {
+	  isShowingDocuments = true
+	} label: {
+	  RoundedInfoCard {
+		HStack(spacing: 14) {
+		  Circle()
+			.fill(theme.appPurpleSoft)
+			.frame(width: 42, height: 42)
+			.overlay {
+			  PlatformIcon(systemName: "doc.text.fill")
+				.font(.system(size: 16, weight: .semibold))
+				.foregroundStyle(theme.appPurple)
+			}
+
+		  VStack(alignment: .leading, spacing: 4) {
+			Text(LocalizationSupport.localized("Documents Uploaded"))
+			  .font(.system(size: 14, weight: .bold))
+			  .foregroundStyle(theme.appPrimaryText)
+
+			Text(LocalizationSupport.localized("View the verification documents you uploaded"))
+			  .font(.system(size: 12))
+			  .foregroundStyle(theme.appSecondaryText)
+		  }
+
+		  Spacer()
+
+		  PlatformIcon(systemName: "chevron.right")
+			.font(.system(size: 13, weight: .semibold))
+			.foregroundStyle(theme.appSecondaryText)
+		}
+	  }
+	}
+	.buttonStyle(.plain)
+  }
+
   func teachingCard(
 	title: String,
 	chips: [String],
@@ -425,14 +467,16 @@ struct ProfileEditView: View {
 
         VStack(spacing: 16) {
           ForEach($viewModel.contactRows, id: \.description) { $row in
-            ProfileEditInfoRow(parameter: $row)
+            if viewModel.roleType == .student && row.description == LocalizationSupport.localized("Grade") {
+              ProfileGradePicker(
+                title: row.description,
+                selectedGrade: $row.value,
+                grades: viewModel.availableStudentGrades
+              )
+            } else {
+              ProfileEditInfoRow(parameter: $row)
+            }
           }
-
-          ProfileCurrencyPicker(
-            title: LocalizationSupport.localized("Currency"),
-            selectedCurrency: $viewModel.currency,
-			availableCurrencies: viewModel.availableCurrencies
-          )
 
           if viewModel.roleType == .teacher {
             ProfileTeachingGradePicker(
@@ -535,6 +579,55 @@ struct ProfileTeachingGradePicker: View {
       selectedGrades.remove(grade)
     } else {
       selectedGrades.insert(grade)
+    }
+  }
+}
+
+struct ProfileGradePicker: View {
+  let title: String
+  @Binding var selectedGrade: String
+  let grades: [String]
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(title)
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundStyle(theme.authPrimaryText)
+
+      Menu {
+        ForEach(grades, id: \.self) { grade in
+          Button(grade) {
+            selectedGrade = grade
+          }
+        }
+      } label: {
+        HStack {
+          Text(selectedGrade.isEmpty ? LocalizationSupport.localized("Select") : selectedGrade)
+            .font(.system(size: 17))
+            .foregroundStyle(selectedGrade.isEmpty ? theme.authSecondaryText : theme.authPrimaryText)
+
+          Spacer()
+
+          PlatformIcon(
+            systemName: "chevron.down",
+            size: 12,
+            weight: .semibold,
+            color: theme.authIcon
+          )
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 56)
+        .background(theme.authFieldBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay {
+          RoundedRectangle(cornerRadius: 15, style: .continuous)
+            .stroke(theme.authFieldBorder, lineWidth: 1)
+        }
+      }
     }
   }
 }

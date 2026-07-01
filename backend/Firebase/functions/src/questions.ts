@@ -107,10 +107,22 @@ export const createQuestion = onCall(async (req) => {
   }
 
   const studentSnap = await firestore.collection("users").doc(uid).get();
-  const remainingMinutes: number = (studentSnap.data()?.remainingMinutes as number | undefined) ?? 0;
+  const studentData = studentSnap.data() ?? {};
+  const remainingMinutes: number = (studentData.remainingMinutes as number | undefined) ?? 0;
   if (remainingMinutes < 2) {
     throw new HttpsError("resource-exhausted", "Not enough time left");
   }
+
+  // Snapshot the student's name + (privacy-respecting) profile image so invited
+  // teachers can see who is asking before they accept.
+  const studentName = (studentData.fullName as string | undefined) ?? "";
+  const studentProfileImage =
+    (studentData.profileImageURL as string | undefined) ??
+    (studentData.profilePhotoURL as string | undefined) ??
+    (studentData.photoURL as string | undefined) ??
+    "";
+  // Respect the "Show my profile image" setting — don't share the photo when off.
+  const studentImageURL = studentData.showProfileImage === false ? "" : studentProfileImage;
 
   const qid = uuidv4();
 
@@ -122,6 +134,8 @@ export const createQuestion = onCall(async (req) => {
 
   const question: QuestionDoc = {
     studentUid: uid,
+    studentName,
+    studentImageURL,
     topic,
     text: trimmedText,
     photoUrls,
@@ -137,6 +151,8 @@ export const createQuestion = onCall(async (req) => {
   const liveQuestion: Record<string, unknown> = {
     questionId: qid,
     studentUid: uid,
+    studentName,
+    studentImageURL,
     topic,
     text: trimmedText,
     photoUrls,
@@ -310,6 +326,10 @@ export const acceptInvite = onCall(async (req) => {
     (u.profilePhotoURL as string | undefined) ??
     (u.photoURL as string | undefined) ??
     "";
+  // Respect the user's "Show my profile image" privacy setting. When the user
+  // has turned it off, don't share their photo with the other participant.
+  const pickSharedImage = (u: FirebaseFirestore.DocumentData): string =>
+    u.showProfileImage === false ? "" : pickImage(u);
 
   if (studentFcmToken) {
     await sendAcceptedPush({
@@ -326,9 +346,9 @@ export const acceptInvite = onCall(async (req) => {
   await qRef.update({
     agoraChannel: channelName,
     teacherName: (teacherUser.fullName as string | undefined) ?? "",
-    teacherImageURL: pickImage(teacherUser),
+    teacherImageURL: pickSharedImage(teacherUser),
     studentName: (studentUser.fullName as string | undefined) ?? "",
-    studentImageURL: pickImage(studentUser),
+    studentImageURL: pickSharedImage(studentUser),
     updatedAt: FieldValue.serverTimestamp(),
   });
 
@@ -337,9 +357,9 @@ export const acceptInvite = onCall(async (req) => {
     {
       agoraChannel: channelName,
       teacherName: (teacherUser.fullName as string | undefined) ?? "",
-      teacherImageURL: pickImage(teacherUser),
+      teacherImageURL: pickSharedImage(teacherUser),
       studentName: (studentUser.fullName as string | undefined) ?? "",
-      studentImageURL: pickImage(studentUser),
+      studentImageURL: pickSharedImage(studentUser),
     },
     "accepted",
     "acceptInvite-profile-sync"

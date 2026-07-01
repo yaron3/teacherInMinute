@@ -54,7 +54,9 @@ struct CreateAccountView: View {
 	.navigationBarTitleDisplayMode(.inline)
 	.navigationTitle(LocalizationSupport.localized("Create Account"))
 	.onChange(of: viewModel.navigateToChooseRole) { _, newValue in
-	  if newValue { router.push(.chooseRole) }
+	  // Replace rather than push so the user cannot navigate back to the
+	  // sign-up form after their account has been created.
+	  if newValue { router.replace(with: .chooseRole) }
 	}
 	.onChange(of: viewModel.destination) { _, resume in
 	  guard let resume else { return }
@@ -229,10 +231,38 @@ struct CreateAccountView: View {
 	}
   }
   
+	@ViewBuilder
 	func termsTextView() -> some View {
 	  let markdown = LocalizationSupport.localized("I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)")
+#if os(Android)
+	  // Skip's `Text` does not parse markdown links, so the tappable link never
+	  // rendered (most visible in Hebrew). Show the agreement as plain text with
+	  // explicitly tappable Terms/Privacy buttons instead.
+	  VStack(alignment: .leading, spacing: 6) {
+		Text(Self.plainAgreementText(markdown))
+		  .font(.system(size: 14))
+		  .lineSpacing(4)
+		  .foregroundStyle(theme.authSecondaryText)
 
-	  return Text(markdown)
+		HStack(spacing: 16) {
+		  Button { viewModel.openTerms() } label: {
+			Text(LocalizationSupport.localized("Terms of Service"))
+			  .font(.system(size: 14, weight: .semibold))
+			  .foregroundStyle(theme.authPink)
+		  }
+		  Button { viewModel.openPrivacy() } label: {
+			Text(LocalizationSupport.localized("Privacy Policy"))
+			  .font(.system(size: 14, weight: .semibold))
+			  .foregroundStyle(theme.authPink)
+		  }
+		}
+	  }
+#else
+	  // Parsing the localized string as markdown makes the links tappable in
+	  // every language; passing a `String` straight to `Text` renders it
+	  // verbatim, which is why the Hebrew (and English) links were dead.
+	  let attributed = (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
+	  Text(attributed)
 		.font(.system(size: 14))
 		.lineSpacing(4)
 		.foregroundStyle(theme.authSecondaryText)
@@ -249,6 +279,31 @@ struct CreateAccountView: View {
 			return .systemAction
 		  }
 		})
+#endif
+  }
+
+  /// Strips markdown link syntax (`[text](url)` -> `text`) so the agreement
+  /// sentence reads naturally where markdown links can't render.
+  static func plainAgreementText(_ markdown: String) -> String {
+	var result = ""
+	var dropUntilCloseParen = false
+	var previous: Character? = nil
+	for character in markdown {
+	  if dropUntilCloseParen {
+		if character == ")" { dropUntilCloseParen = false }
+		continue
+	  }
+	  if character == "[" { continue }
+	  if character == "]" { previous = character; continue }
+	  if character == "(" && previous == "]" {
+		dropUntilCloseParen = true
+		previous = nil
+		continue
+	  }
+	  previous = character
+	  result.append(character)
+	}
+	return result
   }
   
   var continueButton: some View {

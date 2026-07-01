@@ -44,6 +44,8 @@ export const DEFAULT_CONVERSATION_TYPE: ConversationType = "text";
 
 export interface QuestionDoc {
   studentUid: string;
+  studentName?: string;       // snapshot of the student's name at question creation
+  studentImageURL?: string;   // snapshot of the student's shared profile image (respects privacy setting)
   topic: string;             // one of the six math sub-topics
   text: string;
   photoUrls: string[];

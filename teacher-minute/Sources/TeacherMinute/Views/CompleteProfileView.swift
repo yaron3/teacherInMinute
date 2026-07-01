@@ -34,7 +34,8 @@ struct CompleteProfileView: View {
 		  placeholder: LocalizationSupport.localized("place holder name"),
 		  systemImage: "person",
 		  text: $viewModel.fullName,
-		  textContentType: .name
+		  textContentType: .name,
+		  autocapitalization: .words
 		)
 		.padding(.top, 28)
 		

@@ -33,7 +33,7 @@
     },
     "subTaskMath": {
       "defaultValue": {
-        "value": "[\"​Algebra\", \"​Trigonumathics\"]"
+        "value": "[\"Algebra\", \"Trigonometry\"]"
       },
       "valueType": "JSON"
     },
@@ -85,13 +85,13 @@
     },
     "subTaskPhysics": {
       "defaultValue": {
-        "value": "[\"machanic\"]"
+        "value": "[\"Mechanics\"]"
       },
-      "valueType": "STRING"
+      "valueType": "JSON"
     },
     "subjects": {
       "defaultValue": {
-        "value": "[\"​Math\", \"​Physics\", \"​Chemestry\"]"
+        "value": "[\"Math\", \"Physics\", \"Chemistry\"]"
       },
       "valueType": "JSON"
     },
@@ -5552,6 +5552,72 @@
         }
       }
     },
+    "save_board_gallery": {
+      "defaultValue": {
+        "value": "Save board to gallery?"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לשמור את הלוח לגלריה?"
+        }
+      }
+    },
+    "the_session_ended": {
+      "defaultValue": {
+        "value": "The session ended. Do you want to save the board image to your device gallery?"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השיעור הסתיים. האם ברצונך לשמור את תמונת הלוח לגלריית המכשיר?"
+        }
+      }
+    },
+    "the_board_will": {
+      "defaultValue": {
+        "value": "The board will be saved to the chat. Do you also want to save it to your device gallery?"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הלוח יישמר בצ׳אט. האם ברצונך לשמור אותו גם לגלריית המכשיר?"
+        }
+      }
+    },
+    "save_gallery": {
+      "defaultValue": {
+        "value": "Save to gallery"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שמירה לגלריה"
+        }
+      }
+    },
+    "save_chat_only": {
+      "defaultValue": {
+        "value": "Save to chat only"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שמירה לצ׳אט בלבד"
+        }
+      }
+    },
+    "don_save": {
+      "defaultValue": {
+        "value": "Don't save"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא לשמור"
+        }
+      }
+    },
     "general_math": {
       "defaultValue": {
         "value": "General Math"
@@ -5937,7 +6003,7 @@
         }
       }
     },
-  "completed_count": {
+    "completed_count": {
       "defaultValue": {
         "value": "%d completed"
       },
@@ -5967,6 +6033,174 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "(127 ביקורות)"
+        }
+      }
+    },
+    "teacher_id_govid_description_en": {
+      "defaultValue": {
+        "value": "Upload a clear photo of your passport, driver's license, or national ID. A valid government ID is required to become a verified teacher."
+      },
+      "valueType": "STRING"
+    },
+    "teacher_id_govid_description_he": {
+      "defaultValue": {
+        "value": "העלו תמונה ברורה של הדרכון, רישיון הנהיגה או תעודת הזהות שלכם. תעודה מזהה ממשלתית תקפה נדרשת כדי להפוך למורה מאומת."
+      },
+      "valueType": "STRING"
+    },
+    "teacher_id_credentials_description_en": {
+      "defaultValue": {
+        "value": "Optional. Upload your degree, teaching license, or certifications — it helps us verify you as a teacher faster."
+      },
+      "valueType": "STRING"
+    },
+    "teacher_id_credentials_description_he": {
+      "defaultValue": {
+        "value": "אופציונלי. העלו את התואר, רישיון ההוראה או התעודות שלכם — זה עוזר לנו לאמת אתכם כמורים מהר יותר."
+      },
+      "valueType": "STRING"
+    },
+    "teacher_id_selfie_description_en": {
+      "defaultValue": {
+        "value": "Optional. Take a clear selfie to match your Government ID — it helps us verify you faster."
+      },
+      "valueType": "STRING"
+    },
+    "teacher_id_selfie_description_he": {
+      "defaultValue": {
+        "value": "אופציונלי. צלמו סלפי ברור שתואם לתעודה המזהה הממשלתית שלכם — זה עוזר לנו לאמת אתכם מהר יותר."
+      },
+      "valueType": "STRING"
+    },
+    "documents_uploaded": {
+      "defaultValue": {
+        "value": "Documents Uploaded"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מסמכים שהועלו"
+        }
+      }
+    },
+    "view_uploaded_documents": {
+      "defaultValue": {
+        "value": "View the verification documents you uploaded"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צפייה במסמכי האימות שהעלית"
+        }
+      }
+    },
+    "uploaded_documents_intro": {
+      "defaultValue": {
+        "value": "These are the verification documents you uploaded."
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אלה מסמכי האימות שהעלית."
+        }
+      }
+    },
+    "loading_documents": {
+      "defaultValue": {
+        "value": "Loading documents..."
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "טוען מסמכים..."
+        }
+      }
+    },
+    "no_documents_uploaded": {
+      "defaultValue": {
+        "value": "No documents uploaded yet."
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עדיין לא הועלו מסמכים."
+        }
+      }
+    },
+    "could_not_load_document": {
+      "defaultValue": {
+        "value": "Could not load this document."
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא ניתן לטעון מסמך זה."
+        }
+      }
+    },
+    "could_not_load_documents": {
+      "defaultValue": {
+        "value": "Could not load documents."
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא ניתן לטעון את המסמכים."
+        }
+      }
+    },
+    "close": {
+      "defaultValue": {
+        "value": "Close"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סגור"
+        }
+      }
+    },
+    "add_missing_documents": {
+      "defaultValue": {
+        "value": "Add missing documents"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוספת מסמכים חסרים"
+        }
+      }
+    },
+    "upload_remaining_documents_hint": {
+      "defaultValue": {
+        "value": "Uploading the remaining documents helps us verify you as a teacher faster."
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "העלאת המסמכים הנותרים עוזרת לנו לאמת אותך כמורה מהר יותר."
+        }
+      }
+    },
+    "not_uploaded_yet": {
+      "defaultValue": {
+        "value": "Not uploaded yet"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עדיין לא הועלה"
+        }
+      }
+    },
+    "upload_action": {
+      "defaultValue": {
+        "value": "Upload"
+      },
+      "valueType": "STRING",
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "העלאה"
         }
       }
     }

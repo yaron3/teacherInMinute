@@ -124,7 +124,7 @@ struct MainTabView: View {
                 ConnectionSetupView(
                     participantName: teacherDashboardViewModel.activeStudentName,
                     conversationType: teacherDashboardViewModel.activeConversationType,
-                    footerText: "Setting up the session"
+                    footerText: LocalizationSupport.localized("Setting up the session")
                 ) {
                     teacherDashboardViewModel.cancelAcceptingInvite()
                 }
@@ -140,7 +140,7 @@ struct MainTabView: View {
                 ChatSessionView(
                     questionId: questionId,
                     role: "teacher",
-                    title: "Student",
+                    title: LocalizationSupport.localized("Student"),
                     conversationType: teacherDashboardViewModel.activeConversationType,
                     liveKitRoom: teacherDashboardViewModel.activeCallRoom ?? "",
                     liveKitToken: teacherDashboardViewModel.activeCallToken ?? "",

@@ -67,6 +67,7 @@ struct AuthInputField: View {
 
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType?
+    var autocapitalization: TextInputAutocapitalization = .never
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.layoutDirection) var layoutDirection
   var theme: AppTheme {
@@ -116,7 +117,7 @@ struct AuthInputField: View {
             .foregroundStyle(theme.authPrimaryText)
             .keyboardType(keyboardType)
             .textContentType(textContentType)
-            .textInputAutocapitalization(.never)
+            .textInputAutocapitalization(autocapitalization)
             .autocorrectionDisabled()
             .multilineTextAlignment(textAlignment)
             .tint(theme.authPink)

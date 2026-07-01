@@ -25,7 +25,15 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
 
     private static let hebrewFallbacks: [String: String] = [
         "I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)": "אני מסכים/ה ל[תנאי השירות](teacherminute://terms) ול[מדיניות הפרטיות.](teacherminute://privacy)",
-        "Terms of Service": "תנאי השירות"
+        "Terms of Service": "תנאי השירות",
+        "Save board to gallery?": "לשמור את הלוח לגלריה?",
+        "The session ended. Do you want to save the board image to your device gallery?": "השיעור הסתיים. האם ברצונך לשמור את תמונת הלוח לגלריית המכשיר?",
+        "The board will be saved to the chat. Do you also want to save it to your device gallery?": "הלוח יישמר בצ׳אט. האם ברצונך לשמור אותו גם לגלריית המכשיר?",
+        "Save to gallery": "שמירה לגלריה",
+        "Save to chat only": "שמירה לצ׳אט בלבד",
+        "Don't save": "לא לשמור",
+        "Setting up the session": "מתחבר לשיעור",
+        "Waiting now": "ממתין עכשיו"
     ]
 
     #if os(Android)
@@ -144,6 +152,18 @@ enum LocalizationKey {
         "⚡ %@/min": "min_b",
 		"Loading profile...": "loading_profile",
 		"%d completed": "completed_count",
+		"Documents Uploaded": "documents_uploaded",
+		"View the verification documents you uploaded": "view_uploaded_documents",
+		"These are the verification documents you uploaded.": "uploaded_documents_intro",
+		"Loading documents...": "loading_documents",
+		"No documents uploaded yet.": "no_documents_uploaded",
+		"Could not load this document.": "could_not_load_document",
+		"Could not load documents.": "could_not_load_documents",
+		"Close": "close",
+		"Add missing documents": "add_missing_documents",
+		"Uploading the remaining documents helps us verify you as a teacher faster.": "upload_remaining_documents_hint",
+		"Not uploaded yet": "not_uploaded_yet",
+		"Upload": "upload_action",
     ]
 
     /// Deterministic three-word snake-case slug for any source string that

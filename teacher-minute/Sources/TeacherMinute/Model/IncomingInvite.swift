@@ -27,6 +27,7 @@ struct IncomingInvite: Identifiable {
   let voiceMessageDurationSeconds: Int?
   let studentId: String
   let studentName: String
+  let studentImageURL: String
   let connectionFeeCents: Int
   let pricePerMinuteCents: Int
   let conversationType: String
@@ -53,6 +54,7 @@ struct IncomingInvite: Identifiable {
   let voiceMessageDurationSeconds: Int?
   let studentId: String
   let studentName: String
+  let studentImageURL: String
   let connectionFeeCents: Int
   let pricePerMinuteCents: Int
   let conversationType: String

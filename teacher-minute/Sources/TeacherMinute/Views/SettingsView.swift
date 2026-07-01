@@ -90,6 +90,8 @@ struct SettingsView: View {
         switch destination {
         case .accountSecurity:
             AccountSecuritySettingsView(viewModel: viewModel)
+        case .appPreferences:
+            AppPreferencesSettingsView(role: role)
         case .language:
             LanguageSettingsView(viewModel: viewModel)
         case .about:
@@ -564,17 +566,76 @@ struct NotificationPreferencesSettingsView: View {
     }
 }
 
+struct AppPreferencesSettingsView: View {
+    let role: AppUserMode
+    @AppStorage(SessionPreferences.defaultQuestionTypeKey) var defaultQuestionType = ConversationType.audio.rawValue
+
+    var body: some View {
+        Form {
+            if role == .student {
+                Section(
+                    header: Text(LocalizationSupport.localized("Default Session Type")),
+                    footer: Text(LocalizationSupport.localized("This session type is preselected when you ask a teacher a question. You can still change it for each question."))
+                ) {
+                    Picker(LocalizationSupport.localized("Default Session Type"), selection: $defaultQuestionType) {
+                        ForEach(ConversationType.allCases, id: \.rawValue) { type in
+                            Text(type.displayName).tag(type.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+
+            Section(
+                header: Text(LocalizationSupport.localized("Currency")),
+                footer: Text(LocalizationSupport.localized("Your currency is set to Israeli Shekel (ILS) and cannot be changed for now."))
+            ) {
+                HStack {
+                    Text(LocalizationSupport.localized("Currency"))
+                    Spacer()
+                    Text(LocalizationSupport.localized("ILS"))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
 struct PrivacyControlsSettingsView: View {
     @AppStorage("showProfileImage") var showProfileImage = true
     @AppStorage("allowTeacherMessagesOutsideCalls") var allowTeacherMessagesOutsideCalls = true
 
+    private let authService = AuthService()
+
     var body: some View {
         Form {
-            Section(header: Text(LocalizationSupport.localized("Privacy"))) {
+            Section(
+                header: Text(LocalizationSupport.localized("Privacy")),
+                footer: Text(LocalizationSupport.localized("When turned off, your profile photo won't be shared with the other participant during a session."))
+            ) {
                 Toggle(LocalizationSupport.localized("Show my profile image"), isOn: $showProfileImage)
                 Toggle(LocalizationSupport.localized("Allow incoming messages from a teacher while not in a call"), isOn: $allowTeacherMessagesOutsideCalls)
             }
         }
+        .task { await loadShowProfileImage() }
+        .onChange(of: showProfileImage) { _, newValue in
+            Task { await persistShowProfileImage(newValue) }
+        }
+    }
+
+    // The "Show my profile image" preference must live on the user's profile so
+    // the backend can decide whether to share the photo with the other
+    // participant — a device-local @AppStorage value is invisible to it.
+    private func loadShowProfileImage() async {
+        guard let uid = authService.currentUserID,
+              let data = try? await UserService.shared.fetchRaw(uid: uid),
+              let stored = data["showProfileImage"] as? Bool else { return }
+        showProfileImage = stored
+    }
+
+    private func persistShowProfileImage(_ newValue: Bool) async {
+        guard let uid = authService.currentUserID else { return }
+        try? await UserService.shared.updateShowProfileImage(uid: uid, enabled: newValue)
     }
 }
 

@@ -283,22 +283,37 @@ struct ChatSessionView: View {
           .disabled(isEndingSession)
 
           if prompt == .saveBoard {
+            // "Save to chat only" is only meaningful for the local flow; when the
+            // peer already ended the session the chat copy is saved separately.
+            if !saveBoardIsRemoteInitiated {
+              Button {
+                endSessionAfterSnapshot(saveToChat: true, saveToGallery: false)
+              } label: {
+                Text(LocalizationSupport.localized("Save to chat only"))
+                  .font(.system(size: 14, weight: .semibold))
+                  .foregroundStyle(theme.appPrimaryText)
+                  .frame(maxWidth: .infinity)
+                  .frame(height: 42)
+                  .background(theme.appGrayBackground)
+                  .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+              }
+              .buttonStyle(.plain)
+              .disabled(isEndingSession)
+            }
+
+            // End without saving the board anywhere.
             Button {
-              endSessionAfterSnapshot(saveToChat: !saveBoardIsRemoteInitiated, saveToGallery: false)
+              finalizeEndSession()
             } label: {
-              Text(LocalizationSupport.localized(saveBoardIsRemoteInitiated ? "Skip" : "Save to chat only"))
+              Text(LocalizationSupport.localized("Don't save"))
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(theme.appPrimaryText)
+                .foregroundStyle(theme.appSecondaryText)
                 .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background(theme.appGrayBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .frame(height: 38)
             }
             .buttonStyle(.plain)
             .disabled(isEndingSession)
-          }
-
-          if !(prompt == .saveBoard && saveBoardIsRemoteInitiated) {
+          } else {
             Button {
               endSessionPrompt = nil
             } label: {
@@ -361,6 +376,11 @@ struct ChatSessionView: View {
     endSessionPrompt = nil
     isEndingSession = false
     let durationSeconds = viewModel.sessionDurationSeconds(at: sessionFrozenDate ?? Date())
+    if isStudent && durationSeconds >= 30 {
+      // The student has completed a real lesson — make them eligible for the
+      // post-first-lesson notification permission explanation.
+      NotificationPromptStore.markLessonCompleted()
+    }
     if isStudent && durationSeconds >= 30 && !viewModel.teacherId.isEmpty {
       isRatingPromptVisible = true
     } else {
@@ -401,6 +421,9 @@ struct ChatSessionView: View {
   func handleEndSessionPrimaryAction(_ prompt: EndSessionPrompt) {
     switch prompt {
     case .confirmEnd:
+      // The user confirmed "Are you sure?" — end immediately: freeze the timer
+      // now so time stops counting right away, even if a save-board prompt follows.
+      if sessionFrozenDate == nil { sessionFrozenDate = Date() }
       if boardStrokes.isEmpty {
         finalizeEndSession()
       } else {
@@ -621,6 +644,9 @@ struct ChatSessionView: View {
         viewModel.clearBoard()
       },
       onViewportChanged: { rect in
+        // Don't emit viewport updates once the session is ending — the RTDB
+        // question node is being finalized and a late write would be rejected.
+        guard !isEndingSession, sessionFrozenDate == nil else { return }
         let viewport = BoardViewport(
           x: Double(rect.origin.x),
           y: Double(rect.origin.y),
