@@ -459,13 +459,15 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
     const invited = await sendWave(qid, data, nextWave, alreadyInvited);
 
     if (invited.length === 0) {
-      // Ran out of eligible teachers mid-dispatch
-      const archived = await archiveUnanswered(qid, data.alreadyInvited ?? []);
-      if (archived) {
-        logger.info(`[evaluateWave] qid=${qid} no teachers for wave=${nextWave}, unanswered`);
-      } else {
-        logger.info(`[evaluateWave] qid=${qid} no teachers for wave=${nextWave}, unanswered skipped`);
-      }
+      // No *new* eligible teachers for this wave — but earlier waves' invites
+      // are still pending and haven't hit INVITE_EXPIRY_SECONDS yet. Do NOT
+      // archive/delete them here; just stop fanning out further waves and let
+      // those invites run their course (accept, decline, or the watchdog at
+      // INVITE_EXPIRY_SECONDS). A teacher coming online later is still
+      // backfilled via onTeacherStatusChange.
+      logger.info(
+        `[evaluateWave] qid=${qid} no new teachers for wave=${nextWave}, leaving ${(data.alreadyInvited ?? []).length} pending invite(s) untouched`
+      );
       return;
     }
 
