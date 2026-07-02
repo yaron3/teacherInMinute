@@ -66,6 +66,7 @@ final class TeacherDashboardViewModel {
   var weekMinutesTutored = 0
   var lastWeekEarningsCents = 0
   var totalMinutes = 0
+  var lessonCount = 0
   var ratePerMinuteCents = 50
   var hasMicAccess = false
   var hasCameraAccess = false
@@ -477,6 +478,8 @@ final class TeacherDashboardViewModel {
   func endCall() {
     activeQuestionId = nil
     clearActiveCallState()
+    // A lesson just finished — refresh earnings and the Lessons-tab badge count.
+    refreshEarnings()
   }
 
   private func clearActiveCallState() {
@@ -613,6 +616,15 @@ final class TeacherDashboardViewModel {
     weekEarningsCents = weekEarnings
     weekMinutesTutored = weekMinutes
     lastWeekEarningsCents = lastWeekEarnings
+    lessonCount = lessons.count
+    logger.info("[Earnings] dashboard uid=\(uid) currency=\(self.earningsCurrencyCode) lessonCount=\(lessons.count) todayCents=\(todayEarnings) todayMins=\(todayMinutes) weekCents=\(weekEarnings) weekMins=\(weekMinutes) lastWeekCents=\(lastWeekEarnings)")
+  }
+
+  /// Re-fetches lessons/earnings so the dashboard and the Lessons-tab badge
+  /// reflect a lesson that was just completed.
+  func refreshEarnings() {
+    guard let uid = Auth.auth().currentUser?.uid else { return }
+    Task { await loadEarnings(uid: uid) }
   }
 
   private func checkPermissions() {

@@ -87,6 +87,7 @@ final class HistoryModel {
                 pricePerMinuteCentsByCurrency[code] = await SettingsRemoteConfigService.shared.fetchPricePerMinuteCents(currencyCode: code)
             }
         }
+        logger.info("[Earnings] fetchRecentLessons uid=\(uid) questionCount=\(questionIds.count) teacherShare=\(defaultTeacherShare) pricePerMinuteCents=\(pricePerMinuteCentsByCurrency) purchasedCurrency=\(purchasedCurrencyCode)")
 
         var lessons: [HistoryLesson] = []
         for questionId in questionIds {
@@ -154,6 +155,10 @@ final class HistoryModel {
             costCents: costCents,
             defaultTeacherShare: defaultTeacherShare
         )
+
+        // Per-session earnings breakdown — surfaces exactly why a lesson resolves
+        // to 0 (missing per-minute price, zero duration, or a zero teacher share).
+        logger.info("[Earnings] lesson qid=\(questionId) role=\(isCurrentUserStudent ? "student" : "teacher") durationSeconds=\(durationSeconds) currency=\(currencyCode) pricePerMinuteCents=\(pricePerMinuteCents) costCents=\(costCents) teacherShare=\(defaultTeacherShare) teacherEarningsCents=\(teacherEarningsCents)")
 
         let questionText = Self.firstString(in: data, keys: ["text", "questionText", "originalQuestion", "message"])
         let questionPhotoUrls = Self.stringArray(data["photoUrls"])
@@ -366,17 +371,27 @@ final class HistoryModel {
         durationSeconds: Int,
         pricePerMinuteCents: Int
     ) -> Int {
-        if let cents = intValue(data["costCents"])
-            ?? intValue(data["totalCostCents"])
-            ?? intValue(data["priceCents"])
-            ?? intValue(data["costPerQuestionCents"]) {
+        // Only trust an explicit amount when it's actually positive. The question
+        // doc often carries a placeholder `0` (written before billing runs), and
+        // short-circuiting on it would strand the cost at 0 forever. A non-positive
+        // value falls through to the duration × per-minute derivation below.
+        let explicitCents = [
+            intValue(data["costCents"]),
+            intValue(data["totalCostCents"]),
+            intValue(data["priceCents"]),
+            intValue(data["costPerQuestionCents"]),
+        ].compactMap { $0 }.first { $0 > 0 }
+        if let cents = explicitCents {
             return cents
         }
 
-        if let amount = doubleValue(data["cost"])
-            ?? doubleValue(data["totalCost"])
-            ?? doubleValue(data["price"])
-            ?? doubleValue(data["costPerQuestion"]) {
+        let explicitAmount = [
+            doubleValue(data["cost"]),
+            doubleValue(data["totalCost"]),
+            doubleValue(data["price"]),
+            doubleValue(data["costPerQuestion"]),
+        ].compactMap { $0 }.first { $0 > 0 }
+        if let amount = explicitAmount {
             return Int((amount * 100.0).rounded())
         }
 
@@ -393,10 +408,10 @@ final class HistoryModel {
         costCents: Int,
         defaultTeacherShare: Double
     ) -> Int {
-        if let cents = intValue(data["teacherEarningsCents"]) {
+        if let cents = intValue(data["teacherEarningsCents"]), cents > 0 {
             return cents
         }
-        if let amount = doubleValue(data["teacherEarnings"]) {
+        if let amount = doubleValue(data["teacherEarnings"]), amount > 0 {
             return Int((amount * 100.0).rounded())
         }
         let share = doubleValue(data["teacherShare"])

@@ -57,10 +57,16 @@ struct MainTabView: View {
 
             teacherGlobalOverlay
         }
-        .onChange(of: viewModel.selectedTab) { _, _ in
+        .onChange(of: viewModel.selectedTab) { _, newTab in
             if !isTeacherGlobalOverlayVisible {
                 hidesTabBar = false
             }
+            if newTab == .lessons {
+                viewModel.markLessonsTabEntered()
+            }
+        }
+        .onChange(of: teacherDashboardViewModel?.lessonCount ?? 0) { _, newCount in
+            viewModel.updateLessonCount(newCount)
         }
         .background(Color(.systemBackground))
         .navigationBarBackButtonHidden(true)
@@ -68,6 +74,9 @@ struct MainTabView: View {
         .task {
             print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
             PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
+            if let count = teacherDashboardViewModel?.lessonCount {
+                viewModel.updateLessonCount(count)
+            }
         }
         .onAppear {
             #if os(Android)

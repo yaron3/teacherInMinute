@@ -71,6 +71,7 @@ final class TeacherLessonHistoryViewModel {
             for lesson in historyLessons {
                 earningsByCurrency[lesson.currencyCode, default: 0] += lesson.teacherEarningsCents
             }
+            logger.info("[Earnings] teacher total uid=\(uid) lessonCount=\(historyLessons.count) totalByCurrency=\(earningsByCurrency)")
             let earningsFormatted = earningsByCurrency
                 .sorted { $0.key < $1.key }
                 .map { LessonFormatting.currencyText(cents: $0.value, currencyCode: $0.key) }

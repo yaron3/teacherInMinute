@@ -78,7 +78,13 @@ final class InviteService {
           pricePerMinuteCents: pricePerMinuteCents,
           conversationType: conversationType
         )
-        if !invite.isExpired { invites.append(invite) }
+        // Keep the invite visible for as long as the RTDB node exists. The
+        // backend removes teacherInvites/{uid}/{qid} the moment the question is
+        // resolved (accepted by any teacher, declined, cancelled or archived by
+        // the watchdog), so the card should stay on screen while the dispatcher
+        // keeps fanning the question out to more teachers — we must NOT drop it
+        // early just because the client clock passed the wave deadline.
+        invites.append(invite)
       }
       invites.sort { $0.expiresAt < $1.expiresAt }
       self.onInvitesUpdated(invites)
@@ -174,7 +180,13 @@ final class InviteService {
           pricePerMinuteCents: pricePerMinuteCents,
           conversationType: conversationType
         )
-        if !invite.isExpired { invites.append(invite) }
+        // Keep the invite visible for as long as the RTDB node exists. The
+        // backend removes teacherInvites/{uid}/{qid} the moment the question is
+        // resolved (accepted by any teacher, declined, cancelled or archived by
+        // the watchdog), so the card should stay on screen while the dispatcher
+        // keeps fanning the question out to more teachers — we must NOT drop it
+        // early just because the client clock passed the wave deadline.
+        invites.append(invite)
       }
       invites.sort { $0.expiresAt < $1.expiresAt }
       self.onInvitesUpdated(invites)

@@ -54,14 +54,44 @@ enum AppUserMode {
 final class MainTabViewModel {
   var selectedTab: MainTab = .home
   var userMode: AppUserMode
-  
-  var hasTeacherRequestBadge = true
-  
+
+  private(set) var lessonCount = 0
+  private(set) var hasUnseenLessons = false
+
   var shouldShowLessonsBadge: Bool {
-	userMode == .teacher && hasTeacherRequestBadge
+	userMode == .teacher && hasUnseenLessons
   }
-  
+
   init(userMode: AppUserMode = .teacher) {
 	self.userMode = userMode
+  }
+
+  /// Called whenever the current lesson count is known. Shows the badge only
+  /// when new lessons were added since the user last opened the Lessons tab.
+  func updateLessonCount(_ count: Int) {
+	lessonCount = count
+
+	// Already viewing the tab — treat everything as seen.
+	if selectedTab == .lessons {
+	  LessonsBadgeStore.markSeen(count: count)
+	  hasUnseenLessons = false
+	  return
+	}
+
+	guard let seen = LessonsBadgeStore.seenCount() else {
+	  // First time we learn the count — baseline it so the badge only ever
+	  // appears for lessons added from now on, not pre-existing history.
+	  LessonsBadgeStore.markSeen(count: count)
+	  hasUnseenLessons = false
+	  return
+	}
+
+	hasUnseenLessons = count > seen
+  }
+
+  /// The user opened the Lessons tab — mark all current lessons as seen.
+  func markLessonsTabEntered() {
+	LessonsBadgeStore.markSeen(count: lessonCount)
+	hasUnseenLessons = false
   }
 }
