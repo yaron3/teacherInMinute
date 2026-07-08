@@ -15,12 +15,10 @@ struct TeacherDocumentsView: View {
   @State var viewModel = TeacherDocumentsViewModel()
   @Environment(\.dismiss) var dismiss
   @Environment(\.colorScheme) var colorScheme
-#if !os(Android)
-  // Separate picker state per slot so re-picking the same item still fires onChange.
-  @State private var credentialsItem: PhotosPickerItem?
-  @State private var frontItem:       PhotosPickerItem?
-  @State private var backItem:        PhotosPickerItem?
-  @State private var selfieItem:      PhotosPickerItem?
+#if os(Android)
+  // Camera-vs-gallery chooser state for the Android upload flow.
+  @State var showAndroidPhotoSourceDialog = false
+  @State var androidPickTarget: UploadTarget = .governmentIDFront
 #endif
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
@@ -68,6 +66,21 @@ struct TeacherDocumentsView: View {
     .task {
       await viewModel.load()
     }
+#if os(Android)
+    .confirmationDialog(
+      LocalizationSupport.localized("Add a photo"),
+      isPresented: $showAndroidPhotoSourceDialog,
+      titleVisibility: .visible
+    ) {
+      Button(LocalizationSupport.localized("Take Photo")) {
+        pickAndUploadAndroidImage(for: androidPickTarget, source: .camera)
+      }
+      Button(LocalizationSupport.localized("Choose from Library")) {
+        pickAndUploadAndroidImage(for: androidPickTarget, source: .gallery)
+      }
+      Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+    }
+#endif
   }
 
   func documentTile(_ document: TeacherDocument) -> some View {
@@ -117,10 +130,10 @@ struct TeacherDocumentsView: View {
         .lineSpacing(4)
 
 #if !os(Android)
-      if viewModel.isMissing(.governmentIDFront) { uploadPicker(.governmentIDFront, item: $frontItem) }
-      if viewModel.isMissing(.governmentIDBack)  { uploadPicker(.governmentIDBack,  item: $backItem) }
-      if viewModel.isMissing(.teachingCredentials) { uploadPicker(.teachingCredentials, item: $credentialsItem) }
-      if viewModel.isMissing(.selfie)            { uploadPicker(.selfie,            item: $selfieItem) }
+      if viewModel.isMissing(.governmentIDFront) { uploadPicker(.governmentIDFront) }
+      if viewModel.isMissing(.governmentIDBack)  { uploadPicker(.governmentIDBack) }
+      if viewModel.isMissing(.teachingCredentials) { uploadPicker(.teachingCredentials) }
+      if viewModel.isMissing(.selfie)            { uploadPicker(.selfie) }
 #else
       if viewModel.isMissing(.governmentIDFront) { uploadButton(.governmentIDFront) }
       if viewModel.isMissing(.governmentIDBack)  { uploadButton(.governmentIDBack) }
@@ -131,45 +144,48 @@ struct TeacherDocumentsView: View {
   }
 
 #if !os(Android)
-  func uploadPicker(_ target: UploadTarget, item: Binding<PhotosPickerItem?>) -> some View {
+  func uploadPicker(_ target: UploadTarget) -> some View {
     let title = viewModel.title(for: target)
     let uploading = viewModel.isUploading(target)
-    return PhotosPicker(selection: item, matching: .images) {
+    return PhotoSourceButton(onImageData: { data in
+      viewModel.handlePickedImage(data, for: target)
+    }) {
       MissingDocumentRow(title: title, isUploading: uploading)
-    }
-    .buttonStyle(.plain)
-    .onChange(of: item.wrappedValue) { _, newItem in
-      MainActor.assumeIsolated {
-        loadAndUpload(newItem, for: target)
-      }
-    }
-  }
-
-  private func loadAndUpload(_ item: PhotosPickerItem?, for target: UploadTarget) {
-    guard let item else { return }
-    Task {
-      if let data = try? await item.loadTransferable(type: Data.self) {
-        viewModel.handlePickedImage(data, for: target)
-      }
     }
   }
 #else
+  enum AndroidPhotoSource {
+    case camera
+    case gallery
+  }
+
   func uploadButton(_ target: UploadTarget) -> some View {
     let title = viewModel.title(for: target)
     let uploading = viewModel.isUploading(target)
     return Button {
-      pickAndUploadAndroidImage(for: target)
+      androidPickTarget = target
+      showAndroidPhotoSourceDialog = true
     } label: {
       MissingDocumentRow(title: title, isUploading: uploading)
     }
     .buttonStyle(.plain)
   }
 
-  private func pickAndUploadAndroidImage(for target: UploadTarget) {
+  private func pickAndUploadAndroidImage(for target: UploadTarget, source: AndroidPhotoSource) {
     Task {
       do {
+        if source == .camera {
+          let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+          guard cameraState.isGranted else {
+            viewModel.errorMessage = LocalizationSupport.localized("Camera access is required to take a photo.")
+            return
+          }
+        }
         let base64 = try await Task.detached(priority: .userInitiated) {
-          try AndroidDocumentImagePickerBridge.pickImageBase64()
+          switch source {
+          case .camera:  return try AndroidDocumentImagePickerBridge.captureImageBase64()
+          case .gallery: return try AndroidDocumentImagePickerBridge.pickImageBase64()
+          }
         }.value
         guard !base64.isEmpty, let data = Data(base64Encoded: base64) else { return }
         viewModel.handlePickedImage(data, for: target)
@@ -296,11 +312,25 @@ private enum AndroidDocumentImagePickerBridge {
     name: "pickImageBase64",
     sig: "()Ljava/lang/String;"
   )!
+  private static let captureImageBase64Method = managerClass.getStaticMethodID(
+    name: "captureImageBase64",
+    sig: "()Ljava/lang/String;"
+  )!
 
   static func pickImageBase64() throws -> String {
     try jniContext {
       try managerClass.callStatic(
         method: pickImageBase64Method,
+        options: [.kotlincompat],
+        args: []
+      )
+    }
+  }
+
+  static func captureImageBase64() throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: captureImageBase64Method,
         options: [.kotlincompat],
         args: []
       )

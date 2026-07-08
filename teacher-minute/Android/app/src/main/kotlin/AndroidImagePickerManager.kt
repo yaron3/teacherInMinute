@@ -78,12 +78,14 @@ object AndroidImagePickerManager {
                     putExtra(MediaStore.EXTRA_OUTPUT, captureUri)
                     addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                if (intent.resolveActivity(activity.packageManager) == null) {
-                    completePending(error = IllegalStateException("No camera is available"))
-                    return@runOnUiThread
-                }
                 Log.i(TAG, "Starting Android camera capture")
-                activity.startActivityForResult(intent, CAPTURE_IMAGE_REQUEST)
+                try {
+                    activity.startActivityForResult(intent, CAPTURE_IMAGE_REQUEST)
+                } catch (notFound: android.content.ActivityNotFoundException) {
+                    Log.e(TAG, "No camera activity available", notFound)
+                    pendingCaptureUri = null
+                    completePending(error = IllegalStateException("No camera is available"))
+                }
             } catch (error: Throwable) {
                 Log.e(TAG, "Failed to start Android camera capture", error)
                 completePending(error = error)

@@ -17,12 +17,10 @@ struct TeacherIdentityVerificationView: View {
   @State var viewModel = TeacherIdentityVerificationViewModel()
   @Environment(\.appRouter) var router
   
-#if !os(Android)
-  // Separate state per slot — fixes back-side onChange not firing when same item reused
-  @State private var credentialsItem: PhotosPickerItem?
-  @State private var idFrontItem:     PhotosPickerItem?
-  @State private var idBackItem:      PhotosPickerItem?
-  @State private var selfieItem:      PhotosPickerItem?
+#if os(Android)
+  // Camera-vs-gallery chooser state for the Android upload flow.
+  @State var showAndroidPhotoSourceDialog = false
+  @State var androidPickTarget: UploadTarget = .governmentIDFront
 #endif
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -39,14 +37,14 @@ struct TeacherIdentityVerificationView: View {
 		  
 
 		  
-		  Text(LocalizationSupport.localized("To maintain a high-quality learning environment,\nwe need to verify your teaching credentials and\nidentity."))
-			.font(.system(size: 13))
-			.foregroundStyle(theme.authSecondaryText)
-			.lineSpacing(5)
-			.padding(.top, 8)
+//		  Text(LocalizationSupport.localized("To maintain a high-quality learning environment,\nwe need to verify your teaching credentials and\nidentity."))
+//			.font(.system(size: 13))
+//			.foregroundStyle(theme.authSecondaryText)
+//			.lineSpacing(5)
+//			.padding(.top, 8)
 		  
-		  verificationStatus
-			.padding(.top, 20)
+		 // verificationStatus
+		//	.padding(.top, 20)
 		  
 		  sectionTitle(LocalizationSupport.localized("Government ID"))
 			.padding(.top, 22)
@@ -61,7 +59,9 @@ struct TeacherIdentityVerificationView: View {
 #if !os(Android)
 			let hasFront      = viewModel.hasGovernmentIDFront
 			let frontSpinning = viewModel.isUploading(for: .governmentIDFront)
-			PhotosPicker(selection: $idFrontItem, matching: .images) {
+			PhotoSourceButton(onImageData: { data in
+			  viewModel.handlePickedImage(data, for: .governmentIDFront)
+			}) {
 			  IDUploadBox(
 				title: LocalizationSupport.localized("Front Side"),
 				isCompleted: hasFront,
@@ -70,12 +70,10 @@ struct TeacherIdentityVerificationView: View {
 				action: {}
 			  )
 			}
-			.onChange(of: idFrontItem) { _, item in
-			  MainActor.assumeIsolated { loadAndUpload(item, for: .governmentIDFront) }
-			}
 #else
 				Button {
-				  pickAndUploadAndroidImage(for: .governmentIDFront)
+				  androidPickTarget = .governmentIDFront
+				  showAndroidPhotoSourceDialog = true
 				} label: {
 				  idFrontPickerLabel
 				}
@@ -143,6 +141,21 @@ struct TeacherIdentityVerificationView: View {
 	  viewModel.checkAndAutoAdvance()
 	}
 	.navigationTitle(LocalizationSupport.localized("Verify Your Identity"))
+#if os(Android)
+	.confirmationDialog(
+	  LocalizationSupport.localized("Add a photo"),
+	  isPresented: $showAndroidPhotoSourceDialog,
+	  titleVisibility: .visible
+	) {
+	  Button(LocalizationSupport.localized("Take Photo")) {
+		pickAndUploadAndroidImage(for: androidPickTarget, source: .camera)
+	  }
+	  Button(LocalizationSupport.localized("Choose from Library")) {
+		pickAndUploadAndroidImage(for: androidPickTarget, source: .gallery)
+	  }
+	  Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+	}
+#endif
 
   }
   
@@ -175,23 +188,29 @@ struct TeacherIdentityVerificationView: View {
 			  isUploading: viewModel.isUploading(for: .selfie), action: {})
   }
   
-  // MARK: - Load PhotosPickerItem → Data → upload
-#if !os(Android)
-  private func loadAndUpload(_ item: PhotosPickerItem?, for target: UploadTarget) {
-	guard let item else { return }
-	Task {
-	  if let data = try? await item.loadTransferable(type: Data.self) {
-		viewModel.handlePickedImage(data, for: target)
-	  }
-	}
+  // MARK: - Load picked image → upload
+#if os(Android)
+  enum AndroidPhotoSource {
+	case camera
+	case gallery
   }
-#else
-  private func pickAndUploadAndroidImage(for target: UploadTarget) {
+
+  private func pickAndUploadAndroidImage(for target: UploadTarget, source: AndroidPhotoSource) {
 	Task {
 	  do {
-		logger.info("TeacherMinute Android image pick requested target=\(target)")
+		if source == .camera {
+		  let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+		  guard cameraState.isGranted else {
+			viewModel.uploadError = LocalizationSupport.localized("Camera access is required to take a photo.")
+			return
+		  }
+		}
+		logger.info("TeacherMinute Android image pick requested target=\(target) source=\(source)")
 		let base64 = try await Task.detached(priority: .userInitiated) {
-		  try AndroidImagePickerBridge.pickImageBase64()
+		  switch source {
+		  case .camera:  return try AndroidImagePickerBridge.captureImageBase64()
+		  case .gallery: return try AndroidImagePickerBridge.pickImageBase64()
+		  }
 		}.value
 		logger.info("TeacherMinute Android image pick returned target=\(target) base64Length=\(base64.count)")
 		guard !base64.isEmpty else {
@@ -268,7 +287,7 @@ struct TeacherIdentityVerificationView: View {
 		PlatformIcon(systemName: viewModel.acceptedTerms ? "checkmark.square.fill" : "square")
 		  .font(.system(size: 18))
 		  .foregroundStyle(viewModel.acceptedTerms ? theme.authPink : theme.authIcon)
-		Text(LocalizationSupport.localized("I confirm that the uploaded documents are\nauthentic and belong to me. I agree to the\nVerification Terms."))
+		Text(LocalizationSupport.localized("I confirm that the uploaded documents are authentic and belong to me. I agree to the Verification Terms."))
 		  .font(.system(size: 11))
 		  .foregroundStyle(theme.authSecondaryText)
 		  .lineSpacing(4)
@@ -527,11 +546,25 @@ private enum AndroidImagePickerBridge {
 	name: "pickImageBase64",
 	sig: "()Ljava/lang/String;"
   )!
+  private static let captureImageBase64Method = managerClass.getStaticMethodID(
+	name: "captureImageBase64",
+	sig: "()Ljava/lang/String;"
+  )!
 
   static func pickImageBase64() throws -> String {
 	try jniContext {
 	  try managerClass.callStatic(
 		method: pickImageBase64Method,
+		options: [.kotlincompat],
+		args: []
+	  )
+	}
+  }
+
+  static func captureImageBase64() throws -> String {
+	try jniContext {
+	  try managerClass.callStatic(
+		method: captureImageBase64Method,
 		options: [.kotlincompat],
 		args: []
 	  )

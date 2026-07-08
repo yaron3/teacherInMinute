@@ -39,9 +39,7 @@ struct AskTeacherSheet: View {
     @State  var uploadedPhotoUrls: [String] = []
     @State  var isUploadingPhoto = false
     @State  var photoUploadError: String? = nil
-#if !os(Android)
-    @State  var pickedPhotoItem: PhotosPickerItem?
-#else
+#if os(Android)
     @State  var showAndroidPhotoSourceDialog = false
 #endif
     @FocusState var isQuestionFocused: Bool
@@ -334,14 +332,12 @@ struct AskTeacherSheet: View {
     @ViewBuilder
     var addPhotoButton: some View {
 #if !os(Android)
-        PhotosPicker(selection: $pickedPhotoItem, matching: .images) {
+        PhotoSourceButton(onImageData: { data in
+            uploadPhotoData(data)
+        }) {
             addPhotoLabel
         }
-        .buttonStyle(.plain)
         .disabled(isUploadingPhoto)
-        .onChange(of: pickedPhotoItem) { _, item in
-            MainActor.assumeIsolated { loadPickedPhoto(item) }
-        }
 #else
         Button {
             showAndroidPhotoSourceDialog = true
@@ -419,17 +415,12 @@ struct AskTeacherSheet: View {
     }
 
 #if !os(Android)
-    func loadPickedPhoto(_ item: PhotosPickerItem?) {
-        guard let item else { return }
+    func uploadPhotoData(_ data: Data) {
         Task {
             do {
                 isUploadingPhoto = true
                 photoUploadError = nil
-                defer {
-                    isUploadingPhoto = false
-                    pickedPhotoItem = nil
-                }
-                guard let data = try await item.loadTransferable(type: Data.self) else { return }
+                defer { isUploadingPhoto = false }
                 guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
                     photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
                     return
