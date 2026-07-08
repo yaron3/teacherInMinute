@@ -20,8 +20,8 @@ struct ProfileView: View {
   @State var isShowingDocuments = false
   @State var hasProfileDataForDisplay = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
-#if !os(Android)
-  @State private var profilePhotoItem: PhotosPickerItem?
+#if os(Android)
+  @State var showAndroidPhotoSourceDialog = false
 #endif
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -174,11 +174,6 @@ struct ProfileView: View {
               .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
               .id(languagePreference)
             }
-#if !os(Android)
-        .onChange(of: profilePhotoItem) { _, item in
-          loadProfilePhoto(item)
-        }
-#endif
 	  }
 	  
   var profileLoadingView: some View {
@@ -238,17 +233,31 @@ struct ProfileView: View {
   @ViewBuilder
   var profilePhotoButton: some View {
 #if !os(Android)
-    PhotosPicker(selection: $profilePhotoItem, matching: .images) {
+    PhotoSourceButton(onImageData: { data in
+      viewModel.uploadProfileImage(data: data)
+    }) {
       profilePhotoContent
     }
-    .buttonStyle(.plain)
 #else
     Button {
-      pickAndroidProfilePhoto()
+      showAndroidPhotoSourceDialog = true
     } label: {
       profilePhotoContent
     }
     .buttonStyle(.plain)
+    .confirmationDialog(
+      LocalizationSupport.localized("Add a photo"),
+      isPresented: $showAndroidPhotoSourceDialog,
+      titleVisibility: .visible
+    ) {
+      Button(LocalizationSupport.localized("Take Photo")) {
+        pickAndroidProfilePhoto(source: .camera)
+      }
+      Button(LocalizationSupport.localized("Choose from Library")) {
+        pickAndroidProfilePhoto(source: .gallery)
+      }
+      Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+    }
 #endif
   }
 
@@ -420,21 +429,27 @@ struct ProfileView: View {
 	  }
   }
 
-#if !os(Android)
-  private func loadProfilePhoto(_ item: PhotosPickerItem?) {
-    guard let item else { return }
-    Task {
-      if let data = try? await item.loadTransferable(type: Data.self) {
-        viewModel.uploadProfileImage(data: data)
-      }
-    }
+#if os(Android)
+  enum AndroidPhotoSource {
+    case camera
+    case gallery
   }
-#else
-  private func pickAndroidProfilePhoto() {
+
+  private func pickAndroidProfilePhoto(source: AndroidPhotoSource) {
     Task {
       do {
+        if source == .camera {
+          let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+          guard cameraState.isGranted else {
+            viewModel.errorMessage = LocalizationSupport.localized("Camera access is required to take a photo.")
+            return
+          }
+        }
         let base64 = try await Task.detached(priority: .userInitiated) {
-          try AndroidProfileImagePickerBridge.pickImageBase64()
+          switch source {
+          case .camera:  return try AndroidProfileImagePickerBridge.captureImageBase64()
+          case .gallery: return try AndroidProfileImagePickerBridge.pickImageBase64()
+          }
         }.value
         guard !base64.isEmpty, let data = Data(base64Encoded: base64) else { return }
         viewModel.uploadProfileImage(data: data)
@@ -794,11 +809,25 @@ private enum AndroidProfileImagePickerBridge {
     name: "pickImageBase64",
     sig: "()Ljava/lang/String;"
   )!
+  private static let captureImageBase64Method = managerClass.getStaticMethodID(
+    name: "captureImageBase64",
+    sig: "()Ljava/lang/String;"
+  )!
 
   static func pickImageBase64() throws -> String {
     try jniContext {
       try managerClass.callStatic(
         method: pickImageBase64Method,
+        options: [.kotlincompat],
+        args: []
+      )
+    }
+  }
+
+  static func captureImageBase64() throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: captureImageBase64Method,
         options: [.kotlincompat],
         args: []
       )

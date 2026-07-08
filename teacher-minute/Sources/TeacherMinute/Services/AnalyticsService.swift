@@ -120,7 +120,12 @@ final class AnalyticsService {
     /// we expose this so we have one place to wire it up.
     func start() {
         Analytics.setAnalyticsCollectionEnabled(true)
-        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
+        let crashlytics = Crashlytics.crashlytics()
+        crashlytics.setCrashlyticsCollectionEnabled(true)
+        crashlytics.sendUnsentReports()
+        #if DEBUG
+        logger.info("[Analytics] Crashlytics enabled=\(crashlytics.isCrashlyticsCollectionEnabled()) didCrashPrevious=\(crashlytics.didCrashDuringPreviousExecution())")
+        #endif
         logger.info("[Analytics] started")
     }
 
@@ -245,6 +250,17 @@ final class AnalyticsService {
     func log(_ message: String) {
         Crashlytics.crashlytics().log(message)
     }
+
+    #if DEBUG
+    func triggerCrashlyticsTestCrash() {
+        Crashlytics.crashlytics().log("debug_crashlytics_test_crash")
+        #if os(Android)
+        AndroidCrashlyticsBridge.triggerTestCrash()
+        #else
+        fatalError("Debug Crashlytics test crash")
+        #endif
+    }
+    #endif
 
     // MARK: - Helpers
 

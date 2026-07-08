@@ -70,6 +70,10 @@ struct SettingsRow: Identifiable {
             self.destination = nil
         case .contactUs:
             self.destination = .contactUs
+        #if DEBUG
+        case .testCrashlyticsCrash:
+            self.destination = nil
+        #endif
         case .logOut, .deleteAccount:
             // Destructive actions handled via confirmation; no navigation
             self.destination = nil
@@ -92,6 +96,9 @@ enum SettingsAction: Equatable {
     case contactUs
     case eula
     case privacyPolicy
+    #if DEBUG
+    case testCrashlyticsCrash
+    #endif
     
     var id: String {
         switch self {
@@ -109,6 +116,9 @@ enum SettingsAction: Equatable {
         case .contactUs: "contactUs"
         case .eula: "eula"
         case .privacyPolicy: "privacyPolicy"
+        #if DEBUG
+        case .testCrashlyticsCrash: "testCrashlyticsCrash"
+        #endif
         }
     }
 }
@@ -274,7 +284,61 @@ class SettingsViewModel {
         self.remoteConfigService = remoteConfigService
         let savedLanguage = UserDefaults.standard.string(forKey: LocalizationSupport.languagePreferenceKey)
         self.selectedLanguage = savedLanguage.flatMap(SettingsLanguageChoice.init(rawValue:)) ?? .system
-				self.role = role
+        self.role = role
+    }
+
+    var preferenceRows: [SettingsRow] {
+        var rows = [
+            SettingsRow(
+                title: LocalizationSupport.localized("Preferences"),
+                subtitle: role == .teacher
+                    ? LocalizationSupport.localized("Currency")
+                    : LocalizationSupport.localized("Default session type and currency"),
+                systemImage: "slider.horizontal.3",
+                iconColor: .primary,
+                isDestructive: false,
+                action: .appPreferences
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("Language"),
+                subtitle: selectedLanguage.title,
+                systemImage: "globe",
+                iconColor: .primary,
+                isDestructive: false,
+                action: .language
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("Notification Preferences"),
+                subtitle: nil,
+                systemImage: "bell.fill",
+                iconColor: .primary,
+                isDestructive: false,
+                action: .notifications
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("Privacy Controls"),
+                subtitle: nil,
+                systemImage: "shield.lefthalf.filled",
+                iconColor: .primary,
+                isDestructive: false,
+                action: .privacyControls
+            )
+        ]
+
+        #if DEBUG
+        rows.append(
+            SettingsRow(
+                title: LocalizationSupport.localized("Test Crashlytics Crash"),
+                subtitle: LocalizationSupport.localized("Debug builds only"),
+                systemImage: "exclamationmark.triangle.fill",
+                iconColor: .red,
+                isDestructive: true,
+                action: .testCrashlyticsCrash
+            )
+        )
+        #endif
+
+        return rows
     }
 
     var sections: [SettingsSection] {
@@ -308,42 +372,7 @@ class SettingsViewModel {
             ),
             SettingsSection(
                 title: LocalizationSupport.localized("PREFERENCES"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Preferences"),
-                        subtitle: role == .teacher
-                            ? LocalizationSupport.localized("Currency")
-                            : LocalizationSupport.localized("Default session type and currency"),
-                        systemImage: "slider.horizontal.3",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .appPreferences
-                    ),
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Language"),
-                        subtitle: selectedLanguage.title,
-                        systemImage: "globe",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .language
-                    ),
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Notification Preferences"),
-                        subtitle: nil,
-                        systemImage: "bell.fill",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .notifications
-                    ),
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Privacy Controls"),
-                        subtitle: nil,
-                        systemImage: "shield.lefthalf.filled",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .privacyControls
-                    )
-                ]
+                rows: preferenceRows
             ),
             SettingsSection(
                 title: LocalizationSupport.localized("ABOUT"),
@@ -489,6 +518,10 @@ class SettingsViewModel {
             Task { await openEULA() }
         case .privacyPolicy:
             Task { await openPrivacyPolicy() }
+        #if DEBUG
+        case .testCrashlyticsCrash:
+            AnalyticsService.shared.triggerCrashlyticsTestCrash()
+        #endif
         case .logOut:
             activeConfirmation = .logOut
         case .deleteAccount:
