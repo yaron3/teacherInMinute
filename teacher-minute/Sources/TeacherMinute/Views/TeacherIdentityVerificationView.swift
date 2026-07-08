@@ -61,8 +61,6 @@ struct TeacherIdentityVerificationView: View {
 #if !os(Android)
 			let hasFront      = viewModel.hasGovernmentIDFront
 			let frontSpinning = viewModel.isUploading(for: .governmentIDFront)
-			let hasBack       = viewModel.hasGovernmentIDBack
-			let backSpinning  = viewModel.isUploading(for: .governmentIDBack)
 			PhotosPicker(selection: $idFrontItem, matching: .images) {
 			  IDUploadBox(
 				title: LocalizationSupport.localized("Front Side"),
@@ -75,19 +73,6 @@ struct TeacherIdentityVerificationView: View {
 			.onChange(of: idFrontItem) { _, item in
 			  MainActor.assumeIsolated { loadAndUpload(item, for: .governmentIDFront) }
 			}
-			
-			PhotosPicker(selection: $idBackItem, matching: .images) {
-			  IDUploadBox(
-				title: LocalizationSupport.localized("Back Side"),
-				isCompleted: hasBack,
-				isUploading: backSpinning,
-				isMandatory: false,
-				action: {}
-			  )
-			}
-			.onChange(of: idBackItem) { _, item in
-			  MainActor.assumeIsolated { loadAndUpload(item, for: .governmentIDBack) }
-			}
 #else
 				Button {
 				  pickAndUploadAndroidImage(for: .governmentIDFront)
@@ -95,87 +80,9 @@ struct TeacherIdentityVerificationView: View {
 				  idFrontPickerLabel
 				}
 				.buttonStyle(.plain)
-				
-				Button {
-				  pickAndUploadAndroidImage(for: .governmentIDBack)
-				} label: {
-				  idBackPickerLabel
-				}
-				.buttonStyle(.plain)
 #endif
 		  }
 		  .padding(.top, 12)
-		  
-		  sectionTitle(LocalizationSupport.localized("Teaching Credentials"))
-			.padding(.top, 22)
-		  
-		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdCredentialsDescription, fallback: LocalizationSupport.localized("Optional. Upload your degree, teaching license, or\ncertifications — it helps us verify you as a teacher\nfaster.")))
-			.font(.system(size: 11))
-			.foregroundStyle(theme.authSecondaryText)
-			.lineSpacing(4)
-			.padding(.top, 8)
-		  
-#if !os(Android)
-		  let hasCredentials      = viewModel.hasTeachingCredentials
-		  let credentialsSpinning = viewModel.isUploading(for: .teachingCredentials)
-		  PhotosPicker(selection: $credentialsItem,
-					   matching: .any(of: [.images, .livePhotos])) {
-			UploadLargeBox(
-			  title: LocalizationSupport.localized("Tap to upload document"),
-			  subtitle: LocalizationSupport.localized("PDF, JPG or PNG (Max 5MB)"),
-			  icon: "icloud.and.arrow.up.fill",
-			  isCompleted: hasCredentials,
-			  isUploading: credentialsSpinning,
-			  action: {}
-			)
-		  }
-					   .onChange(of: credentialsItem) { _, item in
-						 MainActor.assumeIsolated {
-						   loadAndUpload(item, for: .teachingCredentials)
-						 }
-					   }
-					   .padding(.top, 12)
-#else
-			  Button {
-				pickAndUploadAndroidImage(for: .teachingCredentials)
-			  } label: {
-				credentialsPickerLabel
-			  }
-			  .buttonStyle(.plain)
-#endif
-		  
-		  sectionTitle(LocalizationSupport.localized("Selfie Verification"))
-			.padding(.top, 22)
-		  
-		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdSelfieDescription, fallback: LocalizationSupport.localized("Optional. Take a clear selfie to match your Government\nID — it helps us verify you faster.")))
-			.font(.system(size: 11))
-			.foregroundStyle(theme.authSecondaryText)
-			.padding(.top, 8)
-		  
-#if !os(Android)
-		  let hasSelfie      = viewModel.hasSelfie
-		  let selfieSpinning = viewModel.isUploading(for: .selfie)
-		  PhotosPicker(selection: $selfieItem, matching: .images) {
-			SelfieRow(
-			  isCompleted: hasSelfie,
-			  isUploading: selfieSpinning,
-			  action: {}
-			)
-		  }
-		  .onChange(of: selfieItem) { _, item in
-			MainActor.assumeIsolated {
-			  loadAndUpload(item, for: .selfie)
-			}
-		  }
-		  .padding(.top, 12)
-#else
-			  Button {
-				pickAndUploadAndroidImage(for: .selfie)
-			  } label: {
-				selfiePickerLabel
-			  }
-			  .buttonStyle(.plain)
-#endif
 		  
 		  privacyBox
 			.padding(.top, 24)
@@ -322,9 +229,6 @@ struct TeacherIdentityVerificationView: View {
 		  .clipShape(Capsule())
 	  }
 	  StatusRow(title: LocalizationSupport.localized("Government ID – Front"), isDone: viewModel.hasGovernmentIDFront, isMandatory: true)
-	  StatusRow(title: LocalizationSupport.localized("Government ID – Back"),  isDone: viewModel.hasGovernmentIDBack,  isMandatory: false)
-	  StatusRow(title: LocalizationSupport.localized("Teaching Credentials"), isDone: viewModel.hasTeachingCredentials, isMandatory: false)
-	  StatusRow(title: LocalizationSupport.localized("Selfie Verification"),   isDone: viewModel.hasSelfie,            isMandatory: false)
 	}
 	.padding(16)
 	.background(theme.appCardBackground)

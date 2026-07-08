@@ -381,6 +381,12 @@ struct ChatSessionView: View {
       // post-first-lesson notification permission explanation.
       NotificationPromptStore.markLessonCompleted()
     }
+    if !isStudent && durationSeconds >= TeacherDocumentsPromptStore.minimumLessonSeconds {
+      // The teacher has completed a lesson longer than a minute — make them
+      // eligible for the one-time "finish your verification documents"
+      // suggestion (bug #24).
+      TeacherDocumentsPromptStore.markLessonCompleted()
+    }
     if isStudent && durationSeconds >= 30 && !viewModel.teacherId.isEmpty {
       isRatingPromptVisible = true
     } else {

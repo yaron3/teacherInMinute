@@ -37,6 +37,9 @@ final class ProfileViewModel {
     var notificationsState: PermissionState = .notDetermined
     var contactRows: [Parameter] = []
     var currency: String = LessonFormatting.defaultCurrencyCode
+    /// Whether the teacher still has verification documents left to upload
+    /// (only the front ID is mandatory during onboarding — bug #24).
+    var hasMissingDocuments = false
 
   var availableCurrencies: [String] {
 	[LocalizationSupport.localized("ils"), LocalizationSupport.localized("usd")]
@@ -107,6 +110,9 @@ final class ProfileViewModel {
             apply(profile)
             if profile.role == .teacher {
                 isVerified = (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
+                let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+                let docs = (data["uploadedDocuments"] as? [String]) ?? []
+                hasMissingDocuments = TeacherDocumentsPromptStore.hasMissingDocuments(docs)
             }
             isProfileLoaded = true
         } catch {

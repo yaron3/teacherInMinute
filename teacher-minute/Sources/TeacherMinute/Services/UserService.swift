@@ -130,7 +130,9 @@ final class UserService {
 
 		if role == .teacher {
 	  let docs = data["uploadedDocuments"] as? [String] ?? []
-	  let hasIdentityDocs = docs.count >= 4
+	  // Only the front of the government ID is mandatory to finish onboarding;
+	  // the back / credentials / selfie stay optional (bug #24).
+	  let hasIdentityDocs = docs.contains { $0.contains("_front") }
 
 	  let subjectSelections = data["subjectSelections"] as? [String: [String]] ?? [:]
 	  let hasSubjects = subjectSelections.values.contains { !$0.isEmpty }

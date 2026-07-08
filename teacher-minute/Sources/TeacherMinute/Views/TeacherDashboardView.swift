@@ -13,6 +13,9 @@ struct TeacherDashboardView: View {
   @Binding var hidesTabBar: Bool
   let showsSessionOverlay: Bool
   let showsIncomingOverlay: Bool
+  @State var showsDocumentsSuggestion = false
+  @State var showsDocuments = false
+  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -128,7 +131,37 @@ struct TeacherDashboardView: View {
 		  TeacherSubjectsView(isEditing: true)
 		}
 	  }
-	  
+	  // After a teacher's first lesson (> 1 min) suggest completing the
+	  // optional verification documents — a one-time, dismissible prompt (bug #24).
+	  .sheet(isPresented: $showsDocumentsSuggestion) {
+		TeacherDocumentsSuggestionView {
+		  TeacherDocumentsPromptStore.markSuggestionShown()
+		  showsDocumentsSuggestion = false
+		  showsDocuments = true
+		} onDismiss: {
+		  TeacherDocumentsPromptStore.markSuggestionShown()
+		  showsDocumentsSuggestion = false
+		}
+		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		.id(languagePreference)
+	  }
+	  .sheet(isPresented: $showsDocuments) {
+		NavigationStack {
+		  TeacherDocumentsView()
+		}
+		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		.id(languagePreference)
+	  }
+	  .onAppear {
+		Task {
+		  if await TeacherDocumentsPromptStore.shouldPresentSuggestion() {
+			showsDocumentsSuggestion = true
+		  }
+		}
+	  }
+
 	}
   }
   var statusHero: some View {

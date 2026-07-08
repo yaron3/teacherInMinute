@@ -162,7 +162,11 @@ struct ProfileView: View {
               .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
               .id(languagePreference)
             }
-            .sheet(isPresented: $isShowingDocuments) {
+            .sheet(isPresented: $isShowingDocuments, onDismiss: {
+              // Refresh the "Complete Your Documents" prompt after the teacher
+              // may have uploaded a missing document (bug #24).
+              Task { await viewModel.loadProfile() }
+            }) {
               NavigationStack {
                 TeacherDocumentsView()
               }
@@ -337,20 +341,24 @@ struct ProfileView: View {
 	  RoundedInfoCard {
 		HStack(spacing: 14) {
 		  Circle()
-			.fill(theme.appPurpleSoft)
+			.fill(viewModel.hasMissingDocuments ? theme.appPinkSoft : theme.appPurpleSoft)
 			.frame(width: 42, height: 42)
 			.overlay {
-			  PlatformIcon(systemName: "doc.text.fill")
+			  PlatformIcon(systemName: viewModel.hasMissingDocuments ? "doc.badge.plus" : "doc.text.fill")
 				.font(.system(size: 16, weight: .semibold))
-				.foregroundStyle(theme.appPurple)
+				.foregroundStyle(viewModel.hasMissingDocuments ? theme.appPink : theme.appPurple)
 			}
 
 		  VStack(alignment: .leading, spacing: 4) {
-			Text(LocalizationSupport.localized("Documents Uploaded"))
+			Text(viewModel.hasMissingDocuments
+				 ? LocalizationSupport.localized("Complete Your Documents")
+				 : LocalizationSupport.localized("Documents Uploaded"))
 			  .font(.system(size: 14, weight: .bold))
 			  .foregroundStyle(theme.appPrimaryText)
 
-			Text(LocalizationSupport.localized("View the verification documents you uploaded"))
+			Text(viewModel.hasMissingDocuments
+				 ? LocalizationSupport.localized("Upload your remaining verification documents")
+				 : LocalizationSupport.localized("View the verification documents you uploaded"))
 			  .font(.system(size: 12))
 			  .foregroundStyle(theme.appSecondaryText)
 		  }
