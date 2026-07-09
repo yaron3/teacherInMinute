@@ -70,6 +70,23 @@ struct SettingsView: View {
         } message: {
             Text(viewModel.alertMessage ?? "")
         }
+        .alert(LocalizationSupport.localized("Delete Account"), isPresented: $viewModel.showReauthPasswordPrompt) {
+            SecureField(LocalizationSupport.localized("Password"), text: $viewModel.reauthPassword)
+            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
+                viewModel.reauthPassword = ""
+            }
+            Button(LocalizationSupport.localized("Delete"), role: .destructive) {
+                let password = viewModel.reauthPassword
+                viewModel.reauthPassword = ""
+                Task {
+                    if await viewModel.completeAccountDeletion(withPassword: password) {
+                        router.signOut()
+                    }
+                }
+            }
+        } message: {
+            Text(LocalizationSupport.localized("Enter your password to confirm account deletion."))
+        }
         .sheet(item: $viewModel.contactSupportPreview) { request in
             ContactSupportPreviewSheet(
                 request: request,

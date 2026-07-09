@@ -148,5 +148,95 @@ final class AuthService {
     }
     try await user.delete()
   }
+
+  /// The sign-in provider backing the current user (e.g. "password", "google.com", "apple.com").
+  var currentUserProviderID: String? {
+#if os(Android)
+    Auth.auth().currentUser?.providerID
+#else
+    Auth.auth().currentUser?.providerData.first?.providerID
+#endif
+  }
+
+  /// True when the current user signed in with email/password and therefore must
+  /// supply their password to re-authenticate before a sensitive action.
+  var requiresPasswordForReauth: Bool {
+    currentUserProviderID == "password"
+  }
+
+  /// Whether the given error is Firebase's "requires recent login" error, which is
+  /// raised for sensitive actions (like account deletion) when the session is stale.
+  func isRecentLoginRequired(_ error: Error) -> Bool {
+    // AuthErrorCode.requiresRecentLogin == 17014
+    (error as NSError).code == 17014
+  }
+
+  /// Re-authenticates the current user so sensitive actions are allowed again after
+  /// the session has gone stale. For social providers this re-runs the sign-in flow;
+  /// for email/password it uses the supplied password.
+  func reauthenticate(password: String? = nil) async throws {
+    guard let user = Auth.auth().currentUser else {
+      throw SettingsError.missingUser
+    }
+
+    switch currentUserProviderID {
+    case "password":
+      guard let email = user.email, let password, !password.isEmpty else {
+        throw AuthReauthError.passwordRequired
+      }
+      let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+      try await user.reauthenticate(with: credential)
+    case "google.com":
+      try await reauthenticateWithSocialProvider(.google)
+    case "apple.com":
+      try await reauthenticateWithSocialProvider(.apple)
+    default:
+      throw AuthReauthError.unsupportedProvider
+    }
+  }
+
+  private enum SocialReauthProvider {
+    case google
+    case apple
+  }
+
+  private func reauthenticateWithSocialProvider(_ provider: SocialReauthProvider) async throws {
+#if os(iOS)
+    let signInProvider: AuthProvider = provider == .google
+      ? iOSGoogleSignInProvider()
+      : iOSAppleSignInProvider()
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+      signInProvider.signIn { result in
+        switch result {
+        case .success:
+          continuation.resume()
+        case .failure(let error):
+          continuation.resume(throwing: error)
+        }
+      }
+    }
+#elseif os(Android)
+    switch provider {
+    case .google: _ = try await AndroidGoogleAuth().signIn()
+    case .apple: _ = try await AndroidAppleAuth().signIn()
+    }
+#endif
+  }
+}
+
+enum AuthReauthError: LocalizedError {
+  /// The user signed in with email/password and must supply it to re-authenticate.
+  case passwordRequired
+  /// The user's sign-in provider does not support in-app re-authentication.
+  case unsupportedProvider
+
+  var errorDescription: String? {
+    switch self {
+    case .passwordRequired:
+      return LocalizationSupport.localized("Enter your password to confirm account deletion.")
+    case .unsupportedProvider:
+      return LocalizationSupport.localized("Please sign out and sign in again before deleting your account.")
+    }
+  }
 }
 

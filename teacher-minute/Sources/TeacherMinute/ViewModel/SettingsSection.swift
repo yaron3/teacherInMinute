@@ -262,6 +262,8 @@ class SettingsViewModel {
     var alertTitle = LocalizationSupport.localized("Settings")
     var alertMessage: String?
     var isLoading = false
+    var showReauthPasswordPrompt = false
+    var reauthPassword = ""
     var isOpeningPaymentSettings = false
     var isSavingPayoutSettings = false
     var isSubmittingContactSupport = false
@@ -616,22 +618,42 @@ class SettingsViewModel {
     }
     
     func deleteAccount() async -> Bool {
+        // Email/password users can't be re-authenticated silently — prompt for the
+        // password first, then finish the deletion in `completeAccountDeletion(withPassword:)`.
+        if authService.requiresPasswordForReauth {
+            reauthPassword = ""
+            showReauthPasswordPrompt = true
+            return false
+        }
+        return await performAccountDeletion()
+    }
+
+    /// Finishes account deletion for email/password users after they supply their password.
+    func completeAccountDeletion(withPassword password: String) async -> Bool {
+        return await performAccountDeletion(password: password)
+    }
+
+    /// Re-authenticates the user, then deletes their profile data and Firebase account.
+    /// Deleting the profile data must happen while still authenticated (Firestore rules),
+    /// so re-authentication comes first to guarantee a fresh session for the account deletion.
+    private func performAccountDeletion(password: String? = nil) async -> Bool {
         guard let uid = authService.currentUserID else {
             present(message: SettingsError.missingUser.localizedDescription)
             return false
         }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
+
         do {
+            try await authService.reauthenticate(password: password)
             try await UserService.shared.deleteUserData(uid: uid)
             try await authService.deleteCurrentUser()
             return true
         } catch (let error){
             present(
                 title: LocalizationSupport.localized("Delete Account"),
-                message: "\(error.localizedDescription) " + LocalizationSupport.localized("You may need to log in again before deleting your account.")
+                message: error.localizedDescription
             )
 			Analytics.logEvent("Delete Account error", parameters: ["error" : error])
             return false
