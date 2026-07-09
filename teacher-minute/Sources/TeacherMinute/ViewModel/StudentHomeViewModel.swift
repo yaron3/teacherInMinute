@@ -131,13 +131,14 @@ protocol StudentHomeViewModeling: AnyObject {
   func cancelSearch() async
   func resetSearch()
   func selectTier(_ option: PricingOption)
-  func checkout(_ option: PricingOption) async
+  func checkout(_ option: PricingOption, method: PaymentMethod) async
   func consumeCheckoutURL()
   func checkoutDidOpen()
   func handlePaymentReturn(_ result: PaymentReturnResult) async
   func handleCheckoutReturnWithoutResult() async -> Bool
   func viewAllLessons()
   func loadProfileIfNeeded() async
+  func refresh() async
   func refreshAfterLessonEnded() async
   func refreshUnreadMessages() async
   func chatInitialDetails(questionId: String?) -> ChatSessionDetails
@@ -241,9 +242,9 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     selectedPricePerMinuteCents = option.priceCents
   }
 
-  func checkout(_ option: PricingOption) async {
+  func checkout(_ option: PricingOption, method: PaymentMethod = .paypal) async {
     guard !isStartingCheckout else { return }
-    logger.info("[PaymentReturn] checkout start pricingOptionID=\(option.id)")
+    logger.info("[PaymentReturn] checkout start pricingOptionID=\(option.id) method=\(method.rawValue)")
     isStartingCheckout = true
     checkoutPricingOptionID = option.id
     checkoutStartedRemainingMinutes = remainingMinutes
@@ -254,7 +255,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     selectTier(option)
 
     do {
-      let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id)
+      let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: method)
       checkoutURL = result.checkoutURL
       logger.info("[PaymentReturn] checkout session created url=\(result.checkoutURL.absoluteString)")
     } catch let error as FunctionsError {
@@ -341,6 +342,21 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
+      remainingMinutes = profile.remainingMinutes
+    }
+    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
+    await loadRecentLessons(uid: uid)
+  }
+
+  /// Pull-to-refresh: re-reads the authoritative balance and profile summary
+  /// from Firestore, along with recent lessons and unread messages.
+  func refresh() async {
+    await loadPricingOptions()
+    guard let uid = Auth.auth().currentUser?.uid else { return }
+    if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+      name = profile.displayName
+      profileImageURL = profile.profileImageURL
+      remainingMinutes = profile.remainingMinutes
     }
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
@@ -348,11 +364,13 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func refreshAfterLessonEnded() async {
     guard let uid = Auth.auth().currentUser?.uid else { return }
+    await loadRemainingMinutes(uid: uid)
     await loadRecentLessons(uid: uid)
   }
 
   private func refreshAfterPurchase(uid: String, startingMinutes: Int) async -> Bool {
     for attempt in 1...8 {
+      await loadRemainingMinutes(uid: uid)
       await loadRecentLessons(uid: uid)
       logger.info("[PaymentReturn] balance refresh attempt=\(attempt) startingMinutes=\(startingMinutes) currentMinutes=\(self.remainingMinutes)")
       if remainingMinutes > startingMinutes {
@@ -362,6 +380,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       try? await Task.sleep(nanoseconds: 2_000_000_000)
     }
     return false
+  }
+
+  /// Reads the authoritative remaining-minutes balance straight from the
+  /// `users/{uid}` Firestore document rather than deriving it on the client.
+  private func loadRemainingMinutes(uid: String) async {
+    if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+      remainingMinutes = profile.remainingMinutes
+    }
   }
 
   func refreshUnreadMessages() async {
@@ -387,7 +413,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       lessonCount = allLessons.count
       totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: allLessons)
       totalPurchasedText = LessonFormatting.minutesText(totalPurchasedMinutes)
-      remainingMinutes = max(0, totalPurchasedMinutes - Self.totalUsedMinutes(lessons: allLessons))
       let recent = Array(allLessons.prefix(3))
       if !recent.isEmpty {
         recentLessons = recent.map(Self.recentLesson)
@@ -511,12 +536,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       || status == "active"
   }
 
-  private static func totalUsedMinutes(lessons: [HistoryLesson]) -> Int {
-    let totalSeconds = lessons.reduce(0) { $0 + $1.durationSeconds }
-    guard totalSeconds > 0 else { return 0 }
-    return Int(ceil(Double(totalSeconds) / 60.0))
-  }
-
   private static func recentLesson(_ lesson: HistoryLesson) -> RecentLesson {
     RecentLesson(
       title: lesson.title,
@@ -627,7 +646,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     selectedPricePerMinuteCents = option.priceCents
   }
 
-  func checkout(_ option: PricingOption) async {
+  func checkout(_ option: PricingOption, method: PaymentMethod = .paypal) async {
     selectTier(option)
   }
 
@@ -662,6 +681,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   func viewAllLessons() {}
 
   func loadProfileIfNeeded() async {}
+
+  func refresh() async {}
 
   func refreshAfterLessonEnded() async {}
 

@@ -142,7 +142,7 @@ final class FunctionsService {
     return RedeemCouponResult(minutesAdded: minutes)
   }
 
-  func createCheckoutSession(pricingOptionID: String) async throws -> CheckoutSessionResult {
+  func createCheckoutSession(pricingOptionID: String, paymentMethod: PaymentMethod = .paypal) async throws -> CheckoutSessionResult {
     let result = try await call(
       function: "createCheckoutSession",
       data: [
@@ -150,7 +150,10 @@ final class FunctionsService {
         "pricingOptionID": pricingOptionID,
         "pricingOption": pricingOptionID,
         "packageId": pricingOptionID,
-        "packageID": pricingOptionID
+        "packageID": pricingOptionID,
+        "paymentMethod": paymentMethod.rawValue,
+        "paymentType": paymentMethod.rawValue,
+        "method": paymentMethod.rawValue
       ]
     )
     guard

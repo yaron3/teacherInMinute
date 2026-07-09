@@ -362,7 +362,7 @@ class SettingsViewModel {
 			rows: [
                     SettingsRow(
                         title: LocalizationSupport.localized("Student Payment Methods"),
-                        subtitle: LocalizationSupport.localized("PayPal at checkout"),
+                        subtitle: LocalizationSupport.localized("PayPal, Bit, or credit card"),
                         systemImage: "creditcard.fill",
                         iconColor: .pink,
                         isDestructive: false,

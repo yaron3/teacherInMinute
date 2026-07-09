@@ -496,6 +496,11 @@ struct ProfileEditView: View {
                 selectedGrade: $row.value,
                 grades: viewModel.availableStudentGrades
               )
+            } else if viewModel.roleType == .student && row.description == LocalizationSupport.localized("Date of Birth") {
+              ProfileDateOfBirthPicker(
+                title: row.description,
+                date: $viewModel.dateOfBirth
+              )
             } else {
               ProfileEditInfoRow(parameter: $row)
             }
@@ -602,6 +607,90 @@ struct ProfileTeachingGradePicker: View {
       selectedGrades.remove(grade)
     } else {
       selectedGrades.insert(grade)
+    }
+  }
+}
+
+struct ProfileDateOfBirthPicker: View {
+  let title: String
+  @Binding var date: Date?
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  /// Sensible default when the student first sets a date of birth.
+  private var defaultDate: Date {
+    Calendar.current.date(byAdding: .year, value: -12, to: Date()) ?? Date()
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(title)
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundStyle(theme.authPrimaryText)
+
+      if let currentDate = date {
+        HStack {
+          DatePicker(
+            "",
+            selection: Binding(get: { currentDate }, set: { date = $0 }),
+            in: Date.distantPast...Date(),
+            displayedComponents: .date
+          )
+          .labelsHidden()
+#if !os(Android)
+          .datePickerStyle(.compact)
+#endif
+
+          Spacer()
+
+          Button {
+            date = nil
+          } label: {
+            Text(LocalizationSupport.localized("Clear"))
+              .font(.system(size: 13, weight: .semibold))
+              .foregroundStyle(theme.appPink)
+          }
+          .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 56)
+        .background(theme.authFieldBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay {
+          RoundedRectangle(cornerRadius: 15, style: .continuous)
+            .stroke(theme.authFieldBorder, lineWidth: 1)
+        }
+      } else {
+        Button {
+          date = defaultDate
+        } label: {
+          HStack {
+            Text(LocalizationSupport.localized("Set date of birth"))
+              .font(.system(size: 17))
+              .foregroundStyle(theme.authSecondaryText)
+
+            Spacer()
+
+            PlatformIcon(
+              systemName: "calendar",
+              size: 14,
+              weight: .semibold,
+              color: theme.authIcon
+            )
+          }
+          .padding(.horizontal, 16)
+          .frame(height: 56)
+          .background(theme.authFieldBackground)
+          .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+          .overlay {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+              .stroke(theme.authFieldBorder, lineWidth: 1)
+          }
+        }
+        .buttonStyle(.plain)
+      }
     }
   }
 }

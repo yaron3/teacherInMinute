@@ -142,8 +142,9 @@ final class UserService {
 			  if !(hasName && hasPhone) { return .completeProfile(role: .teacher) }
 		  return .home(role: .teacher)
 	} else {
-	  // Phone is optional for students in CompleteProfileViewModel.
-		  let hasProfile = hasName && data["dateOfBirth"] != nil
+	  // Phone is optional for students in CompleteProfileViewModel; date of
+	  // birth is collected later from Profile, so it no longer gates onboarding.
+		  let hasProfile = hasName
 	  if !hasProfile { return .completeProfile(role: .student) }
 	  return .home(role: .student)
 	}

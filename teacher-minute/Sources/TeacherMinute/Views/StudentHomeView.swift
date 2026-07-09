@@ -14,6 +14,7 @@ struct StudentHomeView: View {
   @State var showingCouponAlert = false
   @State var showsAskTeacher = false
   @State var showsNotificationExplainer = false
+  @State var pendingCheckoutOption: PricingOption?
   @Binding var hidesTabBar: Bool
   @Environment(\.openURL) var openURL
   @Environment(\.scenePhase) var scenePhase
@@ -49,8 +50,8 @@ struct StudentHomeView: View {
 		  askTeacherCard
 			.padding(.top, 14)
 		  
-		  redeemCouponRow
-			.padding(.top, 12)
+		  EmptyView() // Coupon entry hidden on the Home tab (bug #28).
+			.padding(.top, 0)
 		  
 		  sectionHeader(title: LocalizationSupport.localized("Pricing Options"))
 			.padding(.top, 24)
@@ -62,7 +63,7 @@ struct StudentHomeView: View {
 				  option: option,
 				  isLoading: viewModel.isStartingCheckout && viewModel.checkoutPricingOptionID == option.id
 				) {
-				  Task { await viewModel.checkout(option) }
+				  pendingCheckoutOption = option
 				}
 			  }
 			}
@@ -110,7 +111,10 @@ struct StudentHomeView: View {
 		.padding(.bottom, 24)
 	  }
 	  .background(Color(.systemBackground))
-	  
+	  .refreshable {
+		await viewModel.refresh()
+	  }
+
 	  searchStateOverlay
 	  
 #if os(Android)
@@ -141,6 +145,29 @@ struct StudentHomeView: View {
 	}
 	.task {
 	  await viewModel.loadProfileIfNeeded()
+	}
+	.confirmationDialog(
+	  LocalizationSupport.localized("Choose a payment method"),
+	  isPresented: isChoosingPaymentMethod,
+	  titleVisibility: .visible
+	) {
+	  if let option = pendingCheckoutOption {
+		Button(LocalizationSupport.localized("Pay with PayPal")) {
+		  pendingCheckoutOption = nil
+		  Task { await viewModel.checkout(option, method: .paypal) }
+		}
+		Button(LocalizationSupport.localized("Pay with Bit")) {
+		  pendingCheckoutOption = nil
+		  Task { await viewModel.checkout(option, method: .bit) }
+		}
+		Button(LocalizationSupport.localized("Pay with credit card")) {
+		  pendingCheckoutOption = nil
+		  Task { await viewModel.checkout(option, method: .creditCard) }
+		}
+	  }
+	  Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
+		pendingCheckoutOption = nil
+	  }
 	}
 	.onChange(of: viewModel.checkoutURL) { _, url in
 	  guard let url else { return }
@@ -329,6 +356,17 @@ struct StudentHomeView: View {
 	  set: { isPresented in
 		if !isPresented {
 		  paymentReturnStore.consumeLatestResult()
+		}
+	  }
+	)
+  }
+
+  var isChoosingPaymentMethod: Binding<Bool> {
+	Binding(
+	  get: { pendingCheckoutOption != nil },
+	  set: { isPresented in
+		if !isPresented {
+		  pendingCheckoutOption = nil
 		}
 	  }
 	)

@@ -378,12 +378,13 @@ export const adminListCoupons = onCall(async (req) => {
 export const adminCreateCoupon = onCall(async (req) => {
   assertAdmin(req);
 
-  const { studentUserId, numberOfMinutes, price, createdBy, couponId } = req.data as {
+  const { studentUserId, numberOfMinutes, price, createdBy, couponId, applyDirectly } = req.data as {
     studentUserId: string;
     numberOfMinutes: number;
     price: number;
     createdBy: string;
     couponId?: string;
+    applyDirectly?: boolean;
   };
 
   if (!studentUserId) throw new HttpsError("invalid-argument", "studentUserId required");
@@ -392,20 +393,55 @@ export const adminCreateCoupon = onCall(async (req) => {
 
   const docId = couponId?.trim() || generateCouponCode();
   const ref = firestore.collection("coupons").doc(docId);
-  const existing = await ref.get();
-  if (existing.exists) throw new HttpsError("already-exists", `Coupon code "${docId}" already exists`);
+  const safePrice = Number(price);
+  const normalizedPrice = Number.isFinite(safePrice) && safePrice >= 0 ? safePrice : 0;
 
-  await ref.set({
-    studentUserId,
-    numberOfMinutes,
-    price: price ?? 0,
-    createdBy,
-    createdAt: Timestamp.now(),
-    activatedAt: null,
+  await firestore.runTransaction(async (tx) => {
+    const existing = await tx.get(ref);
+    if (existing.exists) throw new HttpsError("already-exists", `Coupon code "${docId}" already exists`);
+
+    const now = Timestamp.now();
+
+    tx.set(ref, {
+      studentUserId,
+      numberOfMinutes,
+      price: normalizedPrice,
+      createdBy,
+      createdAt: now,
+      activatedAt: applyDirectly ? now : null,
+    });
+
+    if (!applyDirectly) return;
+
+    const userRef = firestore.collection("users").doc(studentUserId);
+    tx.set(
+      userRef,
+      {
+        remainingMinutes: FieldValue.increment(numberOfMinutes),
+        totalMinutes: FieldValue.increment(numberOfMinutes),
+      },
+      { merge: true }
+    );
+
+    const purchaseRef = userRef.collection("purchases").doc(docId);
+    tx.set(purchaseRef, {
+      pricingOptionId: docId,
+      provider: "coupon",
+      amountCents: Math.round(normalizedPrice * 100),
+      currency: "USD",
+      type: "pay_as_you_go",
+      status: "active",
+      purchasedAt: now,
+      updatedAt: now,
+      minutesPurchased: numberOfMinutes,
+      minutesRemaining: numberOfMinutes,
+      minutesUsed: 0,
+      createdBy,
+    });
   });
 
-  logger.info(`[admin] created coupon id=${docId} for uid=${studentUserId} minutes=${numberOfMinutes}`);
-  return { success: true, couponId: docId };
+  logger.info(`[admin] created coupon id=${docId} for uid=${studentUserId} minutes=${numberOfMinutes} applyDirectly=${Boolean(applyDirectly)}`);
+  return { success: true, couponId: docId, appliedDirectly: Boolean(applyDirectly) };
 });
 
 function generateCouponCode(length = 8): string {

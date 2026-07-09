@@ -24,6 +24,9 @@ final class ProfileViewModel {
     var email = ""
     var phoneNumber = ""
     var grade = ""
+    /// Date of birth is collected only here in Profile (never during onboarding).
+    /// `nil` means the student has not provided one, so it is never shown to a teacher.
+    var dateOfBirth: Date?
     var subjects: [String] = []
     var profileImageURL = ""
     var roleType: AuthRole
@@ -40,6 +43,15 @@ final class ProfileViewModel {
     /// Whether the teacher still has verification documents left to upload
     /// (only the front ID is mandatory during onboarding — bug #24).
     var hasMissingDocuments = false
+
+    /// Formatted date of birth for display, or empty when it has not been set.
+    var dateOfBirthDisplay: String {
+        guard let dateOfBirth else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.locale = LocalizationSupport.currentLocale
+        return formatter.string(from: dateOfBirth)
+    }
 
   var availableCurrencies: [String] {
 	[LocalizationSupport.localized("ils"), LocalizationSupport.localized("usd")]
@@ -213,14 +225,19 @@ final class ProfileViewModel {
         defer { isLoading = false }
 
         do {
-            try await UserService.shared.updateProfileFields(uid: uid, fields: [
+            var fields: [String: String] = [
                 "fullName": name,
                 "email": email,
                 "phoneNumber": phoneNumber,
                 "grade": grade,
                 "currency": currency,
                 "updatedAt": ISO8601DateFormatter().string(from: Date())
-            ])
+            ]
+            // Persist the date of birth only once the student has actually set one.
+            if let dateOfBirth {
+                fields["dateOfBirth"] = ISO8601DateFormatter().string(from: dateOfBirth)
+            }
+            try await UserService.shared.updateProfileFields(uid: uid, fields: fields)
             isEditing = false
             rebuildContactRows()
         } catch {
@@ -243,6 +260,7 @@ final class ProfileViewModel {
         email = profile.email
         phoneNumber = profile.phoneNumber
         grade = profile.grade
+        dateOfBirth = profile.dateOfBirth
         subjects = profile.subjects
         profileImageURL = profile.profileImageURL
         roleType = profile.role
@@ -260,6 +278,7 @@ final class ProfileViewModel {
 
         if roleType == .student {
             rows.append(Parameter(description: LocalizationSupport.localized("Grade"), value: LocalizationSupport.localized(grade), image: "graduationcap.fill"))
+            rows.append(Parameter(description: LocalizationSupport.localized("Date of Birth"), value: dateOfBirthDisplay, image: "calendar"))
         }
 
         contactRows = rows

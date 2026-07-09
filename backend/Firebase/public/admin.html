@@ -258,8 +258,12 @@
 
     <!-- ── Users ── -->
     <div id="page-users" class="page">
-      <div class="page-title">Users</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="page-title">Users</div>
+        <button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button>
+      </div>
       <div class="page-sub">All registered Firebase Auth users</div>
+      <div class="page-sub" id="users-updated">Last updated: —</div>
       <div class="toolbar">
         <input id="user-search" placeholder="Search email or name…" oninput="filterUsers()">
         <button class="btn-ghost btn-sm" onclick="loadUsers()">↻ Reload</button>
@@ -409,6 +413,7 @@
       <div class="form-group"><label>Minutes to grant</label><input id="c-minutes" type="number" value="60" min="1"></div>
       <div class="form-group"><label>Value / Price (USD)</label><input id="c-price" type="number" value="9.99" step="0.01" min="0"></div>
       <div class="form-group"><label>Created by (your name)</label><input id="c-by" placeholder="Your name"></div>
+      <div class="form-group"><label><input id="c-apply-directly" type="checkbox"> Add minutes directly now and skip coupon entry</label></div>
       <div class="form-group"><label>Custom coupon code (leave blank for random)</label><input id="c-code" placeholder="e.g. WELCOME50" style="text-transform:uppercase"></div>
     </div>
     <div class="modal-foot">
@@ -725,6 +730,7 @@ async function loadUsers(append = false) {
     allUsers = append ? [...allUsers, ...d.users] : d.users;
     nextPageToken = d.nextPageToken;
     document.getElementById("users-load-more").style.display = nextPageToken ? "block" : "none";
+    document.getElementById("users-updated").textContent = "Last updated: " + new Date().toLocaleTimeString();
     renderUsers();
   } catch (e) {
     showToast("Failed to load users: " + e.message, "error");
@@ -783,7 +789,49 @@ async function viewUser(uid) {
 
 function renderUserDetail(d) {
   const a = d.auth, fs = d.firestore || {}, tr = d.teacherRecord;
-  document.getElementById("user-modal-title").textContent = a.displayName || a.email || a.uid;
+  document.getElementById("user-modal-title").textContent = fs.fullName || a.displayName || a.email || a.uid;
+
+  const photoUrl = fs.profileImageURL || fs.profilePhotoURL || a.photoURL;
+  const initials = esc((fs.fullName || a.displayName || a.email || "?")[0].toUpperCase());
+  const headerHtml = `
+    <div class="flex-center section-gap">
+      ${photoUrl
+        ? `<img class="avatar" style="width:56px;height:56px" src="${esc(photoUrl)}" onerror="this.style.display='none'">`
+        : `<div class="avatar" style="width:56px;height:56px;font-size:1.2rem">${initials}</div>`}
+      <div>
+        <div style="font-weight:700;font-size:1.05rem">${esc(fs.fullName || a.displayName || "—")}</div>
+        <div style="color:var(--muted2);font-size:.82rem">${esc(a.email || "—")} ${fs.role ? badge(fs.role, fs.role === "teacher" ? "purple" : "blue") : ""}</div>
+      </div>
+    </div>`;
+
+  const profileHtml = `
+    <div style="margin-bottom:8px;font-weight:600;font-size:.85rem">Profile</div>
+    <div class="two-col">
+      <div>
+        <div class="info-row"><div class="info-key">Full Name</div><div class="info-val">${esc(fs.fullName || "—")}</div></div>
+        <div class="info-row"><div class="info-key">Phone Number</div><div class="info-val">${esc(fs.phoneNumber || "—")}</div></div>
+        <div class="info-row"><div class="info-key">Date of Birth</div><div class="info-val">${fs.dateOfBirth ? fmtDate(Date.parse(fs.dateOfBirth)) : "—"}</div></div>
+        <div class="info-row"><div class="info-key">Grade</div><div class="info-val">${esc(fs.grade || "—")}</div></div>
+      </div>
+      <div>
+        <div class="info-row"><div class="info-key">Role</div><div class="info-val">${esc(fs.role || "—")}</div></div>
+        <div class="info-row"><div class="info-key">PayPal Email</div><div class="info-val">${esc(fs.paypalEmail || "—")}</div></div>
+        <div class="info-row"><div class="info-key">Currency</div><div class="info-val">${esc(fs.currency || "—")}</div></div>
+      </div>
+    </div>
+    <div style="margin-top:10px">${subjectTags(fs.subjectSelections)}</div>
+  `;
+
+  const documentsHtml = (fs.uploadedDocuments || []).length
+    ? `
+    <hr>
+    <div style="margin-bottom:10px;font-weight:600;font-size:.85rem">Uploaded Documents (${fs.uploadedDocuments.length})</div>
+    <div style="margin-bottom:10px">${fs.uploadedDocuments.map(n => `<span class="tag">${esc(docLabel(n))}</span>`).join("")}</div>
+    <div class="doc-grid" id="docs-${esc(a.uid)}">
+      <button class="btn-ghost btn-sm" onclick="loadDocPreviews('${esc(a.uid)}')">🖼 Load Document Previews</button>
+    </div>
+    `
+    : "";
 
   const purchasesHtml = d.purchases.length === 0
     ? "<p style='color:var(--muted);font-size:.8rem'>No purchases</p>"
@@ -822,12 +870,12 @@ function renderUserDetail(d) {
   ` : "";
 
   document.getElementById("user-modal-body").innerHTML = `
+    ${headerHtml}
     <div class="two-col section-gap">
       <div>
         <div style="margin-bottom:8px;font-weight:600;font-size:.85rem">Auth Account</div>
         <div class="info-row"><div class="info-key">UID</div><div class="info-val td-mono">${esc(a.uid)}</div></div>
         <div class="info-row"><div class="info-key">Email</div><div class="info-val">${esc(a.email||"—")}</div></div>
-        <div class="info-row"><div class="info-key">Display Name</div><div class="info-val">${esc(a.displayName||"—")}</div></div>
         <div class="info-row"><div class="info-key">Email Verified</div><div class="info-val">${a.emailVerified ? badge("Yes","green") : badge("No","red")}</div></div>
         <div class="info-row"><div class="info-key">Account Status</div><div class="info-val">${a.disabled ? badge("Disabled","red") : badge("Active","green")}</div></div>
         <div class="info-row"><div class="info-key">Created</div><div class="info-val">${fmtDate(a.createdAt)}</div></div>
@@ -842,7 +890,10 @@ function renderUserDetail(d) {
         <div class="info-row"><div class="info-key">Total Revenue Generated</div><div class="info-val">${fs.totalRevenueGenerated != null ? money(Math.round(fs.totalRevenueGenerated*100)) : "—"}</div></div>
       </div>
     </div>
+    <hr>
+    ${profileHtml}
     ${teacherSection}
+    ${documentsHtml}
     <hr>
     <div style="margin-bottom:10px;font-weight:600;font-size:.85rem">Purchases (${d.purchases.length})</div>
     ${purchasesHtml}
@@ -997,6 +1048,7 @@ function openCreateCoupon() {
   document.getElementById("c-minutes").value = "60";
   document.getElementById("c-price").value = "9.99";
   document.getElementById("c-by").value = "";
+  document.getElementById("c-apply-directly").checked = false;
   document.getElementById("c-code").value = "";
   openModal("coupon-modal");
 }
@@ -1006,12 +1058,20 @@ async function confirmCreateCoupon() {
   const minutes = parseInt(document.getElementById("c-minutes").value);
   const price = parseFloat(document.getElementById("c-price").value);
   const by = document.getElementById("c-by").value.trim();
+  const applyDirectly = document.getElementById("c-apply-directly").checked;
   const code = document.getElementById("c-code").value.trim().toUpperCase();
   if (!uid || !minutes || !by) { showToast("Fill all required fields", "error"); return; }
   try {
-    const d = await call("adminCreateCoupon", { studentUserId: uid, numberOfMinutes: minutes, price, createdBy: by, couponId: code || undefined });
+    const d = await call("adminCreateCoupon", {
+      studentUserId: uid,
+      numberOfMinutes: minutes,
+      price,
+      createdBy: by,
+      couponId: code || undefined,
+      applyDirectly,
+    });
     closeModal("coupon-modal");
-    showToast(`Coupon "${d.couponId}" created`);
+    showToast(d.appliedDirectly ? `Minutes added directly. Coupon "${d.couponId}" marked redeemed` : `Coupon "${d.couponId}" created`);
     loadCoupons();
   } catch (e) {
     showToast("Failed: " + e.message, "error");

@@ -57,6 +57,28 @@ service cloud.firestore {
         allow read: if isUser(uid);
         allow create, update, delete: if false;
       }
+
+      // Per-user notification inbox. Documents are created server-side (Cloud
+      // Functions / Admin SDK); the owner reads them, marks them read
+      // (readTimestamp) and may delete them from their own inbox.
+      match /incomingMessages/{messageId} {
+        allow read, update, delete: if isUser(uid);
+        allow create: if false;
+      }
+
+      // References into the broadcast `generalMessages` collection, tracking
+      // per-user read state. Owner reads/updates/deletes their own references.
+      match /generalMessages/{messageId} {
+        allow read, update, delete: if isUser(uid);
+        allow create: if false;
+      }
+    }
+
+    // Broadcast notification messages shared across users. Written server-side;
+    // any signed-in user may read the broadcast content.
+    match /generalMessages/{messageId} {
+      allow read: if isAuth();
+      allow write: if false;
     }
 
     // Teacher verification records. Written server-side (Cloud Functions with

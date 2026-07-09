@@ -12,7 +12,9 @@ struct UserProfile: Codable {
   let email: String
   let fullName: String
   let phoneNumber: String
-  let dateOfBirth: Date
+  /// Optional: date of birth is collected only from the Profile screen, never
+  /// during onboarding, so a brand-new profile has none until the user sets it.
+  let dateOfBirth: Date?
   let grade: String
   let paypalEmail: String
   let role: String   // "student" | "teacher"
@@ -21,18 +23,22 @@ struct UserProfile: Codable {
 
   var firestoreData: [String: Any] {
 	let iso = ISO8601DateFormatter()
-	return [
+	var data: [String: Any] = [
 	  "uid":         uid,
 	  "email":       email,
 	  "fullName":    fullName,
 		  "phoneNumber": phoneNumber,
-		  "dateOfBirth": iso.string(from: dateOfBirth),
 		  "grade":       grade,
 		  "paypalEmail": paypalEmail,
 		  "role":        role,
 		  "createdAt":   iso.string(from: createdAt),
 		  "currency":    currency,
 		]
+	// Only persist a date of birth once the user has actually provided one.
+	if let dateOfBirth {
+	  data["dateOfBirth"] = iso.string(from: dateOfBirth)
+	}
+	return data
   }
 }
 
@@ -41,6 +47,7 @@ struct UserProfileSummary {
   let email: String
   let fullName: String
   let phoneNumber: String
+  let dateOfBirth: Date?
   let grade: String
   let paypalEmail: String
   let role: AuthRole
@@ -57,6 +64,11 @@ struct UserProfileSummary {
 	self.email = data["email"] as? String ?? ""
 		self.fullName = data["fullName"] as? String ?? ""
 		self.phoneNumber = data["phoneNumber"] as? String ?? ""
+		if let dobString = data["dateOfBirth"] as? String {
+		  self.dateOfBirth = ISO8601DateFormatter().date(from: dobString)
+		} else {
+		  self.dateOfBirth = nil
+		}
 		self.grade = data["grade"] as? String ?? ""
 		self.paypalEmail = data["paypalEmail"] as? String ?? ""
 		self.profileImageURL = data["profileImageURL"] as? String
@@ -100,6 +112,14 @@ struct UserProfileSummary {
 	role == .teacher ? LocalizationSupport.localized("Math Teacher") : LocalizationSupport.localized("Student")
   }
   
+  var dateOfBirthText: String {
+	guard let dateOfBirth else { return "" }
+	let formatter = DateFormatter()
+	formatter.dateStyle = .medium
+	formatter.locale = LocalizationSupport.currentLocale
+	return formatter.string(from: dateOfBirth)
+  }
+
   var memberSinceText: String {
 	guard let createdAt else { return LocalizationSupport.localized("Member") }
 	let formatter = DateFormatter()

@@ -421,8 +421,8 @@ struct StudentPaymentsSettingsView: View {
 
     var body: some View {
         Form {
-            Section(header: Text(LocalizationSupport.localized("PayPal Checkout"))) {
-                Text(LocalizationSupport.localized("Today we support PayPal only. Students do not need to save a payment method in the app; PayPal asks for the student credentials during each purchase."))
+            Section(header: Text(LocalizationSupport.localized("Checkout"))) {
+                Text(LocalizationSupport.localized("You can pay with PayPal, Bit, or a credit card. Choose your preferred method at checkout. There is no need to save a payment method in the app; your credentials are requested during each purchase."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

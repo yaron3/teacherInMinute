@@ -33,7 +33,13 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Save to chat only": "שמירה לצ׳אט בלבד",
         "Don't save": "לא לשמור",
         "Setting up the session": "מתחבר לשיעור",
-        "Waiting now": "ממתין עכשיו"
+        "Waiting now": "ממתין עכשיו",
+        "Choose a payment method": "בחר אמצעי תשלום",
+        "Pay with PayPal": "תשלום באמצעות PayPal",
+        "Pay with Bit": "תשלום באמצעות ביט",
+        "Pay with credit card": "תשלום בכרטיס אשראי",
+        "PayPal, Bit, or credit card": "PayPal, ביט או כרטיס אשראי",
+        "You can pay with PayPal, Bit, or a credit card. Choose your preferred method at checkout. There is no need to save a payment method in the app; your credentials are requested during each purchase.": "ניתן לשלם באמצעות PayPal, ביט או כרטיס אשראי. בחרו את אמצעי התשלום המועדף עליכם בעת התשלום. אין צורך לשמור אמצעי תשלום באפליקציה; פרטי התשלום מתבקשים בכל רכישה."
     ]
 
     #if os(Android)
