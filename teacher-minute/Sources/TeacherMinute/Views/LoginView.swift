@@ -228,7 +228,7 @@ struct LoginView: View {
   
   var socialButtons: some View {
 	HStack(spacing: 16) {
-	  socialButton(title: LocalizationSupport.localized("Google"), systemImage: "g.circle.fill") { viewModel.loginWithGoogle() }
+	  socialButton(title: LocalizationSupport.localized("Google"), systemImage: "google-logo") { viewModel.loginWithGoogle() }
 	  #if !os(Android)
 		  socialButton(title: LocalizationSupport.localized("Apple"),  systemImage: "apple.logo")    { viewModel.loginWithApple() }
 #endif

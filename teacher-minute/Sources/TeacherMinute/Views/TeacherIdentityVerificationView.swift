@@ -116,6 +116,17 @@ struct TeacherIdentityVerificationView: View {
 		  }
 		  .padding(.top, 24)
 		  .padding(.bottom, 24)
+		  
+		  AuthPrimaryButton(
+			title: LocalizationSupport.localized("Continue - upload later"),
+			systemImage: "arrow.right",
+			isEnabled: true
+		  ) {
+			Task { @MainActor in
+			  viewModel.onSubmit?()
+			}
+		  }
+		  .padding(.top, 24)
 		}
 		.padding(.horizontal, 18)
 	  }

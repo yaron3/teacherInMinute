@@ -21,7 +21,7 @@ struct PlatformIcon: View {
   
   private static let bundledIcons: Set<String> = [
 	"bubble.left.and.bubble.right.fill",
-	"g.circle.fill",
+	"google-logo",
 	"teaching_tab_icon"
   ]
   

@@ -8,6 +8,7 @@
 
 import SwiftUI
 
+@MainActor
 struct TeacherSubjectsView: View {
   @State var viewModel = TeacherSubjectsViewModel()
   var isEditing = false
@@ -26,21 +27,21 @@ struct TeacherSubjectsView: View {
 			.foregroundStyle(theme.authSecondaryText)
 			.frame(maxWidth: .infinity)
 		}
-
-			
-			Text(LocalizationSupport.localized("Choose a subject area, then select at least\none subtopic students can request."))
-			  .font(.system(size: 13))
-			  .foregroundStyle(theme.authSecondaryText)
-			  .lineSpacing(5)
-			  .padding(.top, 8)
+		
+		
+		Text(LocalizationSupport.localized("Choose a subject area, then select at least\none subtopic students can request."))
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.authSecondaryText)
+		  .lineSpacing(5)
+		  .padding(.top, 8)
 		
 		searchField
 		  .padding(.top, 24)
 		
 		HStack {
-			  Text(LocalizationSupport.localized("Subject Area"))
-				.font(.system(size: 15, weight: .bold))
-				.foregroundStyle(theme.authPrimaryText)
+		  Text(LocalizationSupport.localized("Subject Area"))
+			.font(.system(size: 15, weight: .bold))
+			.foregroundStyle(theme.authPrimaryText)
 		  
 		  Spacer()
 		  
@@ -51,72 +52,64 @@ struct TeacherSubjectsView: View {
 			.frame(height: 24)
 			.background(theme.authFieldBorder.opacity(0.7))
 			.clipShape(Capsule())
+		}
+		.padding(.top, 28)
+		
+		FlowLayout(spacing: 10) {
+		  ForEach(viewModel.visibleAreas) { area in
+			SubjectAreaChip(
+			  area: area,
+			  isSelected: viewModel.isAreaSelected(area)
+			) {
+			  viewModel.toggleArea(area)
 			}
-			.padding(.top, 28)
-			
-				FlowLayout(spacing: 10) {
-				  ForEach(viewModel.visibleAreas) { area in
-					SubjectAreaChip(
-					  area: area,
-					  isSelected: viewModel.isAreaSelected(area)
-					) {
-					  viewModel.toggleArea(area)
-					}
-				  }
+		  }
+		}
+		.padding(.top, 16)
+		
+		if viewModel.shouldShowSubtopicsPrompt {
+		  Text(LocalizationSupport.localized("Choose one or more subjects to see subtopics."))
+			.font(.system(size: 13))
+			.foregroundStyle(theme.authSecondaryText)
+			.padding(.top, 24)
+		} else {
+		  VStack(alignment: .leading, spacing: 22) {
+			ForEach(viewModel.selectedAreas) { area in
+			  VStack(alignment: .leading, spacing: 12) {
+				HStack {
+				  Text(String(format: LocalizationSupport.localized("%@ subtopics"), LocalizationSupport.localized(area.title)))
+					.font(.system(size: 15, weight: .bold))
+					.foregroundStyle(theme.authPrimaryText)
+				  Spacer()
+				  subtopicBadge(for: area)
 				}
-				.padding(.top, 16)
 				
-				if viewModel.shouldShowSubtopicsPrompt {
-				  Text(LocalizationSupport.localized("Choose one or more subjects to see subtopics."))
-					.font(.system(size: 13))
-					.foregroundStyle(theme.authSecondaryText)
-					.padding(.top, 24)
-				} else {
-				  VStack(alignment: .leading, spacing: 22) {
-					ForEach(viewModel.selectedAreas) { area in
-					  VStack(alignment: .leading, spacing: 12) {
-						HStack {
-						  Text(String(format: LocalizationSupport.localized("%@ subtopics"), area.title))
-							.font(.system(size: 15, weight: .bold))
-							.foregroundStyle(theme.authPrimaryText)
-						  
-						  Spacer()
-						  
-						  Text(viewModel.selectedSubtopicTitles(for: area).isEmpty ? LocalizationSupport.localized("Required") : "\(viewModel.selectedSubtopicTitles(for: area).count) selected")
-							.font(.system(size: 11, weight: .semibold))
-							.foregroundStyle(theme.authSecondaryText)
-							.padding(.horizontal, 10)
-							.frame(height: 24)
-							.background(theme.authFieldBorder.opacity(0.7))
-							.clipShape(Capsule())
-						}
-						
-						FlowLayout(spacing: 10) {
-						  ForEach(viewModel.visibleSubtopics(for: area)) { subtopic in
-							SubjectChip(
-							  subject: subtopic,
-							  isSelected: viewModel.isSubtopicSelected(subtopic, in: area)
-							) {
-							  viewModel.toggleSubtopic(subtopic, in: area)
-							}
-						  }
-						}
-					  }
+				FlowLayout(spacing: 10) {
+				  ForEach(viewModel.visibleSubtopics(for: area)) { subtopic in
+					SubjectChip(
+					  subject: subtopic,
+					  isSelected: viewModel.isSubtopicSelected(subtopic, in: area)
+					) {
+					  viewModel.toggleSubtopic(subtopic, in: area)
 					}
 				  }
-				  .padding(.top, 28)
 				}
-			Spacer()
-			AuthPrimaryButton(
+			  }
+			}
+		  }
+		  .padding(.top, 28)
+		}
+		Spacer()
+		AuthPrimaryButton(
 		  title: isEditing ? LocalizationSupport.localized("Save Changes") : LocalizationSupport.localized("Continue to Onboarding"),
 		  systemImage: isEditing ? "checkmark" : "arrow.right",
 		  isEnabled: viewModel.canContinue
 		) {
 		  viewModel.continueOnboarding()
-			}
-			.padding(.top, 32)
-			.padding(.bottom, 24)
-		  }
+		}
+		.padding(.top, 32)
+		.padding(.bottom, 24)
+	  }
 	  .padding(.horizontal, 18)
 	}
 	.background(Color(.systemBackground))
@@ -151,6 +144,21 @@ struct TeacherSubjectsView: View {
 		}
 	  }
 	}
+  }
+  
+  @ViewBuilder
+  func subtopicBadge(for area: TeachingSubjectArea) -> some View {
+	let count = viewModel.selectedSubtopicTitles(for: area).count
+	let label = count == 0
+	? LocalizationSupport.localized("Required")
+	: String(format: LocalizationSupport.localized("selected"), count)
+	Text(label)
+	  .font(.system(size: 11, weight: .semibold))
+	  .foregroundStyle(theme.authSecondaryText)
+	  .padding(.horizontal, 10)
+	  .frame(height: 24)
+	  .background(theme.authFieldBorder.opacity(0.7))
+	  .clipShape(Capsule())
   }
   
   var searchField: some View {
