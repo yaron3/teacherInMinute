@@ -142,6 +142,9 @@ export interface PaymentCheckoutDoc {
   approvalUrl?: string;
   completedAt?: Timestamp;
   paypalCaptureId?: string;
+  braintreeTransactionId?: string;
+  /** Wallet the buyer picked, e.g. "apple_pay", "credit_card". Undefined means default PayPal flow. */
+  paymentMethod?: string;
 }
 
 // ─── Firestore — users/{uid} ─────────────────────────────────────────────────
@@ -170,7 +173,7 @@ export type PurchaseStatus = "active" | "expired" | "refunded";
 
 export interface PurchaseDoc {
   pricingOptionId: string;
-  provider: "paypal";
+  provider: "paypal" | "braintree";
   amountCents: number;
   currency: string;
   type: PlanType;

@@ -124,7 +124,7 @@ struct SettingsView: View {
         case .changePassword:
             ChangePasswordSettingsView(viewModel: viewModel)
         case .notifications:
-            NotificationPreferencesSettingsView()
+            NotificationPreferencesSettingsView(role: role)
         case .privacyControls:
             PrivacyControlsSettingsView()
         }
@@ -439,7 +439,7 @@ struct StudentPaymentsSettingsView: View {
     var body: some View {
         Form {
             Section(header: Text(LocalizationSupport.localized("Checkout"))) {
-                Text(LocalizationSupport.localized("You can pay with PayPal, Bit, or a credit card. Choose your preferred method at checkout. There is no need to save a payment method in the app; your credentials are requested during each purchase."))
+                Text(LocalizationSupport.localized("You can pay with PayPal, Apple Pay, Bit, or a credit card. Choose your preferred method at checkout. There is no need to save a payment method in the app; your credentials are requested during each purchase."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -513,6 +513,7 @@ struct NotificationPreferencesSettingsView: View {
     @AppStorage("appearanceMode") var appearanceMode = "system"
     @State var notificationState: PermissionState = .notDetermined
     @State var isRequesting = false
+	let role: AppUserMode
 
     var body: some View {
         Form {
@@ -527,7 +528,7 @@ struct NotificationPreferencesSettingsView: View {
             }
 
             Section(header: Text(LocalizationSupport.localized("Notifications"))) {
-                Toggle(LocalizationSupport.localized("Notify me when a teacher sends an incoming message"), isOn: $notifyIncomingTeacherMessage)
+			  Toggle(LocalizationSupport.localized(role == .student ? "Notify me when a teacher sends an incoming message" :"Notify me when a student sends an incoming message"), isOn: $notifyIncomingTeacherMessage)
                     .disabled(!notificationState.isGranted)
                 Toggle(LocalizationSupport.localized("Notify me about general announcements"), isOn: $notifyGeneralAnnouncements)
                     .disabled(!notificationState.isGranted)

@@ -80,7 +80,7 @@ struct UserProfileSummary {
 	self.subjects = subjectSelections
 	  .sorted { $0.key < $1.key }
 	  .flatMap { subject, subtopics in
-		subtopics.sorted().map { "\(subject): \($0)" }
+		subtopics.sorted().map { "\(LocalizationSupport.localized(subject)): \(LocalizationSupport.localized($0))" }
 	  }
 
 	if let createdAtString = data["createdAt"] as? String {

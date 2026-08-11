@@ -357,7 +357,7 @@ struct CreateAccountView: View {
 	  type == .google ? viewModel.signupWithGoogle() : viewModel.signupWithApple()
 	} label: {
 	  HStack(spacing: 10) {
-		PlatformIcon(systemName: type == .google ? "g.circle.fill" : "apple.logo")
+		PlatformIcon(systemName: type == .google ? "google-logo" : "apple.logo")
 		  .font(.system(size: 20, weight: .semibold))
 		Text(type == .google ? LocalizationSupport.localized("Google") : LocalizationSupport.localized("Apple"))
 		  .font(.system(size: 15, weight: .semibold))

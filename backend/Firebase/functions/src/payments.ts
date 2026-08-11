@@ -5,7 +5,15 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { v4 as uuidv4 } from "uuid";
 
 import { createOrder, captureOrder, verifyWebhookSignature, PaymentSource } from "./paypal";
-import { PricingDoc, PaymentCheckoutDoc } from "./types";
+import { createBitOrder, BitNotConfiguredError } from "./bit";
+import {
+  generateApplePayClientToken,
+  createBraintreeSale,
+  assertCurrencySupported,
+  BraintreeNotConfiguredError,
+  BraintreeCurrencyNotSupportedError,
+} from "./braintree";
+import { PricingDoc, PaymentCheckoutDoc, PurchaseDoc } from "./types";
 
 const firestore = admin.firestore();
 
@@ -16,6 +24,113 @@ const FUNCTIONS_BASE_URL =
 function toSafeMinutes(value: unknown): number {
   const n = Math.floor(Number(value));
   return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Look up a pricing package and create its `paymentCheckouts` doc. Shared by every checkout entry point. */
+async function resolvePricingAndCreateCheckout(params: {
+  uid: string;
+  packageId: string;
+  paymentMethod?: string;
+}): Promise<{
+  checkoutId: string;
+  checkoutRef: FirebaseFirestore.DocumentReference;
+  pkg: PricingDoc & { priceCents: number };
+}> {
+  const packageSnap = await firestore.collection("pricing").doc(params.packageId).get();
+  if (!packageSnap.exists) throw new HttpsError("not-found", "Pricing package not found");
+
+  const pkg = packageSnap.data() as PricingDoc;
+  const minutes = toSafeMinutes(pkg.minutes ?? pkg.minutesGranted);
+  // Coerce to number — Firestore may return string if field was set via console
+  const priceCents = Math.floor(Number(pkg.priceCents));
+
+  if (!priceCents || priceCents <= 0)
+    throw new HttpsError("internal", "Invalid package price");
+  if (!pkg.currency)
+    throw new HttpsError("internal", "Invalid package currency");
+  if (minutes <= 0)
+    throw new HttpsError("internal", "Invalid package minutes");
+
+  logger.info(
+    `[payments] package fetched packageId=${params.packageId} priceCents=${priceCents} currency=${pkg.currency} minutes=${minutes}`
+  );
+
+  const checkoutId = uuidv4();
+  const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
+  const checkoutDoc: PaymentCheckoutDoc = {
+    uid: params.uid,
+    packageId: params.packageId,
+    packageType: pkg.type,
+    priceCents,
+    currency: pkg.currency,
+    minutes,
+    status: "created",
+    createdAt: Timestamp.now(),
+    paypalOrderId: null,
+    paymentMethod: params.paymentMethod,
+  };
+  await checkoutRef.set(checkoutDoc);
+
+  return { checkoutId, checkoutRef, pkg: { ...pkg, priceCents } };
+}
+
+/**
+ * Credit a completed checkout's minutes to the buyer and record the purchase.
+ * Idempotent — safe to call from multiple completion paths (redirect return,
+ * webhook, direct confirm) racing on the same checkout.
+ */
+async function creditCompletedCheckout(params: {
+  checkoutRef: FirebaseFirestore.DocumentReference;
+  checkout: PaymentCheckoutDoc;
+  checkoutId: string;
+  provider: PurchaseDoc["provider"];
+  providerTransactionId: string;
+  extraCheckoutFields?: Record<string, unknown>;
+}): Promise<void> {
+  const userRef = firestore.collection("users").doc(params.checkout.uid);
+
+  await firestore.runTransaction(async (tx) => {
+    const freshSnap = await tx.get(params.checkoutRef);
+    if (freshSnap.data()?.status === "completed") return;
+
+    const now = Timestamp.now();
+    tx.update(params.checkoutRef, {
+      status: "completed",
+      completedAt: now,
+      updatedAt: now,
+      ...(params.provider === "paypal"
+        ? { paypalCaptureId: params.providerTransactionId }
+        : { braintreeTransactionId: params.providerTransactionId }),
+      ...params.extraCheckoutFields,
+    });
+    tx.set(
+      userRef,
+      {
+        remainingMinutes: FieldValue.increment(toSafeMinutes(params.checkout.minutes)),
+        totalMinutes: FieldValue.increment(toSafeMinutes(params.checkout.minutes)),
+      },
+      { merge: true }
+    );
+
+    const purchaseRef = userRef.collection("purchases").doc(params.checkoutId);
+    tx.set(
+      purchaseRef,
+      {
+        pricingOptionId: params.checkout.packageId,
+        provider: params.provider,
+        amountCents: params.checkout.priceCents,
+        currency: params.checkout.currency,
+        type: params.checkout.packageType ?? "pay_as_you_go",
+        status: "active",
+        purchasedAt: now,
+        updatedAt: now,
+        minutesPurchased: toSafeMinutes(params.checkout.minutes),
+        minutesRemaining: toSafeMinutes(params.checkout.minutes),
+        minutesUsed: 0,
+      },
+      { merge: true }
+    );
+  });
 }
 
 // ─── createCheckoutSession ────────────────────────────────────────────────────
@@ -41,7 +156,7 @@ export const createCheckoutSession = onCall(async (req) => {
 
   const rawWallet = (data.paymentMethod ?? data.preferredPaymentMethod ?? data.wallet) as string | undefined;
   const rawPlatform = data.platform as string | undefined;
-  const SUPPORTED_WALLETS = ["apple_pay", "google_pay"] as const;
+  const SUPPORTED_WALLETS = ["apple_pay", "google_pay", "credit_card", "bit"] as const;
   let paypalSource: PaymentSource = "paypal";
   if (rawWallet !== undefined) {
     if (!(SUPPORTED_WALLETS as readonly string[]).includes(rawWallet)) {
@@ -51,48 +166,55 @@ export const createCheckoutSession = onCall(async (req) => {
       throw new HttpsError("invalid-argument", "Apple Pay is not supported on Android");
     }
     if (rawWallet === "apple_pay") {
-      paypalSource = "apple_pay";
+      // Apple Pay needs a native PassKit sheet, which this PayPal Orders v2
+      // integration cannot drive — see createApplePayCheckout below.
+      throw new HttpsError(
+        "failed-precondition",
+        "Apple Pay checkout uses a separate flow — call createApplePayCheckout instead."
+      );
     } else if (rawWallet === "google_pay") {
       paypalSource = "google_pay";
+    } else if (rawWallet === "credit_card") {
+      paypalSource = "card";
     }
+    // "bit" has no PayPal payment_source — it's routed to a separate provider below.
   }
 
-  const packageSnap = await firestore.collection("pricing").doc(packageId).get();
-  if (!packageSnap.exists) throw new HttpsError("not-found", "Pricing package not found");
-
-  const pkg = packageSnap.data() as PricingDoc;
-  const minutes = toSafeMinutes(pkg.minutes ?? pkg.minutesGranted);
-  // Coerce to number — Firestore may return string if field was set via console
-  const priceCents = Math.floor(Number(pkg.priceCents));
-
-  if (!priceCents || priceCents <= 0)
-    throw new HttpsError("internal", "Invalid package price");
-  if (!pkg.currency)
-    throw new HttpsError("internal", "Invalid package currency");
-  if (minutes <= 0)
-    throw new HttpsError("internal", "Invalid package minutes");
-
-  logger.info(
-    `[payments] package fetched packageId=${packageId} priceCents=${priceCents} currency=${pkg.currency} minutes=${minutes}`
-  );
-
-  const checkoutId = uuidv4();
+  const { checkoutId, checkoutRef, pkg } = await resolvePricingAndCreateCheckout({
+    uid,
+    packageId,
+    paymentMethod: rawWallet,
+  });
   const returnUrl = `${FUNCTIONS_BASE_URL}/paypalSuccess?checkoutId=${checkoutId}`;
   const cancelUrl = `${FUNCTIONS_BASE_URL}/paypalCancel?checkoutId=${checkoutId}`;
 
-  const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
-  const checkoutDoc: PaymentCheckoutDoc = {
-    uid,
-    packageId,
-    packageType: pkg.type,
-    priceCents,
-    currency: pkg.currency,
-    minutes,
-    status: "created",
-    createdAt: Timestamp.now(),
-    paypalOrderId: null,
-  };
-  await checkoutRef.set(checkoutDoc);
+  if (rawWallet === "bit") {
+    try {
+      await createBitOrder({
+        amountCents: pkg.priceCents,
+        currency: pkg.currency,
+        description: pkg.name,
+        uid,
+        sessionId: checkoutId,
+        returnUrl,
+        cancelUrl,
+      });
+    } catch (err) {
+      await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+      if (err instanceof BitNotConfiguredError) {
+        logger.warn(`[payments] Bit checkout requested but no provider is configured checkoutId=${checkoutId}`);
+        throw new HttpsError(
+          "failed-precondition",
+          "Bit payments are not available yet. Please choose another payment method."
+        );
+      }
+      logger.error(`[payments] Bit createOrder failed checkoutId=${checkoutId}`, err);
+      throw new HttpsError("internal", "Failed to start Bit checkout");
+    }
+    // createBitOrder always throws while unconfigured — unreachable until a
+    // real provider call replaces the stub in ./bit.ts.
+    throw new HttpsError("internal", "Bit checkout did not return a URL");
+  }
 
   let order;
   try {
@@ -115,23 +237,31 @@ export const createCheckoutSession = onCall(async (req) => {
     throw new HttpsError("internal", "Failed to create PayPal order");
   }
 
-  const approvalLink = order.links?.find(
-    (l) => l.rel === "approve" || l.rel === "payer-action"
-  );
-  if (!approvalLink?.href) {
-    logger.error(
-      `[payments] no approval URL checkoutId=${checkoutId} orderId=${order.id} links=${JSON.stringify(order.links)}`
+  // Card orders are completed on our own hosted Card Fields page (there is no
+  // PayPal-hosted approval redirect to follow, since we didn't set a
+  // payment_source at order-creation time — see paypal.ts).
+  let checkoutUrl: string;
+  if (paypalSource === "card") {
+    checkoutUrl = `${FUNCTIONS_BASE_URL}/payCardCheckout?checkoutId=${checkoutId}`;
+  } else {
+    const approvalLink = order.links?.find(
+      (l) => l.rel === "approve" || l.rel === "payer-action"
     );
-    throw new HttpsError("internal", "PayPal did not return an approval URL");
+    if (!approvalLink?.href) {
+      logger.error(
+        `[payments] no approval URL checkoutId=${checkoutId} orderId=${order.id} links=${JSON.stringify(order.links)}`
+      );
+      throw new HttpsError("internal", "PayPal did not return an approval URL");
+    }
+    logger.info(
+      `[payments] approval URL selected rel=${approvalLink.rel} href=${approvalLink.href}`
+    );
+    checkoutUrl = approvalLink.href;
   }
-
-  logger.info(
-    `[payments] approval URL selected rel=${approvalLink.rel} href=${approvalLink.href}`
-  );
 
   await checkoutRef.update({
     paypalOrderId: order.id,
-    approvalUrl: approvalLink.href,
+    approvalUrl: checkoutUrl,
     status: "paypal_created",
     updatedAt: Timestamp.now(),
   });
@@ -140,7 +270,7 @@ export const createCheckoutSession = onCall(async (req) => {
     `[payments] checkout saved checkoutId=${checkoutId} paypalOrderId=${order.id}`
   );
 
-  return { checkoutUrl: approvalLink.href };
+  return { checkoutUrl };
 });
 
 // ─── createPaymentSettingsSession ─────────────────────────────────────────────
@@ -153,6 +283,240 @@ export const createPaymentSettingsSession = onCall(async (req) => {
 
   logger.info(`[payments] settings session uid=${uid}`);
   return { settingsUrl: `${baseUrl}/billingPage?uid=${uid}` };
+});
+
+// ─── createApplePayCheckout / confirmApplePayPayment ──────────────────────────
+// Apple Pay is processed through Braintree (see ./braintree.ts), not PayPal —
+// the app presents a native PassKit sheet itself, then submits the resulting
+// token through these two callables instead of opening a checkout URL.
+
+const APPLE_PAY_MERCHANT_ID = process.env.APPLE_PAY_MERCHANT_ID ?? "";
+const APPLE_PAY_COUNTRY_CODE = process.env.APPLE_PAY_COUNTRY_CODE ?? "US";
+
+export const createApplePayCheckout = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const data = req.data as Record<string, unknown>;
+  const packageId = (data.pricingOptionId ?? data.packageId) as string | undefined;
+  if (!packageId) throw new HttpsError("invalid-argument", "Missing pricing package id");
+
+  logger.info(`[payments] createApplePayCheckout uid=${uid} packageId=${packageId}`);
+
+  const { checkoutId, checkoutRef, pkg } = await resolvePricingAndCreateCheckout({
+    uid,
+    packageId,
+    paymentMethod: "apple_pay",
+  });
+
+  let clientToken: string;
+  try {
+    assertCurrencySupported(pkg.currency);
+    clientToken = await generateApplePayClientToken();
+  } catch (err) {
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    if (err instanceof BraintreeNotConfiguredError) {
+      logger.warn(`[payments] Apple Pay checkout requested but Braintree is not configured checkoutId=${checkoutId}`);
+      throw new HttpsError(
+        "failed-precondition",
+        "Apple Pay is not available yet. Please choose another payment method."
+      );
+    }
+    if (err instanceof BraintreeCurrencyNotSupportedError) {
+      logger.warn(
+        `[payments] Apple Pay checkout requested in unsupported currency=${pkg.currency} checkoutId=${checkoutId}`
+      );
+      throw new HttpsError(
+        "failed-precondition",
+        `Apple Pay does not support ${pkg.currency} yet. Please choose another payment method.`
+      );
+    }
+    logger.error(`[payments] Braintree client token generation failed checkoutId=${checkoutId}`, err);
+    throw new HttpsError("internal", "Failed to start Apple Pay checkout");
+  }
+
+  logger.info(`[payments] Apple Pay checkout created checkoutId=${checkoutId}`);
+
+  return {
+    checkoutId,
+    clientToken,
+    amountCents: pkg.priceCents,
+    currency: pkg.currency,
+    merchantIdentifier: APPLE_PAY_MERCHANT_ID,
+    countryCode: APPLE_PAY_COUNTRY_CODE,
+    label: pkg.name,
+  };
+});
+
+export const confirmApplePayPayment = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const data = req.data as Record<string, unknown>;
+  const checkoutId = data.checkoutId as string | undefined;
+  const nonce = data.nonce as string | undefined;
+  if (!checkoutId || !nonce) throw new HttpsError("invalid-argument", "Missing checkoutId or nonce");
+
+  const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
+  const checkoutSnap = await checkoutRef.get();
+  if (!checkoutSnap.exists) throw new HttpsError("not-found", "Checkout not found");
+
+  const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
+  if (checkout.uid !== uid) throw new HttpsError("permission-denied", "Checkout does not belong to this user");
+  if (checkout.status === "completed") return { status: "completed" };
+  if (checkout.status !== "created")
+    throw new HttpsError("failed-precondition", `Checkout is ${checkout.status}`);
+
+  let sale;
+  try {
+    sale = await createBraintreeSale({
+      amountCents: checkout.priceCents,
+      currency: checkout.currency,
+      nonce,
+      orderId: checkoutId,
+    });
+  } catch (err) {
+    logger.error(`[payments] Braintree sale failed checkoutId=${checkoutId}`, err);
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    throw new HttpsError("internal", "Apple Pay payment failed");
+  }
+
+  if (!sale.success) {
+    logger.warn(`[payments] Braintree sale declined checkoutId=${checkoutId} message=${sale.message}`);
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    throw new HttpsError("aborted", sale.message ?? "Apple Pay payment was declined");
+  }
+
+  await creditCompletedCheckout({
+    checkoutRef,
+    checkout,
+    checkoutId,
+    provider: "braintree",
+    providerTransactionId: sale.transactionId,
+  });
+
+  logger.info(
+    `[payments] Apple Pay credited uid=${uid} minutes=${checkout.minutes} checkoutId=${checkoutId}`
+  );
+
+  return { status: "completed" };
+});
+
+// ─── payCardCheckout (HTTP) ────────────────────────────────────────────────────
+// Hosted PayPal Advanced Card Payments (Card Fields) page. The app opens this
+// URL in the system browser; on success it redirects to `paypalSuccess`, which
+// captures the order and credits minutes exactly like the PayPal-redirect flow.
+//
+// Requires the PayPal merchant account to be approved for "Advanced Credit and
+// Debit Card Payments" — if it isn't, `cardField.isEligible()` in the page's
+// script will be false and buyers see a "not available" message instead of
+// the card form.
+
+export const payCardCheckout = onRequest(async (req, res) => {
+  const checkoutId = req.query.checkoutId as string | undefined;
+  if (!checkoutId) {
+    res.status(400).send("Missing checkoutId");
+    return;
+  }
+
+  const checkoutSnap = await firestore.collection("paymentCheckouts").doc(checkoutId).get();
+  if (!checkoutSnap.exists) {
+    res.status(404).send("Checkout not found");
+    return;
+  }
+
+  const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
+  if (checkout.status === "completed") {
+    res.redirect(
+      302,
+      `teacherminute://payment-return?status=success&order_id=${checkout.paypalOrderId ?? "unknown"}&checkout_id=${checkoutId}`
+    );
+    return;
+  }
+  if (!checkout.paypalOrderId) {
+    res.status(409).send("Checkout has no order to pay");
+    return;
+  }
+
+  const clientId = process.env.PAYPAL_CLIENT_ID ?? "";
+  const successUrl = `${FUNCTIONS_BASE_URL}/paypalSuccess?checkoutId=${checkoutId}`;
+  const cancelUrl = `${FUNCTIONS_BASE_URL}/paypalCancel?checkoutId=${checkoutId}`;
+  const amountLabel = `${(checkout.priceCents / 100).toFixed(2)} ${checkout.currency}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pay by card – TeacherMinute</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:420px;margin:2rem auto;padding:0 1rem;color:#111}
+h1{font-size:1.2rem}
+.amount{color:#555;margin-bottom:1.5rem}
+label{display:block;font-size:.8rem;color:#555;margin:.75rem 0 .25rem}
+.field{border:1px solid #d1d5db;border-radius:8px;padding:.6rem .75rem;height:2.4rem}
+button{margin-top:1.5rem;width:100%;padding:.75rem;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:1rem;cursor:pointer}
+button:disabled{background:#93c5fd;cursor:not-allowed}
+.error{color:#b91c1c;font-size:.85rem;margin-top:1rem;display:none}
+.cancel{display:block;text-align:center;margin-top:1rem;font-size:.85rem;color:#6b7280}
+</style>
+</head>
+<body>
+<h1>Pay by credit or debit card</h1>
+<div class="amount">${amountLabel}</div>
+<div id="card-form">
+  <label>Card number</label><div id="card-number" class="field"></div>
+  <label>Expiry</label><div id="card-expiry" class="field"></div>
+  <label>CVV</label><div id="card-cvv" class="field"></div>
+  <button id="submit-btn" type="button">Pay ${amountLabel}</button>
+</div>
+<div id="error" class="error"></div>
+<a class="cancel" href="${cancelUrl}">Cancel and go back</a>
+<script src="https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=${encodeURIComponent(checkout.currency)}&components=card-fields&intent=capture"></script>
+<script>
+  const orderID = ${JSON.stringify(checkout.paypalOrderId)};
+  const submitBtn = document.getElementById("submit-btn");
+  const errorEl = document.getElementById("error");
+  function showError(message) {
+    errorEl.textContent = message;
+    errorEl.style.display = "block";
+  }
+  try {
+    const cardField = paypal.CardFields({
+      createOrder: () => Promise.resolve(orderID),
+      onApprove: () => { window.location.href = ${JSON.stringify(successUrl)}; },
+      onError: (err) => {
+        console.error(err);
+        showError("Card payment failed. Please check your card details and try again.");
+        submitBtn.disabled = false;
+      },
+    });
+    if (cardField.isEligible()) {
+      cardField.NumberField().render("#card-number");
+      cardField.ExpiryField().render("#card-expiry");
+      cardField.CVVField().render("#card-cvv");
+      submitBtn.addEventListener("click", () => {
+        submitBtn.disabled = true;
+        cardField.submit().catch((err) => {
+          console.error(err);
+          showError("Card payment failed. Please check your card details and try again.");
+          submitBtn.disabled = false;
+        });
+      });
+    } else {
+      document.getElementById("card-form").style.display = "none";
+      showError("Card payments are not available right now. Please choose another payment method.");
+    }
+  } catch (err) {
+    console.error(err);
+    document.getElementById("card-form").style.display = "none";
+    showError("Card payments are not available right now. Please choose another payment method.");
+  }
+</script>
+</body></html>`;
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).send(html);
 });
 
 // ─── paypalSuccess (HTTP) ─────────────────────────────────────────────────────
@@ -235,52 +599,14 @@ export const paypalSuccess = onRequest(async (req, res) => {
     return;
   }
 
-  const userRef = firestore.collection("users").doc(checkout.uid);
-
   try {
-    await firestore.runTransaction(async (tx) => {
-      const freshSnap = await tx.get(checkoutRef);
-      if (freshSnap.data()?.status === "completed") {
-        logger.info(
-          `[payments] paypalSuccess transaction already completed checkoutId=${checkoutId}`
-        );
-        return;
-      }
-      const now = Timestamp.now();
-      tx.update(checkoutRef, {
-        status: "completed",
-        completedAt: now,
-        updatedAt: now,
-        paypalOrderId: orderId,
-        paypalCaptureId: capture.captureId,
-      });
-      tx.set(
-        userRef,
-        {
-          remainingMinutes: FieldValue.increment(toSafeMinutes(checkout.minutes)),
-          totalMinutes: FieldValue.increment(toSafeMinutes(checkout.minutes)),
-        },
-        { merge: true }
-      );
-
-      const purchaseRef = userRef.collection("purchases").doc(checkoutId);
-      tx.set(
-        purchaseRef,
-        {
-          pricingOptionId: checkout.packageId,
-          provider: "paypal",
-          amountCents: checkout.priceCents,
-          currency: checkout.currency,
-          type: checkout.packageType ?? "pay_as_you_go",
-          status: "active",
-          purchasedAt: now,
-          updatedAt: now,
-          minutesPurchased: toSafeMinutes(checkout.minutes),
-          minutesRemaining: toSafeMinutes(checkout.minutes),
-          minutesUsed: 0,
-        },
-        { merge: true }
-      );
+    await creditCompletedCheckout({
+      checkoutRef,
+      checkout,
+      checkoutId,
+      provider: "paypal",
+      providerTransactionId: capture.captureId,
+      extraCheckoutFields: { paypalOrderId: orderId },
     });
   } catch (err) {
     logger.error(
@@ -442,44 +768,12 @@ async function handleWebhookEvent(
         break;
       }
 
-      const userRef = firestore.collection("users").doc(checkout.uid);
-      await firestore.runTransaction(async (tx) => {
-        const fresh = await tx.get(checkoutRef);
-        if (fresh.data()?.status === "completed") return;
-        const now = Timestamp.now();
-        tx.update(checkoutRef, {
-          status: "completed",
-          completedAt: now,
-          updatedAt: now,
-          paypalCaptureId: captureId,
-        });
-        tx.set(
-          userRef,
-          {
-            remainingMinutes: FieldValue.increment(toSafeMinutes(checkout.minutes)),
-            totalMinutes: FieldValue.increment(toSafeMinutes(checkout.minutes)),
-          },
-          { merge: true }
-        );
-
-        const purchaseRef = userRef.collection("purchases").doc(invoiceId);
-        tx.set(
-          purchaseRef,
-          {
-            pricingOptionId: checkout.packageId,
-            provider: "paypal",
-            amountCents: checkout.priceCents,
-            currency: checkout.currency,
-            type: checkout.packageType ?? "pay_as_you_go",
-            status: "active",
-            purchasedAt: now,
-            updatedAt: now,
-            minutesPurchased: toSafeMinutes(checkout.minutes),
-            minutesRemaining: toSafeMinutes(checkout.minutes),
-            minutesUsed: 0,
-          },
-          { merge: true }
-        );
+      await creditCompletedCheckout({
+        checkoutRef,
+        checkout,
+        checkoutId: invoiceId,
+        provider: "paypal",
+        providerTransactionId: captureId,
       });
 
       logger.info(

@@ -113,6 +113,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var selectedPricePerMinuteCents: Int { get set }
   var questionId: String? { get set }
   var pricingOptions: [PricingOption] { get }
+  var availablePaymentMethods: [PaymentMethod] { get }
   var recentLessons: [RecentLesson] { get set }
   var totalTimeLearnedText: String { get }
   var totalPurchasedText: String { get }
@@ -161,6 +162,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var questionId: String?
 
   var pricingOptions: [PricingOption] = []
+  var availablePaymentMethods: [PaymentMethod] = PaymentMethod.availableForCurrentPlatform
 
   var recentLessons: [RecentLesson] = []
   var totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: [])
@@ -254,6 +256,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
     selectTier(option)
 
+    if method == .applePay {
+      await checkoutWithApplePay(option)
+      return
+    }
+
     do {
       let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: method)
       checkoutURL = result.checkoutURL
@@ -268,6 +275,42 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     }
   }
+
+  /// Apple Pay confirms entirely in-process via Braintree — no checkout URL/deep
+  /// link round trip like the PayPal-redirect and hosted-card-page flows.
+  #if canImport(UIKit)
+  private func checkoutWithApplePay(_ option: PricingOption) async {
+    do {
+      let session = try await FunctionsService.shared.createApplePayCheckout(pricingOptionID: option.id)
+      let nonce = try await ApplePayService.shared.startPayment(
+        clientToken: session.clientToken,
+        amountCents: session.amountCents,
+        label: session.label
+      )
+      try await FunctionsService.shared.confirmApplePayPayment(checkoutId: session.checkoutId, nonce: nonce)
+      logger.info("[PaymentReturn] Apple Pay confirmed checkoutId=\(session.checkoutId)")
+
+      if let uid = Auth.auth().currentUser?.uid {
+        _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
+      }
+    } catch ApplePayService.ApplePayServiceError.cancelled {
+      logger.info("[PaymentReturn] Apple Pay cancelled by user")
+    } catch let error as FunctionsError {
+      logger.error("[PaymentReturn] Apple Pay checkout failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.applePayCheckout")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    } catch {
+      logger.error("[PaymentReturn] Apple Pay checkout failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.applePayCheckout")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    }
+  }
+  #else
+  private func checkoutWithApplePay(_ option: PricingOption) async {
+    logger.error("[PaymentReturn] Apple Pay checkout requested on a platform without UIKit")
+    searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+  }
+  #endif
 
   func consumeCheckoutURL() {
     checkoutURL = nil
@@ -396,12 +439,21 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   }
 
   private func loadPricingOptions() async {
+    await loadPaymentMethods()
     do {
       pricingOptions = try await PricingService.shared.fetchPricingOptions()
     } catch {
       logger.error("[StudentHome] failed loading pricing options: \(error.localizedDescription)")
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.loadPricingOptions")
     }
+  }
+
+  /// Resolves which payment methods to offer from Remote Config, falling back to
+  /// the built-in per-platform defaults. Awaits the first Remote Config fetch so
+  /// the configured list (if any) is applied rather than a stale/empty value.
+  private func loadPaymentMethods() async {
+    await RemoteConfigService.shared.ready()
+    availablePaymentMethods = PaymentMethod.configuredForCheckout()
   }
 
   private func loadRecentLessons(uid: String) async {
@@ -559,6 +611,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var questionId: String?
 
   let pricingOptions: [PricingOption]
+  var availablePaymentMethods: [PaymentMethod] = PaymentMethod.availableForCurrentPlatform
   var recentLessons: [RecentLesson]
   var totalTimeLearnedText: String
   var totalPurchasedText: String

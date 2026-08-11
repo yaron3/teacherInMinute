@@ -146,27 +146,15 @@ struct StudentHomeView: View {
 	.task {
 	  await viewModel.loadProfileIfNeeded()
 	}
-	.confirmationDialog(
-	  LocalizationSupport.localized("Choose a payment method"),
-	  isPresented: isChoosingPaymentMethod,
-	  titleVisibility: .visible
-	) {
+	.sheet(isPresented: isChoosingPaymentMethod) {
 	  if let option = pendingCheckoutOption {
-		Button(LocalizationSupport.localized("Pay with PayPal")) {
+		PaymentMethodSheet(
+		  methods: PaymentMethod.supported(viewModel.availablePaymentMethods, forCurrency: option.currency),
+		  theme: theme
+		) { method in
 		  pendingCheckoutOption = nil
-		  Task { await viewModel.checkout(option, method: .paypal) }
+		  Task { await viewModel.checkout(option, method: method) }
 		}
-		Button(LocalizationSupport.localized("Pay with Bit")) {
-		  pendingCheckoutOption = nil
-		  Task { await viewModel.checkout(option, method: .bit) }
-		}
-		Button(LocalizationSupport.localized("Pay with credit card")) {
-		  pendingCheckoutOption = nil
-		  Task { await viewModel.checkout(option, method: .creditCard) }
-		}
-	  }
-	  Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
-		pendingCheckoutOption = nil
 	  }
 	}
 	.onChange(of: viewModel.checkoutURL) { _, url in

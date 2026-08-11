@@ -17,6 +17,12 @@ enum RemoteConfigKey: String {
     case teacherIdGovIdDescription = "teacher_id_govid_description"
     case teacherIdCredentialsDescription = "teacher_id_credentials_description"
     case teacherIdSelfieDescription = "teacher_id_selfie_description"
+    /// Ordered list of payment methods to offer at checkout, as an array (or
+    /// comma-separated string) of `PaymentMethod` raw values. Platform targeting
+    /// (iOS vs Android) is expected to be handled by Remote Config conditions on
+    /// this key, so the client reads a single key and falls back to the built-in
+    /// per-platform defaults when the key is absent.
+    case paymentMethods = "payment_methods"
 }
 
 @MainActor

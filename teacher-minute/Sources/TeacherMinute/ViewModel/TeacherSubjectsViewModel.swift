@@ -163,12 +163,11 @@ final class TeacherSubjectsViewModel {
 			id: subjectID(for: remoteSubject.title),
 			title: remoteSubject.title,
 			systemImage: systemImage(for: remoteSubject.title),
-			subtopics: remoteSubject.subtopics.map {
-			  SubjectOption(title: $0, systemImage: systemImage(for: $0))
-			}
+			subtopics: remoteSubject.subtopics.isEmpty
+			  ? [SubjectOption(title: LocalizationSupport.localized("all"), systemImage: "list.bullet")]
+			  : remoteSubject.subtopics.map { SubjectOption(title: $0, systemImage: systemImage(for: $0)) }
 		  )
 		}
-		.filter { !$0.subtopics.isEmpty }
 	  
 	  if !areas.isEmpty {
 		subjectAreas = areas

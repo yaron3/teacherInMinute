@@ -74,6 +74,14 @@ struct CheckoutSessionResult {
   let checkoutURL: URL
 }
 
+struct ApplePayCheckoutSession {
+  let checkoutId: String
+  let clientToken: String
+  let amountCents: Int
+  let currency: String
+  let label: String
+}
+
 struct PaymentSettingsSessionResult {
   let settingsURL: URL
 }
@@ -143,19 +151,17 @@ final class FunctionsService {
   }
 
   func createCheckoutSession(pricingOptionID: String, paymentMethod: PaymentMethod = .paypal) async throws -> CheckoutSessionResult {
-    let result = try await call(
-      function: "createCheckoutSession",
-      data: [
-        "pricingOptionId": pricingOptionID,
-        "pricingOptionID": pricingOptionID,
-        "pricingOption": pricingOptionID,
-        "packageId": pricingOptionID,
-        "packageID": pricingOptionID,
-        "paymentMethod": paymentMethod.rawValue,
-        "paymentType": paymentMethod.rawValue,
-        "method": paymentMethod.rawValue
-      ]
-    )
+    var data: [String: Any] = [
+      "pricingOptionId": pricingOptionID,
+      "platform": Self.platformIdentifier
+    ]
+    // Keep this payload aligned with the backend callable schema. Sending legacy
+    // aliases like `packageId`/`pricingOptionID` can fail strict validation with
+    // INVALID_ARGUMENT before the function reaches the payment-provider code.
+    if let wallet = paymentMethod.walletParameter {
+      data["paymentMethod"] = wallet
+    }
+    let result = try await call(function: "createCheckoutSession", data: data)
     guard
       let urlString = Self.firstString(in: result, keys: ["checkoutUrl", "checkoutURL", "url"]),
       let checkoutURL = URL(string: urlString)
@@ -164,6 +170,31 @@ final class FunctionsService {
       throw FunctionsError.decodingError(function: "createCheckoutSession", response: "\(result)")
     }
     return CheckoutSessionResult(checkoutURL: checkoutURL)
+  }
+
+  func createApplePayCheckout(pricingOptionID: String) async throws -> ApplePayCheckoutSession {
+    let result = try await call(function: "createApplePayCheckout", data: ["pricingOptionId": pricingOptionID])
+    guard
+      let checkoutId = Self.firstString(in: result, keys: ["checkoutId", "checkoutID"]),
+      let clientToken = result["clientToken"] as? String,
+      let amountCents = result["amountCents"] as? Int,
+      let currency = result["currency"] as? String
+    else {
+      logger.error("[PaymentReturn] createApplePayCheckout missing fields result=\(result)")
+      throw FunctionsError.decodingError(function: "createApplePayCheckout", response: "\(result)")
+    }
+    let label = result["label"] as? String ?? "TeacherMinute"
+    return ApplePayCheckoutSession(
+      checkoutId: checkoutId,
+      clientToken: clientToken,
+      amountCents: amountCents,
+      currency: currency,
+      label: label
+    )
+  }
+
+  func confirmApplePayPayment(checkoutId: String, nonce: String) async throws {
+    _ = try await call(function: "confirmApplePayPayment", data: ["checkoutId": checkoutId, "nonce": nonce])
   }
 
   func createPaymentSettingsSession() async throws -> PaymentSettingsSessionResult {
@@ -272,6 +303,16 @@ final class FunctionsService {
   private func functionsBaseURL() async -> String {
     await RemoteConfigService.shared.ready()
     return RemoteConfigService.shared.getURL(baseURLKey)?.absoluteString ?? defaultBaseURL
+  }
+
+  /// Platform tag sent to the backend so it can validate platform-specific
+  /// wallets (e.g. Apple Pay is rejected on Android).
+  private static var platformIdentifier: String {
+#if os(Android)
+    "android"
+#else
+    "ios"
+#endif
   }
 
   private static func firstString(in dict: [String: Any], keys: [String]) -> String? {

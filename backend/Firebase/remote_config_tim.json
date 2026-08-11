@@ -779,6 +779,50 @@
       },
       "valueType": "STRING"
     },
+    "add_a_photo": {
+      "defaultValue": {
+        "value": "Add a photo"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוסף תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "take_photo": {
+      "defaultValue": {
+        "value": "Take Photo"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צלם תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "choose_from_library": {
+      "defaultValue": {
+        "value": "Choose from Library"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בחר מהספרייה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "camera_access_take_photo": {
+      "defaultValue": {
+        "value": "Camera access is required to take a photo."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת הרשאת מצלמה כדי לצלם תמונה."
+        }
+      },
+      "valueType": "STRING"
+    },
     "phone_number_optional": {
       "defaultValue": {
         "value": "Phone Number (Optional)"
@@ -2213,6 +2257,17 @@
       },
       "valueType": "STRING"
     },
+    "set_date_of_birth": {
+      "defaultValue": {
+        "value": "Set date of birth"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הגדר תאריך לידה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "language": {
       "defaultValue": {
         "value": "Language"
@@ -2275,6 +2330,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "הוספת מסמכים חסרים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "complete_your_documents": {
+      "defaultValue": {
+        "value": "Complete Your Documents"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השלם את המסמכים שלך"
         }
       },
       "valueType": "STRING"
@@ -4753,6 +4819,17 @@
       },
       "valueType": "STRING"
     },
+    "upload_remaining_verification_documents": {
+      "defaultValue": {
+        "value": "Upload your remaining verification documents"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "העלה את מסמכי האימות הנותרים שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
     "incomplete": {
       "defaultValue": {
         "value": "Incomplete"
@@ -5913,6 +5990,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "התראות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "notify_student_incoming_message": {
+      "defaultValue": {
+        "value": "Notify me when a student sends an incoming message"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הודע לי כשתלמיד שולח הודעה נכנסת"
         }
       },
       "valueType": "STRING"

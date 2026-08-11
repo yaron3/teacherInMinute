@@ -45,7 +45,7 @@ export async function getAccessToken(): Promise<string> {
   return cachedToken.token;
 }
 
-export type PaymentSource = "paypal" | "apple_pay" | "google_pay";
+export type PaymentSource = "paypal" | "apple_pay" | "google_pay" | "card";
 
 export interface CreateOrderParams {
   amountCents: number;
@@ -76,7 +76,10 @@ export async function createOrder(params: CreateOrderParams): Promise<PayPalOrde
   const value = (params.amountCents / 100).toFixed(2);
 
   const source = params.paymentSource ?? "paypal";
-  let paymentSourceBody: Record<string, unknown>;
+  // Card orders are created bare (no payment_source): the hosted Card Fields
+  // JS SDK attaches the buyer's card — and resolves any 3DS challenge — to this
+  // order id client-side after creation, so there is nothing to set here.
+  let paymentSourceBody: Record<string, unknown> | undefined;
   if (source === "apple_pay") {
     paymentSourceBody = {
       apple_pay: {
@@ -89,6 +92,8 @@ export async function createOrder(params: CreateOrderParams): Promise<PayPalOrde
         experience_context: { return_url: params.returnUrl, cancel_url: params.cancelUrl },
       },
     };
+  } else if (source === "card") {
+    paymentSourceBody = undefined;
   } else {
     paymentSourceBody = {
       paypal: {
@@ -111,7 +116,7 @@ export async function createOrder(params: CreateOrderParams): Promise<PayPalOrde
         description: params.description,
       },
     ],
-    payment_source: paymentSourceBody,
+    ...(paymentSourceBody ? { payment_source: paymentSourceBody } : {}),
   };
 
   logger.info(

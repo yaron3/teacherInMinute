@@ -36,6 +36,8 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Waiting now": "ממתין עכשיו",
         "Choose a payment method": "בחר אמצעי תשלום",
         "Pay with PayPal": "תשלום באמצעות PayPal",
+        "Pay with Apple Pay": "תשלום באמצעות Apple Pay",
+        "Pay with Google Pay": "תשלום באמצעות Google Pay",
         "Pay with Bit": "תשלום באמצעות ביט",
         "Pay with credit card": "תשלום בכרטיס אשראי",
         "PayPal, Bit, or credit card": "PayPal, ביט או כרטיס אשראי",
@@ -170,6 +172,7 @@ enum LocalizationKey {
 		"Uploading the remaining documents helps us verify you as a teacher faster.": "upload_remaining_documents_hint",
 		"Not uploaded yet": "not_uploaded_yet",
 		"Upload": "upload_action",
+		"Set date of birth": "set_date_of_birth"
     ]
 
     /// Deterministic three-word snake-case slug for any source string that
