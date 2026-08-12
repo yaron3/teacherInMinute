@@ -9,7 +9,6 @@ import { createBitOrder, BitNotConfiguredError } from "./bit";
 import {
   generateApplePayClientToken,
   createBraintreeSale,
-  assertCurrencySupported,
   BraintreeNotConfiguredError,
   BraintreeCurrencyNotSupportedError,
 } from "./braintree";
@@ -67,7 +66,9 @@ async function resolvePricingAndCreateCheckout(params: {
     status: "created",
     createdAt: Timestamp.now(),
     paypalOrderId: null,
-    paymentMethod: params.paymentMethod,
+    // Omit rather than write `undefined` — the plain-PayPal flow sends no
+    // wallet, and Firestore rejects undefined field values.
+    ...(params.paymentMethod ? { paymentMethod: params.paymentMethod } : {}),
   };
   await checkoutRef.set(checkoutDoc);
 
@@ -311,8 +312,9 @@ export const createApplePayCheckout = onCall(async (req) => {
 
   let clientToken: string;
   try {
-    assertCurrencySupported(pkg.currency);
-    clientToken = await generateApplePayClientToken();
+    // Throws BraintreeCurrencyNotSupportedError when no merchant account is
+    // declared for this currency — see merchantAccountIdFor.
+    clientToken = await generateApplePayClientToken(pkg.currency);
   } catch (err) {
     await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
     if (err instanceof BraintreeNotConfiguredError) {

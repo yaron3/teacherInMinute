@@ -81,14 +81,14 @@ function getGateway(): braintree.BraintreeGateway {
   });
 }
 
-export async function generateApplePayClientToken(): Promise<string> {
+export async function generateApplePayClientToken(currency: string): Promise<string> {
   const gateway = getGateway();
   // Must match the merchantAccountId used in createBraintreeSale below —
   // the Apple Pay sheet's displayed currency comes from whichever merchant
   // account this client token is scoped to, so a mismatch here means the
   // sheet shows one currency while the sale charges in another.
   const response = await gateway.clientToken.generate({
-    merchantAccountId: process.env.BRAINTREE_MERCHANT_ACCOUNT_ID || undefined,
+    merchantAccountId: merchantAccountIdFor(currency),
   });
   return response.clientToken;
 }
@@ -109,7 +109,7 @@ export interface BraintreeSaleResult {
 export async function createBraintreeSale(
   params: BraintreeSaleParams
 ): Promise<BraintreeSaleResult> {
-  assertCurrencySupported(params.currency);
+  const merchantAccountId = merchantAccountIdFor(params.currency);
 
   const gateway = getGateway();
   const amount = (params.amountCents / 100).toFixed(2);
@@ -118,7 +118,7 @@ export async function createBraintreeSale(
     amount,
     paymentMethodNonce: params.nonce,
     orderId: params.orderId,
-    merchantAccountId: process.env.BRAINTREE_MERCHANT_ACCOUNT_ID || undefined,
+    merchantAccountId,
     options: { submitForSettlement: true },
   });
 
