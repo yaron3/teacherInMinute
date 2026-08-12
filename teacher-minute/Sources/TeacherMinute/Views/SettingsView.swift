@@ -118,7 +118,7 @@ struct SettingsView: View {
         case .webPage(let title, let url):
             AboutWebView(url: url, title: title)
         case .studentPayments:
-            StudentPaymentsSettingsView(viewModel: viewModel)
+            StudentPaymentHistoryView()
         case .teacherPayouts:
             TeacherPayoutSettingsView(viewModel: viewModel)
         case .changePassword:
@@ -247,8 +247,8 @@ struct LanguageSettingsView: View {
     private func localizedTitle(for language: SettingsLanguageChoice) -> String {
         switch language {
         case .system: service.localized("System Language")
-        case .english: service.localized("English")
-        case .hebrew: service.localized("Hebrew")
+        case .english: "English"
+        case .hebrew: "עברית"
         }
     }
 
@@ -433,18 +433,134 @@ struct SettingsPlaceholderView: View {
     }
 }
 
-struct StudentPaymentsSettingsView: View {
-    let viewModel: SettingsViewModel
+struct StudentPaymentHistoryView: View {
+    @State  var monthSections: [PaymentHistoryMonthSection] = []
+    @State  var isLoading = true
+    private let authService = AuthService()
 
     var body: some View {
-        Form {
-            Section(header: Text(LocalizationSupport.localized("Checkout"))) {
-                Text(LocalizationSupport.localized("You can pay with PayPal, Apple Pay, Bit, or a credit card. Choose your preferred method at checkout. There is no need to save a payment method in the app; your credentials are requested during each purchase."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        Group {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if monthSections.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "creditcard")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.secondary)
+                    Text(LocalizationSupport.localized("No payments yet"))
+                        .font(.headline)
+                    Text(LocalizationSupport.localized("Your lesson payments will appear here."))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(monthSections) { section in
+                        Section {
+                            ForEach(section.entries) { entry in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(entry.title)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .lineLimit(1)
+                                        Text(entry.dateText)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(entry.amountText)
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                            }
+                        } header: {
+                            HStack {
+                                Text(section.title)
+                                Spacer()
+                                Text(section.totalText)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
             }
         }
+        .task { await load() }
     }
+
+    private func load() async {
+        defer { isLoading = false }
+        guard let uid = authService.currentUserID else { return }
+        do {
+            let currencyCode = try await HistoryModel.shared.fetchPurchasedCurrencyCode(for: uid)
+            let lessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 200)
+            monthSections = Self.groupByMonth(lessons, currencyCode: currencyCode)
+        } catch {
+            logger.error("[PaymentHistory] failed loading: \(error.localizedDescription)")
+        }
+    }
+
+    private static func groupByMonth(_ lessons: [HistoryLesson], currencyCode: String) -> [PaymentHistoryMonthSection] {
+        let calendar = Calendar.current
+        let monthFormatter = DateFormatter()
+        monthFormatter.dateFormat = "MMMM yyyy"
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "MMM d, HH:mm"
+
+        var lessonsByKey: [String: [HistoryLesson]] = [:]
+        var monthTitleByKey: [String: String] = [:]
+
+        for lesson in lessons {
+            let comps = calendar.dateComponents([.year, .month], from: lesson.acceptedAt)
+            let key = String(format: "%04d-%02d", comps.year ?? 0, comps.month ?? 0)
+            var existing = lessonsByKey[key] ?? []
+            existing.append(lesson)
+            lessonsByKey[key] = existing
+            if monthTitleByKey[key] == nil {
+                monthTitleByKey[key] = monthFormatter.string(from: lesson.acceptedAt)
+            }
+        }
+
+        return lessonsByKey.keys
+            .sorted(by: >)
+            .compactMap { key in
+                guard let monthLessons = lessonsByKey[key], let title = monthTitleByKey[key] else { return nil }
+                let sorted = monthLessons.sorted { $0.acceptedAt > $1.acceptedAt }
+                let totalCents = sorted.reduce(0) { $0 + $1.costCents }
+                let monthCurrencyCode = sorted.first?.currencyCode ?? currencyCode
+                let entries = sorted.map { lesson in
+                    PaymentHistoryEntry(
+                        id: lesson.id,
+                        title: lesson.title,
+                        dateText: dayFormatter.string(from: lesson.acceptedAt),
+                        amountText: LessonFormatting.currencyText(cents: lesson.costCents, currencyCode: lesson.currencyCode)
+                    )
+                }
+                return PaymentHistoryMonthSection(
+                    id: key,
+                    title: title,
+                    totalText: LessonFormatting.currencyText(cents: totalCents, currencyCode: monthCurrencyCode),
+                    entries: entries
+                )
+            }
+    }
+}
+
+ struct PaymentHistoryMonthSection: Identifiable {
+    let id: String
+    let title: String
+    let totalText: String
+    let entries: [PaymentHistoryEntry]
+}
+
+ struct PaymentHistoryEntry: Identifiable {
+    let id: String
+    let title: String
+    let dateText: String
+    let amountText: String
 }
 
 struct TeacherPayoutSettingsView: View {

@@ -142,7 +142,7 @@ enum SettingsDestination: Hashable {
         case .appPreferences: LocalizationSupport.localized("Preferences")
         case .changePassword: LocalizationSupport.localized("Change Password")
         case .teacherPayouts: LocalizationSupport.localized("Teacher Payout Settings")
-        case .studentPayments: LocalizationSupport.localized("Student Payment Methods")
+        case .studentPayments: LocalizationSupport.localized("Payment History")
         case .notifications: LocalizationSupport.localized("Notification Preferences")
         case .privacyControls: LocalizationSupport.localized("Privacy Controls")
         case .language: LocalizationSupport.localized("Language")
@@ -363,8 +363,8 @@ class SettingsViewModel {
 			title: LocalizationSupport.localized("PAYMENTS"),
 			rows: [
                     SettingsRow(
-                        title: LocalizationSupport.localized("Student Payment Methods"),
-                        subtitle: LocalizationSupport.localized("PayPal, Bit, or credit card"),
+                        title: LocalizationSupport.localized("Payment History"),
+                        subtitle: LocalizationSupport.localized("View your lesson payment history"),
                         systemImage: "creditcard.fill",
                         iconColor: .pink,
                         isDestructive: false,

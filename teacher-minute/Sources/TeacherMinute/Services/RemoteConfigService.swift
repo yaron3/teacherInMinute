@@ -72,14 +72,22 @@ final class RemoteConfigService {
     /// `fetch(withExpirationDuration: 0)` so the SDK actually re-pulls the
     /// template — `fetchAndActivate()` alone honors `minimumFetchInterval`
     /// and would otherwise serve cached values for up to an hour.
-    func refresh() async {
-        LocalizationManager.applyRemoteConfigLanguageSignal()
+    ///
+    /// Pass `language` when refreshing as part of a language switch. The
+    /// default reads `settings.language.preference`, which a switch only
+    /// writes *after* this call returns — so relying on the default here would
+    /// re-publish the outgoing language to Analytics and the JVM locale
+    /// immediately before fetching, and the server would hand back the
+    /// language the user just moved away from.
+    func refresh(language: String? = nil) async {
+        let languageCode = language ?? LocalizationSupport.currentLanguageCode
+        LocalizationManager.applyRemoteConfigLanguageSignal(languageCode)
         #if os(Android)
-        AndroidLocaleBridge.applyLanguageCode(LocalizationSupport.currentLanguageCode)
+        AndroidLocaleBridge.applyLanguageCode(languageCode)
         #endif
         let remoteConfig = RemoteConfig.remoteConfig()
         #if os(Android)
-        logger.info("[RemoteConfig][Android] refresh; language=\(LocalizationSupport.currentLanguageCode) locale=\(LocalizationSupport.currentLocale.identifier)")
+        logger.info("[RemoteConfig][Android] refresh; language=\(languageCode) locale=\(LocalizationSupport.currentLocale.identifier)")
         #endif
         do {
             let fetchStatus = try await remoteConfig.fetch(withExpirationDuration: 0)

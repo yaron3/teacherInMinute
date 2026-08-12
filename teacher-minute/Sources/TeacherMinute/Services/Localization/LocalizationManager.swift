@@ -18,6 +18,16 @@ final class LocalizationManager {
         static let appleLanguages = "AppleLanguages"
     }
 
+    /// Google Analytics user properties that Remote Config conditions can
+    /// target to pick the translation set. The fetch request carries user
+    /// properties in its `analyticsUserProperties` field, so a condition on
+    /// one of these resolves against the language the user picked in-app
+    /// rather than the device locale that `device.language` reports.
+    private enum AnalyticsProperty {
+        static let userLanguage = "user_language"
+        static let appLanguage = "app_language"
+    }
+
     var dataFetched = false
     var languageCode: String
     var layoutDirection: LayoutDirection
@@ -72,7 +82,7 @@ final class LocalizationManager {
 
         isLoading = true
         dataFetched = false
-        await RemoteConfigService.shared.refresh()
+        await RemoteConfigService.shared.refresh(language: resolvedCode)
         dataFetched = true
         isLoading = false
     }
@@ -109,11 +119,17 @@ final class LocalizationManager {
         #endif
     }
 
+    /// Publishes the selected language to every channel a Remote Config
+    /// condition can read, then leaves the fetch to the caller — every call
+    /// site is immediately followed by `RemoteConfigService.refresh()`, which
+    /// force-fetches with `expirationDuration: 0` so the new values are not
+    /// served from the one-hour cache.
     static func applyRemoteConfigLanguageSignal(_ languageCode: String = LocalizationSupport.currentLanguageCode) {
-        Analytics.setUserProperty(languageCode, forName: "app_language")
+        Analytics.setUserProperty(languageCode, forName: AnalyticsProperty.userLanguage)
+        Analytics.setUserProperty(languageCode, forName: AnalyticsProperty.appLanguage)
         #if os(Android)
         AndroidLocaleBridge.applyRemoteConfigLanguageSignal(languageCode)
         #endif
-        logger.info("[Localization] applied Remote Config language signal app_language=\(languageCode)")
+        logger.info("[Localization] applied Remote Config language signal \(AnalyticsProperty.userLanguage)=\(languageCode)")
     }
 }

@@ -14,8 +14,8 @@ enum SettingsLanguageChoice: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .system: LocalizationSupport.localized("System Language")
-        case .english: LocalizationSupport.localized("English")
-        case .hebrew: LocalizationSupport.localized("Hebrew")
+        case .english: "English"
+        case .hebrew: "עברית"
         }
     }
 
