@@ -626,7 +626,6 @@ struct ChangePasswordSettingsView: View {
 struct NotificationPreferencesSettingsView: View {
     @AppStorage("notifyIncomingTeacherMessage") var notifyIncomingTeacherMessage = true
     @AppStorage("notifyGeneralAnnouncements") var notifyGeneralAnnouncements = true
-    @AppStorage("appearanceMode") var appearanceMode = "system"
     @State var notificationState: PermissionState = .notDetermined
     @State var isRequesting = false
 	let role: AppUserMode
@@ -648,15 +647,6 @@ struct NotificationPreferencesSettingsView: View {
                     .disabled(!notificationState.isGranted)
                 Toggle(LocalizationSupport.localized("Notify me about general announcements"), isOn: $notifyGeneralAnnouncements)
                     .disabled(!notificationState.isGranted)
-            }
-
-            Section(header: Text(LocalizationSupport.localized("Appearance"))) {
-                Picker(LocalizationSupport.localized("Appearance"), selection: $appearanceMode) {
-                    Text(LocalizationSupport.localized("System")).tag("system")
-                    Text(LocalizationSupport.localized("Light")).tag("light")
-                    Text(LocalizationSupport.localized("Dark")).tag("dark")
-                }
-                .pickerStyle(.segmented)
             }
         }
         .task {
@@ -703,6 +693,7 @@ struct NotificationPreferencesSettingsView: View {
 struct AppPreferencesSettingsView: View {
     let role: AppUserMode
     @AppStorage(SessionPreferences.defaultQuestionTypeKey) var defaultQuestionType = ConversationType.audio.rawValue
+    @AppStorage("appearanceMode") var appearanceMode = "system"
 
     var body: some View {
         Form {
@@ -730,6 +721,15 @@ struct AppPreferencesSettingsView: View {
                     Text(LocalizationSupport.localized("ILS"))
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Section(header: Text(LocalizationSupport.localized("Appearance"))) {
+                Picker(LocalizationSupport.localized("Appearance"), selection: $appearanceMode) {
+                    Text(LocalizationSupport.localized("System")).tag("system")
+                    Text(LocalizationSupport.localized("Light")).tag("light")
+                    Text(LocalizationSupport.localized("Dark")).tag("dark")
+                }
+                .pickerStyle(.segmented)
             }
         }
     }
