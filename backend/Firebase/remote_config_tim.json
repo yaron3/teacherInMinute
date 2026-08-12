@@ -1,19 +1,29 @@
 {
   "conditions": [
     {
+      "name": "iOS",
+      "expression": "device.os == 'ios'",
+      "tagColor": "BLUE"
+    },
+    {
       "name": "Hebrew",
       "expression": "device.language in ['he']",
       "tagColor": "TEAL"
+    },
+    {
+      "name": "Hebrew - custom",
+      "expression": "app.userProperty['user_language'].contains(['he'])",
+      "tagColor": "ORANGE"
     }
   ],
   "parameters": {
-    "all": {
+    "home": {
       "defaultValue": {
-        "value": "All"
+        "value": "Home"
       },
       "conditionalValues": {
-        "Hebrew": {
-          "value": "הכל"
+        "Hebrew - custom": {
+          "value": "בית"
         }
       },
       "valueType": "STRING"
@@ -779,50 +789,6 @@
       },
       "valueType": "STRING"
     },
-    "add_a_photo": {
-      "defaultValue": {
-        "value": "Add a photo"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "הוסף תמונה"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "take_photo": {
-      "defaultValue": {
-        "value": "Take Photo"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "צלם תמונה"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "choose_from_library": {
-      "defaultValue": {
-        "value": "Choose from Library"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "בחר מהספרייה"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "camera_access_take_photo": {
-      "defaultValue": {
-        "value": "Camera access is required to take a photo."
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "נדרשת הרשאת מצלמה כדי לצלם תמונה."
-        }
-      },
-      "valueType": "STRING"
-    },
     "phone_number_optional": {
       "defaultValue": {
         "value": "Phone Number (Optional)"
@@ -1160,6 +1126,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "עכשיו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "upload_remaining_verification_documents": {
+      "defaultValue": {
+        "value": "Upload your remaining verification documents"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "העלה את מסמכי האימות הנותרים שלך"
         }
       },
       "valueType": "STRING"
@@ -1773,11 +1750,11 @@
     },
     "payment_methods": {
       "defaultValue": {
-        "value": "Payment Methods"
+        "value": "paypal"
       },
       "conditionalValues": {
-        "Hebrew": {
-          "value": "אמצעי תשלום"
+        "iOS": {
+          "value": "paypal,apple_pay"
         }
       },
       "valueType": "STRING"
@@ -2257,17 +2234,6 @@
       },
       "valueType": "STRING"
     },
-    "set_date_of_birth": {
-      "defaultValue": {
-        "value": "Set date of birth"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "הגדר תאריך לידה"
-        }
-      },
-      "valueType": "STRING"
-    },
     "language": {
       "defaultValue": {
         "value": "Language"
@@ -2330,17 +2296,6 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "הוספת מסמכים חסרים"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "complete_your_documents": {
-      "defaultValue": {
-        "value": "Complete Your Documents"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "השלם את המסמכים שלך"
         }
       },
       "valueType": "STRING"
@@ -2677,6 +2632,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "יצירת חשבון"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "take_photo": {
+      "defaultValue": {
+        "value": "Take Photo"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צלם תמונה"
         }
       },
       "valueType": "STRING"
@@ -3211,17 +3177,6 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "לוח המורה"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "home": {
-      "defaultValue": {
-        "value": "Home"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "בית"
         }
       },
       "valueType": "STRING"
@@ -3829,6 +3784,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "השאלה המקורית"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "camera_access_take_photo": {
+      "defaultValue": {
+        "value": "Camera access is required to take a photo."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת הרשאת מצלמה כדי לצלם תמונה."
         }
       },
       "valueType": "STRING"
@@ -4466,6 +4432,17 @@
       },
       "valueType": "STRING"
     },
+    "choose_from_library": {
+      "defaultValue": {
+        "value": "Choose from Library"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בחר מהספרייה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "demand_help": {
       "defaultValue": {
         "value": "On-demand help"
@@ -4643,6 +4620,17 @@
       },
       "valueType": "STRING"
     },
+    "notify_student_incoming_message": {
+      "defaultValue": {
+        "value": "Notify me when a student sends an incoming message"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הודע לי כשתלמיד שולח הודעה נכנסת"
+        }
+      },
+      "valueType": "STRING"
+    },
     "you_may_need": {
       "defaultValue": {
         "value": "You may need to log in again before deleting your account."
@@ -4731,6 +4719,17 @@
       },
       "valueType": "STRING"
     },
+    "complete_your_documents": {
+      "defaultValue": {
+        "value": "Complete Your Documents"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השלם את המסמכים שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
     "your_teacher_will": {
       "defaultValue": {
         "value": "Your teacher will join shortly"
@@ -4760,6 +4759,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "תשלומי PayPal"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "set_date_of_birth": {
+      "defaultValue": {
+        "value": "Set date of birth"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הגדר תאריך לידה"
         }
       },
       "valueType": "STRING"
@@ -4819,17 +4829,6 @@
       },
       "valueType": "STRING"
     },
-    "upload_remaining_verification_documents": {
-      "defaultValue": {
-        "value": "Upload your remaining verification documents"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "העלה את מסמכי האימות הנותרים שלך"
-        }
-      },
-      "valueType": "STRING"
-    },
     "incomplete": {
       "defaultValue": {
         "value": "Incomplete"
@@ -4854,6 +4853,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "בחר רמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "all": {
+      "defaultValue": {
+        "value": "All"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הכל"
         }
       },
       "valueType": "STRING"
@@ -5486,6 +5496,17 @@
       },
       "valueType": "STRING"
     },
+    "add_a_photo": {
+      "defaultValue": {
+        "value": "Add a photo"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוסף תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "log": {
       "defaultValue": {
         "value": "Log In"
@@ -5994,17 +6015,6 @@
       },
       "valueType": "STRING"
     },
-    "notify_student_incoming_message": {
-      "defaultValue": {
-        "value": "Notify me when a student sends an incoming message"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "הודע לי כשתלמיד שולח הודעה נכנסת"
-        }
-      },
-      "valueType": "STRING"
-    },
     "teacher_minute_app": {
       "defaultValue": {
         "value": "Teacher in a Minute App"
@@ -6237,14 +6247,5 @@
       },
       "valueType": "STRING"
     }
-  },
-  "version": {
-    "versionNumber": "27",
-    "updateTime": "2026-08-10T08:14:35.926143Z",
-    "updateUser": {
-      "email": "yaronj3@gmail.com"
-    },
-    "updateOrigin": "CONSOLE",
-    "updateType": "INCREMENTAL_UPDATE"
   }
 }

@@ -47,9 +47,9 @@ enum PaymentMethod: String, CaseIterable {
         return parsed.isEmpty ? availableForCurrentPlatform : parsed
     }
 
-    /// Currencies Apple Pay can actually process — must match the backend's
-    /// `BRAINTREE_DEFAULT_CURRENCY` / `BRAINTREE_MERCHANT_ACCOUNT_ID` setup in
-    /// functions/.env. Offering Apple Pay for any other currency would let the
+    /// Currencies Apple Pay can actually process — must match the
+    /// `BRAINTREE_MERCHANT_ACCOUNT_<CURRENCY>` vars declared in functions/.env.
+    /// Offering Apple Pay for any other currency would let the
     /// buyer tap it and hit a dead-end "not supported yet" error, so it must be
     /// filtered out of the picker per pricing option, not just rejected server-side.
     private static let applePaySupportedCurrencies: Set<String> = ["USD", "ILS"]
