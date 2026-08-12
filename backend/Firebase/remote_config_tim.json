@@ -1750,7 +1750,7 @@
     },
     "payment_methods": {
       "defaultValue": {
-        "value": "paypal"
+        "value": "paypal,google_pay"
       },
       "conditionalValues": {
         "iOS": {

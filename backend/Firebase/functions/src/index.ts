@@ -34,12 +34,14 @@ export {
   adminSendTeacherMessage,
 } from "./admin";
 
-// Payments — PayPal Checkout + Braintree (Apple Pay)
+// Payments — PayPal Checkout + Braintree (Apple Pay, Google Pay)
 export {
   createCheckoutSession,
   createPaymentSettingsSession,
   createApplePayCheckout,
   confirmApplePayPayment,
+  createGooglePayCheckout,
+  confirmGooglePayPayment,
   payCardCheckout,
   paypalSuccess,
   paypalCancel,

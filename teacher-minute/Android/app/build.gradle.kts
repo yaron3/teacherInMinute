@@ -237,4 +237,8 @@ dependencies {
 
     implementation("com.google.android.gms:play-services-auth:21.1.1")
     implementation("io.livekit:livekit-android:2.25.3")
+
+    // Google Pay via Braintree — see AndroidGooglePayManager. Pulls in
+    // braintree-core and play-services-wallet transitively.
+    implementation("com.braintreepayments.api:google-pay:5.13.0")
 }

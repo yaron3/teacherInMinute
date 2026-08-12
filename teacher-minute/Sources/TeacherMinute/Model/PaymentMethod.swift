@@ -47,18 +47,22 @@ enum PaymentMethod: String, CaseIterable {
         return parsed.isEmpty ? availableForCurrentPlatform : parsed
     }
 
-    /// Currencies Apple Pay can actually process — must match the
+    /// Currencies the Braintree wallets can actually process — must match the
     /// `BRAINTREE_MERCHANT_ACCOUNT_<CURRENCY>` vars declared in functions/.env.
-    /// Offering Apple Pay for any other currency would let the
+    /// Offering a wallet for any other currency would let the
     /// buyer tap it and hit a dead-end "not supported yet" error, so it must be
     /// filtered out of the picker per pricing option, not just rejected server-side.
-    private static let applePaySupportedCurrencies: Set<String> = ["USD", "ILS"]
+    private static let braintreeSupportedCurrencies: Set<String> = ["USD", "ILS"]
+
+    /// Wallets that settle through Braintree and so share its per-currency
+    /// merchant-account requirement.
+    private static let braintreeWallets: Set<PaymentMethod> = [.applePay, .googlePay]
 
     /// Filters `methods` down to what's actually usable for a given pricing
-    /// option's currency — currently only affects Apple Pay.
+    /// option's currency — affects the Braintree wallets (Apple Pay, Google Pay).
     static func supported(_ methods: [PaymentMethod], forCurrency currency: String) -> [PaymentMethod] {
-        guard !applePaySupportedCurrencies.contains(currency) else { return methods }
-        return methods.filter { $0 != .applePay }
+        guard !braintreeSupportedCurrencies.contains(currency) else { return methods }
+        return methods.filter { !braintreeWallets.contains($0) }
     }
 
     /// The wallet override string the backend expects, or `nil` for the default

@@ -47,6 +47,11 @@
         android:supportsRtl="true"
         android:allowBackup="true"
         >
+        <!-- Required for the Google Pay API; without it isReadyToPay always fails. -->
+        <meta-data
+            android:name="com.google.android.gms.wallet.api.enabled"
+            android:value="true" />
+
         <service
         android:name=".TeacherMinuteFirebaseMessagingService"
         android:exported="false">

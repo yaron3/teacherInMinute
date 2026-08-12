@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { createOrder, captureOrder, verifyWebhookSignature, PaymentSource } from "./paypal";
 import { createBitOrder, BitNotConfiguredError } from "./bit";
 import {
-  generateApplePayClientToken,
+  generateBraintreeClientToken,
   createBraintreeSale,
   BraintreeNotConfiguredError,
   BraintreeCurrencyNotSupportedError,
@@ -174,7 +174,15 @@ export const createCheckoutSession = onCall(async (req) => {
         "Apple Pay checkout uses a separate flow — call createApplePayCheckout instead."
       );
     } else if (rawWallet === "google_pay") {
-      paypalSource = "google_pay";
+      // Same as Apple Pay: PayPal silently drops a `google_pay` payment_source
+      // that carries only an experience_context (it wants a Google Pay token),
+      // returning a plain order whose approval link is the ordinary PayPal
+      // login page. Buyers tapping "Google Pay" would land on PayPal instead,
+      // so route them to the Braintree flow — see createGooglePayCheckout.
+      throw new HttpsError(
+        "failed-precondition",
+        "Google Pay checkout uses a separate flow — call createGooglePayCheckout instead."
+      );
     } else if (rawWallet === "credit_card") {
       paypalSource = "card";
     }
@@ -286,13 +294,147 @@ export const createPaymentSettingsSession = onCall(async (req) => {
   return { settingsUrl: `${baseUrl}/billingPage?uid=${uid}` };
 });
 
-// ─── createApplePayCheckout / confirmApplePayPayment ──────────────────────────
-// Apple Pay is processed through Braintree (see ./braintree.ts), not PayPal —
-// the app presents a native PassKit sheet itself, then submits the resulting
-// token through these two callables instead of opening a checkout URL.
+// ─── Wallet checkouts (Apple Pay / Google Pay) ────────────────────────────────
+// Both wallets are processed through Braintree (see ./braintree.ts), not
+// PayPal — the app presents the native sheet itself, then submits the
+// resulting token through a create/confirm callable pair instead of opening a
+// checkout URL. Neither wallet works as a PayPal Orders v2 `payment_source`:
+// that API drives a browser redirect and cannot raise a native sheet.
 
 const APPLE_PAY_MERCHANT_ID = process.env.APPLE_PAY_MERCHANT_ID ?? "";
 const APPLE_PAY_COUNTRY_CODE = process.env.APPLE_PAY_COUNTRY_CODE ?? "US";
+const GOOGLE_PAY_MERCHANT_NAME = process.env.GOOGLE_PAY_MERCHANT_NAME ?? "TeacherMinute";
+const GOOGLE_PAY_COUNTRY_CODE =
+  process.env.GOOGLE_PAY_COUNTRY_CODE ?? APPLE_PAY_COUNTRY_CODE;
+
+/** Reads the pricing package, opens a checkout, and mints a Braintree client
+ *  token scoped to the package currency. Shared by both wallet flows; the
+ *  caller adds its own wallet-specific fields to the response. */
+async function startWalletCheckout(params: {
+  uid: string;
+  packageId: string;
+  wallet: "apple_pay" | "google_pay";
+  walletLabel: string;
+}): Promise<{
+  checkoutId: string;
+  clientToken: string;
+  pkg: PricingDoc & { priceCents: number };
+}> {
+  const { checkoutId, checkoutRef, pkg } = await resolvePricingAndCreateCheckout({
+    uid: params.uid,
+    packageId: params.packageId,
+    paymentMethod: params.wallet,
+  });
+
+  let clientToken: string;
+  try {
+    // Throws BraintreeCurrencyNotSupportedError when no merchant account is
+    // declared for this currency — see merchantAccountIdFor.
+    clientToken = await generateBraintreeClientToken(pkg.currency);
+  } catch (err) {
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    if (err instanceof BraintreeNotConfiguredError) {
+      logger.warn(
+        `[payments] ${params.walletLabel} checkout requested but Braintree is not configured checkoutId=${checkoutId}`
+      );
+      throw new HttpsError(
+        "failed-precondition",
+        `${params.walletLabel} is not available yet. Please choose another payment method.`
+      );
+    }
+    if (err instanceof BraintreeCurrencyNotSupportedError) {
+      logger.warn(
+        `[payments] ${params.walletLabel} checkout requested in unsupported currency=${pkg.currency} checkoutId=${checkoutId}`
+      );
+      throw new HttpsError(
+        "failed-precondition",
+        `${params.walletLabel} does not support ${pkg.currency} yet. Please choose another payment method.`
+      );
+    }
+    logger.error(
+      `[payments] Braintree client token generation failed checkoutId=${checkoutId}`,
+      err
+    );
+    throw new HttpsError("internal", `Failed to start ${params.walletLabel} checkout`);
+  }
+
+  logger.info(`[payments] ${params.walletLabel} checkout created checkoutId=${checkoutId}`);
+  return { checkoutId, clientToken, pkg };
+}
+
+/** Runs the Braintree sale for a wallet nonce and credits the buyer. Shared by
+ *  both wallet confirm callables. */
+async function confirmWalletPayment(params: {
+  uid: string;
+  checkoutId: string;
+  nonce: string;
+  walletLabel: string;
+}): Promise<{ status: string }> {
+  const checkoutRef = firestore.collection("paymentCheckouts").doc(params.checkoutId);
+  const checkoutSnap = await checkoutRef.get();
+  if (!checkoutSnap.exists) throw new HttpsError("not-found", "Checkout not found");
+
+  const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
+  if (checkout.uid !== params.uid)
+    throw new HttpsError("permission-denied", "Checkout does not belong to this user");
+  if (checkout.status === "completed") return { status: "completed" };
+  if (checkout.status !== "created")
+    throw new HttpsError("failed-precondition", `Checkout is ${checkout.status}`);
+
+  let sale;
+  try {
+    sale = await createBraintreeSale({
+      amountCents: checkout.priceCents,
+      currency: checkout.currency,
+      nonce: params.nonce,
+      orderId: params.checkoutId,
+    });
+  } catch (err) {
+    logger.error(`[payments] Braintree sale failed checkoutId=${params.checkoutId}`, err);
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    throw new HttpsError("internal", `${params.walletLabel} payment failed`);
+  }
+
+  if (!sale.success) {
+    logger.warn(
+      `[payments] Braintree sale declined checkoutId=${params.checkoutId} message=${sale.message}`
+    );
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    throw new HttpsError("aborted", sale.message ?? `${params.walletLabel} payment was declined`);
+  }
+
+  await creditCompletedCheckout({
+    checkoutRef,
+    checkout,
+    checkoutId: params.checkoutId,
+    provider: "braintree",
+    providerTransactionId: sale.transactionId,
+  });
+
+  logger.info(
+    `[payments] ${params.walletLabel} credited uid=${params.uid} minutes=${checkout.minutes} checkoutId=${params.checkoutId}`
+  );
+
+  return { status: "completed" };
+}
+
+/** Shared argument parsing for the two wallet confirm callables. */
+function walletConfirmArgs(req: { auth?: { uid?: string }; data: unknown }): {
+  uid: string;
+  checkoutId: string;
+  nonce: string;
+} {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const data = req.data as Record<string, unknown>;
+  const checkoutId = data.checkoutId as string | undefined;
+  const nonce = data.nonce as string | undefined;
+  if (!checkoutId || !nonce)
+    throw new HttpsError("invalid-argument", "Missing checkoutId or nonce");
+
+  return { uid, checkoutId, nonce };
+}
 
 export const createApplePayCheckout = onCall(async (req) => {
   const uid = req.auth?.uid;
@@ -304,40 +446,12 @@ export const createApplePayCheckout = onCall(async (req) => {
 
   logger.info(`[payments] createApplePayCheckout uid=${uid} packageId=${packageId}`);
 
-  const { checkoutId, checkoutRef, pkg } = await resolvePricingAndCreateCheckout({
+  const { checkoutId, clientToken, pkg } = await startWalletCheckout({
     uid,
     packageId,
-    paymentMethod: "apple_pay",
+    wallet: "apple_pay",
+    walletLabel: "Apple Pay",
   });
-
-  let clientToken: string;
-  try {
-    // Throws BraintreeCurrencyNotSupportedError when no merchant account is
-    // declared for this currency — see merchantAccountIdFor.
-    clientToken = await generateApplePayClientToken(pkg.currency);
-  } catch (err) {
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
-    if (err instanceof BraintreeNotConfiguredError) {
-      logger.warn(`[payments] Apple Pay checkout requested but Braintree is not configured checkoutId=${checkoutId}`);
-      throw new HttpsError(
-        "failed-precondition",
-        "Apple Pay is not available yet. Please choose another payment method."
-      );
-    }
-    if (err instanceof BraintreeCurrencyNotSupportedError) {
-      logger.warn(
-        `[payments] Apple Pay checkout requested in unsupported currency=${pkg.currency} checkoutId=${checkoutId}`
-      );
-      throw new HttpsError(
-        "failed-precondition",
-        `Apple Pay does not support ${pkg.currency} yet. Please choose another payment method.`
-      );
-    }
-    logger.error(`[payments] Braintree client token generation failed checkoutId=${checkoutId}`, err);
-    throw new HttpsError("internal", "Failed to start Apple Pay checkout");
-  }
-
-  logger.info(`[payments] Apple Pay checkout created checkoutId=${checkoutId}`);
 
   return {
     checkoutId,
@@ -351,57 +465,47 @@ export const createApplePayCheckout = onCall(async (req) => {
 });
 
 export const confirmApplePayPayment = onCall(async (req) => {
+  const { uid, checkoutId, nonce } = walletConfirmArgs(req);
+  return confirmWalletPayment({ uid, checkoutId, nonce, walletLabel: "Apple Pay" });
+});
+
+// Google Pay mirrors Apple Pay: the Android app raises the Google Pay sheet
+// through Braintree's SDK, which tokenizes the card into a nonce that
+// confirmGooglePayPayment charges. `environment` selects Google's TEST vs
+// PRODUCTION wallet and must track the Braintree environment — a PRODUCTION
+// sheet against a sandbox gateway fails at tokenization.
+export const createGooglePayCheckout = onCall(async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
   const data = req.data as Record<string, unknown>;
-  const checkoutId = data.checkoutId as string | undefined;
-  const nonce = data.nonce as string | undefined;
-  if (!checkoutId || !nonce) throw new HttpsError("invalid-argument", "Missing checkoutId or nonce");
+  const packageId = (data.pricingOptionId ?? data.packageId) as string | undefined;
+  if (!packageId) throw new HttpsError("invalid-argument", "Missing pricing package id");
 
-  const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
-  const checkoutSnap = await checkoutRef.get();
-  if (!checkoutSnap.exists) throw new HttpsError("not-found", "Checkout not found");
+  logger.info(`[payments] createGooglePayCheckout uid=${uid} packageId=${packageId}`);
 
-  const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
-  if (checkout.uid !== uid) throw new HttpsError("permission-denied", "Checkout does not belong to this user");
-  if (checkout.status === "completed") return { status: "completed" };
-  if (checkout.status !== "created")
-    throw new HttpsError("failed-precondition", `Checkout is ${checkout.status}`);
-
-  let sale;
-  try {
-    sale = await createBraintreeSale({
-      amountCents: checkout.priceCents,
-      currency: checkout.currency,
-      nonce,
-      orderId: checkoutId,
-    });
-  } catch (err) {
-    logger.error(`[payments] Braintree sale failed checkoutId=${checkoutId}`, err);
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
-    throw new HttpsError("internal", "Apple Pay payment failed");
-  }
-
-  if (!sale.success) {
-    logger.warn(`[payments] Braintree sale declined checkoutId=${checkoutId} message=${sale.message}`);
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
-    throw new HttpsError("aborted", sale.message ?? "Apple Pay payment was declined");
-  }
-
-  await creditCompletedCheckout({
-    checkoutRef,
-    checkout,
-    checkoutId,
-    provider: "braintree",
-    providerTransactionId: sale.transactionId,
+  const { checkoutId, clientToken, pkg } = await startWalletCheckout({
+    uid,
+    packageId,
+    wallet: "google_pay",
+    walletLabel: "Google Pay",
   });
 
-  logger.info(
-    `[payments] Apple Pay credited uid=${uid} minutes=${checkout.minutes} checkoutId=${checkoutId}`
-  );
+  return {
+    checkoutId,
+    clientToken,
+    amountCents: pkg.priceCents,
+    currency: pkg.currency,
+    environment: process.env.BRAINTREE_ENV === "production" ? "PRODUCTION" : "TEST",
+    merchantName: GOOGLE_PAY_MERCHANT_NAME,
+    countryCode: GOOGLE_PAY_COUNTRY_CODE,
+    label: pkg.name,
+  };
+});
 
-  return { status: "completed" };
+export const confirmGooglePayPayment = onCall(async (req) => {
+  const { uid, checkoutId, nonce } = walletConfirmArgs(req);
+  return confirmWalletPayment({ uid, checkoutId, nonce, walletLabel: "Google Pay" });
 });
 
 // ─── payCardCheckout (HTTP) ────────────────────────────────────────────────────

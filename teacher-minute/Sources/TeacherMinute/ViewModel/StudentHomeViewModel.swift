@@ -261,6 +261,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       return
     }
 
+    if method == .googlePay {
+      await checkoutWithGooglePay(option)
+      return
+    }
+
     do {
       let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: method)
       checkoutURL = result.checkoutURL
@@ -308,6 +313,45 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   #else
   private func checkoutWithApplePay(_ option: PricingOption) async {
     logger.error("[PaymentReturn] Apple Pay checkout requested on a platform without UIKit")
+    searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+  }
+  #endif
+
+  /// Google Pay is the Android mirror of Apple Pay — same Braintree
+  /// create/confirm pair, no checkout URL or deep-link round trip.
+  #if os(Android)
+  private func checkoutWithGooglePay(_ option: PricingOption) async {
+    do {
+      let session = try await FunctionsService.shared.createGooglePayCheckout(pricingOptionID: option.id)
+      let nonce = try await GooglePayService.shared.startPayment(
+        clientToken: session.clientToken,
+        amountCents: session.amountCents,
+        currency: session.currency,
+        merchantName: session.merchantName,
+        countryCode: session.countryCode,
+        environment: session.environment
+      )
+      try await FunctionsService.shared.confirmGooglePayPayment(checkoutId: session.checkoutId, nonce: nonce)
+      logger.info("[PaymentReturn] Google Pay confirmed checkoutId=\(session.checkoutId)")
+
+      if let uid = Auth.auth().currentUser?.uid {
+        _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
+      }
+    } catch GooglePayServiceError.cancelled {
+      logger.info("[PaymentReturn] Google Pay cancelled by user")
+    } catch let error as FunctionsError {
+      logger.error("[PaymentReturn] Google Pay checkout failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.googlePayCheckout")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    } catch {
+      logger.error("[PaymentReturn] Google Pay checkout failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.googlePayCheckout")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    }
+  }
+  #else
+  private func checkoutWithGooglePay(_ option: PricingOption) async {
+    logger.error("[PaymentReturn] Google Pay checkout requested on a non-Android platform")
     searchState = .error(LocalizationSupport.localized("Could not start checkout."))
   }
   #endif

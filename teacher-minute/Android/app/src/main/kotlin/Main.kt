@@ -78,6 +78,10 @@ open class MainActivity: AppCompatActivity {
         blockBackCallback = callback
         onBackPressedDispatcher.addCallback(this, callback)
 
+        // Must happen in onCreate: GooglePayLauncher registers an Activity Result
+        // callback, which Android rejects once the activity is STARTED.
+        AndroidGooglePayManager.register(this)
+
         setContent {
             val saveableStateHolder = rememberSaveableStateHolder()
             saveableStateHolder.SaveableStateProvider(true) {

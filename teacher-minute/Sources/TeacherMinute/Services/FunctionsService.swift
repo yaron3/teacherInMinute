@@ -82,6 +82,19 @@ struct ApplePayCheckoutSession {
   let label: String
 }
 
+struct GooglePayCheckoutSession {
+  let checkoutId: String
+  let clientToken: String
+  let amountCents: Int
+  let currency: String
+  let label: String
+  /// Google's wallet environment — "TEST" or "PRODUCTION", tracking the
+  /// backend's Braintree environment.
+  let environment: String
+  let merchantName: String
+  let countryCode: String
+}
+
 struct PaymentSettingsSessionResult {
   let settingsURL: URL
 }
@@ -195,6 +208,33 @@ final class FunctionsService {
 
   func confirmApplePayPayment(checkoutId: String, nonce: String) async throws {
     _ = try await call(function: "confirmApplePayPayment", data: ["checkoutId": checkoutId, "nonce": nonce])
+  }
+
+  func createGooglePayCheckout(pricingOptionID: String) async throws -> GooglePayCheckoutSession {
+    let result = try await call(function: "createGooglePayCheckout", data: ["pricingOptionId": pricingOptionID])
+    guard
+      let checkoutId = Self.firstString(in: result, keys: ["checkoutId", "checkoutID"]),
+      let clientToken = result["clientToken"] as? String,
+      let amountCents = result["amountCents"] as? Int,
+      let currency = result["currency"] as? String
+    else {
+      logger.error("[PaymentReturn] createGooglePayCheckout missing fields result=\(result)")
+      throw FunctionsError.decodingError(function: "createGooglePayCheckout", response: "\(result)")
+    }
+    return GooglePayCheckoutSession(
+      checkoutId: checkoutId,
+      clientToken: clientToken,
+      amountCents: amountCents,
+      currency: currency,
+      label: result["label"] as? String ?? "TeacherMinute",
+      environment: result["environment"] as? String ?? "TEST",
+      merchantName: result["merchantName"] as? String ?? "TeacherMinute",
+      countryCode: result["countryCode"] as? String ?? "US"
+    )
+  }
+
+  func confirmGooglePayPayment(checkoutId: String, nonce: String) async throws {
+    _ = try await call(function: "confirmGooglePayPayment", data: ["checkoutId": checkoutId, "nonce": nonce])
   }
 
   func createPaymentSettingsSession() async throws -> PaymentSettingsSessionResult {
