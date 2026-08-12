@@ -453,7 +453,13 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// the configured list (if any) is applied rather than a stale/empty value.
   private func loadPaymentMethods() async {
     await RemoteConfigService.shared.ready()
-    availablePaymentMethods = PaymentMethod.configuredForCheckout()
+    var methods = PaymentMethod.configuredForCheckout()
+#if canImport(UIKit)
+    if !ApplePayService.shared.canMakePayments() {
+      methods = methods.filter { $0 != .applePay }
+    }
+#endif
+    availablePaymentMethods = methods
   }
 
   private func loadRecentLessons(uid: String) async {

@@ -52,7 +52,7 @@ enum PaymentMethod: String, CaseIterable {
     /// functions/.env. Offering Apple Pay for any other currency would let the
     /// buyer tap it and hit a dead-end "not supported yet" error, so it must be
     /// filtered out of the picker per pricing option, not just rejected server-side.
-    private static let applePaySupportedCurrencies: Set<String> = ["USD"]
+    private static let applePaySupportedCurrencies: Set<String> = ["USD", "ILS"]
 
     /// Filters `methods` down to what's actually usable for a given pricing
     /// option's currency — currently only affects Apple Pay.

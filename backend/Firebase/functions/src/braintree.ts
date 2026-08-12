@@ -41,14 +41,26 @@ export class BraintreeCurrencyNotSupportedError extends Error {
  * there is no per-transaction currency field. Charging a currency that
  * doesn't match the merchant account actually in use would silently charge
  * the raw amount in the wrong currency (e.g. an ILS price charged as USD),
- * so this must hard-fail rather than just log a warning.
+ * so every chargeable currency names its own account, one env var each:
+ *
+ *   BRAINTREE_MERCHANT_ACCOUNT_ILS=my_ils_account
+ *   BRAINTREE_MERCHANT_ACCOUNT_USD=my_usd_account
+ *
+ * Adding a currency is then a Control Panel account plus one line in
+ * functions/.env. An undeclared currency hard-fails rather than falling back
+ * to the gateway's default account, which is what would produce the
+ * wrong-currency charge. A declared-but-empty value means "the gateway's
+ * default account" — only correct for the one currency that account is
+ * actually denominated in. Braintree cannot verify that an id really matches
+ * the currency it is mapped to here, so check each pairing in the Control
+ * Panel yourself.
  */
-export function assertCurrencySupported(currency: string): void {
-  const defaultCurrency = process.env.BRAINTREE_DEFAULT_CURRENCY;
-  const merchantAccountId = process.env.BRAINTREE_MERCHANT_ACCOUNT_ID;
-  if (defaultCurrency && currency !== defaultCurrency && !merchantAccountId) {
+export function merchantAccountIdFor(currency: string): string | undefined {
+  const id = process.env[`BRAINTREE_MERCHANT_ACCOUNT_${currency.toUpperCase()}`];
+  if (id === undefined) {
     throw new BraintreeCurrencyNotSupportedError(currency);
   }
+  return id.trim() || undefined;
 }
 
 function getGateway(): braintree.BraintreeGateway {
