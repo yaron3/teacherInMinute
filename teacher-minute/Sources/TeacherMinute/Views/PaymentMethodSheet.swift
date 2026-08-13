@@ -49,12 +49,16 @@ struct PaymentMethodSheet: View {
         .frame(height: 48)
     } else if method == .paypal {
       payPalRow()
+    } else if method == .googlePay {
+      googlePayRow()
     } else {
       standardRow(for: method)
     }
 #else
     if method == .paypal {
       payPalRow()
+    } else if method == .googlePay {
+      googlePayRow()
     } else {
       standardRow(for: method)
     }
@@ -83,6 +87,29 @@ struct PaymentMethodSheet: View {
           .stroke(Self.payPalInk, lineWidth: 1)
       )
       .cornerRadius(12)
+    }
+  }
+
+  /// Google Pay's dark button, per developers.google.com/pay/api/web/guides/brand-guidelines.
+  /// The guidelines forbid custom buttons and any recolouring, retyping or
+  /// translation of the mark, so this draws Google's own `dark_gpay` artwork
+  /// (bundled unmodified as the google-pay-logo asset) on a black field, with
+  /// no label of our own — Google's "plain" button form. `scaledToFit` keeps
+  /// the mark's proportions, which resizing must preserve. Geometry otherwise
+  /// matches `standardRow`, and the surrounding 12pt row spacing plus 20pt
+  /// horizontal padding satisfy the 8dp minimum clear space.
+  private func googlePayRow() -> some View {
+    Button {
+      onSelect(.googlePay)
+    } label: {
+      Image("google-pay-logo", bundle: .module)
+        .resizable()
+        .scaledToFit()
+        .frame(height: 20)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Color.black)
+        .cornerRadius(12)
     }
   }
 
