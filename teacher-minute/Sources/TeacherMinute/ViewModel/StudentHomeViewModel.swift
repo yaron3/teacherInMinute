@@ -101,6 +101,25 @@ enum CouponRedemptionState: Equatable {
   case error(String)
 }
 
+/// What a completed purchase granted, for the confirmation shown afterwards.
+/// Built from the pricing option the buyer chose rather than re-read from the
+/// server, so the wallet and redirect flows can describe the purchase
+/// identically.
+struct PurchaseSummary {
+  /// Distinct per purchase, so buying the same package twice still re-presents
+  /// the confirmation when observed via `onChange`.
+  let id = UUID().uuidString
+  let packageName: String
+  let priceText: String
+  let minutesText: String?
+
+  init(option: PricingOption) {
+    packageName = option.name
+    priceText = option.priceText
+    minutesText = option.minutesText
+  }
+}
+
 // MARK: - ViewModel Protocol
 
 @MainActor
@@ -127,6 +146,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var isAwaitingPaymentReturn: Bool { get set }
   var couponCode: String { get set }
   var couponState: CouponRedemptionState { get set }
+  var purchaseSummary: PurchaseSummary? { get set }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
   func cancelSearch() async
@@ -145,6 +165,7 @@ protocol StudentHomeViewModeling: AnyObject {
   func chatInitialDetails(questionId: String?) -> ChatSessionDetails
   func redeemCoupon() async
   func resetCouponState()
+  func consumePurchaseSummary()
 }
 
 // MARK: - ViewModel
@@ -177,10 +198,15 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var isAwaitingPaymentReturn = false
   var couponCode = ""
   var couponState: CouponRedemptionState = .idle
+  var purchaseSummary: PurchaseSummary?
 
   private var pollingTask: Task<Void, Never>?
   private var didLoadProfile = false
   private var checkoutStartedRemainingMinutes = 0
+  /// The option being bought. Unlike `checkoutPricingOptionID` this survives
+  /// the end of `checkout(_:method:)`, because the redirect flows only learn
+  /// the purchase succeeded once the buyer comes back from the browser.
+  private var pendingPurchaseOption: PricingOption?
   private var purchasedCurrencyCode = LessonFormatting.defaultCurrencyCode
 
   // MARK: - Actions
@@ -250,6 +276,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     isStartingCheckout = true
     checkoutPricingOptionID = option.id
     checkoutStartedRemainingMinutes = remainingMinutes
+    pendingPurchaseOption = option
     defer {
       isStartingCheckout = false
       checkoutPricingOptionID = nil
@@ -294,6 +321,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
       try await FunctionsService.shared.confirmApplePayPayment(checkoutId: session.checkoutId, nonce: nonce)
       logger.info("[PaymentReturn] Apple Pay confirmed checkoutId=\(session.checkoutId)")
+      announcePurchase(option)
 
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
@@ -333,6 +361,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
       try await FunctionsService.shared.confirmGooglePayPayment(checkoutId: session.checkoutId, nonce: nonce)
       logger.info("[PaymentReturn] Google Pay confirmed checkoutId=\(session.checkoutId)")
+      announcePurchase(option)
 
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
@@ -368,9 +397,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   func handlePaymentReturn(_ result: PaymentReturnResult) async {
     logger.info("[PaymentReturn] handling result status=\(String(describing: result.status)) rawURL=\(result.rawURL.absoluteString)")
     isAwaitingPaymentReturn = false
-    if case .success = result.status, let uid = Auth.auth().currentUser?.uid {
-      _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
-      logger.info("[PaymentReturn] success handled; refreshed lessons and remaining minutes")
+    if case .success = result.status {
+      announcePurchase(pendingPurchaseOption)
+      if let uid = Auth.auth().currentUser?.uid {
+        _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
+        logger.info("[PaymentReturn] success handled; refreshed lessons and remaining minutes")
+      }
     }
   }
 
@@ -381,7 +413,29 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     guard let uid = Auth.auth().currentUser?.uid else { return false }
 
     let startingMinutes = checkoutStartedRemainingMinutes
-    return await refreshAfterPurchase(uid: uid, startingMinutes: startingMinutes)
+    let credited = await refreshAfterPurchase(uid: uid, startingMinutes: startingMinutes)
+    // Only a confirmed balance increase proves the purchase went through; the
+    // caller shows a "pending confirmation" notice otherwise.
+    if credited {
+      announcePurchase(pendingPurchaseOption)
+    }
+    return credited
+  }
+
+  /// Records what was bought so the view can confirm it to the buyer. Clears
+  /// the pending option so a later return cannot re-announce a stale purchase.
+  private func announcePurchase(_ option: PricingOption?) {
+    guard let option else {
+      logger.info("[PaymentReturn] purchase succeeded but the pricing option is unknown; no summary shown")
+      return
+    }
+    purchaseSummary = PurchaseSummary(option: option)
+    pendingPurchaseOption = nil
+    logger.info("[PaymentReturn] purchase summary ready package=\(option.name) price=\(option.priceText)")
+  }
+
+  func consumePurchaseSummary() {
+    purchaseSummary = nil
   }
 
   func redeemCoupon() async {
@@ -675,6 +729,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var isAwaitingPaymentReturn = false
   var couponCode = ""
   var couponState: CouponRedemptionState = .idle
+  var purchaseSummary: PurchaseSummary?
 
   init(
     name: String = "Sarah Jenkins",
@@ -779,6 +834,10 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   func resetCouponState() {
     couponState = .idle
+  }
+
+  func consumePurchaseSummary() {
+    purchaseSummary = nil
   }
 
   func viewAllLessons() {}

@@ -37,6 +37,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Choose a payment method": "בחר אמצעי תשלום",
         // Prefix for the branded PayPal button, where the logo follows the text.
         "Pay with": "תשלום באמצעות",
+        // Confirmation shown after a successful purchase.
+        "Purchase complete": "הרכישה הושלמה",
+        "%@ purchased for %@.": "נרכש %@ בעלות %@.",
+        "Added %@ to your balance.": "נוספו %@ ליתרה שלך.",
         "Pay with PayPal": "תשלום באמצעות PayPal",
         "Pay with Apple Pay": "תשלום באמצעות Apple Pay",
         "Pay with Google Pay": "תשלום באמצעות Google Pay",

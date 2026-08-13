@@ -12,6 +12,7 @@ struct StudentHomeView: View {
   @State var paymentReturnStore = PaymentReturnStore.shared
   @State var showingLowBalanceAlert = false
   @State var showingCouponAlert = false
+  @State var showingPurchaseSummaryAlert = false
   @State var showsAskTeacher = false
   @State var showsNotificationExplainer = false
   @State var pendingCheckoutOption: PricingOption?
@@ -182,6 +183,19 @@ struct StudentHomeView: View {
 	.onChange(of: couponStateKey) { _, _ in
 	  handleCouponStateChange()
 	}
+	.onChange(of: viewModel.purchaseSummary?.id) { _, id in
+	  showingPurchaseSummaryAlert = id != nil
+	}
+	.alert(LocalizationSupport.localized("Purchase complete"), isPresented: $showingPurchaseSummaryAlert) {
+	  Button(LocalizationSupport.localized("OK"), role: .cancel) {
+		viewModel.consumePurchaseSummary()
+		// The redirect flows also leave a success result behind; clear it so a
+		// stale one cannot resurface.
+		paymentReturnStore.consumeLatestResult()
+	  }
+	} message: {
+	  Text(purchaseSummaryMessage)
+	}
 	.alert(couponAlertTitle, isPresented: $showingCouponAlert) {
 	  Button(LocalizationSupport.localized("OK"), role: .cancel) {
 		viewModel.resetCouponState()
@@ -340,13 +354,35 @@ struct StudentHomeView: View {
   
   var isShowingPaymentReturnResult: Binding<Bool> {
 	Binding(
-	  get: { paymentReturnStore.latestResult != nil },
+	  get: {
+		guard let result = paymentReturnStore.latestResult else { return false }
+		// Successful payments are announced by the purchase-summary alert,
+		// which also names the package and the amount charged; showing this
+		// generic one too would stack two alerts on the same event.
+		if case .success = result.status { return false }
+		return true
+	  },
 	  set: { isPresented in
 		if !isPresented {
 		  paymentReturnStore.consumeLatestResult()
 		}
 	  }
 	)
+  }
+
+  var purchaseSummaryMessage: String {
+	guard let summary = viewModel.purchaseSummary else { return "" }
+	let purchased = String(
+	  format: LocalizationSupport.localized("%@ purchased for %@."),
+	  summary.packageName,
+	  summary.priceText
+	)
+	guard let minutesText = summary.minutesText else { return purchased }
+	let added = String(
+	  format: LocalizationSupport.localized("Added %@ to your balance."),
+	  minutesText
+	)
+	return purchased + "\n" + added
   }
 
   var isChoosingPaymentMethod: Binding<Bool> {
