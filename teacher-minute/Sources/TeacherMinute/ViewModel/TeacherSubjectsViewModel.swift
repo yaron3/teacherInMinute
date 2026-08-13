@@ -18,7 +18,8 @@ import SkipFirebaseFirestore
 
 struct TeachingSubjectArea: Identifiable, Hashable {
     let id: String
-    let title: String
+    let englishTitle: String   // English, e.g. "Math" — used as Firestore storage key
+    let title: String          // Localized for display
     let systemImage: String
     let subtopics: [SubjectOption]
 }
@@ -37,34 +38,37 @@ final class TeacherSubjectsViewModel {
   private let fallbackSubjectAreas: [TeachingSubjectArea] = [
 	TeachingSubjectArea(
 	  id: "math",
+	  englishTitle: "Math",
 	  title: LocalizationSupport.localized("Math"),
 	  systemImage: "function",
 	  // TODO: next version read this data from remoteconfig
 	  subtopics: [
-		SubjectOption(title: LocalizationSupport.localized("General Math"), systemImage: "function"),
-		SubjectOption(title: LocalizationSupport.localized("Algebra"), systemImage: "x.squareroot"),
-		SubjectOption(title: LocalizationSupport.localized("Geometry"), systemImage: "triangle"),
-		SubjectOption(title: LocalizationSupport.localized("Calculus"), systemImage: "chart.xyaxis.line"),
-		SubjectOption(title: LocalizationSupport.localized("Statistics"), systemImage: "chart.pie"),
-		SubjectOption(title: LocalizationSupport.localized("Trigonometry"), systemImage: "angle")
+		SubjectOption(title: LocalizationSupport.localized("General Math"), systemImage: "function",     key: "General Math"),
+		SubjectOption(title: LocalizationSupport.localized("Algebra"),      systemImage: "x.squareroot", key: "Algebra"),
+		SubjectOption(title: LocalizationSupport.localized("Geometry"),     systemImage: "triangle",     key: "Geometry"),
+		SubjectOption(title: LocalizationSupport.localized("Calculus"),     systemImage: "chart.xyaxis.line", key: "Calculus"),
+		SubjectOption(title: LocalizationSupport.localized("Statistics"),   systemImage: "chart.pie",    key: "Statistics"),
+		SubjectOption(title: LocalizationSupport.localized("Trigonometry"), systemImage: "angle",        key: "Trigonometry")
 	  ]
 	),
 	TeachingSubjectArea(
 	  id: "physics",
+	  englishTitle: "Physics",
 	  title: LocalizationSupport.localized("Physics"),
 	  systemImage: "atom",
 	  subtopics: [
-		SubjectOption(title: LocalizationSupport.localized("Mechanics"), systemImage: "gearshape.2"),
-		SubjectOption(title: LocalizationSupport.localized("Electricity"), systemImage: "bolt.fill"),
-		SubjectOption(title: LocalizationSupport.localized("Waves"), systemImage: "waveform.path.ecg")
+		SubjectOption(title: LocalizationSupport.localized("Mechanics"),    systemImage: "gearshape.2",       key: "Mechanics"),
+		SubjectOption(title: LocalizationSupport.localized("Electricity"),  systemImage: "bolt.fill",          key: "Electricity"),
+		SubjectOption(title: LocalizationSupport.localized("Waves"),        systemImage: "waveform.path.ecg",  key: "Waves")
 	  ]
 	),
 	TeachingSubjectArea(
 	  id: "computer_science",
+	  englishTitle: "Computer Science",
 	  title: LocalizationSupport.localized("Computer Science"),
 	  systemImage: "desktopcomputer",
 	  subtopics: [
-		SubjectOption(title: LocalizationSupport.localized("Programming"), systemImage: "chevron.left.forwardslash.chevron.right")
+		SubjectOption(title: LocalizationSupport.localized("Programming"), systemImage: "chevron.left.forwardslash.chevron.right", key: "Programming")
 	  ]
 	)
   ]
@@ -146,10 +150,14 @@ final class TeacherSubjectsViewModel {
 	guard let selections = data["subjectSelections"] as? [String: [String]], !selections.isEmpty else { return }
 
 	for area in subjectAreas {
-	  let savedSubtopics = selections[area.title] ?? []
+	  // New format stores by englishTitle; old format stored by localized title — try both.
+	  let savedSubtopics = selections[area.englishTitle] ?? selections[area.title] ?? []
 	  guard !savedSubtopics.isEmpty else { continue }
 	  selectedAreaIDs.insert(area.id)
-	  selectedSubtopicTitlesByArea[area.id] = Set(area.subtopics.map(\.title).filter { savedSubtopics.contains($0) })
+	  // New format stores English keys; old format stored localized titles — match either.
+	  selectedSubtopicTitlesByArea[area.id] = Set(area.subtopics
+		.filter { savedSubtopics.contains($0.key) || savedSubtopics.contains($0.title) }
+		.map(\.title))
 	}
   }
   
@@ -161,11 +169,14 @@ final class TeacherSubjectsViewModel {
 		.map { remoteSubject in
 		  TeachingSubjectArea(
 			id: subjectID(for: remoteSubject.title),
+			englishTitle: remoteSubject.title,   // remote config delivers English titles
 			title: remoteSubject.title,
 			systemImage: systemImage(for: remoteSubject.title),
 			subtopics: remoteSubject.subtopics.isEmpty
-			  ? [SubjectOption(title: LocalizationSupport.localized("all"), systemImage: "list.bullet")]
+			  ? [SubjectOption(title: LocalizationSupport.localized("all"), systemImage: "list.bullet", key: "all")]
 			  : remoteSubject.subtopics.map { SubjectOption(title: $0, systemImage: systemImage(for: $0)) }
+			  // No explicit key needed: remote subtopic strings are English, so the default
+			  // key derivation (lowercased, letters/numbers only) produces the correct RTDB key.
 		  )
 		}
 	  
@@ -224,9 +235,16 @@ final class TeacherSubjectsViewModel {
 	  let selectedAreas = selectedAreas
 	  let selectedAreaIDs = selectedAreas.map(\.id)
 	  let selectedAreaTitles = selectedAreas.map(\.title)
+	  // Store by English title (area) and English key (subtopic) so RTDB subject keys and
+	  // Firestore lookups are locale-independent regardless of the teacher's language setting.
 	  let subjectSelections = Dictionary(
 		uniqueKeysWithValues: selectedAreas.map { area in
-		  (area.title, Array(selectedSubtopicTitles(for: area)).sorted())
+		  let selectedTitles = selectedSubtopicTitles(for: area)
+		  let keys = area.subtopics
+			.filter { selectedTitles.contains($0.title) }
+			.map(\.key)
+			.sorted()
+		  return (area.englishTitle, keys)
 		}
 	  )
 	  try? await db.collection("users").document(uid).setData([

@@ -60,6 +60,7 @@ final class TeacherDashboardViewModel {
   var isAcceptingCalls = false
   var isVerified = false
   var subjects: [String] = []
+  private var subjectRawKeys: [String] = []
   var todayEarningsCents = 0
   var todayMinutesTutored = 0
   var weekEarningsCents = 0
@@ -511,6 +512,7 @@ final class TeacherDashboardViewModel {
 	  if let data = try? await UserService.shared.fetchRaw(uid: uid) {
 		let summary = UserProfileSummary(uid: uid, data: data)
 		subjects = summary?.subjects ?? []
+		subjectRawKeys = summary?.rawSubjectKeys ?? []
 	  }
 	}
   }
@@ -535,15 +537,9 @@ final class TeacherDashboardViewModel {
 	)
   }
   
-  // Converts display subject strings to normalized topic keys for RTDB.
-  // "Math: Algebra" → "algebra", "Physics: Mechanics" → "mechanics"
-  // Mirrors the normalizeSubject logic in the backend scoring module.
-  var subjectKeys: [String] {
-	subjects.map { s in
-	  let subtopic = s.contains(": ") ? String(s.split(separator: ":", maxSplits: 1).last ?? Substring(s)).trimmingCharacters(in: .whitespaces) : s
-	  return subtopic.lowercased().filter { $0.isLetter || $0.isNumber }
-	}
-  }
+  // English normalized topic keys for RTDB, derived directly from the stored English subtopic names.
+  // These are locale-independent regardless of the teacher's language setting.
+  var subjectKeys: [String] { subjectRawKeys }
   
   private static func firstString(_ row: [String: Any], keys: [String]) -> String {
 	for key in keys {
@@ -572,6 +568,7 @@ final class TeacherDashboardViewModel {
 	  teacherName = summary?.displayName ?? "Teacher"
 	  teacherImageURL = summary?.profileImageURL ?? ""
 	  subjects = summary?.subjects ?? []
+	  subjectRawKeys = summary?.rawSubjectKeys ?? []
 	  ratePerMinuteCents = Self.intValue(data["ratePerMinuteCents"]) ?? 50
 	  totalMinutes = summary?.totalMinutes ?? 0
 	}

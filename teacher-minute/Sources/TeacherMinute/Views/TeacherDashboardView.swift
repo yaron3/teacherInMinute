@@ -8,6 +8,7 @@
 
 import SwiftUI
 
+@MainActor
 struct TeacherDashboardView: View {
   @State var viewModel: TeacherDashboardViewModel
   @Binding var hidesTabBar: Bool

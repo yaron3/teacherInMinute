@@ -367,24 +367,27 @@ export const dispatchQuestion = onDocumentCreated(
 
     const invited = await sendWave(qid, data, 1, new Set<string>());
 
-    if (invited.length === 0) {
-      // No eligible teachers at all — declare unanswered immediately
-      const archived = await archiveUnanswered(qid, []);
-      if (archived) {
-        logger.info(`[dispatch] no teachers found for qid=${qid}, declared unanswered`);
-      } else {
-        logger.info(`[dispatch] no teachers found for qid=${qid}, unanswered skipped`);
-      }
-      return;
+    const initialDispatchUpdate: Record<string, unknown> = {
+      dispatchWave: 1,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (invited.length > 0) {
+      initialDispatchUpdate.alreadyInvited = FieldValue.arrayUnion(...invited);
     }
 
-    await firestore.collection("questions").doc(qid).update({
-      dispatchWave: 1,
-      alreadyInvited: FieldValue.arrayUnion(...invited),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    await firestore.collection("questions").doc(qid).update(initialDispatchUpdate);
 
     logger.info(`[dispatch] qid=${qid} dispatchWave updated to 1 invitedNow=${invited.length}`);
+
+    if (invited.length === 0) {
+      // Keep the question searchable until the watchdog expires it. A teacher
+      // can come online after creation and be invited by onTeacherStatusChange.
+      // The scheduled wave evaluation also retries after transient presence
+      // races (mobile clients can write status="online" just before subjects).
+      logger.info(
+        `[dispatch] qid=${qid} no eligible teachers in initial wave; keeping question in RTDB for backfill`
+      );
+    }
 
     await Promise.all([
       enqueueWaveEvaluation(qid, 1),

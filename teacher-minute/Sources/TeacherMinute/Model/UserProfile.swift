@@ -52,6 +52,7 @@ struct UserProfileSummary {
   let paypalEmail: String
   let role: AuthRole
   let subjects: [String]
+  let rawSubjectKeys: [String]   // English normalized, e.g. ["algebra", "geometry"] — used for RTDB matching
   let createdAt: Date?
   let profileImageURL: String
   let remainingMinutes: Int
@@ -82,6 +83,11 @@ struct UserProfileSummary {
 	  .flatMap { subject, subtopics in
 		subtopics.sorted().map { "\(LocalizationSupport.localized(subject)): \(LocalizationSupport.localized($0))" }
 	  }
+	// English normalized keys for RTDB: stored subtopic values are English (e.g. "Algebra"),
+	// so normalizing them always produces locale-independent keys (e.g. "algebra").
+	self.rawSubjectKeys = subjectSelections
+	  .flatMap { _, subtopics in subtopics }
+	  .map { $0.lowercased().filter { $0.isLetter || $0.isNumber } }
 
 	if let createdAtString = data["createdAt"] as? String {
 	  self.createdAt = ISO8601DateFormatter().date(from: createdAtString)
