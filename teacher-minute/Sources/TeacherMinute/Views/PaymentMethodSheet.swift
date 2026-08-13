@@ -47,13 +47,78 @@ struct PaymentMethodSheet: View {
     if method == .applePay {
       ApplePayButtonView { onSelect(method) }
         .frame(height: 48)
+    } else if method == .paypal {
+      payPalRow()
     } else {
       standardRow(for: method)
     }
 #else
-    standardRow(for: method)
+    if method == .paypal {
+      payPalRow()
+    } else {
+      standardRow(for: method)
+    }
 #endif
   }
+
+  /// PayPal's branded button: same geometry as `standardRow` (full width, same
+  /// padding, radius and border weight), but PayPal's own colours and lockup
+  /// instead of the app theme — brand marks must not adapt to light/dark, so
+  /// these colours are fixed rather than drawn from `theme`.
+  private func payPalRow() -> some View {
+    Button {
+      onSelect(.paypal)
+    } label: {
+      HStack(spacing: 6) {
+        Text(LocalizationSupport.localized("Pay with"))
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(Self.payPalInk)
+        payPalLockup
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 14)
+      .background(Self.payPalGold)
+      .overlay(
+        RoundedRectangle(cornerRadius: 12)
+          .stroke(Self.payPalInk, lineWidth: 1)
+      )
+      .cornerRadius(12)
+    }
+  }
+
+  /// The PayPal monogram followed by the two-tone wordmark.
+  private var payPalLockup: some View {
+    HStack(spacing: 3) {
+      // Monogram: the light-blue P sits in front of and below the navy one.
+      ZStack(alignment: .leading) {
+        Text(verbatim: "P")
+          .font(.system(size: 17, weight: .bold))
+          .italic()
+          .foregroundStyle(Self.payPalNavy)
+        Text(verbatim: "P")
+          .font(.system(size: 17, weight: .bold))
+          .italic()
+          .foregroundStyle(Self.payPalBlue)
+          .offset(x: 4, y: 2)
+      }
+      .padding(.trailing, 4)
+
+      HStack(spacing: 0) {
+        Text(verbatim: "Pay")
+          .foregroundStyle(Self.payPalNavy)
+        Text(verbatim: "Pal")
+          .foregroundStyle(Self.payPalBlue)
+      }
+      .font(.system(size: 17, weight: .bold))
+      .italic()
+    }
+  }
+
+  // PayPal brand palette (fixed in both colour schemes).
+  private static let payPalGold = Color(red: 255 / 255, green: 196 / 255, blue: 57 / 255)
+  private static let payPalNavy = Color(red: 37 / 255, green: 59 / 255, blue: 128 / 255)
+  private static let payPalBlue = Color(red: 23 / 255, green: 155 / 255, blue: 215 / 255)
+  private static let payPalInk = Color(red: 28 / 255, green: 28 / 255, blue: 28 / 255)
 
   private func standardRow(for method: PaymentMethod) -> some View {
     Button {
