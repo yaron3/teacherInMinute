@@ -111,6 +111,7 @@ struct LoginView: View {
 			.autocorrectionDisabled()
                 .multilineTextAlignment(.leading)
                 .environment(\.layoutDirection, .leftToRight)
+			.accessibilityIdentifier("email_input")
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)
@@ -140,6 +141,7 @@ struct LoginView: View {
 			  TextField(LocalizationSupport.localized("Enter your password"), text: $viewModel.password)
 			} else {
 			  SecureField(LocalizationSupport.localized("Enter your password"), text: $viewModel.password)
+				.accessibilityIdentifier("password_input")
 			}
 		  }
 		  .font(.system(size: 16))

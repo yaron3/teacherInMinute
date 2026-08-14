@@ -778,7 +778,7 @@ struct ChatSessionView: View {
     ZStack(alignment: .bottomTrailing) {
       VStack(spacing: 0) {
         Spacer(minLength: 0)
-        if peerChatPaused {
+        if selfChatPaused && peerChatPaused {
           peerPausedPanel
         } else if let remoteTrack {
           SwiftUIVideoView(remoteTrack, layoutMode: .fit)
@@ -792,7 +792,7 @@ struct ChatSessionView: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
       }
-      if isStudent && !peerChatPaused {
+      if isStudent && !(selfChatPaused && peerChatPaused) {
         localPreview(localTrack: localTrack)
           .padding(10)
       }
@@ -802,7 +802,7 @@ struct ChatSessionView: View {
     .padding(.bottom, 8)
     .id(liveKitRevision)
 #else
-    if peerChatPaused {
+    if selfChatPaused && peerChatPaused {
       peerPausedPanel
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
@@ -1224,7 +1224,7 @@ struct ChatSessionView: View {
     }
     viewModel.setSelfChatPaused(selfChatPaused)
 
-    let shouldCameraBeOff = selfChatPaused || peerChatPaused
+    let shouldCameraBeOff = selfChatPaused && peerChatPaused
 
     if shouldCameraBeOff != isCameraOff {
       isCameraOff = shouldCameraBeOff
