@@ -11,8 +11,8 @@
  *   commissionRate = 0.75   (default; teacher keeps 75 % of lesson cost)
  *   studentInitialMinutes = 20.0
  *
- * Rounding rule: lesson duration is floored to the nearest completed
- * 30-second slot before billing (e.g. 1m 23s → 60 s billed, not 90 s).
+ * Rounding rule: lesson duration is rounded to a whole minute. More than
+ * 30 seconds rounds up; exactly 30 seconds rounds down.
  */
 
 import { calculateBilling } from "../billing";
@@ -45,7 +45,7 @@ describe("Lesson 1:23 (83 s) — student: s1test@a.com, teacher: t1test@a.com", 
     expect(r.rawSeconds).toBe(83);
   });
 
-  test("duration rounds down to 60 s (2 × 30-second slots)", () => {
+  test("duration rounds down to 60 s", () => {
     expect(r.roundedSeconds).toBe(60);
   });
 
@@ -74,25 +74,24 @@ describe("Lesson 3:46 (226 s) — student: s1test@a.com, teacher: t1test@a.com",
     expect(r.rawSeconds).toBe(226);
   });
 
-  test("duration rounds down to 210 s (7 × 30-second slots)", () => {
-    expect(r.roundedSeconds).toBe(210);
+  test("duration rounds up to 240 s", () => {
+    expect(r.roundedSeconds).toBe(240);
   });
 
-  test("student is charged 3.5 minutes", () => {
-    expect(r.minutesToCharge).toBe(3.5);
+  test("student is charged 4 minutes", () => {
+    expect(r.minutesToCharge).toBe(4);
   });
 
-  test("student has 16.5 minutes remaining after lesson", () => {
-    expect(r.studentRemainingMinutes).toBe(16.5);
+  test("student has 16 minutes remaining after lesson", () => {
+    expect(r.studentRemainingMinutes).toBe(16);
   });
 
-  test("lesson cost is $3.50", () => {
-    expect(r.cost).toBe(3.5);
+  test("lesson cost is $4.00", () => {
+    expect(r.cost).toBe(4);
   });
 
-  test("teacher earns $2.63  (round($3.50 × 0.75 × 100) / 100)", () => {
-    // Math.round(3.5 * 0.75 * 100) = Math.round(262.5) = 263 → $2.63
-    expect(r.teacherEarnings).toBe(2.63);
+  test("teacher earns $3.00", () => {
+    expect(r.teacherEarnings).toBe(3);
   });
 });
 
@@ -104,25 +103,24 @@ describe("Lesson 10:30 (630 s) — student: s1test@a.com, teacher: t1test@a.com"
     expect(r.rawSeconds).toBe(630);
   });
 
-  test("duration stays at 630 s (21 × 30-second slots — no remainder)", () => {
-    expect(r.roundedSeconds).toBe(630);
+  test("duration rounds down to 600 s because exactly half does not round up", () => {
+    expect(r.roundedSeconds).toBe(600);
   });
 
-  test("student is charged 10.5 minutes", () => {
-    expect(r.minutesToCharge).toBe(10.5);
+  test("student is charged 10 minutes", () => {
+    expect(r.minutesToCharge).toBe(10);
   });
 
-  test("student has 9.5 minutes remaining after lesson", () => {
-    expect(r.studentRemainingMinutes).toBe(9.5);
+  test("student has 10 minutes remaining after lesson", () => {
+    expect(r.studentRemainingMinutes).toBe(10);
   });
 
-  test("lesson cost is $10.50", () => {
-    expect(r.cost).toBe(10.5);
+  test("lesson cost is $10.00", () => {
+    expect(r.cost).toBe(10);
   });
 
-  test("teacher earns $7.88  (round($10.50 × 0.75 × 100) / 100)", () => {
-    // Math.round(10.5 * 0.75 * 100) = Math.round(787.5) = 788 → $7.88
-    expect(r.teacherEarnings).toBe(7.88);
+  test("teacher earns $7.50", () => {
+    expect(r.teacherEarnings).toBe(7.5);
   });
 });
 
@@ -136,10 +134,24 @@ describe("Edge cases", () => {
     expect(r.studentRemainingMinutes).toBe(INITIAL_STUDENT_MINUTES);
   });
 
-  test("exactly 30 s bills 0.5 minutes", () => {
+  test("exactly 30 s rounds down to 0 minutes", () => {
     const r = runLesson(30);
-    expect(r.minutesToCharge).toBe(0.5);
-    expect(r.cost).toBe(0.5);
+    expect(r.minutesToCharge).toBe(0);
+    expect(r.cost).toBe(0);
+  });
+
+  test("31 s rounds up to 1 minute", () => {
+    const r = runLesson(31);
+    expect(r.roundedSeconds).toBe(60);
+    expect(r.minutesToCharge).toBe(1);
+    expect(r.studentRemainingMinutes).toBe(19);
+  });
+
+  test("3 min 12 s rounds down and deducts exactly 3 minutes", () => {
+    const r = runLesson(3 * 60 + 12);
+    expect(r.roundedSeconds).toBe(180);
+    expect(r.minutesToCharge).toBe(3);
+    expect(r.studentRemainingMinutes).toBe(17);
   });
 
   test("endedAt before acceptedAt yields 0 s (no negative charge)", () => {

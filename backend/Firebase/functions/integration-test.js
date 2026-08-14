@@ -10,8 +10,8 @@
  *    Teacher  t1test@a.com  / 123456
  *
  *  Scenario:
- *    Lesson lasts 1:20 (80 s).  The billing engine floors to the nearest
- *    completed 30-second slot → 60 s → 1.0 minute billed.
+ *    Lesson lasts 1:20 (80 s). The billing engine rounds the duration to
+ *    the nearest whole minute → 60 s → 1.0 minute billed.
  *
  *  Assertions:
  *    8.  Student's remaining minutes decreased by exactly 1.0
@@ -253,7 +253,7 @@ async function pollRtdb(path, idToken, timeoutMs = INVITE_POLL_TIMEOUT_MS) {
     //
     // Billing window = startedAt → endedAt.
     // 80 s wait + ~1 s endLesson overhead ≈ 81 s total.
-    //   floor(81/30)*30 = 60 s  →  1.0 minute billed
+    //   81 s = 1m 21s, which rounds to 1 whole minute billed
 
     log(`Step 6  Waiting ${LESSON_WAIT_MS / 1000}s to simulate 1:20 lesson`);
     process.stdout.write('  ');
