@@ -23,7 +23,6 @@ struct VerifyPhoneView: View {
             Circle()
                 .fill(theme.authPinkSoft)
                 .frame(width: 76, height: 76)
-                .shadow(color: theme.authPink.opacity(0.12), radius: 24, x: 0, y: 12)
                 .overlay {
                     PlatformIcon(
                         systemName: "shield.lefthalf.filled",
@@ -123,7 +122,7 @@ struct VerifyPhoneView: View {
             .padding(.bottom, 42)
         }
         .padding(.horizontal, 18)
-        .background(Color(.systemBackground))
+        .background(theme.flatSurface)
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen(AnalyticsScreen.verifyPhone)
         .onAppear {
@@ -149,10 +148,10 @@ struct VerifyPhoneView: View {
         .foregroundStyle(theme.authPrimaryText)
         .focused($focusedIndex, equals: index)
         .frame(width: 52, height: 56)
-        .background(theme.appCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .background(theme.flatSurfaceRaised)
+        .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
+            RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
                 .stroke(theme.authFieldBorder, lineWidth: 1.5)
         }
     }

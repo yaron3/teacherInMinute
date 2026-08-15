@@ -85,7 +85,7 @@ struct CompleteProfileView: View {
                 .padding(.bottom, 24)
             }
             .padding(.horizontal, 18)
-            .background(Color(.systemBackground))
+            .background(theme.flatSurface)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .onAppear {
@@ -104,7 +104,7 @@ struct CompleteProfileView: View {
                     ZStack {
                         theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
                         VStack(spacing: 12) {
-                            ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.appPrimaryText)
+                            ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.flatInk)
                             Text(LocalizationSupport.localized("Loading your profile…"))
                                 .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.appPrimaryText)
                         }
@@ -151,10 +151,10 @@ struct CompleteProfileView: View {
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 56)
-                .background(theme.appCardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(theme.flatSurfaceRaised)
+                .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
                         .stroke(theme.authFieldBorder, lineWidth: 1)
                 }
             }

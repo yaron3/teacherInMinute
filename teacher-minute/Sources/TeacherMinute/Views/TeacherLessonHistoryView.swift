@@ -19,35 +19,31 @@ struct TeacherLessonHistoryView: View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    AppTopHeader(
-                        avatarSystemImage: "person.crop.circle.fill",
-                        eyebrow: "Teaching History",
+                    FlatTopHeader(
+                        eyebrow: LocalizationSupport.localized("Teaching History"),
                         name: viewModel.teacherName,
                         avatarImageURL: viewModel.profileImageURL,
+                        avatarSystemImage: "person.crop.circle.fill",
                         showNotificationBadge: false
                     )
-                    .padding(.top, 18)
+                    .padding(.top, 16)
+
+                    FlatPageTitle(title: LocalizationSupport.localized("Past Lessons"))
+                        .padding(.top, 24)
 
                     summaryStrip
-                        .padding(.top, 22)
+                        .padding(.top, 20)
 
-                    searchField
-                        .padding(.top, 22)
+                    FlatSearchField(
+                        placeholder: LocalizationSupport.localized("Search lessons or students"),
+                        text: $viewModel.query
+                    )
+                    .padding(.top, 16)
 
-                    HStack {
-                        Text(LocalizationSupport.localized("Past Lessons"))
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(theme.appPrimaryText)
-
-                        Spacer()
-
-                        SmallPill(
-                            title: viewModel.completedCountText,
-                            foreground: theme.appPurple,
-                            background: theme.appPurpleSoft
-                        )
+                    FlatSectionHeader(LocalizationSupport.localized("Past")) {
+                        FlatChip(title: viewModel.completedCountText)
                     }
-                    .padding(.top, 26)
+                    .padding(.top, 28)
 
                     if isLoading {
                         HStack {
@@ -55,31 +51,42 @@ struct TeacherLessonHistoryView: View {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .scaleEffect(1.4)
-                                .tint(theme.appPurple)
+                                .tint(theme.flatInk)
                                 .padding(.vertical, 40)
                             Spacer()
                         }
                         .padding(.top, 14)
+                    } else if viewModel.filteredLessons.isEmpty {
+                        Text(LocalizationSupport.localized("You don't have any recent activity"))
+                            .font(.system(size: 17))
+                            .foregroundStyle(theme.flatInkMuted)
+                            .padding(.top, 20)
                     } else {
-                        VStack(spacing: 12) {
-                            ForEach(viewModel.filteredLessons) { lesson in
-                                LessonHistoryRow(
-                                    lesson: lesson,
-                                    accentColor: theme.appPurple,
-                                    iconName: "person.fill.checkmark",
-                                    isLoading: viewModel.isLoading(lesson)
-                                ) {
-                                    presentingLesson = lesson
+                        FlatCard(padding: 0, outlined: true) {
+                            VStack(spacing: 0) {
+                                ForEach(viewModel.filteredLessons) { lesson in
+                                    LessonHistoryRow(
+                                        lesson: lesson,
+                                        accentColor: theme.flatInk,
+                                        iconName: "person.fill.checkmark",
+                                        isLoading: viewModel.isLoading(lesson)
+                                    ) {
+                                        presentingLesson = lesson
+                                    }
+
+                                    if lesson.id != viewModel.filteredLessons.last?.id {
+                                        FlatRule()
+                                    }
                                 }
                             }
                         }
                         .padding(.top, 14)
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 24)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
-            .background(Color(.systemBackground))
+            .background(theme.flatSurface)
         }
         .task {
             await viewModel.loadProfile()
@@ -97,47 +104,21 @@ struct TeacherLessonHistoryView: View {
     }
     
     private var summaryStrip: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             HistoryMetricCard(
                 title: "Time Taught",
                 value: viewModel.totalTimeTaughtText,
                 systemImage: "clock.fill",
-                tint: theme.appPink
+                tint: theme.flatInk
             )
-            
+
             HistoryMetricCard(
                 title: "Earnings",
                 value: viewModel.totalEarningsText,
                 systemImage: "dollarsign.circle.fill",
-                tint: theme.appPurple
+                tint: theme.flatInk
             )
         }
-    }
-    
-    private var searchField: some View {
-        HStack(spacing: 10) {
-            PlatformIcon(
-                systemName: "magnifyingglass",
-                size: 14,
-                weight: .semibold,
-                color: theme.appSecondaryText
-            )
-            
-            TextField(LocalizationSupport.localized("Search lessons or students"), text: $viewModel.query)
-                .font(.system(size: 14))
-                .foregroundStyle(theme.appPrimaryText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 48)
-        .background(theme.appCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(theme.appGrayBackground, lineWidth: 1)
-        }
-        .shadow(color: theme.appPrimaryText.opacity(0.025), radius: 10, x: 0, y: 5)
     }
 }
 

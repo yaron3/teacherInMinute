@@ -19,35 +19,31 @@ struct StudentLessonHistoryView: View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    AppTopHeader(
-                        avatarSystemImage: "person.crop.circle.fill",
+                    FlatTopHeader(
                         eyebrow: LocalizationSupport.localized("Lesson History"),
                         name: viewModel.studentName,
                         avatarImageURL: viewModel.profileImageURL,
+                        avatarSystemImage: "person.crop.circle.fill",
                         showNotificationBadge: false
                     )
-                    .padding(.top, 18)
+                    .padding(.top, 16)
+
+                    FlatPageTitle(title: LocalizationSupport.localized("Past Lessons"))
+                        .padding(.top, 24)
 
                     summaryStrip
-                        .padding(.top, 22)
+                        .padding(.top, 20)
 
-                    searchField
-                        .padding(.top, 22)
+                    FlatSearchField(
+                        placeholder: LocalizationSupport.localized("Search lessons or teachers"),
+                        text: $viewModel.query
+                    )
+                    .padding(.top, 16)
 
-                    HStack {
-                        Text(LocalizationSupport.localized("Past Lessons"))
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(theme.appPrimaryText)
-
-                        Spacer()
-
-                        SmallPill(
-                            title: viewModel.completedCountText,
-                            foreground: theme.appPurple,
-                            background: theme.appPurpleSoft
-                        )
+                    FlatSectionHeader(LocalizationSupport.localized("Past")) {
+                        FlatChip(title: viewModel.completedCountText)
                     }
-                    .padding(.top, 26)
+                    .padding(.top, 28)
 
                     if isLoading {
                         HStack {
@@ -55,32 +51,43 @@ struct StudentLessonHistoryView: View {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .scaleEffect(1.4)
-                                .tint(theme.appPink)
+                                .tint(theme.flatInk)
                                 .padding(.vertical, 40)
                             Spacer()
                         }
                         .padding(.top, 14)
+                    } else if viewModel.filteredLessons.isEmpty {
+                        Text(LocalizationSupport.localized("You don't have any recent activity"))
+                            .font(.system(size: 17))
+                            .foregroundStyle(theme.flatInkMuted)
+                            .padding(.top, 20)
                     } else {
-                        VStack(spacing: 12) {
-                            ForEach(viewModel.filteredLessons) { lesson in
-                                LessonHistoryRow(
-                                    lesson: lesson,
-                                    accentColor: theme.appPink,
-                                    iconName: "function",
-                                    isLoading: viewModel.isLoading(lesson),
-                                    showsAmount: false
-                                ) {
-                                    presentingLesson = lesson
+                        FlatCard(padding: 0, outlined: true) {
+                            VStack(spacing: 0) {
+                                ForEach(viewModel.filteredLessons) { lesson in
+                                    LessonHistoryRow(
+                                        lesson: lesson,
+                                        accentColor: theme.flatInk,
+                                        iconName: "function",
+                                        isLoading: viewModel.isLoading(lesson),
+                                        showsAmount: false
+                                    ) {
+                                        presentingLesson = lesson
+                                    }
+
+                                    if lesson.id != viewModel.filteredLessons.last?.id {
+                                        FlatRule()
+                                    }
                                 }
                             }
                         }
                         .padding(.top, 14)
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 24)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
-            .background(Color(.systemBackground))
+            .background(theme.flatSurface)
         }
         .task {
             await viewModel.loadProfile()
@@ -101,41 +108,15 @@ struct StudentLessonHistoryView: View {
     private var summaryStrip: some View {
         // Students only see the time they consumed — spend/cost is intentionally
         // omitted here.
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             HistoryMetricCard(
                 title: "Time Learned",
                 value: viewModel.totalTimeLearnedText,
                 systemImage: "clock.fill",
-                tint: theme.appPink
+                tint: theme.flatInk
             )
-			.frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity)
         }
-    }
-    
-    private var searchField: some View {
-        HStack(spacing: 10) {
-            PlatformIcon(
-                systemName: "magnifyingglass",
-                size: 14,
-                weight: .semibold,
-                color: theme.appSecondaryText
-            )
-            
-            TextField(LocalizationSupport.localized("Search lessons or teachers"), text: $viewModel.query)
-                .font(.system(size: 14))
-                .foregroundStyle(theme.appPrimaryText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 48)
-        .background(theme.appCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(theme.appGrayBackground, lineWidth: 1)
-        }
-        .shadow(color: theme.appPrimaryText.opacity(0.025), radius: 10, x: 0, y: 5)
     }
 }
 
@@ -149,27 +130,17 @@ struct HistoryMetricCard: View {
 	AppTheme(colorScheme: colorScheme)
   }
     var body: some View {
-        RoundedInfoCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Circle()
-                    .fill(tint.opacity(0.12))
-                    .frame(width: 34, height: 34)
-                    .overlay {
-                        PlatformIcon(
-                            systemName: systemImage,
-                            size: 14,
-                            weight: .semibold,
-                            color: tint
-                        )
-                    }
-                
+        FlatCard {
+            VStack(alignment: .leading, spacing: 10) {
+                FlatIconTile(systemName: systemImage, size: 40, background: theme.flatSurface)
+
                 Text(LocalizationSupport.localized(title))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(theme.appSecondaryText)
-                
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.flatInkMuted)
+
                 Text(value)
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(theme.appPrimaryText)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(theme.flatInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -203,56 +174,58 @@ struct LessonHistoryRow: View {
         .disabled(isLoading)
     }
 
+    /// Borderless row — the enclosing screen supplies the list container and the
+    /// hairline separators, matching the grouped-list treatment.
     private var rowContent: some View {
-        RoundedInfoCard {
-            HStack(alignment: .top, spacing: 12) {
-                ProfileAvatarView(
-                    imageURL: lesson.otherParticipantImageURL,
-                    size: 46,
-                    fallbackSystemImage: iconName,
-                    background: accentColor.opacity(0.15),
-                    tint: accentColor
-                )
+        HStack(alignment: .center, spacing: 14) {
+            ProfileAvatarView(
+                imageURL: lesson.otherParticipantImageURL,
+                size: 44,
+                fallbackSystemImage: iconName,
+                background: theme.flatSurfaceRaised,
+                tint: theme.flatInk
+            )
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(lesson.title)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(theme.appPrimaryText)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(lesson.title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(theme.flatInk)
 
-                    Text(isLoading ? LocalizationSupport.localized("Loading session details") : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(theme.appSecondaryText)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                VStack(alignment: .trailing, spacing: 6) {
-                    if isLoading {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .tint(accentColor)
-                    } else if showsAmount {
-                        Text(lesson.amount)
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(theme.appPrimaryText)
-                    }
-
-                    SmallPill(
-                        title: lesson.duration,
-                        foreground: theme.appGreen,
-                        background: theme.appGreenSoft
-                    )
-                }
-
-                PlatformIcon(
-                    systemName: "chevron.right",
-                    size: 12,
-                    weight: .semibold,
-                    color: theme.appSecondaryText
-                )
-                .padding(.top, 3)
+                Text(isLoading ? LocalizationSupport.localized("Loading session details") : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.flatInkMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .tint(theme.flatInk)
+                } else if showsAmount {
+                    Text(lesson.amount)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(theme.flatInk)
+                }
+
+                Text(lesson.duration)
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.flatInkMuted)
+            }
+
+            PlatformIcon(
+                systemName: "chevron.right",
+                size: 13,
+                weight: .medium,
+                color: theme.flatInkMuted
+            )
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        // An opaque background keeps the whole row tappable; `contentShape` is
+        // not available in Skip's SwiftUI.
+        .background(theme.flatSurface)
         .opacity(isLoading ? 0.72 : 1)
     }
 }

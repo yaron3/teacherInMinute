@@ -36,17 +36,17 @@ struct StudentHomeView: View {
 	ZStack {
 	  ScrollView(.vertical, showsIndicators: false) {
 		VStack(alignment: .leading, spacing: 0) {
-		  AppTopHeader(
-			avatarSystemImage: "person.crop.circle.fill",
-			eyebrow: LocalizationSupport.localized("Welcome Back"),
-			name: viewModel.name,
-			avatarImageURL: viewModel.profileImageURL,
-			showNotificationBadge: viewModel.hasUnreadMessages,
-			onMessagesDismissed: {
-			  Task { await viewModel.refreshUnreadMessages() }
-			}
-		  )
-		  .padding(.top, 6)
+      FlatTopHeader(
+        eyebrow: LocalizationSupport.localized("Welcome Back"),
+        name: viewModel.name,
+        avatarImageURL: viewModel.profileImageURL,
+        avatarSystemImage: "person.crop.circle.fill",
+        showNotificationBadge: viewModel.hasUnreadMessages,
+        onMessagesDismissed: {
+          Task { await viewModel.refreshUnreadMessages() }
+        }
+      )
+      .padding(.top, 8)
 
 		  askTeacherCard
 			.padding(.top, 14)
@@ -85,33 +85,30 @@ struct StudentHomeView: View {
 		  }
 		  .padding(.top, 28)
 		  
-		  if viewModel.recentLessons.isEmpty {
-			RoundedInfoCard {
-			  HStack(spacing: 12) {
-				PlatformIcon(
-				  systemName: "clock",
-				  size: 16,
-				  color: theme.appSecondaryText
-				)
-				Text(LocalizationSupport.localized("No lessons yet. Ask a teacher to get started!"))
-				  .font(.system(size: 13))
-				  .foregroundStyle(theme.appSecondaryText)
-			  }
-			}
-			.padding(.top, 12)
-		  } else {
-			VStack(spacing: 12) {
-			  ForEach(viewModel.recentLessons) { lesson in
-				RecentLessonRow(lesson: lesson)
-			  }
-			}
-			.padding(.top, 12)
-		  }
-		}
-		.padding(.horizontal, 18)
-		.padding(.bottom, 24)
-	  }
-	  .background(Color(.systemBackground))
+      if viewModel.recentLessons.isEmpty {
+        Text(LocalizationSupport.localized("No lessons yet. Ask a teacher to get started!"))
+          .font(.system(size: 17))
+          .foregroundStyle(theme.flatInkMuted)
+          .padding(.top, 16)
+      } else {
+        FlatCard(padding: 0, outlined: true) {
+          VStack(spacing: 0) {
+            ForEach(viewModel.recentLessons) { lesson in
+              RecentLessonRow(lesson: lesson)
+
+              if lesson.id != viewModel.recentLessons.last?.id {
+                FlatRule()
+              }
+            }
+          }
+        }
+        .padding(.top, 12)
+      }
+    }
+    .padding(.horizontal, 20)
+    .padding(.bottom, 40)
+  }
+  .background(theme.flatSurface)
 	  .refreshable {
 		await viewModel.refresh()
 	  }
@@ -468,21 +465,21 @@ struct StudentHomeView: View {
   // MARK: - Stats
   
   var statsStrip: some View {
-	HStack(spacing: 14) {
-	  HistoryMetricCard(
-		title: LocalizationSupport.localized("Time Learned"),
-		value: viewModel.totalTimeLearnedText,
-		systemImage: "clock.fill",
-		tint: theme.appPink
-	  )
-	  
-	  HistoryMetricCard(
-		title: LocalizationSupport.localized("Total Purchased"),
-		value: viewModel.totalPurchasedText,
-		systemImage: "clock.badge.checkmark.fill",
-		tint: theme.appPurple
-	  )
-	}
+    HStack(spacing: 12) {
+      HistoryMetricCard(
+        title: LocalizationSupport.localized("Time Learned"),
+        value: viewModel.totalTimeLearnedText,
+        systemImage: "clock.fill",
+        tint: theme.flatInk
+      )
+
+      HistoryMetricCard(
+        title: LocalizationSupport.localized("Total Purchased"),
+        value: viewModel.totalPurchasedText,
+        systemImage: "clock.badge.checkmark.fill",
+        tint: theme.flatInk
+      )
+    }
   }
   
   // MARK: - Ask card
@@ -506,127 +503,100 @@ struct StudentHomeView: View {
   }
   }
 
+  // Solid ink panel instead of the pink/purple gradient: one strong CTA, the
+  // same role the Go Online button plays on the teacher dashboard.
   var askTeacherCardContent: some View {
-	  ZStack(alignment: .topTrailing) {
-		LinearGradient(
-		  colors: [theme.appPink, theme.appPurple],
-		  startPoint: .topLeading,
-		  endPoint: .bottomTrailing
-		)
-		
-		Circle()
-		  .fill(.white.opacity(0.10))
-		  .frame(width: 116, height: 116)
-		  .offset(x: 34, y: -26)
-		
-		VStack(alignment: .leading, spacing: 0) {
-		  Circle()
-			.fill(.white.opacity(0.18))
-			.frame(width: 58, height: 58)
-			.overlay {
-			  PlatformIcon(
-				systemName: "building.columns.fill",
-				size: 24,
-				weight: .semibold,
-				color: theme.appPrimaryText
-			  )
-			}
-		  
-		  Spacer()
-		  
-		  Text(LocalizationSupport.localized("Ask a math teacher"))
-			.font(.system(size: 22, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  HStack(spacing: 6) {
-			Text(String(format: LocalizationSupport.localized("%d min remaining"), viewModel.remainingMinutes))
-			  .font(.system(size: 13, weight: .semibold))
-			  .foregroundStyle(.white.opacity(0.95))
-			Text(LocalizationSupport.localized("•"))
-			  .font(.system(size: 13))
-			  .foregroundStyle(theme.appGrayBackground.opacity(0.6))
-			Text(LocalizationSupport.localized("Per-minute billing"))
-			  .font(.system(size: 13, weight: .medium))
-			  .foregroundStyle(theme.appGrayBackground.opacity(0.9))
-		  }
-		  .padding(.top, 6)
-		}
-		.padding(20)
-		.frame(maxWidth: .infinity, alignment: .leading)
-		
-		Circle()
-		  .fill(theme.appPrimaryText)
-		  .frame(width: 44, height: 44)
-		  .overlay {
-			PlatformIcon(
-			  systemName: "arrow.right",
-			  size: 17,
-			  weight: .bold,
-			  color: theme.appGrayBackground
-			)
-		  }
-		  .padding(.top, 36)
-		  .padding(.trailing, 20)
-	  }
-	  .frame(height: 148)
-	  .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-	  .shadow(color: theme.appPink.opacity(0.25), radius: 18, x: 0, y: 10)
-	}
+    ZStack(alignment: .topTrailing) {
+      VStack(alignment: .leading, spacing: 0) {
+        Spacer()
+
+        Text(LocalizationSupport.localized("Ask a math teacher"))
+          .font(.system(size: 26, weight: .bold))
+          .foregroundStyle(theme.flatInkInverse)
+
+        HStack(spacing: 6) {
+          Text(String(format: LocalizationSupport.localized("%d min remaining"), viewModel.remainingMinutes))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.flatInkInverse.opacity(0.75))
+          Text(LocalizationSupport.localized("•"))
+            .font(.system(size: 14))
+            .foregroundStyle(theme.flatInkInverse.opacity(0.5))
+          Text(LocalizationSupport.localized("Per-minute billing"))
+            .font(.system(size: 14))
+            .foregroundStyle(theme.flatInkInverse.opacity(0.75))
+        }
+        .padding(.top, 6)
+      }
+      .padding(20)
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      Circle()
+        .fill(theme.flatInkInverse)
+        .frame(width: 44, height: 44)
+        .overlay {
+          PlatformIcon(
+            systemName: "arrow.right",
+            size: 17,
+            weight: .bold,
+            color: theme.flatInk
+          )
+        }
+        .padding(.top, 20)
+        .padding(.trailing, 20)
+    }
+    .frame(height: 150)
+    .background(theme.flatInk)
+    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+  }
   
   // MARK: - Supporting views
   
   var tipsCard: some View {
-	RoundedInfoCard {
-	  HStack(alignment: .top, spacing: 14) {
-		Circle()
-		  .fill(theme.yellow.opacity(0.2))
-		  .frame(width: 34, height: 34)
-		  .overlay {
-			PlatformIcon(systemName: "lightbulb.fill", size: 14, weight: .semibold,color: theme.appOrange)
-		  }
-		
-		VStack(alignment: .leading, spacing: 10) {
-		  Text(LocalizationSupport.localized("Tips for faster matches"))
-			.font(.system(size: 15, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  tipLine(LocalizationSupport.localized("Upload a clear photo of your math problem"))
-		  tipLine(LocalizationSupport.localized("Specify the exact topic (e.g., \u{201C}Derivatives\u{201D})"))
-		}
-		
-		Spacer()
-	  }
-	}
+    FlatCard {
+      HStack(alignment: .top, spacing: 14) {
+        FlatIconTile(systemName: "lightbulb.fill", size: 44, background: theme.flatSurface)
+
+        VStack(alignment: .leading, spacing: 10) {
+          Text(LocalizationSupport.localized("Tips for faster matches"))
+            .font(.system(size: 16, weight: .bold))
+            .foregroundStyle(theme.flatInk)
+
+          tipLine(LocalizationSupport.localized("Upload a clear photo of your math problem"))
+          tipLine(LocalizationSupport.localized("Specify the exact topic (e.g., \u{201C}Derivatives\u{201D})"))
+        }
+
+        Spacer()
+      }
+    }
   }
-  
+
   func tipLine(_ text: String) -> some View {
-	HStack(spacing: 8) {
-	  PlatformIcon(systemName: "checkmark", size: 10, weight: .bold,
-				   color: theme.appGreen)
-	  
-	  Text(text)
-		.font(.system(size: 12))
-		.foregroundStyle(theme.appSecondaryText)
-	}
+    HStack(spacing: 8) {
+      PlatformIcon(systemName: "checkmark", size: 11, weight: .bold, color: theme.flatPositive)
+
+      Text(text)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.flatInkMuted)
+    }
   }
   
   func sectionHeader(title: String, actionTitle: String? = nil, action: (@MainActor @Sendable () -> Void)? = nil) -> some View {
-	HStack {
-	  Text(LocalizationSupport.localized(title))
-		.font(.system(size: 18, weight: .bold))
-		.foregroundStyle(theme.appPrimaryText)
-	  
-	  Spacer()
-	  
-	  if let actionTitle, let action {
-		Button(action: action) {
-		  Text(LocalizationSupport.localized(actionTitle))
-			.font(.system(size: 12, weight: .medium))
-			.foregroundStyle(theme.appPink)
-		}
-		.buttonStyle(.plain)
-	  }
-	}
+    HStack {
+      Text(LocalizationSupport.localized(title))
+        .font(.system(size: 24, weight: .bold))
+        .foregroundStyle(theme.flatInk)
+
+      Spacer()
+
+      if let actionTitle, let action {
+        Button(action: action) {
+          Text(LocalizationSupport.localized(actionTitle))
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.flatInk)
+        }
+        .buttonStyle(.plain)
+      }
+    }
   }
 }
 
@@ -974,75 +944,67 @@ struct PricingCard: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	RoundedInfoCard {
-	  VStack(alignment: .leading, spacing: 0) {
-		SmallPill(
-		  title: option.name,
-		  foreground: option.isHighlighted ?theme.appCardBackground: theme.appPink,
-		  background: option.isHighlighted ? theme.appPurple : theme.appPinkSoft
-		)
-		
-		HStack(alignment: .firstTextBaseline, spacing: 4) {
-		  if let minutesText = option.minutesText {
-			HStack(spacing: 4) {
-			  PlatformIcon(systemName: "clock.fill", size: 28, color: theme.appGreen)
-			  Text(minutesText)
+    // Highlighted plans are marked with a heavier ink border rather than a
+    // second accent colour.
+    FlatCard(outlined: true) {
+      VStack(alignment: .leading, spacing: 0) {
+        if option.isHighlighted {
+          FlatBadge(title: option.name)
+        } else {
+          FlatChip(title: option.name, outlined: true)
+        }
+
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          if let minutesText = option.minutesText {
+            Text(minutesText)
 #if os(Android)
-				.font(.system(size: 22, weight: .bold))
+              .font(.system(size: 24, weight: .bold))
 #else
-				.font(.system(size: 28, weight: .bold))
+              .font(.system(size: 30, weight: .bold))
 #endif
-				.foregroundStyle(theme.appGreen)
-			}
-			.padding(.top, 4)
-			
-		  }
-		  
-		  Text(option.priceText)
-			.font(.system(size: 12, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  //                    Text(priceSuffix(for: option))
-		  //					.font(.system(size: 11, weight: .semibold))
-		  //                        .foregroundStyle(theme.appSecondaryText)
-		}
-		.padding(.top, 8)
-		.padding(.leading, 5)
-		
-		Text(LocalizationSupport.localized(option.description))
-		  .font(.system(size: 12))
-		  .foregroundStyle(theme.appSecondaryText)
-		  .lineSpacing(4)
-		  .padding(.top, 8)
-		  .frame(maxWidth: .infinity, alignment: .topLeading)
-		
-		Button(action: action) {
-		  HStack(spacing: 8) {
-			if isLoading {
-			  ProgressView()
-				.scaleEffect(0.8)
-				.tint(option.isHighlighted ? theme.appCardBackground : theme.appPrimaryText)
-			}
-			
-			Text(isLoading ? LocalizationSupport.localized("checkout_connecting") : LocalizationSupport.localized("Checkout"))
-			  .font(.system(size: 13, weight: .semibold))
-			  .foregroundStyle(option.isHighlighted ?theme.appCardBackground: theme.appPrimaryText)
-		  }
-		  .frame(maxWidth: .infinity)
-		  .frame(height: 38)
-		  .background(option.isHighlighted ? theme.appPurple : theme.appGrayBackground)
-		  .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-		}
-		.buttonStyle(.plain)
-		.disabled(isLoading)
-		.padding(.top, 14)
-	  }
-	  .frame(width: 172)
-	}
-	.overlay {
-	  RoundedRectangle(cornerRadius: 18, style: .continuous)
-		.stroke(option.isHighlighted ? theme.appPurple : Color.clear, lineWidth: 2)
-	}
+              .foregroundStyle(theme.flatInk)
+          }
+
+          Text(option.priceText)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.flatInkMuted)
+        }
+        .padding(.top, 12)
+
+        Text(LocalizationSupport.localized(option.description))
+          .font(.system(size: 13))
+          .foregroundStyle(theme.flatInkMuted)
+          .lineSpacing(4)
+          .padding(.top, 8)
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+
+        Button(action: action) {
+          HStack(spacing: 8) {
+            if isLoading {
+              ProgressView()
+                .scaleEffect(0.8)
+                .tint(theme.flatInkInverse)
+            }
+
+            Text(isLoading ? LocalizationSupport.localized("checkout_connecting") : LocalizationSupport.localized("Checkout"))
+              .font(.system(size: 15, weight: .bold))
+              .foregroundStyle(theme.flatInkInverse)
+          }
+          .frame(maxWidth: .infinity)
+          .frame(height: 44)
+          .background(theme.flatInk)
+          .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+        .padding(.top, 16)
+      }
+      .frame(width: 176)
+    }
+    .overlay {
+      RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+        .stroke(option.isHighlighted ? theme.flatInk : Color.clear, lineWidth: 2)
+    }
   }
   
   private func priceSuffix(for option: PricingOption) -> String {
@@ -1060,38 +1022,41 @@ struct RecentLessonRow: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	RoundedInfoCard {
-	  HStack(spacing: 12) {
-		ProfileAvatarView(
-		  imageURL: lesson.teacherImageURL,
-		  size: 50,
-		  fallbackSystemImage: "person.crop.circle.fill",
-		  background: theme.appPurpleSoft,
-		  tint: theme.appPurple
-		)
-		
-		VStack(alignment: .leading, spacing: 5) {
-		  Text(lesson.title)
-			.font(.system(size: 14, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  Text(String(format: LocalizationSupport.localized("%@ • %@"), lesson.teacher, lesson.time))
-			.font(.system(size: 11))
-			.foregroundStyle(theme.appSecondaryText)
-		}
-		
-		Spacer()
-		
-		VStack(spacing: 6) {
-		  SmallPill(title: LocalizationSupport.localized("Solved"), foreground: theme.appGreen, background: theme.appGreenSoft)
-		  
-		  Text(lesson.duration)
-			.font(.system(size: 11, weight: .semibold))
-			.foregroundStyle(theme.appPrimaryText)
-		}
-	  }
-	  .background(theme.appCardBackground)
-	}
+    // Borderless row; the screen supplies the list container and separators.
+    HStack(spacing: 14) {
+      ProfileAvatarView(
+        imageURL: lesson.teacherImageURL,
+        size: 44,
+        fallbackSystemImage: "person.crop.circle.fill",
+        background: theme.flatSurfaceRaised,
+        tint: theme.flatInk
+      )
+
+      VStack(alignment: .leading, spacing: 3) {
+        Text(lesson.title)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(theme.flatInk)
+
+        Text(String(format: LocalizationSupport.localized("%@ • %@"), lesson.teacher, lesson.time))
+          .font(.system(size: 13))
+          .foregroundStyle(theme.flatInkMuted)
+      }
+
+      Spacer()
+
+      VStack(alignment: .trailing, spacing: 3) {
+        Text(LocalizationSupport.localized("Solved"))
+          .font(.system(size: 13, weight: .bold))
+          .foregroundStyle(theme.flatPositive)
+
+        Text(lesson.duration)
+          .font(.system(size: 13))
+          .foregroundStyle(theme.flatInkMuted)
+      }
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 14)
+    .background(theme.flatSurface)
   }
 }
 

@@ -187,10 +187,11 @@ struct TeacherSubjectsView: View {
   }
 }
 
+@MainActor
 struct SubjectAreaChip: View {
   let area: TeachingSubjectArea
   let isSelected: Bool
-  let action: () -> Void
+  let action: @MainActor () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -198,13 +199,11 @@ struct SubjectAreaChip: View {
   var body: some View {
 	Button(action: action) {
 	  HStack(spacing: 7) {
-		PlatformIcon(systemName: area.systemImage)
-		  .font(.system(size: 12, weight: .semibold))
-		
+		PlatformIcon(systemName: area.systemImage, size: 12, color: isSelected ? theme.authSecondaryText : theme.authPrimaryText)
 		Text(LocalizationSupport.localized(area.title))
 		  .font(.system(size: 13, weight: .medium))
 	  }
-	  .foregroundStyle(theme.authPrimaryText)
+	  .foregroundStyle(isSelected ? theme.authSecondaryText: theme.authPrimaryText)
 	  .padding(.horizontal, 14)
 	  .frame(height: 34)
 	  .background(isSelected ? theme.authPink : theme.authPinkSoft)

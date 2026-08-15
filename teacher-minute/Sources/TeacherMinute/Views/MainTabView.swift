@@ -11,7 +11,11 @@ struct MainTabView: View {
     @State var viewModel: MainTabViewModel
     @State var teacherDashboardViewModel: TeacherDashboardViewModel?
     @State var hidesTabBar = false
-    
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
+
     init(userMode: AppUserMode = .teacher) {
         self._viewModel = State(wrappedValue: MainTabViewModel(userMode: userMode))
         self._teacherDashboardViewModel = State(wrappedValue: userMode == .teacher ? TeacherDashboardViewModel() : nil)
@@ -54,6 +58,8 @@ struct MainTabView: View {
                     .tag(MainTab.settings)
             }
             .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
+            // Monochrome selection instead of the system blue accent.
+            .tint(theme.flatInk)
 
             teacherGlobalOverlay
         }

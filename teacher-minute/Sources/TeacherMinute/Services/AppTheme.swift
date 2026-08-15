@@ -161,72 +161,63 @@ struct AppTheme {
     }
 
     // MARK: - Auth Aliases
+    //
+    // The onboarding, login and signup screens are built entirely on these
+    // aliases, so pointing them at the flat tokens converts that whole family
+    // at once. `authPink`/`authPurple` are now ink: anywhere one of them is used
+    // as a *background*, the label must be `flatInkInverse` rather than
+    // `appPrimaryText`, or it will disappear.
 
     var authPrimaryText: Color {
-        appPrimaryText
+        flatInk
     }
 
     var authSecondaryText: Color {
-        appSecondaryText
+        flatInkMuted
     }
 
     var authPink: Color {
-        appPink
+        flatInk
     }
 
     var authPinkSoft: Color {
-        appPinkSoft
+        flatSurfaceRaised
     }
 
     var authPurple: Color {
-        appPurple
+        flatInk
     }
 
     var authPurpleSoft: Color {
-        appPurpleSoft
+        flatSurfaceRaised
     }
 
     var authGreen: Color {
-        appGreen
+        flatPositive
     }
 
     var authOrange: Color {
-        appOrange
+        flatInk
     }
 
     var authFieldBackground: Color {
-        adaptive(
-            light: (249, 250, 251),
-            dark: (30, 30, 36)
-        )
+        flatSurfaceRaised
     }
 
     var authFieldBorder: Color {
-        adaptive(
-            light: (239, 242, 247),
-            dark: (50, 52, 60)
-        )
+        flatLine
     }
 
     var authIcon: Color {
-        adaptive(
-            light: (156, 163, 175),
-            dark: (156, 163, 175)
-        )
+        flatInkMuted
     }
 
     var authDivider: Color {
-        adaptive(
-            light: (229, 231, 235),
-            dark: (45, 45, 52)
-        )
+        flatLine
     }
 
     var authSocialBorder: Color {
-        adaptive(
-            light: (229, 231, 235),
-            dark: (45, 45, 52)
-        )
+        flatLine
     }
 
     // MARK: - Generic Aliases

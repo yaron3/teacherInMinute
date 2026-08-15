@@ -47,7 +47,7 @@
 /* Begin PBXFileReference section */
 		4900101C2BACEA710000DE33 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		493609562A6B7EAE00C401E2 /* TeacherMinute */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = TeacherMinute; path = ..; sourceTree = "<group>"; };
-		496BDBEB2B89A47800C09264 /* TeacherMinute.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeacherMinute.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		496BDBEB2B89A47800C09264 /* .app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = .app; sourceTree = BUILT_PRODUCTS_DIR; };
 		496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = ../Sources/TeacherMinute/Resources/Localizable.xcstrings; sourceTree = "<group>"; };
 		496EB72F2A6AE4DE00C1253A /* Skip.env */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Skip.env; path = ../Skip.env; sourceTree = "<group>"; };
 		496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = TeacherMinute.xcconfig; sourceTree = "<group>"; };
@@ -92,7 +92,7 @@
 		496BDBEC2B89A47800C09264 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				496BDBEB2B89A47800C09264 /* TeacherMinute.app */,
+				496BDBEB2B89A47800C09264 /* .app */,
 				4AC88531302E11E2001E0831 /* TeacherMinuteUITests.xctest */,
 			);
 			name = Products;
@@ -169,7 +169,7 @@
 				4AB6CD5A2FAC7BE7003E7ADA /* GoogleSignInSwift */,
 			);
 			productName = App;
-			productReference = 496BDBEB2B89A47800C09264 /* TeacherMinute.app */;
+			productReference = 496BDBEB2B89A47800C09264 /* .app */;
 			productType = "com.apple.product-type.application";
 		};
 		4AC88530302E11E2001E0831 /* TeacherMinuteUITests */ = {

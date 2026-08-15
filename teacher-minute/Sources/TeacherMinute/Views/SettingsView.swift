@@ -37,12 +37,15 @@ struct SettingsView: View {
 
                     Section {
                         Text(viewModel.appVersion)
-                            .font(.system(size: 11))
-                            .foregroundStyle(theme.appSecondaryText)
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.flatInkMuted)
                             .frame(maxWidth: .infinity)
                             .listRowBackground(Color.clear)
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(theme.flatSurface)
 
                 loadingOverlay
             }
@@ -133,11 +136,11 @@ struct SettingsView: View {
     @ViewBuilder
     var loadingOverlay: some View {
         if viewModel.isLoading {
-            theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+            theme.flatInk.opacity(0.18).ignoresSafeArea()
             ProgressView()
                 .progressViewStyle(.circular)
                 .scaleEffect(1.4)
-                .tint(theme.appPrimaryText)
+                .tint(theme.flatInk)
         }
     }
 
@@ -177,11 +180,11 @@ struct AccountSecuritySettingsView: View {
             }
 
             if viewModel.isLoading {
-                theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+                theme.flatInk.opacity(0.18).ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.appPrimaryText)
+                    .tint(theme.flatInk)
             }
         }
     }
@@ -235,11 +238,11 @@ struct LanguageSettingsView: View {
             .disabled(localizationManager.isLoading)
 
             if localizationManager.isLoading {
-                theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+                theme.flatInk.opacity(0.18).ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.appPrimaryText)
+                    .tint(theme.flatInk)
             }
         }
     }
@@ -776,6 +779,10 @@ struct PrivacyControlsSettingsView: View {
 struct SettingsSectionView: View {
     let section: SettingsSection
     let onSelect: (SettingsRow) -> Void
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
 
     var body: some View {
         Section {
@@ -794,6 +801,8 @@ struct SettingsSectionView: View {
             }
         } header: {
             Text(section.title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(theme.flatInk)
         }
     }
 }
@@ -806,30 +815,25 @@ struct SettingsRowView: View {
     }
     var body: some View {
         HStack(spacing: 14) {
-            Circle()
-                .fill(theme.primaryBackground)
-                .frame(width: 34, height: 34)
-                .overlay {
-                    PlatformIcon(
-                        systemName: row.systemImage,
-                        size: 13,
-                        weight: .semibold,
-                        color: theme.primaryText
-                    )
-                }
+            FlatIconTile(
+                systemName: row.systemImage,
+                size: 40,
+                tint: row.isDestructive ? theme.flatCritical : theme.flatInk
+            )
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(row.isDestructive ? .red : theme.appPrimaryText)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(row.isDestructive ? theme.flatCritical : theme.flatInk)
 
                 if let subtitle = row.subtitle {
                     Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(theme.appSecondaryText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.flatInkMuted)
                 }
             }
         }
+        .padding(.vertical, 6)
     }
 }
 

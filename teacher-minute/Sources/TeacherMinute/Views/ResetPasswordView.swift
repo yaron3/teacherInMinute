@@ -61,7 +61,7 @@ struct ResetPasswordView: View {
             .padding(.bottom, 34)
         }
         .padding(.horizontal, 18)
-        .background(Color(.systemBackground))
+        .background(theme.flatSurface)
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen(AnalyticsScreen.resetPassword)
     }
@@ -91,9 +91,8 @@ struct ResetPasswordView: View {
             }
         }
         .padding(24)
-        .background(theme.appCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 24, x: 0, y: 14)
+        .background(theme.flatSurfaceRaised)
+        .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
     }
 
     var methodPicker: some View {
@@ -108,8 +107,8 @@ struct ResetPasswordView: View {
                     .foregroundStyle(theme.authPrimaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
-                    .background(viewModel.method == .email ?theme.appCardBackground: .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(viewModel.method == .email ?theme.flatSurfaceRaised: .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
             }
 
             Button {
@@ -122,12 +121,12 @@ struct ResetPasswordView: View {
                     .foregroundStyle(theme.authSecondaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
-                    .background(viewModel.method == .phone ?theme.appCardBackground: .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(viewModel.method == .phone ?theme.flatSurfaceRaised: .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
             }
         }
         .padding(3)
         .background(theme.authFieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
     }
 }

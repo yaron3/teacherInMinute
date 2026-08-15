@@ -91,7 +91,7 @@ struct ChooseRoleView: View {
 //      .padding(.bottom, 24)
     }
     .padding(.horizontal, 20)
-    .background(Color(.systemBackground))
+    .background(theme.flatSurface)
     .navigationBarTitleDisplayMode(.inline)
     .sheet(isPresented: $showingTerms) {
       if let termsURL {
@@ -158,7 +158,7 @@ struct RoleCard: View {
     Button(action: action) {
       VStack(alignment: .leading, spacing: 18) {
         HStack {
-          RoundedRectangle(cornerRadius: 14, style: .continuous)
+          RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
             .fill(accent.opacity(0.08))
             .frame(width: 46, height: 46)
             .overlay {
@@ -206,13 +206,12 @@ struct RoleCard: View {
       }
       .padding(20)
       .frame(maxWidth: .infinity)
-      .background(theme.appCardBackground)
-      .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+      .background(theme.flatSurfaceRaised)
+      .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
       .overlay {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
+        RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
           .stroke(isSelected ? accent : Color.clear, lineWidth: 2)
       }
-      .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 20, x: 0, y: 12)
     }
     .buttonStyle(.plain)
   }

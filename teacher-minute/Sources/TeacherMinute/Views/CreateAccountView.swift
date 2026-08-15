@@ -26,7 +26,7 @@ struct CreateAccountView: View {
   }
   var body: some View {
 	ZStack {
-	  theme.appCardBackground.ignoresSafeArea()
+	  theme.flatSurface.ignoresSafeArea()
 	  VStack(spacing: 0) {
 		ScrollView(showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 24) {
@@ -44,11 +44,11 @@ struct CreateAccountView: View {
 	  
 	  // Loading overlay
 	  if viewModel.isLoading {
-		theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+		theme.flatInk.opacity(0.18).ignoresSafeArea()
 		ProgressView()
 		  .progressViewStyle(.circular)
 		  .scaleEffect(1.6)
-		  .tint(theme.appPrimaryText)
+		  .tint(theme.flatInk)
 	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
@@ -119,9 +119,8 @@ struct CreateAccountView: View {
 	}
 	.padding(24)
 	.background(
-	  RoundedRectangle(cornerRadius: 22)
-		.fill(theme.appCardBackground)
-		.shadow(color: theme.appCardBackgroundShadow.opacity(0.045), radius: 18, x: 0, y: 10)
+	  RoundedRectangle(cornerRadius: flatRadius)
+		.fill(theme.flatSurfaceRaised)
 	)
   }
   
@@ -171,10 +170,10 @@ struct CreateAccountView: View {
 	  .padding(.horizontal, 16)
 	  .frame(height: 56)
 		.background(
-		  RoundedRectangle(cornerRadius: 16)
+		  RoundedRectangle(cornerRadius: flatRadius)
 			.fill(theme.authFieldBackground)
 			.overlay(
-			  RoundedRectangle(cornerRadius: 16)
+			  RoundedRectangle(cornerRadius: flatRadius)
 				.stroke(isValid ? theme.authFieldBorder : theme.red.opacity(0.5), lineWidth: 1.5)
 			)
 		)
@@ -202,19 +201,20 @@ struct CreateAccountView: View {
 	HStack(alignment: .top, spacing: 12) {
 		  Button { isOn.wrappedValue.toggle() } label: {
 			ZStack {
-			  RoundedRectangle(cornerRadius: 4)
-				.fill(isOn.wrappedValue ? theme.authPink : theme.appCardBackground)
+			  RoundedRectangle(cornerRadius: flatRadiusSmall)
+				.fill(isOn.wrappedValue ? theme.authPink : theme.flatSurfaceRaised)
 				.frame(width: 18, height: 18)
 				.overlay(
-				  RoundedRectangle(cornerRadius: 4)
+				  RoundedRectangle(cornerRadius: flatRadiusSmall)
 					.stroke(isOn.wrappedValue ? theme.authPink : theme.appBorder, lineWidth: 1)
 				)
 		  if isOn.wrappedValue {
+			// The box fills with ink when checked, so the tick must invert.
 			PlatformIcon(
 			  systemName: "checkmark",
 			  size: 11,
 			  weight: .bold,
-			  color: theme.appPrimaryText
+			  color: theme.flatInkInverse
 			)
 		  }
 		}
@@ -312,19 +312,18 @@ struct CreateAccountView: View {
 	} label: {
 	  ZStack {
 		Text(LocalizationSupport.localized("Continue to Role Selection"))
-		  .font(.system(size: 16, weight: .semibold))
-		  .foregroundStyle(theme.appPrimaryText)
+		  .font(.system(size: 17, weight: .bold))
+		  .foregroundStyle(viewModel.canSubmit ? theme.flatInkInverse : theme.flatInkMuted)
 		  .opacity(viewModel.isLoading ? 0 : 1)
 		if viewModel.isLoading {
-		  ProgressView().tint(theme.appPrimaryText)
+		  ProgressView().tint(theme.flatInkInverse)
 		}
 	  }
 	  .frame(maxWidth: .infinity)
-	  .frame(height: 56)
+	  .frame(height: 54)
 		.background(
-			Capsule()
-			  .fill(viewModel.canSubmit ? theme.authPink : theme.authPink.opacity(0.45))
-			  .shadow(color: theme.authPink.opacity(viewModel.canSubmit ? 0.28 : 0), radius: 14, x: 0, y: 8)
+			RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+			  .fill(viewModel.canSubmit ? theme.flatInk : theme.flatSurfaceRaised)
 		)
 	}
 	.disabled(viewModel.isLoading)
@@ -366,10 +365,9 @@ struct CreateAccountView: View {
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 54)
 	  .background(
-		  RoundedRectangle(cornerRadius: 14)
-			.fill(theme.appGrayBackground)
-			.overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.authSocialBorder, lineWidth: 1))
-			.shadow(color: theme.appPrimaryText.opacity(0.025), radius: 6, x: 0, y: 4)
+		  RoundedRectangle(cornerRadius: flatRadius)
+			.fill(theme.flatSurfaceRaised)
+			.overlay(RoundedRectangle(cornerRadius: flatRadius).stroke(theme.authSocialBorder, lineWidth: 1))
 	  )
 	}
   }

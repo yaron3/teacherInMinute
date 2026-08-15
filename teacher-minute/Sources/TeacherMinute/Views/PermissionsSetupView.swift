@@ -26,7 +26,7 @@ struct PermissionsSetupView: View {
                 .frame(height: 72)
 
             ZStack(alignment: .bottomTrailing) {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
                     .fill(theme.authPinkSoft)
                     .frame(width: 78, height: 78)
                     .overlay {
@@ -37,7 +37,6 @@ struct PermissionsSetupView: View {
                             color: theme.authPink
                         )
                     }
-                    .shadow(color: theme.authPink.opacity(0.1), radius: 24, x: 0, y: 12)
 
                 Circle()
                     .fill(theme.authPurpleSoft)
@@ -107,7 +106,7 @@ struct PermissionsSetupView: View {
             .padding(.bottom, 24)
         }
         .padding(.horizontal, 18)
-        .background(Color(.systemBackground))
+        .background(theme.flatSurface)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .trackScreen(AnalyticsScreen.permissionsSetup)
@@ -161,12 +160,11 @@ struct PermissionCard: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity)
-        .background(theme.appCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(theme.flatSurfaceRaised)
+        .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
                 .stroke(theme.authPink.opacity(0.10), lineWidth: 1)
         }
-		.shadow(color: theme.appPrimaryText.opacity(0.03), radius: 18, x: 0, y: 10)
     }
 }

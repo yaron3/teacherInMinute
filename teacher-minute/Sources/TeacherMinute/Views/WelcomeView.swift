@@ -17,7 +17,7 @@ struct WelcomeView: View {
 
   var body: some View {
 	ZStack {
-	  Color(.systemBackground)
+	  theme.flatSurface
 		.ignoresSafeArea()
 
 	  welcomeContent
@@ -32,7 +32,7 @@ struct WelcomeView: View {
           
           Text(LocalizationSupport.localized("Help you any where"))
             .font(.system(size: 35, weight: .bold, design: .default))
-            .foregroundStyle(theme.primaryText)
+            .foregroundStyle(theme.flatInk)
             .lineSpacing(-4)
             .padding(.top, 42)
           
@@ -60,8 +60,8 @@ struct WelcomeView: View {
               .foregroundStyle(theme.primaryBackground)
               .frame(maxWidth: .infinity)
               .frame(height: 62)
-              .background(theme.primaryText)
-              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+              .background(theme.flatInk)
+              .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
           }
           
         Button {
@@ -69,7 +69,7 @@ struct WelcomeView: View {
         } label: {
           Text(LocalizationSupport.localized("Already have an account? Log In"))
             .fontWeight(.semibold)
-            .foregroundStyle(theme.primaryText)
+            .foregroundStyle(theme.flatInk)
         }
       
       .font(.system(size: 15))
@@ -87,7 +87,7 @@ struct WelcomeView: View {
   
   private var header: some View {
 	HStack(spacing: 12) {
-	  RoundedRectangle(cornerRadius: 9, style: .continuous)
+	  RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
 		.fill(theme.primaryBackground)
 		.frame(width: 34, height: 34)
 		.overlay {
@@ -95,13 +95,13 @@ struct WelcomeView: View {
 			systemName: "graduationcap.fill",
 			size: 15,
 			weight: .semibold,
-			color: theme.primaryText
+			color: theme.flatInk
 		  )
 		}
 	  
 	  Text(LocalizationSupport.localized("Teacher in a Minute"))
 		.font(.system(size: 16, weight: .semibold))
-		.foregroundStyle(theme.primaryText)
+		.foregroundStyle(theme.flatInk)
 	  
 	  Spacer()
 	}
@@ -109,13 +109,12 @@ struct WelcomeView: View {
   
   private var previewCard: some View {
 	ZStack(alignment: .topLeading) {
-	  RoundedRectangle(cornerRadius: 16, style: .continuous)
+	  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
 		.fill(theme.previewBackground)
 		.overlay {
-		  RoundedRectangle(cornerRadius: 16, style: .continuous)
+		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
 			.stroke(theme.appPrimaryText.opacity(0.04), lineWidth: 1)
 		}
-		.shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 12)
 	  
 	  HStack(spacing: 0) {
 		PlatformIcon(
@@ -126,7 +125,7 @@ struct WelcomeView: View {
 		
 		Text(LocalizationSupport.localized("App Preview"))
 		  .font(.system(size: 16))
-		  .foregroundStyle(theme.primaryText)
+		  .foregroundStyle(theme.flatInk)
 	  }
 	  .offset(x: 0, y: 2)
 	}

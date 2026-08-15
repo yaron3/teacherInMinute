@@ -17,7 +17,7 @@ struct LoginView: View {
   }
   var body: some View {
 	ZStack {
-	  Color(.systemBackground)
+	  theme.flatSurface
 		.ignoresSafeArea()
 	  
 	  ScrollView(.vertical, showsIndicators: false) {
@@ -57,15 +57,15 @@ struct LoginView: View {
 	  
 	  // Full-screen loading overlay while checking Firestore
 	  if viewModel.isLoading {
-		theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
+		theme.flatSurface.opacity(0.85).ignoresSafeArea()
 		VStack(spacing: 14) {
 		  ProgressView()
 			.progressViewStyle(.circular)
 			.scaleEffect(1.8)
-			.tint(theme.appPrimaryText)
+			.tint(theme.flatInk)
 		  Text(LocalizationSupport.localized("Signing in…"))
-			.font(.system(size: 14, weight: .medium))
-			.foregroundStyle(theme.appPrimaryText)
+			.font(.system(size: 15, weight: .medium))
+			.foregroundStyle(theme.flatInk)
 		}
 	  }
 	}
@@ -116,9 +116,9 @@ struct LoginView: View {
 		.padding(.horizontal, 16)
 		.frame(height: 56)
 		.background(theme.authFieldBackground)
-		.clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+		.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 		.overlay {
-		  RoundedRectangle(cornerRadius: 15, style: .continuous)
+		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
 			.stroke(theme.authFieldBorder, lineWidth: 1)
 		}
 	  }
@@ -161,9 +161,9 @@ struct LoginView: View {
 		.padding(.horizontal, 16)
 		.frame(height: 56)
 		.background(theme.authFieldBackground)
-		.clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+		.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 		.overlay {
-		  RoundedRectangle(cornerRadius: 15, style: .continuous)
+		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
 			.stroke(theme.authFieldBorder, lineWidth: 1)
 		}
 	  }
@@ -182,9 +182,8 @@ struct LoginView: View {
 	.padding(.horizontal, 24)
 	.padding(.top, 26)
 	.padding(.bottom, 24)
-	.background(theme.appCardBackground)
-	.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-	.shadow(color: theme.appPrimaryText.opacity(0.035), radius: 24, x: 0, y: 14)
+	.background(theme.flatSurfaceRaised)
+	.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
   }
   
   var loginButton: some View {
@@ -193,18 +192,19 @@ struct LoginView: View {
 	} label: {
 	  HStack(spacing: 8) {
 		if viewModel.isLoading {
-		  ProgressView().tint(theme.appPrimaryText)
+		  ProgressView().tint(theme.flatInkInverse)
 		}
-		
+
 		Text(viewModel.isLoading ? LocalizationSupport.localized("Signing In…") : LocalizationSupport.localized("Log In"))
-		  .font(.system(size: 16, weight: .semibold))
+		  .font(.system(size: 17, weight: .bold))
 	  }
-	  .foregroundStyle(theme.appPrimaryText)
+	  // Disabled state swaps to the raised gray rather than fading ink into the
+	  // background, which left the label unreadable.
+	  .foregroundStyle(viewModel.canSubmit ? theme.flatInkInverse : theme.flatInkMuted)
 	  .frame(maxWidth: .infinity)
-	  .frame(height: 57)
-	  .background(theme.authPink.opacity(viewModel.canSubmit ? 1 : 0.55))
-	  .clipShape(Capsule())
-	  .shadow(color: theme.authPink.opacity(viewModel.canSubmit ? 0.25 : 0), radius: 18, x: 0, y: 10)
+	  .frame(height: 54)
+	  .background(viewModel.canSubmit ? theme.flatInk : theme.flatSurfaceRaised)
+	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 	}
 	.buttonStyle(.plain)
 	.disabled(!viewModel.canSubmit)
@@ -246,10 +246,9 @@ struct LoginView: View {
 	  .foregroundStyle(theme.authPrimaryText)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 56)
-	  .background(theme.appCardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-	  .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.authSocialBorder, lineWidth: 1) }
-	  .shadow(color: theme.appPrimaryText.opacity(0.04), radius: 10, x: 0, y: 5)
+	  .background(theme.flatSurfaceRaised)
+	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+	  .overlay { RoundedRectangle(cornerRadius: flatRadius, style: .continuous).stroke(theme.authSocialBorder, lineWidth: 1) }
 	}
 	.buttonStyle(.plain)
   }
