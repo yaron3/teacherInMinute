@@ -192,7 +192,7 @@ struct LoginView: View {
 	} label: {
 	  HStack(spacing: 8) {
 		if viewModel.isLoading {
-		  ProgressView().tint(theme.flatInkInverse)
+		  ProgressView().tint(theme.flatOnAccent)
 		}
 
 		Text(viewModel.isLoading ? LocalizationSupport.localized("Signing In…") : LocalizationSupport.localized("Log In"))
@@ -200,10 +200,10 @@ struct LoginView: View {
 	  }
 	  // Disabled state swaps to the raised gray rather than fading ink into the
 	  // background, which left the label unreadable.
-	  .foregroundStyle(viewModel.canSubmit ? theme.flatInkInverse : theme.flatInkMuted)
+	  .foregroundStyle(viewModel.canSubmit ? theme.flatOnAccent : theme.flatInkMuted)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 54)
-	  .background(viewModel.canSubmit ? theme.flatInk : theme.flatSurfaceRaised)
+	  .background(viewModel.canSubmit ? theme.flatAccent : theme.flatSurfaceRaised)
 	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 	}
 	.buttonStyle(.plain)

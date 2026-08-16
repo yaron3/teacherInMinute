@@ -512,18 +512,18 @@ struct StudentHomeView: View {
 
         Text(LocalizationSupport.localized("Ask a math teacher"))
           .font(.system(size: 26, weight: .bold))
-          .foregroundStyle(theme.flatInkInverse)
+          .foregroundStyle(theme.flatOnAccent)
 
         HStack(spacing: 6) {
           Text(String(format: LocalizationSupport.localized("%d min remaining"), viewModel.remainingMinutes))
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(theme.flatInkInverse.opacity(0.75))
+            .foregroundStyle(theme.flatOnAccent.opacity(0.75))
           Text(LocalizationSupport.localized("•"))
             .font(.system(size: 14))
-            .foregroundStyle(theme.flatInkInverse.opacity(0.5))
+            .foregroundStyle(theme.flatOnAccent.opacity(0.5))
           Text(LocalizationSupport.localized("Per-minute billing"))
             .font(.system(size: 14))
-            .foregroundStyle(theme.flatInkInverse.opacity(0.75))
+            .foregroundStyle(theme.flatOnAccent.opacity(0.75))
         }
         .padding(.top, 6)
       }
@@ -531,7 +531,7 @@ struct StudentHomeView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
 
       Circle()
-        .fill(theme.flatInkInverse)
+        .fill(theme.flatOnAccent)
         .frame(width: 44, height: 44)
         .overlay {
           PlatformIcon(
@@ -545,14 +545,14 @@ struct StudentHomeView: View {
         .padding(.trailing, 20)
     }
     .frame(height: 150)
-    .background(theme.flatInk)
+    .background(theme.flatAccent)
     .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
   }
   
   // MARK: - Supporting views
   
   var tipsCard: some View {
-    FlatCard {
+    FlatCard(filled: theme.flatPositiveSurface) {
       HStack(alignment: .top, spacing: 14) {
         FlatIconTile(systemName: "lightbulb.fill", size: 44, background: theme.flatSurface)
 
@@ -983,16 +983,16 @@ struct PricingCard: View {
             if isLoading {
               ProgressView()
                 .scaleEffect(0.8)
-                .tint(theme.flatInkInverse)
+                .tint(theme.flatOnAccent)
             }
 
             Text(isLoading ? LocalizationSupport.localized("checkout_connecting") : LocalizationSupport.localized("Checkout"))
               .font(.system(size: 15, weight: .bold))
-              .foregroundStyle(theme.flatInkInverse)
+              .foregroundStyle(theme.flatOnAccent)
           }
           .frame(maxWidth: .infinity)
           .frame(height: 44)
-          .background(theme.flatInk)
+          .background(theme.flatAccent)
           .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1003,7 +1003,7 @@ struct PricingCard: View {
     }
     .overlay {
       RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-        .stroke(option.isHighlighted ? theme.flatInk : Color.clear, lineWidth: 2)
+        .stroke(option.isHighlighted ? theme.flatAccent : Color.clear, lineWidth: 2)
     }
   }
   

@@ -273,19 +273,19 @@ struct ProfileView: View {
       .clipShape(Circle())
 
       Circle()
-        .fill(theme.flatInk)
+        .fill(theme.flatAccent)
         .frame(width: 30, height: 30)
         .overlay {
           if viewModel.isUploadingPhoto {
             ProgressView()
               .scaleEffect(0.7)
-              .tint(theme.flatInkInverse)
+              .tint(theme.flatOnAccent)
           } else {
             PlatformIcon(
               systemName: "camera.fill",
               size: 12,
               weight: .bold,
-              color: theme.flatInkInverse
+              color: theme.flatOnAccent
             )
           }
         }

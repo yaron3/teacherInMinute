@@ -164,8 +164,8 @@ struct AppTheme {
     //
     // The onboarding, login and signup screens are built entirely on these
     // aliases, so pointing them at the flat tokens converts that whole family
-    // at once. `authPink`/`authPurple` are now ink: anywhere one of them is used
-    // as a *background*, the label must be `flatInkInverse` rather than
+    // at once. `authPink`/`authPurple` are now the accent: anywhere one of them
+    // is used as a *background*, the label must be `flatOnAccent` rather than
     // `appPrimaryText`, or it will disappear.
 
     var authPrimaryText: Color {
@@ -177,19 +177,19 @@ struct AppTheme {
     }
 
     var authPink: Color {
-        flatInk
+        flatAccent
     }
 
     var authPinkSoft: Color {
-        flatSurfaceRaised
+        flatAccentSoft
     }
 
     var authPurple: Color {
-        flatInk
+        flatAccent
     }
 
     var authPurpleSoft: Color {
-        flatSurfaceRaised
+        flatAccentSoft
     }
 
     var authGreen: Color {

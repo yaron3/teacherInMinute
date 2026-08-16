@@ -56,12 +56,12 @@ struct WelcomeView: View {
             router.push(.createAccount)
           } label: {
             Text(LocalizationSupport.localized("Sign Up"))
-              .font(.system(size: 16, weight: .semibold))
-              .foregroundStyle(theme.primaryBackground)
+              .font(.system(size: 17, weight: .bold))
+              .foregroundStyle(theme.flatOnAccent)
               .frame(maxWidth: .infinity)
-              .frame(height: 62)
-              .background(theme.flatInk)
-              .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+              .frame(height: 56)
+              .background(theme.flatAccent)
+              .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
           }
           
         Button {

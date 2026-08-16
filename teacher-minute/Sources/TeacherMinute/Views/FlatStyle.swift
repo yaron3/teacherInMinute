@@ -14,28 +14,79 @@ import SwiftUI
 
 extension AppTheme {
 
-  /// Page background. Pure white / pure black — no off-white tints.
+  /// Page background. Near-black rather than pure black in dark mode.
   var flatSurface: Color {
     adaptive(
       light: (255, 255, 255),
-      dark: (0, 0, 0)
+      dark: (15, 15, 17)
     )
   }
 
   /// Filled panel. This is the default surface for cards and tiles — a solid
-  /// light gray with no border, which is what carries grouping.
+  /// gray with no border, which is what carries grouping.
   var flatSurfaceRaised: Color {
     adaptive(
-      light: (242, 242, 242),
-      dark: (28, 28, 28)
+      light: (242, 242, 244),
+      dark: (35, 35, 38)
     )
   }
 
-  /// Hairline rule. Used only for row lists on a white card, not around tiles.
+  /// Hairline rule. Used only for row lists on a plain surface, not around tiles.
   var flatLine: Color {
     adaptive(
-      light: (232, 232, 232),
-      dark: (42, 42, 42)
+      light: (228, 228, 231),
+      dark: (58, 58, 62)
+    )
+  }
+
+  /// Primary accent — violet. This is the fill for primary actions, selected
+  /// states and highlights. Kept distinct from `flatInk` (which stays text) so
+  /// a coloured action never collides with body copy.
+  var flatAccent: Color {
+    adaptive(
+      light: (67, 75, 214),
+      dark: (100, 100, 255)
+    )
+  }
+
+  /// Deep accent fill for selected tiles — the filled chip in the reference.
+  var flatAccentDeep: Color {
+    adaptive(
+      light: (74, 60, 190),
+      dark: (46, 42, 158)
+    )
+  }
+
+  /// Tinted accent surface for accent-on-surface treatments.
+  var flatAccentSoft: Color {
+    adaptive(
+      light: (238, 236, 255),
+      dark: (38, 34, 74)
+    )
+  }
+
+  /// Text/icons drawn on `flatAccent`. White in both schemes — the accent is
+  /// dark enough either way.
+  var flatOnAccent: Color {
+    adaptive(
+      light: (255, 255, 255),
+      dark: (255, 255, 255)
+    )
+  }
+
+  /// Muted green surface used for promotional panels.
+  var flatPositiveSurface: Color {
+    adaptive(
+      light: (226, 242, 237),
+      dark: (30, 59, 52)
+    )
+  }
+
+  /// Warning / pending accent — the hourglass yellow.
+  var flatWarning: Color {
+    adaptive(
+      light: (176, 132, 0),
+      dark: (245, 197, 24)
     )
   }
 
@@ -94,10 +145,13 @@ struct FlatCard<Content: View>: View {
   let content: Content
   var padding: CGFloat = 16
   var outlined = false
+  /// Overrides the default raised gray — used for the tinted promo panel.
+  var filled: Color?
 
-  init(padding: CGFloat = 16, outlined: Bool = false, @ViewBuilder content: () -> Content) {
+  init(padding: CGFloat = 16, outlined: Bool = false, filled: Color? = nil, @ViewBuilder content: () -> Content) {
     self.padding = padding
     self.outlined = outlined
+    self.filled = filled
     self.content = content()
   }
 
@@ -110,7 +164,7 @@ struct FlatCard<Content: View>: View {
     content
       .padding(padding)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(outlined ? theme.flatSurface : theme.flatSurfaceRaised)
+      .background(filled ?? (outlined ? theme.flatSurface : theme.flatSurfaceRaised))
       .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
       .overlay {
         if outlined {
@@ -170,10 +224,10 @@ struct FlatBadge: View {
   var body: some View {
     Text(title)
       .font(.system(size: 12, weight: .bold))
-      .foregroundStyle(foreground ?? theme.flatInkInverse)
+      .foregroundStyle(foreground ?? theme.flatOnAccent)
       .padding(.horizontal, 8)
       .frame(height: 24)
-      .background(background ?? theme.flatInk)
+      .background(background ?? theme.flatAccent)
       .clipShape(RoundedRectangle(cornerRadius: flatRadiusBadge, style: .continuous))
   }
 }
@@ -250,16 +304,16 @@ struct FlatPrimaryButton: View {
             systemName: systemImage,
             size: 15,
             weight: .bold,
-            color: foreground ?? theme.flatInkInverse
+            color: foreground ?? theme.flatOnAccent
           )
         }
         Text(title)
           .font(.system(size: 17, weight: .bold))
-          .foregroundStyle(foreground ?? theme.flatInkInverse)
+          .foregroundStyle(foreground ?? theme.flatOnAccent)
       }
       .frame(maxWidth: .infinity)
       .frame(height: 54)
-      .background(background ?? theme.flatInk)
+      .background(background ?? theme.flatAccent)
       .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
     }
     .buttonStyle(.plain)
@@ -462,3 +516,62 @@ struct FlatTopHeader: View {
     }
   }
 }
+
+// MARK: - Preview
+
+#if os(iOS)
+#Preview("Flat Palette — Light") {
+  FlatPalettePreview()
+    .preferredColorScheme(.light)
+}
+
+#Preview("Flat Palette — Dark") {
+  FlatPalettePreview()
+    .preferredColorScheme(.dark)
+}
+
+private struct FlatPalettePreview: View {
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
+
+  private let swatches: [(String, KeyPath<AppTheme, Color>)] = [
+    ("flatSurface",         \.flatSurface),
+    ("flatSurfaceRaised",   \.flatSurfaceRaised),
+    ("flatLine",            \.flatLine),
+    ("flatAccent",          \.flatAccent),
+    ("flatAccentDeep",      \.flatAccentDeep),
+    ("flatAccentSoft",      \.flatAccentSoft),
+    ("flatOnAccent",        \.flatOnAccent),
+    ("flatPositiveSurface", \.flatPositiveSurface),
+    ("flatWarning",         \.flatWarning),
+    ("flatInk",             \.flatInk),
+    ("flatInkInverse",      \.flatInkInverse),
+    ("flatInkMuted",        \.flatInkMuted),
+    ("flatPositive",        \.flatPositive),
+    ("flatCritical",        \.flatCritical),
+  ]
+
+  var body: some View {
+    ScrollView {
+      LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+        ForEach(swatches, id: \.0) { name, keyPath in
+          VStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
+              .fill(theme[keyPath: keyPath])
+              .frame(height: 60)
+              .overlay(
+                RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
+                  .stroke(theme.flatLine, lineWidth: flatHairline)
+              )
+            Text(name)
+              .font(.system(size: 11, weight: .medium))
+              .foregroundStyle(theme.flatInkMuted)
+          }
+        }
+      }
+      .padding(16)
+    }
+    .background(theme.flatSurface)
+  }
+}
+#endif

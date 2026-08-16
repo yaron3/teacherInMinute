@@ -214,7 +214,7 @@ struct CreateAccountView: View {
 			  systemName: "checkmark",
 			  size: 11,
 			  weight: .bold,
-			  color: theme.flatInkInverse
+			  color: theme.flatOnAccent
 			)
 		  }
 		}
@@ -313,17 +313,17 @@ struct CreateAccountView: View {
 	  ZStack {
 		Text(LocalizationSupport.localized("Continue to Role Selection"))
 		  .font(.system(size: 17, weight: .bold))
-		  .foregroundStyle(viewModel.canSubmit ? theme.flatInkInverse : theme.flatInkMuted)
+		  .foregroundStyle(viewModel.canSubmit ? theme.flatOnAccent : theme.flatInkMuted)
 		  .opacity(viewModel.isLoading ? 0 : 1)
 		if viewModel.isLoading {
-		  ProgressView().tint(theme.flatInkInverse)
+		  ProgressView().tint(theme.flatOnAccent)
 		}
 	  }
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 54)
 		.background(
 			RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-			  .fill(viewModel.canSubmit ? theme.flatInk : theme.flatSurfaceRaised)
+			  .fill(viewModel.canSubmit ? theme.flatAccent : theme.flatSurfaceRaised)
 		)
 	}
 	.disabled(viewModel.isLoading)

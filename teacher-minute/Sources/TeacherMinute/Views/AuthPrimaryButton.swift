@@ -29,10 +29,10 @@ struct AuthPrimaryButton: View {
                 }
             }
             .font(.system(size: 17, weight: .bold))
-            .foregroundStyle(theme.flatInkInverse)
+            .foregroundStyle(theme.flatOnAccent)
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .background(theme.flatInk.opacity(isEnabled ? 1 : 0.4))
+            .background(isEnabled ? theme.flatAccent : theme.flatSurfaceRaised)
             .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -171,7 +171,7 @@ struct AuthSelectedRoleBackground: View {
     var body: some View {
         if isSelected {
             RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
-                .fill(theme.flatInk)
+                .fill(theme.flatAccent)
         }
     }
 }
@@ -194,14 +194,14 @@ struct SubjectChip: View {
                     .font(.system(size: 15, weight: .medium))
             }
             // Selected chips fill with ink, so the label has to invert.
-            .foregroundStyle(isSelected ? theme.flatInkInverse : theme.flatInk)
+            .foregroundStyle(isSelected ? theme.flatOnAccent : theme.flatInk)
             .padding(.horizontal, 14)
             .frame(height: 36)
-            .background(isSelected ? theme.flatInk : theme.flatSurface)
+            .background(isSelected ? theme.flatAccent : theme.flatSurface)
             .clipShape(Capsule())
             .overlay {
                 Capsule()
-                    .stroke(isSelected ? theme.flatInk : theme.flatLine, lineWidth: flatHairline)
+                    .stroke(isSelected ? theme.flatAccent : theme.flatLine, lineWidth: flatHairline)
             }
         }
         .buttonStyle(.plain)
