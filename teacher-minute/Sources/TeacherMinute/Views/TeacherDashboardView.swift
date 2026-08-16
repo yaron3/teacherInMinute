@@ -113,7 +113,7 @@ struct TeacherDashboardView: View {
 		  .padding(.horizontal, 20)
 		  .padding(.bottom, 40)
 		}
-		.background(theme.flatSurface)
+		.background(theme.screenBackground)
 
 		if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
 		  TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
@@ -171,11 +171,11 @@ struct TeacherDashboardView: View {
   var statusHero: some View {
 	VStack(alignment: .leading, spacing: 0) {
 	  HStack(spacing: 8) {
-		FlatStatusDot(color: viewModel.isOnline ? theme.flatPositive : theme.flatInkMuted)
+		FlatStatusDot(color: viewModel.isOnline ? theme.positive : theme.secondaryText)
 
 		Text(viewModel.isOnline ? LocalizationSupport.localized("ONLINE") : LocalizationSupport.localized("OFFLINE"))
 		  .font(.system(size: 11, weight: .bold))
-		  .foregroundStyle(viewModel.isOnline ? theme.flatPositive : theme.flatInkMuted)
+		  .foregroundStyle(viewModel.isOnline ? theme.positive : theme.secondaryText)
 	  }
 
 	  FlatPageTitle(title: viewModel.isOnline ? LocalizationSupport.localized("You're Online") : LocalizationSupport.localized("You're Offline"))
@@ -183,7 +183,7 @@ struct TeacherDashboardView: View {
 
 	  Text(viewModel.isOnline ? LocalizationSupport.localized("Waiting for students...") : LocalizationSupport.localized("Go online to start receiving student requests and\nearn money."))
 		.font(.system(size: 15))
-		.foregroundStyle(theme.flatInkMuted)
+		.foregroundStyle(theme.secondaryText)
 		.lineSpacing(4)
 		.padding(.top, 6)
 		.frame(maxWidth: .infinity, alignment: .leading)
@@ -212,18 +212,18 @@ struct TeacherDashboardView: View {
 		  FlatIconTile(
 			systemName: viewModel.isVerified ? "checkmark.seal" : "clock",
 			size: 44,
-			tint: viewModel.isVerified ? theme.flatPositive : theme.flatInkMuted,
-			background: theme.flatSurface
+			tint: viewModel.isVerified ? theme.positive : theme.secondaryText,
+			background: theme.screenBackground
 		  )
 
 		  VStack(alignment: .leading, spacing: 3) {
 			Text(viewModel.isVerified ? LocalizationSupport.localized("Verified Expert") : LocalizationSupport.localized("Pending Verification"))
 			  .font(.system(size: 15, weight: .bold))
-			  .foregroundStyle(theme.flatInk)
+			  .foregroundStyle(theme.primaryText)
 
 			Text(viewModel.subjectsDisplayText)
 			  .font(.system(size: 13))
-			  .foregroundStyle(theme.flatInkMuted)
+			  .foregroundStyle(theme.secondaryText)
 		  }
 
 		  Spacer()
@@ -246,7 +246,7 @@ struct TeacherDashboardView: View {
 	  HStack(spacing: 12) {
 		EarningsCard(title: LocalizationSupport.localized("Today"), amount: viewModel.formattedTodayEarnings, subtitle: String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
 		  .frame(maxWidth: .infinity)
-		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.flatPositive : nil)
+		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.positive : nil)
 		  .frame(maxWidth: .infinity)
 	  }
 
@@ -267,15 +267,15 @@ struct TeacherDashboardView: View {
 		VStack(alignment: .leading, spacing: 6) {
 		  Text(LocalizationSupport.localized("Live Earnings Today"))
 			.font(.system(size: 14))
-			.foregroundStyle(theme.flatInkMuted)
+			.foregroundStyle(theme.secondaryText)
 
 		  Text(viewModel.formattedTodayEarnings)
 			.font(.system(size: 40, weight: .bold))
-			.foregroundStyle(theme.flatInk)
+			.foregroundStyle(theme.primaryText)
 
 		  Text(String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
 			.font(.system(size: 13))
-			.foregroundStyle(theme.flatInkMuted)
+			.foregroundStyle(theme.secondaryText)
 		}
 
 		Spacer()
@@ -288,18 +288,18 @@ struct TeacherDashboardView: View {
   var onlineStatusCard: some View {
 	FlatCard(padding: 14) {
 	  HStack(spacing: 0) {
-		statusItem(icon: "mic.fill", title: LocalizationSupport.localized("Mic"), subtitle: viewModel.hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off"), color: viewModel.hasMicAccess ? theme.flatPositive : theme.flatInkMuted)
+		statusItem(icon: "mic.fill", title: LocalizationSupport.localized("Mic"), subtitle: viewModel.hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off"), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
 		verticalRule
-		statusItem(icon: "video.fill", title: LocalizationSupport.localized("Cam"), subtitle: viewModel.hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off"), color: viewModel.hasCameraAccess ? theme.flatPositive : theme.flatInkMuted)
+		statusItem(icon: "video.fill", title: LocalizationSupport.localized("Cam"), subtitle: viewModel.hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off"), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
 		verticalRule
-		statusItem(icon: "circle.fill", title: LocalizationSupport.localized("Status"), subtitle: LocalizationSupport.localized("Connected"), color: theme.flatPositive)
+		statusItem(icon: "circle.fill", title: LocalizationSupport.localized("Status"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
 	  }
 	}
   }
 
   var verticalRule: some View {
 	Rectangle()
-	  .fill(theme.flatLine)
+	  .fill(theme.separator)
 	  .frame(width: flatHairline, height: 30)
   }
 
@@ -333,7 +333,7 @@ struct TeacherDashboardView: View {
 
   func incomingQuestionOverlay(inviteID: String) -> some View {
 	ZStack {
-	  theme.flatSurface
+	  theme.screenBackground
 
 	  ScrollView(.vertical, showsIndicators: false) {
 		VStack(spacing: 0) {
@@ -360,7 +360,7 @@ struct TeacherDashboardView: View {
 		  if let errorMessage = viewModel.errorMessage {
 			Text(errorMessage)
 			  .font(.system(size: 13, weight: .semibold))
-			  .foregroundStyle(theme.flatCritical)
+			  .foregroundStyle(theme.danger)
 			  .multilineTextAlignment(.center)
 			  .padding(.horizontal, 24)
 			  .padding(.top, 12)
@@ -380,11 +380,11 @@ struct TeacherDashboardView: View {
 
 	  FlatCard(padding: 0, outlined: true) {
 		VStack(spacing: 0) {
-		  checklistRow(icon: "mic.fill", title: viewModel.hasMicAccess ? LocalizationSupport.localized("Microphone Enabled") : LocalizationSupport.localized("Microphone Disabled"), subtitle: LocalizationSupport.localized("Required for voice sessions."), color: viewModel.hasMicAccess ? theme.flatPositive : theme.flatInkMuted)
+		  checklistRow(icon: "mic.fill", title: viewModel.hasMicAccess ? LocalizationSupport.localized("Microphone Enabled") : LocalizationSupport.localized("Microphone Disabled"), subtitle: LocalizationSupport.localized("Required for voice sessions."), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
 		  FlatRule()
-		  checklistRow(icon: "camera.fill", title: viewModel.hasCameraAccess ? LocalizationSupport.localized("Camera Enabled") : LocalizationSupport.localized("Camera Disabled"), subtitle: LocalizationSupport.localized("Enable for video tutoring."), color: viewModel.hasCameraAccess ? theme.flatPositive : theme.flatInkMuted)
+		  checklistRow(icon: "camera.fill", title: viewModel.hasCameraAccess ? LocalizationSupport.localized("Camera Enabled") : LocalizationSupport.localized("Camera Disabled"), subtitle: LocalizationSupport.localized("Enable for video tutoring."), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
 		  FlatRule()
-		  checklistRow(icon: "wifi", title: LocalizationSupport.localized("Connection"), subtitle: LocalizationSupport.localized("Connected"), color: theme.flatPositive)
+		  checklistRow(icon: "wifi", title: LocalizationSupport.localized("Connection"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
 		}
 	  }
 	}
@@ -397,11 +397,11 @@ struct TeacherDashboardView: View {
 	  VStack(alignment: .leading, spacing: 1) {
 		Text(title)
 		  .font(.system(size: 12, weight: .bold))
-		  .foregroundStyle(theme.flatInk)
+		  .foregroundStyle(theme.primaryText)
 
 		Text(subtitle)
 		  .font(.system(size: 11))
-		  .foregroundStyle(theme.flatInkMuted)
+		  .foregroundStyle(theme.secondaryText)
 	  }
 	}
 	.frame(maxWidth: .infinity)
@@ -414,11 +414,11 @@ struct TeacherDashboardView: View {
 	  VStack(alignment: .leading, spacing: 2) {
 		Text(title)
 		  .font(.system(size: 15, weight: .bold))
-		  .foregroundStyle(theme.flatInk)
+		  .foregroundStyle(theme.primaryText)
 
 		Text(subtitle)
 		  .font(.system(size: 13))
-		  .foregroundStyle(theme.flatInkMuted)
+		  .foregroundStyle(theme.secondaryText)
 	  }
 
 	  Spacer()
@@ -442,15 +442,15 @@ struct TeacherDashboardView: View {
 		VStack(alignment: .leading, spacing: 6) {
 		  Text(title)
 			.font(.system(size: 13, weight: .semibold))
-			.foregroundStyle(theme.flatInkMuted)
+			.foregroundStyle(theme.secondaryText)
 
 		  Text(amount)
 			.font(.system(size: 26, weight: .bold))
-			.foregroundStyle(theme.flatInk)
+			.foregroundStyle(theme.primaryText)
 
 		  Text(subtitle)
 			.font(.system(size: 12))
-			.foregroundStyle(subtitleColor ?? theme.flatInkMuted)
+			.foregroundStyle(subtitleColor ?? theme.secondaryText)
 		}
 		.frame(maxWidth: .infinity, alignment: .leading)
 	  }
@@ -536,17 +536,17 @@ struct TeacherDashboardView: View {
 	  HStack(alignment: .firstTextBaseline, spacing: 8) {
 		Text("\(timerValue)")
 		  .font(.system(size: 32, weight: .bold))
-		  .foregroundStyle(isExpired ? theme.flatInkMuted : theme.flatInk)
+		  .foregroundStyle(isExpired ? theme.secondaryText : theme.primaryText)
 
 		Text(timerCaption)
 		  .font(.system(size: 11, weight: .bold))
-		  .foregroundStyle(theme.flatInkMuted)
+		  .foregroundStyle(theme.secondaryText)
 
 		Spacer()
 
 		HStack(spacing: 6) {
 		  if let icon = sessionIcon {
-			PlatformIcon(systemName: icon, size: 14, weight: .medium, color: theme.flatInk)
+			PlatformIcon(systemName: icon, size: 14, weight: .medium, color: theme.primaryText)
 		  }
 		  FlatChip(title: LocalizationSupport.localized(topic.capitalized))
 		}
@@ -561,18 +561,18 @@ struct TeacherDashboardView: View {
 		  imageURL: studentImageURL,
 		  size: 40,
 		  fallbackSystemImage: "person.crop.circle.fill",
-		  background: theme.flatSurfaceRaised,
-		  tint: theme.flatInk
+		  background: theme.cardBackground,
+		  tint: theme.primaryText
 		)
 
 		VStack(alignment: .leading, spacing: 2) {
 		  Text(displayStudentName)
 			.font(.system(size: 15, weight: .bold))
-			.foregroundStyle(theme.flatInk)
+			.foregroundStyle(theme.primaryText)
 
 		  Text(LocalizationSupport.localized("Waiting now"))
 			.font(.system(size: 12))
-			.foregroundStyle(theme.flatInkMuted)
+			.foregroundStyle(theme.secondaryText)
 		}
 
 		Spacer()
@@ -585,11 +585,11 @@ struct TeacherDashboardView: View {
 	  VStack(alignment: .leading, spacing: 12) {
 		Text(LocalizationSupport.localized("QUESTION"))
 		  .font(.system(size: 11, weight: .bold))
-		  .foregroundStyle(theme.flatInkMuted)
+		  .foregroundStyle(theme.secondaryText)
 
 		Text(text)
 		  .font(.system(size: 15))
-		  .foregroundStyle(theme.flatInk)
+		  .foregroundStyle(theme.primaryText)
 		  .lineSpacing(4)
 		  .lineLimit(6)
 		  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
@@ -613,7 +613,7 @@ struct TeacherDashboardView: View {
 	func attachmentTile(url: String) -> some View {
 	  let minSide: CGFloat = hSizeClass == .regular ? 700 : 500
 	  return RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-		.fill(theme.flatSurfaceRaised)
+		.fill(theme.cardBackground)
 		.frame(maxWidth: CGFloat.infinity)
 		.frame(minHeight: minSide)
 		.overlay {
@@ -623,22 +623,22 @@ struct TeacherDashboardView: View {
 		.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 		.overlay {
 		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-			.stroke(theme.flatLine, lineWidth: flatHairline)
+			.stroke(theme.separator, lineWidth: flatHairline)
 		}
 	}
 
 	var voiceMessageRow: some View {
 	  HStack(spacing: 12) {
-		FlatIconTile(systemName: "play.fill", size: 40, background: theme.flatSurface)
+		FlatIconTile(systemName: "play.fill", size: 40, background: theme.screenBackground)
 
 		VStack(alignment: .leading, spacing: 1) {
 		  Text(LocalizationSupport.localized("Voice Message"))
 			.font(.system(size: 14, weight: .bold))
-			.foregroundStyle(theme.flatInk)
+			.foregroundStyle(theme.primaryText)
 		  if let formatted = formattedVoiceMessageDuration {
 			Text(formatted)
 			  .font(.system(size: 12))
-			  .foregroundStyle(theme.flatInkMuted)
+			  .foregroundStyle(theme.secondaryText)
 		  }
 		}
 
@@ -647,13 +647,13 @@ struct TeacherDashboardView: View {
 		HStack(spacing: 3) {
 		  ForEach(0..<6, id: \.self) { index in
 			Capsule()
-			  .fill(theme.flatInk)
+			  .fill(theme.primaryText)
 			  .frame(width: 3, height: CGFloat(10 + (index % 3) * 6))
 		  }
 		}
 	  }
 	  .padding(12)
-	  .background(theme.flatSurfaceRaised)
+	  .background(theme.cardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 	}
 
@@ -664,7 +664,7 @@ struct TeacherDashboardView: View {
 		Button(action: decline) {
 		  Text(LocalizationSupport.localized("Decline"))
 			.font(.system(size: 14, weight: .bold))
-			.foregroundStyle(theme.flatInkMuted)
+			.foregroundStyle(theme.secondaryText)
 			.frame(maxWidth: .infinity)
 			.frame(height: 36)
 		}
@@ -684,7 +684,7 @@ struct TeacherIncomingQuestionOverlay: View {
   }
   var body: some View {
 	ZStack {
-	  theme.flatSurface
+	  theme.screenBackground
 
 	  ScrollView(.vertical, showsIndicators: false) {
 		VStack(spacing: 0) {

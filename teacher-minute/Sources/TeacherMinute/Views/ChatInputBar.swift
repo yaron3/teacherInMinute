@@ -45,17 +45,17 @@ struct ChatInputBar: View {
           .lineLimit(1)
           .padding(.horizontal, 14)
           .frame(height: textFieldHeight)
-          .background(theme.appGrayBackground)
+          .background(theme.fieldBackground)
           .clipShape(Capsule())
 
         Button {
           send()
         } label: {
-          PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.white)
+          PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.onAccentText)
             .frame(width: 42, height: 42)
             .background(
               LinearGradient(
-                colors: canSend ? [theme.appPink, theme.appPurple] : [theme.appBorder, theme.appBorder],
+                colors: canSend ? [theme.accent, theme.accentStrong] : [theme.controlDisabled, theme.controlDisabled],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
               )

@@ -43,7 +43,7 @@ struct CachedRemoteImage: View {
     } else {
       ProgressView()
         .progressViewStyle(.circular)
-        .tint(theme.appPrimaryText)
+        .tint(theme.primaryText)
     }
   }
 
@@ -75,7 +75,7 @@ struct CachedRemoteImage: View {
         default:
           ProgressView()
             .progressViewStyle(.circular)
-            .tint(theme.appPrimaryText)
+            .tint(theme.primaryText)
         }
       }
     } else {
@@ -85,7 +85,7 @@ struct CachedRemoteImage: View {
 #endif
 
   private var placeholder: some View {
-    PlatformIcon(systemName: "photo.fill", size: 24, weight: .semibold, color: theme.appSecondaryText)
+    PlatformIcon(systemName: "photo.fill", size: 24, weight: .semibold, color: theme.secondaryText)
   }
 }
 

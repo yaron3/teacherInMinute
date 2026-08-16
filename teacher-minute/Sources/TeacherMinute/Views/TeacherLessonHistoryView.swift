@@ -51,7 +51,7 @@ struct TeacherLessonHistoryView: View {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .scaleEffect(1.4)
-                                .tint(theme.flatInk)
+                                .tint(theme.primaryText)
                                 .padding(.vertical, 40)
                             Spacer()
                         }
@@ -59,7 +59,7 @@ struct TeacherLessonHistoryView: View {
                     } else if viewModel.filteredLessons.isEmpty {
                         Text(LocalizationSupport.localized("You don't have any recent activity"))
                             .font(.system(size: 17))
-                            .foregroundStyle(theme.flatInkMuted)
+                            .foregroundStyle(theme.secondaryText)
                             .padding(.top, 20)
                     } else {
                         FlatCard(padding: 0, outlined: true) {
@@ -67,7 +67,7 @@ struct TeacherLessonHistoryView: View {
                                 ForEach(viewModel.filteredLessons) { lesson in
                                     LessonHistoryRow(
                                         lesson: lesson,
-                                        accentColor: theme.flatInk,
+                                        accentColor: theme.primaryText,
                                         iconName: "person.fill.checkmark",
                                         isLoading: viewModel.isLoading(lesson)
                                     ) {
@@ -86,7 +86,7 @@ struct TeacherLessonHistoryView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
             }
-            .background(theme.flatSurface)
+            .background(theme.screenBackground)
         }
         .task {
             await viewModel.loadProfile()
@@ -109,14 +109,14 @@ struct TeacherLessonHistoryView: View {
                 title: "Time Taught",
                 value: viewModel.totalTimeTaughtText,
                 systemImage: "clock.fill",
-                tint: theme.flatInk
+                tint: theme.primaryText
             )
 
             HistoryMetricCard(
                 title: "Earnings",
                 value: viewModel.totalEarningsText,
                 systemImage: "dollarsign.circle.fill",
-                tint: theme.flatInk
+                tint: theme.primaryText
             )
         }
     }

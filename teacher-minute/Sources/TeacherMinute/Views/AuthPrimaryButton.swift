@@ -29,10 +29,10 @@ struct AuthPrimaryButton: View {
                 }
             }
             .font(.system(size: 17, weight: .bold))
-            .foregroundStyle(theme.flatOnAccent)
+            .foregroundStyle(theme.onAccentText)
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .background(isEnabled ? theme.flatAccent : theme.flatSurfaceRaised)
+            .background(isEnabled ? theme.accent : theme.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -48,12 +48,12 @@ struct AuthIconHeader: View {
   }
     var body: some View {
         RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-            .fill(theme.flatSurfaceRaised)
+            .fill(theme.cardBackground)
             .frame(width: 56, height: 56)
             .overlay {
                 PlatformIcon(systemName: systemImage)
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(theme.flatInk)
+                    .foregroundStyle(theme.primaryText)
             }
     }
 }
@@ -82,7 +82,7 @@ struct AuthInputField: View {
 	  VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(theme.authPrimaryText)
+                .foregroundStyle(theme.primaryText)
 
             HStack(spacing: 12) {
                 if layoutDirection == .leftToRight {
@@ -95,7 +95,7 @@ struct AuthInputField: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 56)
-            .background(theme.flatSurfaceRaised)
+            .background(theme.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
         }
     }
@@ -103,19 +103,19 @@ struct AuthInputField: View {
     var fieldIcon: some View {
         PlatformIcon(systemName: systemImage)
             .font(.system(size: 18))
-            .foregroundStyle(theme.authIcon)
+            .foregroundStyle(theme.secondaryText)
     }
 
     var inputField: some View {
         TextField(placeholder, text: $text)
             .font(.system(size: 17))
-            .foregroundStyle(theme.authPrimaryText)
+            .foregroundStyle(theme.primaryText)
             .keyboardType(keyboardType)
             .textContentType(textContentType)
             .textInputAutocapitalization(autocapitalization)
             .autocorrectionDisabled()
             .multilineTextAlignment(textAlignment)
-            .tint(theme.authPink)
+            .tint(theme.accent)
     }
 }
 
@@ -132,7 +132,7 @@ struct AuthSegmentedRolePicker: View {
             }
         }
         .padding(3)
-        .background(theme.flatSurfaceRaised)
+        .background(theme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
     }
 
@@ -146,13 +146,13 @@ struct AuthSegmentedRolePicker: View {
         } label: {
             Text(role.title)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(isSelected ? theme.authPrimaryText : theme.authSecondaryText)
+                .foregroundStyle(isSelected ? theme.primaryText : theme.secondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
                 .background {
                     AuthSelectedRoleBackground(
                         isSelected: isSelected,
-                        shadowColor: theme.appPrimaryText
+                        shadowColor: theme.primaryText
                     )
                 }
         }
@@ -171,7 +171,7 @@ struct AuthSelectedRoleBackground: View {
     var body: some View {
         if isSelected {
             RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
-                .fill(theme.flatAccent)
+                .fill(theme.accent)
         }
     }
 }
@@ -194,14 +194,14 @@ struct SubjectChip: View {
                     .font(.system(size: 15, weight: .medium))
             }
             // Selected chips fill with ink, so the label has to invert.
-            .foregroundStyle(isSelected ? theme.flatOnAccent : theme.flatInk)
+            .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
             .padding(.horizontal, 14)
             .frame(height: 36)
-            .background(isSelected ? theme.flatAccent : theme.flatSurface)
+            .background(isSelected ? theme.accent : theme.screenBackground)
             .clipShape(Capsule())
             .overlay {
                 Capsule()
-                    .stroke(isSelected ? theme.flatAccent : theme.flatLine, lineWidth: flatHairline)
+                    .stroke(isSelected ? theme.accent : theme.separator, lineWidth: flatHairline)
             }
         }
         .buttonStyle(.plain)

@@ -38,14 +38,14 @@ struct SettingsView: View {
                     Section {
                         Text(viewModel.appVersion)
                             .font(.system(size: 13))
-                            .foregroundStyle(theme.flatInkMuted)
+                            .foregroundStyle(theme.secondaryText)
                             .frame(maxWidth: .infinity)
                             .listRowBackground(Color.clear)
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .background(theme.flatSurface)
+                .background(theme.screenBackground)
 
                 loadingOverlay
             }
@@ -136,11 +136,11 @@ struct SettingsView: View {
     @ViewBuilder
     var loadingOverlay: some View {
         if viewModel.isLoading {
-            theme.flatInk.opacity(0.18).ignoresSafeArea()
+            theme.scrim.opacity(0.18).ignoresSafeArea()
             ProgressView()
                 .progressViewStyle(.circular)
                 .scaleEffect(1.4)
-                .tint(theme.flatInk)
+                .tint(theme.primaryText)
         }
     }
 
@@ -180,11 +180,11 @@ struct AccountSecuritySettingsView: View {
             }
 
             if viewModel.isLoading {
-                theme.flatInk.opacity(0.18).ignoresSafeArea()
+                theme.scrim.opacity(0.18).ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.flatInk)
+                    .tint(theme.primaryText)
             }
         }
     }
@@ -238,11 +238,11 @@ struct LanguageSettingsView: View {
             .disabled(localizationManager.isLoading)
 
             if localizationManager.isLoading {
-                theme.flatInk.opacity(0.18).ignoresSafeArea()
+                theme.scrim.opacity(0.18).ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.flatInk)
+                    .tint(theme.primaryText)
             }
         }
     }
@@ -409,24 +409,24 @@ struct SettingsPlaceholderView: View {
     var body: some View {
         VStack(spacing: 14) {
             Circle()
-                .fill(theme.appGrayBackground)
+                .fill(theme.cardBackground)
                 .frame(width: 58, height: 58)
                 .overlay {
                     PlatformIcon(
                         systemName: "gearshape.fill",
                         size: 22,
                         weight: .semibold,
-                        color: theme.appSecondaryText
+                        color: theme.secondaryText
                     )
                 }
 
             Text(destination.title)
                 .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(theme.appPrimaryText)
+                .foregroundStyle(theme.primaryText)
 
             Text(destination.placeholderMessage)
                 .font(.system(size: 13))
-                .foregroundStyle(theme.appSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 .padding(.horizontal, 32)
@@ -802,7 +802,7 @@ struct SettingsSectionView: View {
         } header: {
             Text(section.title)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(theme.flatInk)
+                .foregroundStyle(theme.primaryText)
         }
     }
 }
@@ -818,18 +818,18 @@ struct SettingsRowView: View {
             FlatIconTile(
                 systemName: row.systemImage,
                 size: 40,
-                tint: row.isDestructive ? theme.flatCritical : theme.flatInk
+                tint: row.isDestructive ? theme.danger : theme.primaryText
             )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(row.isDestructive ? theme.flatCritical : theme.flatInk)
+                    .foregroundStyle(row.isDestructive ? theme.danger : theme.primaryText)
 
                 if let subtitle = row.subtitle {
                     Text(subtitle)
                         .font(.system(size: 13))
-                        .foregroundStyle(theme.flatInkMuted)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
         }

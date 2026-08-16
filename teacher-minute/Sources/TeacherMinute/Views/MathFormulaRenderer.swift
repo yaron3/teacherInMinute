@@ -118,7 +118,7 @@ struct MathFormulaRenderer: View {
         ScrollView(.horizontal, showsIndicators: false) {
             Text(display.isEmpty ? "Empty equation" : display)
                 .font(.system(size: 16))
-                .foregroundStyle(display.isEmpty ? theme.appSecondaryText : theme.appPrimaryText)
+                .foregroundStyle(display.isEmpty ? theme.secondaryText : theme.primaryText)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
         }

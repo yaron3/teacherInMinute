@@ -15,7 +15,7 @@ struct ChatThreadView: View {
           if messages.isEmpty {
             Text(LocalizationSupport.localized("Start with a text explanation, then use the board below for the math work."))
               .font(.system(size: 13))
-              .foregroundStyle(theme.appSecondaryText)
+              .foregroundStyle(theme.secondaryText)
               .multilineTextAlignment(.center)
               .padding(.horizontal, 28)
               .padding(.top, 24)
@@ -33,7 +33,7 @@ struct ChatThreadView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
       }
-      .background(theme.appGrayBackground.opacity(0.45))
+      .background(theme.cardBackground.opacity(0.45))
       .onChange(of: messages.count) { _, _ in
         if let last = messages.last {
           withAnimation(.easeOut(duration: 0.2)) {

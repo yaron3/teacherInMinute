@@ -20,7 +20,7 @@ struct PaymentMethodSheet: View {
     VStack(spacing: 16) {
       Text(LocalizationSupport.localized("Choose a payment method"))
         .font(.headline)
-        .foregroundStyle(theme.appPrimaryText)
+        .foregroundStyle(theme.primaryText)
         .padding(.top, 20)
 
       VStack(spacing: 12) {
@@ -33,7 +33,7 @@ struct PaymentMethodSheet: View {
       Button(LocalizationSupport.localized("Cancel")) {
         dismiss()
       }
-      .foregroundStyle(theme.appSecondaryText)
+      .foregroundStyle(theme.secondaryText)
       .padding(.top, 4)
 
       Spacer()
@@ -155,11 +155,11 @@ struct PaymentMethodSheet: View {
         .font(.system(size: 16, weight: .semibold))
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .foregroundStyle(theme.appPrimaryText)
-        .background(theme.appCardBackground)
+        .foregroundStyle(theme.primaryText)
+        .background(theme.cardBackground)
         .overlay(
           RoundedRectangle(cornerRadius: 12)
-            .stroke(theme.appBorder, lineWidth: 1)
+            .stroke(theme.controlBorder, lineWidth: 1)
         )
         .cornerRadius(12)
     }

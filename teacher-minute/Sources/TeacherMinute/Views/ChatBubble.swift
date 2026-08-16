@@ -28,10 +28,10 @@ struct ChatBubble: View {
             .frame(minWidth: 160, maxWidth: 300, minHeight: Self.formulaHeight(message.text))
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
-            .background(theme.appCardBackground)
+            .background(theme.cardBackground)
             .overlay(
               RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(message.isMine ? theme.appPink : theme.appBorder.opacity(0.5), lineWidth: 1.5)
+                .stroke(message.isMine ? theme.accent : theme.controlBorder.opacity(0.5), lineWidth: 1.5)
             )
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         } else {
@@ -39,13 +39,13 @@ struct ChatBubble: View {
             .frame(maxWidth: contentMaxWidth, alignment: .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(message.isMine ? theme.appPink : theme.appCardBackground)
+            .background(message.isMine ? theme.outgoingBubbleBackground : theme.incomingBubbleBackground)
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
 
         Text(timeText)
           .font(.system(size: 9, weight: .medium))
-          .foregroundStyle(theme.appSecondaryText)
+          .foregroundStyle(theme.secondaryText)
       }
 
       if message.isMine {
@@ -69,8 +69,8 @@ struct ChatBubble: View {
       imageURL: avatarImageURL,
       size: 24,
       fallbackSystemImage: "person.crop.circle.fill",
-      background: message.isMine ? theme.appPurpleSoft : theme.appGreenSoft,
-      tint: message.isMine ? theme.appPurple : theme.appGreen
+      background: message.isMine ? theme.accentBackground : theme.positiveBackground,
+      tint: message.isMine ? theme.accentStrong : theme.positive
     )
   }
 
@@ -84,7 +84,7 @@ struct ChatBubble: View {
         } else {
           Self.formattedText(segment.text)
             .font(.system(size: 14))
-            .foregroundStyle(message.isMine ? theme.appCardBackground: theme.appPrimaryText)
+            .foregroundStyle(message.isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
             .lineSpacing(4)
             .multilineTextAlignment(.leading)
         }

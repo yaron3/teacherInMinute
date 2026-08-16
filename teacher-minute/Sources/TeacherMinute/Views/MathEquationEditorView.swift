@@ -47,18 +47,18 @@ struct MathEquationEditorView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: inputCapsuleHeight)
                     .padding(.horizontal, 6)
-                    .background(theme.appGrayBackground)
+                    .background(theme.fieldBackground)
                     .clipShape(Capsule())
 
                 Button {
                     sendCurrent(exported: exported)
                     modelTick &+= 1
                 } label: {
-                    PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.white)
+                    PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.onAccentText)
                         .frame(width: 42, height: 42)
                         .background(
                             LinearGradient(
-                                colors: canSend ? [theme.appPink, theme.appPurple] : [theme.appBorder, theme.appBorder],
+                                colors: canSend ? [theme.accent, theme.accentStrong] : [theme.controlDisabled, theme.controlDisabled],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )

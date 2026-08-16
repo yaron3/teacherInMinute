@@ -21,30 +21,30 @@ struct VerifyPhoneView: View {
                 .frame(height: 78)
 
             Circle()
-                .fill(theme.authPinkSoft)
+                .fill(theme.accentBackground)
                 .frame(width: 76, height: 76)
                 .overlay {
                     PlatformIcon(
                         systemName: "shield.lefthalf.filled",
                         size: 30,
                         weight: .semibold,
-                        color: theme.authPink
+                        color: theme.accent
                     )
                 }
 
             Text(LocalizationSupport.localized("Verify your number"))
                 .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(theme.authPrimaryText)
+                .foregroundStyle(theme.primaryText)
                 .padding(.top, 26)
 
             Text(LocalizationSupport.localized("We've sent a 4-digit security code to"))
                 .font(.system(size: 14))
-                .foregroundStyle(theme.authSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .padding(.top, 10)
 
             Text(viewModel.phoneNumber)
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(theme.authPrimaryText)
+                .foregroundStyle(theme.primaryText)
                 .padding(.top, 6)
 
             Button {
@@ -55,13 +55,13 @@ struct VerifyPhoneView: View {
                         systemName: "pencil",
                         size: 10,
                         weight: .semibold,
-                        color: theme.authPink
+                        color: theme.accent
                     )
 
                     Text(LocalizationSupport.localized("Change contact info"))
                         .font(.system(size: 12, weight: .medium))
                 }
-                .foregroundStyle(theme.authPink)
+                .foregroundStyle(theme.accent)
             }
             .buttonStyle(.plain)
             .padding(.top, 16)
@@ -81,16 +81,16 @@ struct VerifyPhoneView: View {
                         systemName: "arrow.clockwise",
                         size: 12,
                         weight: .semibold,
-                        color: theme.authPink
+                        color: theme.accent
                     )
 
                     Text(LocalizationSupport.localized("Resend Code Now"))
                         .font(.system(size: 13, weight: .semibold))
                 }
-                .foregroundStyle(theme.authPink)
+                .foregroundStyle(theme.accent)
                 .padding(.horizontal, 16)
                 .frame(height: 36)
-                .background(theme.authPinkSoft)
+                .background(theme.accentBackground)
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -99,21 +99,21 @@ struct VerifyPhoneView: View {
             Spacer()
 
             Rectangle()
-                .fill(theme.authFieldBorder)
+                .fill(theme.controlBorder)
                 .frame(height: 1)
                 .padding(.horizontal, 18)
 
             HStack(spacing: 4) {
                 Text(LocalizationSupport.localized("Having trouble?"))
                     .font(.system(size: 12))
-                    .foregroundStyle(theme.authSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
 
                 Button {
                     viewModel.contactSupport()
                 } label: {
                     Text(LocalizationSupport.localized("Contact Support"))
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(theme.authPrimaryText)
+                        .foregroundStyle(theme.primaryText)
                         .underline()
                 }
                 .buttonStyle(.plain)
@@ -122,7 +122,7 @@ struct VerifyPhoneView: View {
             .padding(.bottom, 42)
         }
         .padding(.horizontal, 18)
-        .background(theme.flatSurface)
+        .background(theme.screenBackground)
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen(AnalyticsScreen.verifyPhone)
         .onAppear {
@@ -145,14 +145,14 @@ struct VerifyPhoneView: View {
         .keyboardType(.numberPad)
         .multilineTextAlignment(.center)
         .font(.system(size: 24, weight: .bold))
-        .foregroundStyle(theme.authPrimaryText)
+        .foregroundStyle(theme.primaryText)
         .focused($focusedIndex, equals: index)
         .frame(width: 52, height: 56)
-        .background(theme.flatSurfaceRaised)
+        .background(theme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-                .stroke(theme.authFieldBorder, lineWidth: 1.5)
+                .stroke(theme.controlBorder, lineWidth: 1.5)
         }
     }
 }

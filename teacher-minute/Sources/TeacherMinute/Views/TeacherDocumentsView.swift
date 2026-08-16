@@ -29,7 +29,7 @@ struct TeacherDocumentsView: View {
       VStack(alignment: .leading, spacing: 16) {
         Text(LocalizationSupport.localized("These are the verification documents you uploaded."))
           .font(.system(size: 13))
-          .foregroundStyle(theme.appSecondaryText)
+          .foregroundStyle(theme.secondaryText)
           .lineSpacing(4)
           .padding(.top, 8)
 
@@ -87,19 +87,19 @@ struct TeacherDocumentsView: View {
     VStack(alignment: .leading, spacing: 10) {
       Text(document.title)
         .font(.system(size: 14, weight: .bold))
-        .foregroundStyle(theme.appPrimaryText)
+        .foregroundStyle(theme.primaryText)
 
       RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(theme.appGrayBackground)
+        .fill(theme.cardBackground)
         .frame(maxWidth: .infinity)
         .frame(minHeight: 320)
         .overlay {
           if document.url.isEmpty {
             VStack(spacing: 8) {
-              PlatformIcon(systemName: "exclamationmark.triangle.fill", size: 22, color: theme.appOrange)
+              PlatformIcon(systemName: "exclamationmark.triangle.fill", size: 22, color: theme.warning)
               Text(LocalizationSupport.localized("Could not load this document."))
                 .font(.system(size: 12))
-                .foregroundStyle(theme.appSecondaryText)
+                .foregroundStyle(theme.secondaryText)
             }
           } else {
             CachedRemoteImage(url: document.url, contentMode: .fit)
@@ -109,7 +109,7 @@ struct TeacherDocumentsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
           RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(theme.appBorder, lineWidth: 1)
+            .stroke(theme.controlBorder, lineWidth: 1)
         }
     }
   }
@@ -121,12 +121,12 @@ struct TeacherDocumentsView: View {
     if !viewModel.missingTargets.isEmpty {
       Text(LocalizationSupport.localized("Add missing documents"))
         .font(.system(size: 16, weight: .bold))
-        .foregroundStyle(theme.appPrimaryText)
+        .foregroundStyle(theme.primaryText)
         .padding(.top, 12)
 
       Text(LocalizationSupport.localized("Uploading the remaining documents helps us verify you as a teacher faster."))
         .font(.system(size: 12))
-        .foregroundStyle(theme.appSecondaryText)
+        .foregroundStyle(theme.secondaryText)
         .lineSpacing(4)
 
 #if !os(Android)
@@ -201,10 +201,10 @@ struct TeacherDocumentsView: View {
   var loadingView: some View {
     VStack(spacing: 12) {
       ProgressView()
-        .tint(theme.appPink)
+        .tint(theme.accent)
       Text(LocalizationSupport.localized("Loading documents..."))
         .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(theme.appSecondaryText)
+        .foregroundStyle(theme.secondaryText)
     }
     .frame(maxWidth: .infinity, minHeight: 320)
   }
@@ -213,13 +213,13 @@ struct TeacherDocumentsView: View {
     VStack(spacing: 12) {
       Text(error)
         .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(theme.red)
+        .foregroundStyle(theme.danger)
       Button {
         Task { await viewModel.load() }
       } label: {
         Text(LocalizationSupport.localized("Retry"))
           .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(theme.appPink)
+          .foregroundStyle(theme.accent)
       }
       .buttonStyle(.plain)
     }
@@ -228,10 +228,10 @@ struct TeacherDocumentsView: View {
 
   var emptyView: some View {
     VStack(spacing: 12) {
-      PlatformIcon(systemName: "doc.text", size: 28, color: theme.appSecondaryText)
+      PlatformIcon(systemName: "doc.text", size: 28, color: theme.secondaryText)
       Text(LocalizationSupport.localized("No documents uploaded yet."))
         .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(theme.appSecondaryText)
+        .foregroundStyle(theme.secondaryText)
     }
     .frame(maxWidth: .infinity, minHeight: 200)
   }
@@ -256,29 +256,29 @@ struct MissingDocumentRow: View {
   var body: some View {
     HStack(spacing: 14) {
       Circle()
-        .fill(theme.appPinkSoft)
+        .fill(theme.accentBackground)
         .frame(width: 42, height: 42)
         .overlay {
           if isUploading {
             ProgressView()
               .progressViewStyle(.circular)
-              .tint(theme.appPink)
+              .tint(theme.accent)
           } else {
             PlatformIcon(systemName: "arrow.up.doc.fill")
               .font(.system(size: 16, weight: .semibold))
-              .foregroundStyle(theme.appPink)
+              .foregroundStyle(theme.accent)
           }
         }
 
       VStack(alignment: .leading, spacing: 4) {
         Text(title)
           .font(.system(size: 14, weight: .bold))
-          .foregroundStyle(theme.appPrimaryText)
+          .foregroundStyle(theme.primaryText)
         Text(isUploading
              ? LocalizationSupport.localized("Uploading…")
              : LocalizationSupport.localized("Not uploaded yet"))
           .font(.system(size: 12))
-          .foregroundStyle(theme.appSecondaryText)
+          .foregroundStyle(theme.secondaryText)
       }
 
       Spacer()
@@ -286,21 +286,21 @@ struct MissingDocumentRow: View {
       if !isUploading {
         Text(LocalizationSupport.localized("Upload"))
           .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(theme.white)
+          .foregroundStyle(theme.onAccentText)
           .padding(.horizontal, 14)
           .frame(height: 32)
-          .background(theme.appPink)
+          .background(theme.accent)
           .clipShape(Capsule())
       }
     }
     .padding(14)
     .frame(maxWidth: .infinity)
-    .background(theme.appCardBackground)
+    .background(theme.cardBackground)
     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 14, style: .continuous)
         .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-        .foregroundStyle(theme.appBorder)
+        .foregroundStyle(theme.controlBorder)
     }
   }
 }

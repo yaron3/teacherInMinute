@@ -26,14 +26,14 @@ enum BoardColor: CaseIterable, Hashable {
 
   func color(theme: AppTheme) -> Color {
 	switch self {
-	case .default: return theme.appPrimaryText
-	case .pink: return theme.appPink
-	case .purple: return theme.appPurple
-	case .green: return theme.appGreen
-	case .orange: return theme.appOrange
-	case .teal: return theme.appTeal
-	case .red: return theme.red
-	case .yellow: return theme.yellow
+	case .default: return theme.penInk
+	case .pink: return theme.penPink
+	case .purple: return theme.penPurple
+	case .green: return theme.penGreen
+	case .orange: return theme.penOrange
+	case .teal: return theme.penTeal
+	case .red: return theme.penRed
+	case .yellow: return theme.penYellow
 	}
   }
 
@@ -160,7 +160,7 @@ struct WhiteboardView: View {
 	  .padding(.bottom, isMaximized ? 0 : 6)
 	}
 	.padding(.top, isMaximized ? 0 : 10)
-	.background(theme.appGrayBackground.opacity(0.35))
+	.background(theme.cardBackground.opacity(0.35))
 	.confirmationDialog(
 	  clearDialogTitle,
 	  isPresented: $isClearDialogPresented,
@@ -224,10 +224,10 @@ struct WhiteboardView: View {
 			systemName: "hand.raised.fill",
 			size: 14,
 			weight: .semibold,
-			color: isMoveMode ? theme.white : theme.appPrimaryText
+			color: isMoveMode ? theme.onAccentText : theme.primaryText
 		  )
 		  .frame(width: 28, height: 28)
-		  .background(isMoveMode ? theme.appPink : Color.clear)
+		  .background(isMoveMode ? theme.accent : Color.clear)
 		  .clipShape(Circle())
 		}
 		.buttonStyle(.plain)
@@ -239,7 +239,7 @@ struct WhiteboardView: View {
 			systemName: isMaximized ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
 			size: 14,
 			weight: .semibold,
-			color: theme.appPrimaryText
+			color: theme.primaryText
 		  )
 		  .frame(width: 28, height: 28)
 		}
@@ -254,7 +254,7 @@ struct WhiteboardView: View {
 		  systemName: "trash",
 		  size: 14,
 		  weight: .semibold,
-		  color: theme.appPink
+		  color: theme.accent
 		)
 		.frame(width: 28, height: 28)
 	  }
@@ -271,7 +271,7 @@ struct WhiteboardView: View {
 		.fill(selectedColor.color(theme: theme))
 		.frame(width: 24, height: 24)
 		.overlay(
-		  Circle().stroke(theme.appBorder, lineWidth: 1.5)
+		  Circle().stroke(theme.controlBorder, lineWidth: 1.5)
 		)
 	}
 	.buttonStyle(.plain)
@@ -289,7 +289,7 @@ struct WhiteboardView: View {
 			.frame(width: 28, height: 28)
 			.overlay(
 			  Circle().stroke(
-				selectedColor == color ? theme.appPink : theme.appBorder,
+				selectedColor == color ? theme.accent : theme.controlBorder,
 				lineWidth: selectedColor == color ? 2.5 : 1
 			  )
 			)
@@ -300,11 +300,11 @@ struct WhiteboardView: View {
 	}
 	.padding(.horizontal, 12)
 	.padding(.vertical, 6)
-	.background(theme.appCardBackground)
+	.background(theme.cardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 	.overlay(
 	  RoundedRectangle(cornerRadius: 10, style: .continuous)
-		.stroke(theme.appBorder, lineWidth: 0.5)
+		.stroke(theme.controlBorder, lineWidth: 0.5)
 	)
 	.padding(.horizontal, 12)
   }
@@ -324,10 +324,10 @@ struct WhiteboardView: View {
 		systemName: tool.iconName,
 		size: 14,
 		weight: .semibold,
-		color: isActive ? theme.white : theme.appPrimaryText
+		color: isActive ? theme.onAccentText : theme.primaryText
 	  )
 	  .frame(width: 28, height: 28)
-	  .background(isActive ? theme.appPink : Color.clear)
+	  .background(isActive ? theme.accent : Color.clear)
 	  .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 	}
 	.buttonStyle(.plain)
@@ -346,7 +346,7 @@ struct WhiteboardView: View {
 	if let bc = localStrokeColors[key] {
 	  return bc.color(theme: theme)
 	}
-	return theme.appPrimaryText
+	return theme.primaryText
   }
 
   func recordLocalColor(for points: [CGPoint]) {
@@ -357,8 +357,8 @@ struct WhiteboardView: View {
   func saveBoardAsPhoto(strokesToSave: [BoardStroke]? = nil) {
 #if canImport(UIKit) && !os(Android)
 	let renderSize = CGSize(width: 1080, height: 1080)
-	let defaultColor = theme.appPrimaryText
-	let background = theme.appCardBackground
+	let defaultColor = theme.primaryText
+	let background = theme.cardBackground
 	let logical = Self.logicalSize
 	let strokesSnapshot = strokesToSave ?? strokes
 	let colorMap = localStrokeColors
@@ -435,14 +435,14 @@ struct WhiteboardView: View {
   @ViewBuilder
   func canvas(viewSize: CGSize) -> some View {
 	ZStack {
-	  theme.appCardBackground
+	  theme.cardBackground
 
 	  if strokes.isEmpty && activeStroke.isEmpty {
 		VStack(spacing: 8) {
-		  PlatformIcon(systemName: "pencil", size: 22, weight: .semibold, color: theme.appSecondaryText)
+		  PlatformIcon(systemName: "pencil", size: 22, weight: .semibold, color: theme.secondaryText)
 		  Text(LocalizationSupport.localized("Use your finger to write or sketch."))
 			.font(.system(size: 12))
-			.foregroundStyle(theme.appSecondaryText)
+			.foregroundStyle(theme.secondaryText)
 		}
 	  }
 
@@ -475,7 +475,7 @@ struct WhiteboardView: View {
       if let peerViewport, !isCompact {
 		let rect = logicalRectToView(peerViewport, viewSize: viewSize)
 		Rectangle()
-		  .stroke(theme.appPink.opacity(0.55), lineWidth: 2)
+		  .stroke(theme.accent.opacity(0.55), lineWidth: 2)
 		  .frame(width: max(0, rect.width), height: max(0, rect.height))
 		  .position(x: rect.midX, y: rect.midY)
 		  .allowsHitTesting(false)
@@ -487,7 +487,7 @@ struct WhiteboardView: View {
 	.overlay {
 	  if !isMaximized {
 		RoundedRectangle(cornerRadius: 14, style: .continuous)
-		  .stroke(theme.appBorder, lineWidth: 1)
+		  .stroke(theme.controlBorder, lineWidth: 1)
 	  }
 	}
 	.overlay(gestureLayer(viewSize: viewSize))

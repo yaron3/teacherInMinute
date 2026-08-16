@@ -101,7 +101,7 @@ struct MathKeyboardView: View {
             }
         }
         .padding(8)
-        .background(theme.appGrayBackground)
+        .background(theme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
@@ -132,19 +132,19 @@ struct MathKeyboardView: View {
 
     func background(for style: MathKey.KeyStyle) -> Color {
         switch style {
-        case .standard:    return theme.appCardBackground
-        case .operatorKey: return theme.appPurpleSoft
-        case .command:     return theme.appPinkSoft
-        case .destructive: return theme.yellow.opacity(0.22)
+        case .standard:    return theme.cardBackground
+        case .operatorKey: return theme.accentBackground
+        case .command:     return theme.accentBackground
+        case .destructive: return theme.dangerBackground
         }
     }
 
     func foreground(for style: MathKey.KeyStyle) -> Color {
         switch style {
-        case .standard:    return theme.appPrimaryText
-        case .operatorKey: return theme.appPurple
-        case .command:     return theme.appPink
-        case .destructive: return theme.appOrange
+        case .standard:    return theme.primaryText
+        case .operatorKey: return theme.accentStrong
+        case .command:     return theme.accent
+        case .destructive: return theme.danger
         }
     }
 }

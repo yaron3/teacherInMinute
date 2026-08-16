@@ -67,7 +67,7 @@ struct MainTabView: View {
 	  }
 	  .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
 	  // Accent selection instead of the system blue.
-	  //.tint(theme.flatAccent)
+	  //.tint(theme.accent)
 	  
 	  teacherGlobalOverlay
 	}

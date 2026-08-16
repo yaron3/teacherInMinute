@@ -26,22 +26,22 @@ struct TeacherDocumentsSuggestionView: View {
             Spacer(minLength: 24)
 
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(theme.authPurpleSoft)
+                .fill(theme.accentBackground)
                 .frame(width: 78, height: 78)
                 .overlay {
-                    PlatformIcon(systemName: "checkmark.seal.fill", size: 34, weight: .semibold, color: theme.authPurple)
+                    PlatformIcon(systemName: "checkmark.seal.fill", size: 34, weight: .semibold, color: theme.accent)
                 }
-                .shadow(color: theme.authPurple.opacity(0.12), radius: 24, x: 0, y: 12)
+                .shadow(color: theme.accent.opacity(0.12), radius: 24, x: 0, y: 12)
 
             Text(LocalizationSupport.localized("Complete your verification"))
                 .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(theme.appPrimaryText)
+                .foregroundStyle(theme.primaryText)
                 .multilineTextAlignment(.center)
                 .padding(.top, 28)
 
             Text(LocalizationSupport.localized("Nice work on your first lesson! Uploading the rest of your verification documents helps us confirm you as a teacher faster. It's optional — you can also do it anytime from your Profile."))
                 .font(.system(size: 14))
-                .foregroundStyle(theme.appSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .lineSpacing(6)
                 .multilineTextAlignment(.center)
                 .padding(.top, 12)
@@ -62,7 +62,7 @@ struct TeacherDocumentsSuggestionView: View {
             } label: {
                 Text(LocalizationSupport.localized("Maybe later"))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.appSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)

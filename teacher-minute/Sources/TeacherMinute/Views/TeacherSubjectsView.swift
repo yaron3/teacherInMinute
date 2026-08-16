@@ -24,14 +24,14 @@ struct TeacherSubjectsView: View {
 		if !isEditing {
 		  Text(LocalizationSupport.localized("Step 2 of 2"))
 			.font(.system(size: 13, weight: .medium))
-			.foregroundStyle(theme.authSecondaryText)
+			.foregroundStyle(theme.secondaryText)
 			.frame(maxWidth: .infinity)
 		}
 		
 		
 		Text(LocalizationSupport.localized("Choose a subject area, then select at least\none subtopic students can request."))
 		  .font(.system(size: 13))
-		  .foregroundStyle(theme.authSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(5)
 		  .padding(.top, 8)
 		
@@ -41,16 +41,16 @@ struct TeacherSubjectsView: View {
 		HStack {
 		  Text(LocalizationSupport.localized("Subject Area"))
 			.font(.system(size: 15, weight: .bold))
-			.foregroundStyle(theme.authPrimaryText)
+			.foregroundStyle(theme.primaryText)
 		  
 		  Spacer()
 		  
 		  Text(viewModel.selectedCountText)
 			.font(.system(size: 11, weight: .semibold))
-			.foregroundStyle(theme.authSecondaryText)
+			.foregroundStyle(theme.secondaryText)
 			.padding(.horizontal, 10)
 			.frame(height: 24)
-			.background(theme.authFieldBorder.opacity(0.7))
+			.background(theme.controlBorder.opacity(0.7))
 			.clipShape(Capsule())
 		}
 		.padding(.top, 28)
@@ -70,7 +70,7 @@ struct TeacherSubjectsView: View {
 		if viewModel.shouldShowSubtopicsPrompt {
 		  Text(LocalizationSupport.localized("Choose one or more subjects to see subtopics."))
 			.font(.system(size: 13))
-			.foregroundStyle(theme.authSecondaryText)
+			.foregroundStyle(theme.secondaryText)
 			.padding(.top, 24)
 		} else {
 		  VStack(alignment: .leading, spacing: 22) {
@@ -79,7 +79,7 @@ struct TeacherSubjectsView: View {
 				HStack {
 				  Text(String(format: LocalizationSupport.localized("%@ subtopics"), LocalizationSupport.localized(area.title)))
 					.font(.system(size: 15, weight: .bold))
-					.foregroundStyle(theme.authPrimaryText)
+					.foregroundStyle(theme.primaryText)
 				  Spacer()
 				  subtopicBadge(for: area)
 				}
@@ -135,11 +135,11 @@ struct TeacherSubjectsView: View {
 	.overlay {
 	  if viewModel.isCheckingCompletion {
 		ZStack {
-		  theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
+		  theme.scrim.opacity(0.25).ignoresSafeArea()
 		  VStack(spacing: 12) {
-			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.appPrimaryText)
+			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.primaryText)
 			Text(LocalizationSupport.localized("Checking your subjects…"))
-			  .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.appPrimaryText)
+			  .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.primaryText)
 		  }
 		}
 	  }
@@ -154,10 +154,10 @@ struct TeacherSubjectsView: View {
 	: String(format: LocalizationSupport.localized("selected"), count)
 	Text(label)
 	  .font(.system(size: 11, weight: .semibold))
-	  .foregroundStyle(theme.authSecondaryText)
+	  .foregroundStyle(theme.secondaryText)
 	  .padding(.horizontal, 10)
 	  .frame(height: 24)
-	  .background(theme.authFieldBorder.opacity(0.7))
+	  .background(theme.controlBorder.opacity(0.7))
 	  .clipShape(Capsule())
   }
   
@@ -166,24 +166,24 @@ struct TeacherSubjectsView: View {
 	  PlatformIcon(
 		systemName: "magnifyingglass",
 		size: 14,
-		color: theme.authIcon
+		color: theme.secondaryText
 	  )
 	  
 	  TextField(LocalizationSupport.localized("Search subjects or subtopics"), text: $viewModel.searchText)
 		.font(.system(size: 13))
-		.foregroundStyle(theme.authPrimaryText)
+		.foregroundStyle(theme.primaryText)
 		.textInputAutocapitalization(.never)
 		.autocorrectionDisabled()
 	}
 	.padding(.horizontal, 16)
 	.frame(height: 44)
-	.background(theme.appCardBackground)
+	.background(theme.cardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 13, style: .continuous)
-		.stroke(theme.authFieldBorder, lineWidth: 1)
+		.stroke(theme.controlBorder, lineWidth: 1)
 	}
-	.shadow(color: theme.appPrimaryText.opacity(0.03), radius: 10, x: 0, y: 4)
+	.shadow(color: theme.cardShadow.opacity(0.03), radius: 10, x: 0, y: 4)
   }
 }
 
@@ -199,18 +199,18 @@ struct SubjectAreaChip: View {
   var body: some View {
 	Button(action: action) {
 	  HStack(spacing: 7) {
-		PlatformIcon(systemName: area.systemImage, size: 12, color: isSelected ? theme.authSecondaryText : theme.authPrimaryText)
+		PlatformIcon(systemName: area.systemImage, size: 12, color: isSelected ? theme.onAccentText : theme.primaryText)
 		Text(LocalizationSupport.localized(area.title))
 		  .font(.system(size: 13, weight: .medium))
 	  }
-	  .foregroundStyle(isSelected ? theme.authSecondaryText: theme.authPrimaryText)
+	  .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
 	  .padding(.horizontal, 14)
 	  .frame(height: 34)
-	  .background(isSelected ? theme.authPink : theme.authPinkSoft)
+	  .background(isSelected ? theme.accent : theme.accentBackground)
 	  .clipShape(Capsule())
 	  .overlay {
 		Capsule()
-		  .stroke(isSelected ? theme.authPink : theme.authFieldBorder, lineWidth: 1)
+		  .stroke(isSelected ? theme.accent : theme.controlBorder, lineWidth: 1)
 	  }
 	}
 	.buttonStyle(.plain)

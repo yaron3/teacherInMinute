@@ -11,6 +11,7 @@ struct StudentLessonHistoryView: View {
     @State var viewModel = StudentLessonHistoryViewModel()
     @State var isLoading = true
     @State var presentingLesson: LessonHistoryItem?
+  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -18,6 +19,30 @@ struct StudentLessonHistoryView: View {
     var body: some View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
+                lessonSections
+            }
+            .background(theme.screenBackground)
+        }
+        .task {
+            await viewModel.loadProfile()
+            isLoading = false
+        }
+        .sheet(item: $presentingLesson) { lesson in
+            LessonDetailView(
+                lesson: lesson,
+                amountLabel: "Cost",
+                isPlaying: viewModel.isPlaying(lesson),
+                initialDetails: nil,
+                showsAmount: false,
+                audioAction: { viewModel.toggleAudio(for: lesson) }
+            )
+        }
+    }
+
+    // Split out of `body` so the type checker solves the list and the
+    // navigation chrome separately — together they are more than it will
+    // solve in one expression on the Android build.
+    private var lessonSections: some View {
                 VStack(alignment: .leading, spacing: 0) {
                     FlatTopHeader(
                         eyebrow: LocalizationSupport.localized("Lesson History"),
@@ -51,7 +76,7 @@ struct StudentLessonHistoryView: View {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .scaleEffect(1.4)
-                                .tint(theme.flatInk)
+                                .tint(theme.primaryText)
                                 .padding(.vertical, 40)
                             Spacer()
                         }
@@ -59,7 +84,7 @@ struct StudentLessonHistoryView: View {
                     } else if viewModel.filteredLessons.isEmpty {
                         Text(LocalizationSupport.localized("You don't have any recent activity"))
                             .font(.system(size: 17))
-                            .foregroundStyle(theme.flatInkMuted)
+                            .foregroundStyle(theme.secondaryText)
                             .padding(.top, 20)
                     } else {
                         FlatCard(padding: 0, outlined: true) {
@@ -67,7 +92,7 @@ struct StudentLessonHistoryView: View {
                                 ForEach(viewModel.filteredLessons) { lesson in
                                     LessonHistoryRow(
                                         lesson: lesson,
-                                        accentColor: theme.flatInk,
+                                        accentColor: theme.primaryText,
                                         iconName: "function",
                                         isLoading: viewModel.isLoading(lesson),
                                         showsAmount: false
@@ -86,23 +111,6 @@ struct StudentLessonHistoryView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
-            }
-            .background(theme.flatSurface)
-        }
-        .task {
-            await viewModel.loadProfile()
-            isLoading = false
-        }
-        .sheet(item: $presentingLesson) { lesson in
-            LessonDetailView(
-                lesson: lesson,
-                amountLabel: "Cost",
-                isPlaying: viewModel.isPlaying(lesson),
-                initialDetails: nil,
-                showsAmount: false,
-                audioAction: { viewModel.toggleAudio(for: lesson) }
-            )
-        }
     }
     
     private var summaryStrip: some View {
@@ -113,7 +121,7 @@ struct StudentLessonHistoryView: View {
                 title: "Time Learned",
                 value: viewModel.totalTimeLearnedText,
                 systemImage: "clock.fill",
-                tint: theme.flatInk
+                tint: theme.primaryText
             )
             .frame(maxWidth: .infinity)
         }
@@ -132,15 +140,15 @@ struct HistoryMetricCard: View {
     var body: some View {
         FlatCard {
             VStack(alignment: .leading, spacing: 10) {
-                FlatIconTile(systemName: systemImage, size: 40, background: theme.flatSurface)
+                FlatIconTile(systemName: systemImage, size: 40, background: theme.screenBackground)
 
                 Text(LocalizationSupport.localized(title))
                     .font(.system(size: 13))
-                    .foregroundStyle(theme.flatInkMuted)
+                    .foregroundStyle(theme.secondaryText)
 
                 Text(value)
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(theme.flatInk)
+                    .foregroundStyle(theme.primaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -182,18 +190,18 @@ struct LessonHistoryRow: View {
                 imageURL: lesson.otherParticipantImageURL,
                 size: 44,
                 fallbackSystemImage: iconName,
-                background: theme.flatSurfaceRaised,
-                tint: theme.flatInk
+                background: theme.cardBackground,
+                tint: theme.primaryText
             )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(lesson.title)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(theme.flatInk)
+                    .foregroundStyle(theme.primaryText)
 
                 Text(isLoading ? LocalizationSupport.localized("Loading session details") : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
                     .font(.system(size: 13))
-                    .foregroundStyle(theme.flatInkMuted)
+                    .foregroundStyle(theme.secondaryText)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -201,23 +209,23 @@ struct LessonHistoryRow: View {
                 if isLoading {
                     ProgressView()
                         .scaleEffect(0.8)
-                        .tint(theme.flatInk)
+                        .tint(theme.primaryText)
                 } else if showsAmount {
                     Text(lesson.amount)
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(theme.flatInk)
+                        .foregroundStyle(theme.primaryText)
                 }
 
                 Text(lesson.duration)
                     .font(.system(size: 13))
-                    .foregroundStyle(theme.flatInkMuted)
+                    .foregroundStyle(theme.secondaryText)
             }
 
             PlatformIcon(
                 systemName: "chevron.right",
                 size: 13,
                 weight: .medium,
-                color: theme.flatInkMuted
+                color: theme.secondaryText
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -225,7 +233,7 @@ struct LessonHistoryRow: View {
         .padding(.vertical, 14)
         // An opaque background keeps the whole row tappable; `contentShape` is
         // not available in Skip's SwiftUI.
-        .background(theme.flatSurface)
+        .background(theme.screenBackground)
         .opacity(isLoading ? 0.72 : 1)
     }
 }
@@ -310,11 +318,11 @@ struct LessonDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(lesson.title)
                             .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(theme.appPrimaryText)
+                            .foregroundStyle(theme.primaryText)
 
                         Text("\(lesson.otherParticipant) \u{2022} \(lesson.completedAt) \u{2022} \(lesson.duration)")
                             .font(.system(size: 13))
-                            .foregroundStyle(theme.appSecondaryText)
+                            .foregroundStyle(theme.secondaryText)
                     }
 
                     HStack(spacing: 14) {
@@ -323,7 +331,7 @@ struct LessonDetailView: View {
                                 title: amountLabel,
                                 value: lesson.amount,
                                 systemImage: "creditcard.fill",
-                                tint: theme.appPurple
+                                tint: theme.accentBackground
                             )
                         }
 
@@ -331,15 +339,15 @@ struct LessonDetailView: View {
                             title: "Duration",
                             value: lesson.duration,
                             systemImage: "clock.fill",
-                            tint: theme.appPink
+                            tint: theme.accent
                         )
                     }
 
                     LessonActionButton(
                         title: isPlaying ? "Pause Audio" : "Listen to Lesson",
                         systemImage: isPlaying ? "pause.fill" : "play.fill",
-                        foreground: lesson.hasAudio ? theme.appCardBackground : theme.appSecondaryText,
-                        background: lesson.hasAudio ? theme.appPink : theme.appGrayBackground,
+                        foreground: lesson.hasAudio ? theme.cardBackground : theme.secondaryText,
+                        background: lesson.hasAudio ? theme.accent : theme.cardBackground,
                         action: audioAction
                     )
                     .disabled(!lesson.hasAudio)
@@ -348,15 +356,15 @@ struct LessonDetailView: View {
                         RoundedInfoCard {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 6) {
-                                    PlatformIcon(systemName: "pin.fill", size: 12, weight: .semibold, color: theme.appOrange)
+                                    PlatformIcon(systemName: "pin.fill", size: 12, weight: .semibold, color: theme.warning)
                                     Text(LocalizationSupport.localized("Original Question"))
                                         .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(theme.appOrange)
+                                        .foregroundStyle(theme.warning)
                                 }
                                 if !questionText.isEmpty {
                                     Text(questionText)
                                         .font(.system(size: 14))
-                                        .foregroundStyle(theme.appPrimaryText)
+                                        .foregroundStyle(theme.primaryText)
                                         .lineSpacing(4)
                                 }
                                 ForEach(questionPhotoUrls, id: \.self) { url in
@@ -373,11 +381,11 @@ struct LessonDetailView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(LocalizationSupport.localized("Summary"))
                                     .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(theme.appPrimaryText)
+                                    .foregroundStyle(theme.primaryText)
 
                                 Text(lesson.summary)
                                     .font(.system(size: 13))
-                                    .foregroundStyle(theme.appSecondaryText)
+                                    .foregroundStyle(theme.secondaryText)
                                     .lineSpacing(4)
                             }
                         }
@@ -387,7 +395,7 @@ struct LessonDetailView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(LocalizationSupport.localized("Chat Messages"))
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(theme.appPrimaryText)
+                                .foregroundStyle(theme.primaryText)
 
                             VStack(spacing: 8) {
                                 ForEach(messages) { message in
@@ -399,7 +407,7 @@ struct LessonDetailView: View {
                                 }
                             }
                             .padding(12)
-                            .background(theme.appGrayBackground.opacity(0.45))
+                            .background(theme.cardBackground.opacity(0.45))
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                     }
@@ -409,11 +417,11 @@ struct LessonDetailView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(LocalizationSupport.localized("Transcript Preview"))
                                     .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(theme.appPrimaryText)
+                                    .foregroundStyle(theme.primaryText)
 
                                 Text(lesson.transcriptPreview)
                                     .font(.system(size: 13))
-                                    .foregroundStyle(theme.appSecondaryText)
+                                    .foregroundStyle(theme.secondaryText)
                                     .lineSpacing(4)
                             }
                         }
@@ -473,7 +481,7 @@ struct LessonMessageBubble: View {
 
                 Text(timeText)
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(theme.appSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
             }
 
             if isMine { avatar }
@@ -491,36 +499,36 @@ struct LessonMessageBubble: View {
 
         case "audio":
             HStack(spacing: 6) {
-                PlatformIcon(systemName: "waveform", size: 14, weight: .semibold, color: isMine ? theme.appCardBackground : theme.appPrimaryText)
+                PlatformIcon(systemName: "waveform", size: 14, weight: .semibold, color: isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
                 Text(LocalizationSupport.localized("Audio message"))
                     .font(.system(size: 14))
-                    .foregroundStyle(isMine ? theme.appCardBackground : theme.appPrimaryText)
+                    .foregroundStyle(isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(isMine ? theme.appPink : Color(red: 229 / 255, green: 231 / 255, blue: 235 / 255))
+            .background(isMine ? theme.outgoingBubbleBackground : theme.incomingBubbleBackground)
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
         case "video":
             HStack(spacing: 6) {
-                PlatformIcon(systemName: "video.fill", size: 14, weight: .semibold, color: isMine ? theme.appCardBackground : theme.appPrimaryText)
+                PlatformIcon(systemName: "video.fill", size: 14, weight: .semibold, color: isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
                 Text(LocalizationSupport.localized("Video message"))
                     .font(.system(size: 14))
-                    .foregroundStyle(isMine ? theme.appCardBackground : theme.appPrimaryText)
+                    .foregroundStyle(isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(isMine ? theme.appPink : Color(red: 229 / 255, green: 231 / 255, blue: 235 / 255))
+            .background(isMine ? theme.outgoingBubbleBackground : theme.incomingBubbleBackground)
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
         default:
             Text(message.text)
                 .font(.system(size: 14))
-                .foregroundStyle(isMine ? theme.appCardBackground : theme.appGrayBackground)
+                .foregroundStyle(isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
                 .lineSpacing(3)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-				.background(isMine ? theme.appPink : theme.appPrimaryText)
+				.background(isMine ? theme.outgoingBubbleBackground : theme.incomingBubbleBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
     }
@@ -530,8 +538,8 @@ struct LessonMessageBubble: View {
             imageURL: avatarImageURL,
             size: 24,
             fallbackSystemImage: "person.crop.circle.fill",
-            background: isMine ? theme.appPurpleSoft : theme.appGreenSoft,
-            tint: isMine ? theme.appPurple : theme.appGreen
+            background: isMine ? theme.accentBackground : theme.positiveBackground,
+            tint: isMine ? theme.accentStrong : theme.positive
         )
     }
 

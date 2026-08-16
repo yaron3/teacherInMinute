@@ -21,12 +21,12 @@ struct ResetPasswordView: View {
 
             Text(LocalizationSupport.localized("Reset Password"))
                 .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(theme.authPrimaryText)
+                .foregroundStyle(theme.primaryText)
                 .padding(.top, 26)
 
             Text(LocalizationSupport.localized("Enter your email or phone number and we'll\nsend you instructions to reset your password."))
                 .font(.system(size: 15))
-                .foregroundStyle(theme.authSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .lineSpacing(5)
                 .padding(.top, 8)
 
@@ -48,20 +48,20 @@ struct ResetPasswordView: View {
                         systemName: "chevron.left",
                         size: 12,
                         weight: .semibold,
-                        color: theme.authSecondaryText
+                        color: theme.secondaryText
                     )
 
                     Text(LocalizationSupport.localized("Back to Log In"))
                         .font(.system(size: 14, weight: .medium))
                 }
-                .foregroundStyle(theme.authSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
             .padding(.bottom, 34)
         }
         .padding(.horizontal, 18)
-        .background(theme.flatSurface)
+        .background(theme.screenBackground)
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen(AnalyticsScreen.resetPassword)
     }
@@ -91,7 +91,7 @@ struct ResetPasswordView: View {
             }
         }
         .padding(24)
-        .background(theme.flatSurfaceRaised)
+        .background(theme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
     }
 
@@ -104,10 +104,10 @@ struct ResetPasswordView: View {
             } label: {
                 Text(LocalizationSupport.localized("Email"))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.authPrimaryText)
+                    .foregroundStyle(theme.primaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
-                    .background(viewModel.method == .email ?theme.flatSurfaceRaised: .clear)
+                    .background(viewModel.method == .email ?theme.cardBackground: .clear)
                     .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
             }
 
@@ -118,15 +118,15 @@ struct ResetPasswordView: View {
             } label: {
                 Text(LocalizationSupport.localized("Phone"))
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(theme.authSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
-                    .background(viewModel.method == .phone ?theme.flatSurfaceRaised: .clear)
+                    .background(viewModel.method == .phone ?theme.cardBackground: .clear)
                     .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
             }
         }
         .padding(3)
-        .background(theme.authFieldBackground)
+        .background(theme.fieldBackground)
         .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
     }
 }

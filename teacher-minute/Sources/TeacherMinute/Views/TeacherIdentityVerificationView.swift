@@ -32,14 +32,14 @@ struct TeacherIdentityVerificationView: View {
 		VStack(alignment: .leading, spacing: 0) {
 		  Text(LocalizationSupport.localized("Step 1 of 2"))
 			.font(.system(size: 13, weight: .medium))
-			.foregroundStyle(theme.authSecondaryText)
+			.foregroundStyle(theme.secondaryText)
 			.frame(maxWidth: .infinity)
 		  
 
 		  
 //		  Text(LocalizationSupport.localized("To maintain a high-quality learning environment,\nwe need to verify your teaching credentials and\nidentity."))
 //			.font(.system(size: 13))
-//			.foregroundStyle(theme.authSecondaryText)
+//			.foregroundStyle(theme.secondaryText)
 //			.lineSpacing(5)
 //			.padding(.top, 8)
 		  
@@ -51,7 +51,7 @@ struct TeacherIdentityVerificationView: View {
 		  
 		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdGovIdDescription, fallback: LocalizationSupport.localized("Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.")))
 			.font(.system(size: 11))
-			.foregroundStyle(theme.authSecondaryText)
+			.foregroundStyle(theme.secondaryText)
 			.lineSpacing(4)
 			.padding(.top, 8)
 		  
@@ -101,7 +101,7 @@ struct TeacherIdentityVerificationView: View {
 				 ? LocalizationSupport.localized("Accept the terms to continue")
 				 : LocalizationSupport.localized("Upload the front side of your ID to continue"))
 			.font(.system(size: 11))
-			.foregroundStyle(theme.authOrange)
+			.foregroundStyle(theme.primaryText)
 			.padding(.top, 8)
 		  }
 		  
@@ -134,15 +134,15 @@ struct TeacherIdentityVerificationView: View {
 	  
 	  // Full-screen spinner while checking Firestore on appear
 	  if viewModel.isCheckingCompletion {
-		theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
+		theme.scrim.opacity(0.25).ignoresSafeArea()
 		VStack(spacing: 14) {
 		  ProgressView()
 			.progressViewStyle(.circular)
 			.scaleEffect(1.8)
-			.tint(theme.appPrimaryText)
+			.tint(theme.primaryText)
 		  Text(LocalizationSupport.localized("Checking…"))
 			.font(.system(size: 14, weight: .medium))
-			.foregroundStyle(theme.appPrimaryText)
+			.foregroundStyle(theme.primaryText)
 		}
 	  }
 	}
@@ -248,22 +248,22 @@ struct TeacherIdentityVerificationView: View {
 	  HStack {
 		Text(LocalizationSupport.localized("VERIFICATION STATUS"))
 		  .font(.system(size: 11, weight: .bold))
-		  .foregroundStyle(theme.authPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		Spacer()
 		Text(viewModel.canSubmit ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Incomplete"))
 		  .font(.system(size: 11, weight: .medium))
-		  .foregroundStyle(viewModel.canSubmit ? theme.authGreen : theme.authOrange)
+		  .foregroundStyle(viewModel.canSubmit ? theme.positive : theme.primaryText)
 		  .padding(.horizontal, 10)
 		  .frame(height: 22)
-		  .background((viewModel.canSubmit ? theme.authGreen : theme.authOrange).opacity(0.12))
+		  .background((viewModel.canSubmit ? theme.positive : theme.controlDisabled).opacity(0.12))
 		  .clipShape(Capsule())
 	  }
 	  StatusRow(title: LocalizationSupport.localized("Government ID – Front"), isDone: viewModel.hasGovernmentIDFront, isMandatory: true)
 	}
 	.padding(16)
-	.background(theme.appCardBackground)
+	.background(theme.cardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-	.shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
+	.shadow(color: theme.cardShadow.opacity(0.035), radius: 18, x: 0, y: 10)
   }
   
   var privacyBox: some View {
@@ -272,21 +272,21 @@ struct TeacherIdentityVerificationView: View {
 		systemName: "shield.lefthalf.filled",
 		size: 18,
 		weight: .semibold,
-		color: theme.authPurple
+		color: theme.accent
 	  )
 	  VStack(alignment: .leading, spacing: 6) {
 		Text(LocalizationSupport.localized("Your Privacy Matters"))
 		  .font(.system(size: 13, weight: .bold))
-		  .foregroundStyle(theme.authPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		Text(LocalizationSupport.localized("Your documents are securely encrypted and\nonly used for verification purposes. They will\nnot be shared publicly on your profile."))
 		  .font(.system(size: 11))
-		  .foregroundStyle(theme.authSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(4)
 	  }
 	  Spacer()
 	}
 	.padding(16)
-	.background(theme.authPurpleSoft.opacity(0.45))
+	.background(theme.accentBackground.opacity(0.45))
 	.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
   
@@ -297,10 +297,10 @@ struct TeacherIdentityVerificationView: View {
 	  HStack(alignment: .top, spacing: 10) {
 		PlatformIcon(systemName: viewModel.acceptedTerms ? "checkmark.square.fill" : "square")
 		  .font(.system(size: 18))
-		  .foregroundStyle(viewModel.acceptedTerms ? theme.authPink : theme.authIcon)
+		  .foregroundStyle(viewModel.acceptedTerms ? theme.accent : theme.secondaryText)
 		Text(LocalizationSupport.localized("I confirm that the uploaded documents are authentic and belong to me. I agree to the Verification Terms."))
 		  .font(.system(size: 11))
-		  .foregroundStyle(theme.authSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(4)
 		  .multilineTextAlignment(.leading)
 		Spacer()
@@ -312,7 +312,7 @@ struct TeacherIdentityVerificationView: View {
   func sectionTitle(_ title: String) -> some View {
 	Text(title)
 	  .font(.system(size: 15, weight: .bold))
-	  .foregroundStyle(theme.authPrimaryText)
+	  .foregroundStyle(theme.primaryText)
   }
 }
 
@@ -329,38 +329,38 @@ struct StatusRow: View {
   var body: some View {
 	HStack(spacing: 12) {
 	  Circle()
-		.fill(theme.authFieldBorder)
+		.fill(theme.controlBorder)
 		.frame(width: 18, height: 18)
 		.overlay {
 		  PlatformIcon(systemName: isDone ? "checkmark" : "circle.fill")
 			.font(.system(size: 8, weight: .bold))
-			.foregroundStyle(isDone ? theme.authGreen : theme.authIcon)
+			.foregroundStyle(isDone ? theme.positive : theme.secondaryText)
 		}
 	  
 	  Text(title)
 		.font(.system(size: 12))
-		.foregroundStyle(theme.authSecondaryText)
+		.foregroundStyle(theme.secondaryText)
 	  
 	  if isMandatory && !isDone {
 		Text(LocalizationSupport.localized("required"))
 		  .font(.system(size: 9, weight: .semibold))
-		  .foregroundStyle(theme.authOrange)
+		  .foregroundStyle(theme.warning)
 		  .padding(.horizontal, 6)
 		  .padding(.vertical, 2)
-		  .background(theme.authOrange.opacity(0.12))
+		  .background(theme.warningBackground)
 		  .clipShape(Capsule())
 	  }
 	  
 	  Spacer()
 	  
 	  Circle()
-		.fill(isDone ? theme.authGreen : theme.authOrange)
+		.fill(isDone ? theme.positive : theme.controlDisabled)
 		.frame(width: 10, height: 10)
 		.overlay {
 		  if !isDone {
 			Text(LocalizationSupport.localized("!"))
 			  .font(.system(size: 7, weight: .bold))
-			  .foregroundStyle(theme.appPrimaryText)
+			  .foregroundStyle(theme.primaryText)
 		  }
 		}
 	}
@@ -393,36 +393,36 @@ struct UploadLargeBox: View {
   var body: some View {
 	VStack(spacing: 10) {
 	  Circle()
-		.fill(theme.authPinkSoft)
+		.fill(theme.accentBackground)
 		.frame(width: 42, height: 42)
 		.overlay {
 		  if isUploading {
 			ProgressView()
 			  .progressViewStyle(.circular)
-			  .tint(theme.authPink)
+			  .tint(theme.accent)
 		  } else {
 			PlatformIcon(systemName: isCompleted ? "checkmark" : icon)
 			  .font(.system(size: 16, weight: .bold))
-			  .foregroundStyle(isCompleted ? theme.authGreen : theme.authPink)
+			  .foregroundStyle(isCompleted ? theme.positive : theme.accent)
 		  }
 		}
 	  
 	  Text(isUploading ? LocalizationSupport.localized("Uploading…") : title)
 		.font(.system(size: 13, weight: .semibold))
-		.foregroundStyle(theme.authPrimaryText)
+		.foregroundStyle(theme.primaryText)
 	  
 	  Text(subtitle)
 		.font(.system(size: 10))
-		.foregroundStyle(theme.authSecondaryText)
+		.foregroundStyle(theme.secondaryText)
 	}
 	.frame(maxWidth: .infinity)
 	.frame(height: 116)
-	.background(theme.appCardBackground)
+	.background(theme.cardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 14, style: .continuous)
 		.strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-		.foregroundStyle(theme.authFieldBorder)
+		.foregroundStyle(theme.controlBorder)
 	}
   }
 }
@@ -450,42 +450,42 @@ struct IDUploadBox: View {
   var body: some View {
 	VStack(spacing: 8) {
 	  Circle()
-		.fill(theme.authPurpleSoft)
+		.fill(theme.accentBackground)
 		.frame(width: 36, height: 36)
 		.overlay {
 		  if isUploading {
 			ProgressView()
 			  .progressViewStyle(.circular)
-			  .tint(theme.authPurple)
+			  .tint(theme.accent)
 		  } else {
 			PlatformIcon(systemName: isCompleted ? "checkmark" : "person.text.rectangle")
 			  .font(.system(size: 14, weight: .semibold))
-			  .foregroundStyle(isCompleted ? theme.authGreen : theme.authPurple)
+			  .foregroundStyle(isCompleted ? theme.positive : theme.accent)
 		  }
 		}
 	  
 	  Text(isUploading ? LocalizationSupport.localized("Uploading…") : title)
 		.font(.system(size: 12, weight: .medium))
-		.foregroundStyle(theme.authPrimaryText)
+		.foregroundStyle(theme.primaryText)
 	  
 	  if isMandatory && !isCompleted && !isUploading {
 		Text(LocalizationSupport.localized("required"))
 		  .font(.system(size: 9, weight: .semibold))
-		  .foregroundStyle(theme.authOrange)
+		  .foregroundStyle(theme.warning)
 		  .padding(.horizontal, 5)
 		  .padding(.vertical, 2)
-		  .background(theme.authOrange.opacity(0.12))
+		  .background(theme.warningBackground)
 		  .clipShape(Capsule())
 	  }
 	}
 	.frame(maxWidth: .infinity)
 	.frame(height: 90)
-	.background(theme.appCardBackground)
+	.background(theme.cardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 14, style: .continuous)
 		.strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-		.foregroundStyle(isMandatory && !isCompleted ? theme.authOrange.opacity(0.5) : theme.authFieldBorder)
+		.foregroundStyle(isMandatory && !isCompleted ? theme.warning : theme.controlBorder)
 	}
   }
 }
@@ -508,27 +508,27 @@ struct SelfieRow: View {
   var body: some View {
 	HStack(spacing: 14) {
 	  RoundedRectangle(cornerRadius: 12, style: .continuous)
-		.fill(theme.authFieldBackground)
+		.fill(theme.fieldBackground)
 		.frame(width: 42, height: 42)
 		.overlay {
 		  if isUploading {
 			ProgressView()
 			  .progressViewStyle(.circular)
-			  .tint(theme.authPrimaryText)
+			  .tint(theme.primaryText)
 		  } else {
 			PlatformIcon(systemName: isCompleted ? "checkmark" : "camera.fill")
-			  .foregroundStyle(isCompleted ? theme.authGreen : theme.authPrimaryText)
+			  .foregroundStyle(isCompleted ? theme.positive : theme.primaryText)
 		  }
 		}
 	  
 	  VStack(alignment: .leading, spacing: 4) {
 		Text(isUploading ? LocalizationSupport.localized("Uploading selfie…") : LocalizationSupport.localized("Take Selfie"))
 		  .font(.system(size: 13, weight: .semibold))
-		  .foregroundStyle(theme.authPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		
 		Text(LocalizationSupport.localized("Ensure good lighting"))
 		  .font(.system(size: 11))
-		  .foregroundStyle(theme.authSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 	  }
 	  
 	  Spacer()
@@ -537,15 +537,15 @@ struct SelfieRow: View {
 		systemName: "chevron.right",
 		size: 12,
 		weight: .semibold,
-		color: theme.authIcon
+		color: theme.secondaryText
 	  )
 	}
 	.padding(14)
-	.background(theme.appCardBackground)
+	.background(theme.cardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 	.overlay {
 	  RoundedRectangle(cornerRadius: 16, style: .continuous)
-		.stroke(theme.authFieldBorder, lineWidth: 1)
+		.stroke(theme.controlBorder, lineWidth: 1)
 	}
   }
 }
