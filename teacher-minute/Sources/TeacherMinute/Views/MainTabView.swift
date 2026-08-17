@@ -111,6 +111,10 @@ struct MainTabView: View {
 	if tab == .lessons {
 	  // Bundled asset, not an SF Symbol.
 	  Image(name, bundle: .module)
+		.renderingMode(.template)
+		.resizable()
+		.aspectRatio(contentMode: .fit)
+		.frame(width: 40, height: 40)
 	} else {
 #if os(iOS)
 	  // iOS forces the .fill variant on every tab bar symbol, so "house" and
