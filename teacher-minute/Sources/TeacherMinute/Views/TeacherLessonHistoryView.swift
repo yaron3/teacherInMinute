@@ -95,7 +95,7 @@ struct TeacherLessonHistoryView: View {
         .sheet(item: $presentingLesson) { lesson in
             LessonDetailView(
                 lesson: lesson,
-                amountLabel: "Earnings",
+                amountLabel: LocalizationSupport.localized("Earnings"),
                 isPlaying: viewModel.isPlaying(lesson),
                 initialDetails: nil,
                 audioAction: { viewModel.toggleAudio(for: lesson) }
@@ -106,14 +106,14 @@ struct TeacherLessonHistoryView: View {
     private var summaryStrip: some View {
         HStack(spacing: 12) {
             HistoryMetricCard(
-                title: "Time Taught",
+                title: LocalizationSupport.localized("Time Taught"),
                 value: viewModel.totalTimeTaughtText,
                 systemImage: "clock.fill",
                 tint: theme.primaryText
             )
 
             HistoryMetricCard(
-                title: "Earnings",
+                title: LocalizationSupport.localized("Earnings"),
                 value: viewModel.totalEarningsText,
                 systemImage: "dollarsign.circle.fill",
                 tint: theme.primaryText

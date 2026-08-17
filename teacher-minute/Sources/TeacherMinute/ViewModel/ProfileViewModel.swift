@@ -66,8 +66,15 @@ final class ProfileViewModel {
         roleType == .teacher
     }
 
+    /// Canonical grade values, as stored on the profile. Selection and saving
+    /// both key off these, so they stay English in every language.
     var gradeLevels: [String] {
         teacherGradeLevels(from: grade)
+    }
+
+    /// The same grades, translated for display only.
+    var gradeLevelLabels: [String] {
+        gradeLevels.map(LocalizationSupport.localizedGradeLabel)
     }
 
     var selectedTeachingGrades: Set<String> {

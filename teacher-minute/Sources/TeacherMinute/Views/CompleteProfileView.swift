@@ -23,7 +23,7 @@ struct CompleteProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
 
-                Text(LocalizationSupport.localized("Tell us a bit about yourself to get started with\nMath Connect."))
+                Text(LocalizationSupport.localized("Tell us a bit about yourself to get started with\nTeacher in a Minute."))
                     .font(.system(size: 13))
                     .foregroundStyle(theme.secondaryText)
                     .lineSpacing(5)

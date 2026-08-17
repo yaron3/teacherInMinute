@@ -30,7 +30,7 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 0) {
           header
           
-          Text(LocalizationSupport.localized("Help you any where"))
+          Text(LocalizationSupport.localized("Help you anywhere"))
             .font(.system(size: 35, weight: .bold, design: .default))
             .foregroundStyle(theme.primaryText)
             .lineSpacing(-4)

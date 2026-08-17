@@ -89,7 +89,7 @@ final class TeacherDashboardViewModel {
 	guard lastWeekEarningsCents > 0 else { return nil }
 	let change = Int(((Double(weekEarningsCents) - Double(lastWeekEarningsCents)) / Double(lastWeekEarningsCents) * 100).rounded())
 	let sign = change >= 0 ? "+" : ""
-	return "\(sign)\(change)% vs last week"
+	return String(format: LocalizationSupport.localized("%@%d%% vs last week"), sign, change)
   }
   
   var subjectsDisplayText: String {

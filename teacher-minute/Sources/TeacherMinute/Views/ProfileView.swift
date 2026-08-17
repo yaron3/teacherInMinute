@@ -59,7 +59,7 @@ struct ProfileView: View {
 
         teachingCard(
           title: LocalizationSupport.localized("Grade Levels Taught"),
-          chips: viewModel.gradeLevels,
+          chips: viewModel.gradeLevelLabels,
           includeAdd: viewModel.gradeLevels.isEmpty,
           editAction: showProfileEditor,
           addAction: showProfileEditor
@@ -572,7 +572,7 @@ struct ProfileTeachingGradePicker: View {
 		FlowLayout(spacing: 10) {
 		  ForEach(grades, id: \.self) { grade in
 			ProfileTeachingGradeChip(
-			  title: grade,
+			  title: LocalizationSupport.localizedGradeLabel(grade),
 			  isSelected: selectedGrades.contains(grade)
 			) {
 			  toggleGrade(grade)

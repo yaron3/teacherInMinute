@@ -191,7 +191,7 @@ struct CreateAccountView: View {
 	VStack(alignment: .leading, spacing: 18) {
 	  checkboxRow(isOn: $viewModel.agreedToTerms, isTermsRow: true)
 	  checkboxRow(isOn: $viewModel.sendUpdates,
-				  text: LocalizationSupport.localized("Send me occasional updates and tips about\nMath Connect."),
+				  text: LocalizationSupport.localized("Send me occasional updates and tips about\nTeacher in a Minute."),
 				  isTermsRow: false)
 	}
 	.padding(.horizontal, 8)

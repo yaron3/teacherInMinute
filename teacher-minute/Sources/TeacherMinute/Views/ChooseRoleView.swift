@@ -24,7 +24,7 @@ struct ChooseRoleView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
 
-      Text(LocalizationSupport.localized("How do you want to use Math Connect? You\ncan change this later in settings."))
+      Text(LocalizationSupport.localized("How do you want to use Teacher in a Minute? You\ncan change this later in settings."))
         .font(.system(size: 15))
         .foregroundStyle(theme.secondaryText)
         .lineSpacing(5)

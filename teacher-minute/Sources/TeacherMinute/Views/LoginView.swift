@@ -27,7 +27,7 @@ struct LoginView: View {
 //		  .foregroundStyle(theme.primaryText)
 //		  .padding(.top, 28)
 		
-		Text(LocalizationSupport.localized("Log in to Math Connect to continue your\njourney."))
+		Text(LocalizationSupport.localized("Log in to Teacher in a Minute to continue your\njourney."))
 		  .font(.system(size: 16, weight: .regular))
 		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(6)
