@@ -49,9 +49,16 @@ struct AppDialogView: View {
     let onDismiss: () -> Void
 
     @Environment(\.colorScheme) var colorScheme
-    @Environment(\.layoutDirection) var layoutDirection
 
     var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
+
+    /// Read from the in-app language rather than `@Environment`. A dialog shown
+    /// through `fullScreenCover` is a separate presentation context and does not
+    /// inherit `layoutDirection` from the presenting view, so an inherited value
+    /// would silently fall back to LTR and left-align Hebrew.
+    var layoutDirection: LayoutDirection {
+        LocalizationSupport.layoutDirection
+    }
 
     /// Text hugs the reading edge, which is what makes Hebrew right-aligned.
     var textAlignment: HorizontalAlignment {
@@ -92,6 +99,10 @@ struct AppDialogView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.horizontal, 32)
         }
+        // Pushed down so nested text and controls flip too, not just the
+        // alignments computed above.
+        .environment(\.layoutDirection, layoutDirection)
+        .environment(\.locale, LocalizationSupport.currentLocale)
     }
 
     @ViewBuilder
@@ -132,23 +143,49 @@ struct AppDialogView: View {
 extension View {
     /// Presents an in-app dialog that honours the app's own layout direction.
     /// Drop-in stand-in for `.alert(_:isPresented:actions:message:)`.
+    ///
+    /// - Parameter coversScreen: pass `true` when attaching to a small view. An
+    ///   overlay is laid out inside the bounds of the view it modifies, so a
+    ///   dialog attached to, say, a 44pt button would be crushed into it; a
+    ///   full-screen presentation escapes those bounds. Leave `false` when
+    ///   attaching at a screen root, where the overlay already fills the screen
+    ///   and avoids stacking another presentation onto the view.
     func appDialog(
         _ title: String,
         isPresented: Binding<Bool>,
         message: String? = nil,
-        actions: [AppDialogAction]
+        actions: [AppDialogAction],
+        coversScreen: Bool = false
     ) -> some View {
-        overlay {
+        let dialog = AppDialogView(
+            title: title,
+            message: message,
+            actions: actions.isEmpty
+                ? [AppDialogAction(LocalizationSupport.localized("OK"), kind: .primary)]
+                : actions,
+            onDismiss: { isPresented.wrappedValue = false }
+        )
+#if os(Android)
+        // Skip marks `presentationBackground` unavailable, so a cover here could
+        // not be made transparent. Every Android call site attaches at a screen
+        // root, where the overlay already spans the screen.
+        return overlay {
             if isPresented.wrappedValue {
-                AppDialogView(
-                    title: title,
-                    message: message,
-                    actions: actions.isEmpty
-                        ? [AppDialogAction(LocalizationSupport.localized("OK"), kind: .primary)]
-                        : actions,
-                    onDismiss: { isPresented.wrappedValue = false }
-                )
+                dialog
             }
         }
+#else
+        return overlay {
+            if isPresented.wrappedValue && !coversScreen {
+                dialog
+            }
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { coversScreen && isPresented.wrappedValue },
+            set: { if !$0 { isPresented.wrappedValue = false } }
+        )) {
+            dialog.presentationBackground(.clear)
+        }
+#endif
     }
 }

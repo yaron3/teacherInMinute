@@ -43,6 +43,9 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "How do you want to use Teacher in a Minute? You\ncan change this later in settings.": "איך תרצה להשתמש ב־Teacher in a Minute? תוכל\nלשנות זאת מאוחר יותר בהגדרות.",
         "Send me occasional updates and tips about\nTeacher in a Minute.": "שלחו לי מדי פעם עדכונים וטיפים על\nTeacher in a Minute.",
         "Help you anywhere": "עזרה מכל מקום",
+        // Title of the photo-source dialog; its buttons already had Hebrew, so
+        // only the heading was showing through in English.
+        "Add a photo": "הוספת תמונה",
         // Grade ordinals, mirroring the `grade_1`...`grade_12` Remote Config
         // entries so the chips read correctly even before the template is
         // published to the console.

@@ -29,6 +29,29 @@ struct PhotoSourceButton<Label: View>: View {
   @State private var showCamera = false
 #endif
 
+  /// Camera capture only exists on iOS; other Apple platforms fall through to
+  /// the library picker alone.
+  var photoSourceActions: [AppDialogAction] {
+    var actions: [AppDialogAction] = []
+#if os(iOS)
+    actions.append(
+      AppDialogAction(LocalizationSupport.localized("Take Photo")) {
+        Task {
+          let state = await PermissionService.shared.requestCapturePermission(for: .camera)
+          if state.isGranted { showCamera = true }
+        }
+      }
+    )
+#endif
+    actions.append(
+      AppDialogAction(LocalizationSupport.localized("Choose from Library")) {
+        showLibraryPicker = true
+      }
+    )
+    actions.append(AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel))
+    return actions
+  }
+
   var body: some View {
     Button {
       showSourceDialog = true
@@ -36,24 +59,14 @@ struct PhotoSourceButton<Label: View>: View {
       label()
     }
     .buttonStyle(.plain)
-    .confirmationDialog(
+    // Attached to the button itself, so this needs the full-screen presentation
+    // rather than an overlay bounded by the button's frame.
+    .appDialog(
       LocalizationSupport.localized("Add a photo"),
       isPresented: $showSourceDialog,
-      titleVisibility: .visible
-    ) {
-#if os(iOS)
-      Button(LocalizationSupport.localized("Take Photo")) {
-        Task {
-          let state = await PermissionService.shared.requestCapturePermission(for: .camera)
-          if state.isGranted { showCamera = true }
-        }
-      }
-#endif
-      Button(LocalizationSupport.localized("Choose from Library")) {
-        showLibraryPicker = true
-      }
-      Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
-    }
+      actions: photoSourceActions,
+      coversScreen: true
+    )
     .photosPicker(isPresented: $showLibraryPicker, selection: $pickedItem, matching: .images)
     .onChange(of: pickedItem) { _, item in
       guard let item else { return }

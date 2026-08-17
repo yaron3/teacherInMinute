@@ -129,6 +129,37 @@ struct WhiteboardView: View {
 	}
   }
 
+  /// A local clear is the user's own destructive action, so it offers a save
+  /// first and a plain Clear second. A remote clear has already happened —
+  /// there is nothing to confirm, only the chance to keep a copy.
+  var clearDialogActions: [AppDialogAction] {
+	switch clearDialogReason {
+	case .local:
+	  return [
+		AppDialogAction(LocalizationSupport.localized("Save as photo and clear")) {
+		  saveBoardAsPhoto()
+		  performClear()
+		},
+		AppDialogAction(LocalizationSupport.localized("Clear"), kind: .destructive) {
+		  performClear()
+		},
+		AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel)
+	  ]
+	case .remote:
+	  return [
+		AppDialogAction(LocalizationSupport.localized("Save as photo")) {
+		  saveBoardAsPhoto(strokesToSave: pendingClearSnapshot)
+		  pendingClearSnapshot = []
+		  localStrokeColors.removeAll()
+		},
+		AppDialogAction(LocalizationSupport.localized("Dismiss"), kind: .cancel) {
+		  pendingClearSnapshot = []
+		  localStrokeColors.removeAll()
+		}
+	  ]
+	}
+  }
+
   func usesScrollableViewport(viewSize: CGSize) -> Bool {
 	guard viewSize.width > 0, viewSize.height > 0 else { return isCompact }
 	let shortSide = min(viewSize.width, viewSize.height)
@@ -161,33 +192,11 @@ struct WhiteboardView: View {
 	}
 	.padding(.top, isMaximized ? 0 : 10)
 	.background(theme.cardBackground.opacity(0.35))
-	.confirmationDialog(
+	.appDialog(
 	  clearDialogTitle,
 	  isPresented: $isClearDialogPresented,
-	  titleVisibility: .visible
-	) {
-	  switch clearDialogReason {
-	  case .local:
-		Button(LocalizationSupport.localized("Save as photo and clear")) {
-		  saveBoardAsPhoto()
-		  performClear()
-		}
-		Button(LocalizationSupport.localized("Clear"), role: .destructive) {
-		  performClear()
-		}
-		Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
-	  case .remote:
-		Button(LocalizationSupport.localized("Save as photo")) {
-		  saveBoardAsPhoto(strokesToSave: pendingClearSnapshot)
-		  pendingClearSnapshot = []
-		  localStrokeColors.removeAll()
-		}
-		Button(LocalizationSupport.localized("Dismiss"), role: .cancel) {
-		  pendingClearSnapshot = []
-		  localStrokeColors.removeAll()
-		}
-	  }
-	}
+	  actions: clearDialogActions
+	)
 	.onChange(of: strokes) { oldStrokes, newStrokes in
 	  if !oldStrokes.isEmpty && newStrokes.isEmpty {
 		if localClearInitiated {

@@ -2636,6 +2636,17 @@
       },
       "valueType": "STRING"
     },
+    "add_photo": {
+      "defaultValue": {
+        "value": "Add a photo"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוספת תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "take_photo": {
       "defaultValue": {
         "value": "Take Photo"
