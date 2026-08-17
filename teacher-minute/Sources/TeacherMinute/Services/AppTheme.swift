@@ -271,8 +271,8 @@ struct AppTheme {
     /// Messages received from the other participant.
     var incomingBubbleBackground: Color {
         adaptive(
-            light: (242, 242, 244),
-            dark: (35, 35, 38)
+            light: (200, 200, 214),
+            dark: (50, 50, 50)
         )
     }
 
