@@ -77,11 +77,12 @@ struct LoginView: View {
 	  router.resume(resume)
 	  viewModel.destination = nil
 	}
-	.alert(LocalizationSupport.localized("Sign In Error"), isPresented: $viewModel.showAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) { viewModel.showAlert = false }
-	} message: {
-	  Text(viewModel.alertMessage ?? LocalizationSupport.localized("An unexpected error occurred."))
-	}
+	.appDialog(
+	  LocalizationSupport.localized("Sign In Error"),
+	  isPresented: $viewModel.showAlert,
+	  message: viewModel.alertMessage ?? LocalizationSupport.localized("An unexpected error occurred."),
+	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	)
   }
   
 

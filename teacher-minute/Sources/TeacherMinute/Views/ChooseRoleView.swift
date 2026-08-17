@@ -104,11 +104,12 @@ struct ChooseRoleView: View {
         NavigationStack { AboutWebView(url: privacyURL, title: LocalizationSupport.localized("Privacy Policy")) }
       }
     }
-    .alert(LocalizationSupport.localized("Choose Your Role"), isPresented: $showLegalAlert) {
-      Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-    } message: {
-      Text(legalAlertMessage)
-    }
+    .appDialog(
+      LocalizationSupport.localized("Choose Your Role"),
+      isPresented: $showLegalAlert,
+      message: legalAlertMessage,
+      actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+    )
   }
 
   private func continueWithSelectedRole() {

@@ -113,36 +113,46 @@ struct StudentHomeView: View {
 	  }
 #endif
 	}
-	.alert(LocalizationSupport.localized("Low Balance"), isPresented: $showingLowBalanceAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-	} message: {
-	  Text(lowBalanceMessage)
-	}
-	.alert(LocalizationSupport.localized("Purchase complete"), isPresented: $showingPurchaseSummaryAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) {
-		viewModel.consumePurchaseSummary()
-		// The redirect flows also leave a success result behind; clear it so a
-		// stale one cannot resurface.
-		paymentReturnStore.consumeLatestResult()
-	  }
-	} message: {
-	  Text(purchaseSummaryMessage)
-	}
-	.alert(couponAlertTitle, isPresented: $showingCouponAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) {
-		viewModel.resetCouponState()
-	  }
-	} message: {
-	  Text(couponAlertMessage)
-	}
+	.appDialog(
+	  LocalizationSupport.localized("Low Balance"),
+	  isPresented: $showingLowBalanceAlert,
+	  message: lowBalanceMessage,
+	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	)
+	.appDialog(
+	  LocalizationSupport.localized("Purchase complete"),
+	  isPresented: $showingPurchaseSummaryAlert,
+	  message: purchaseSummaryMessage,
+	  actions: [
+		AppDialogAction(LocalizationSupport.localized("OK")) {
+		  viewModel.consumePurchaseSummary()
+		  // The redirect flows also leave a success result behind; clear it so a
+		  // stale one cannot resurface.
+		  paymentReturnStore.consumeLatestResult()
+		}
+	  ]
+	)
+	.appDialog(
+	  couponAlertTitle,
+	  isPresented: $showingCouponAlert,
+	  message: couponAlertMessage,
+	  actions: [
+		AppDialogAction(LocalizationSupport.localized("OK")) {
+		  viewModel.resetCouponState()
+		}
+	  ]
+	)
 #if !os(Android)
-	.alert(paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"), isPresented: isShowingPaymentReturnResult) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) {
-		paymentReturnStore.consumeLatestResult()
-	  }
-	} message: {
-	  Text(paymentReturnStore.latestResult?.message ?? "")
-	}
+	.appDialog(
+	  paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"),
+	  isPresented: isShowingPaymentReturnResult,
+	  message: paymentReturnStore.latestResult?.message ?? "",
+	  actions: [
+		AppDialogAction(LocalizationSupport.localized("OK")) {
+		  paymentReturnStore.consumeLatestResult()
+		}
+	  ]
+	)
 #endif
   }
 
@@ -847,7 +857,7 @@ struct MatchedOverlay: View {
 		Button(action: onDismiss) {
 		  Text(LocalizationSupport.localized("Done"))
 			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
+			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
 			.frame(height: 48)
 			.background(theme.positive)
@@ -895,7 +905,7 @@ struct NoMatchOverlay: View {
 		Button(action: onDismiss) {
 		  Text(LocalizationSupport.localized("OK"))
 			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
+			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
 			.frame(height: 48)
 			.background(theme.accent)
@@ -944,7 +954,7 @@ struct ErrorOverlay: View {
 		Button(action: onDismiss) {
 		  Text(LocalizationSupport.localized("OK"))
 			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
+			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
 			.frame(height: 48)
 			.background(theme.accent)
@@ -1234,13 +1244,12 @@ struct RedeemCouponSheet: View {
 		showSuccessAlert = true
 	  }
 	}
-	.alert(LocalizationSupport.localized("Success"), isPresented: $showSuccessAlert) {
-	  Button(LocalizationSupport.localized("OK")) {
-		onDismiss()
-	  }
-	} message: {
-	  Text(String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), successMinutes))
-	}
+	.appDialog(
+	  LocalizationSupport.localized("Success"),
+	  isPresented: $showSuccessAlert,
+	  message: String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), successMinutes),
+	  actions: [AppDialogAction(LocalizationSupport.localized("OK")) { onDismiss() }]
+	)
   }
 }
 

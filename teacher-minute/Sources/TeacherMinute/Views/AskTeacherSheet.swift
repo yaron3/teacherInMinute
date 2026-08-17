@@ -218,7 +218,11 @@ struct AskTeacherSheet: View {
                 } label: {
                     Text(LocalizationSupport.localized("Find a Teacher"))
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(isFindDisabled ? theme.secondaryText : theme.primaryText)
+                        // Enabled, this sits on `accent`, so the label needs the
+                        // on-accent token; `primaryText` is black in light mode.
+                        // Disabled it sits on `cardBackground`, where secondary
+                        // text is the readable choice.
+                        .foregroundStyle(isFindDisabled ? theme.secondaryText : theme.onAccentText)
                         .frame(maxWidth: .infinity)
                         .frame(height: findButtonHeight)
                         .background(isFindDisabled ? theme.cardBackground : theme.accent)
@@ -255,17 +259,15 @@ struct AskTeacherSheet: View {
             isQuestionFocused = true
         }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
-        .alert(
+        .appDialog(
             LocalizationSupport.localized("Permission required"),
             isPresented: Binding(
                 get: { permissionAlertMessage != nil },
                 set: { if !$0 { permissionAlertMessage = nil } }
-            )
-        ) {
-            Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-        } message: {
-            Text(permissionAlertMessage ?? "")
-        }
+            ),
+            message: permissionAlertMessage ?? "",
+            actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+        )
     }
 
     func findTeacherTapped() async {

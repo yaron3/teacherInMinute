@@ -111,14 +111,17 @@ struct CompleteProfileView: View {
                     }
                 }
             }
-            .alert(LocalizationSupport.localized("Payout Details Missing"), isPresented: $viewModel.showMissingPayoutInfoConfirmation) {
-                Button(LocalizationSupport.localized("Add Now"), role: .cancel) {}
-                Button(LocalizationSupport.localized("Continue Anyway")) {
-                    viewModel.continueWithoutPayoutInfo()
-                }
-            } message: {
-                Text(LocalizationSupport.localized("You will not receive money until you provide bank account details or PayPal info."))
-            }
+            .appDialog(
+                LocalizationSupport.localized("Payout Details Missing"),
+                isPresented: $viewModel.showMissingPayoutInfoConfirmation,
+                message: LocalizationSupport.localized("You will not receive money until you provide bank account details or PayPal info."),
+                actions: [
+                    AppDialogAction(LocalizationSupport.localized("Add Now"), kind: .cancel),
+                    AppDialogAction(LocalizationSupport.localized("Continue Anyway")) {
+                        viewModel.continueWithoutPayoutInfo()
+                    }
+                ]
+            )
         }
     }
 

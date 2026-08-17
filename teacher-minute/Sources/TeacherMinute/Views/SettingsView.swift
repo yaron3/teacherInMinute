@@ -56,23 +56,18 @@ struct SettingsView: View {
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
-        .alert(viewModel.activeConfirmation?.title ?? "Settings", isPresented: isShowingConfirmation) {
-            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
-                viewModel.activeConfirmation = nil
-            }
-            if let confirmation = viewModel.activeConfirmation {
-                Button(confirmation.confirmTitle, role: confirmation.isDestructive ? .destructive : nil) {
-                    confirm(confirmation)
-                }
-            }
-        } message: {
-            Text(viewModel.activeConfirmation?.message ?? "")
-        }
-        .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
-            Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-        } message: {
-            Text(viewModel.alertMessage ?? "")
-        }
+        .appDialog(
+            viewModel.activeConfirmation?.title ?? LocalizationSupport.localized("Settings"),
+            isPresented: isShowingConfirmation,
+            message: viewModel.activeConfirmation?.message ?? "",
+            actions: confirmationDialogActions
+        )
+        .appDialog(
+            viewModel.alertTitle,
+            isPresented: $viewModel.showAlert,
+            message: viewModel.alertMessage ?? "",
+            actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+        )
         .alert(LocalizationSupport.localized("Delete Account"), isPresented: $viewModel.showReauthPasswordPrompt) {
             SecureField(LocalizationSupport.localized("Password"), text: $viewModel.reauthPassword)
             Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
@@ -142,6 +137,27 @@ struct SettingsView: View {
                 .scaleEffect(1.4)
                 .tint(theme.primaryText)
         }
+    }
+
+    /// Cancel first so it reads as the safe default, then the confirm action —
+    /// destructive confirmations get the danger styling.
+    var confirmationDialogActions: [AppDialogAction] {
+        var actions = [
+            AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel) {
+                viewModel.activeConfirmation = nil
+            }
+        ]
+        if let confirmation = viewModel.activeConfirmation {
+            actions.append(
+                AppDialogAction(
+                    confirmation.confirmTitle,
+                    kind: confirmation.isDestructive ? .destructive : .primary
+                ) {
+                    confirm(confirmation)
+                }
+            )
+        }
+        return actions
     }
 
     var isShowingConfirmation: Binding<Bool> {

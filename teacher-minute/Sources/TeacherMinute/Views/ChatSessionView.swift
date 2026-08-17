@@ -275,8 +275,11 @@ struct ChatSessionView: View {
               Spacer()
             }
             .frame(height: 46)
+            // `onAccentText` is white in both schemes, so this fill has to be
+            // the solid accent — `accentBackground` is a pale tint meant for
+            // surfaces, and left the label unreadable in light mode.
             .foregroundStyle(theme.onAccentText)
-            .background(theme.accentBackground)
+            .background(theme.accent)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
           .buttonStyle(.plain)
@@ -1111,7 +1114,7 @@ struct ChatSessionView: View {
       } label: {
         Text(isEndingSession ? LocalizationSupport.localized("Ending...") : LocalizationSupport.localized("End"))
           .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(theme.primaryText)
+          .foregroundStyle(theme.onAccentText)
           .padding(.horizontal, 12)
           .frame(height: 32)
           .background(theme.danger)

@@ -66,11 +66,12 @@ struct CreateAccountView: View {
 	.onChange(of: viewModel.focusField) { _, field in
 	  focusedField = field
 	}
-	.alert(LocalizationSupport.localized("Sign Up"), isPresented: $viewModel.showAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) { viewModel.showAlert = false }
-	} message: {
-	  Text(viewModel.alertMessage ?? "")
-	}
+	.appDialog(
+	  LocalizationSupport.localized("Sign Up"),
+	  isPresented: $viewModel.showAlert,
+	  message: viewModel.alertMessage ?? "",
+	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	)
 	.sheet(isPresented: $viewModel.showingTerms) {
 		  
 		  if let _ = viewModel.termsURL {
@@ -82,11 +83,12 @@ struct CreateAccountView: View {
 			NavigationStack { AboutWebView(url: viewModel.privacyURL!, title: LocalizationSupport.localized("Privacy Policy")) }
 		  }
 		}
-		.alert(LocalizationSupport.localized("Sign Up"), isPresented: $viewModel.showLegalAlert) {
-		  Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-		} message: {
-		  Text(viewModel.legalAlertMessage)
-		}
+		.appDialog(
+		  LocalizationSupport.localized("Sign Up"),
+		  isPresented: $viewModel.showLegalAlert,
+		  message: viewModel.legalAlertMessage,
+		  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+		)
   }
   
   // MARK: - Sections

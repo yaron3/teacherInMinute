@@ -77,8 +77,13 @@ struct MathEquationEditorView: View {
     func sendCurrent(exported: String) {
         let trimmed = exported.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        onSend(trimmed)
+        // Clear before handing off. `onSend` appends to the parent's message
+        // list, which rebuilds this view — in the chat session it sits inside a
+        // `safeAreaInset`, so the rebuild can hand us a fresh `model` and a
+        // clear afterwards lands on the discarded one. The equation then stays
+        // in the field, which reads as "the send button did nothing".
         model.clear()
+        onSend(trimmed)
     }
 
     func handleKeyboardAction(_ action: MathKeyboardAction) {
