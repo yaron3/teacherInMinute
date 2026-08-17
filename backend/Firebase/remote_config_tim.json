@@ -6246,6 +6246,13 @@
         }
       },
       "valueType": "STRING"
+    },
+    "demo_student_enabled": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Shows the teacher-facing 'Simulate a student question' demo tool. Requires the local demo-student service to be running.",
+      "valueType": "BOOLEAN"
     }
   }
 }

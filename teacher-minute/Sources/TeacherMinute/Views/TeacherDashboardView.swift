@@ -16,6 +16,7 @@ struct TeacherDashboardView: View {
   let showsIncomingOverlay: Bool
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
+  @State var showsQuestionSimulator = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -109,6 +110,11 @@ struct TeacherDashboardView: View {
 			  readinessChecklist
 				.padding(.top, 24)
 			}
+
+			if DemoStudentService.isEnabled {
+			  simulateQuestionCard
+				.padding(.top, 24)
+			}
 		  }
 		  .padding(.horizontal, 18)
 		  .padding(.bottom, 24)
@@ -150,6 +156,16 @@ struct TeacherDashboardView: View {
 	  .sheet(isPresented: $showsDocuments) {
 		NavigationStack {
 		  TeacherDocumentsView()
+		}
+		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		.id(languagePreference)
+	  }
+	  // Demo tool — sends this teacher a simulated question written by the
+	  // local AI model behind the demo-student service.
+	  .sheet(isPresented: $showsQuestionSimulator) {
+		SimulateStudentQuestionView(teacherName: viewModel.teacherName) {
+		  showsQuestionSimulator = false
 		}
 		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
 		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
@@ -225,6 +241,49 @@ struct TeacherDashboardView: View {
 	
   }
   
+  /// Demo-only entry point: sends this teacher a simulated student question,
+  /// written by a local AI model. Hidden in release builds unless the
+  /// `demo_student_enabled` Remote Config flag is on.
+  var simulateQuestionCard: some View {
+	RoundedInfoCard {
+	  VStack(alignment: .leading, spacing: 12) {
+		HStack(spacing: 12) {
+		  Circle()
+			.fill(theme.appPurpleSoft)
+			.frame(width: 38, height: 38)
+			.overlay {
+			  PlatformIcon(systemName: "wand.and.stars", size: 15, weight: .semibold, color: theme.appPurple)
+			}
+
+		  VStack(alignment: .leading, spacing: 4) {
+			Text(LocalizationSupport.localized("Demo Mode"))
+			  .font(.system(size: 14, weight: .bold))
+			  .foregroundStyle(theme.appPrimaryText)
+
+			Text(LocalizationSupport.localized("Send yourself a question from a simulated student."))
+			  .font(.system(size: 12))
+			  .foregroundStyle(theme.appSecondaryText)
+		  }
+
+		  Spacer()
+		}
+
+		Button {
+		  showsQuestionSimulator = true
+		} label: {
+		  Text(LocalizationSupport.localized("Simulate a Student Question"))
+			.font(.system(size: 13, weight: .bold))
+			.foregroundStyle(theme.appPrimaryText)
+			.frame(maxWidth: .infinity)
+			.frame(height: 42)
+			.background(theme.appPurpleSoft)
+			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+		}
+		.buttonStyle(.plain)
+	  }
+	}
+  }
+
   var teacherStatusCard: some View {
 	RoundedInfoCard {
 	  HStack(spacing: 14) {
