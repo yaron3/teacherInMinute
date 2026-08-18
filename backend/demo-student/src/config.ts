@@ -49,18 +49,25 @@ function loadServiceAccount(): Record<string, unknown> | null {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) return null; // fall back to Application Default Credentials
 
-  // If it looks like a file path, read it.
+  // If it looks like a file path, read it. Relative paths resolve from the
+  // directory npm was run in, which is a common source of confusion when the
+  // value is copied over from another service's .env — so report the absolute
+  // path we actually looked at.
   const trimmed = raw.trim();
   if (trimmed.startsWith("/") || trimmed.startsWith(".")) {
-    if (!existsSync(trimmed)) {
+    const absolute = resolve(process.cwd(), trimmed);
+    if (!existsSync(absolute)) {
       throw new Error(
-        `FIREBASE_SERVICE_ACCOUNT points at ${trimmed}, which does not exist.\n` +
-          `Set it to the service-account JSON you downloaded from the Firebase console\n` +
-          `(Project settings -> Service accounts -> Generate new private key), or remove\n` +
-          `the line entirely to use Application Default Credentials.`,
+        `FIREBASE_SERVICE_ACCOUNT=${trimmed}\n` +
+          `resolved to ${absolute}, which does not exist.\n` +
+          `Use an absolute path to the service-account JSON you downloaded from the\n` +
+          `Firebase console (Project settings -> Service accounts -> Generate new\n` +
+          `private key). Find an existing key with:\n` +
+          `  find ~ -name "*firebase-adminsdk*.json" -not -path "*/node_modules/*"\n` +
+          `Or remove the line entirely to use Application Default Credentials.`,
       );
     }
-    return JSON.parse(readFileSync(trimmed, "utf8")) as Record<string, unknown>;
+    return JSON.parse(readFileSync(absolute, "utf8")) as Record<string, unknown>;
   }
 
   // Otherwise treat as an inline JSON string.
