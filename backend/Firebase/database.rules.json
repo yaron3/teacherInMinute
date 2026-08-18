@@ -25,6 +25,10 @@
       }
     },
     "demoStudent": {
+      "service": {
+        ".read": "auth != null",
+        ".write": false
+      },
       "requests": {
         "$requestId": {
           ".read": "auth != null && data.child('teacherUid').val() == auth.uid",

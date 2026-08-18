@@ -100,11 +100,9 @@ function parseRequest(requestId: string, data: Record<string, unknown>): Simulat
 
 const db = admin.database();
 
-// Requests written before this process started are stale — the teacher who
-// pressed the button is long gone. Anything from the last 60 s still counts,
-// which covers a restart in the middle of a demo.
+// Requests are judged on their own age, not on when this process started, so a
+// request written just before `npm run dev` is still picked up.
 const serviceStartMs = Date.now();
-const STARTUP_WINDOW_MS = 60_000;
 const handled = new Set<string>();
 
 async function setStatus(
@@ -152,23 +150,53 @@ function onRequest(snap: admin.database.DataSnapshot): void {
 
   const data = (snap.val() ?? {}) as Record<string, unknown>;
   const status = String(data.status ?? "pending").toLowerCase();
-  if (status !== "pending") return; // already picked up (by us or a previous run)
+  if (status !== "pending") {
+    console.log(`[demo-student] skip ${requestId} — status=${status} (already picked up)`);
+    return;
+  }
 
   const createdAt = typeof data.createdAt === "number" ? data.createdAt : undefined;
-  if (createdAt !== undefined && createdAt < serviceStartMs - STARTUP_WINDOW_MS) {
-    console.log(`[demo-student] ignoring stale request ${requestId}`);
-    return;
+  if (createdAt !== undefined) {
+    const ageMs = Date.now() - createdAt;
+    if (ageMs > config.requestMaxAgeMs) {
+      console.log(
+        `[demo-student] skip ${requestId} — ${Math.round(ageMs / 1000)}s old, older than ` +
+          `DEMO_STUDENT_REQUEST_MAX_AGE_SECONDS=${Math.round(config.requestMaxAgeMs / 1000)}`,
+      );
+      return;
+    }
   }
 
   const request = parseRequest(requestId, data);
   if (!request) {
-    console.warn(`[demo-student] ignoring request ${requestId} — no teacherUid`);
+    console.warn(`[demo-student] skip ${requestId} — no teacherUid on the request node`);
     return;
   }
 
   handled.add(requestId);
   runWhenSlotAvailable(() => handleRequest(request));
 }
+
+// ─── Service presence ─────────────────────────────────────────────────────────
+// The app reads this so it can say "the demo student service is not running"
+// straight away, instead of waiting out a request that nothing will answer.
+
+const presenceRef = db.ref("demoStudent/service");
+
+async function publishPresence(): Promise<void> {
+  await presenceRef.onDisconnect().update({ status: "offline", updatedAt: Date.now() });
+  await presenceRef.update({
+    status: "online",
+    model: config.llmModel,
+    startedAt: serviceStartMs,
+    updatedAt: Date.now(),
+  });
+  console.log("[demo-student] presence published — app can see the service is up");
+}
+
+void publishPresence().catch((err) => {
+  console.error("[demo-student] could not publish presence:", err);
+});
 
 db.ref("demoStudent/requests").on("child_added", onRequest);
 db.ref("demoStudent/requests").on("child_changed", onRequest);
@@ -177,8 +205,13 @@ db.ref("demoStudent/requests").on("child_changed", onRequest);
 
 function shutdown(signal: string): void {
   console.log(`[demo-student] ${signal} received — shutting down`);
-  db.goOffline();
-  process.exit(0);
+  presenceRef
+    .update({ status: "offline", updatedAt: Date.now() })
+    .catch(() => {})
+    .finally(() => {
+      db.goOffline();
+      process.exit(0);
+    });
 }
 
 process.on("SIGINT", () => shutdown("SIGINT"));

@@ -18,6 +18,7 @@ export interface Config {
   replyDelayMs: number;
   maxReplies: number;
   allowFallbackQuestion: boolean;
+  requestMaxAgeMs: number;
   maxConcurrent: number;
 }
 
@@ -68,6 +69,8 @@ export function loadConfig(): Config {
     replyDelayMs: Math.max(0, parseInt(process.env.DEMO_STUDENT_REPLY_DELAY_MS ?? "2500", 10)),
     maxReplies: Math.max(1, parseInt(process.env.DEMO_STUDENT_MAX_REPLIES ?? "25", 10)),
     allowFallbackQuestion: boolEnv("DEMO_STUDENT_ALLOW_FALLBACK", true),
+    requestMaxAgeMs:
+      Math.max(60, parseInt(process.env.DEMO_STUDENT_REQUEST_MAX_AGE_SECONDS ?? "600", 10)) * 1000,
     maxConcurrent: Math.max(1, parseInt(process.env.MAX_CONCURRENT ?? "2", 10)),
   };
 }

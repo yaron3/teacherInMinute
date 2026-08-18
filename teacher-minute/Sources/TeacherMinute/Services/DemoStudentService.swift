@@ -48,6 +48,7 @@ struct DemoStudentRequestStatus: Equatable {
 
 enum DemoStudentError: Error, LocalizedError {
   case notSignedIn
+  case serviceOffline
   case notDelivered
   case failed(String)
 
@@ -55,6 +56,8 @@ enum DemoStudentError: Error, LocalizedError {
     switch self {
     case .notSignedIn:
       return LocalizationSupport.localized("Sign in as a teacher to simulate a question.")
+    case .serviceOffline:
+      return LocalizationSupport.localized("The demo student service is not running. Start it with `npm run dev` in backend/demo-student.")
     case .notDelivered:
       return LocalizationSupport.localized("The demo student service did not respond. Make sure it is running on your machine.")
     case .failed(let message):
@@ -79,6 +82,32 @@ enum DemoStudentService {
     return true
 #else
     return RemoteConfigService.shared.getBool("demo_student_enabled")
+#endif
+  }
+
+  /// True when the local demo-student service has published presence. Returns
+  /// true if presence cannot be read at all, so a stale rules deploy never
+  /// blocks a demo — the request path still reports what happened.
+  static func isServiceRunning() async -> Bool {
+#if os(Android)
+    guard let json = try? await Task.detached(priority: .userInitiated, operation: {
+      try AndroidDemoStudentBridge.fetchServiceStatus()
+    }).value else {
+      return true
+    }
+    let status = json.trimmingCharacters(in: .whitespacesAndNewlines)
+    return status.isEmpty || status == "online"
+#else
+    let ref = FirebaseDatabase.Database.database().reference(withPath: "demoStudent/service/status")
+    let status: String? = await withCheckedContinuation { (cont: CheckedContinuation<String?, Never>) in
+      ref.observeSingleEvent(of: .value) { snapshot in
+        cont.resume(returning: snapshot.value as? String)
+      } withCancel: { _ in
+        cont.resume(returning: nil)
+      }
+    }
+    guard let status else { return true }
+    return status == "online"
 #endif
   }
 
@@ -200,6 +229,10 @@ private enum AndroidDemoStudentBridge {
     name: "fetchRequestStatusJson",
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
   )!
+  private static let serviceStatusMethod = managerClass.getStaticMethodID(
+    name: "fetchServiceStatus",
+    sig: "()Ljava/lang/String;"
+  )!
 
   static func submitRequest(json: String) throws -> String {
     try jniContext {
@@ -208,6 +241,12 @@ private enum AndroidDemoStudentBridge {
         options: [.kotlincompat],
         args: [json.toJavaParameter(options: [.kotlincompat])]
       )
+    } as String
+  }
+
+  static func fetchServiceStatus() throws -> String {
+    try jniContext {
+      try managerClass.callStatic(method: serviceStatusMethod, options: [.kotlincompat], args: [])
     } as String
   }
 

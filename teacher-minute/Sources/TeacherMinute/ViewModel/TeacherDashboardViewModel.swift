@@ -522,6 +522,10 @@ final class TeacherDashboardViewModel {
 	demoSimulationTask = Task { [weak self] in
 	  guard let self else { return }
 	  do {
+		guard await DemoStudentService.isServiceRunning() else {
+		  throw DemoStudentError.serviceOffline
+		}
+		try Task.checkCancellation()
 		let requestId = try await DemoStudentService.submit(simulation, teacherName: teacherName)
 		try Task.checkCancellation()
 		let status = try await DemoStudentService.awaitDispatch(requestId: requestId)

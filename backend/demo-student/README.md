@@ -73,6 +73,25 @@ per-session reply cap.
 The button only shows when the demo is enabled: in `DEBUG` builds, or when the
 Remote Config flag `demo_student_enabled` is `true`.
 
+## Troubleshooting
+
+**The request appears under `demoStudent/requests` but nothing shows up under
+`questions/`.** Nothing consumed the request. Look at the request node's
+`status` field — it tells you where it stopped:
+
+| `status` | What it means |
+| --- | --- |
+| `pending` | The service never picked it up: it is not running, is pointed at another database, or the request was older than `DEMO_STUDENT_REQUEST_MAX_AGE_SECONDS` when the service started. The console prints a `skip <id>` line with the exact reason. |
+| `generating` | The service took it but died mid-way — check the console for the stack trace. |
+| `failed` | The `error` field on the node carries the message (bad credentials, Firestore not reachable, model failure with fallbacks off). |
+| `dispatched` | The question was created. `questionId` points at it, and the invite is under `teacherInvites/{teacherUid}/{questionId}`. |
+
+The service publishes its own presence at `demoStudent/service`. When it is
+running that node reads `status: "online"` (and flips to `offline` when the
+process exits or the connection drops). The app checks it before writing a
+request, so a missing service is reported on the dashboard immediately rather
+than after a timeout.
+
 ## Notes
 
 - Demo questions carry `isDemo: true` (and `demoTeacherUid`) on both the RTDB

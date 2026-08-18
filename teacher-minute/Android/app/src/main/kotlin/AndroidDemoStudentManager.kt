@@ -44,6 +44,24 @@ object AndroidDemoStudentManager {
         }
     }
 
+    /** Reads the local service's presence: "online", "offline", or "" when unknown. */
+    @JvmStatic
+    fun fetchServiceStatus(): String {
+        return try {
+            val snapshot = Tasks.await(
+                FirebaseDatabase.getInstance(DATABASE_URL)
+                    .getReference("demoStudent/service/status")
+                    .get(),
+                TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            snapshot.getValue(String::class.java) ?: ""
+        } catch (error: Throwable) {
+            Log.e(TAG, "Failed reading demo student service status", error)
+            ""
+        }
+    }
+
     /** Reads the current state of a request. Returns "{}" when it is not readable yet. */
     @JvmStatic
     fun fetchRequestStatusJson(requestId: String): String {
