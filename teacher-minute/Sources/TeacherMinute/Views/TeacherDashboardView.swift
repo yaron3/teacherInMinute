@@ -164,7 +164,9 @@ struct TeacherDashboardView: View {
 	  // Demo tool — sends this teacher a simulated question written by the
 	  // local AI model behind the demo-student service.
 	  .sheet(isPresented: $showsQuestionSimulator) {
-		SimulateStudentQuestionView(teacherName: viewModel.teacherName) {
+		SimulateStudentQuestionView { simulation in
+		  viewModel.startDemoSimulation(simulation)
+		} onClose: {
 		  showsQuestionSimulator = false
 		}
 		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
@@ -250,6 +252,23 @@ struct TeacherDashboardView: View {
 		  systemImage: "paperplane.fill"
 		) {
 		  showsQuestionSimulator = true
+		}
+
+		if let demoStatusMessage = viewModel.demoStatusMessage {
+		  HStack(spacing: 8) {
+			ProgressView()
+			Text(demoStatusMessage)
+			  .font(.system(size: 13))
+			  .foregroundStyle(theme.secondaryText)
+		  }
+		}
+
+		if let demoErrorMessage = viewModel.demoErrorMessage {
+		  Text(demoErrorMessage)
+			.font(.system(size: 13, weight: .semibold))
+			.foregroundStyle(theme.danger)
+			.lineSpacing(3)
+			.frame(maxWidth: .infinity, alignment: .leading)
 		}
 	  }
 	}

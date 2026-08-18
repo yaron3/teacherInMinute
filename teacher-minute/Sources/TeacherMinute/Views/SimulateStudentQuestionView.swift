@@ -4,6 +4,8 @@
 //
 //  Demo tool: lets a teacher send themselves a simulated student question,
 //  written by the local AI model behind the `demo-student` service.
+//  Tapping Send hands the request to the dashboard and closes immediately, so
+//  the teacher is back on the dashboard when the invite arrives.
 //
 
 import SwiftUI
@@ -11,7 +13,7 @@ import SwiftUI
 @MainActor
 struct SimulateStudentQuestionView: View {
   @State var viewModel: SimulateStudentQuestionViewModel
-  let teacherName: String
+  let onSend: (DemoStudentSimulation) -> Void
   let onClose: () -> Void
 
   @Environment(\.colorScheme) var colorScheme
@@ -21,11 +23,11 @@ struct SimulateStudentQuestionView: View {
 
   init(
     viewModel: SimulateStudentQuestionViewModel = SimulateStudentQuestionViewModel(),
-    teacherName: String,
+    onSend: @escaping (DemoStudentSimulation) -> Void,
     onClose: @escaping () -> Void
   ) {
     self._viewModel = State(initialValue: viewModel)
-    self.teacherName = teacherName
+    self.onSend = onSend
     self.onClose = onClose
   }
 
@@ -56,21 +58,12 @@ struct SimulateStudentQuestionView: View {
         }
         hintField
         sendButton
-        statusArea
+        footnote
       }
       .padding(.horizontal, 20)
       .padding(.vertical, 24)
     }
     .background(theme.screenBackground)
-    // Close once the question is on its way, so the incoming-question overlay
-    // is visible on the dashboard behind this sheet.
-    .onChange(of: viewModel.dispatchedQuestionText) { _, questionText in
-      guard let questionText, !questionText.isEmpty else { return }
-      Task {
-        try? await Task.sleep(nanoseconds: 1_600_000_000)
-        onClose()
-      }
-    }
   }
 
   // MARK: - Sections
@@ -85,7 +78,6 @@ struct SimulateStudentQuestionView: View {
         Spacer()
 
         Button {
-          viewModel.cancel()
           onClose()
         } label: {
           PlatformIcon(systemName: "xmark", size: 13, weight: .semibold, color: theme.secondaryText)
@@ -158,67 +150,20 @@ struct SimulateStudentQuestionView: View {
   }
 
   var sendButton: some View {
-    Button {
-      viewModel.send(teacherName: teacherName)
-    } label: {
-      HStack(spacing: 9) {
-        if viewModel.isSending {
-          ProgressView()
-        } else {
-          PlatformIcon(systemName: "paperplane.fill", size: 14, weight: .bold, color: theme.onAccentText)
-        }
-        Text(viewModel.isSending
-             ? LocalizationSupport.localized("Sending...")
-             : LocalizationSupport.localized("Send Simulated Question"))
-        .font(.system(size: 17, weight: .bold))
-        .foregroundStyle(theme.onAccentText)
-      }
-      .frame(maxWidth: .infinity)
-      .frame(height: 54)
-      .background(viewModel.canSend ? theme.accent : theme.controlDisabled)
-      .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+    FlatPrimaryButton(
+      title: LocalizationSupport.localized("Send Simulated Question"),
+      systemImage: "paperplane.fill"
+    ) {
+      onSend(viewModel.pendingSimulation())
+      onClose()
     }
-    .buttonStyle(.plain)
-    .disabled(!viewModel.canSend)
   }
 
-  var statusArea: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      if let statusMessage = viewModel.statusMessage {
-        Text(statusMessage)
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(theme.positive)
-      }
-
-      if let questionText = viewModel.dispatchedQuestionText, !questionText.isEmpty {
-        VStack(alignment: .leading, spacing: 6) {
-          Text(LocalizationSupport.localized("QUESTION"))
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(theme.secondaryText)
-          Text(questionText)
-            .font(.system(size: 13))
-            .foregroundStyle(theme.primaryText)
-            .lineSpacing(3)
-        }
-        .padding(14)
-        .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
-        .background(theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-      }
-
-      if viewModel.usedCannedQuestion {
-        Text(LocalizationSupport.localized("The local AI model was unreachable, so a sample question was used instead."))
-          .font(.system(size: 11))
-          .foregroundStyle(theme.secondaryText)
-      }
-
-      if let errorMessage = viewModel.errorMessage {
-        Text(errorMessage)
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(theme.danger)
-          .lineSpacing(3)
-      }
-    }
-    .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
+  var footnote: some View {
+    Text(LocalizationSupport.localized("The question takes a few seconds to write. You will get it on your dashboard like any other request."))
+      .font(.system(size: 12))
+      .foregroundStyle(theme.secondaryText)
+      .lineSpacing(3)
+      .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
   }
 }

@@ -72,7 +72,12 @@ final class TeacherDashboardViewModel {
   var hasMicAccess = false
   var hasCameraAccess = false
   var showsSubjectEditor = false
-  
+  /// Demo tool progress. Tracked here, not in the sheet, so the sheet can close
+  /// straight away and the teacher waits for the simulated question on the
+  /// dashboard — where the invite actually shows up.
+  var demoStatusMessage: String? = nil
+  var demoErrorMessage: String? = nil
+
   var formattedTodayEarnings: String {
 	Self.formatCents(todayEarningsCents, currency: earningsCurrencyCode)
   }
@@ -113,6 +118,7 @@ final class TeacherDashboardViewModel {
 #endif
   private var authListenerHandle: Any?
   private var acceptingTask: Task<Void, Never>?
+  private var demoSimulationTask: Task<Void, Never>?
   private var didLoadProfile = false
   
   // MARK: - Init
@@ -502,6 +508,49 @@ final class TeacherDashboardViewModel {
 	activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   }
   
+  // MARK: - Demo Simulation
+
+  /// Kicks off a simulated student question and returns immediately. The work
+  /// outlives the sheet on purpose: the teacher goes back to the dashboard and
+  /// the invite arrives there, the same way a real question would.
+  func startDemoSimulation(_ simulation: DemoStudentSimulation) {
+	demoErrorMessage = nil
+	demoStatusMessage = LocalizationSupport.localized("Writing a question with the local AI model...")
+	logger.info("[Simulate] requested topic=\(simulation.topic) difficulty=\(simulation.difficulty) type=\(simulation.conversationType)")
+
+	demoSimulationTask?.cancel()
+	demoSimulationTask = Task { [weak self] in
+	  guard let self else { return }
+	  do {
+		let requestId = try await DemoStudentService.submit(simulation, teacherName: teacherName)
+		try Task.checkCancellation()
+		let status = try await DemoStudentService.awaitDispatch(requestId: requestId)
+		try Task.checkCancellation()
+
+		demoStatusMessage = status.source == "fallback"
+		  ? LocalizationSupport.localized("Question sent — the local AI model was unreachable, so a sample question was used.")
+		  : LocalizationSupport.localized("Question sent — it should appear in your queue now.")
+		AnalyticsService.shared.logEvent(AnalyticsEvent.teacherDemoQuestionSimulated, parameters: [
+		  "topic": simulation.topic,
+		  "difficulty": simulation.difficulty,
+		  "conversation_type": simulation.conversationType,
+		  "source": status.source
+		])
+		logger.info("[Simulate] dispatched qid=\(status.questionId) source=\(status.source)")
+
+		// The invite card takes over from here — clear the note after a beat.
+		try? await Task.sleep(nanoseconds: 6_000_000_000)
+		if !Task.isCancelled { demoStatusMessage = nil }
+	  } catch is CancellationError {
+		demoStatusMessage = nil
+	  } catch {
+		demoStatusMessage = nil
+		demoErrorMessage = error.localizedDescription
+		logger.error("[Simulate] failed — \(error.localizedDescription)")
+	  }
+	}
+  }
+
   func editSubjects() {
 	showsSubjectEditor = true
   }
