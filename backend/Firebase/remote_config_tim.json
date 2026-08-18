@@ -6260,7 +6260,7 @@
     },
     "demo_student_enabled": {
       "defaultValue": {
-        "value": "false"
+        "value": "true"
       },
       "description": "Master switch for the teacher-facing demo question feature. Off hides the 'Simulate a Student Question' card in the app and makes the simulateDemoQuestion function refuse. Unset counts as on for the backend and for DEBUG builds, off for release builds.",
       "valueType": "BOOLEAN"

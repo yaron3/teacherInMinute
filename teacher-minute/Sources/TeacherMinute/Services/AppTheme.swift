@@ -82,7 +82,7 @@ struct AppTheme {
     var cardBackground: Color {
         adaptive(
             light: (242, 242, 244),
-            dark: (35, 35, 38)
+            dark: (45, 45, 42)
         )
     }
 
@@ -161,7 +161,7 @@ struct AppTheme {
     var controlBorder: Color {
         adaptive(
             light: (228, 228, 231),
-            dark: (58, 58, 62)
+            dark: (85, 85, 88)
         )
     }
 
