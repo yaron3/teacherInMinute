@@ -155,6 +155,14 @@ final class RemoteConfigService {
         RemoteConfig.remoteConfig().configValue(forKey: key).boolValue
     }
 
+    /// Like `getBool(_:)` but distinguishes "not published" from "published as
+    /// false": an absent key yields `fallback` rather than `false`. Use it for
+    /// switches that should stay on until someone deliberately turns them off.
+    func getBool(_ key: String, fallback: Bool) -> Bool {
+        let value = RemoteConfig.remoteConfig().configValue(forKey: key)
+        return value.source == .static ? fallback : value.boolValue
+    }
+
     func getURL(_ key: String) -> URL? {
         let value = getString(key)
         guard !value.isEmpty,

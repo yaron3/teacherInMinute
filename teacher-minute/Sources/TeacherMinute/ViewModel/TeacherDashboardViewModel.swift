@@ -555,7 +555,14 @@ final class TeacherDashboardViewModel {
 		demoStatusMessage = nil
 	  } catch {
 		demoStatusMessage = nil
-		demoErrorMessage = error.localizedDescription
+		// The backend reads the same demo_student_enabled flag, and the app's
+		// copy of Remote Config can be up to an hour stale, so the button may
+		// still be there after the feature was switched off.
+		if case FunctionsError.serverError(_, let status) = error, status == "FAILED_PRECONDITION" {
+		  demoErrorMessage = LocalizationSupport.localized("The demo question feature is currently turned off.")
+		} else {
+		  demoErrorMessage = error.localizedDescription
+		}
 		logger.error("[Simulate] failed — \(error.localizedDescription)")
 	  }
 	}

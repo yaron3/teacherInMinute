@@ -6262,7 +6262,7 @@
       "defaultValue": {
         "value": "false"
       },
-      "description": "Shows the teacher-facing 'Simulate a student question' demo tool. Requires the local demo-student service to be running.",
+      "description": "Master switch for the teacher-facing demo question feature. Off hides the 'Simulate a Student Question' card in the app and makes the simulateDemoQuestion function refuse. Unset counts as on for the backend and for DEBUG builds, off for release builds.",
       "valueType": "BOOLEAN"
     },
     "demo_student_offline_message": {

@@ -72,13 +72,20 @@ enum DemoStudentService {
   private static let pollIntervalNanoseconds: UInt64 = 1_500_000_000
   private static let pollAttempts = 40   // ~60 s, covering a slow first token on a cold model
 
-  /// Demo tooling stays out of release builds unless it is switched on remotely.
+  /// Remote Config key that turns the whole demo feature on or off. The backend
+  /// reads the same key, so one switch covers the button and the callable.
+  static let featureFlagKey = "demo_student_enabled"
+
+  /// Whether the demo tooling is available. A published value always wins;
+  /// when the flag has never been published the feature is on in DEBUG builds
+  /// (so development works before anyone touches Remote Config) and off in
+  /// release builds.
   @MainActor
   static var isEnabled: Bool {
 #if DEBUG
-    return true
+    return RemoteConfigService.shared.getBool(featureFlagKey, fallback: true)
 #else
-    return RemoteConfigService.shared.getBool("demo_student_enabled")
+    return RemoteConfigService.shared.getBool(featureFlagKey, fallback: false)
 #endif
   }
 

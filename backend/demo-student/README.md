@@ -90,8 +90,21 @@ per-session reply cap.
 4. In the app, sign in as a teacher, go online, and use **Simulate student
    question** on the dashboard. The invite arrives like any other one.
 
-The button only shows when the demo is enabled: in `DEBUG` builds, or when the
-Remote Config flag `demo_student_enabled` is `true`.
+## Turning the feature on and off
+
+`demo_student_enabled` in Remote Config is the master switch, read by both the
+app and the backend:
+
+| Flag | App | Backend |
+| --- | --- | --- |
+| `true` | The Demo Mode card is shown | Simulations allowed |
+| `false` | Card hidden | `simulateDemoQuestion` refuses, and canned replies stop — including mid-session |
+| not published | Shown in `DEBUG` builds, hidden in release | Allowed, so an existing setup keeps working |
+
+Two caveats on timing: the app caches Remote Config for up to an hour, so a
+teacher may still see the button briefly after you switch it off — the callable
+refuses and the dashboard says the feature is turned off. The backend caches the
+template for five minutes.
 
 ## Troubleshooting
 

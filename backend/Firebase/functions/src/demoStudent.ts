@@ -32,6 +32,11 @@ const VALID_DIFFICULTIES = ["easy", "medium", "hard"];
 const OFFLINE_MESSAGE_KEY = "demo_student_offline_message";
 const DEFAULT_OFFLINE_MESSAGE = "This is an automatic message from Demo #{count}";
 
+// Master switch for the whole demo feature. Unset means "allowed" so an
+// existing setup keeps working before the flag is published; publish it as
+// false to turn simulations off everywhere without shipping an app build.
+const FEATURE_FLAG_KEY = "demo_student_enabled";
+
 // Replies stop after this many canned messages in one chat, so a forgotten demo
 // session can't loop forever.
 const MAX_FALLBACK_REPLIES = 30;
@@ -81,6 +86,19 @@ async function offlineMessageTemplate(language: string): Promise<string> {
     parameterValue(parameters, OFFLINE_MESSAGE_KEY) ??
     DEFAULT_OFFLINE_MESSAGE
   );
+}
+
+/**
+ * Whether simulations are allowed at all. Reads the same `demo_student_enabled`
+ * flag the app uses to show the button, so one switch covers both. Note the
+ * Remote Config template is cached for a few minutes — flipping the flag takes
+ * up to TEMPLATE_TTL_MS to take effect here.
+ */
+async function isFeatureEnabled(): Promise<boolean> {
+  const parameters = await remoteConfigParameters();
+  const raw = parameterValue(parameters, FEATURE_FLAG_KEY);
+  if (raw === null) return true; // never published — don't break a working setup
+  return !["false", "0", "no", "off"].includes(raw.trim().toLowerCase());
 }
 
 /** Fills the counter into the template. Appends `#N` when it has no placeholder. */
@@ -216,6 +234,11 @@ export const simulateDemoQuestion = onCall(async (req) => {
   const teacherUid = req.auth?.uid;
   if (!teacherUid) throw new HttpsError("unauthenticated", "Sign in required");
 
+  if (!(await isFeatureEnabled())) {
+    logger.info(`[demoStudent] simulate refused teacher=${teacherUid} — ${FEATURE_FLAG_KEY} is off`);
+    throw new HttpsError("failed-precondition", "The demo question feature is turned off.");
+  }
+
   const {
     topic: rawTopic,
     difficulty: rawDifficulty,
@@ -297,6 +320,9 @@ export const demoStudentAutoReply = onValueCreated(
 
     if (String(message.senderRole ?? "") !== "teacher") return;
     if (!String(message.text ?? "").trim()) return;
+
+    // Turning the feature off stops canned replies too, mid-session included.
+    if (!(await isFeatureEnabled())) return;
 
     const questionSnap = await db.ref(`questions/${qid}`).once("value");
     if (!questionSnap.exists()) return;
