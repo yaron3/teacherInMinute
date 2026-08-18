@@ -1,4 +1,5 @@
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
+import { resolve } from "path";
 
 export type LlmApiType = "ollama" | "openai";
 
@@ -24,8 +25,18 @@ export interface Config {
 
 function requireEnv(name: string): string {
   const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
+  if (v) return v;
+
+  // Nearly always the same cause: `.env` was never created from the example.
+  const envPath = resolve(process.cwd(), ".env");
+  if (!existsSync(envPath)) {
+    throw new Error(
+      `No .env file found at ${envPath}.\n` +
+        `Create one first:  cp .env.example .env\n` +
+        `then set FIREBASE_SERVICE_ACCOUNT to your service-account JSON.`,
+    );
+  }
+  throw new Error(`Missing required env var: ${name} (add it to ${envPath})`);
 }
 
 function boolEnv(name: string, fallback: boolean): boolean {
@@ -39,8 +50,17 @@ function loadServiceAccount(): Record<string, unknown> | null {
   if (!raw) return null; // fall back to Application Default Credentials
 
   // If it looks like a file path, read it.
-  if (raw.trim().startsWith("/") || raw.trim().startsWith(".")) {
-    return JSON.parse(readFileSync(raw.trim(), "utf8")) as Record<string, unknown>;
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("/") || trimmed.startsWith(".")) {
+    if (!existsSync(trimmed)) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT points at ${trimmed}, which does not exist.\n` +
+          `Set it to the service-account JSON you downloaded from the Firebase console\n` +
+          `(Project settings -> Service accounts -> Generate new private key), or remove\n` +
+          `the line entirely to use Application Default Credentials.`,
+      );
+    }
+    return JSON.parse(readFileSync(trimmed, "utf8")) as Record<string, unknown>;
   }
 
   // Otherwise treat as an inline JSON string.
