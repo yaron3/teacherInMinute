@@ -71,7 +71,7 @@ struct SettingsRow: Identifiable {
         case .contactUs:
             self.destination = .contactUs
         #if DEBUG
-        case .testCrashlyticsCrash:
+        case .testCrashlyticsCrash, .refreshRemoteConfig:
             self.destination = nil
         #endif
         case .logOut, .deleteAccount:
@@ -98,6 +98,7 @@ enum SettingsAction: Equatable {
     case privacyPolicy
     #if DEBUG
     case testCrashlyticsCrash
+    case refreshRemoteConfig
     #endif
     
     var id: String {
@@ -118,6 +119,7 @@ enum SettingsAction: Equatable {
         case .privacyPolicy: "privacyPolicy"
         #if DEBUG
         case .testCrashlyticsCrash: "testCrashlyticsCrash"
+        case .refreshRemoteConfig: "refreshRemoteConfig"
         #endif
         }
     }
@@ -330,6 +332,16 @@ class SettingsViewModel {
         #if DEBUG
         rows.append(
             SettingsRow(
+                title: LocalizationSupport.localized("Refresh Remote Config"),
+                subtitle: LocalizationSupport.localized("Debug builds only"),
+                systemImage: "arrow.clockwise",
+                iconColor: .primary,
+                isDestructive: false,
+                action: .refreshRemoteConfig
+            )
+        )
+        rows.append(
+            SettingsRow(
                 title: LocalizationSupport.localized("Test Crashlytics Crash"),
                 subtitle: LocalizationSupport.localized("Debug builds only"),
                 systemImage: "exclamationmark.triangle.fill",
@@ -523,6 +535,8 @@ class SettingsViewModel {
         #if DEBUG
         case .testCrashlyticsCrash:
             AnalyticsService.shared.triggerCrashlyticsTestCrash()
+        case .refreshRemoteConfig:
+            Task { await refreshRemoteConfigNow() }
         #endif
         case .logOut:
             activeConfirmation = .logOut
@@ -780,6 +794,24 @@ class SettingsViewModel {
         }
     }
     
+    #if DEBUG
+    /// Pulls the Remote Config template right now instead of waiting out the
+    /// one-hour `minimumFetchInterval`, so a value published seconds ago can be
+    /// checked on the device. Reopen the screen you are testing afterwards —
+    /// views read Remote Config as they render, so ones already on screen keep
+    /// showing the values they were built with.
+    func refreshRemoteConfigNow() async {
+        isLoading = true
+        let keyCount = await RemoteConfigService.shared.refreshAndCountKeys()
+        isLoading = false
+        present(
+            message: keyCount > 0
+                ? String(format: LocalizationSupport.localized("Remote Config refreshed — %d keys loaded."), keyCount)
+                : LocalizationSupport.localized("Remote Config refresh returned no keys. Check the connection and that a template is published.")
+        )
+    }
+    #endif
+
     func present(title: String = LocalizationSupport.localized("Settings"), message: String) {
         alertTitle = title
         alertMessage = message

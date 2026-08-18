@@ -7159,6 +7159,39 @@
         }
       },
       "valueType": "STRING"
+    },
+    "refresh_remote_config": {
+      "defaultValue": {
+        "value": "Refresh Remote Config"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רענון Remote Config"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "remote_config_refreshed": {
+      "defaultValue": {
+        "value": "Remote Config refreshed — %d keys loaded."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "‏Remote Config רוענן — נטענו %d מפתחות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "remote_config_refresh": {
+      "defaultValue": {
+        "value": "Remote Config refresh returned no keys. Check the connection and that a template is published."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רענון Remote Config לא החזיר מפתחות. בדקו את החיבור ושפורסמה תבנית."
+        }
+      },
+      "valueType": "STRING"
     }
   }
 }
