@@ -22,7 +22,7 @@ struct AndroidVideoFeed: View {
 
   var body: some View {
     RoundedRectangle(cornerRadius: 18, style: .continuous)
-      .fill(Color.black)
+      .fill(theme.videoBackground)
       .overlay {
         ZStack {
           remoteContent
@@ -59,11 +59,11 @@ struct AndroidVideoFeed: View {
           systemName: "video.fill",
           size: 32,
           weight: .semibold,
-          color: theme.appSecondaryText
+          color: theme.secondaryText
         )
         Text(LocalizationSupport.localized("Waiting for video…"))
           .font(.system(size: 13, weight: .medium))
-          .foregroundStyle(theme.appSecondaryText)
+          .foregroundStyle(theme.secondaryText)
       }
     }
   }
@@ -77,13 +77,13 @@ struct AndroidVideoFeed: View {
         backed
       } else {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .fill(Color.black.opacity(0.6))
+          .fill(theme.videoBackground.opacity(0.6))
           .overlay {
             PlatformIcon(
               systemName: isCameraOff ? "video.slash.fill" : "video.fill",
               size: 18,
               weight: .semibold,
-              color: theme.white
+              color: theme.onAccentText
             )
           }
       }
@@ -92,7 +92,7 @@ struct AndroidVideoFeed: View {
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .stroke(.white.opacity(0.4), lineWidth: 1)
+        .stroke(theme.onAccentText.opacity(0.4), lineWidth: 1)
     }
   }
 }

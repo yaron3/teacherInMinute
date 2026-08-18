@@ -26,7 +26,7 @@ struct CreateAccountView: View {
   }
   var body: some View {
 	ZStack {
-	  theme.appCardBackground.ignoresSafeArea()
+	  theme.screenBackground.ignoresSafeArea()
 	  VStack(spacing: 0) {
 		ScrollView(showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 24) {
@@ -44,11 +44,11 @@ struct CreateAccountView: View {
 	  
 	  // Loading overlay
 	  if viewModel.isLoading {
-		theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+		theme.scrim.opacity(0.18).ignoresSafeArea()
 		ProgressView()
 		  .progressViewStyle(.circular)
 		  .scaleEffect(1.6)
-		  .tint(theme.appPrimaryText)
+		  .tint(theme.primaryText)
 	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
@@ -66,11 +66,12 @@ struct CreateAccountView: View {
 	.onChange(of: viewModel.focusField) { _, field in
 	  focusedField = field
 	}
-	.alert(LocalizationSupport.localized("Sign Up"), isPresented: $viewModel.showAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) { viewModel.showAlert = false }
-	} message: {
-	  Text(viewModel.alertMessage ?? "")
-	}
+	.appDialog(
+	  LocalizationSupport.localized("Sign Up"),
+	  isPresented: $viewModel.showAlert,
+	  message: viewModel.alertMessage ?? "",
+	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	)
 	.sheet(isPresented: $viewModel.showingTerms) {
 		  
 		  if let _ = viewModel.termsURL {
@@ -82,11 +83,12 @@ struct CreateAccountView: View {
 			NavigationStack { AboutWebView(url: viewModel.privacyURL!, title: LocalizationSupport.localized("Privacy Policy")) }
 		  }
 		}
-		.alert(LocalizationSupport.localized("Sign Up"), isPresented: $viewModel.showLegalAlert) {
-		  Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-		} message: {
-		  Text(viewModel.legalAlertMessage)
-		}
+		.appDialog(
+		  LocalizationSupport.localized("Sign Up"),
+		  isPresented: $viewModel.showLegalAlert,
+		  message: viewModel.legalAlertMessage,
+		  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+		)
   }
   
   // MARK: - Sections
@@ -119,9 +121,8 @@ struct CreateAccountView: View {
 	}
 	.padding(24)
 	.background(
-	  RoundedRectangle(cornerRadius: 22)
-		.fill(theme.appCardBackground)
-		.shadow(color: theme.appCardBackgroundShadow.opacity(0.045), radius: 18, x: 0, y: 10)
+	  RoundedRectangle(cornerRadius: flatRadius)
+		.fill(theme.cardBackground)
 	)
   }
   
@@ -139,12 +140,12 @@ struct CreateAccountView: View {
 	VStack(alignment: .leading, spacing: 9) {
 	  Text(title)
 		.font(.system(size: 14, weight: .semibold))
-		.foregroundStyle(theme.authPrimaryText)
+		.foregroundStyle(theme.primaryText)
 	  
 	  HStack(spacing: 12) {
 		PlatformIcon(systemName: icon)
 		  .font(.system(size: 15, weight: .medium))
-		  .foregroundStyle(isValid ? theme.authIcon : theme.red.opacity(0.8))
+		  .foregroundStyle(isValid ? theme.secondaryText : theme.danger.opacity(0.8))
 		  .frame(width: 20)
 		
 		Group {
@@ -157,32 +158,32 @@ struct CreateAccountView: View {
 		  }
 		}
 		.font(.system(size: 16))
-		.foregroundStyle(theme.authPrimaryText)
+		.foregroundStyle(theme.primaryText)
 		.focused($focusedField, equals: field)
 		
 		if let trailingIcon {
 		  Button { trailingAction?() } label: {
 			PlatformIcon(systemName: trailingIcon)
 			  .font(.system(size: 16, weight: .medium))
-			  .foregroundStyle(theme.authIcon)
+			  .foregroundStyle(theme.secondaryText)
 		  }
 		}
 	  }
 	  .padding(.horizontal, 16)
 	  .frame(height: 56)
 		.background(
-		  RoundedRectangle(cornerRadius: 16)
-			.fill(theme.authFieldBackground)
+		  RoundedRectangle(cornerRadius: flatRadius)
+			.fill(theme.fieldBackground)
 			.overlay(
-			  RoundedRectangle(cornerRadius: 16)
-				.stroke(isValid ? theme.authFieldBorder : theme.red.opacity(0.5), lineWidth: 1.5)
+			  RoundedRectangle(cornerRadius: flatRadius)
+				.stroke(isValid ? theme.controlBorder : theme.danger.opacity(0.5), lineWidth: 1.5)
 			)
 		)
 	  
 	  if !isValid {
 			Text(field == .email ? LocalizationSupport.localized("Enter a valid email address.") : LocalizationSupport.localized("Must be at least 6 characters."))
 			  .font(.system(size: 11))
-			  .foregroundStyle(theme.red)
+			  .foregroundStyle(theme.danger)
 			  .padding(.leading, 4)
 	  }
 	}
@@ -192,7 +193,7 @@ struct CreateAccountView: View {
 	VStack(alignment: .leading, spacing: 18) {
 	  checkboxRow(isOn: $viewModel.agreedToTerms, isTermsRow: true)
 	  checkboxRow(isOn: $viewModel.sendUpdates,
-				  text: LocalizationSupport.localized("Send me occasional updates and tips about\nMath Connect."),
+				  text: LocalizationSupport.localized("Send me occasional updates and tips about\nTeacher in a Minute."),
 				  isTermsRow: false)
 	}
 	.padding(.horizontal, 8)
@@ -202,19 +203,20 @@ struct CreateAccountView: View {
 	HStack(alignment: .top, spacing: 12) {
 		  Button { isOn.wrappedValue.toggle() } label: {
 			ZStack {
-			  RoundedRectangle(cornerRadius: 4)
-				.fill(isOn.wrappedValue ? theme.authPink : theme.appCardBackground)
+			  RoundedRectangle(cornerRadius: flatRadiusSmall)
+				.fill(isOn.wrappedValue ? theme.accent : theme.cardBackground)
 				.frame(width: 18, height: 18)
 				.overlay(
-				  RoundedRectangle(cornerRadius: 4)
-					.stroke(isOn.wrappedValue ? theme.authPink : theme.appBorder, lineWidth: 1)
+				  RoundedRectangle(cornerRadius: flatRadiusSmall)
+					.stroke(isOn.wrappedValue ? theme.accent : theme.controlBorder, lineWidth: 1)
 				)
 		  if isOn.wrappedValue {
+			// The box fills with ink when checked, so the tick must invert.
 			PlatformIcon(
 			  systemName: "checkmark",
 			  size: 11,
 			  weight: .bold,
-			  color: theme.appPrimaryText
+			  color: theme.onAccentText
 			)
 		  }
 		}
@@ -226,7 +228,7 @@ struct CreateAccountView: View {
 			Text(text)
 			  .font(.system(size: 14))
 			  .lineSpacing(4)
-			  .foregroundStyle(theme.authSecondaryText)
+			  .foregroundStyle(theme.secondaryText)
 		  }
 	}
   }
@@ -242,18 +244,18 @@ struct CreateAccountView: View {
 		Text(Self.plainAgreementText(markdown))
 		  .font(.system(size: 14))
 		  .lineSpacing(4)
-		  .foregroundStyle(theme.authSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 
 		HStack(spacing: 16) {
 		  Button { viewModel.openTerms() } label: {
 			Text(LocalizationSupport.localized("Terms of Service"))
 			  .font(.system(size: 14, weight: .semibold))
-			  .foregroundStyle(theme.authPink)
+			  .foregroundStyle(theme.accent)
 		  }
 		  Button { viewModel.openPrivacy() } label: {
 			Text(LocalizationSupport.localized("Privacy Policy"))
 			  .font(.system(size: 14, weight: .semibold))
-			  .foregroundStyle(theme.authPink)
+			  .foregroundStyle(theme.accent)
 		  }
 		}
 	  }
@@ -265,8 +267,8 @@ struct CreateAccountView: View {
 	  Text(attributed)
 		.font(.system(size: 14))
 		.lineSpacing(4)
-		.foregroundStyle(theme.authSecondaryText)
-		.tint(theme.authPink)
+		.foregroundStyle(theme.secondaryText)
+		.tint(theme.accent)
 		.environment(\.openURL, OpenURLAction { url in
 		  switch url.absoluteString {
 		  case "teacherminute://terms":
@@ -312,19 +314,18 @@ struct CreateAccountView: View {
 	} label: {
 	  ZStack {
 		Text(LocalizationSupport.localized("Continue to Role Selection"))
-		  .font(.system(size: 16, weight: .semibold))
-		  .foregroundStyle(theme.appPrimaryText)
+		  .font(.system(size: 17, weight: .bold))
+		  .foregroundStyle(viewModel.canSubmit ? theme.onAccentText : theme.secondaryText)
 		  .opacity(viewModel.isLoading ? 0 : 1)
 		if viewModel.isLoading {
-		  ProgressView().tint(theme.appPrimaryText)
+		  ProgressView().tint(theme.onAccentText)
 		}
 	  }
 	  .frame(maxWidth: .infinity)
-	  .frame(height: 56)
+	  .frame(height: 54)
 		.background(
-			Capsule()
-			  .fill(viewModel.canSubmit ? theme.authPink : theme.authPink.opacity(0.45))
-			  .shadow(color: theme.authPink.opacity(viewModel.canSubmit ? 0.28 : 0), radius: 14, x: 0, y: 8)
+			RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+			  .fill(viewModel.canSubmit ? theme.accent : theme.cardBackground)
 		)
 	}
 	.disabled(viewModel.isLoading)
@@ -333,12 +334,12 @@ struct CreateAccountView: View {
   
 	var dividerSection: some View {
 	  HStack(spacing: 16) {
-		Rectangle().fill(theme.authDivider).frame(height: 1)
+		Rectangle().fill(theme.separator).frame(height: 1)
 		Text(LocalizationSupport.localized("Or continue with"))
 		  .font(.system(size: 14))
-		  .foregroundStyle(theme.authSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 		  .lineLimit(1)
-		Rectangle().fill(theme.authDivider).frame(height: 1)
+		Rectangle().fill(theme.separator).frame(height: 1)
 	  }
 	.padding(.horizontal, 16)
   }
@@ -362,23 +363,22 @@ struct CreateAccountView: View {
 		Text(type == .google ? LocalizationSupport.localized("Google") : LocalizationSupport.localized("Apple"))
 		  .font(.system(size: 15, weight: .semibold))
 	  }
-	  .foregroundStyle(theme.authPrimaryText)
+	  .foregroundStyle(theme.primaryText)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 54)
 	  .background(
-		  RoundedRectangle(cornerRadius: 14)
-			.fill(theme.appGrayBackground)
-			.overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.authSocialBorder, lineWidth: 1))
-			.shadow(color: theme.appPrimaryText.opacity(0.025), radius: 6, x: 0, y: 4)
+		  RoundedRectangle(cornerRadius: flatRadius)
+			.fill(theme.cardBackground)
+			.overlay(RoundedRectangle(cornerRadius: flatRadius).stroke(theme.controlBorder, lineWidth: 1))
 	  )
 	}
   }
   
 	var bottomLoginSection: some View {
 	  HStack(spacing: 4) {
-		Text(LocalizationSupport.localized("Already have an account?")).foregroundStyle(theme.authSecondaryText)
+		Text(LocalizationSupport.localized("Already have an account?")).foregroundStyle(theme.secondaryText)
 		Button { router.push(.login) } label: {
-			Text(LocalizationSupport.localized("Log In")).foregroundStyle(theme.authPink)
+			Text(LocalizationSupport.localized("Log In")).foregroundStyle(theme.accent)
 		}
 	}
 	.font(.system(size: 14))

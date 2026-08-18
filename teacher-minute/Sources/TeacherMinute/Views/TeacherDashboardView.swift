@@ -33,7 +33,7 @@ struct TeacherDashboardView: View {
 	self.showsSessionOverlay = showsSessionOverlay
 	self.showsIncomingOverlay = showsIncomingOverlay
   }
-  
+
   var body: some View {
 	if showsSessionOverlay, viewModel.isAcceptingCalls, viewModel.acceptingQuestionId != nil {
 	  ConnectionSetupView(
@@ -72,55 +72,55 @@ struct TeacherDashboardView: View {
 	  ZStack {
 		ScrollView(.vertical, showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 0) {
-			AppTopHeader(
-			  avatarSystemImage: "person.crop.circle.fill",
+			FlatTopHeader(
 			  eyebrow: LocalizationSupport.localized("Teacher Dashboard"),
 			  name: viewModel.teacherName,
+			  avatarSystemImage: "person.crop.circle.fill",
 			  showNotificationBadge: viewModel.isOnline
 			)
-			.padding(.top, 18)
-			
+			.padding(.top, 16)
+
 			statusHero
-			  .padding(.top, 34)
+			  .padding(.top, 28)
 			if viewModel.isOnline {
-			  
-			  
+
+
 			  liveEarningsCard
-				.padding(.top, 24)
-			  
+				.padding(.top, 28)
+
 			  onlineStatusCard
-				.padding(.top, 20)
+				.padding(.top, 12)
 			  ZStack {
 				liveQueue
-				  .padding(.top, 24)
+				  .padding(.top, 28)
 				  .disabled(viewModel.isAcceptingCalls)
 				if viewModel.isAcceptingCalls {
 				  ProgressView()
 				}
 			  }
 			} else {
-			  
-			  
+
+
 			  teacherStatusCard
-				.padding(.top, 38)
-			  
+				.padding(.top, 28)
+
 			  earningsSnapshot
-				.padding(.top, 26)
-			  
+				.padding(.top, 28)
+
 			  readinessChecklist
-				.padding(.top, 24)
+				.padding(.top, 28)
 			}
 
 			if DemoStudentService.isEnabled {
 			  simulateQuestionCard
-				.padding(.top, 24)
+				.padding(.top, 28)
 			}
 		  }
-		  .padding(.horizontal, 18)
-		  .padding(.bottom, 24)
+		  .padding(.horizontal, 20)
+		  .padding(.bottom, 40)
 		}
-		.background(theme.appCardBackground)
-		
+		.background(theme.screenBackground)
+
 		if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
 		  TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
 			.onAppear {
@@ -181,217 +181,186 @@ struct TeacherDashboardView: View {
 
 	}
   }
+
+  // Status is carried by type weight and a single solid dot rather than a
+  // stacked-circle badge, so the block reads as one clean left-aligned column.
   var statusHero: some View {
-	VStack(spacing: 0) {
-	  Circle()
-		.fill(viewModel.isOnline ? theme.appGreenSoft : theme.appGrayBackground)
-		.frame(width: 112, height: 112)
-		.overlay {
-		  Circle()
-			.fill(theme.appGreen)
-			.frame(width: 84, height: 84)
-			.overlay {
-			  PlatformIcon(systemName: viewModel.isOnline ? "antenna.radiowaves.left.and.right" : "moon.fill", size: 34, weight: .semibold, color: theme.white)
-			}
+	VStack(alignment: .leading, spacing: 0) {
+	  HStack(spacing: 8) {
+		FlatStatusDot(color: viewModel.isOnline ? theme.positive : theme.secondaryText)
+
+		Text(viewModel.isOnline ? LocalizationSupport.localized("ONLINE") : LocalizationSupport.localized("OFFLINE"))
+		  .font(.system(size: 11, weight: .bold))
+		  .foregroundStyle(viewModel.isOnline ? theme.positive : theme.secondaryText)
+	  }
+
+	  FlatPageTitle(title: viewModel.isOnline ? LocalizationSupport.localized("You're Online") : LocalizationSupport.localized("You're Offline"))
+		.padding(.top, 10)
+
+	  Text(viewModel.isOnline ? LocalizationSupport.localized("Waiting for students...") : LocalizationSupport.localized("Go online to start receiving student requests and\nearn money."))
+		.font(.system(size: 15))
+		.foregroundStyle(theme.secondaryText)
+		.lineSpacing(4)
+		.padding(.top, 6)
+		.frame(maxWidth: .infinity, alignment: .leading)
+
+	  if viewModel.isOnline {
+		FlatSecondaryButton(title: LocalizationSupport.localized("Go Offline"), systemImage: "moon.fill") {
+		  viewModel.toggleOnline()
 		}
-	  
-	  Text(viewModel.isOnline ? LocalizationSupport.localized("You're Online") : LocalizationSupport.localized("You're Offline"))
-		.font(.system(size: 26, weight: .bold))
-		.foregroundStyle(theme.appPrimaryText)
 		.padding(.top, 22)
-	  
-	  HStack {
-		Text(viewModel.isOnline ? LocalizationSupport.localized("Waiting for students...") : LocalizationSupport.localized("Go online to start receiving student requests and\nearn money."))
-		  .font(.system(size: 13, weight: .semibold))
-		  .foregroundStyle(theme.appGreen)
-		  .lineSpacing(5)
-		  .padding(.top, 10)
-		  .multilineTextAlignment(.center)
-	  }
-	  Button {
-		viewModel.toggleOnline()
-	  } label: {
-		HStack(spacing: 10) {
-		  if viewModel.isOnline {
-			Text(LocalizationSupport.localized("ON"))
-			  .font(.system(size: 12, weight: .bold))
-			  .foregroundStyle(theme.appPrimaryText)
-			  .padding(.leading, 16)
-			Circle()
-			  .fill(theme.appPrimaryText)
-			  .frame(width: 44, height: 44)
-		  } else {
-			Circle()
-			  .fill(theme.primaryText)
-			  .frame(width: 44, height: 44)
-			Text(LocalizationSupport.localized("OFF"))
-			  .font(.system(size: 12, weight: .bold))
-			  .foregroundStyle(theme.appSecondaryText)
-			  .padding(.trailing, 14)
-		  }
+	  } else {
+		FlatPrimaryButton(title: LocalizationSupport.localized("Go Online"), systemImage: "antenna.radiowaves.left.and.right") {
+		  viewModel.toggleOnline()
 		}
-		.frame(height: 48)
-		.background(viewModel.isOnline ? theme.appGreen : theme.appBorder)
-		.clipShape(Capsule())
+		.padding(.top, 22)
 	  }
-	  .buttonStyle(.plain)
-	  .padding(.top, 26)
 	}
-	.frame(maxWidth: .infinity)
-	
+	.frame(maxWidth: .infinity, alignment: .leading)
   }
   
   /// Demo-only entry point: sends this teacher a simulated student question,
   /// written by a local AI model. Hidden in release builds unless the
   /// `demo_student_enabled` Remote Config flag is on.
   var simulateQuestionCard: some View {
-	RoundedInfoCard {
-	  VStack(alignment: .leading, spacing: 12) {
-		HStack(spacing: 12) {
-		  Circle()
-			.fill(theme.appPurpleSoft)
-			.frame(width: 38, height: 38)
-			.overlay {
-			  PlatformIcon(systemName: "wand.and.stars", size: 15, weight: .semibold, color: theme.appPurple)
-			}
+	FlatCard(outlined: true) {
+	  VStack(alignment: .leading, spacing: 14) {
+		HStack(alignment: .top, spacing: 12) {
+		  FlatIconTile(
+			systemName: "wand.and.stars",
+			size: 44,
+			tint: theme.accent,
+			background: theme.accentBackground
+		  )
 
-		  VStack(alignment: .leading, spacing: 4) {
+		  VStack(alignment: .leading, spacing: 3) {
 			Text(LocalizationSupport.localized("Demo Mode"))
-			  .font(.system(size: 14, weight: .bold))
-			  .foregroundStyle(theme.appPrimaryText)
+			  .font(.system(size: 15, weight: .bold))
+			  .foregroundStyle(theme.primaryText)
 
 			Text(LocalizationSupport.localized("Send yourself a question from a simulated student."))
-			  .font(.system(size: 12))
-			  .foregroundStyle(theme.appSecondaryText)
+			  .font(.system(size: 13))
+			  .foregroundStyle(theme.secondaryText)
+			  .frame(maxWidth: .infinity, alignment: .leading)
+		  }
+		}
+
+		FlatSecondaryButton(
+		  title: LocalizationSupport.localized("Simulate a Student Question"),
+		  systemImage: "paperplane.fill"
+		) {
+		  showsQuestionSimulator = true
+		}
+	  }
+	}
+  }
+
+  var teacherStatusCard: some View {
+	// The subject list wraps to several lines, so the action sits on its own row
+	// underneath rather than competing with it for horizontal space.
+	FlatCard {
+	  VStack(alignment: .leading, spacing: 14) {
+		HStack(alignment: .top, spacing: 12) {
+		  FlatIconTile(
+			systemName: viewModel.isVerified ? "checkmark.seal" : "clock",
+			size: 44,
+			tint: viewModel.isVerified ? theme.positive : theme.secondaryText,
+			background: theme.screenBackground
+		  )
+
+		  VStack(alignment: .leading, spacing: 3) {
+			Text(viewModel.isVerified ? LocalizationSupport.localized("Verified Expert") : LocalizationSupport.localized("Pending Verification"))
+			  .font(.system(size: 15, weight: .bold))
+			  .foregroundStyle(theme.primaryText)
+
+			Text(viewModel.subjectsDisplayText)
+			  .font(.system(size: 13))
+			  .foregroundStyle(theme.secondaryText)
 		  }
 
 		  Spacer()
 		}
 
 		Button {
-		  showsQuestionSimulator = true
-		} label: {
-		  Text(LocalizationSupport.localized("Simulate a Student Question"))
-			.font(.system(size: 13, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-			.frame(maxWidth: .infinity)
-			.frame(height: 42)
-			.background(theme.appPurpleSoft)
-			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-		}
-		.buttonStyle(.plain)
-	  }
-	}
-  }
-
-  var teacherStatusCard: some View {
-	RoundedInfoCard {
-	  HStack(spacing: 14) {
-		Circle()
-		  .fill(viewModel.isVerified ? theme.appGreenSoft : theme.appGrayBackground)
-		  .frame(width: 38, height: 38)
-		  .overlay {
-			PlatformIcon(systemName: viewModel.isVerified ? "checkmark.seal" : "clock", size: 15, weight: .semibold, color: viewModel.isVerified ? theme.appGreen : theme.appSecondaryText)
-		  }
-		
-		VStack(alignment: .leading, spacing: 4) {
-		  Text(viewModel.isVerified ? LocalizationSupport.localized("Verified Expert") : LocalizationSupport.localized("Pending Verification"))
-			.font(.system(size: 14, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  Text(viewModel.subjectsDisplayText)
-			.font(.system(size: 12))
-			.foregroundStyle(theme.appSecondaryText)
-		}
-		
-		Spacer()
-		
-		Button {
 		  viewModel.editSubjects()
 		} label: {
-		  Text(LocalizationSupport.localized("Edit Subjects"))
-			.font(.system(size: 12, weight: .medium))
-			.foregroundStyle(theme.appPink)
+		  FlatChip(title: LocalizationSupport.localized("Edit Subjects"), systemImage: "pencil", outlined: true)
 		}
 		.buttonStyle(.plain)
 	  }
 	}
   }
-  
-  var earningsSnapshot: some View {
-	VStack(alignment: .leading, spacing: 14) {
-	  Text(LocalizationSupport.localized("Earnings Snapshot"))
-		.font(.system(size: 18, weight: .bold))
-		.foregroundStyle(theme.appPrimaryText)
 
-	  HStack(spacing: 16) {
+  var earningsSnapshot: some View {
+	VStack(alignment: .leading, spacing: 12) {
+	  FlatSectionHeader(LocalizationSupport.localized("Earnings Snapshot"))
+
+	  HStack(spacing: 12) {
 		EarningsCard(title: LocalizationSupport.localized("Today"), amount: viewModel.formattedTodayEarnings, subtitle: String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
 		  .frame(maxWidth: .infinity)
-		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.appGreen : nil)
+		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.positive : nil)
 		  .frame(maxWidth: .infinity)
 	  }
 
 	  EarningsCard(
 		title: LocalizationSupport.localized("All Time"),
 		amount: String(format: LocalizationSupport.localized("%d min"), viewModel.totalMinutes),
-		subtitle: LocalizationSupport.localized("Total minutes tutored"),
-		subtitleColor: theme.appGreen
+		subtitle: LocalizationSupport.localized("Total minutes tutored")
 	  )
 	  .frame(maxWidth: .infinity)
 	}
   }
-  
+
+  // Filled rather than outlined so the live figure reads as the one emphasised
+  // surface on the online dashboard.
   var liveEarningsCard: some View {
-	RoundedInfoCard {
-	  HStack {
-		VStack(alignment: .leading, spacing: 10) {
+	FlatCard(padding: 20) {
+	  HStack(alignment: .top) {
+		VStack(alignment: .leading, spacing: 6) {
 		  Text(LocalizationSupport.localized("Live Earnings Today"))
-			.font(.system(size: 12, weight: .medium))
-			.foregroundStyle(theme.appSecondaryText)
-		  
+			.font(.system(size: 14))
+			.foregroundStyle(theme.secondaryText)
+
 		  Text(viewModel.formattedTodayEarnings)
-			.font(.system(size: 25, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		}
-		
-		Spacer()
-		
-		VStack(alignment: .trailing, spacing: 8) {
-		  SmallPill(title: String(format: LocalizationSupport.localized("⚡ %@/min"), viewModel.formattedRate), foreground: theme.appPink, background: theme.appPinkSoft)
-		  
+			.font(.system(size: 40, weight: .bold))
+			.foregroundStyle(theme.primaryText)
+
 		  Text(String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
-			.font(.system(size: 11))
-			.foregroundStyle(theme.appSecondaryText)
+			.font(.system(size: 13))
+			.foregroundStyle(theme.secondaryText)
 		}
+
+		Spacer()
+
+		FlatBadge(title: String(format: LocalizationSupport.localized("%@/min"), viewModel.formattedRate))
 	  }
 	}
-	.background(theme.appPinkSoft.opacity(0.3))
   }
-  
+
   var onlineStatusCard: some View {
-	RoundedInfoCard {
-	  HStack {
-		statusItem(icon: "mic.fill", title: LocalizationSupport.localized("Mic"), subtitle: viewModel.hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off"), color: viewModel.hasMicAccess ? theme.appGreen : theme.appSecondaryText)
-		Spacer()
-		statusItem(icon: "video.fill", title: LocalizationSupport.localized("Cam"), subtitle: viewModel.hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off"), color: viewModel.hasCameraAccess ? theme.appGreen : theme.appSecondaryText)
-		Spacer()
-		statusItem(icon: "circle.fill", title: LocalizationSupport.localized("Status"), subtitle: LocalizationSupport.localized("Connected"), color: theme.appGreen)
+	FlatCard(padding: 14) {
+	  HStack(spacing: 0) {
+		statusItem(icon: "mic.fill", title: LocalizationSupport.localized("Mic"), subtitle: viewModel.hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off"), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
+		verticalRule
+		statusItem(icon: "video.fill", title: LocalizationSupport.localized("Cam"), subtitle: viewModel.hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off"), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
+		verticalRule
+		statusItem(icon: "circle.fill", title: LocalizationSupport.localized("Status"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
 	  }
 	}
   }
-  
+
+  var verticalRule: some View {
+	Rectangle()
+	  .fill(theme.separator)
+	  .frame(width: flatHairline, height: 30)
+  }
+
   var liveQueue: some View {
-	VStack(alignment: .leading, spacing: 14) {
-	  HStack {
-		Text(LocalizationSupport.localized("Live Queue"))
-		  .font(.system(size: 18, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
-		
-		Spacer()
-		
-		SmallPill(title: String(format: LocalizationSupport.localized("%d Waiting"), viewModel.inviteIDs.count), foreground: theme.appPrimaryText, background: theme.appGrayBackground)
+	VStack(alignment: .leading, spacing: 12) {
+	  FlatSectionHeader(LocalizationSupport.localized("Live Queue")) {
+		FlatChip(title: String(format: LocalizationSupport.localized("%d Waiting"), viewModel.inviteIDs.count))
 	  }
-	  
+
 	  ForEach(viewModel.inviteIDs, id: \.self) { inviteID in
 		LiveRequestCard(
 		  id: inviteID,
@@ -413,15 +382,11 @@ struct TeacherDashboardView: View {
 	  }
 	}
   }
-  
+
   func incomingQuestionOverlay(inviteID: String) -> some View {
 	ZStack {
-	  LinearGradient(
-		colors: [theme.appPinkSoft.opacity(0.75), theme.appCardBackground],
-		startPoint: .top,
-		endPoint: .bottom
-	  )
-	  
+	  theme.screenBackground
+
 	  ScrollView(.vertical, showsIndicators: false) {
 		VStack(spacing: 0) {
 		  LiveRequestCard(
@@ -441,18 +406,18 @@ struct TeacherDashboardView: View {
 		  } decline: {
 			viewModel.declineInvite(questionId: inviteID)
 		  }
-		  .padding(.horizontal, 16)
+		  .padding(.horizontal, 20)
 		  .padding(.top, 24)
-		  
+
 		  if let errorMessage = viewModel.errorMessage {
 			Text(errorMessage)
-			  .font(.system(size: 12, weight: .semibold))
-			  .foregroundStyle(theme.appPink)
+			  .font(.system(size: 13, weight: .semibold))
+			  .foregroundStyle(theme.danger)
 			  .multilineTextAlignment(.center)
 			  .padding(.horizontal, 24)
 			  .padding(.top, 12)
 		  }
-		  
+
 		  Spacer(minLength: 32)
 		}
 		.frame(maxWidth: CGFloat.infinity)
@@ -460,61 +425,60 @@ struct TeacherDashboardView: View {
 	}
 	.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
   }
-  
+
   var readinessChecklist: some View {
-	VStack(alignment: .leading, spacing: 14) {
-	  Text(LocalizationSupport.localized("Readiness Checklist"))
-		.font(.system(size: 16, weight: .bold))
-		.foregroundStyle(theme.appPrimaryText)
-	  
-	  checklistRow(icon: "mic.fill", title: viewModel.hasMicAccess ? LocalizationSupport.localized("Microphone Enabled") : LocalizationSupport.localized("Microphone Disabled"), subtitle: LocalizationSupport.localized("Required for voice sessions."), color: viewModel.hasMicAccess ? theme.appGreen : theme.appSecondaryText)
-	  checklistRow(icon: "camera.fill", title: viewModel.hasCameraAccess ? LocalizationSupport.localized("Camera Enabled") : LocalizationSupport.localized("Camera Disabled"), subtitle: LocalizationSupport.localized("Enable for video tutoring."), color: viewModel.hasCameraAccess ? theme.appGreen : theme.appSecondaryText)
-	  checklistRow(icon: "wifi", title: LocalizationSupport.localized("Connection"), subtitle: LocalizationSupport.localized("Connected"), color: theme.appGreen)
-	}
-	.padding(20)
-	.background(theme.appGrayBackground)
-	.clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-  }
-  
-  func statusItem(icon: String, title: String, subtitle: String, color: Color) -> some View {
-	HStack(spacing: 6) {
-	  PlatformIcon(systemName: icon, size: 13, weight: .semibold, color: color)
-	  
-	  VStack(alignment: .leading, spacing: 2) {
-		Text(title)
-		  .font(.system(size: 11, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
-		
-		Text(subtitle)
-		  .font(.system(size: 10))
-		  .foregroundStyle(theme.appSecondaryText)
+	VStack(alignment: .leading, spacing: 12) {
+	  FlatSectionHeader(LocalizationSupport.localized("Readiness Checklist"))
+
+	  FlatCard(padding: 0, outlined: true) {
+		VStack(spacing: 0) {
+		  checklistRow(icon: "mic.fill", title: viewModel.hasMicAccess ? LocalizationSupport.localized("Microphone Enabled") : LocalizationSupport.localized("Microphone Disabled"), subtitle: LocalizationSupport.localized("Required for voice sessions."), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
+		  FlatRule()
+		  checklistRow(icon: "camera.fill", title: viewModel.hasCameraAccess ? LocalizationSupport.localized("Camera Enabled") : LocalizationSupport.localized("Camera Disabled"), subtitle: LocalizationSupport.localized("Enable for video tutoring."), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
+		  FlatRule()
+		  checklistRow(icon: "wifi", title: LocalizationSupport.localized("Connection"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
+		}
 	  }
 	}
   }
-  
-  func checklistRow(icon: String, title: String, subtitle: String, color: Color) -> some View {
-	HStack(spacing: 12) {
-	  Circle()
-		.fill(color.opacity(0.12))
-		.frame(width: 30, height: 30)
-		.overlay {
-		  PlatformIcon(systemName: icon, size: 12, weight: .semibold, color: color)
-		}
-	  
-	  VStack(alignment: .leading, spacing: 3) {
+
+  func statusItem(icon: String, title: String, subtitle: String, color: Color) -> some View {
+	HStack(spacing: 8) {
+	  PlatformIcon(systemName: icon, size: 14, weight: .semibold, color: color)
+
+	  VStack(alignment: .leading, spacing: 1) {
 		Text(title)
-		  .font(.system(size: 13, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
-		
+		  .font(.system(size: 12, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+
 		Text(subtitle)
 		  .font(.system(size: 11))
-		  .foregroundStyle(theme.appSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 	  }
-	  
+	}
+	.frame(maxWidth: .infinity)
+  }
+
+  func checklistRow(icon: String, title: String, subtitle: String, color: Color) -> some View {
+	HStack(spacing: 14) {
+	  FlatIconTile(systemName: icon, size: 44, tint: color)
+
+	  VStack(alignment: .leading, spacing: 2) {
+		Text(title)
+		  .font(.system(size: 15, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+
+		Text(subtitle)
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.secondaryText)
+	  }
+
 	  Spacer()
 	}
+	.padding(.horizontal, 16)
+	.padding(.vertical, 12)
   }
-  
+
   struct EarningsCard: View {
 	@Environment(\.colorScheme) var colorScheme
 	var theme: AppTheme {
@@ -524,27 +488,29 @@ struct TeacherDashboardView: View {
 	let amount: String
 	let subtitle: String
 	var subtitleColor: Color?
-	
+
 	var body: some View {
-	  RoundedInfoCard {
-		VStack(alignment: .leading, spacing: 8) {
+	  FlatCard {
+		VStack(alignment: .leading, spacing: 6) {
 		  Text(title)
-			.font(.system(size: 12))
-			.foregroundStyle(theme.appSecondaryText)
-		  
+			.font(.system(size: 13, weight: .semibold))
+			.foregroundStyle(theme.secondaryText)
+
 		  Text(amount)
-			.font(.system(size: 25, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
+			.font(.system(size: 26, weight: .bold))
+			.foregroundStyle(theme.primaryText)
+
 		  Text(subtitle)
-			.font(.system(size: 11))
-			.foregroundStyle(subtitleColor ?? theme.appSecondaryText)
+			.font(.system(size: 12))
+			.foregroundStyle(subtitleColor ?? theme.secondaryText)
 		}
 		.frame(maxWidth: .infinity, alignment: .leading)
 	  }
 	}
   }
-  
+
+  // One bordered container split by hairlines, instead of nested rounded cards
+  // floating on a gradient.
   struct LiveRequestCard: View {
 	let id: String
 	let topic: String
@@ -578,7 +544,7 @@ struct TeacherDashboardView: View {
 	  return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
 	}
 	@State var now = Date().timeIntervalSince1970 * 1000.0
-	
+
 	private var isFirstWave: Bool { wave == 1 }
 	private var timerValue: Int {
 	  let delta = (expiresAt - now) / 1000.0
@@ -587,7 +553,9 @@ struct TeacherDashboardView: View {
 	  }
 	  return Int(abs(floor(delta)))
 	}
-	
+
+	private var isExpired: Bool { now > expiresAt }
+
 	private var timerCaption: String {
 	  now <= expiresAt ? LocalizationSupport.localized("SECONDS") : LocalizationSupport.localized("WAITING")
 	}
@@ -598,24 +566,16 @@ struct TeacherDashboardView: View {
 	}
 
 	var body: some View {
-	  VStack(spacing: 16) {
-		timerView
-		studentCard
-		questionCard
-		acceptButton
-		declineButton
+	  FlatCard(padding: 0, outlined: true) {
+		VStack(spacing: 0) {
+		  headerRow
+		  FlatRule()
+		  studentRow
+		  FlatRule()
+		  questionSection
+		  actions
+		}
 	  }
-	  .padding(.horizontal, 16)
-	  .padding(.vertical, 18)
-	  .background(
-		LinearGradient(
-		  colors: [theme.appPinkSoft.opacity(0.55), theme.appCardBackground],
-		  startPoint: .top,
-		  endPoint: .center
-		)
-	  )
-	  .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-	  .shadow(color: theme.appPink.opacity(0.12), radius: 18, x: 0, y: 10)
 	  .task {
 		while true {
 		  now = Date().timeIntervalSince1970 * 1000.0
@@ -623,91 +583,69 @@ struct TeacherDashboardView: View {
 		}
 	  }
 	}
-	
-	var timerView: some View {
-	  ZStack {
-		Circle()
-		  .stroke(theme.appGreenSoft.opacity(0.85), lineWidth: 4)
-		  .frame(width: 74, height: 74)
-		
-		VStack(spacing: 1) {
-		  Text("\(timerValue)")
-			.font(.system(size: 21, weight: .bold))
-			.foregroundStyle(theme.appPink)
-		  Text(timerCaption)
-			.font(.system(size: 7, weight: .bold))
-			.foregroundStyle(theme.appSecondaryText)
+
+	var headerRow: some View {
+	  HStack(alignment: .firstTextBaseline, spacing: 8) {
+		Text("\(timerValue)")
+		  .font(.system(size: 32, weight: .bold))
+		  .foregroundStyle(isExpired ? theme.secondaryText : theme.primaryText)
+
+		Text(timerCaption)
+		  .font(.system(size: 11, weight: .bold))
+		  .foregroundStyle(theme.secondaryText)
+
+		Spacer()
+
+		HStack(spacing: 6) {
+		  if let icon = sessionIcon {
+			PlatformIcon(systemName: icon, size: 14, weight: .medium, color: theme.primaryText)
+		  }
+		  FlatChip(title: LocalizationSupport.localized(topic.capitalized))
 		}
 	  }
+	  .padding(.horizontal, 16)
+	  .padding(.vertical, 14)
 	}
-	
-	var studentCard: some View {
+
+	var studentRow: some View {
 	  HStack(spacing: 12) {
 		ProfileAvatarView(
 		  imageURL: studentImageURL,
-		  size: 44,
+		  size: 40,
 		  fallbackSystemImage: "person.crop.circle.fill",
-		  background: theme.appPurpleSoft,
-		  tint: theme.appPurple
+		  background: theme.cardBackground,
+		  tint: theme.primaryText
 		)
 
-		VStack(alignment: .leading, spacing: 4) {
+		VStack(alignment: .leading, spacing: 2) {
 		  Text(displayStudentName)
 			.font(.system(size: 15, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
+			.foregroundStyle(theme.primaryText)
 
 		  Text(LocalizationSupport.localized("Waiting now"))
-			.font(.system(size: 11, weight: .medium))
-			.foregroundStyle(theme.appSecondaryText)
+			.font(.system(size: 12))
+			.foregroundStyle(theme.secondaryText)
 		}
-		
+
 		Spacer()
-		
-		HStack(spacing: 6) {
-		  if let icon = sessionIcon {
-			Circle()
-			  .fill(theme.appTeal)
-			  .frame(width: 26, height: 26)
-			  .overlay {
-				PlatformIcon(systemName: icon, size: 11, weight: .bold, color: theme.white)
-			  }
-		  }
-		  Text(LocalizationSupport.localized(topic.capitalized))
-			.font(.system(size: 10, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-			.padding(.horizontal, 12)
-			.padding(.vertical, 8)
-			.background(theme.appPurple)
-			.clipShape(Capsule())
-		}
 	  }
-	  .padding(14)
-	  .background(theme.appCardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+	  .padding(.horizontal, 16)
+	  .padding(.vertical, 14)
 	}
-	
-	var questionCard: some View {
-	  VStack(alignment: .leading, spacing: 14) {
-		HStack(spacing: 9) {
-		  Circle()
-			.fill(theme.appPinkSoft)
-			.frame(width: 22, height: 22)
-			.overlay {
-			  PlatformIcon(systemName: "questionmark.circle", size: 11, weight: .bold, color: theme.appPink)
-			}
-		  
-		  Text(LocalizationSupport.localized("QUESTION"))
-			.font(.system(size: 10, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		}
-		
+
+	var questionSection: some View {
+	  VStack(alignment: .leading, spacing: 12) {
+		Text(LocalizationSupport.localized("QUESTION"))
+		  .font(.system(size: 11, weight: .bold))
+		  .foregroundStyle(theme.secondaryText)
+
 		Text(text)
-		  .font(.system(size: 12))
-		  .foregroundStyle(theme.appPrimaryText)
-		  .lineSpacing(3)
+		  .font(.system(size: 15))
+		  .foregroundStyle(theme.primaryText)
+		  .lineSpacing(4)
 		  .lineLimit(6)
 		  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
-		
+
 		if !photoUrls.isEmpty {
 		  VStack(spacing: 10) {
 			ForEach(photoUrls.prefix(4), id: \.self) { url in
@@ -715,96 +653,77 @@ struct TeacherDashboardView: View {
 			}
 		  }
 		}
-		
+
 		if hasVoiceMessage {
 		  voiceMessageRow
 		}
 	  }
-	  .padding(14)
-	  .background(theme.appCardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+	  .padding(.horizontal, 16)
+	  .padding(.vertical, 14)
 	}
-	
+
 	func attachmentTile(url: String) -> some View {
 	  let minSide: CGFloat = hSizeClass == .regular ? 700 : 500
-	  return RoundedRectangle(cornerRadius: 12, style: .continuous)
-		.fill(theme.appGrayBackground)
+	  return RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+		.fill(theme.cardBackground)
 		.frame(maxWidth: CGFloat.infinity)
 		.frame(minHeight: minSide)
 		.overlay {
 		  CachedRemoteImage(url: url, contentMode: .fit)
 			.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
 		}
-		.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+		.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 		.overlay {
-		  RoundedRectangle(cornerRadius: 12, style: .continuous)
-			.stroke(theme.appBorder, lineWidth: 1)
+		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+			.stroke(theme.separator, lineWidth: flatHairline)
 		}
 	}
-	
+
 	var voiceMessageRow: some View {
 	  HStack(spacing: 12) {
-		Circle()
-		  .fill(theme.appPrimaryText)
-		  .frame(width: 34, height: 34)
-		  .overlay {
-			PlatformIcon(systemName: "play.fill", size: 12, weight: .bold, color: theme.appPink)
-		  }
-		
-		VStack(alignment: .leading, spacing: 2) {
+		FlatIconTile(systemName: "play.fill", size: 40, background: theme.screenBackground)
+
+		VStack(alignment: .leading, spacing: 1) {
 		  Text(LocalizationSupport.localized("Voice Message"))
-			.font(.system(size: 10, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
+			.font(.system(size: 14, weight: .bold))
+			.foregroundStyle(theme.primaryText)
 		  if let formatted = formattedVoiceMessageDuration {
 			Text(formatted)
-			  .font(.system(size: 9, weight: .medium))
-			  .foregroundStyle(theme.appSecondaryText)
+			  .font(.system(size: 12))
+			  .foregroundStyle(theme.secondaryText)
 		  }
 		}
-		
+
 		Spacer()
-		
+
 		HStack(spacing: 3) {
 		  ForEach(0..<6, id: \.self) { index in
 			Capsule()
-			  .fill(theme.appPink.opacity(index % 2 == 0 ? 0.75 : 0.35))
-			  .frame(width: 3, height: CGFloat(14 + (index % 3) * 7))
+			  .fill(theme.primaryText)
+			  .frame(width: 3, height: CGFloat(10 + (index % 3) * 6))
 		  }
 		}
 	  }
-	  .padding(10)
-	  .background(theme.appPinkSoft.opacity(0.65))
-	  .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+	  .padding(12)
+	  .background(theme.cardBackground)
+	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 	}
-	
-	var acceptButton: some View {
-	  Button(action: accept) {
-		HStack(spacing: 9) {
-		  PlatformIcon(systemName: "checkmark.circle.fill", size: 14, weight: .bold, color: theme.white)
-		  Text(LocalizationSupport.localized("Accept Question"))
-			.font(.system(size: 15, weight: .bold))
-		}
-		.foregroundStyle(theme.appPrimaryText)
-		.frame(maxWidth: .infinity)
-		.frame(height: 52)
-		.background(theme.appPink)
-		.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-		.shadow(color: theme.appPink.opacity(0.25), radius: 16, x: 0, y: 8)
-	  }
-	  .buttonStyle(.plain)
-	}
-	
-	var declineButton: some View {
-	  Button(action: decline) {
-		HStack(spacing: 6) {
-		  PlatformIcon(systemName: "xmark", size: 10, weight: .semibold, color: theme.appSecondaryText)
+
+	var actions: some View {
+	  VStack(spacing: 10) {
+		FlatPrimaryButton(title: LocalizationSupport.localized("Accept Question"), action: accept)
+
+		Button(action: decline) {
 		  Text(LocalizationSupport.localized("Decline"))
-			.font(.system(size: 11, weight: .semibold))
-			.foregroundStyle(theme.appSecondaryText)
+			.font(.system(size: 14, weight: .bold))
+			.foregroundStyle(theme.secondaryText)
+			.frame(maxWidth: .infinity)
+			.frame(height: 36)
 		}
-		.frame(height: 26)
+		.buttonStyle(.plain)
 	  }
-	  .buttonStyle(.plain)
+	  .padding(.horizontal, 16)
+	  .padding(.bottom, 16)
 	}
   }
 }
@@ -817,12 +736,8 @@ struct TeacherIncomingQuestionOverlay: View {
   }
   var body: some View {
 	ZStack {
-	  LinearGradient(
-		colors: [theme.appPinkSoft.opacity(0.75), theme.appCardBackground],
-		startPoint: .top,
-		endPoint: .bottom
-	  )
-	  
+	  theme.screenBackground
+
 	  ScrollView(.vertical, showsIndicators: false) {
 		VStack(spacing: 0) {
 		  TeacherDashboardView.LiveRequestCard(
@@ -842,7 +757,7 @@ struct TeacherIncomingQuestionOverlay: View {
 		  } decline: {
 			viewModel.declineInvite(questionId: inviteID)
 		  }
-		  .padding(.horizontal, 16)
+		  .padding(.horizontal, 20)
 		  .padding(.top, 24)
 		  .padding(.bottom, 32)
 		}

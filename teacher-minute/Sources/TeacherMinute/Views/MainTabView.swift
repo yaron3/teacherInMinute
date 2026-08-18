@@ -8,187 +8,224 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @State var viewModel: MainTabViewModel
-    @State var teacherDashboardViewModel: TeacherDashboardViewModel?
-    @State var hidesTabBar = false
-    
-    init(userMode: AppUserMode = .teacher) {
-        self._viewModel = State(wrappedValue: MainTabViewModel(userMode: userMode))
-        self._teacherDashboardViewModel = State(wrappedValue: userMode == .teacher ? TeacherDashboardViewModel() : nil)
-    }
+  @State var viewModel: MainTabViewModel
+  @State var teacherDashboardViewModel: TeacherDashboardViewModel?
+  @State var hidesTabBar = false
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
+  
+  init(userMode: AppUserMode = .teacher) {
+	self._viewModel = State(wrappedValue: MainTabViewModel(userMode: userMode))
+	self._teacherDashboardViewModel = State(wrappedValue: userMode == .teacher ? TeacherDashboardViewModel() : nil)
+  }
+  
+  var body: some View {
+	ZStack {
+	  TabView(selection: $viewModel.selectedTab) {
+		tabContent(.home)
+		  .tabItem {
+			Label {
+			  Text(LocalizationSupport.localized("Home"))
+			} icon: {
+			  tabIcon(.home)
+			}
+		  }
+		  .tag(MainTab.home)
 
-    var body: some View {
-        ZStack {
-            TabView(selection: $viewModel.selectedTab) {
-                tabContent(.home)
-                    .tabItem {
-                        Label(LocalizationSupport.localized("Home"), systemImage: MainTab.home.systemImage)
-                    }
-                    .tag(MainTab.home)
+		tabContent(.lessons)
+		  .tabItem {
+			Label {
+			  Text(LocalizationSupport.localized("Lessons"))
+			} icon: {
+			  tabIcon(.lessons)
+			}
+		  }
+		  .tag(MainTab.lessons)
+		  .badge(viewModel.shouldShowLessonsBadge ? 1 : 0)
 
-                tabContent(.lessons)
-                    .tabItem {
-                        Label {
-                            Text(LocalizationSupport.localized("Lessons"))
-                        } icon: {
-                            Image(MainTab.lessons.systemImage, bundle: .module)
-                                .renderingMode(.template)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 40, height: 40)
-                        }
-                    }
-                    .tag(MainTab.lessons)
-                    .badge(viewModel.shouldShowLessonsBadge ? 1 : 0)
+		tabContent(.profile)
+		  .tabItem {
+			Label {
+			  Text(LocalizationSupport.localized("Profile"))
+			} icon: {
+			  tabIcon(.profile)
+			}
+		  }
+		  .tag(MainTab.profile)
 
-                tabContent(.profile)
-                    .tabItem {
-                        Label(LocalizationSupport.localized("Profile"), systemImage: MainTab.profile.systemImage)
-                    }
-                    .tag(MainTab.profile)
+		tabContent(.settings)
+		  .tabItem {
+			Label {
+			  Text(LocalizationSupport.localized("Settings"))
+			} icon: {
+			  tabIcon(.settings)
+			}
+		  }
+		  .tag(MainTab.settings)
+	  }
+	  .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
+	  // Accent selection instead of the system blue.
+	  //.tint(theme.accent)
+	  
+	  teacherGlobalOverlay
+	}
+	.onChange(of: viewModel.selectedTab) { _, newTab in
+	  if !isTeacherGlobalOverlayVisible {
+		hidesTabBar = false
+	  }
+	  if newTab == .lessons {
+		viewModel.markLessonsTabEntered()
+	  }
+	}
+	.onChange(of: teacherDashboardViewModel?.lessonCount ?? 0) { _, newCount in
+	  viewModel.updateLessonCount(newCount)
+	}
+	.background(Color(.systemBackground))
+	.navigationBarBackButtonHidden(true)
+	.navigationBarHidden(true)
+	.task {
+	  print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
+	  PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
+	  if let count = teacherDashboardViewModel?.lessonCount {
+		viewModel.updateLessonCount(count)
+	  }
+	}
+	.onAppear {
+#if os(Android)
+	  AndroidBackNavigationBridge.setSystemBackBlocked(true)
+#endif
+	}
+	.onDisappear {
+#if os(Android)
+	  AndroidBackNavigationBridge.setSystemBackBlocked(false)
+#endif
+	}
+  }
+  
+  /// Tab bar icon for `tab`, filled while it is the selected tab.
+  @ViewBuilder
+  func tabIcon(_ tab: MainTab) -> some View {
+	let name = tab.systemImage(isSelected: viewModel.selectedTab == tab)
+	if tab == .lessons {
+	  // Bundled asset, not an SF Symbol.
+	  Image(name, bundle: .module)
+		.renderingMode(.template)
+		.resizable()
+		.aspectRatio(contentMode: .fit)
+		.frame(width: 40, height: 40)
+	} else {
+#if os(iOS)
+	  // iOS forces the .fill variant on every tab bar symbol, so "house" and
+	  // "house.fill" render identically. Opting out lets the name decide.
+	  Image(systemName: name)
+		.environment(\.symbolVariants, .none)
+#else
+	  Image(systemName: name)
+#endif
+	}
+  }
 
-                tabContent(.settings)
-                    .tabItem {
-                        Label(LocalizationSupport.localized("Settings"), systemImage: MainTab.settings.systemImage)
-                    }
-                    .tag(MainTab.settings)
-            }
-            .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
-
-            teacherGlobalOverlay
-        }
-        .onChange(of: viewModel.selectedTab) { _, newTab in
-            if !isTeacherGlobalOverlayVisible {
-                hidesTabBar = false
-            }
-            if newTab == .lessons {
-                viewModel.markLessonsTabEntered()
-            }
-        }
-        .onChange(of: teacherDashboardViewModel?.lessonCount ?? 0) { _, newCount in
-            viewModel.updateLessonCount(newCount)
-        }
-        .background(Color(.systemBackground))
-        .navigationBarBackButtonHidden(true)
-        .navigationBarHidden(true)
-        .task {
-            print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
-            PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
-            if let count = teacherDashboardViewModel?.lessonCount {
-                viewModel.updateLessonCount(count)
-            }
-        }
-        .onAppear {
-            #if os(Android)
-            AndroidBackNavigationBridge.setSystemBackBlocked(true)
-            #endif
-        }
-        .onDisappear {
-            #if os(Android)
-            AndroidBackNavigationBridge.setSystemBackBlocked(false)
-            #endif
-        }
-    }
-
-    @ViewBuilder
-    func tabContent(_ tab: MainTab) -> some View {
-        switch tab {
-        case .home:
-            if viewModel.userMode == .student {
-                StudentHomeView(hidesTabBar: $hidesTabBar)
-                    .trackScreen(AnalyticsScreen.studentHome)
-            } else if let teacherDashboardViewModel {
-                TeacherDashboardView(
-                    viewModel: teacherDashboardViewModel,
-                    hidesTabBar: $hidesTabBar,
-                    showsSessionOverlay: false,
-                    showsIncomingOverlay: false
-                )
-                .trackScreen(AnalyticsScreen.teacherDashboard)
-            }
-
-        case .lessons:
-            if viewModel.userMode == .student {
-                StudentLessonHistoryView()
-                    .trackScreen(AnalyticsScreen.studentLessonHistory)
-            } else {
-                TeacherLessonHistoryView()
-                    .trackScreen(AnalyticsScreen.teacherLessonHistory)
-            }
-
-        case .profile:
-            ProfileView(viewModel: ProfileViewModel(roleType: viewModel.userMode == .teacher ? .teacher : .student))
-                .trackScreen(AnalyticsScreen.profile)
-
-        case .settings:
-			SettingsView(role: viewModel.userMode, viewModel: nil)
-                    .trackScreen(AnalyticsScreen.settings)
-        }
-    }
-
-    @ViewBuilder
-    var teacherGlobalOverlay: some View {
-        if viewModel.userMode == .teacher, let teacherDashboardViewModel {
-            if teacherDashboardViewModel.isAcceptingCalls, teacherDashboardViewModel.acceptingQuestionId != nil {
-                ConnectionSetupView(
-                    participantName: teacherDashboardViewModel.activeStudentName,
-                    conversationType: teacherDashboardViewModel.activeConversationType,
-                    footerText: LocalizationSupport.localized("Setting up the session")
-                ) {
-                    teacherDashboardViewModel.cancelAcceptingInvite()
-                }
-                .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
-                .zIndex(20)
-                .onAppear {
-                    hidesTabBar = true
-                }
-                .onDisappear {
-                    hidesTabBar = false
-                }
-            } else if let questionId = teacherDashboardViewModel.activeQuestionId {
-                ChatSessionView(
-                    questionId: questionId,
-                    role: "teacher",
-                    title: LocalizationSupport.localized("Student"),
-                    conversationType: teacherDashboardViewModel.activeConversationType,
-                    liveKitRoom: teacherDashboardViewModel.activeCallRoom ?? "",
-                    liveKitToken: teacherDashboardViewModel.activeCallToken ?? "",
-                    initialDetails: teacherDashboardViewModel.activeChatInitialDetails()
-                ) {
-                    teacherDashboardViewModel.endCall()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .zIndex(20)
-                .onAppear {
-                    hidesTabBar = true
-                }
-                .onDisappear {
-                    hidesTabBar = false
-                }
-            } else if let inviteID = teacherDashboardViewModel.inviteIDs.first {
-                TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: teacherDashboardViewModel)
-                    .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
-                    .zIndex(20)
-                    .onAppear {
-                        hidesTabBar = true
-                    }
-                    .onDisappear {
-                        hidesTabBar = false
-                    }
-            }
-        }
-    }
-
-    var isTeacherGlobalOverlayVisible: Bool {
-        guard viewModel.userMode == .teacher, let teacherDashboardViewModel else { return false }
-        return teacherDashboardViewModel.isAcceptingCalls || teacherDashboardViewModel.activeQuestionId != nil || teacherDashboardViewModel.inviteIDs.first != nil
-    }
+  @ViewBuilder
+  func tabContent(_ tab: MainTab) -> some View {
+	switch tab {
+	  case .home:
+		if viewModel.userMode == .student {
+		  StudentHomeView(hidesTabBar: $hidesTabBar)
+			.trackScreen(AnalyticsScreen.studentHome)
+		} else if let teacherDashboardViewModel {
+		  TeacherDashboardView(
+			viewModel: teacherDashboardViewModel,
+			hidesTabBar: $hidesTabBar,
+			showsSessionOverlay: false,
+			showsIncomingOverlay: false
+		  )
+		  .trackScreen(AnalyticsScreen.teacherDashboard)
+		}
+		
+	  case .lessons:
+		if viewModel.userMode == .student {
+		  StudentLessonHistoryView()
+			.trackScreen(AnalyticsScreen.studentLessonHistory)
+		} else {
+		  TeacherLessonHistoryView()
+			.trackScreen(AnalyticsScreen.teacherLessonHistory)
+		}
+		
+	  case .profile:
+		ProfileView(viewModel: ProfileViewModel(roleType: viewModel.userMode == .teacher ? .teacher : .student))
+		  .trackScreen(AnalyticsScreen.profile)
+		
+	  case .settings:
+		SettingsView(role: viewModel.userMode, viewModel: nil)
+		  .trackScreen(AnalyticsScreen.settings)
+	}
+  }
+  
+  @ViewBuilder
+  var teacherGlobalOverlay: some View {
+	if viewModel.userMode == .teacher, let teacherDashboardViewModel {
+	  if teacherDashboardViewModel.isAcceptingCalls, teacherDashboardViewModel.acceptingQuestionId != nil {
+		ConnectionSetupView(
+		  participantName: teacherDashboardViewModel.activeStudentName,
+		  conversationType: teacherDashboardViewModel.activeConversationType,
+		  footerText: LocalizationSupport.localized("Setting up the session")
+		) {
+		  teacherDashboardViewModel.cancelAcceptingInvite()
+		}
+		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+		.zIndex(20)
+		.onAppear {
+		  hidesTabBar = true
+		}
+		.onDisappear {
+		  hidesTabBar = false
+		}
+	  } else if let questionId = teacherDashboardViewModel.activeQuestionId {
+		ChatSessionView(
+		  questionId: questionId,
+		  role: "teacher",
+		  title: LocalizationSupport.localized("Student"),
+		  conversationType: teacherDashboardViewModel.activeConversationType,
+		  liveKitRoom: teacherDashboardViewModel.activeCallRoom ?? "",
+		  liveKitToken: teacherDashboardViewModel.activeCallToken ?? "",
+		  initialDetails: teacherDashboardViewModel.activeChatInitialDetails()
+		) {
+		  teacherDashboardViewModel.endCall()
+		}
+		.frame(maxWidth: .infinity, maxHeight: .infinity)
+		.zIndex(20)
+		.onAppear {
+		  hidesTabBar = true
+		}
+		.onDisappear {
+		  hidesTabBar = false
+		}
+	  } else if let inviteID = teacherDashboardViewModel.inviteIDs.first {
+		TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: teacherDashboardViewModel)
+		  .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+		  .zIndex(20)
+		  .onAppear {
+			hidesTabBar = true
+		  }
+		  .onDisappear {
+			hidesTabBar = false
+		  }
+	  }
+	}
+  }
+  
+  var isTeacherGlobalOverlayVisible: Bool {
+	guard viewModel.userMode == .teacher, let teacherDashboardViewModel else { return false }
+	return teacherDashboardViewModel.isAcceptingCalls || teacherDashboardViewModel.activeQuestionId != nil || teacherDashboardViewModel.inviteIDs.first != nil
+  }
 }
 
 #if os(iOS)
 struct MainTabView_Previews: PreviewProvider {
-    static var previews: some View {
-        MainTabView()
-    }
+  static var previews: some View {
+	MainTabView()
+  }
 }
 #endif

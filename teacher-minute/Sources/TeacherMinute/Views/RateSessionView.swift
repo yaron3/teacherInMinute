@@ -42,9 +42,9 @@ struct RateSessionView: View {
         Button(action: onFinish) {
           PlatformIcon(systemName: "xmark")
             .font(.system(size: 16, weight: .bold))
-            .foregroundStyle(theme.appSecondaryText)
+            .foregroundStyle(theme.secondaryText)
             .frame(width: 36, height: 36)
-            .background(theme.appCardBackground)
+            .background(theme.cardBackground)
             .clipShape(Circle())
         }
         .buttonStyle(.plain)
@@ -56,7 +56,7 @@ struct RateSessionView: View {
         VStack(spacing: 20) {
           Circle()
             .fill(LinearGradient(
-              colors: [theme.appPink, theme.appPurple],
+              colors: [theme.accent, theme.accentStrong],
               startPoint: .topLeading,
               endPoint: .bottomTrailing
             ))
@@ -64,20 +64,20 @@ struct RateSessionView: View {
             .overlay {
               PlatformIcon(systemName: "checkmark")
                 .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(theme.onAccentText)
             }
             .padding(.top, 8)
 
           VStack(spacing: 6) {
             Text(LocalizationSupport.localized("Session Complete!"))
               .font(.system(size: 22, weight: .bold))
-              .foregroundStyle(theme.appPrimaryText)
+              .foregroundStyle(theme.primaryText)
             Text(String(
               format: LocalizationSupport.localized("Great job learning with %@"),
               teacherName
             ))
               .font(.system(size: 14))
-              .foregroundStyle(theme.appSecondaryText)
+              .foregroundStyle(theme.secondaryText)
               .multilineTextAlignment(.center)
           }
 
@@ -87,17 +87,17 @@ struct RateSessionView: View {
                 imageURL: teacherImageURL,
                 size: 56,
                 fallbackSystemImage: "person.fill",
-                background: theme.appPinkSoft,
-                tint: theme.appPink
+                background: theme.accentBackground,
+                tint: theme.accent
               )
               VStack(alignment: .leading, spacing: 4) {
                 Text(teacherName)
                   .font(.system(size: 16, weight: .bold))
-                  .foregroundStyle(theme.appPrimaryText)
+                  .foregroundStyle(theme.primaryText)
                 if !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                   Text(subject)
                     .font(.system(size: 13))
-                    .foregroundStyle(theme.appSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(2)
                 }
               }
@@ -109,13 +109,13 @@ struct RateSessionView: View {
             VStack(spacing: 14) {
               Text(LocalizationSupport.localized("Rate this session"))
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(theme.appPrimaryText)
+                .foregroundStyle(theme.primaryText)
               Text(String(
                 format: LocalizationSupport.localized("How was your experience with %@?"),
                 teacherName
               ))
                 .font(.system(size: 13))
-                .foregroundStyle(theme.appSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
               HStack(spacing: 10) {
                 ForEach(1..<6, id: \.self) { index in
@@ -124,7 +124,7 @@ struct RateSessionView: View {
                   } label: {
                     PlatformIcon(systemName: index <= rating ? "star.fill" : "star")
                       .font(.system(size: 32, weight: .bold))
-                      .foregroundStyle(index <= rating ? theme.yellow : theme.appSecondaryText)
+                      .foregroundStyle(index <= rating ? theme.ratingStar : theme.secondaryText)
                   }
                   .buttonStyle(.plain)
                 }
@@ -136,7 +136,7 @@ struct RateSessionView: View {
           if let errorMessage {
             Text(errorMessage)
               .font(.system(size: 12, weight: .semibold))
-              .foregroundStyle(theme.red)
+              .foregroundStyle(theme.danger)
               .multilineTextAlignment(.center)
           }
         }
@@ -149,18 +149,18 @@ struct RateSessionView: View {
           Spacer()
           if isSending {
             ProgressView()
-              .tint(.white)
+              .tint(theme.onAccentText)
           } else {
             Text(LocalizationSupport.localized("Send"))
               .font(.system(size: 16, weight: .bold))
-              .foregroundStyle(.white)
+              .foregroundStyle(theme.onAccentText)
           }
           Spacer()
         }
         .frame(height: 52)
         .background(
           LinearGradient(
-            colors: rating > 0 ? [theme.appPink, theme.appPurple] : [theme.appSecondaryText, theme.appSecondaryText],
+            colors: rating > 0 ? [theme.accent, theme.accentStrong] : [theme.secondaryText, theme.secondaryText],
             startPoint: .leading,
             endPoint: .trailing
           )

@@ -24,6 +24,43 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
     }
 
     private static let hebrewFallbacks: [String: String] = [
+        // Teacher dashboard and lesson history. The Remote Config template has
+        // no entries for these yet, so the fallback is what actually renders.
+        "Go Online": "עבור למצב מקוון",
+        "Go Offline": "עבור למצב לא מקוון",
+        "ONLINE": "מחובר",
+        "OFFLINE": "לא מחובר",
+        "Teaching History": "היסטוריית הוראה",
+        "Past": "קודמים",
+        "Earnings": "רווחים",
+        "Time Taught": "זמן הוראה",
+        "%@%d%% vs last week": "%@%d%% מהשבוע שעבר",
+        // Onboarding copy, rebranded from the old "Math Connect" placeholder.
+        // The published Remote Config values still carry the old name, so these
+        // stand in until the template is republished.
+        "Log in to Teacher in a Minute to continue your\njourney.": "התחבר כדי להמשיך\nאת הדרך שלך.",
+        "Tell us a bit about yourself to get started with\nTeacher in a Minute.": "ספר לנו קצת על עצמך כדי להתחיל עם\nTeacher in a Minute.",
+        "How do you want to use Teacher in a Minute? You\ncan change this later in settings.": "איך תרצה להשתמש ב־Teacher in a Minute? תוכל\nלשנות זאת מאוחר יותר בהגדרות.",
+        "Send me occasional updates and tips about\nTeacher in a Minute.": "שלחו לי מדי פעם עדכונים וטיפים על\nTeacher in a Minute.",
+        "Help you anywhere": "עזרה מכל מקום",
+        // Title of the photo-source dialog; its buttons already had Hebrew, so
+        // only the heading was showing through in English.
+        "Add a photo": "הוספת תמונה",
+        // Grade ordinals, mirroring the `grade_1`...`grade_12` Remote Config
+        // entries so the chips read correctly even before the template is
+        // published to the console.
+        "Grade 1": "כיתה א׳",
+        "Grade 2": "כיתה ב׳",
+        "Grade 3": "כיתה ג׳",
+        "Grade 4": "כיתה ד׳",
+        "Grade 5": "כיתה ה׳",
+        "Grade 6": "כיתה ו׳",
+        "Grade 7": "כיתה ז׳",
+        "Grade 8": "כיתה ח׳",
+        "Grade 9": "כיתה ט׳",
+        "Grade 10": "כיתה י׳",
+        "Grade 11": "כיתה י״א",
+        "Grade 12": "כיתה י״ב",
         "I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)": "אני מסכים/ה ל[תנאי השירות](teacherminute://terms) ול[מדיניות הפרטיות.](teacherminute://privacy)",
         "Terms of Service": "תנאי השירות",
         "Save board to gallery?": "לשמור את הלוח לגלריה?",
@@ -106,6 +143,13 @@ enum LocalizationKey {
         "Enter your email address first.": "enter_your_email_dot_a",
         "Enter your email or phone number and we'll\nsend you instructions to reset your password.": "enter_your_email_dot_b",
         "End session?": "end_session_qmark",
+        // "Go Online" and the "ONLINE" status pill both reduce to `online`,
+        // which would make one translation serve two unrelated strings.
+        "Go Online": "go_online",
+        "Go Offline": "go_offline",
+        "ONLINE": "online_caps",
+        "OFFLINE": "offline_caps",
+        "%@%d%% vs last week": "fmt_vs_last_week",
         "Grade 1": "grade_1",
         "Grade 10": "grade_10",
         "Grade 11": "grade_11",
@@ -141,8 +185,14 @@ enum LocalizationKey {
         "Privacy Policy.": "privacy_policy_dot",
         "Privacy.": "privacy_dot",
         "Required": "required_a",
-        "Send me occasional updates and tips about\nMath Connect.": "send_occasional_updates_dot_a",
-        "Send me occasional updates and tips about\\nMath Connect.": "send_occasional_updates_dot_b",
+        // Rebranded onboarding copy. These deliberately use new keys: the old
+        // ones still resolve to published values carrying the "Math Connect"
+        // name, and a non-empty config value always wins over the source
+        // string, so reusing them would keep serving the old brand.
+        "Send me occasional updates and tips about\nTeacher in a Minute.": "send_occasional_updates_tim_a",
+        "Send me occasional updates and tips about\\nTeacher in a Minute.": "send_occasional_updates_tim_b",
+        "Tell us a bit about yourself to get started with\nTeacher in a Minute.": "tell_bit_about_tim",
+        "How do you want to use Teacher in a Minute? You\ncan change this later in settings.": "how_you_want_tim",
         "Signing In…": "signing_ellipsis_a",
         "Signing in…": "signing_ellipsis_b",
         "Step 1 of 2": "step_1_2",

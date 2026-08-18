@@ -47,18 +47,18 @@ struct MathEquationEditorView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: inputCapsuleHeight)
                     .padding(.horizontal, 6)
-                    .background(theme.appGrayBackground)
+                    .background(theme.fieldBackground)
                     .clipShape(Capsule())
 
                 Button {
                     sendCurrent(exported: exported)
                     modelTick &+= 1
                 } label: {
-                    PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.white)
+                    PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.onAccentText)
                         .frame(width: 42, height: 42)
                         .background(
                             LinearGradient(
-                                colors: canSend ? [theme.appPink, theme.appPurple] : [theme.appBorder, theme.appBorder],
+                                colors: canSend ? [theme.accent, theme.accentStrong] : [theme.controlDisabled, theme.controlDisabled],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -77,8 +77,13 @@ struct MathEquationEditorView: View {
     func sendCurrent(exported: String) {
         let trimmed = exported.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        onSend(trimmed)
+        // Clear before handing off. `onSend` appends to the parent's message
+        // list, which rebuilds this view — in the chat session it sits inside a
+        // `safeAreaInset`, so the rebuild can hand us a fresh `model` and a
+        // clear afterwards lands on the discarded one. The equation then stays
+        // in the field, which reads as "the send button did nothing".
         model.clear()
+        onSend(trimmed)
     }
 
     func handleKeyboardAction(_ action: MathKeyboardAction) {

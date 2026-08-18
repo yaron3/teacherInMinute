@@ -23,9 +23,9 @@ struct CompleteProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
 
-                Text(LocalizationSupport.localized("Tell us a bit about yourself to get started with\nMath Connect."))
+                Text(LocalizationSupport.localized("Tell us a bit about yourself to get started with\nTeacher in a Minute."))
                     .font(.system(size: 13))
-                    .foregroundStyle(theme.authSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
                     .lineSpacing(5)
                     .padding(.top, 10)
 
@@ -85,7 +85,7 @@ struct CompleteProfileView: View {
                 .padding(.bottom, 24)
             }
             .padding(.horizontal, 18)
-            .background(Color(.systemBackground))
+            .background(theme.screenBackground)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .onAppear {
@@ -102,23 +102,26 @@ struct CompleteProfileView: View {
             .overlay {
                 if viewModel.isCheckingCompletion {
                     ZStack {
-                        theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
+                        theme.scrim.opacity(0.25).ignoresSafeArea()
                         VStack(spacing: 12) {
-                            ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.appPrimaryText)
+                            ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.primaryText)
                             Text(LocalizationSupport.localized("Loading your profile…"))
-                                .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.appPrimaryText)
+                                .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.primaryText)
                         }
                     }
                 }
             }
-            .alert(LocalizationSupport.localized("Payout Details Missing"), isPresented: $viewModel.showMissingPayoutInfoConfirmation) {
-                Button(LocalizationSupport.localized("Add Now"), role: .cancel) {}
-                Button(LocalizationSupport.localized("Continue Anyway")) {
-                    viewModel.continueWithoutPayoutInfo()
-                }
-            } message: {
-                Text(LocalizationSupport.localized("You will not receive money until you provide bank account details or PayPal info."))
-            }
+            .appDialog(
+                LocalizationSupport.localized("Payout Details Missing"),
+                isPresented: $viewModel.showMissingPayoutInfoConfirmation,
+                message: LocalizationSupport.localized("You will not receive money until you provide bank account details or PayPal info."),
+                actions: [
+                    AppDialogAction(LocalizationSupport.localized("Add Now"), kind: .cancel),
+                    AppDialogAction(LocalizationSupport.localized("Continue Anyway")) {
+                        viewModel.continueWithoutPayoutInfo()
+                    }
+                ]
+            )
         }
     }
 
@@ -126,7 +129,7 @@ struct CompleteProfileView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(LocalizationSupport.localized("Your Grade"))
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(theme.authPrimaryText)
+                .foregroundStyle(theme.primaryText)
 
             Menu {
                 ForEach(viewModel.grades, id: \.self) { grade in
@@ -138,7 +141,7 @@ struct CompleteProfileView: View {
                 HStack {
                     Text(viewModel.grade.isEmpty ? LocalizationSupport.localized("Select") : viewModel.grade)
                         .font(.system(size: 15))
-                        .foregroundStyle(viewModel.grade.isEmpty ? theme.authSecondaryText : theme.authPrimaryText)
+                        .foregroundStyle(viewModel.grade.isEmpty ? theme.secondaryText : theme.primaryText)
 
                     Spacer()
 
@@ -146,16 +149,16 @@ struct CompleteProfileView: View {
                         systemName: "chevron.down",
                         size: 12,
                         weight: .semibold,
-                        color: theme.authIcon
+                        color: theme.secondaryText
                     )
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 56)
-                .background(theme.appCardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(theme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .stroke(theme.authFieldBorder, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+                        .stroke(theme.controlBorder, lineWidth: 1)
                 }
             }
         }

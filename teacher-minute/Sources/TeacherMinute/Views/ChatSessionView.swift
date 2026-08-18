@@ -246,18 +246,18 @@ struct ChatSessionView: View {
 
   func endSessionPromptOverlay(_ prompt: EndSessionPrompt) -> some View {
     ZStack {
-      Color.black.opacity(0.35)
+      theme.scrim.opacity(0.35)
         .ignoresSafeArea()
 
       VStack(spacing: 14) {
         Text(endSessionPromptTitle(prompt))
           .font(.system(size: 18, weight: .bold))
-          .foregroundStyle(theme.appPrimaryText)
+          .foregroundStyle(theme.primaryText)
           .multilineTextAlignment(.center)
 
         Text(endSessionPromptMessage(prompt))
           .font(.system(size: 13))
-          .foregroundStyle(theme.appSecondaryText)
+          .foregroundStyle(theme.secondaryText)
           .multilineTextAlignment(.center)
 
         VStack(spacing: 10) {
@@ -275,8 +275,11 @@ struct ChatSessionView: View {
               Spacer()
             }
             .frame(height: 46)
-            .foregroundStyle(theme.white)
-            .background(theme.appPink)
+            // `onAccentText` is white in both schemes, so this fill has to be
+            // the solid accent — `accentBackground` is a pale tint meant for
+            // surfaces, and left the label unreadable in light mode.
+            .foregroundStyle(theme.onAccentText)
+            .background(theme.accent)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
           .buttonStyle(.plain)
@@ -291,10 +294,10 @@ struct ChatSessionView: View {
               } label: {
                 Text(LocalizationSupport.localized("Save to chat only"))
                   .font(.system(size: 14, weight: .semibold))
-                  .foregroundStyle(theme.appPrimaryText)
+                  .foregroundStyle(theme.primaryText)
                   .frame(maxWidth: .infinity)
                   .frame(height: 42)
-                  .background(theme.appGrayBackground)
+                  .background(theme.cardBackground)
                   .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
               }
               .buttonStyle(.plain)
@@ -307,7 +310,7 @@ struct ChatSessionView: View {
             } label: {
               Text(LocalizationSupport.localized("Don't save"))
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(theme.appSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 38)
             }
@@ -319,7 +322,7 @@ struct ChatSessionView: View {
             } label: {
               Text(LocalizationSupport.localized("Cancel"))
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(theme.appSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 38)
             }
@@ -330,7 +333,7 @@ struct ChatSessionView: View {
       }
       .padding(18)
       .frame(maxWidth: 340)
-      .background(theme.appCardBackground)
+      .background(theme.cardBackground)
       .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
       .padding(.horizontal, 24)
     }
@@ -341,13 +344,13 @@ struct ChatSessionView: View {
     VStack(spacing: 16) {
       ProgressView()
         .progressViewStyle(.circular)
-        .tint(theme.appPink)
+        .tint(theme.accentBackground)
       Text(LocalizationSupport.localized("Switching to text chat…"))
         .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(theme.appSecondaryText)
+        .foregroundStyle(theme.secondaryText)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(theme.appCardBackground)
+    .background(theme.cardBackground)
   }
 
   var ratingPromptOverlay: some View {
@@ -484,8 +487,8 @@ struct ChatSessionView: View {
 #if canImport(UIKit) && !os(Android)
     let renderSize = CGSize(width: 500, height: 500)
     let logical = WhiteboardView.logicalSize
-    let strokeColor = theme.appPrimaryText
-    let background = theme.appCardBackground
+    let strokeColor = theme.primaryText
+    let background = theme.cardBackground
 
     let snapshot = ZStack {
       background
@@ -589,7 +592,7 @@ struct ChatSessionView: View {
         if let errorMessage {
           Text(errorMessage)
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(theme.appPink)
+            .foregroundStyle(theme.accentBackground)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.top, 6)
@@ -625,12 +628,12 @@ struct ChatSessionView: View {
 
 #endif
     }
-    .background(theme.appCardBackground)
+    .background(theme.cardBackground)
 #if !os(Android)
     .safeAreaInset(edge: .bottom) {
       if selectedTab == .CHAT && !isBoardMaximized {
         inputBar
-          .background(theme.appCardBackground)
+          .background(theme.cardBackground)
       }
     }
 #endif
@@ -681,13 +684,13 @@ struct ChatSessionView: View {
       .padding(.vertical, 16)
       .frame(maxWidth: CGFloat.infinity)
     }
-    .background(theme.appCardBackground)
+    .background(theme.cardBackground)
   }
 
   func questionImageTile(url: String) -> some View {
     let minSide: CGFloat = hSizeClass == .regular ? 700 : 500
     return RoundedRectangle(cornerRadius: 14, style: .continuous)
-      .fill(theme.appGrayBackground)
+      .fill(theme.cardBackground)
       .frame(maxWidth: CGFloat.infinity)
       .frame(minHeight: minSide)
       .overlay {
@@ -697,7 +700,7 @@ struct ChatSessionView: View {
       .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
       .overlay {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
-          .stroke(theme.appBorder, lineWidth: 1)
+          .stroke(theme.controlBorder, lineWidth: 1)
       }
   }
 
@@ -706,7 +709,7 @@ struct ChatSessionView: View {
     let remoteTrack = LiveKitService.shared.remoteCameraVideoTrack
     let localTrack = LiveKitService.shared.localCameraVideoTrack
     return RoundedRectangle(cornerRadius: 18, style: .continuous)
-      .fill(Color.black)
+      .fill(theme.videoBackground)
       .overlay {
         ZStack {
           if let remoteTrack {
@@ -816,18 +819,18 @@ struct ChatSessionView: View {
 
   var peerPausedPanel: some View {
     RoundedRectangle(cornerRadius: 18, style: .continuous)
-      .fill(Color.black.opacity(0.85))
+      .fill(theme.videoBackground.opacity(0.85))
       .overlay {
         VStack(spacing: 10) {
           PlatformIcon(
             systemName: "video.slash.fill",
             size: 30,
             weight: .semibold,
-            color: theme.white.opacity(0.9)
+            color: theme.onAccentText.opacity(0.9)
           )
           Text(peerPausedMessage)
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(theme.white)
+            .foregroundStyle(theme.onAccentText)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 18)
         }
@@ -887,11 +890,11 @@ struct ChatSessionView: View {
         systemName: icon,
         size: 32,
         weight: .semibold,
-        color: theme.appSecondaryText
+        color: theme.secondaryText
       )
       Text(text)
         .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(theme.appSecondaryText)
+        .foregroundStyle(theme.secondaryText)
     }
   }
 
@@ -904,13 +907,13 @@ struct ChatSessionView: View {
           .id(ObjectIdentifier(localTrack))
       } else {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .fill(Color.black.opacity(0.6))
+          .fill(theme.videoBackground.opacity(0.6))
           .overlay {
             PlatformIcon(
               systemName: isCameraOff ? "video.slash.fill" : "video.fill",
               size: 18,
               weight: .semibold,
-              color: theme.white
+              color: theme.onAccentText
             )
           }
       }
@@ -919,7 +922,7 @@ struct ChatSessionView: View {
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .stroke(.white.opacity(0.4), lineWidth: 1)
+        .stroke(theme.onAccentText.opacity(0.4), lineWidth: 1)
     }
   }
 #endif
@@ -946,10 +949,10 @@ struct ChatSessionView: View {
         systemName: systemName,
         size: 13,
         weight: .bold,
-        color: isActive ? theme.white : theme.appPrimaryText
+        color: isActive ? theme.onAccentText : theme.primaryText
       )
       .frame(width: 34, height: 34)
-      .background(isActive ? theme.appPink : theme.appGrayBackground)
+      .background(isActive ? theme.accentBackground : theme.cardBackground)
       .clipShape(Circle())
     }
     .buttonStyle(.plain)
@@ -957,14 +960,14 @@ struct ChatSessionView: View {
 
   var videoBadge: some View {
     HStack(spacing: 4) {
-      PlatformIcon(systemName: "video.fill", size: 10, weight: .bold, color: theme.white)
+      PlatformIcon(systemName: "video.fill", size: 10, weight: .bold, color: theme.onAccentText)
       Text(LocalizationSupport.localized("Video"))
         .font(.system(size: 11, weight: .bold))
-        .foregroundStyle(theme.white)
+        .foregroundStyle(theme.onAccentText)
     }
     .padding(.horizontal, 10)
     .frame(height: 26)
-    .background(theme.appTeal)
+    .background(theme.info)
     .clipShape(Capsule())
   }
 
@@ -1007,10 +1010,10 @@ struct ChatSessionView: View {
     } label: {
       Text(LocalizationSupport.localized(title))
         .font(.system(size: 12, weight: .bold))
-        .foregroundStyle(isSelected ? theme.white : theme.appPrimaryText)
+        .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
         .padding(.horizontal, 14)
         .frame(height: 28)
-        .background(isSelected ? theme.appPurple : theme.appGrayBackground)
+        .background(isSelected ? theme.accentStrong : theme.cardBackground)
         .clipShape(Capsule())
     }
     .buttonStyle(.plain)
@@ -1057,25 +1060,25 @@ struct ChatSessionView: View {
         imageURL: viewModel.participantImageURL,
         size: 40,
         fallbackSystemImage: "person.crop.circle.fill",
-        background: theme.appPinkSoft,
-        tint: theme.appPink
+        background: theme.accentBackground,
+        tint: theme.accent
       )
         .overlay(alignment: .bottomTrailing) {
           Circle()
-            .fill(theme.appGreen)
+            .fill(theme.positive)
             .frame(width: 10, height: 10)
             .overlay {
-              Circle().stroke(.white, lineWidth: 2)
+              Circle().stroke(theme.onAccentText, lineWidth: 2)
             }
         }
 
       VStack(alignment: .leading, spacing: 2) {
         Text(participantName)
           .font(.system(size: 15, weight: .bold))
-          .foregroundStyle(theme.appPrimaryText)
+          .foregroundStyle(theme.primaryText)
         Text(connectionModeText)
           .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(hasVideo ? theme.appTeal : theme.appGreen)
+          .foregroundStyle(hasVideo ? theme.info : theme.positive)
       }
 
       Spacer()
@@ -1111,10 +1114,10 @@ struct ChatSessionView: View {
       } label: {
         Text(isEndingSession ? LocalizationSupport.localized("Ending...") : LocalizationSupport.localized("End"))
           .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(theme.appPrimaryText)
+          .foregroundStyle(theme.onAccentText)
           .padding(.horizontal, 12)
           .frame(height: 32)
-          .background(theme.red)
+          .background(theme.danger)
           .clipShape(Capsule())
       }
       .buttonStyle(.plain)
@@ -1122,26 +1125,26 @@ struct ChatSessionView: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
-    .background(theme.appCardBackground)
+    .background(theme.cardBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(theme.appBorder)
+        .fill(theme.controlBorder)
         .frame(height: 1)
       }
   }
 
   var sessionStats: some View {
     HStack(spacing: 0) {
-	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.appOrange)
+	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.warning)
 		.padding(.top, 2)
 		.padding(.trailing, 8)
 	  VStack(alignment: .leading, spacing: 0) {
 		Text(LocalizationSupport.localized("ORIGINAL QUESTION"))
 		  .font(.system(size: 10, weight: .bold))
-		  .foregroundStyle(theme.appOrange)
+		  .foregroundStyle(theme.warning)
 		Text(viewModel.originalQuestion)
 		  .font(.system(size: 12, weight: .medium))
-		  .foregroundStyle(theme.appPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		  .lineSpacing(3)
           .frame(maxWidth: .infinity, alignment: .leading)
 	  }
@@ -1150,16 +1153,16 @@ struct ChatSessionView: View {
       VStack(alignment: .trailing, spacing: 2) {
         Text(LocalizationSupport.localized("Session Time"))
           .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(theme.appSecondaryText)
+          .foregroundStyle(theme.secondaryText)
         Text(viewModel.sessionTimeText(at: sessionFrozenDate ?? displayDate))
           .font(.system(size: 28, weight: .heavy, design: .monospaced))
           .lineLimit(1)
           .minimumScaleFactor(0.85)
           .frame(width: 92, alignment: .trailing)
-          .foregroundStyle(theme.appPrimaryText)
+          .foregroundStyle(theme.primaryText)
         Text(LocalizationSupport.localized("minutes"))
           .font(.system(size: 10, weight: .medium))
-          .foregroundStyle(theme.appSecondaryText)
+          .foregroundStyle(theme.secondaryText)
       }
       .frame(width: 92, alignment: .trailing)
 	  
@@ -1167,20 +1170,20 @@ struct ChatSessionView: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 16)
-    .background(theme.appPinkSoft.opacity(0.45))
+    .background(theme.accentBackground.opacity(0.45))
   }
 
   var originalQuestionBanner: some View {
     HStack(alignment: .top, spacing: 10) {
-	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.appOrange)
+	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.warning)
         .padding(.top, 2)
       VStack(alignment: .leading, spacing: 5) {
         Text(LocalizationSupport.localized("ORIGINAL QUESTION"))
           .font(.system(size: 10, weight: .bold))
-          .foregroundStyle(theme.appOrange)
+          .foregroundStyle(theme.warning)
         Text(viewModel.originalQuestion)
           .font(.system(size: 12, weight: .medium))
-          .foregroundStyle(theme.appPrimaryText)
+          .foregroundStyle(theme.primaryText)
           .lineSpacing(3)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -1188,9 +1191,9 @@ struct ChatSessionView: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
-    .background(theme.yellow.opacity(0.14))
+    .background(theme.warningBackground)
     .overlay(alignment: .bottom) {
-      Rectangle().fill(theme.yellow.opacity(0.45)).frame(height: 1)
+      Rectangle().fill(theme.warningBorder).frame(height: 1)
     }
   }
 
@@ -1254,9 +1257,9 @@ struct ChatSessionView: View {
       }
     }
     .frame(height: 40)
-    .background(theme.appCardBackground)
+    .background(theme.cardBackground)
     .overlay(alignment: .bottom) {
-      Rectangle().fill(theme.appBorder).frame(height: 1)
+      Rectangle().fill(theme.controlBorder).frame(height: 1)
     }
   }
 
@@ -1271,13 +1274,13 @@ struct ChatSessionView: View {
               systemName: icon,
               size: 12,
               weight: .semibold,
-              color: selectedTab == id ? theme.appPink : theme.appSecondaryText
+              color: selectedTab == id ? theme.accentBackground : theme.secondaryText
             )
             if showsBadge {
               Circle()
-                .fill(theme.red)
+                .fill(theme.danger)
                 .overlay {
-                  Circle().stroke(theme.appCardBackground, lineWidth: 2)
+                  Circle().stroke(theme.cardBackground, lineWidth: 2)
                 }
                 .frame(width: 14, height: 14)
                 .offset(x: 8, y: -6)
@@ -1285,18 +1288,18 @@ struct ChatSessionView: View {
           }
           Text(LocalizationSupport.localized(title))
             .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.appPink : theme.appSecondaryText))
+            .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.accentBackground : theme.secondaryText))
             .padding(.horizontal, showsBadge ? 18 : 0)
             .padding(.vertical, showsBadge ? 3 : 0)
             .background {
               if showsBadge {
-                Capsule().fill(theme.red)
+                Capsule().fill(theme.danger)
 				  .frame(height: 28)
               }
             }
         }
         Rectangle()
-          .fill(selectedTab == id ? theme.appPink : Color.clear)
+          .fill(selectedTab == id ? theme.accentBackground : Color.clear)
           .frame(height: 2)
       }
     }
@@ -1307,13 +1310,13 @@ struct ChatSessionView: View {
   var sessionNotice: some View {
     Text(viewModel.sessionNoticeText)
       .font(.system(size: 10, weight: .semibold))
-      .foregroundStyle(theme.appOrange)
+      .foregroundStyle(theme.warning)
       .padding(.horizontal, 12)
       .padding(.vertical, 6)
-      .background(theme.yellow.opacity(0.18))
+      .background(theme.warningBackground)
       .clipShape(Capsule())
       .overlay {
-        Capsule().stroke(theme.yellow.opacity(0.55), lineWidth: 1)
+        Capsule().stroke(theme.warningBorder, lineWidth: 1)
       }
       .padding(.top, 12)
   }

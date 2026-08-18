@@ -104,7 +104,7 @@ struct AskTeacherSheet: View {
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(theme.appPrimaryText)
+                        .foregroundStyle(theme.primaryText)
 
                     HStack(spacing: 10) {
                         ConversationTypeChip(
@@ -140,7 +140,7 @@ struct AskTeacherSheet: View {
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(theme.appPrimaryText)
+                        .foregroundStyle(theme.primaryText)
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
@@ -150,10 +150,10 @@ struct AskTeacherSheet: View {
                                 } label: {
                                     Text(LocalizationSupport.localized(topic.capitalized))
                                         .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(selectedTopic == topic ?theme.appCardBackground: theme.appPrimaryText)
+                                        .foregroundStyle(selectedTopic == topic ? theme.onAccentText : theme.primaryText)
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .background(selectedTopic == topic ? theme.appPink : theme.appGrayBackground)
+                                        .background(selectedTopic == topic ? theme.accent : theme.cardBackground)
                                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                                 }
                                 .buttonStyle(.plain)
@@ -168,7 +168,7 @@ struct AskTeacherSheet: View {
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(theme.appPrimaryText)
+                        .foregroundStyle(theme.primaryText)
 
                     if composerMode == .regular {
                         TextEditor(text: $questionText)
@@ -177,12 +177,12 @@ struct AskTeacherSheet: View {
                             .autocorrectionDisabled(true)
                             .font(.system(size: 14))
                             .multilineTextAlignment(.leading)
-                            .foregroundStyle(theme.appPrimaryText)
-                            .tint(theme.appPink)
+                            .foregroundStyle(theme.primaryText)
+                            .tint(theme.accent)
                             .scrollContentBackground(.hidden)
                             .padding(12)
                             .frame(minHeight: editorMinHeight, alignment: .leading)
-                            .background(theme.appGrayBackground)
+                            .background(theme.fieldBackground)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     } else {
                         Text(questionText.isEmpty
@@ -190,11 +190,11 @@ struct AskTeacherSheet: View {
                              : questionText)
                             .font(.system(size: 14))
                             .multilineTextAlignment(.leading)
-                            .foregroundStyle(questionText.isEmpty ? theme.appSecondaryText : theme.appPrimaryText)
+                            .foregroundStyle(questionText.isEmpty ? theme.secondaryText : theme.primaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .frame(minHeight: editorMinHeight, alignment: .leading)
-                            .background(theme.appGrayBackground)
+                            .background(theme.fieldBackground)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
 
@@ -205,7 +205,7 @@ struct AskTeacherSheet: View {
                             .font(.system(size: 11))
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(canSubmit ? theme.appGreen : theme.appSecondaryText)
+                            .foregroundStyle(canSubmit ? theme.positive : theme.secondaryText)
                     }
                 }
 
@@ -218,10 +218,14 @@ struct AskTeacherSheet: View {
                 } label: {
                     Text(LocalizationSupport.localized("Find a Teacher"))
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(isFindDisabled ? theme.appSecondaryText : theme.appPrimaryText)
+                        // Enabled, this sits on `accent`, so the label needs the
+                        // on-accent token; `primaryText` is black in light mode.
+                        // Disabled it sits on `cardBackground`, where secondary
+                        // text is the readable choice.
+                        .foregroundStyle(isFindDisabled ? theme.secondaryText : theme.onAccentText)
                         .frame(maxWidth: .infinity)
                         .frame(height: findButtonHeight)
-                        .background(isFindDisabled ? theme.appGrayBackground : theme.appPink)
+                        .background(isFindDisabled ? theme.cardBackground : theme.accent)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .opacity(isFindDisabled ? 0.6 : 1.0)
                 }
@@ -239,7 +243,7 @@ struct AskTeacherSheet: View {
             .environment(\.layoutDirection, .leftToRight)
             .padding(.horizontal, sheetPadding)
             .padding(.bottom, sheetPadding)
-            .background(theme.appCardBackground)
+            .background(theme.cardBackground)
         }
         }
         .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
@@ -255,17 +259,15 @@ struct AskTeacherSheet: View {
             isQuestionFocused = true
         }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
-        .alert(
+        .appDialog(
             LocalizationSupport.localized("Permission required"),
             isPresented: Binding(
                 get: { permissionAlertMessage != nil },
                 set: { if !$0 { permissionAlertMessage = nil } }
-            )
-        ) {
-            Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-        } message: {
-            Text(permissionAlertMessage ?? "")
-        }
+            ),
+            message: permissionAlertMessage ?? "",
+            actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+        )
     }
 
     func findTeacherTapped() async {
@@ -306,7 +308,7 @@ struct AskTeacherSheet: View {
                 .font(.system(size: 14, weight: .semibold))
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundStyle(theme.appPrimaryText)
+                .foregroundStyle(theme.primaryText)
 
             HStack(spacing: 10) {
                 ForEach(uploadedPhotoUrls, id: \.self) { url in
@@ -323,7 +325,7 @@ struct AskTeacherSheet: View {
             if let photoUploadError {
                 Text(photoUploadError)
                     .font(.system(size: 11))
-                    .foregroundStyle(theme.appPink)
+                    .foregroundStyle(theme.accent)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -364,27 +366,27 @@ struct AskTeacherSheet: View {
 
     var addPhotoLabel: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(theme.appGrayBackground)
+            .fill(theme.cardBackground)
             .frame(width: 64, height: 64)
             .overlay {
                 if isUploadingPhoto {
                     ProgressView()
                         .progressViewStyle(.circular)
-                        .tint(theme.appPrimaryText)
+                        .tint(theme.primaryText)
                 } else {
-                    PlatformIcon(systemName: "camera.fill", size: 20, weight: .semibold, color: theme.appSecondaryText)
+                    PlatformIcon(systemName: "camera.fill", size: 20, weight: .semibold, color: theme.secondaryText)
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(theme.appBorder, lineWidth: 1)
+                    .stroke(theme.controlBorder, lineWidth: 1)
             }
     }
 
     func photoThumbnail(url: String) -> some View {
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(theme.appGrayBackground)
+                .fill(theme.cardBackground)
                 .frame(width: 64, height: 64)
                 .overlay {
                     CachedRemoteImage(url: url, contentMode: .fill)
@@ -392,17 +394,17 @@ struct AskTeacherSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(theme.appBorder, lineWidth: 1)
+                        .stroke(theme.controlBorder, lineWidth: 1)
                 }
 
             Button {
                 removePhoto(url: url)
             } label: {
                 Circle()
-                    .fill(theme.appPrimaryText.opacity(0.85))
+                    .fill(theme.primaryText.opacity(0.85))
                     .frame(width: 20, height: 20)
                     .overlay {
-                        PlatformIcon(systemName: "xmark", size: 10, weight: .bold, color: theme.appCardBackground)
+                        PlatformIcon(systemName: "xmark", size: 10, weight: .bold, color: theme.invertedText)
                     }
             }
             .buttonStyle(.plain)
@@ -501,10 +503,10 @@ struct AskTeacherSheet: View {
         } label: {
             Text(LocalizationSupport.localized(title))
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(isSelected ? theme.white : theme.appPrimaryText)
+                .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
                 .padding(.horizontal, 14)
                 .frame(height: 28)
-                .background(isSelected ? theme.appPurple : theme.appGrayBackground)
+                .background(isSelected ? theme.accentStrong : theme.cardBackground)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)

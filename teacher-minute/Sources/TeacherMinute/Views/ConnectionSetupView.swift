@@ -81,12 +81,12 @@ struct ConnectionSetupView: View {
 
       Text(viewModel.footerText)
         .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.appOrange : theme.appSecondaryText)
+        .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
 
       Button(action: onCancel) {
         Text(LocalizationSupport.localized("Cancel Session"))
           .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(theme.appPink)
+          .foregroundStyle(theme.accent)
           .frame(height: 36)
       }
       .buttonStyle(.plain)
@@ -95,7 +95,7 @@ struct ConnectionSetupView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(
       LinearGradient(
-        colors: [theme.appCardBackground, theme.appPinkSoft, theme.appCardBackground],
+        colors: [theme.cardBackground, theme.accentBackground, theme.cardBackground],
         startPoint: .top,
         endPoint: .bottom
       )
@@ -104,7 +104,7 @@ struct ConnectionSetupView: View {
 
   var timeoutOverlay: some View {
     ZStack {
-      Color.black.opacity(0.45)
+      theme.scrim.opacity(0.45)
         .ignoresSafeArea()
 
       VStack(spacing: 18) {
@@ -112,15 +112,15 @@ struct ConnectionSetupView: View {
           systemName: viewModel.hasVideo ? "video.slash.fill" : "mic.slash.fill",
           size: 28,
           weight: .semibold,
-          color: theme.appPink
+          color: theme.accent
         )
         .frame(width: 56, height: 56)
-        .background(theme.appPinkSoft)
+        .background(theme.accentBackground)
         .clipShape(Circle())
 
         Text(LocalizationSupport.localized("Connection is taking longer than usual"))
           .font(.system(size: 16, weight: .bold))
-          .foregroundStyle(theme.appPrimaryText)
+          .foregroundStyle(theme.primaryText)
           .multilineTextAlignment(.center)
 
         Text(
@@ -129,7 +129,7 @@ struct ConnectionSetupView: View {
             : LocalizationSupport.localized("We couldn't establish an audio connection. Retry, continue with text only, or cancel.")
         )
         .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.appOrange : theme.appSecondaryText)
+        .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
         .multilineTextAlignment(.center)
 
         VStack(spacing: 10) {
@@ -138,10 +138,10 @@ struct ConnectionSetupView: View {
           } label: {
             Text(LocalizationSupport.localized("Retry"))
               .font(.system(size: 14, weight: .bold))
-              .foregroundStyle(theme.white)
+              .foregroundStyle(theme.onAccentText)
               .frame(maxWidth: .infinity)
               .frame(height: 44)
-              .background(theme.appPink)
+              .background(theme.accent)
               .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           }
           .buttonStyle(.plain)
@@ -153,10 +153,10 @@ struct ConnectionSetupView: View {
             } label: {
               Text(LocalizationSupport.localized("Continue with text only"))
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(theme.appPrimaryText)
+                .foregroundStyle(theme.primaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
-                .background(theme.appGrayBackground)
+                .background(theme.cardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -165,7 +165,7 @@ struct ConnectionSetupView: View {
           Button(action: onCancel) {
             Text(LocalizationSupport.localized("Cancel"))
               .font(.system(size: 13, weight: .semibold))
-              .foregroundStyle(theme.appSecondaryText)
+              .foregroundStyle(theme.secondaryText)
               .frame(maxWidth: .infinity)
               .frame(height: 38)
           }
@@ -174,9 +174,9 @@ struct ConnectionSetupView: View {
       }
       .padding(24)
       .frame(maxWidth: 320)
-      .background(theme.appCardBackground)
+      .background(theme.cardBackground)
       .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-      .shadow(color: theme.appCardBackgroundShadow.opacity(0.18), radius: 24, x: 0, y: 14)
+      .shadow(color: theme.cardShadow.opacity(0.18), radius: 24, x: 0, y: 14)
       .padding(.horizontal, 24)
     }
   }
@@ -184,30 +184,30 @@ struct ConnectionSetupView: View {
   var avatarSection: some View {
     VStack(spacing: 14) {
       Circle()
-        .fill(theme.appGrayBackground)
+        .fill(theme.cardBackground)
         .frame(width: 70, height: 70)
         .overlay {
-          PlatformIcon(systemName: "person.crop.circle.fill", size: 62, color: theme.appSecondaryText)
+          PlatformIcon(systemName: "person.crop.circle.fill", size: 62, color: theme.secondaryText)
         }
         .overlay {
-          Circle().stroke(.white, lineWidth: 4)
+          Circle().stroke(theme.screenBackground, lineWidth: 4)
         }
-        .shadow(color: theme.appPrimaryText.opacity(0.12), radius: 10, x: 0, y: 5)
+        .shadow(color: theme.cardShadow.opacity(0.12), radius: 10, x: 0, y: 5)
 
       Text(viewModel.participantName)
         .font(.system(size: 20, weight: .bold))
-        .foregroundStyle(theme.appPrimaryText)
+        .foregroundStyle(theme.primaryText)
 
       HStack(spacing: 4) {
         ForEach(0..<5, id: \.self) { _ in
-          PlatformIcon(systemName: "star.fill", size: 11, weight: .bold, color: theme.yellow)
+          PlatformIcon(systemName: "star.fill", size: 11, weight: .bold, color: theme.ratingStar)
         }
         Text(LocalizationSupport.localized("4.9"))
           .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(theme.appPrimaryText)
+          .foregroundStyle(theme.primaryText)
         Text(LocalizationSupport.localized("(127 reviews)"))
           .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(theme.appSecondaryText)
+          .foregroundStyle(theme.secondaryText)
       }
     }
   }
@@ -217,7 +217,7 @@ struct ConnectionSetupView: View {
       Capsule()
         .fill(
           LinearGradient(
-            colors: [theme.appPink, theme.appPurple],
+            colors: [theme.accent, theme.accentStrong],
             startPoint: .top,
             endPoint: .bottom
           )
@@ -225,7 +225,7 @@ struct ConnectionSetupView: View {
         .frame(width: 62, height: 104)
         .rotationEffect(.degrees(capsuleRotation))
         .overlay {
-          PlatformIcon(systemName: "wifi", size: 20, weight: .bold, color: theme.white)
+          PlatformIcon(systemName: "wifi", size: 20, weight: .bold, color: theme.onAccentText)
         }
         .task {
           withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
@@ -240,7 +240,7 @@ struct ConnectionSetupView: View {
           Spacer()
           Text(viewModel.connectionTitle)
             .font(.system(size: 16, weight: .bold))
-            .foregroundStyle(theme.appPrimaryText)
+            .foregroundStyle(theme.primaryText)
             .lineLimit(2)
 
           LoadingDotsView()
@@ -251,18 +251,18 @@ struct ConnectionSetupView: View {
           Spacer()
           Text(viewModel.setupStatusText)
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.appOrange : theme.appSecondaryText)
+            .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
             .multilineTextAlignment(.center)
           Spacer()
         }
         GeometryReader { proxy in
           ZStack(alignment: .leading) {
             Capsule()
-              .fill(theme.appGrayBackground)
+              .fill(theme.cardBackground)
             Capsule()
               .fill(
                 LinearGradient(
-                  colors: [theme.appPink, theme.appPurple],
+                  colors: [theme.accent, theme.accentStrong],
                   startPoint: .leading,
                   endPoint: .trailing
                 )
@@ -278,7 +278,7 @@ struct ConnectionSetupView: View {
     }
     .padding(28)
     .frame(maxWidth: .infinity, minHeight: 132)
-    .background(theme.appCardBackground)
+    .background(theme.cardBackground)
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 
@@ -310,44 +310,44 @@ struct ConnectionSetupView: View {
     VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .top, spacing: 12) {
         Circle()
-          .fill(theme.appOrange.opacity(0.12))
+          .fill(theme.warning.opacity(0.12))
           .frame(width: 34, height: 34)
           .overlay {
-            PlatformIcon(systemName: icon, size: 14, weight: .semibold, color: theme.appOrange)
+            PlatformIcon(systemName: icon, size: 14, weight: .semibold, color: theme.warning)
           }
 
         VStack(alignment: .leading, spacing: 6) {
           Text(LocalizationSupport.localized(title))
             .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(theme.appPrimaryText)
+            .foregroundStyle(theme.primaryText)
           Text(LocalizationSupport.localized(message))
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(theme.appSecondaryText)
+            .foregroundStyle(theme.secondaryText)
             .lineSpacing(3)
         }
       }
 
       Button(action: action) {
         HStack(spacing: 8) {
-          PlatformIcon(systemName: buttonIcon, size: 11, weight: .bold, color: theme.white)
+          PlatformIcon(systemName: buttonIcon, size: 11, weight: .bold, color: theme.onAccentText)
           Text(buttonTitle)
             .font(.system(size: 13, weight: .bold))
         }
-        .foregroundStyle(theme.appPrimaryText)
+        .foregroundStyle(theme.primaryText)
         .frame(maxWidth: .infinity)
         .frame(height: 42)
-        .background(theme.appOrange)
+        .background(theme.warning)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
       }
       .buttonStyle(.plain)
       .padding(.leading, 52)
     }
     .padding(16)
-    .background(theme.appOrange.opacity(0.06))
+    .background(theme.warning.opacity(0.06))
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .stroke(theme.appOrange.opacity(0.28), lineWidth: 1)
+        .stroke(theme.warning.opacity(0.28), lineWidth: 1)
     }
   }
 }
@@ -362,7 +362,7 @@ struct LoadingDotsView: View {
     HStack(spacing: 4) {
       ForEach(0..<3, id: \.self) { index in
         Circle()
-          .fill(theme.appPrimaryText)
+          .fill(theme.secondaryText)
           .frame(width: 3, height: 3)
           .opacity(phase == index ? 1 : 0.28)
       }

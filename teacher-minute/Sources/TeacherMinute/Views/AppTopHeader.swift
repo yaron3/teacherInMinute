@@ -27,18 +27,18 @@ struct AppTopHeader: View {
         imageURL: avatarImageURL,
         size: 38,
         fallbackSystemImage: avatarSystemImage,
-        background: theme.appPurpleSoft,
-        tint: theme.appPurple
+        background: theme.accentBackground,
+        tint: theme.accentStrong
       )
 	  
 	  VStack(alignment: .leading, spacing: 2) {
 		Text(LocalizedStringKey(eyebrow))
 		  .font(.system(size: 11))
-		  .foregroundStyle(theme.appSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 		
 		Text(name)
 		  .font(.system(size: 15, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 	  }
 	  
 	  Spacer()
@@ -48,16 +48,16 @@ struct AppTopHeader: View {
 	  } label: {
 		ZStack(alignment: .topTrailing) {
 		  Circle()
-			.fill(theme.appPrimaryText)
+			.fill(theme.cardBackground)
 			.frame(width: 42, height: 42)
-			.shadow(color: theme.appPrimaryText.opacity(0.05), radius: 12, x: 0, y: 6)
+			.shadow(color: theme.cardShadow.opacity(0.05), radius: 12, x: 0, y: 6)
 			.overlay {
-			  PlatformIcon(systemName: "bell.fill", size: 15, weight: .semibold, color: theme.appOrange)
+			  PlatformIcon(systemName: "bell.fill", size: 15, weight: .semibold, color: theme.primaryText)
 			}
 		  
 		  if showNotificationBadge {
 			Circle()
-			  .fill(theme.appPink)
+			  .fill(theme.accent)
 			  .frame(width: 8, height: 8)
 			  .offset(x: -8, y: 8)
 		  }
@@ -86,9 +86,9 @@ struct RoundedInfoCard<Content: View>: View {
   var body: some View {
 	content
 	  .padding(18)
-	  .background(theme.appCardBackground)
+	  .background(theme.cardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-	  .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 10)
+	  .shadow(color: theme.cardShadow.opacity(0.035), radius: 18, x: 0, y: 10)
   }
 }
 
@@ -104,10 +104,10 @@ struct SmallPill: View {
   var body: some View {
 	Text(title)
 	  .font(.system(size: 11, weight: .semibold))
-	  .foregroundStyle(foreground ?? theme.appPink)
+	  .foregroundStyle(foreground ?? theme.accent)
 	  .padding(.horizontal, 10)
 	  .frame(height: 24)
-	  .background(background ?? theme.appPinkSoft)
+	  .background(background ?? theme.accentBackground)
 	  .clipShape(Capsule())
   }
 }

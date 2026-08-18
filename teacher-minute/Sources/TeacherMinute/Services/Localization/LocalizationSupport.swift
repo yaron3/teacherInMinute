@@ -21,6 +21,16 @@ enum LocalizationSupport {
         RemoteConfigLocalizationService().localized(key)
     }
 
+    /// Display label for a canonical grade value such as `"Grade 7"`.
+    ///
+    /// Grade values are stored in English so a saved profile keeps its meaning
+    /// when the user switches language. Each grade has its own translation key
+    /// (`grade_1`...`grade_12`) because Hebrew numbers them with letters rather
+    /// than digits, so a single format string could not produce them.
+    static func localizedGradeLabel(_ canonicalGrade: String) -> String {
+        localized(canonicalGrade)
+    }
+
     private static var preferredLanguageCode: String? {
         let rawValue = UserDefaults.standard.string(forKey: languagePreferenceKey) ?? SettingsLanguageChoice.system.rawValue
         switch rawValue {

@@ -25,21 +25,21 @@ struct NotificationPermissionExplainerView: View {
             Spacer(minLength: 24)
 
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(theme.authPurpleSoft)
+                .fill(theme.accentBackground)
                 .frame(width: 78, height: 78)
                 .overlay {
-                    PlatformIcon(systemName: "bell.badge.fill", size: 34, weight: .semibold, color: theme.authPurple)
+                    PlatformIcon(systemName: "bell.badge.fill", size: 34, weight: .semibold, color: theme.accent)
                 }
-                .shadow(color: theme.authPurple.opacity(0.12), radius: 24, x: 0, y: 12)
+                .shadow(color: theme.accent.opacity(0.12), radius: 24, x: 0, y: 12)
 
             Text(LocalizationSupport.localized("Stay in the loop"))
                 .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(theme.appPrimaryText)
+                .foregroundStyle(theme.primaryText)
                 .padding(.top, 28)
 
             Text(LocalizationSupport.localized("Turn on notifications so we can let you know the moment a teacher accepts your request, replies to a message, or your session is about to start."))
                 .font(.system(size: 14))
-                .foregroundStyle(theme.appSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .lineSpacing(6)
                 .multilineTextAlignment(.center)
                 .padding(.top, 12)
@@ -60,7 +60,7 @@ struct NotificationPermissionExplainerView: View {
             } label: {
                 Text(LocalizationSupport.localized("Not now"))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.appSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)

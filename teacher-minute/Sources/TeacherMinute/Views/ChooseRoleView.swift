@@ -24,9 +24,9 @@ struct ChooseRoleView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
 
-      Text(LocalizationSupport.localized("How do you want to use Math Connect? You\ncan change this later in settings."))
+      Text(LocalizationSupport.localized("How do you want to use Teacher in a Minute? You\ncan change this later in settings."))
         .font(.system(size: 15))
-        .foregroundStyle(theme.authSecondaryText)
+        .foregroundStyle(theme.secondaryText)
         .lineSpacing(5)
         .padding(.top, 8)
 
@@ -39,7 +39,7 @@ struct ChooseRoleView: View {
             LocalizationSupport.localized("Per-minute billing")
           ],
           isSelected: viewModel.selectedRole == .student,
-          accent: theme.authPink
+          accent: theme.accent
         ) {
           viewModel.selectedRole = .student
         }
@@ -52,7 +52,7 @@ struct ChooseRoleView: View {
             LocalizationSupport.localized("Verification required")
           ],
           isSelected: viewModel.selectedRole == .teacher,
-          accent: theme.authPurple
+          accent: theme.accent
         ) {
           viewModel.selectedRole = .teacher
         }
@@ -69,19 +69,19 @@ struct ChooseRoleView: View {
 
 //      HStack(spacing: 2) {
 //        Text(LocalizationSupport.localized("By continuing, you agree to our"))
-//          .foregroundStyle(theme.authSecondaryText)
+//          .foregroundStyle(theme.secondaryText)
 //        Button { openTerms() } label: {
 //          Text(LocalizationSupport.localized("Terms")).underline()
 //            .fontWeight(.semibold)
-//            .foregroundStyle(theme.authPrimaryText)
+//            .foregroundStyle(theme.primaryText)
 //        }
 //        .buttonStyle(.plain)
 //        Text(LocalizationSupport.localized("&"))
-//          .foregroundStyle(theme.authSecondaryText)
+//          .foregroundStyle(theme.secondaryText)
 //        Button { openPrivacy() } label: {
 //          Text(LocalizationSupport.localized("Privacy.")).underline()
 //            .fontWeight(.semibold)
-//            .foregroundStyle(theme.authPrimaryText)
+//            .foregroundStyle(theme.primaryText)
 //        }
 //        .buttonStyle(.plain)
 //      }
@@ -91,7 +91,7 @@ struct ChooseRoleView: View {
 //      .padding(.bottom, 24)
     }
     .padding(.horizontal, 20)
-    .background(Color(.systemBackground))
+    .background(theme.screenBackground)
     .navigationBarTitleDisplayMode(.inline)
     .sheet(isPresented: $showingTerms) {
       if let termsURL {
@@ -104,11 +104,12 @@ struct ChooseRoleView: View {
         NavigationStack { AboutWebView(url: privacyURL, title: LocalizationSupport.localized("Privacy Policy")) }
       }
     }
-    .alert(LocalizationSupport.localized("Choose Your Role"), isPresented: $showLegalAlert) {
-      Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-    } message: {
-      Text(legalAlertMessage)
-    }
+    .appDialog(
+      LocalizationSupport.localized("Choose Your Role"),
+      isPresented: $showLegalAlert,
+      message: legalAlertMessage,
+      actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+    )
   }
 
   private func continueWithSelectedRole() {
@@ -158,7 +159,7 @@ struct RoleCard: View {
     Button(action: action) {
       VStack(alignment: .leading, spacing: 18) {
         HStack {
-          RoundedRectangle(cornerRadius: 14, style: .continuous)
+          RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
             .fill(accent.opacity(0.08))
             .frame(width: 46, height: 46)
             .overlay {
@@ -178,7 +179,7 @@ struct RoleCard: View {
                   systemName: "checkmark",
                   size: 10,
                   weight: .bold,
-                  color: theme.appPrimaryText
+                  color: theme.primaryText
                 )
               }
           }
@@ -187,7 +188,7 @@ struct RoleCard: View {
         VStack(alignment: .leading, spacing: 8) {
           Text(title)
             .font(.system(size: 18, weight: .bold))
-            .foregroundStyle(theme.authPrimaryText)
+            .foregroundStyle(theme.primaryText)
 
           HStack(spacing: 8) {
             ForEach(details, id: \.self) { detail in
@@ -198,7 +199,7 @@ struct RoleCard: View {
 
                 Text(detail)
                   .font(.system(size: 12))
-                  .foregroundStyle(theme.authSecondaryText)
+                  .foregroundStyle(theme.secondaryText)
               }
             }
           }
@@ -206,13 +207,12 @@ struct RoleCard: View {
       }
       .padding(20)
       .frame(maxWidth: .infinity)
-      .background(theme.appCardBackground)
-      .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+      .background(theme.cardBackground)
+      .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
       .overlay {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
+        RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
           .stroke(isSelected ? accent : Color.clear, lineWidth: 2)
       }
-      .shadow(color: theme.appPrimaryText.opacity(0.035), radius: 20, x: 0, y: 12)
     }
     .buttonStyle(.plain)
   }

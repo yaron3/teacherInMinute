@@ -17,19 +17,19 @@ struct LoginView: View {
   }
   var body: some View {
 	ZStack {
-	  Color(.systemBackground)
+	  theme.screenBackground
 		.ignoresSafeArea()
 	  
 	  ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 0) {
 //		Text(LocalizationSupport.localized("Welcome Back"))
 //		  .font(.system(size: 32, weight: .bold))
-//		  .foregroundStyle(theme.authPrimaryText)
+//		  .foregroundStyle(theme.primaryText)
 //		  .padding(.top, 28)
 		
-		Text(LocalizationSupport.localized("Log in to Math Connect to continue your\njourney."))
+		Text(LocalizationSupport.localized("Log in to Teacher in a Minute to continue your\njourney."))
 		  .font(.system(size: 16, weight: .regular))
-		  .foregroundStyle(theme.authSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(6)
 		  .padding(.top, 10)
 		
@@ -57,15 +57,15 @@ struct LoginView: View {
 	  
 	  // Full-screen loading overlay while checking Firestore
 	  if viewModel.isLoading {
-		theme.appPrimaryText.opacity(0.25).ignoresSafeArea()
+		theme.screenBackground.opacity(0.85).ignoresSafeArea()
 		VStack(spacing: 14) {
 		  ProgressView()
 			.progressViewStyle(.circular)
 			.scaleEffect(1.8)
-			.tint(theme.appPrimaryText)
+			.tint(theme.primaryText)
 		  Text(LocalizationSupport.localized("Signing in…"))
-			.font(.system(size: 14, weight: .medium))
-			.foregroundStyle(theme.appPrimaryText)
+			.font(.system(size: 15, weight: .medium))
+			.foregroundStyle(theme.primaryText)
 		}
 	  }
 	}
@@ -77,11 +77,12 @@ struct LoginView: View {
 	  router.resume(resume)
 	  viewModel.destination = nil
 	}
-	.alert(LocalizationSupport.localized("Sign In Error"), isPresented: $viewModel.showAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) { viewModel.showAlert = false }
-	} message: {
-	  Text(viewModel.alertMessage ?? LocalizationSupport.localized("An unexpected error occurred."))
-	}
+	.appDialog(
+	  LocalizationSupport.localized("Sign In Error"),
+	  isPresented: $viewModel.showAlert,
+	  message: viewModel.alertMessage ?? LocalizationSupport.localized("An unexpected error occurred."),
+	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	)
   }
   
 
@@ -94,18 +95,18 @@ struct LoginView: View {
 	  VStack(alignment: .leading, spacing: 9) {
 		Text(LocalizationSupport.localized("Email"))
 		  .font(.system(size: 14, weight: .semibold))
-		  .foregroundStyle(theme.authPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		
 		HStack(spacing: 13) {
 		  PlatformIcon(
 			systemName: "envelope",
 			size: 15,
-			color: theme.authIcon
+			color: theme.secondaryText
 		  )
 		  
 		  TextField(LocalizationSupport.localized("Enter your email"), text: $viewModel.emailOrPhone)
 			.font(.system(size: 16))
-			.foregroundStyle(theme.authPrimaryText)
+			.foregroundStyle(theme.primaryText)
 			.keyboardType(.emailAddress)
 			.textInputAutocapitalization(.never)
 			.autocorrectionDisabled()
@@ -115,11 +116,11 @@ struct LoginView: View {
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)
-		.background(theme.authFieldBackground)
-		.clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+		.background(theme.fieldBackground)
+		.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 		.overlay {
-		  RoundedRectangle(cornerRadius: 15, style: .continuous)
-			.stroke(theme.authFieldBorder, lineWidth: 1)
+		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+			.stroke(theme.controlBorder, lineWidth: 1)
 		}
 	  }
 	  
@@ -127,13 +128,13 @@ struct LoginView: View {
 	  VStack(alignment: .leading, spacing: 9) {
 		Text(LocalizationSupport.localized("Password"))
 		  .font(.system(size: 14, weight: .semibold))
-		  .foregroundStyle(theme.authPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		
 		HStack(spacing: 13) {
 		  PlatformIcon(
 			systemName: "lock.fill",
 			size: 15,
-			color: theme.authIcon
+			color: theme.secondaryText
 		  )
 		  
 		  Group {
@@ -145,7 +146,7 @@ struct LoginView: View {
 			}
 		  }
 		  .font(.system(size: 16))
-		  .foregroundStyle(theme.authPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		  .textInputAutocapitalization(.never)
 		  .autocorrectionDisabled()
 		  
@@ -154,17 +155,17 @@ struct LoginView: View {
 		  } label: {
 			PlatformIcon(systemName: viewModel.isPasswordVisible ? "eye" : "eye.slash")
 			  .font(.system(size: 17))
-			  .foregroundStyle(theme.authIcon)
+			  .foregroundStyle(theme.secondaryText)
 		  }
 		  .buttonStyle(.plain)
 		}
 		.padding(.horizontal, 16)
 		.frame(height: 56)
-		.background(theme.authFieldBackground)
-		.clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+		.background(theme.fieldBackground)
+		.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 		.overlay {
-		  RoundedRectangle(cornerRadius: 15, style: .continuous)
-			.stroke(theme.authFieldBorder, lineWidth: 1)
+		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+			.stroke(theme.controlBorder, lineWidth: 1)
 		}
 	  }
 	  
@@ -173,7 +174,7 @@ struct LoginView: View {
 	  } label: {
 		Text(LocalizationSupport.localized("Forgot Password?"))
 		  .font(.system(size: 14, weight: .medium))
-		  .foregroundStyle(theme.authPink)
+		  .foregroundStyle(theme.accent)
 		  .frame(maxWidth: .infinity, alignment: .trailing)
 	  }
 	  .buttonStyle(.plain)
@@ -182,9 +183,8 @@ struct LoginView: View {
 	.padding(.horizontal, 24)
 	.padding(.top, 26)
 	.padding(.bottom, 24)
-	.background(theme.appCardBackground)
-	.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-	.shadow(color: theme.appPrimaryText.opacity(0.035), radius: 24, x: 0, y: 14)
+	.background(theme.cardBackground)
+	.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
   }
   
   var loginButton: some View {
@@ -193,18 +193,19 @@ struct LoginView: View {
 	} label: {
 	  HStack(spacing: 8) {
 		if viewModel.isLoading {
-		  ProgressView().tint(theme.appPrimaryText)
+		  ProgressView().tint(theme.onAccentText)
 		}
-		
+
 		Text(viewModel.isLoading ? LocalizationSupport.localized("Signing In…") : LocalizationSupport.localized("Log In"))
-		  .font(.system(size: 16, weight: .semibold))
+		  .font(.system(size: 17, weight: .bold))
 	  }
-	  .foregroundStyle(theme.appPrimaryText)
+	  // Disabled state swaps to the raised gray rather than fading ink into the
+	  // background, which left the label unreadable.
+	  .foregroundStyle(viewModel.canSubmit ? theme.onAccentText : theme.secondaryText)
 	  .frame(maxWidth: .infinity)
-	  .frame(height: 57)
-	  .background(theme.authPink.opacity(viewModel.canSubmit ? 1 : 0.55))
-	  .clipShape(Capsule())
-	  .shadow(color: theme.authPink.opacity(viewModel.canSubmit ? 0.25 : 0), radius: 18, x: 0, y: 10)
+	  .frame(height: 54)
+	  .background(viewModel.canSubmit ? theme.accent : theme.cardBackground)
+	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
 	}
 	.buttonStyle(.plain)
 	.disabled(!viewModel.canSubmit)
@@ -213,16 +214,16 @@ struct LoginView: View {
   var dividerTitle: some View {
 	HStack(spacing: 17) {
 	  Rectangle()
-		.fill(theme.authDivider)
+		.fill(theme.separator)
 		.frame(height: 1)
 	  
 	  Text(LocalizationSupport.localized("Or continue with"))
 		.font(.system(size: 14, weight: .regular))
-		.foregroundStyle(theme.authSecondaryText)
+		.foregroundStyle(theme.secondaryText)
 		.lineLimit(1)
 	  
 	  Rectangle()
-		.fill(theme.authDivider)
+		.fill(theme.separator)
 		.frame(height: 1)
 	}
 	.padding(.horizontal, 16)
@@ -243,13 +244,12 @@ struct LoginView: View {
 		PlatformIcon(systemName: systemImage).font(.system(size: 20, weight: .semibold))
 		Text(title).font(.system(size: 15, weight: .semibold))
 	  }
-	  .foregroundStyle(theme.authPrimaryText)
+	  .foregroundStyle(theme.primaryText)
 	  .frame(maxWidth: .infinity)
 	  .frame(height: 56)
-	  .background(theme.appCardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-	  .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.authSocialBorder, lineWidth: 1) }
-	  .shadow(color: theme.appPrimaryText.opacity(0.04), radius: 10, x: 0, y: 5)
+	  .background(theme.cardBackground)
+	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+	  .overlay { RoundedRectangle(cornerRadius: flatRadius, style: .continuous).stroke(theme.controlBorder, lineWidth: 1) }
 	}
 	.buttonStyle(.plain)
   }
@@ -257,14 +257,14 @@ struct LoginView: View {
   var bottomSignUp: some View {
 	HStack(spacing: 4) {
 	  Text(LocalizationSupport.localized("Don't have an account?"))
-		.foregroundStyle(theme.authSecondaryText)
+		.foregroundStyle(theme.secondaryText)
 	  
 	  Button {
 		router.push(.createAccount)
 	  } label: {
 		Text(LocalizationSupport.localized("Sign Up"))
 		  .fontWeight(.semibold)
-		  .foregroundStyle(theme.authPink)
+		  .foregroundStyle(theme.accent)
 	  }
 	  .buttonStyle(.plain)
 	}

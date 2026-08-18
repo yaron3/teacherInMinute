@@ -33,99 +33,7 @@ struct StudentHomeView: View {
   }
   
   var body: some View {
-	ZStack {
-	  ScrollView(.vertical, showsIndicators: false) {
-		VStack(alignment: .leading, spacing: 0) {
-		  AppTopHeader(
-			avatarSystemImage: "person.crop.circle.fill",
-			eyebrow: LocalizationSupport.localized("Welcome Back"),
-			name: viewModel.name,
-			avatarImageURL: viewModel.profileImageURL,
-			showNotificationBadge: viewModel.hasUnreadMessages,
-			onMessagesDismissed: {
-			  Task { await viewModel.refreshUnreadMessages() }
-			}
-		  )
-		  .padding(.top, 6)
-
-		  askTeacherCard
-			.padding(.top, 14)
-		  
-		  EmptyView() // Coupon entry hidden on the Home tab (bug #28).
-			.padding(.top, 0)
-		  
-		  sectionHeader(title: LocalizationSupport.localized("Pricing Options"))
-			.padding(.top, 24)
-
-		  ScrollView(.horizontal, showsIndicators: false) {
-			HStack(spacing: 16) {
-			  ForEach(viewModel.pricingOptions) { option in
-				PricingCard(
-				  option: option,
-				  isLoading: viewModel.isStartingCheckout && viewModel.checkoutPricingOptionID == option.id
-				) {
-				  pendingCheckoutOption = option
-				}
-			  }
-			}
-			.padding(.horizontal, 2)
-			.padding(.vertical, 4)
-		  }
-		  .padding(.top, 10)
-		  
-		  statsStrip
-			.padding(.top, 24)
-		  
-		  tipsCard
-			.padding(.top, 28)
-		  
-		  Group {
-			sectionHeader(title: LocalizationSupport.localized("Recent Lessons"), actionTitle: "")
-			
-		  }
-		  .padding(.top, 28)
-		  
-		  if viewModel.recentLessons.isEmpty {
-			RoundedInfoCard {
-			  HStack(spacing: 12) {
-				PlatformIcon(
-				  systemName: "clock",
-				  size: 16,
-				  color: theme.appSecondaryText
-				)
-				Text(LocalizationSupport.localized("No lessons yet. Ask a teacher to get started!"))
-				  .font(.system(size: 13))
-				  .foregroundStyle(theme.appSecondaryText)
-			  }
-			}
-			.padding(.top, 12)
-		  } else {
-			VStack(spacing: 12) {
-			  ForEach(viewModel.recentLessons) { lesson in
-				RecentLessonRow(lesson: lesson)
-			  }
-			}
-			.padding(.top, 12)
-		  }
-		}
-		.padding(.horizontal, 18)
-		.padding(.bottom, 24)
-	  }
-	  .background(Color(.systemBackground))
-	  .refreshable {
-		await viewModel.refresh()
-	  }
-
-	  searchStateOverlay
-	  
-#if os(Android)
-	  if let result = paymentReturnStore.latestResult {
-		paymentReturnOverlay(result)
-		  .frame(maxWidth: .infinity, maxHeight: .infinity)
-		  .zIndex(10)
-	  }
-#endif
-	}
+	homeContent
 	.fullScreenCover(isPresented: $showsAskTeacher) {
 	  NavigationStack {
 		AskTeacherSheet(viewModel: viewModel)
@@ -158,6 +66,14 @@ struct StudentHomeView: View {
 		}
 	  }
 	}
+  }
+
+  // `body` is deliberately split across the properties below. As one
+  // expression — ZStack, scroll content and the whole modifier chain — it
+  // is more than the Swift type checker will solve, and it gives up first
+  // on the Android build, where SkipUI's view types make inference costlier.
+  var homeContent: some View {
+	homeLayers
 	.onChange(of: viewModel.checkoutURL) { _, url in
 	  guard let url else { return }
 	  logger.info("[PaymentReturn] opening checkoutURL=\(url.absoluteString)")
@@ -175,45 +91,161 @@ struct StudentHomeView: View {
 	  guard phase == .active else { return }
 	  handleActiveAfterExternalCheckout()
 	}
-	.alert(LocalizationSupport.localized("Low Balance"), isPresented: $showingLowBalanceAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-	} message: {
-	  Text(lowBalanceMessage)
-	}
 	.onChange(of: couponStateKey) { _, _ in
 	  handleCouponStateChange()
 	}
 	.onChange(of: viewModel.purchaseSummary?.id) { _, id in
 	  showingPurchaseSummaryAlert = id != nil
 	}
-	.alert(LocalizationSupport.localized("Purchase complete"), isPresented: $showingPurchaseSummaryAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) {
-		viewModel.consumePurchaseSummary()
-		// The redirect flows also leave a success result behind; clear it so a
-		// stale one cannot resurface.
-		paymentReturnStore.consumeLatestResult()
+  }
+
+  var homeLayers: some View {
+	ZStack {
+	  homeScroll
+
+	  searchStateOverlay
+	  
+#if os(Android)
+	  if let result = paymentReturnStore.latestResult {
+		paymentReturnOverlay(result)
+		  .frame(maxWidth: .infinity, maxHeight: .infinity)
+		  .zIndex(10)
 	  }
-	} message: {
-	  Text(purchaseSummaryMessage)
+#endif
 	}
-	.alert(couponAlertTitle, isPresented: $showingCouponAlert) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) {
-		viewModel.resetCouponState()
-	  }
-	} message: {
-	  Text(couponAlertMessage)
-	}
+	.appDialog(
+	  LocalizationSupport.localized("Low Balance"),
+	  isPresented: $showingLowBalanceAlert,
+	  message: lowBalanceMessage,
+	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	)
+	.appDialog(
+	  LocalizationSupport.localized("Purchase complete"),
+	  isPresented: $showingPurchaseSummaryAlert,
+	  message: purchaseSummaryMessage,
+	  actions: [
+		AppDialogAction(LocalizationSupport.localized("OK")) {
+		  viewModel.consumePurchaseSummary()
+		  // The redirect flows also leave a success result behind; clear it so a
+		  // stale one cannot resurface.
+		  paymentReturnStore.consumeLatestResult()
+		}
+	  ]
+	)
+	.appDialog(
+	  couponAlertTitle,
+	  isPresented: $showingCouponAlert,
+	  message: couponAlertMessage,
+	  actions: [
+		AppDialogAction(LocalizationSupport.localized("OK")) {
+		  viewModel.resetCouponState()
+		}
+	  ]
+	)
 #if !os(Android)
-	.alert(paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"), isPresented: isShowingPaymentReturnResult) {
-	  Button(LocalizationSupport.localized("OK"), role: .cancel) {
-		paymentReturnStore.consumeLatestResult()
-	  }
-	} message: {
-	  Text(paymentReturnStore.latestResult?.message ?? "")
-	}
+	.appDialog(
+	  paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"),
+	  isPresented: isShowingPaymentReturnResult,
+	  message: paymentReturnStore.latestResult?.message ?? "",
+	  actions: [
+		AppDialogAction(LocalizationSupport.localized("OK")) {
+		  paymentReturnStore.consumeLatestResult()
+		}
+	  ]
+	)
 #endif
   }
+
+  var homeScroll: some View {
+	  ScrollView(.vertical, showsIndicators: false) {
+	  homeSections
+	}
+  .background(theme.screenBackground)
+	  .refreshable {
+		await viewModel.refresh()
+	  }
+  }
+
+  var homeSections: some View {
+		VStack(alignment: .leading, spacing: 0) {
+      FlatTopHeader(
+        eyebrow: LocalizationSupport.localized("Welcome Back"),
+        name: viewModel.name,
+        avatarImageURL: viewModel.profileImageURL,
+        avatarSystemImage: "person.crop.circle.fill",
+        showNotificationBadge: viewModel.hasUnreadMessages,
+        onMessagesDismissed: {
+          Task { await viewModel.refreshUnreadMessages() }
+        }
+      )
+      .padding(.top, 8)
+
+		  askTeacherCard
+			.padding(.top, 14)
+		  
+		  EmptyView() // Coupon entry hidden on the Home tab (bug #28).
+			.padding(.top, 0)
+		  
+		  sectionHeader(title: LocalizationSupport.localized("Pricing Options"))
+			.padding(.top, 24)
+
+		  pricingStrip
+		  .padding(.top, 10)
+		  
+		  statsStrip
+			.padding(.top, 24)
+		  
+		  tipsCard
+			.padding(.top, 28)
+		  
+		  Group {
+			sectionHeader(title: LocalizationSupport.localized("Recent Lessons"), actionTitle: "")
+			
+		  }
+		  .padding(.top, 28)
+		  
+      if viewModel.recentLessons.isEmpty {
+        Text(LocalizationSupport.localized("No lessons yet. Ask a teacher to get started!"))
+          .font(.system(size: 17))
+          .foregroundStyle(theme.secondaryText)
+          .padding(.top, 16)
+      } else {
+        FlatCard(padding: 0, outlined: true) {
+          VStack(spacing: 0) {
+            ForEach(viewModel.recentLessons) { lesson in
+              RecentLessonRow(lesson: lesson)
+
+              if lesson.id != viewModel.recentLessons.last?.id {
+                FlatRule()
+              }
+            }
+          }
+        }
+        .padding(.top, 12)
+      }
+    }
+    .padding(.horizontal, 20)
+    .padding(.bottom, 40)
+  }
   
+
+  var pricingStrip: some View {
+		  ScrollView(.horizontal, showsIndicators: false) {
+			HStack(spacing: 16) {
+			  ForEach(viewModel.pricingOptions) { option in
+				PricingCard(
+				  option: option,
+				  isLoading: viewModel.isStartingCheckout && viewModel.checkoutPricingOptionID == option.id
+				) {
+				  pendingCheckoutOption = option
+				}
+			  }
+			}
+			.padding(.horizontal, 2)
+			.padding(.vertical, 4)
+		  }
+  }
+
   var redeemCouponRow: some View {
 	let couponBinding = Binding<String>(
 	  get: { viewModel.couponCode },
@@ -230,7 +262,7 @@ struct StudentHomeView: View {
 		.padding(.vertical, 10)
 		.background(
 		  RoundedRectangle(cornerRadius: 8, style: .continuous)
-			.stroke(theme.appSecondaryText.opacity(0.4), lineWidth: 1)
+			.stroke(theme.controlBorder, lineWidth: 1)
 		)
 		.multilineTextAlignment(.leading)
 		.frame(maxWidth: .infinity, alignment: .leading)
@@ -310,18 +342,18 @@ struct StudentHomeView: View {
 #if os(Android)
   func paymentReturnOverlay(_ result: PaymentReturnResult) -> some View {
 	ZStack {
-	  Color.black.opacity(0.34)
+	  theme.scrim.opacity(0.34)
 		.ignoresSafeArea()
 	  
 	  VStack(spacing: 14) {
 		Text(result.title)
 		  .font(.system(size: 18, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		  .multilineTextAlignment(.center)
 		
 		Text(result.message)
 		  .font(.system(size: 14))
-		  .foregroundStyle(theme.appSecondaryText)
+		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
 		
 		Button {
@@ -329,10 +361,10 @@ struct StudentHomeView: View {
 		} label: {
 		  Text(LocalizationSupport.localized("OK"))
 			.font(.system(size: 15, weight: .bold))
-			.foregroundStyle(theme.white)
+			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
 			.frame(height: 44)
-			.background(theme.appPink)
+			.background(theme.accent)
 			.clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 		}
 		.buttonStyle(.plain)
@@ -340,7 +372,7 @@ struct StudentHomeView: View {
 	  }
 	  .padding(20)
 	  .frame(maxWidth: 320)
-	  .background(theme.appCardBackground)
+	  .background(theme.cardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 	  .padding(.horizontal, 24)
 	}
@@ -468,21 +500,21 @@ struct StudentHomeView: View {
   // MARK: - Stats
   
   var statsStrip: some View {
-	HStack(spacing: 14) {
-	  HistoryMetricCard(
-		title: LocalizationSupport.localized("Time Learned"),
-		value: viewModel.totalTimeLearnedText,
-		systemImage: "clock.fill",
-		tint: theme.appPink
-	  )
-	  
-	  HistoryMetricCard(
-		title: LocalizationSupport.localized("Total Purchased"),
-		value: viewModel.totalPurchasedText,
-		systemImage: "clock.badge.checkmark.fill",
-		tint: theme.appPurple
-	  )
-	}
+    HStack(spacing: 12) {
+      HistoryMetricCard(
+        title: LocalizationSupport.localized("Time Learned"),
+        value: viewModel.totalTimeLearnedText,
+        systemImage: "clock.fill",
+        tint: theme.primaryText
+      )
+
+      HistoryMetricCard(
+        title: LocalizationSupport.localized("Total Purchased"),
+        value: viewModel.totalPurchasedText,
+        systemImage: "clock.badge.checkmark.fill",
+        tint: theme.primaryText
+      )
+    }
   }
   
   // MARK: - Ask card
@@ -506,127 +538,100 @@ struct StudentHomeView: View {
   }
   }
 
+  // Solid ink panel instead of the pink/purple gradient: one strong CTA, the
+  // same role the Go Online button plays on the teacher dashboard.
   var askTeacherCardContent: some View {
-	  ZStack(alignment: .topTrailing) {
-		LinearGradient(
-		  colors: [theme.appPink, theme.appPurple],
-		  startPoint: .topLeading,
-		  endPoint: .bottomTrailing
-		)
-		
-		Circle()
-		  .fill(.white.opacity(0.10))
-		  .frame(width: 116, height: 116)
-		  .offset(x: 34, y: -26)
-		
-		VStack(alignment: .leading, spacing: 0) {
-		  Circle()
-			.fill(.white.opacity(0.18))
-			.frame(width: 58, height: 58)
-			.overlay {
-			  PlatformIcon(
-				systemName: "building.columns.fill",
-				size: 24,
-				weight: .semibold,
-				color: theme.appPrimaryText
-			  )
-			}
-		  
-		  Spacer()
-		  
-		  Text(LocalizationSupport.localized("Ask a math teacher"))
-			.font(.system(size: 22, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  HStack(spacing: 6) {
-			Text(String(format: LocalizationSupport.localized("%d min remaining"), viewModel.remainingMinutes))
-			  .font(.system(size: 13, weight: .semibold))
-			  .foregroundStyle(.white.opacity(0.95))
-			Text(LocalizationSupport.localized("•"))
-			  .font(.system(size: 13))
-			  .foregroundStyle(theme.appGrayBackground.opacity(0.6))
-			Text(LocalizationSupport.localized("Per-minute billing"))
-			  .font(.system(size: 13, weight: .medium))
-			  .foregroundStyle(theme.appGrayBackground.opacity(0.9))
-		  }
-		  .padding(.top, 6)
-		}
-		.padding(20)
-		.frame(maxWidth: .infinity, alignment: .leading)
-		
-		Circle()
-		  .fill(theme.appPrimaryText)
-		  .frame(width: 44, height: 44)
-		  .overlay {
-			PlatformIcon(
-			  systemName: "arrow.right",
-			  size: 17,
-			  weight: .bold,
-			  color: theme.appGrayBackground
-			)
-		  }
-		  .padding(.top, 36)
-		  .padding(.trailing, 20)
-	  }
-	  .frame(height: 148)
-	  .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-	  .shadow(color: theme.appPink.opacity(0.25), radius: 18, x: 0, y: 10)
-	}
+    ZStack(alignment: .topTrailing) {
+      VStack(alignment: .leading, spacing: 0) {
+        Spacer()
+
+        Text(LocalizationSupport.localized("Ask a math teacher"))
+          .font(.system(size: 26, weight: .bold))
+          .foregroundStyle(theme.onAccentText)
+
+        HStack(spacing: 6) {
+          Text(String(format: LocalizationSupport.localized("%d min remaining"), viewModel.remainingMinutes))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.onAccentText.opacity(0.75))
+          Text(LocalizationSupport.localized("•"))
+            .font(.system(size: 14))
+            .foregroundStyle(theme.onAccentText.opacity(0.5))
+          Text(LocalizationSupport.localized("Per-minute billing"))
+            .font(.system(size: 14))
+            .foregroundStyle(theme.onAccentText.opacity(0.75))
+        }
+        .padding(.top, 6)
+      }
+      .padding(20)
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      Circle()
+        .fill(theme.screenBackground)
+        .frame(width: 44, height: 44)
+        .overlay {
+          PlatformIcon(
+            systemName: "arrow.right",
+            size: 17,
+            weight: .bold,
+            color: theme.primaryText
+          )
+        }
+        .padding(.top, 20)
+        .padding(.trailing, 20)
+    }
+    .frame(height: 150)
+    .background(theme.accent)
+    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+  }
   
   // MARK: - Supporting views
   
   var tipsCard: some View {
-	RoundedInfoCard {
-	  HStack(alignment: .top, spacing: 14) {
-		Circle()
-		  .fill(theme.yellow.opacity(0.2))
-		  .frame(width: 34, height: 34)
-		  .overlay {
-			PlatformIcon(systemName: "lightbulb.fill", size: 14, weight: .semibold,color: theme.appOrange)
-		  }
-		
-		VStack(alignment: .leading, spacing: 10) {
-		  Text(LocalizationSupport.localized("Tips for faster matches"))
-			.font(.system(size: 15, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  tipLine(LocalizationSupport.localized("Upload a clear photo of your math problem"))
-		  tipLine(LocalizationSupport.localized("Specify the exact topic (e.g., \u{201C}Derivatives\u{201D})"))
-		}
-		
-		Spacer()
-	  }
-	}
+    FlatCard(filled: theme.positiveBackground) {
+      HStack(alignment: .top, spacing: 14) {
+        FlatIconTile(systemName: "lightbulb.fill", size: 44, background: theme.screenBackground)
+
+        VStack(alignment: .leading, spacing: 10) {
+          Text(LocalizationSupport.localized("Tips for faster matches"))
+            .font(.system(size: 16, weight: .bold))
+            .foregroundStyle(theme.primaryText)
+
+          tipLine(LocalizationSupport.localized("Upload a clear photo of your math problem"))
+          tipLine(LocalizationSupport.localized("Specify the exact topic (e.g., \u{201C}Derivatives\u{201D})"))
+        }
+
+        Spacer()
+      }
+    }
   }
-  
+
   func tipLine(_ text: String) -> some View {
-	HStack(spacing: 8) {
-	  PlatformIcon(systemName: "checkmark", size: 10, weight: .bold,
-				   color: theme.appGreen)
-	  
-	  Text(text)
-		.font(.system(size: 12))
-		.foregroundStyle(theme.appSecondaryText)
-	}
+    HStack(spacing: 8) {
+      PlatformIcon(systemName: "checkmark", size: 11, weight: .bold, color: theme.positive)
+
+      Text(text)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.secondaryText)
+    }
   }
   
   func sectionHeader(title: String, actionTitle: String? = nil, action: (@MainActor @Sendable () -> Void)? = nil) -> some View {
-	HStack {
-	  Text(LocalizationSupport.localized(title))
-		.font(.system(size: 18, weight: .bold))
-		.foregroundStyle(theme.appPrimaryText)
-	  
-	  Spacer()
-	  
-	  if let actionTitle, let action {
-		Button(action: action) {
-		  Text(LocalizationSupport.localized(actionTitle))
-			.font(.system(size: 12, weight: .medium))
-			.foregroundStyle(theme.appPink)
-		}
-		.buttonStyle(.plain)
-	  }
-	}
+    HStack {
+      Text(LocalizationSupport.localized(title))
+        .font(.system(size: 24, weight: .bold))
+        .foregroundStyle(theme.primaryText)
+
+      Spacer()
+
+      if let actionTitle, let action {
+        Button(action: action) {
+          Text(LocalizationSupport.localized(actionTitle))
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.primaryText)
+        }
+        .buttonStyle(.plain)
+      }
+    }
   }
 }
 
@@ -644,8 +649,8 @@ struct ConversationTypeChip: View {
   }
   var accentColor: Color {
 	switch accent {
-	  case .pink: return theme.appPink
-	  case .teal: return theme.appTeal
+	  case .pink: return theme.accent
+	  case .teal: return theme.info
 	}
   }
   var body: some View {
@@ -656,18 +661,18 @@ struct ConversationTypeChip: View {
 			systemName: icon,
 			size: 12,
 			weight: .semibold,
-			color: isSelected ? theme.appCardBackground : theme.appPrimaryText
+			color: isSelected ? theme.onAccentText : theme.primaryText
 		  )
 		}
 		Text(LocalizationSupport.localized(title))
 		  .font(.system(size: 12, weight: .semibold))
-		  .foregroundStyle(isSelected ? theme.appCardBackground : theme.appPrimaryText)
+		  .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
 		  .lineLimit(1)
 		  .minimumScaleFactor(0.75)
 	  }
 	  .padding(.horizontal, 12)
 	  .padding(.vertical, 8)
-	  .background(isSelected ? accentColor : theme.appGrayBackground)
+	  .background(isSelected ? accentColor : theme.cardBackground)
 	  .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 	}
 	.buttonStyle(.plain)
@@ -704,7 +709,7 @@ struct SearchingOverlay: View {
   
   var body: some View {
 	ZStack {
-	  theme.appGrayBackground.ignoresSafeArea()
+	  theme.screenBackground.ignoresSafeArea()
 	  
 	  VStack(spacing: 28) {
 		avatarRing
@@ -712,24 +717,24 @@ struct SearchingOverlay: View {
 		VStack(spacing: 8) {
 		  Text(LocalizationSupport.localized("Searching for a teacher\u{2026}"))
 			.font(.system(size: 17, weight: .semibold))
-			.foregroundStyle(theme.appPrimaryText)
+			.foregroundStyle(theme.primaryText)
 		  Text(LocalizationSupport.localized("This usually takes under 30 seconds."))
 			.font(.system(size: 13))
-			.foregroundStyle(theme.appSecondaryText)
+			.foregroundStyle(theme.secondaryText)
 			.multilineTextAlignment(.center)
 		}
 		
 		Button(action: onCancel) {
 		  Text(LocalizationSupport.localized("Cancel"))
 			.font(.system(size: 14, weight: .semibold))
-			.foregroundStyle(theme.appPrimaryText)
+			.foregroundStyle(theme.primaryText)
 			.padding(.horizontal, 32)
 			.padding(.vertical, 12)
-			.background(theme.appCardBackground)
+			.background(theme.cardBackground)
 			.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 			.overlay {
 			  RoundedRectangle(cornerRadius: 10, style: .continuous)
-				.stroke(theme.appBorder, lineWidth: 1)
+				.stroke(theme.controlBorder, lineWidth: 1)
 			}
 		}
 		.buttonStyle(.plain)
@@ -750,11 +755,11 @@ struct SearchingOverlay: View {
   private var avatarRing: some View {
 	ZStack {
 	  Circle()
-		.stroke(theme.appPink.opacity(0.18), lineWidth: 1.5)
+		.stroke(theme.accent.opacity(0.18), lineWidth: 1.5)
 		.frame(width: ringDiameter, height: ringDiameter)
 	  
 	  Circle()
-		.fill(theme.appPink.opacity(0.08))
+		.fill(theme.accent.opacity(0.08))
 		.frame(width: ringDiameter * 0.45, height: ringDiameter * 0.45)
 	  
 	  ForEach(0..<slotCount, id: \.self) { index in
@@ -776,9 +781,9 @@ struct SearchingOverlay: View {
 	  .frame(width: avatarSize, height: avatarSize)
 	  .clipShape(Circle())
 	  .overlay {
-		Circle().stroke(theme.appCardBackground, lineWidth: 3)
+		Circle().stroke(theme.cardBackground, lineWidth: 3)
 	  }
-	  .shadow(color: theme.appPrimaryText.opacity(0.10), radius: 6, x: 0, y: 3)
+	  .shadow(color: theme.cardShadow.opacity(0.10), radius: 6, x: 0, y: 3)
 	  .rotationEffect(.degrees(-ringRotation))
 	  .offset(x: CGFloat(x), y: CGFloat(y))
   }
@@ -800,11 +805,11 @@ struct SearchingOverlay: View {
   
   private var placeholderAvatar: some View {
 	ZStack {
-	  Circle().fill(theme.appPurpleSoft)
+	  Circle().fill(theme.accentBackground)
 	  PlatformIcon(
 		systemName: "person.crop.circle.fill",
 		size: avatarSize * 0.9,
-		color: theme.appPurple
+		color: theme.accentStrong
 	  )
 	}
   }
@@ -826,36 +831,36 @@ struct MatchedOverlay: View {
   }
   var body: some View {
 	ZStack {
-	  theme.appPrimaryText.opacity(0.6).ignoresSafeArea()
+	  theme.scrim.opacity(0.6).ignoresSafeArea()
 	  
 	  VStack(spacing: 20) {
 		Circle()
-		  .fill(theme.appGreen.opacity(0.2))
+		  .fill(theme.positive.opacity(0.2))
 		  .frame(width: 80, height: 80)
 		  .overlay {
 			PlatformIcon(
 			  systemName: "checkmark.circle.fill",
 			  size: 44,
-			  color: theme.appGreen
+			  color: theme.positive
 			)
 		  }
 		
 		Text(LocalizationSupport.localized("Teacher Found!"))
 		  .font(.system(size: 22, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		
 		Text(String(format: LocalizationSupport.localized("Your session is ready.\nRoom: %@"), liveKitRoom))
 		  .font(.system(size: 13))
-		  .foregroundStyle(.white.opacity(0.8))
+		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
 		
 		Button(action: onDismiss) {
 		  Text(LocalizationSupport.localized("Done"))
 			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.appPrimaryText)
+			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
 			.frame(height: 48)
-			.background(theme.appGreen)
+			.background(theme.positive)
 			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 		}
 		.buttonStyle(.plain)
@@ -874,36 +879,36 @@ struct NoMatchOverlay: View {
   }
   var body: some View {
 	ZStack {
-	  theme.appPrimaryText.opacity(0.6).ignoresSafeArea()
+	  theme.scrim.opacity(0.6).ignoresSafeArea()
 	  
 	  VStack(spacing: 20) {
 		Circle()
-		  .fill(theme.appSecondaryText.opacity(0.15))
+		  .fill(theme.cardBackground)
 		  .frame(width: 80, height: 80)
 		  .overlay {
 			PlatformIcon(
 			  systemName: "person.slash.fill",
 			  size: 36,
-			  color: theme.appSecondaryText
+			  color: theme.secondaryText
 			)
 		  }
 		
 		Text(LocalizationSupport.localized("No Teachers Available"))
 		  .font(.system(size: 20, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		
 		Text(LocalizationSupport.localized("All teachers are busy right now.\nTry again in a few minutes."))
 		  .font(.system(size: 13))
-		  .foregroundStyle(.white.opacity(0.8))
+		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
 		
 		Button(action: onDismiss) {
 		  Text(LocalizationSupport.localized("OK"))
 			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.appPrimaryText)
+			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
 			.frame(height: 48)
-			.background(theme.appPink)
+			.background(theme.accent)
 			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 		}
 		.buttonStyle(.plain)
@@ -923,36 +928,36 @@ struct ErrorOverlay: View {
   }
   var body: some View {
 	ZStack {
-	  theme.appCardBackground.opacity(0.9).ignoresSafeArea()
+	  theme.cardBackground.opacity(0.9).ignoresSafeArea()
 	  
 	  VStack(spacing: 20) {
 		Circle()
-		  .fill(theme.appPink.opacity(0.18))
+		  .fill(theme.accent.opacity(0.18))
 		  .frame(width: 80, height: 80)
 		  .overlay {
 			PlatformIcon(
 			  systemName: "exclamationmark.triangle.fill",
 			  size: 34,
-			  color: theme.appPink
+			  color: theme.accent
 			)
 		  }
 		
 		Text(LocalizationSupport.localized("Could Not Send Question"))
 		  .font(.system(size: 20, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
+		  .foregroundStyle(theme.primaryText)
 		
 		Text(LocalizationSupport.localized(message))
 		  .font(.system(size: 13))
-		  .foregroundStyle(.white.opacity(0.8))
+		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
 		
 		Button(action: onDismiss) {
 		  Text(LocalizationSupport.localized("OK"))
 			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.appPrimaryText)
+			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
 			.frame(height: 48)
-			.background(theme.appPink)
+			.background(theme.accent)
 			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 		}
 		.buttonStyle(.plain)
@@ -974,75 +979,67 @@ struct PricingCard: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	RoundedInfoCard {
-	  VStack(alignment: .leading, spacing: 0) {
-		SmallPill(
-		  title: option.name,
-		  foreground: option.isHighlighted ?theme.appCardBackground: theme.appPink,
-		  background: option.isHighlighted ? theme.appPurple : theme.appPinkSoft
-		)
-		
-		HStack(alignment: .firstTextBaseline, spacing: 4) {
-		  if let minutesText = option.minutesText {
-			HStack(spacing: 4) {
-			  PlatformIcon(systemName: "clock.fill", size: 28, color: theme.appGreen)
-			  Text(minutesText)
+    // Highlighted plans are marked with a heavier ink border rather than a
+    // second accent colour.
+    FlatCard(outlined: true) {
+      VStack(alignment: .leading, spacing: 0) {
+        if option.isHighlighted {
+          FlatBadge(title: option.name)
+        } else {
+          FlatChip(title: option.name, outlined: true)
+        }
+
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          if let minutesText = option.minutesText {
+            Text(minutesText)
 #if os(Android)
-				.font(.system(size: 22, weight: .bold))
+              .font(.system(size: 24, weight: .bold))
 #else
-				.font(.system(size: 28, weight: .bold))
+              .font(.system(size: 30, weight: .bold))
 #endif
-				.foregroundStyle(theme.appGreen)
-			}
-			.padding(.top, 4)
-			
-		  }
-		  
-		  Text(option.priceText)
-			.font(.system(size: 12, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  //                    Text(priceSuffix(for: option))
-		  //					.font(.system(size: 11, weight: .semibold))
-		  //                        .foregroundStyle(theme.appSecondaryText)
-		}
-		.padding(.top, 8)
-		.padding(.leading, 5)
-		
-		Text(LocalizationSupport.localized(option.description))
-		  .font(.system(size: 12))
-		  .foregroundStyle(theme.appSecondaryText)
-		  .lineSpacing(4)
-		  .padding(.top, 8)
-		  .frame(maxWidth: .infinity, alignment: .topLeading)
-		
-		Button(action: action) {
-		  HStack(spacing: 8) {
-			if isLoading {
-			  ProgressView()
-				.scaleEffect(0.8)
-				.tint(option.isHighlighted ? theme.appCardBackground : theme.appPrimaryText)
-			}
-			
-			Text(isLoading ? LocalizationSupport.localized("checkout_connecting") : LocalizationSupport.localized("Checkout"))
-			  .font(.system(size: 13, weight: .semibold))
-			  .foregroundStyle(option.isHighlighted ?theme.appCardBackground: theme.appPrimaryText)
-		  }
-		  .frame(maxWidth: .infinity)
-		  .frame(height: 38)
-		  .background(option.isHighlighted ? theme.appPurple : theme.appGrayBackground)
-		  .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-		}
-		.buttonStyle(.plain)
-		.disabled(isLoading)
-		.padding(.top, 14)
-	  }
-	  .frame(width: 172)
-	}
-	.overlay {
-	  RoundedRectangle(cornerRadius: 18, style: .continuous)
-		.stroke(option.isHighlighted ? theme.appPurple : Color.clear, lineWidth: 2)
-	}
+              .foregroundStyle(theme.primaryText)
+          }
+
+          Text(option.priceText)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.secondaryText)
+        }
+        .padding(.top, 12)
+
+        Text(LocalizationSupport.localized(option.description))
+          .font(.system(size: 13))
+          .foregroundStyle(theme.secondaryText)
+          .lineSpacing(4)
+          .padding(.top, 8)
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+
+        Button(action: action) {
+          HStack(spacing: 8) {
+            if isLoading {
+              ProgressView()
+                .scaleEffect(0.8)
+                .tint(theme.onAccentText)
+            }
+
+            Text(isLoading ? LocalizationSupport.localized("checkout_connecting") : LocalizationSupport.localized("Checkout"))
+              .font(.system(size: 15, weight: .bold))
+              .foregroundStyle(theme.onAccentText)
+          }
+          .frame(maxWidth: .infinity)
+          .frame(height: 44)
+          .background(theme.accent)
+          .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+        .padding(.top, 16)
+      }
+      .frame(width: 176)
+    }
+    .overlay {
+      RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+        .stroke(option.isHighlighted ? theme.accent : Color.clear, lineWidth: 2)
+    }
   }
   
   private func priceSuffix(for option: PricingOption) -> String {
@@ -1060,38 +1057,41 @@ struct RecentLessonRow: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	RoundedInfoCard {
-	  HStack(spacing: 12) {
-		ProfileAvatarView(
-		  imageURL: lesson.teacherImageURL,
-		  size: 50,
-		  fallbackSystemImage: "person.crop.circle.fill",
-		  background: theme.appPurpleSoft,
-		  tint: theme.appPurple
-		)
-		
-		VStack(alignment: .leading, spacing: 5) {
-		  Text(lesson.title)
-			.font(.system(size: 14, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  Text(String(format: LocalizationSupport.localized("%@ • %@"), lesson.teacher, lesson.time))
-			.font(.system(size: 11))
-			.foregroundStyle(theme.appSecondaryText)
-		}
-		
-		Spacer()
-		
-		VStack(spacing: 6) {
-		  SmallPill(title: LocalizationSupport.localized("Solved"), foreground: theme.appGreen, background: theme.appGreenSoft)
-		  
-		  Text(lesson.duration)
-			.font(.system(size: 11, weight: .semibold))
-			.foregroundStyle(theme.appPrimaryText)
-		}
-	  }
-	  .background(theme.appCardBackground)
-	}
+    // Borderless row; the screen supplies the list container and separators.
+    HStack(spacing: 14) {
+      ProfileAvatarView(
+        imageURL: lesson.teacherImageURL,
+        size: 44,
+        fallbackSystemImage: "person.crop.circle.fill",
+        background: theme.cardBackground,
+        tint: theme.primaryText
+      )
+
+      VStack(alignment: .leading, spacing: 3) {
+        Text(lesson.title)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(theme.primaryText)
+
+        Text(String(format: LocalizationSupport.localized("%@ • %@"), lesson.teacher, lesson.time))
+          .font(.system(size: 13))
+          .foregroundStyle(theme.secondaryText)
+      }
+
+      Spacer()
+
+      VStack(alignment: .trailing, spacing: 3) {
+        Text(LocalizationSupport.localized("Solved"))
+          .font(.system(size: 13, weight: .bold))
+          .foregroundStyle(theme.positive)
+
+        Text(lesson.duration)
+          .font(.system(size: 13))
+          .foregroundStyle(theme.secondaryText)
+      }
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 14)
+    .background(theme.screenBackground)
   }
 }
 
@@ -1206,7 +1206,7 @@ struct RedeemCouponSheet: View {
 		  if case .loading = state {
 			ProgressView()
 			  .progressViewStyle(.circular)
-			  .tint(theme.appPink)
+			  .tint(theme.accent)
 			  .frame(maxWidth: .infinity)
 		  } else {
 			Text(LocalizationSupport.localized("Redeem"))
@@ -1220,7 +1220,7 @@ struct RedeemCouponSheet: View {
 		switch state {
 		  case .error(let message):
 			Text(LocalizationSupport.localized(message))
-			  .foregroundColor(theme.appPink)
+			  .foregroundColor(theme.accent)
 			  .multilineTextAlignment(.center)
 			  .padding(.horizontal)
 		  default:
@@ -1244,13 +1244,12 @@ struct RedeemCouponSheet: View {
 		showSuccessAlert = true
 	  }
 	}
-	.alert(LocalizationSupport.localized("Success"), isPresented: $showSuccessAlert) {
-	  Button(LocalizationSupport.localized("OK")) {
-		onDismiss()
-	  }
-	} message: {
-	  Text(String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), successMinutes))
-	}
+	.appDialog(
+	  LocalizationSupport.localized("Success"),
+	  isPresented: $showSuccessAlert,
+	  message: String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), successMinutes),
+	  actions: [AppDialogAction(LocalizationSupport.localized("OK")) { onDismiss() }]
+	)
   }
 }
 

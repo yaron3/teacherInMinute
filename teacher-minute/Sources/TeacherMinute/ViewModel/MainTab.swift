@@ -26,11 +26,24 @@ enum MainTab: Hashable, CaseIterable {
   
   var systemImage: String {
 	switch self {
-	  case .home: "house.fill"
+	  case .home: "house"
 	  case .lessons: "teaching_tab_icon"
+	  case .profile: "person"
+	  case .settings: "gearshape"
+	}
+  }
+  
+  var selectedSystemImage: String {
+	switch self {
+	  case .home: "house.fill"
+	  case .lessons: "teaching_tab_icon.fill"
 	  case .profile: "person.fill"
 	  case .settings: "gearshape.fill"
 	}
+  }
+  
+  func systemImage(isSelected: Bool) -> String {
+	isSelected ? selectedSystemImage : systemImage
   }
 }
 

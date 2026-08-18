@@ -26,28 +26,27 @@ struct PermissionsSetupView: View {
                 .frame(height: 72)
 
             ZStack(alignment: .bottomTrailing) {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(theme.authPinkSoft)
+                RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+                    .fill(theme.accentBackground)
                     .frame(width: 78, height: 78)
                     .overlay {
                         PlatformIcon(
                             systemName: "mic.fill",
                             size: 34,
                             weight: .semibold,
-                            color: theme.authPink
+                            color: theme.accent
                         )
                     }
-                    .shadow(color: theme.authPink.opacity(0.1), radius: 24, x: 0, y: 12)
 
                 Circle()
-                    .fill(theme.authPurpleSoft)
+                    .fill(theme.accentBackground)
                     .frame(width: 34, height: 34)
                     .overlay {
                         PlatformIcon(
                             systemName: "bell.fill",
                             size: 14,
                             weight: .semibold,
-                            color: theme.authPurple
+                            color: theme.accent
                         )
                     }
                     .offset(x: 12, y: 8)
@@ -55,12 +54,12 @@ struct PermissionsSetupView: View {
 
             Text(LocalizationSupport.localized("Connect & Learn"))
                 .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(theme.authPrimaryText)
+                .foregroundStyle(theme.primaryText)
                 .padding(.top, 34)
 
             Text(LocalizationSupport.localized("To give you the best math tutoring\nexperience, we need a couple of\npermissions to connect you instantly."))
                 .font(.system(size: 14))
-                .foregroundStyle(theme.authSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .lineSpacing(6)
                 .multilineTextAlignment(.center)
                 .padding(.top, 12)
@@ -68,8 +67,8 @@ struct PermissionsSetupView: View {
             VStack(spacing: 16) {
                 PermissionCard(
                     icon: "mic.fill",
-                    iconColor: theme.authPink,
-                    iconBackground: theme.authPinkSoft,
+                    iconColor: theme.accent,
+                    iconBackground: theme.accentBackground,
                     title: "Microphone",
                     subtitle: LocalizationSupport.localized("Talk live with\nteachers to solve\nmath problems\ntogether in real-\ntime."),
                     isOn: $viewModel.microphoneEnabled
@@ -77,8 +76,8 @@ struct PermissionsSetupView: View {
 
                 PermissionCard(
                     icon: "camera.fill",
-                    iconColor: theme.authGreen,
-                    iconBackground: theme.authGreen.opacity(0.14),
+                    iconColor: theme.positive,
+                    iconBackground: theme.positive.opacity(0.14),
                     title: "Camera",
                     subtitle: LocalizationSupport.localized("Use video in live\\nlessons and update\\nyour profile photo\\nwhen needed."),
                     isOn: $viewModel.cameraEnabled
@@ -99,7 +98,7 @@ struct PermissionsSetupView: View {
             } label: {
                 Text(LocalizationSupport.localized("Not now, use limited mode"))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.authSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
@@ -107,7 +106,7 @@ struct PermissionsSetupView: View {
             .padding(.bottom, 24)
         }
         .padding(.horizontal, 18)
-        .background(Color(.systemBackground))
+        .background(theme.screenBackground)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .trackScreen(AnalyticsScreen.permissionsSetup)
@@ -145,11 +144,11 @@ struct PermissionCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(theme.authPrimaryText)
+                    .foregroundStyle(theme.primaryText)
 
                 Text(subtitle)
                     .font(.system(size: 12))
-                    .foregroundStyle(theme.authSecondaryText)
+                    .foregroundStyle(theme.secondaryText)
                     .lineSpacing(4)
             }
 
@@ -157,16 +156,15 @@ struct PermissionCard: View {
 
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(theme.authGreen)
+                .tint(theme.positive)
         }
         .padding(18)
         .frame(maxWidth: .infinity)
-        .background(theme.appCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(theme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(theme.authPink.opacity(0.10), lineWidth: 1)
+            RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+                .stroke(theme.accent.opacity(0.10), lineWidth: 1)
         }
-		.shadow(color: theme.appPrimaryText.opacity(0.03), radius: 18, x: 0, y: 10)
     }
 }

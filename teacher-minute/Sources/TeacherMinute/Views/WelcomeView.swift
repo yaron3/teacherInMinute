@@ -17,7 +17,7 @@ struct WelcomeView: View {
 
   var body: some View {
 	ZStack {
-	  Color(.systemBackground)
+	  theme.screenBackground
 		.ignoresSafeArea()
 
 	  welcomeContent
@@ -30,7 +30,7 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 0) {
           header
           
-          Text(LocalizationSupport.localized("Help you any where"))
+          Text(LocalizationSupport.localized("Help you anywhere"))
             .font(.system(size: 35, weight: .bold, design: .default))
             .foregroundStyle(theme.primaryText)
             .lineSpacing(-4)
@@ -56,12 +56,12 @@ struct WelcomeView: View {
             router.push(.createAccount)
           } label: {
             Text(LocalizationSupport.localized("Sign Up"))
-              .font(.system(size: 16, weight: .semibold))
-              .foregroundStyle(theme.primaryBackground)
+              .font(.system(size: 17, weight: .bold))
+              .foregroundStyle(theme.onAccentText)
               .frame(maxWidth: .infinity)
-              .frame(height: 62)
-              .background(theme.primaryText)
-              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+              .frame(height: 56)
+              .background(theme.accent)
+              .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
           }
           
         Button {
@@ -87,8 +87,8 @@ struct WelcomeView: View {
   
   private var header: some View {
 	HStack(spacing: 12) {
-	  RoundedRectangle(cornerRadius: 9, style: .continuous)
-		.fill(theme.primaryBackground)
+	  RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
+		.fill(theme.screenBackground)
 		.frame(width: 34, height: 34)
 		.overlay {
 		  PlatformIcon(
@@ -109,13 +109,12 @@ struct WelcomeView: View {
   
   private var previewCard: some View {
 	ZStack(alignment: .topLeading) {
-	  RoundedRectangle(cornerRadius: 16, style: .continuous)
-		.fill(theme.previewBackground)
+	  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+		.fill(theme.cardBackground)
 		.overlay {
-		  RoundedRectangle(cornerRadius: 16, style: .continuous)
-			.stroke(theme.appPrimaryText.opacity(0.04), lineWidth: 1)
+		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+			.stroke(theme.separator, lineWidth: 1)
 		}
-		.shadow(color: theme.appPrimaryText.opacity(0.035), radius: 18, x: 0, y: 12)
 	  
 	  HStack(spacing: 0) {
 		PlatformIcon(
@@ -139,17 +138,17 @@ struct WelcomeView: View {
 	  BadgeView(
 		title: LocalizationSupport.localized("Verified Tutors"),
 		systemImage: "checkmark.seal",
-		foreground: theme.greenText,
-		background: theme.greenBackground,
-		border: theme.greenBorder
+		foreground: theme.positive,
+		background: theme.positiveBackground,
+		border: theme.positiveBorder
 	  )
 	  Spacer()
 	  BadgeView(
 		title: LocalizationSupport.localized("Privacy Protected"),
 		systemImage: "lock.fill",
-		foreground: theme.badgeGrayText,
-		background: theme.grayBadgeBackground,
-		border: theme.grayBadgeBorder
+		foreground: theme.badgeText,
+		background: theme.badgeBackground,
+		border: theme.badgeBorder
 	  )
 	}
   }

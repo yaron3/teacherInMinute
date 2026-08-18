@@ -37,12 +37,15 @@ struct SettingsView: View {
 
                     Section {
                         Text(viewModel.appVersion)
-                            .font(.system(size: 11))
-                            .foregroundStyle(theme.appSecondaryText)
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.secondaryText)
                             .frame(maxWidth: .infinity)
                             .listRowBackground(Color.clear)
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(theme.screenBackground)
 
                 loadingOverlay
             }
@@ -53,23 +56,18 @@ struct SettingsView: View {
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
-        .alert(viewModel.activeConfirmation?.title ?? "Settings", isPresented: isShowingConfirmation) {
-            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
-                viewModel.activeConfirmation = nil
-            }
-            if let confirmation = viewModel.activeConfirmation {
-                Button(confirmation.confirmTitle, role: confirmation.isDestructive ? .destructive : nil) {
-                    confirm(confirmation)
-                }
-            }
-        } message: {
-            Text(viewModel.activeConfirmation?.message ?? "")
-        }
-        .alert(viewModel.alertTitle, isPresented: $viewModel.showAlert) {
-            Button(LocalizationSupport.localized("OK"), role: .cancel) {}
-        } message: {
-            Text(viewModel.alertMessage ?? "")
-        }
+        .appDialog(
+            viewModel.activeConfirmation?.title ?? LocalizationSupport.localized("Settings"),
+            isPresented: isShowingConfirmation,
+            message: viewModel.activeConfirmation?.message ?? "",
+            actions: confirmationDialogActions
+        )
+        .appDialog(
+            viewModel.alertTitle,
+            isPresented: $viewModel.showAlert,
+            message: viewModel.alertMessage ?? "",
+            actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+        )
         .alert(LocalizationSupport.localized("Delete Account"), isPresented: $viewModel.showReauthPasswordPrompt) {
             SecureField(LocalizationSupport.localized("Password"), text: $viewModel.reauthPassword)
             Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
@@ -133,12 +131,33 @@ struct SettingsView: View {
     @ViewBuilder
     var loadingOverlay: some View {
         if viewModel.isLoading {
-            theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+            theme.scrim.opacity(0.18).ignoresSafeArea()
             ProgressView()
                 .progressViewStyle(.circular)
                 .scaleEffect(1.4)
-                .tint(theme.appPrimaryText)
+                .tint(theme.primaryText)
         }
+    }
+
+    /// Cancel first so it reads as the safe default, then the confirm action —
+    /// destructive confirmations get the danger styling.
+    var confirmationDialogActions: [AppDialogAction] {
+        var actions = [
+            AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel) {
+                viewModel.activeConfirmation = nil
+            }
+        ]
+        if let confirmation = viewModel.activeConfirmation {
+            actions.append(
+                AppDialogAction(
+                    confirmation.confirmTitle,
+                    kind: confirmation.isDestructive ? .destructive : .primary
+                ) {
+                    confirm(confirmation)
+                }
+            )
+        }
+        return actions
     }
 
     var isShowingConfirmation: Binding<Bool> {
@@ -177,11 +196,11 @@ struct AccountSecuritySettingsView: View {
             }
 
             if viewModel.isLoading {
-                theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+                theme.scrim.opacity(0.18).ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.appPrimaryText)
+                    .tint(theme.primaryText)
             }
         }
     }
@@ -235,11 +254,11 @@ struct LanguageSettingsView: View {
             .disabled(localizationManager.isLoading)
 
             if localizationManager.isLoading {
-                theme.appPrimaryText.opacity(0.18).ignoresSafeArea()
+                theme.scrim.opacity(0.18).ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.appPrimaryText)
+                    .tint(theme.primaryText)
             }
         }
     }
@@ -406,24 +425,24 @@ struct SettingsPlaceholderView: View {
     var body: some View {
         VStack(spacing: 14) {
             Circle()
-                .fill(theme.appGrayBackground)
+                .fill(theme.cardBackground)
                 .frame(width: 58, height: 58)
                 .overlay {
                     PlatformIcon(
                         systemName: "gearshape.fill",
                         size: 22,
                         weight: .semibold,
-                        color: theme.appSecondaryText
+                        color: theme.secondaryText
                     )
                 }
 
             Text(destination.title)
                 .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(theme.appPrimaryText)
+                .foregroundStyle(theme.primaryText)
 
             Text(destination.placeholderMessage)
                 .font(.system(size: 13))
-                .foregroundStyle(theme.appSecondaryText)
+                .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 .padding(.horizontal, 32)
@@ -776,6 +795,10 @@ struct PrivacyControlsSettingsView: View {
 struct SettingsSectionView: View {
     let section: SettingsSection
     let onSelect: (SettingsRow) -> Void
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
 
     var body: some View {
         Section {
@@ -794,6 +817,8 @@ struct SettingsSectionView: View {
             }
         } header: {
             Text(section.title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(theme.primaryText)
         }
     }
 }
@@ -806,30 +831,25 @@ struct SettingsRowView: View {
     }
     var body: some View {
         HStack(spacing: 14) {
-            Circle()
-                .fill(theme.primaryBackground)
-                .frame(width: 34, height: 34)
-                .overlay {
-                    PlatformIcon(
-                        systemName: row.systemImage,
-                        size: 13,
-                        weight: .semibold,
-                        color: theme.primaryText
-                    )
-                }
+            FlatIconTile(
+                systemName: row.systemImage,
+                size: 40,
+                tint: row.isDestructive ? theme.danger : theme.primaryText
+            )
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(row.isDestructive ? .red : theme.appPrimaryText)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(row.isDestructive ? theme.danger : theme.primaryText)
 
                 if let subtitle = row.subtitle {
                     Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(theme.appSecondaryText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
         }
+        .padding(.vertical, 6)
     }
 }
 

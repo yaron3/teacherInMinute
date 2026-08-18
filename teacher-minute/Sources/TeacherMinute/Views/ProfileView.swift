@@ -33,112 +33,95 @@ struct ProfileView: View {
   var body: some View {
 	ScrollView(.vertical, showsIndicators: false) {
       if hasProfileDataForDisplay {
-	  VStack(alignment: .leading, spacing: 0) {
-		HStack {
-		  Text(LocalizationSupport.localized("Profile"))
-			.font(.system(size: 24, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  Spacer()
-		  
-		  Button {
-		    showProfileEditor()
-		  } label: {
-			Circle()
-			  .fill(theme.appPrimaryText)
-			  .frame(width: 42, height: 42)
-			  .shadow(color: theme.appPrimaryText.opacity(0.05), radius: 12, x: 0, y: 6)
-		      .overlay {
-					PlatformIcon(systemName: "pencil", color: theme.appGreen)
-					  .font(.system(size: 15, weight: .bold))
-		      }
-		  }
-		  .buttonStyle(.plain)
-		}
-		.padding(.top, 24)
-		
-		profileHeader
-		  .padding(.top, 26)
-		
-		Text(LocalizationSupport.localized("Account Info"))
-		  .font(.system(size: 16, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
-		  .padding(.top, 30)
-		
-		VStack(spacing: 14) {
-		  ForEach($viewModel.contactRows, id: \.description) { $row in
-			ProfileInfoRow(parameter: $row,
-						   isEditing: viewModel.isEditing)
-		  }
-		}
-		.padding(.top, 14)
-		
-		if viewModel.shouldShowTeachingDetails {
-		  Text(LocalizationSupport.localized("Teaching Details"))
-			.font(.system(size: 16, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-			.padding(.top, 30)
-		  
-		  teachingCard(
-			title: LocalizationSupport.localized("Grade Levels Taught"),
-			chips: viewModel.gradeLevels,
-			includeAdd: viewModel.gradeLevels.isEmpty,
-			editAction: showProfileEditor,
-			addAction: showProfileEditor
-		  )
-		  .padding(.top, 14)
-		  
-			  teachingCard(
-				title: LocalizationSupport.localized("Subjects"),
-				chips: viewModel.subjectsOrPlaceholder,
-				includeAdd: viewModel.subjects.isEmpty,
-				editAction: { isShowingSubjectEditor = true },
-				addAction: { isShowingSubjectEditor = true }
-			  )
-			  .padding(.top, 18)
+    VStack(alignment: .leading, spacing: 0) {
+      profileHeader
+        .padding(.top, 20)
 
-			  documentsButton
-				.padding(.top, 14)
-			}
-		
-		Text(LocalizationSupport.localized("Device Permissions"))
-		  .font(.system(size: 16, weight: .bold))
-		  .foregroundStyle(theme.appPrimaryText)
-		  .padding(.top, 30)
-		
-			VStack(spacing: 14) {
-			  ProfilePermissionRow(
-				icon: "mic.fill",
-				title: LocalizationSupport.localized("Microphone"),
-				state: viewModel.microphoneState,
-				iconColor: permissionColor(viewModel.microphoneState),
-                action: viewModel.requestMicrophonePermission
-              )
+      FlatSectionHeader(LocalizationSupport.localized("Account Info"))
+        .padding(.top, 32)
 
-			  ProfilePermissionRow(
-				icon: "camera.fill",
-				title: LocalizationSupport.localized("Camera"),
-				state: viewModel.cameraState,
-				iconColor: permissionColor(viewModel.cameraState),
-                action: viewModel.requestCameraPermission
-              )
+      FlatCard(padding: 0, outlined: true) {
+        VStack(spacing: 0) {
+          ForEach($viewModel.contactRows, id: \.description) { $row in
+            ProfileInfoRow(parameter: $row, isEditing: viewModel.isEditing)
 
-			  ProfilePermissionRow(
-				icon: "bell.fill",
-				title: LocalizationSupport.localized("Notifications"),
-				state: viewModel.notificationsState,
-				iconColor: permissionColor(viewModel.notificationsState),
-                action: viewModel.manageNotifications
-              )
-			}
-	  }
-	  .padding(.horizontal, 18)
-	  .padding(.bottom, 24)
+            if row.description != viewModel.contactRows.last?.description {
+              FlatRule()
+            }
+          }
+        }
+      }
+      .padding(.top, 14)
+
+      if viewModel.shouldShowTeachingDetails {
+        FlatSectionHeader(LocalizationSupport.localized("Teaching Details"))
+          .padding(.top, 32)
+
+        teachingCard(
+          title: LocalizationSupport.localized("Grade Levels Taught"),
+          chips: viewModel.gradeLevelLabels,
+          includeAdd: viewModel.gradeLevels.isEmpty,
+          editAction: showProfileEditor,
+          addAction: showProfileEditor
+        )
+        .padding(.top, 14)
+
+        teachingCard(
+          title: LocalizationSupport.localized("Subjects"),
+          chips: viewModel.subjectsOrPlaceholder,
+          includeAdd: viewModel.subjects.isEmpty,
+          editAction: { isShowingSubjectEditor = true },
+          addAction: { isShowingSubjectEditor = true }
+        )
+        .padding(.top, 12)
+
+        documentsButton
+          .padding(.top, 12)
+      }
+
+      FlatSectionHeader(LocalizationSupport.localized("Device Permissions"))
+        .padding(.top, 32)
+
+      FlatCard(padding: 0, outlined: true) {
+        VStack(spacing: 0) {
+          ProfilePermissionRow(
+            icon: "mic.fill",
+            title: LocalizationSupport.localized("Microphone"),
+            state: viewModel.microphoneState,
+            iconColor: permissionColor(viewModel.microphoneState),
+            action: viewModel.requestMicrophonePermission
+          )
+
+          FlatRule()
+
+          ProfilePermissionRow(
+            icon: "camera.fill",
+            title: LocalizationSupport.localized("Camera"),
+            state: viewModel.cameraState,
+            iconColor: permissionColor(viewModel.cameraState),
+            action: viewModel.requestCameraPermission
+          )
+
+          FlatRule()
+
+          ProfilePermissionRow(
+            icon: "bell.fill",
+            title: LocalizationSupport.localized("Notifications"),
+            state: viewModel.notificationsState,
+            iconColor: permissionColor(viewModel.notificationsState),
+            action: viewModel.manageNotifications
+          )
+        }
+      }
+      .padding(.top, 14)
+    }
+    .padding(.horizontal, 20)
+    .padding(.bottom, 40)
       } else {
         profileLoadingView
       }
 	}
-		.background(Color(.systemBackground))
+    .background(theme.screenBackground)
 			.task {
               await loadProfileForDisplay()
 			}
@@ -180,54 +163,68 @@ struct ProfileView: View {
     VStack(spacing: 12) {
       if let error = viewModel.errorMessage {
         Text(error)
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(theme.red)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(theme.danger)
 
         Button {
           Task { await loadProfileForDisplay() }
         } label: {
           Text(LocalizationSupport.localized("Retry"))
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(theme.appPink)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.primaryText)
         }
         .buttonStyle(.plain)
       } else {
         ProgressView()
-          .tint(theme.appPink)
+          .tint(theme.primaryText)
 
         Text(LocalizationSupport.localized("Loading profile..."))
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(theme.appSecondaryText)
+          .font(.system(size: 14))
+          .foregroundStyle(theme.secondaryText)
       }
     }
     .frame(maxWidth: .infinity, minHeight: 420)
-    .padding(.horizontal, 18)
+    .padding(.horizontal, 20)
   }
 
+	  // Name leads at page-title scale with the photo trailing it, matching the
+	  // account screen in the reference.
 	  var profileHeader: some View {
-	VStack(spacing: 0) {
-		  ZStack(alignment: .bottomTrailing) {
-            profilePhotoButton
-		  }
-	  
-	  Text(viewModel.name)
-		.font(.system(size: 22, weight: .bold))
-		.foregroundStyle(theme.appPrimaryText)
-		.padding(.top, 14)
-	  
-	  HStack(spacing: 8) {
-		SmallPill(title: viewModel.role, foreground: theme.appPurple, background: theme.appPurpleSoft)
-		
-		// Teacher verification badge is intentionally hidden for now.
+	VStack(alignment: .leading, spacing: 0) {
+	  HStack(alignment: .top, spacing: 16) {
+		VStack(alignment: .leading, spacing: 8) {
+		  Text(viewModel.name)
+			.font(.system(size: 34, weight: .bold))
+			.foregroundStyle(theme.primaryText)
+			.lineLimit(2)
+			.minimumScaleFactor(0.7)
+
+		  FlatChip(title: viewModel.role)
+
+		  // Teacher verification badge is intentionally hidden for now.
+		}
+
+		Spacer()
+
+		ZStack(alignment: .bottomTrailing) {
+		  profilePhotoButton
+		}
 	  }
-	  .padding(.top, 8)
-	  
+
 	  Text(viewModel.memberSince)
-		.font(.system(size: 13))
-		.foregroundStyle(theme.appSecondaryText)
+		.font(.system(size: 14))
+		.foregroundStyle(theme.secondaryText)
 		.padding(.top, 12)
+
+	  Button {
+		showProfileEditor()
+	  } label: {
+		FlatChip(title: LocalizationSupport.localized("Edit Profile"), systemImage: "pencil")
+	  }
+	  .buttonStyle(.plain)
+	  .padding(.top, 14)
 	}
-	.frame(maxWidth: .infinity)
+	.frame(maxWidth: .infinity, alignment: .leading)
   }
 
   @ViewBuilder
@@ -266,29 +263,29 @@ struct ProfileView: View {
       Group {
         ProfileAvatarView(
           imageURL: viewModel.profileImageURL,
-          size: 96,
+          size: 88,
           fallbackSystemImage: "person.crop.circle.fill",
-          background: theme.appPurpleSoft,
-          tint: theme.appPurple
+          background: theme.cardBackground,
+          tint: theme.primaryText
         )
       }
-      .frame(width: 96, height: 96)
+      .frame(width: 88, height: 88)
       .clipShape(Circle())
 
       Circle()
-        .fill(theme.appPink)
+        .fill(theme.accent)
         .frame(width: 30, height: 30)
         .overlay {
           if viewModel.isUploadingPhoto {
             ProgressView()
               .scaleEffect(0.7)
-              .tint(theme.appPrimaryText)
+              .tint(theme.onAccentText)
           } else {
             PlatformIcon(
               systemName: "camera.fill",
               size: 12,
               weight: .bold,
-              color: theme.appPrimaryText
+              color: theme.onAccentText
             )
           }
         }
@@ -297,21 +294,21 @@ struct ProfileView: View {
 
   var defaultProfileIcon: some View {
     Circle()
-      .fill(theme.appPurpleSoft)
+      .fill(theme.accentBackground)
       .overlay {
         PlatformIcon(
           systemName: "person.crop.circle.fill",
           size: 72,
-          color: theme.appPurple
+          color: theme.accentStrong
         )
       }
   }
   
   func permissionColor(_ state: PermissionState) -> Color {
 	switch state {
-	case .granted: return theme.appGreen
-	case .denied: return theme.red
-	case .notDetermined: return theme.appSecondaryText
+	case .granted: return theme.positive
+	case .denied: return theme.danger
+	case .notDetermined: return theme.secondaryText
 	}
   }
 
@@ -347,36 +344,27 @@ struct ProfileView: View {
 	Button {
 	  isShowingDocuments = true
 	} label: {
-	  RoundedInfoCard {
+	  FlatCard {
 		HStack(spacing: 14) {
-		  Circle()
-			.fill(viewModel.hasMissingDocuments ? theme.appPinkSoft : theme.appPurpleSoft)
-			.frame(width: 42, height: 42)
-			.overlay {
-			  PlatformIcon(systemName: viewModel.hasMissingDocuments ? "doc.badge.plus" : "doc.text.fill")
-				.font(.system(size: 16, weight: .semibold))
-				.foregroundStyle(viewModel.hasMissingDocuments ? theme.appPink : theme.appPurple)
-			}
+		  FlatIconTile(systemName: viewModel.hasMissingDocuments ? "doc.badge.plus" : "doc.text.fill", size: 44, background: theme.screenBackground)
 
-		  VStack(alignment: .leading, spacing: 4) {
+		  VStack(alignment: .leading, spacing: 3) {
 			Text(viewModel.hasMissingDocuments
 				 ? LocalizationSupport.localized("Complete Your Documents")
 				 : LocalizationSupport.localized("Documents Uploaded"))
-			  .font(.system(size: 14, weight: .bold))
-			  .foregroundStyle(theme.appPrimaryText)
+			  .font(.system(size: 15, weight: .bold))
+			  .foregroundStyle(theme.primaryText)
 
 			Text(viewModel.hasMissingDocuments
 				 ? LocalizationSupport.localized("Upload your remaining verification documents")
 				 : LocalizationSupport.localized("View the verification documents you uploaded"))
-			  .font(.system(size: 12))
-			  .foregroundStyle(theme.appSecondaryText)
+			  .font(.system(size: 13))
+			  .foregroundStyle(theme.secondaryText)
 		  }
 
 		  Spacer()
 
-		  PlatformIcon(systemName: "chevron.right")
-			.font(.system(size: 13, weight: .semibold))
-			.foregroundStyle(theme.appSecondaryText)
+		  PlatformIcon(systemName: "chevron.right", size: 13, weight: .medium, color: theme.secondaryText)
 		}
 	  }
 	}
@@ -390,37 +378,31 @@ struct ProfileView: View {
 	editAction: @escaping () -> Void,
 	addAction: @escaping () -> Void
   ) -> some View {
-	RoundedInfoCard {
-	  VStack(alignment: .leading, spacing: 16) {
+	FlatCard {
+	  VStack(alignment: .leading, spacing: 14) {
 		HStack {
 		  Text(title)
-			.font(.system(size: 12))
-			.foregroundStyle(theme.appSecondaryText)
-		  
+			.font(.system(size: 13))
+			.foregroundStyle(theme.secondaryText)
+
 		  Spacer()
-		  
+
 		  Button(action: editAction) {
 			Text(LocalizationSupport.localized("Edit"))
-			  .font(.system(size: 12, weight: .medium))
-			  .foregroundStyle(theme.appPink)
+			  .font(.system(size: 14, weight: .bold))
+			  .foregroundStyle(theme.primaryText)
 		  }
 		  .buttonStyle(.plain)
 		}
-		
+
 		ChipGrid(minimumItemWidth: 96, spacing: 8) {
 		  ForEach(chips, id: \.self) { chip in
-			SmallPill(title: chip, foreground: theme.appPink, background: theme.appPinkSoft)
+			FlatChip(title: chip, outlined: true)
 		  }
-		  
+
 		  if includeAdd {
 			Button(action: addAction) {
-			  Text(LocalizationSupport.localized("+ Add"))
-				.font(.system(size: 12, weight: .medium))
-				.foregroundStyle(theme.appSecondaryText)
-				.padding(.horizontal, 12)
-				.frame(height: 28)
-				.background(theme.appGrayBackground)
-				.clipShape(Capsule())
+			  FlatChip(title: LocalizationSupport.localized("+ Add"), outlined: true)
 			}
 			.buttonStyle(.plain)
 		  }
@@ -478,12 +460,12 @@ struct ProfileEditView: View {
 	  VStack(alignment: .leading, spacing: 0) {
         Text(LocalizationSupport.localized("Edit Profile"))
           .font(.system(size: 26, weight: .bold))
-          .foregroundStyle(theme.authPrimaryText)
+          .foregroundStyle(theme.primaryText)
           .padding(.top, 24)
 
         Text(LocalizationSupport.localized("Update the details students and teachers use to recognize and contact you."))
           .font(.system(size: 13))
-          .foregroundStyle(theme.authSecondaryText)
+          .foregroundStyle(theme.secondaryText)
           .lineSpacing(5)
           .multilineTextAlignment(.leading)
           .padding(.top, 8)
@@ -573,16 +555,16 @@ struct ProfileTeachingGradePicker: View {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(theme.authPrimaryText)
+          .foregroundStyle(theme.primaryText)
 
         Spacer()
 
         Text(selectedGrades.isEmpty ? LocalizationSupport.localized("Choose grades") : String(format: LocalizationSupport.localized("%d selected"), selectedGrades.count))
           .font(.system(size: 11, weight: .semibold))
-          .foregroundStyle(theme.authSecondaryText)
+          .foregroundStyle(theme.secondaryText)
           .padding(.horizontal, 10)
           .frame(height: 24)
-          .background(theme.authFieldBorder.opacity(0.7))
+          .background(theme.controlBorder.opacity(0.7))
           .clipShape(Capsule())
       }
 	  HStack {
@@ -590,7 +572,7 @@ struct ProfileTeachingGradePicker: View {
 		FlowLayout(spacing: 10) {
 		  ForEach(grades, id: \.self) { grade in
 			ProfileTeachingGradeChip(
-			  title: grade,
+			  title: LocalizationSupport.localizedGradeLabel(grade),
 			  isSelected: selectedGrades.contains(grade)
 			) {
 			  toggleGrade(grade)
@@ -628,7 +610,7 @@ struct ProfileDateOfBirthPicker: View {
     VStack(alignment: .leading, spacing: 10) {
       Text(title)
         .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(theme.authPrimaryText)
+        .foregroundStyle(theme.primaryText)
 
       if let currentDate = date {
         HStack {
@@ -650,17 +632,17 @@ struct ProfileDateOfBirthPicker: View {
           } label: {
             Text(LocalizationSupport.localized("Clear"))
               .font(.system(size: 13, weight: .semibold))
-              .foregroundStyle(theme.appPink)
+              .foregroundStyle(theme.accent)
           }
           .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
-        .background(theme.authFieldBackground)
+        .background(theme.fieldBackground)
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         .overlay {
           RoundedRectangle(cornerRadius: 15, style: .continuous)
-            .stroke(theme.authFieldBorder, lineWidth: 1)
+            .stroke(theme.controlBorder, lineWidth: 1)
         }
       } else {
         Button {
@@ -669,7 +651,7 @@ struct ProfileDateOfBirthPicker: View {
           HStack {
             Text(LocalizationSupport.localized("Set date of birth"))
               .font(.system(size: 17))
-              .foregroundStyle(theme.authSecondaryText)
+              .foregroundStyle(theme.secondaryText)
 
             Spacer()
 
@@ -677,16 +659,16 @@ struct ProfileDateOfBirthPicker: View {
               systemName: "calendar",
               size: 14,
               weight: .semibold,
-              color: theme.authIcon
+              color: theme.secondaryText
             )
           }
           .padding(.horizontal, 16)
           .frame(height: 56)
-          .background(theme.authFieldBackground)
+          .background(theme.fieldBackground)
           .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
           .overlay {
             RoundedRectangle(cornerRadius: 15, style: .continuous)
-              .stroke(theme.authFieldBorder, lineWidth: 1)
+              .stroke(theme.controlBorder, lineWidth: 1)
           }
         }
         .buttonStyle(.plain)
@@ -708,7 +690,7 @@ struct ProfileGradePicker: View {
     VStack(alignment: .leading, spacing: 10) {
       Text(title)
         .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(theme.authPrimaryText)
+        .foregroundStyle(theme.primaryText)
 
       Menu {
         ForEach(grades, id: \.self) { grade in
@@ -720,7 +702,7 @@ struct ProfileGradePicker: View {
         HStack {
           Text(selectedGrade.isEmpty ? LocalizationSupport.localized("Select") : selectedGrade)
             .font(.system(size: 17))
-            .foregroundStyle(selectedGrade.isEmpty ? theme.authSecondaryText : theme.authPrimaryText)
+            .foregroundStyle(selectedGrade.isEmpty ? theme.secondaryText : theme.primaryText)
 
           Spacer()
 
@@ -728,16 +710,16 @@ struct ProfileGradePicker: View {
             systemName: "chevron.down",
             size: 12,
             weight: .semibold,
-            color: theme.authIcon
+            color: theme.secondaryText
           )
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
-        .background(theme.authFieldBackground)
+        .background(theme.fieldBackground)
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         .overlay {
           RoundedRectangle(cornerRadius: 15, style: .continuous)
-            .stroke(theme.authFieldBorder, lineWidth: 1)
+            .stroke(theme.controlBorder, lineWidth: 1)
         }
       }
     }
@@ -763,16 +745,16 @@ struct ProfileCurrencyPicker: View {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(theme.authPrimaryText)
+          .foregroundStyle(theme.primaryText)
 
         Spacer()
 
         Text(selectedCurrency)
           .font(.system(size: 11, weight: .semibold))
-          .foregroundStyle(theme.authSecondaryText)
+          .foregroundStyle(theme.secondaryText)
           .padding(.horizontal, 10)
           .frame(height: 24)
-          .background(theme.authFieldBorder.opacity(0.7))
+          .background(theme.controlBorder.opacity(0.7))
           .clipShape(Capsule())
       }
       HStack {
@@ -806,14 +788,14 @@ struct ProfileCurrencyChip: View {
     Button(action: action) {
       Text(title)
         .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(theme.authPrimaryText)
+        .foregroundStyle(theme.primaryText)
         .padding(.horizontal, 18)
         .frame(height: 34)
-        .background(isSelected ? theme.authPink : theme.authPinkSoft)
+        .background(isSelected ? theme.accent : theme.accentBackground)
         .clipShape(Capsule())
         .overlay {
           Capsule()
-            .stroke(isSelected ? theme.authPink : theme.authFieldBorder, lineWidth: 1)
+            .stroke(isSelected ? theme.accent : theme.controlBorder, lineWidth: 1)
         }
     }
     .buttonStyle(.plain)
@@ -838,14 +820,14 @@ struct ProfileTeachingGradeChip: View {
         Text(LocalizationSupport.localized(title))
           .font(.system(size: 13, weight: .medium))
       }
-      .foregroundStyle(theme.authPrimaryText)
+      .foregroundStyle(theme.primaryText)
       .padding(.horizontal, 14)
       .frame(height: 34)
-      .background(isSelected ? theme.authPink : theme.authPinkSoft)
+      .background(isSelected ? theme.accent : theme.accentBackground)
       .clipShape(Capsule())
       .overlay {
         Capsule()
-          .stroke(isSelected ? theme.authPink : theme.authFieldBorder, lineWidth: 1)
+          .stroke(isSelected ? theme.accent : theme.controlBorder, lineWidth: 1)
       }
     }
     .buttonStyle(.plain)
@@ -936,37 +918,30 @@ struct ProfilePermissionRow: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	RoundedInfoCard {
-	  HStack(spacing: 14) {
-		Circle()
-		  .fill(iconColor.opacity(0.12))
-		  .frame(width: 42, height: 42)
-		  .overlay {
-			PlatformIcon(systemName: icon)
-			  .font(.system(size: 16, weight: .semibold))
-			  .foregroundStyle(iconColor)
-		  }
-		
-		VStack(alignment: .leading, spacing: 4) {
-		  Text(title)
-			.font(.system(size: 14, weight: .bold))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  Text(state.subtitle)
-			.font(.system(size: 12, weight: .semibold))
-			.foregroundStyle(iconColor)
-		}
-		
-		Spacer()
-		
-        Button(action: action) {
-          Text(state.actionTitle)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(theme.appPink)
-        }
-        .buttonStyle(.plain)
+	HStack(spacing: 14) {
+	  FlatIconTile(systemName: icon, size: 44, tint: iconColor)
+
+	  VStack(alignment: .leading, spacing: 3) {
+		Text(title)
+		  .font(.system(size: 15, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+
+		Text(state.subtitle)
+		  .font(.system(size: 13))
+		  .foregroundStyle(iconColor)
 	  }
+
+	  Spacer()
+
+	  Button(action: action) {
+		Text(state.actionTitle)
+		  .font(.system(size: 14, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+	  }
+	  .buttonStyle(.plain)
 	}
+	.padding(.horizontal, 16)
+	.padding(.vertical, 14)
   }
 }
 
@@ -978,43 +953,36 @@ struct ProfileInfoRow: View {
   }
   let isEditing: Bool
   var body: some View {
-	RoundedInfoCard {
-	  HStack(spacing: 14) {
-		Circle()
-		  .fill(theme.appPurpleSoft)
-		  .frame(width: 42, height: 42)
-		  .overlay {
-			PlatformIcon(systemName: parameter.image)
-			  .font(.system(size: 17, weight: .semibold))
-			  .foregroundStyle(theme.appPurple)
-		  }
-		
-		VStack(alignment: .leading, spacing: 4) {
-		  Text(parameter.description)
-			.font(.system(size: 14))
-			.foregroundStyle(theme.appPrimaryText)
-		  
-		  if isEditing {
-		    TextField(parameter.description, text: $parameter.value)
-		      .font(.system(size: 16, weight: .bold))
-		      .foregroundStyle(theme.appPrimaryText)
-		      .lineLimit(1)
-		      .minimumScaleFactor(0.75)
-		      .multilineTextAlignment(.leading)
-		      .environment(\.layoutDirection, .leftToRight)
-		  } else {
-		    Text(parameter.value.isEmpty ? "-" : parameter.value)
-		      .font(.system(size: 16, weight: .bold))
-		      .foregroundStyle(theme.appPrimaryText)
-		      .lineLimit(1)
-		      .minimumScaleFactor(0.75)
-		      .frame(maxWidth: .infinity, alignment: .trailing)
-		      .multilineTextAlignment(.trailing)
-		  }
+	HStack(spacing: 14) {
+	  FlatIconTile(systemName: parameter.image, size: 44)
+
+	  VStack(alignment: .leading, spacing: 3) {
+		Text(parameter.description)
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.secondaryText)
+
+		if isEditing {
+		  TextField(parameter.description, text: $parameter.value)
+			.font(.system(size: 16, weight: .bold))
+			.foregroundStyle(theme.primaryText)
+			.lineLimit(1)
+			.minimumScaleFactor(0.75)
+			.multilineTextAlignment(.leading)
+			.environment(\.layoutDirection, .leftToRight)
+		} else {
+		  Text(parameter.value.isEmpty ? "-" : parameter.value)
+			.font(.system(size: 16, weight: .bold))
+			.foregroundStyle(theme.primaryText)
+			.lineLimit(1)
+			.minimumScaleFactor(0.75)
+			.frame(maxWidth: .infinity, alignment: .leading)
+			.multilineTextAlignment(.leading)
 		}
-		
-		Spacer()
 	  }
+
+	  Spacer()
 	}
+	.padding(.horizontal, 16)
+	.padding(.vertical, 14)
   }
 }
