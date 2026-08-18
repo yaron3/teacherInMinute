@@ -6278,6 +6278,282 @@
       },
       "description": "Hebrew variant of demo_student_offline_message.",
       "valueType": "STRING"
+    },
+    "demo_mode": {
+      "defaultValue": {
+        "value": "Demo Mode"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מצב הדגמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "send_yourself_question": {
+      "defaultValue": {
+        "value": "Send yourself a question from a simulated student."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שלחו לעצמכם שאלה מתלמיד מדומה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "simulate_student_question": {
+      "defaultValue": {
+        "value": "Simulate a Student Question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הדמיית שאלת תלמיד"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "demo_student_writes": {
+      "defaultValue": {
+        "value": "A demo student writes the question with a local AI model and sends it to you, so you can practise the whole flow without a real student."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תלמיד הדגמה מנסח את השאלה בעזרת מודל AI מקומי ושולח אותה אליכם, כדי שתוכלו להתאמן על התהליך המלא בלי תלמיד אמיתי."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "difficulty": {
+      "defaultValue": {
+        "value": "Difficulty"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רמת קושי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "what_should_about": {
+      "defaultValue": {
+        "value": "What should it be about? (optional)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "במה תעסוק השאלה? (רשות)"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "solving_quadratic_equations": {
+      "defaultValue": {
+        "value": "e.g. solving quadratic equations"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לדוגמה: פתרון משוואות ריבועיות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "send_simulated_question": {
+      "defaultValue": {
+        "value": "Send Simulated Question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שליחת שאלה מדומה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_question_takes": {
+      "defaultValue": {
+        "value": "The question takes a few seconds to write. You will get it on your dashboard like any other request."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כתיבת השאלה אורכת כמה שניות. היא תגיע ללוח הבקרה שלכם כמו כל בקשה אחרת."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "writing_question_with": {
+      "defaultValue": {
+        "value": "Writing a question with the local AI model..."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כותב שאלה בעזרת מודל ה־AI המקומי..."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "question_sent_should": {
+      "defaultValue": {
+        "value": "Question sent — it should appear in your queue now."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השאלה נשלחה — היא אמורה להופיע בתור שלכם עכשיו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "question_sent_the": {
+      "defaultValue": {
+        "value": "Question sent — the local AI model was unreachable, so a sample question was used."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השאלה נשלחה — מודל ה־AI המקומי לא היה זמין, ולכן נעשה שימוש בשאלה לדוגמה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_local_offline": {
+      "defaultValue": {
+        "value": "The local AI is offline — sent a standard demo question instead."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ה־AI המקומי אינו פעיל — נשלחה במקומו שאלת הדגמה סטנדרטית."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_demo_question": {
+      "defaultValue": {
+        "value": "The demo question feature is currently turned off."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תכונת שאלת ההדגמה כבויה כרגע."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "sign_teacher_simulate": {
+      "defaultValue": {
+        "value": "Sign in as a teacher to simulate a question."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התחברו כמורה כדי להדמות שאלה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "demo_service_no_response": {
+      "defaultValue": {
+        "value": "The demo student service did not respond. Make sure it is running on your machine."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שירות תלמיד ההדגמה לא הגיב. ודאו שהוא פועל במחשב שלכם."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "demo_service_create_failed": {
+      "defaultValue": {
+        "value": "The demo student service could not create the question."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שירות תלמיד ההדגמה לא הצליח ליצור את השאלה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "camera_access_required": {
+      "defaultValue": {
+        "value": "Camera access is required to take a photo."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת גישה למצלמה כדי לצלם תמונה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "complete_now": {
+      "defaultValue": {
+        "value": "Complete now"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "להשלים עכשיו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "complete_your_verification": {
+      "defaultValue": {
+        "value": "Complete your verification"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השלימו את האימות שלכם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "continue_upload_later": {
+      "defaultValue": {
+        "value": "Continue - upload later"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המשך - העלאה מאוחר יותר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "maybe_later": {
+      "defaultValue": {
+        "value": "Maybe later"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אולי מאוחר יותר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "nice_work_your": {
+      "defaultValue": {
+        "value": "Nice work on your first lesson! Uploading the rest of your verification documents helps us confirm you as a teacher faster. It's optional — you can also do it anytime from your Profile."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כל הכבוד על השיעור הראשון! העלאת שאר מסמכי האימות עוזרת לנו לאשר אתכם כמורים מהר יותר. ההעלאה אינה חובה — תוכלו לבצע אותה בכל עת מהפרופיל שלכם."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "upload_your_remaining": {
+      "defaultValue": {
+        "value": "Upload your remaining verification documents"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "העלו את מסמכי האימות שנותרו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "upload_clear_photo_id": {
+      "defaultValue": {
+        "value": "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "העלו תמונה ברורה של דרכון, רישיון נהיגה\nאו תעודת זהות. נדרשת תעודה מזהה ממשלתית תקפה\nכדי להפוך למורה מאומת."
+        }
+      },
+      "description": "Government-ID upload instruction on the teacher verification screen. Split from upload_clear_photo, which is the student's math-problem photo tip.",
+      "valueType": "STRING"
     }
   }
 }

@@ -84,6 +84,34 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Pay with Bit": "תשלום באמצעות ביט",
         "Pay with credit card": "תשלום בכרטיס אשראי",
         "PayPal, Bit, or credit card": "PayPal, ביט או כרטיס אשראי",
+        // Demo tooling (simulate a student question) and the teacher
+        // verification prompts. Not in the published Remote Config template
+        // yet, so these fallbacks are what actually render in Hebrew.
+        "Demo Mode": "מצב הדגמה",
+        "Send yourself a question from a simulated student.": "שלחו לעצמכם שאלה מתלמיד מדומה.",
+        "Simulate a Student Question": "הדמיית שאלת תלמיד",
+        "A demo student writes the question with a local AI model and sends it to you, so you can practise the whole flow without a real student.": "תלמיד הדגמה מנסח את השאלה בעזרת מודל AI מקומי ושולח אותה אליכם, כדי שתוכלו להתאמן על התהליך המלא בלי תלמיד אמיתי.",
+        "Difficulty": "רמת קושי",
+        "What should it be about? (optional)": "במה תעסוק השאלה? (רשות)",
+        "e.g. solving quadratic equations": "לדוגמה: פתרון משוואות ריבועיות",
+        "Send Simulated Question": "שליחת שאלה מדומה",
+        "The question takes a few seconds to write. You will get it on your dashboard like any other request.": "כתיבת השאלה אורכת כמה שניות. היא תגיע ללוח הבקרה שלכם כמו כל בקשה אחרת.",
+        "Writing a question with the local AI model...": "כותב שאלה בעזרת מודל ה־AI המקומי...",
+        "Question sent — it should appear in your queue now.": "השאלה נשלחה — היא אמורה להופיע בתור שלכם עכשיו.",
+        "Question sent — the local AI model was unreachable, so a sample question was used.": "השאלה נשלחה — מודל ה־AI המקומי לא היה זמין, ולכן נעשה שימוש בשאלה לדוגמה.",
+        "The local AI is offline — sent a standard demo question instead.": "ה־AI המקומי אינו פעיל — נשלחה במקומו שאלת הדגמה סטנדרטית.",
+        "The demo question feature is currently turned off.": "תכונת שאלת ההדגמה כבויה כרגע.",
+        "Sign in as a teacher to simulate a question.": "התחברו כמורה כדי להדמות שאלה.",
+        "The demo student service did not respond. Make sure it is running on your machine.": "שירות תלמיד ההדגמה לא הגיב. ודאו שהוא פועל במחשב שלכם.",
+        "The demo student service could not create the question.": "שירות תלמיד ההדגמה לא הצליח ליצור את השאלה.",
+        "Camera access is required to take a photo.": "נדרשת גישה למצלמה כדי לצלם תמונה.",
+        "Complete now": "להשלים עכשיו",
+        "Complete your verification": "השלימו את האימות שלכם",
+        "Continue - upload later": "המשך - העלאה מאוחר יותר",
+        "Maybe later": "אולי מאוחר יותר",
+        "Nice work on your first lesson! Uploading the rest of your verification documents helps us confirm you as a teacher faster. It's optional — you can also do it anytime from your Profile.": "כל הכבוד על השיעור הראשון! העלאת שאר מסמכי האימות עוזרת לנו לאשר אתכם כמורים מהר יותר. ההעלאה אינה חובה — תוכלו לבצע אותה בכל עת מהפרופיל שלכם.",
+        "Upload your remaining verification documents": "העלו את מסמכי האימות שנותרו",
+        "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.": "העלו תמונה ברורה של דרכון, רישיון נהיגה\nאו תעודת זהות. נדרשת תעודה מזהה ממשלתית תקפה\nכדי להפוך למורה מאומת.",
         "You can pay with PayPal, Bit, or a credit card. Choose your preferred method at checkout. There is no need to save a payment method in the app; your credentials are requested during each purchase.": "ניתן לשלם באמצעות PayPal, ביט או כרטיס אשראי. בחרו את אמצעי התשלום המועדף עליכם בעת התשלום. אין צורך לשמור אמצעי תשלום באפליקציה; פרטי התשלום מתבקשים בכל רכישה."
     ]
 
@@ -138,6 +166,10 @@ enum LocalizationKey {
         "Are you sure you want to end this session?": "are_you_sure_end_session",
         "Audio": "audio_title",
         "Could not send rating. Please try again next time.": "could_not_send_dot_a",
+        // Both demo-service errors generate `the_demo_student`, which would make
+        // one translation serve two different failures.
+        "The demo student service did not respond. Make sure it is running on your machine.": "demo_service_no_response",
+        "The demo student service could not create the question.": "demo_service_create_failed",
         "Could not send your message.": "could_not_send_dot_b",
         "Could not start the audio/video connection. Please try again.": "could_not_start_audio_video",
         "Enter your email address first.": "enter_your_email_dot_a",
@@ -202,6 +234,10 @@ enum LocalizationKey {
         "Teacher": "teacher_b",
         "Terms of Service": "terms_of_service",
         "Upload a clear photo of your passport, driver's license,\nor national ID.": "upload_clear_photo_dot",
+        // The longer variant generated `upload_clear_photo` — the same key as
+        // the student's "photo of your math problem" tip, so the ID screen was
+        // showing the math-problem translation in Hebrew.
+        "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.": "upload_clear_photo_id",
         "Use the device language": "use_the_device_language",
         "WAITING": "waiting_caps",
         "algebra": "algebra_b",
