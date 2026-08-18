@@ -6554,6 +6554,611 @@
       },
       "description": "Government-ID upload instruction on the teacher verification screen. Split from upload_clear_photo, which is the student's math-problem photo tip.",
       "valueType": "STRING"
+    },
+    "purchased_for": {
+      "defaultValue": {
+        "value": "%@ purchased for %@."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נרכש %@ בעלות %@."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_vs_last_week": {
+      "defaultValue": {
+        "value": "%@%d%% vs last week"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%@%d%% מהשבוע שעבר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "added_your_balance": {
+      "defaultValue": {
+        "value": "Added %@ to your balance."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נוספו %@ ליתרה שלך."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "choose_payment_method": {
+      "defaultValue": {
+        "value": "Choose a payment method"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בחר אמצעי תשלום"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "don_save": {
+      "defaultValue": {
+        "value": "Don't save"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא לשמור"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "earnings": {
+      "defaultValue": {
+        "value": "Earnings"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רווחים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "go_offline": {
+      "defaultValue": {
+        "value": "Go Offline"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עבור למצב לא מקוון"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "go_online": {
+      "defaultValue": {
+        "value": "Go Online"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עבור למצב מקוון"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "agree_terms_privacy_markdown": {
+      "defaultValue": {
+        "value": "I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אני מסכים/ה ל[תנאי השירות](teacherminute://terms) ול[מדיניות הפרטיות.](teacherminute://privacy)"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "offline_caps": {
+      "defaultValue": {
+        "value": "OFFLINE"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא מחובר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "online_caps": {
+      "defaultValue": {
+        "value": "ONLINE"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מחובר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "past": {
+      "defaultValue": {
+        "value": "Past"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "קודמים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pay_with": {
+      "defaultValue": {
+        "value": "Pay with"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום באמצעות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pay_with_apple": {
+      "defaultValue": {
+        "value": "Pay with Apple Pay"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום באמצעות Apple Pay"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pay_with_bit": {
+      "defaultValue": {
+        "value": "Pay with Bit"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום באמצעות ביט"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pay_with_google": {
+      "defaultValue": {
+        "value": "Pay with Google Pay"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום באמצעות Google Pay"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pay_with_paypal": {
+      "defaultValue": {
+        "value": "Pay with PayPal"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום באמצעות PayPal"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pay_with_credit": {
+      "defaultValue": {
+        "value": "Pay with credit card"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום בכרטיס אשראי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "purchase_complete": {
+      "defaultValue": {
+        "value": "Purchase complete"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הרכישה הושלמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "save_board_gallery": {
+      "defaultValue": {
+        "value": "Save board to gallery?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לשמור את הלוח לגלריה?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "save_chat_only": {
+      "defaultValue": {
+        "value": "Save to chat only"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שמירה לצ׳אט בלבד"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "save_gallery": {
+      "defaultValue": {
+        "value": "Save to gallery"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שמירה לגלריה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teaching_history": {
+      "defaultValue": {
+        "value": "Teaching History"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "היסטוריית הוראה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "terms_of_service": {
+      "defaultValue": {
+        "value": "Terms of Service"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תנאי השירות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_board_will": {
+      "defaultValue": {
+        "value": "The board will be saved to the chat. Do you also want to save it to your device gallery?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הלוח יישמר בצ׳אט. האם ברצונך לשמור אותו גם לגלריית המכשיר?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_session_ended": {
+      "defaultValue": {
+        "value": "The session ended. Do you want to save the board image to your device gallery?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השיעור הסתיים. האם ברצונך לשמור את תמונת הלוח לגלריית המכשיר?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "time_taught": {
+      "defaultValue": {
+        "value": "Time Taught"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זמן הוראה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "min": {
+      "defaultValue": {
+        "value": "%@/min"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%@ לדקה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "attach_photo_optional": {
+      "defaultValue": {
+        "value": "Attach a photo (optional)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צירוף תמונה (רשות)"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "debug_builds_only": {
+      "defaultValue": {
+        "value": "Debug builds only"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "גרסאות פיתוח בלבד"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "enabling": {
+      "defaultValue": {
+        "value": "Enabling..."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מפעיל..."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "image": {
+      "defaultValue": {
+        "value": "Image"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "images": {
+      "defaultValue": {
+        "value": "Images"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תמונות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "loading": {
+      "defaultValue": {
+        "value": "Loading..."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "טוען..."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "payments_yet": {
+      "defaultValue": {
+        "value": "No payments yet"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין עדיין תשלומים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "subjects_selected": {
+      "defaultValue": {
+        "value": "No subjects selected"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא נבחרו מקצועות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "not_now": {
+      "defaultValue": {
+        "value": "Not now"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא עכשיו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "payment_history": {
+      "defaultValue": {
+        "value": "Payment History"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "היסטוריית תשלומים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "please_sign_out": {
+      "defaultValue": {
+        "value": "Please sign out and sign in again before deleting your account."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התנתקו והתחברו מחדש לפני מחיקת החשבון."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "stay_the_loop": {
+      "defaultValue": {
+        "value": "Stay in the loop"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הישארו מעודכנים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_reading_chat": {
+      "defaultValue": {
+        "value": "Student is reading chat — video paused"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד קורא את הצ׳אט — הווידאו מושהה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "switching_text_chat": {
+      "defaultValue": {
+        "value": "Switching to text chat…"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עובר לצ׳אט טקסט…"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teacher_reading_chat": {
+      "defaultValue": {
+        "value": "Teacher is reading chat — video paused"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה קורא את הצ׳אט — הווידאו מושהה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "test_crashlytics_crash": {
+      "defaultValue": {
+        "value": "Test Crashlytics Crash"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בדיקת קריסה ב־Crashlytics"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "this_session_type": {
+      "defaultValue": {
+        "value": "This session type is preselected when you ask a teacher a question. You can still change it for each question."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סוג שיעור זה נבחר מראש כששואלים מורה שאלה. עדיין אפשר לשנות אותו בכל שאלה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "turn_notifications_can": {
+      "defaultValue": {
+        "value": "Turn on notifications so we can let you know the moment a teacher accepts your request, replies to a message, or your session is about to start."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הפעילו התראות כדי שנוכל לעדכן אתכם ברגע שמורה מקבל את הבקשה, משיב להודעה, או כשהשיעור עומד להתחיל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "view_your_lesson": {
+      "defaultValue": {
+        "value": "View your lesson payment history"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צפייה בהיסטוריית תשלומי השיעורים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "when_turned_off": {
+      "defaultValue": {
+        "value": "When turned off, your profile photo won't be shared with the other participant during a session."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כאשר האפשרות כבויה, תמונת הפרופיל שלכם לא תשותף עם המשתתף השני במהלך השיעור."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_don_have": {
+      "defaultValue": {
+        "value": "You don't have any recent activity"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין לכם פעילות אחרונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_need_signed": {
+      "defaultValue": {
+        "value": "You need to be signed in to attach a photo."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "יש להתחבר כדי לצרף תמונה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_currency_set": {
+      "defaultValue": {
+        "value": "Your currency is set to Israeli Shekel (ILS) and cannot be changed for now."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המטבע שלכם מוגדר לשקל חדש (₪) ולא ניתן לשנותו כרגע."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_lesson_payments": {
+      "defaultValue": {
+        "value": "Your lesson payments will appear here."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלומי השיעורים שלכם יופיעו כאן."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "default_session_type": {
+      "defaultValue": {
+        "value": "Default Session Type"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סוג שיעור ברירת מחדל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "default_session_type_currency": {
+      "defaultValue": {
+        "value": "Default session type and currency"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סוג שיעור ומטבע ברירת מחדל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "enter_password_delete_account": {
+      "defaultValue": {
+        "value": "Enter your password to confirm account deletion."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הזינו את הסיסמה שלכם כדי לאשר את מחיקת החשבון."
+        }
+      },
+      "valueType": "STRING"
     }
   }
 }

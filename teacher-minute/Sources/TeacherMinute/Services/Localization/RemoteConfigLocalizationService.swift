@@ -84,6 +84,36 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Pay with Bit": "תשלום באמצעות ביט",
         "Pay with credit card": "תשלום בכרטיס אשראי",
         "PayPal, Bit, or credit card": "PayPal, ביט או כרטיס אשראי",
+        // Settings, chat status, notification and payment-history copy that had
+        // no template entry. Translated alongside the Remote Config additions.
+        "%@/min": "%@ לדקה",
+        "Attach a photo (optional)": "צירוף תמונה (רשות)",
+        "Debug builds only": "גרסאות פיתוח בלבד",
+        "Enabling...": "מפעיל...",
+        "Image": "תמונה",
+        "Images": "תמונות",
+        "Loading...": "טוען...",
+        "No payments yet": "אין עדיין תשלומים",
+        "No subjects selected": "לא נבחרו מקצועות",
+        "Not now": "לא עכשיו",
+        "Payment History": "היסטוריית תשלומים",
+        "Please sign out and sign in again before deleting your account.": "התנתקו והתחברו מחדש לפני מחיקת החשבון.",
+        "Stay in the loop": "הישארו מעודכנים",
+        "Student is reading chat — video paused": "התלמיד קורא את הצ׳אט — הווידאו מושהה",
+        "Switching to text chat…": "עובר לצ׳אט טקסט…",
+        "Teacher is reading chat — video paused": "המורה קורא את הצ׳אט — הווידאו מושהה",
+        "Test Crashlytics Crash": "בדיקת קריסה ב־Crashlytics",
+        "This session type is preselected when you ask a teacher a question. You can still change it for each question.": "סוג שיעור זה נבחר מראש כששואלים מורה שאלה. עדיין אפשר לשנות אותו בכל שאלה.",
+        "Turn on notifications so we can let you know the moment a teacher accepts your request, replies to a message, or your session is about to start.": "הפעילו התראות כדי שנוכל לעדכן אתכם ברגע שמורה מקבל את הבקשה, משיב להודעה, או כשהשיעור עומד להתחיל.",
+        "View your lesson payment history": "צפייה בהיסטוריית תשלומי השיעורים",
+        "When turned off, your profile photo won't be shared with the other participant during a session.": "כאשר האפשרות כבויה, תמונת הפרופיל שלכם לא תשותף עם המשתתף השני במהלך השיעור.",
+        "You don't have any recent activity": "אין לכם פעילות אחרונה",
+        "You need to be signed in to attach a photo.": "יש להתחבר כדי לצרף תמונה.",
+        "Your currency is set to Israeli Shekel (ILS) and cannot be changed for now.": "המטבע שלכם מוגדר לשקל חדש (₪) ולא ניתן לשנותו כרגע.",
+        "Your lesson payments will appear here.": "תשלומי השיעורים שלכם יופיעו כאן.",
+        "Default Session Type": "סוג שיעור ברירת מחדל",
+        "Default session type and currency": "סוג שיעור ומטבע ברירת מחדל",
+        "Enter your password to confirm account deletion.": "הזינו את הסיסמה שלכם כדי לאשר את מחיקת החשבון.",
         // Demo tooling (simulate a student question) and the teacher
         // verification prompts. Not in the published Remote Config template
         // yet, so these fallbacks are what actually render in Hebrew.
@@ -166,6 +196,11 @@ enum LocalizationKey {
         "Are you sure you want to end this session?": "are_you_sure_end_session",
         "Audio": "audio_title",
         "Could not send rating. Please try again next time.": "could_not_send_dot_a",
+        // Shared `enter_your_password` with the login field, so the delete-account
+        // confirmation was showing the login prompt's translation.
+        "Enter your password to confirm account deletion.": "enter_password_delete_account",
+        // Shared `default_session_type` with the settings section title.
+        "Default session type and currency": "default_session_type_currency",
         // Both demo-service errors generate `the_demo_student`, which would make
         // one translation serve two different failures.
         "The demo student service did not respond. Make sure it is running on your machine.": "demo_service_no_response",
