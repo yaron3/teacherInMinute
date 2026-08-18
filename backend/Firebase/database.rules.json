@@ -23,6 +23,15 @@
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid"
       }
+    },
+    "demoStudent": {
+      "requests": {
+        "$requestId": {
+          ".read": "auth != null && data.child('teacherUid').val() == auth.uid",
+          ".write": "auth != null && !data.exists() && newData.child('teacherUid').val() == auth.uid && newData.child('status').val() == 'pending'",
+          ".validate": "newData.hasChildren(['teacherUid', 'topic', 'status', 'createdAt'])"
+        }
+      }
     }
   }
 }

@@ -16,6 +16,7 @@ struct TeacherDashboardView: View {
   let showsIncomingOverlay: Bool
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
+  @State var showsQuestionSimulator = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -109,6 +110,11 @@ struct TeacherDashboardView: View {
 			  readinessChecklist
 				.padding(.top, 28)
 			}
+
+			if DemoStudentService.isEnabled {
+			  simulateQuestionCard
+				.padding(.top, 28)
+			}
 		  }
 		  .padding(.horizontal, 20)
 		  .padding(.bottom, 40)
@@ -150,6 +156,16 @@ struct TeacherDashboardView: View {
 	  .sheet(isPresented: $showsDocuments) {
 		NavigationStack {
 		  TeacherDocumentsView()
+		}
+		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		.id(languagePreference)
+	  }
+	  // Demo tool — sends this teacher a simulated question written by the
+	  // local AI model behind the demo-student service.
+	  .sheet(isPresented: $showsQuestionSimulator) {
+		SimulateStudentQuestionView(teacherName: viewModel.teacherName) {
+		  showsQuestionSimulator = false
 		}
 		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
 		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
@@ -201,6 +217,42 @@ struct TeacherDashboardView: View {
 	  }
 	}
 	.frame(maxWidth: .infinity, alignment: .leading)
+  }
+  
+  /// Demo-only entry point: sends this teacher a simulated student question,
+  /// written by a local AI model. Hidden in release builds unless the
+  /// `demo_student_enabled` Remote Config flag is on.
+  var simulateQuestionCard: some View {
+	FlatCard(outlined: true) {
+	  VStack(alignment: .leading, spacing: 14) {
+		HStack(alignment: .top, spacing: 12) {
+		  FlatIconTile(
+			systemName: "wand.and.stars",
+			size: 44,
+			tint: theme.accent,
+			background: theme.accentBackground
+		  )
+
+		  VStack(alignment: .leading, spacing: 3) {
+			Text(LocalizationSupport.localized("Demo Mode"))
+			  .font(.system(size: 15, weight: .bold))
+			  .foregroundStyle(theme.primaryText)
+
+			Text(LocalizationSupport.localized("Send yourself a question from a simulated student."))
+			  .font(.system(size: 13))
+			  .foregroundStyle(theme.secondaryText)
+			  .frame(maxWidth: .infinity, alignment: .leading)
+		  }
+		}
+
+		FlatSecondaryButton(
+		  title: LocalizationSupport.localized("Simulate a Student Question"),
+		  systemImage: "paperplane.fill"
+		) {
+		  showsQuestionSimulator = true
+		}
+	  }
+	}
   }
 
   var teacherStatusCard: some View {

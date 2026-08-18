@@ -504,6 +504,8 @@ export const startLesson = onCall(async (req) => {
     status: "in_progress",
     liveKitRoom,
     liveKitTokenExpiry: Timestamp.fromDate(new Date(now.getTime() + 3600 * 1000)),
+    // Simulated sessions stay identifiable all the way through to reporting.
+    ...(q.isDemo ? { isDemo: true } : {}),
   };
 
   const batch = firestore.batch();

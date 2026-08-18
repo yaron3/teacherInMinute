@@ -192,6 +192,11 @@ async function tryInviteTeacherForQuestionWave(
     const question = qSnap.data() as QuestionDoc;
     if (question.status !== "searching") return { invited: false, reason: `status-${question.status}` };
 
+    // Demo questions belong to the teacher who simulated them.
+    if (question.isDemo && question.demoTeacherUid !== teacherUid) {
+      return { invited: false, reason: "demo-question" };
+    }
+
     const wave = question.dispatchWave;
     if (!wave || wave < 1 || wave > WAVE_SIZES.length) {
       return { invited: false, reason: `invalid-wave-${wave ?? 0}` };
@@ -364,6 +369,17 @@ export const dispatchQuestion = onDocumentCreated(
     logger.info(
       `[dispatch] initial status qid=${qid} status=${data.status} alreadyInvited=${(data.alreadyInvited ?? []).length}`
     );
+
+    // Simulated questions (demo-student service) are already delivered to the
+    // one teacher who asked for them. Skip the waves so no real teacher is
+    // paged by a demo, but keep the watchdog so the question still expires.
+    if (data.isDemo) {
+      logger.info(
+        `[dispatch] qid=${qid} isDemo — skipping waves, invited teacher=${data.demoTeacherUid ?? "unknown"}`
+      );
+      await enqueueQuestionWatchdog(qid);
+      return;
+    }
 
     const invited = await sendWave(qid, data, 1, new Set<string>());
 

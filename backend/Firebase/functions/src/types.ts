@@ -64,6 +64,10 @@ export interface QuestionDoc {
   totalCents?: number;
   endedBy?: "student" | "teacher" | "system";
   lessonId?: string;
+  /** Written by the demo-student service — a simulated question, not a real one. */
+  isDemo?: boolean;
+  /** The teacher who asked for the simulation; the only one invited to it. */
+  demoTeacherUid?: string;
 }
 
 // ─── Firestore — questions/{qid}/invites/{tid} ───────────────────────────────
@@ -105,6 +109,8 @@ export interface LessonDoc {
   liveKitRoom: string;          // "lesson_<questionId>"
   liveKitTokenExpiry: Timestamp;
   endedBy?: "student" | "teacher" | "system";
+  /** Inherited from the question — a lesson taught to the simulated demo student. */
+  isDemo?: boolean;
 }
 
 // ─── Firestore — pricing/{pricingOptionId} ────────────────────────────────────
