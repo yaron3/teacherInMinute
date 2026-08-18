@@ -6264,6 +6264,20 @@
       },
       "description": "Shows the teacher-facing 'Simulate a student question' demo tool. Requires the local demo-student service to be running.",
       "valueType": "BOOLEAN"
+    },
+    "demo_student_offline_message": {
+      "defaultValue": {
+        "value": "This is an automatic message from Demo #{count}"
+      },
+      "description": "Canned demo-student message used when the local AI service is offline. {count} is replaced by the message number within the demo (the question is #1).",
+      "valueType": "STRING"
+    },
+    "demo_student_offline_message_he": {
+      "defaultValue": {
+        "value": "זוהי הודעה אוטומטית מדמו #{count}"
+      },
+      "description": "Hebrew variant of demo_student_offline_message.",
+      "valueType": "STRING"
     }
   }
 }

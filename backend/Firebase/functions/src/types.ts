@@ -68,6 +68,8 @@ export interface QuestionDoc {
   isDemo?: boolean;
   /** The teacher who asked for the simulation; the only one invited to it. */
   demoTeacherUid?: string;
+  /** Simulated without the local AI service — replies come from Remote Config. */
+  demoFallback?: boolean;
 }
 
 // ─── Firestore — questions/{qid}/invites/{tid} ───────────────────────────────

@@ -522,25 +522,31 @@ final class TeacherDashboardViewModel {
 	demoSimulationTask = Task { [weak self] in
 	  guard let self else { return }
 	  do {
-		guard await DemoStudentService.isServiceRunning() else {
-		  throw DemoStudentError.serviceOffline
-		}
-		try Task.checkCancellation()
-		let requestId = try await DemoStudentService.submit(simulation, teacherName: teacherName)
-		try Task.checkCancellation()
-		let status = try await DemoStudentService.awaitDispatch(requestId: requestId)
+		// The backend decides who answers: it checks whether the local AI
+		// service is up, and falls back to canned Remote Config messages if not.
+		let result = try await DemoStudentService.simulate(simulation, teacherName: teacherName)
 		try Task.checkCancellation()
 
-		demoStatusMessage = status.source == "fallback"
-		  ? LocalizationSupport.localized("Question sent — the local AI model was unreachable, so a sample question was used.")
-		  : LocalizationSupport.localized("Question sent — it should appear in your queue now.")
+		var source = result.mode
+		if result.usedLocalAI {
+		  let status = try await DemoStudentService.awaitDispatch(requestId: result.requestId)
+		  try Task.checkCancellation()
+		  source = status.source
+		  demoStatusMessage = status.source == "fallback"
+			? LocalizationSupport.localized("Question sent — the local AI model was unreachable, so a sample question was used.")
+			: LocalizationSupport.localized("Question sent — it should appear in your queue now.")
+		  logger.info("[Simulate] dispatched qid=\(status.questionId) source=\(status.source)")
+		} else {
+		  demoStatusMessage = LocalizationSupport.localized("The local AI is offline — sent a standard demo question instead.")
+		  logger.info("[Simulate] fallback question qid=\(result.questionId)")
+		}
+
 		AnalyticsService.shared.logEvent(AnalyticsEvent.teacherDemoQuestionSimulated, parameters: [
 		  "topic": simulation.topic,
 		  "difficulty": simulation.difficulty,
 		  "conversation_type": simulation.conversationType,
-		  "source": status.source
+		  "source": source
 		])
-		logger.info("[Simulate] dispatched qid=\(status.questionId) source=\(status.source)")
 
 		// The invite card takes over from here — clear the note after a beat.
 		try? await Task.sleep(nanoseconds: 6_000_000_000)

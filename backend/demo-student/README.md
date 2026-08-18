@@ -19,10 +19,30 @@ Teacher app                 RTDB                     demo-student            RTD
 Teacher accepts and chats ──►  questions/{qid}/messages  ──►  student reply (local Qwen) ──► back into the chat
 ```
 
+## Who answers a simulation
+
+The app never writes the request itself — it calls the `simulateDemoQuestion`
+Cloud Function, which checks whether this service is online (see
+`demoStudent/service` below) and routes accordingly:
+
+| This service | What happens |
+| --- | --- |
+| **online** | The function queues the request here, and everything below applies: a real question from the local model, and in-character replies during the chat. |
+| **offline** | The function creates the question itself from the `demo_student_offline_message` Remote Config string, and a Firestore trigger answers the teacher with the same message. The invite/accept/chat flow still demos with nothing running locally. |
+
+The canned message carries a counter that runs across one demo: the question is
+`#1`, then each reply is `#2`, `#3`… `{count}` in the template is where the
+number goes (`demo_student_offline_message_he` holds the Hebrew variant):
+
+```
+This is an automatic message from Demo #{count}
+```
+
 ## What it does
 
-1. Watches `demoStudent/requests` in the Realtime Database. The teacher app
-   writes one node per tap on **Simulate student question**.
+1. Watches `demoStudent/requests` in the Realtime Database. The
+   `simulateDemoQuestion` function writes one node per tap on **Simulate
+   student question** — but only while this service is online.
 2. Asks the local model for a realistic question in the requested topic,
    difficulty and language.
 3. Tops up the demo student's Firestore user doc (so the lesson is not blocked
@@ -81,16 +101,20 @@ Remote Config flag `demo_student_enabled` is `true`.
 
 | `status` | What it means |
 | --- | --- |
-| `pending` | The service never picked it up: it is not running, is pointed at another database, or the request was older than `DEMO_STUDENT_REQUEST_MAX_AGE_SECONDS` when the service started. The console prints a `skip <id>` line with the exact reason. |
+| `pending` | The service never picked it up: it stopped between the presence check and the request, is pointed at another database, or the request was older than `DEMO_STUDENT_REQUEST_MAX_AGE_SECONDS`. The console prints a `skip <id>` line with the exact reason. |
 | `generating` | The service took it but died mid-way — check the console for the stack trace. |
 | `failed` | The `error` field on the node carries the message (bad credentials, Firestore not reachable, model failure with fallbacks off). |
 | `dispatched` | The question was created. `questionId` points at it, and the invite is under `teacherInvites/{teacherUid}/{questionId}`. |
 
 The service publishes its own presence at `demoStudent/service`. When it is
 running that node reads `status: "online"` (and flips to `offline` when the
-process exits or the connection drops). The app checks it before writing a
-request, so a missing service is reported on the dashboard immediately rather
-than after a timeout.
+process exits or the connection drops). `simulateDemoQuestion` reads it to
+decide between the local model and the canned Remote Config message, so a
+stopped service degrades the demo instead of breaking it.
+
+**Getting canned messages when you expected the local model.** The presence node
+says `offline` — the service is not running, crashed, or is writing to a
+different database than the one the functions read.
 
 ## Notes
 
@@ -99,6 +123,10 @@ than after a timeout.
   so demo traffic can be filtered out of reporting later.
 - The 90 s invite watchdog still applies: accept the simulated question within
   90 seconds or it is archived as `unanswered`, exactly like a real one.
+- Fallback questions additionally carry `demoFallback: true`. The auto-reply
+  trigger only answers those, so it never talks over this service.
+- If this service dies mid-session, the chat goes quiet: the trigger stays out
+  of questions the local model started. Restart the service and simulate again.
 - If `ai-teacher` is running at the same time, it ignores demo questions unless
   it is started with `ANSWER_DEMO_QUESTIONS=true` — otherwise it would grab the
   question before the human teacher could.
