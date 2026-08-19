@@ -5893,6 +5893,17 @@
       },
       "valueType": "STRING"
     },
+    "top_minutes": {
+      "defaultValue": {
+        "value": "Top up minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רכוש עוד דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
     "you_have_remaining": {
       "defaultValue": {
         "value": "You have %@ remaining. You need at least 2 minutes to ask a teacher. Please buy more minutes to continue."
@@ -6028,7 +6039,7 @@
     },
     "teacher_minute_app": {
       "defaultValue": {
-        "value": "Teacher in a Minute App"
+        "value": "Instant teacher"
       },
       "conditionalValues": {
         "Hebrew": {
