@@ -15,6 +15,8 @@ struct StudentHomeView: View {
   @State var showingPurchaseSummaryAlert = false
   @State var showsAskTeacher = false
   @State var showsNotificationExplainer = false
+  @State var showsPricingOptions: Bool
+  @State var selectedPricingOptionID: String?
   @State var pendingCheckoutOption: PricingOption?
   @Binding var hidesTabBar: Bool
   @Environment(\.openURL) var openURL
@@ -28,8 +30,9 @@ struct StudentHomeView: View {
 	viewModel: any StudentHomeViewModeling = StudentHomeViewModel(),
 	hidesTabBar: Binding<Bool> = .constant(false)
   ) {
-	self._viewModel = State(initialValue: viewModel)
-	self._hidesTabBar = hidesTabBar
+		self._viewModel = State(initialValue: viewModel)
+		self._showsPricingOptions = State(initialValue: Self.shouldShowPricingOptions(remainingMinutes: viewModel.remainingMinutes))
+		self._hidesTabBar = hidesTabBar
   }
   
   var body: some View {
@@ -51,10 +54,11 @@ struct StudentHomeView: View {
 	  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
 	  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
 	  .id(languagePreference)
-	}
-	.task {
-	  await viewModel.loadProfileIfNeeded()
-	}
+		}
+		.task {
+		  await viewModel.loadProfileIfNeeded()
+		  updatePricingVisibilityForCurrentBalance()
+		}
 	.sheet(isPresented: isChoosingPaymentMethod) {
 	  if let option = pendingCheckoutOption {
 		PaymentMethodSheet(
@@ -94,9 +98,17 @@ struct StudentHomeView: View {
 	.onChange(of: couponStateKey) { _, _ in
 	  handleCouponStateChange()
 	}
-	.onChange(of: viewModel.purchaseSummary?.id) { _, id in
-	  showingPurchaseSummaryAlert = id != nil
-	}
+		.onChange(of: viewModel.purchaseSummary?.id) { _, id in
+		  showingPurchaseSummaryAlert = id != nil
+		  if id != nil {
+			updatePricingVisibilityForCurrentBalance()
+		  }
+		}
+		.onChange(of: viewModel.remainingMinutes) { _, _ in
+		  if viewModel.purchaseSummary != nil {
+			updatePricingVisibilityForCurrentBalance()
+		  }
+		}
   }
 
   var homeLayers: some View {
@@ -186,11 +198,11 @@ struct StudentHomeView: View {
 		  EmptyView() // Coupon entry hidden on the Home tab (bug #28).
 			.padding(.top, 0)
 		  
-		  sectionHeader(title: LocalizationSupport.localized("Pricing Options"))
-			.padding(.top, 24)
+			  sectionHeader(title: LocalizationSupport.localized("Pricing Options"))
+				.padding(.top, 24)
 
-		  pricingStrip
-		  .padding(.top, 10)
+			  pricingControls
+				.padding(.top, 10)
 		  
 		  statsStrip
 			.padding(.top, 24)
@@ -229,21 +241,54 @@ struct StudentHomeView: View {
   }
   
 
+  @ViewBuilder
+  var pricingControls: some View {
+	if showsPricingOptions {
+	  pricingStrip
+		.transition(.opacity)
+	} else {
+	  topUpMinutesButton
+		.transition(.opacity)
+	}
+  }
+
+  var topUpMinutesButton: some View {
+	Button {
+	  withAnimation(.easeInOut(duration: 0.22)) {
+		showsPricingOptions = true
+	  }
+	} label: {
+	  Text(LocalizationSupport.localized("Top up minutes"))
+		.font(.system(size: 15, weight: .bold))
+		.foregroundStyle(theme.onAccentText)
+		.frame(maxWidth: .infinity)
+		.frame(height: 44)
+		.background(theme.accent)
+		.clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+	}
+	.buttonStyle(.plain)
+  }
+
   var pricingStrip: some View {
-		  ScrollView(.horizontal, showsIndicators: false) {
-			HStack(spacing: 16) {
-			  ForEach(viewModel.pricingOptions) { option in
-				PricingCard(
-				  option: option,
-				  isLoading: viewModel.isStartingCheckout && viewModel.checkoutPricingOptionID == option.id
-				) {
-				  pendingCheckoutOption = option
+			  ScrollView(.horizontal, showsIndicators: false) {
+				HStack(spacing: 16) {
+				  ForEach(viewModel.pricingOptions) { option in
+					PricingCard(
+					  option: option,
+					  isSelected: isPricingOptionSelected(option),
+					  isLoading: viewModel.isStartingCheckout && viewModel.checkoutPricingOptionID == option.id,
+					  onSelect: {
+						selectedPricingOptionID = option.id
+					  }
+					) {
+					  selectedPricingOptionID = option.id
+					  pendingCheckoutOption = option
+					}
+				  }
 				}
+				.padding(.horizontal, 2)
+				.padding(.vertical, 4)
 			  }
-			}
-			.padding(.horizontal, 2)
-			.padding(.vertical, 4)
-		  }
   }
 
   var redeemCouponRow: some View {
@@ -427,6 +472,23 @@ struct StudentHomeView: View {
 	  }
 	)
   }
+
+  private static let pricingAutoShowMinuteThreshold = 10
+
+  private static func shouldShowPricingOptions(remainingMinutes: Int) -> Bool {
+	remainingMinutes <= pricingAutoShowMinuteThreshold
+  }
+
+  private func updatePricingVisibilityForCurrentBalance() {
+	showsPricingOptions = Self.shouldShowPricingOptions(remainingMinutes: viewModel.remainingMinutes)
+  }
+
+  private func isPricingOptionSelected(_ option: PricingOption) -> Bool {
+	if let selectedPricingOptionID {
+	  return selectedPricingOptionID == option.id
+	}
+	return option.isHighlighted
+  }
   
   private func handleActiveAfterExternalCheckout() {
 	guard viewModel.isAwaitingPaymentReturn else { return }
@@ -480,6 +542,7 @@ struct StudentHomeView: View {
       ) {
         Task {
           await viewModel.refreshAfterLessonEnded()
+          updatePricingVisibilityForCurrentBalance()
           viewModel.resetSearch()
           // After the student's first lesson, offer notifications behind a
           // custom explanation (the system prompt only appears if they opt in).
@@ -972,8 +1035,10 @@ struct ErrorOverlay: View {
 
 struct PricingCard: View {
   let option: PricingOption
+  let isSelected: Bool
   let isLoading: Bool
-  let action: @MainActor @Sendable () -> Void
+  let onSelect: @MainActor @Sendable () -> Void
+  let onCheckout: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -1013,7 +1078,7 @@ struct PricingCard: View {
           .padding(.top, 8)
           .frame(maxWidth: .infinity, alignment: .topLeading)
 
-        Button(action: action) {
+        Button(action: onCheckout) {
           HStack(spacing: 8) {
             if isLoading {
               ProgressView()
@@ -1038,8 +1103,9 @@ struct PricingCard: View {
     }
     .overlay {
       RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-        .stroke(option.isHighlighted ? theme.accent : Color.clear, lineWidth: 2)
+        .stroke(isSelected ? theme.accent : Color.clear, lineWidth: 2)
     }
+    .onTapGesture(perform: onSelect)
   }
   
   private func priceSuffix(for option: PricingOption) -> String {
