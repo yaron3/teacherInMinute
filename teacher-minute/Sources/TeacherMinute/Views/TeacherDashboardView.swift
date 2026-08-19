@@ -17,6 +17,7 @@ struct TeacherDashboardView: View {
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
   @State var showsQuestionSimulator = false
+  @State  var isDemoEnabled = DemoStudentService.isEnabled
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -111,7 +112,7 @@ struct TeacherDashboardView: View {
 				.padding(.top, 28)
 			}
 
-			if DemoStudentService.isEnabled {
+			if isDemoEnabled {
 			  simulateQuestionCard
 				.padding(.top, 28)
 			}
@@ -179,6 +180,10 @@ struct TeacherDashboardView: View {
 			showsDocumentsSuggestion = true
 		  }
 		}
+	  }
+	  .task {
+		await RemoteConfigService.shared.ready()
+		isDemoEnabled = DemoStudentService.isEnabled
 	  }
 
 	}

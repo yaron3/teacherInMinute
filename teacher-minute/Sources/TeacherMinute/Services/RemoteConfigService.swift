@@ -100,6 +100,17 @@ final class RemoteConfigService {
         }
     }
 
+    /// Force-fetches and activates, then reports how many keys the server
+    /// returned. `refresh()` already bypasses `minimumFetchInterval`; the count
+    /// is what lets debug tooling confirm a freshly published template actually
+    /// reached the device.
+    func refreshAndCountKeys() async -> Int {
+        await refresh()
+        let keys = RemoteConfig.remoteConfig().allKeys(from: .remote)
+        logger.info("[RemoteConfig] manual refresh complete; remoteKeyCount=\(keys.count)")
+        return keys.count
+    }
+
     private func configureRemoteConfig() {
         let remoteConfig = RemoteConfig.remoteConfig()
         let settings = RemoteConfigSettings()

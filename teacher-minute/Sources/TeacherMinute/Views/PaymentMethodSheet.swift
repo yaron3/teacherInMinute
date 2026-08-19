@@ -73,12 +73,7 @@ struct PaymentMethodSheet: View {
     Button {
       onSelect(.paypal)
     } label: {
-      HStack(spacing: 6) {
-        Text(LocalizationSupport.localized("Pay with"))
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(Self.payPalInk)
-        payPalLockup
-      }
+	  payPalLockup
       .frame(maxWidth: .infinity)
       .padding(.vertical, 14)
       .background(Self.payPalGold)
@@ -116,33 +111,19 @@ struct PaymentMethodSheet: View {
   /// The PayPal monogram followed by the two-tone wordmark.
   private var payPalLockup: some View {
     HStack(spacing: 3) {
-      // Monogram: the light-blue P sits in front of and below the navy one.
-      ZStack(alignment: .leading) {
-        Text(verbatim: "P")
-          .font(.system(size: 17, weight: .bold))
-          .italic()
-          .foregroundStyle(Self.payPalNavy)
-        Text(verbatim: "P")
-          .font(.system(size: 17, weight: .bold))
-          .italic()
-          .foregroundStyle(Self.payPalBlue)
-          .offset(x: 4, y: 2)
-      }
-      .padding(.trailing, 4)
-
       HStack(spacing: 0) {
         Text(verbatim: "Pay")
           .foregroundStyle(Self.payPalNavy)
         Text(verbatim: "Pal")
           .foregroundStyle(Self.payPalBlue)
       }
-      .font(.system(size: 17, weight: .bold))
+      .font(.system(size: 20, weight: .bold))
       .italic()
     }
   }
 
   // PayPal brand palette (fixed in both colour schemes).
-  private static let payPalGold = Color(red: 255 / 255, green: 196 / 255, blue: 57 / 255)
+  private static let payPalGold = Color(red: 249 / 255, green: 184 / 255, blue: 35 / 255)
   private static let payPalNavy = Color(red: 37 / 255, green: 59 / 255, blue: 128 / 255)
   private static let payPalBlue = Color(red: 23 / 255, green: 155 / 255, blue: 215 / 255)
   private static let payPalInk = Color(red: 28 / 255, green: 28 / 255, blue: 28 / 255)
