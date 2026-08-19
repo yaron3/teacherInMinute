@@ -218,6 +218,7 @@
 			knownRegions = (
 				en,
 				Base,
+				he,
 			);
 			mainGroup = 49F90C1F2A52156200F06D93;
 			packageReferences = (
@@ -307,10 +308,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
+				INFOPLIST_KEY_CFBundleDisplayName = "Instant teacher";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera for profile photos, identity verification, and live lessons.";
@@ -330,10 +331,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
+				INFOPLIST_KEY_CFBundleDisplayName = "Instant teacher";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera for profile photos, identity verification, and live lessons.";
