@@ -143,7 +143,12 @@ struct AskTeacherSheet: View {
                 set: { if !$0 { permissionAlertMessage = nil } }
             ),
             message: permissionAlertMessage ?? "",
-            actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+            actions: [
+                AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+                    PermissionService.shared.openAppSettings()
+                },
+                AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
+            ]
         )
     }
 

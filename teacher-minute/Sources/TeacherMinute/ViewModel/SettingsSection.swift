@@ -59,8 +59,9 @@ struct SettingsRow: Identifiable {
         case .changePassword:  self.destination = .changePassword
         case .teacherPayouts:  self.destination = .teacherPayouts
         case .studentPayments: self.destination = .studentPayments
-        case .notifications:   self.destination = .notifications
-        case .privacyControls: self.destination = .privacyControls
+        case .notifications:      self.destination = .notifications
+        case .mediaPermissions:   self.destination = .mediaPermissions
+        case .privacyControls:    self.destination = .privacyControls
         case .language:        self.destination = .language
         case .about:           self.destination = .about
         case .eula:
@@ -90,6 +91,7 @@ enum SettingsAction: Equatable {
     case teacherPayouts
     case studentPayments
     case notifications
+    case mediaPermissions
     case privacyControls
     case language
     case about
@@ -111,6 +113,7 @@ enum SettingsAction: Equatable {
         case .teacherPayouts: "teacherPayouts"
         case .studentPayments: "studentPayments"
         case .notifications: "notifications"
+        case .mediaPermissions: "mediaPermissions"
         case .privacyControls: "privacyControls"
         case .language: "language"
         case .about: "about"
@@ -130,6 +133,7 @@ enum SettingsDestination: Hashable {
     case appPreferences
     case changePassword
     case teacherPayouts
+    case mediaPermissions
     case studentPayments
     case notifications
     case privacyControls
@@ -146,6 +150,7 @@ enum SettingsDestination: Hashable {
         case .teacherPayouts: LocalizationSupport.localized("Teacher Payout Settings")
         case .studentPayments: LocalizationSupport.localized("Payment History")
         case .notifications: LocalizationSupport.localized("Notification Preferences")
+        case .mediaPermissions: LocalizationSupport.localized("App Permissions")
         case .privacyControls: LocalizationSupport.localized("Privacy Controls")
         case .language: LocalizationSupport.localized("Language")
         case .about: LocalizationSupport.localized("About")
@@ -166,7 +171,7 @@ enum SettingsDestination: Hashable {
             LocalizationSupport.localized("Notification preferences will be available here.")
         case .privacyControls:
             LocalizationSupport.localized("Privacy controls will be available here.")
-        case .accountSecurity, .appPreferences, .language, .about, .contactUs, .webPage:
+        case .accountSecurity, .appPreferences, .mediaPermissions, .language, .about, .contactUs, .webPage:
             ""
         }
     }
@@ -318,6 +323,14 @@ class SettingsViewModel {
                 iconColor: .primary,
                 isDestructive: false,
                 action: .notifications
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("App Permissions"),
+                subtitle: LocalizationSupport.localized("Microphone and camera"),
+                systemImage: "mic.fill",
+                iconColor: .primary,
+                isDestructive: false,
+                action: .mediaPermissions
             ),
             SettingsRow(
                 title: LocalizationSupport.localized("Privacy Controls"),
@@ -520,6 +533,8 @@ class SettingsViewModel {
             navigationPath.append(.studentPayments)
         case .notifications:
             navigationPath.append(.notifications)
+        case .mediaPermissions:
+            navigationPath.append(.mediaPermissions)
         case .privacyControls:
             navigationPath.append(.privacyControls)
         case .language:

@@ -302,8 +302,9 @@ export const createPaymentSettingsSession = onCall(async (req) => {
 // that API drives a browser redirect and cannot raise a native sheet.
 
 const APPLE_PAY_MERCHANT_ID = process.env.APPLE_PAY_MERCHANT_ID ?? "";
+const APPLE_PAY_MERCHANT_NAME = process.env.APPLE_PAY_MERCHANT_NAME ?? "Instant Teacher";
 const APPLE_PAY_COUNTRY_CODE = process.env.APPLE_PAY_COUNTRY_CODE ?? "US";
-const GOOGLE_PAY_MERCHANT_NAME = process.env.GOOGLE_PAY_MERCHANT_NAME ?? "TeacherMinute";
+const GOOGLE_PAY_MERCHANT_NAME = process.env.GOOGLE_PAY_MERCHANT_NAME ?? "Instant Teacher";
 const GOOGLE_PAY_COUNTRY_CODE =
   process.env.GOOGLE_PAY_COUNTRY_CODE ?? APPLE_PAY_COUNTRY_CODE;
 
@@ -460,7 +461,7 @@ export const createApplePayCheckout = onCall(async (req) => {
     currency: pkg.currency,
     merchantIdentifier: APPLE_PAY_MERCHANT_ID,
     countryCode: APPLE_PAY_COUNTRY_CODE,
-    label: pkg.name,
+    label: APPLE_PAY_MERCHANT_NAME,
   };
 });
 
@@ -499,7 +500,7 @@ export const createGooglePayCheckout = onCall(async (req) => {
     environment: process.env.BRAINTREE_ENV === "production" ? "PRODUCTION" : "TEST",
     merchantName: GOOGLE_PAY_MERCHANT_NAME,
     countryCode: GOOGLE_PAY_COUNTRY_CODE,
-    label: pkg.name,
+    label: GOOGLE_PAY_MERCHANT_NAME,
   };
 });
 

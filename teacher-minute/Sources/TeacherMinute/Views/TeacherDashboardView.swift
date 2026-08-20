@@ -14,12 +14,14 @@ struct TeacherDashboardView: View {
   @Binding var hidesTabBar: Bool
   let showsSessionOverlay: Bool
   let showsIncomingOverlay: Bool
+  let onOpenPermissions: (() -> Void)?
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
   @State var showsQuestionSimulator = false
   @State  var isDemoEnabled = DemoStudentService.isEnabled
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.scenePhase) var scenePhase
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
@@ -27,12 +29,14 @@ struct TeacherDashboardView: View {
 	viewModel: TeacherDashboardViewModel = TeacherDashboardViewModel(),
 	hidesTabBar: Binding<Bool> = .constant(false),
 	showsSessionOverlay: Bool = true,
-	showsIncomingOverlay: Bool = true
+	showsIncomingOverlay: Bool = true,
+	onOpenPermissions: (() -> Void)? = nil
   ) {
 	self._viewModel = State(initialValue: viewModel)
 	self._hidesTabBar = hidesTabBar
 	self.showsSessionOverlay = showsSessionOverlay
 	self.showsIncomingOverlay = showsIncomingOverlay
+	self.onOpenPermissions = onOpenPermissions
   }
 
   var body: some View {
@@ -184,6 +188,11 @@ struct TeacherDashboardView: View {
 	  .task {
 		await RemoteConfigService.shared.ready()
 		isDemoEnabled = DemoStudentService.isEnabled
+	  }
+	  .onChange(of: scenePhase) { _, phase in
+		if phase == .active {
+		  viewModel.refreshPermissionStatus()
+		}
 	  }
 
 	}
@@ -364,9 +373,9 @@ struct TeacherDashboardView: View {
   var onlineStatusCard: some View {
 	FlatCard(padding: 14) {
 	  HStack(spacing: 0) {
-		statusItem(icon: "mic.fill", title: LocalizationSupport.localized("Mic"), subtitle: viewModel.hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off"), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
+		statusItem(icon: "mic.fill", title: LocalizationSupport.localized("Mic"), subtitle: viewModel.hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off"), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText, onTap: viewModel.hasMicAccess ? nil : onOpenPermissions)
 		verticalRule
-		statusItem(icon: "video.fill", title: LocalizationSupport.localized("Cam"), subtitle: viewModel.hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off"), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
+		statusItem(icon: "video.fill", title: LocalizationSupport.localized("Cam"), subtitle: viewModel.hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off"), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText, onTap: viewModel.hasCameraAccess ? nil : onOpenPermissions)
 		verticalRule
 		statusItem(icon: "circle.fill", title: LocalizationSupport.localized("Status"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
 	  }
@@ -456,9 +465,9 @@ struct TeacherDashboardView: View {
 
 	  FlatCard(padding: 0, outlined: true) {
 		VStack(spacing: 0) {
-		  checklistRow(icon: "mic.fill", title: viewModel.hasMicAccess ? LocalizationSupport.localized("Microphone Enabled") : LocalizationSupport.localized("Microphone Disabled"), subtitle: LocalizationSupport.localized("Required for voice sessions."), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
+		  checklistRow(icon: "mic.fill", title: viewModel.hasMicAccess ? LocalizationSupport.localized("Microphone Enabled") : LocalizationSupport.localized("Microphone Disabled"), subtitle: LocalizationSupport.localized("Required for voice sessions."), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText, onTap: viewModel.hasMicAccess ? nil : onOpenPermissions)
 		  FlatRule()
-		  checklistRow(icon: "camera.fill", title: viewModel.hasCameraAccess ? LocalizationSupport.localized("Camera Enabled") : LocalizationSupport.localized("Camera Disabled"), subtitle: LocalizationSupport.localized("Enable for video tutoring."), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
+		  checklistRow(icon: "camera.fill", title: viewModel.hasCameraAccess ? LocalizationSupport.localized("Camera Enabled") : LocalizationSupport.localized("Camera Disabled"), subtitle: LocalizationSupport.localized("Enable for video tutoring."), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText, onTap: viewModel.hasCameraAccess ? nil : onOpenPermissions)
 		  FlatRule()
 		  checklistRow(icon: "wifi", title: LocalizationSupport.localized("Connection"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
 		}
@@ -466,41 +475,51 @@ struct TeacherDashboardView: View {
 	}
   }
 
-  func statusItem(icon: String, title: String, subtitle: String, color: Color) -> some View {
-	HStack(spacing: 8) {
-	  PlatformIcon(systemName: icon, size: 14, weight: .semibold, color: color)
+  func statusItem(icon: String, title: String, subtitle: String, color: Color, onTap: (() -> Void)? = nil) -> some View {
+	Button { onTap?() } label: {
+	  HStack(spacing: 8) {
+		PlatformIcon(systemName: icon, size: 14, weight: .semibold, color: color)
 
-	  VStack(alignment: .leading, spacing: 1) {
-		Text(title)
-		  .font(.system(size: 12, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
+		VStack(alignment: .leading, spacing: 1) {
+		  Text(title)
+			.font(.system(size: 12, weight: .bold))
+			.foregroundStyle(theme.primaryText)
 
-		Text(subtitle)
-		  .font(.system(size: 11))
-		  .foregroundStyle(theme.secondaryText)
+		  Text(subtitle)
+			.font(.system(size: 11))
+			.foregroundStyle(theme.secondaryText)
+		}
 	  }
+	  .frame(maxWidth: .infinity)
 	}
-	.frame(maxWidth: .infinity)
+	.buttonStyle(.plain)
   }
 
-  func checklistRow(icon: String, title: String, subtitle: String, color: Color) -> some View {
-	HStack(spacing: 14) {
-	  FlatIconTile(systemName: icon, size: 44, tint: color)
+  func checklistRow(icon: String, title: String, subtitle: String, color: Color, onTap: (() -> Void)? = nil) -> some View {
+	Button { onTap?() } label: {
+	  HStack(spacing: 14) {
+		FlatIconTile(systemName: icon, size: 44, tint: color)
 
-	  VStack(alignment: .leading, spacing: 2) {
-		Text(title)
-		  .font(.system(size: 15, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
+		VStack(alignment: .leading, spacing: 2) {
+		  Text(title)
+			.font(.system(size: 15, weight: .bold))
+			.foregroundStyle(theme.primaryText)
 
-		Text(subtitle)
-		  .font(.system(size: 13))
-		  .foregroundStyle(theme.secondaryText)
+		  Text(subtitle)
+			.font(.system(size: 13))
+			.foregroundStyle(theme.secondaryText)
+		}
+
+		Spacer()
+
+		if onTap != nil {
+		  PlatformIcon(systemName: "chevron.right", size: 12, weight: .semibold, color: theme.secondaryText)
+		}
 	  }
-
-	  Spacer()
+	  .padding(.horizontal, 16)
+	  .padding(.vertical, 12)
 	}
-	.padding(.horizontal, 16)
-	.padding(.vertical, 12)
+	.buttonStyle(.plain)
   }
 
   struct EarningsCard: View {

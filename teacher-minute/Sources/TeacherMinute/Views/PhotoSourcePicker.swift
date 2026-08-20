@@ -25,6 +25,7 @@ struct PhotoSourceButton<Label: View>: View {
   @State private var showSourceDialog = false
   @State private var showLibraryPicker = false
   @State private var pickedItem: PhotosPickerItem?
+  @State private var showCameraPermissionDenied = false
 #if os(iOS)
   @State private var showCamera = false
 #endif
@@ -38,7 +39,11 @@ struct PhotoSourceButton<Label: View>: View {
       AppDialogAction(LocalizationSupport.localized("Take Photo")) {
         Task {
           let state = await PermissionService.shared.requestCapturePermission(for: .camera)
-          if state.isGranted { showCamera = true }
+          if state.isGranted {
+            showCamera = true
+          } else if state == .denied {
+            showCameraPermissionDenied = true
+          }
         }
       }
     )
@@ -85,6 +90,18 @@ struct PhotoSourceButton<Label: View>: View {
       .ignoresSafeArea()
     }
 #endif
+    .appDialog(
+      LocalizationSupport.localized("Camera access required"),
+      isPresented: $showCameraPermissionDenied,
+      message: LocalizationSupport.localized("Enable camera access in Settings to take photos."),
+      actions: [
+        AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+          PermissionService.shared.openAppSettings()
+        },
+        AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
+      ],
+      coversScreen: true
+    )
   }
 }
 

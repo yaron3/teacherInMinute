@@ -92,17 +92,6 @@ struct PermissionsSetupView: View {
             AuthPrimaryButton(title: LocalizationSupport.localized("Continue Setup"), systemImage: "arrow.right") {
                 viewModel.continueSetup()
             }
-
-            Button {
-                viewModel.limitedMode()
-            } label: {
-                Text(LocalizationSupport.localized("Not now, use limited mode"))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.secondaryText)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 20)
             .padding(.bottom, 24)
         }
         .padding(.horizontal, 18)

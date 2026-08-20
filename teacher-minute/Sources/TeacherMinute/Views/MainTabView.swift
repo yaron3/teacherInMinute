@@ -10,6 +10,7 @@ import SwiftUI
 struct MainTabView: View {
   @State var viewModel: MainTabViewModel
   @State var teacherDashboardViewModel: TeacherDashboardViewModel?
+  @State var settingsViewModel: SettingsViewModel
   @State var hidesTabBar = false
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -19,6 +20,7 @@ struct MainTabView: View {
   init(userMode: AppUserMode = .teacher) {
 	self._viewModel = State(wrappedValue: MainTabViewModel(userMode: userMode))
 	self._teacherDashboardViewModel = State(wrappedValue: userMode == .teacher ? TeacherDashboardViewModel() : nil)
+	self._settingsViewModel = State(wrappedValue: SettingsViewModel(role: userMode))
   }
   
   var body: some View {
@@ -77,6 +79,9 @@ struct MainTabView: View {
 	  }
 	  if newTab == .lessons {
 		viewModel.markLessonsTabEntered()
+	  }
+	  if newTab == .home {
+		teacherDashboardViewModel?.refreshPermissionStatus()
 	  }
 	}
 	.onChange(of: teacherDashboardViewModel?.lessonCount ?? 0) { _, newCount in
@@ -139,7 +144,14 @@ struct MainTabView: View {
 			viewModel: teacherDashboardViewModel,
 			hidesTabBar: $hidesTabBar,
 			showsSessionOverlay: false,
-			showsIncomingOverlay: false
+			showsIncomingOverlay: false,
+			onOpenPermissions: {
+			  withAnimation { viewModel.selectedTab = .settings }
+			  Task { @MainActor in
+				try? await Task.sleep(nanoseconds: 350_000_000)
+				settingsViewModel.navigationPath = [.mediaPermissions]
+			  }
+			}
 		  )
 		  .trackScreen(AnalyticsScreen.teacherDashboard)
 		}
@@ -158,7 +170,7 @@ struct MainTabView: View {
 		  .trackScreen(AnalyticsScreen.profile)
 		
 	  case .settings:
-		SettingsView(role: viewModel.userMode, viewModel: nil)
+		SettingsView(role: viewModel.userMode, viewModel: settingsViewModel)
 		  .trackScreen(AnalyticsScreen.settings)
 	}
   }

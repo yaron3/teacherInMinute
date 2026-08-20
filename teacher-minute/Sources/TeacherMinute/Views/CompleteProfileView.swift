@@ -90,11 +90,8 @@ struct CompleteProfileView: View {
             .navigationBarBackButtonHidden(true)
             .onAppear {
                 viewModel.onContinue = {
-                    if viewModel.shouldShowPermissionsOnContinue && PermissionsSetupStore.shouldShowForCurrentUser() {
-                        router.replace(with: .permissionsSetup(role: viewModel.role))
-                    } else {
-                        router.enterMainTabs(role: viewModel.role)
-                    }
+                    PermissionsSetupStore.markCompletedForCurrentUser()
+                    router.enterMainTabs(role: viewModel.role)
                 }
                 viewModel.checkAndAutoAdvance()
             }

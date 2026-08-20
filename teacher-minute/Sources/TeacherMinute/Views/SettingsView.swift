@@ -123,6 +123,8 @@ struct SettingsView: View {
             ChangePasswordSettingsView(viewModel: viewModel)
         case .notifications:
             NotificationPreferencesSettingsView(role: role)
+        case .mediaPermissions:
+            MediaPermissionsSettingsView()
         case .privacyControls:
             PrivacyControlsSettingsView()
         }
@@ -706,6 +708,93 @@ struct NotificationPreferencesSettingsView: View {
         defer { isRequesting = false }
         let result = await PermissionService.shared.requestNotifications()
         notificationState = result
+    }
+}
+
+struct MediaPermissionsSettingsView: View {
+    @State var micState: PermissionState = .notDetermined
+    @State var cameraState: PermissionState = .notDetermined
+    @State var isRequestingMic = false
+    @State var isRequestingCamera = false
+
+    var body: some View {
+        Form {
+            Section(header: Text(LocalizationSupport.localized("System Permissions"))) {
+                permissionRow(
+                    title: LocalizationSupport.localized("Microphone"),
+                    subtitle: LocalizationSupport.localized("Required for audio and video sessions"),
+                    icon: "mic.fill",
+                    state: micState,
+                    isRequesting: isRequestingMic,
+                    onEnable: { Task { await requestMic() } }
+                )
+                permissionRow(
+                    title: LocalizationSupport.localized("Camera"),
+                    subtitle: LocalizationSupport.localized("Required for video sessions and taking photos"),
+                    icon: "camera.fill",
+                    state: cameraState,
+                    isRequesting: isRequestingCamera,
+                    onEnable: { Task { await requestCamera() } }
+                )
+            }
+        }
+        .task {
+            micState = PermissionService.shared.captureStatus(for: .microphone)
+            cameraState = PermissionService.shared.captureStatus(for: .camera)
+        }
+    }
+
+    @ViewBuilder
+    private func permissionRow(
+        title: String,
+        subtitle: String,
+        icon: String,
+        state: PermissionState,
+        isRequesting: Bool,
+        onEnable: @escaping () -> Void
+    ) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(title, systemImage: icon)
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            switch state {
+            case .notDetermined:
+                Button {
+                    onEnable()
+                } label: {
+                    if isRequesting {
+                        ProgressView().scaleEffect(0.8)
+                    } else {
+                        Text(LocalizationSupport.localized("Enable"))
+                    }
+                }
+                .disabled(isRequesting)
+            case .denied:
+                Button(LocalizationSupport.localized("Open Settings")) {
+                    PermissionService.shared.openAppSettings()
+                }
+                .foregroundStyle(.red)
+            case .granted:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            }
+        }
+    }
+
+    private func requestMic() async {
+        isRequestingMic = true
+        defer { isRequestingMic = false }
+        micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+    }
+
+    private func requestCamera() async {
+        isRequestingCamera = true
+        defer { isRequestingCamera = false }
+        cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
     }
 }
 

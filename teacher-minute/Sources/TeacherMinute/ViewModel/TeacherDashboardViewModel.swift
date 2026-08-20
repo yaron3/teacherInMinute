@@ -640,7 +640,7 @@ final class TeacherDashboardViewModel {
 	}
 	
 	isVerified = (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
-	checkPermissions()
+	refreshPermissionStatus()
 	await loadEarnings(uid: uid)
   }
   
@@ -693,7 +693,7 @@ final class TeacherDashboardViewModel {
 	Task { await loadEarnings(uid: uid) }
   }
   
-  private func checkPermissions() {
+  func refreshPermissionStatus() {
 #if !os(Android)
 	hasMicAccess = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
 	hasCameraAccess = AVCaptureDevice.authorizationStatus(for: .video) == .authorized

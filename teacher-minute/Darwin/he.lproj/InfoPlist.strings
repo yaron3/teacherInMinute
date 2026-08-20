@@ -1,2 +1,6 @@
 "CFBundleDisplayName" = "מורה בדקה";
 "CFBundleName" = "מורה בדקה";
+"NSCameraUsageDescription" = "Instant Teacher משתמשת במצלמה לשיעורי וידאו חיים ולצילום סלפי לאימות זהות.";
+"NSMicrophoneUsageDescription" = "Instant Teacher משתמשת במיקרופון לשיעורי קול חיים.";
+"NSPhotoLibraryUsageDescription" = "Instant Teacher מאפשרת לבחור תמונות לפרופיל שלכם, לשאלות בשיעורים ולמסמכי אימות מורה.";
+"NSPhotoLibraryAddUsageDescription" = "Instant Teacher עשויה לשמור תמונות שיצרתם או קיבלתם במהלך שיעורים לספריית התמונות שלכם.";

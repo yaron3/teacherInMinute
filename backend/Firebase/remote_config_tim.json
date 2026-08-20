@@ -3661,7 +3661,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "מאופשר"
+          "value": "אפשר"
         }
       },
       "valueType": "STRING"

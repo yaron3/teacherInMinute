@@ -153,7 +153,7 @@ enum PermissionState: String {
     var actionTitle: String {
         switch self {
         case .notDetermined: return LocalizationSupport.localized("Enable")
-        case .granted: return LocalizationSupport.localized("Manage")
+        case .granted: return LocalizationSupport.localized("Enabled")
         case .denied: return LocalizationSupport.localized("Settings")
         }
     }
