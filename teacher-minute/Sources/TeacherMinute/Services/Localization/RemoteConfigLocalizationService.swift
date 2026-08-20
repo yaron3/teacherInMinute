@@ -88,6 +88,12 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // no template entry. Translated alongside the Remote Config additions.
         "%@/min": "%@ לדקה",
         "Attach a photo (optional)": "צירוף תמונה (רשות)",
+        // Ask-a-Teacher composer copy added with the redesigned sheet. No
+        // Remote Config entries yet, so these fallbacks are what renders.
+        "Tell us what you're stuck on. A teacher usually joins within a minute.": "ספרו לנו במה נתקעתם. מורה בדרך כלל מצטרף תוך כדקה.",
+        "For example: I got stuck on question 3 right after opening the parentheses.": "לדוגמה: נתקעתי בשאלה 3 מיד אחרי פתיחת הסוגריים.",
+        "Math keyboard": "מקלדת נוסחאות",
+        "Ready to send": "אפשר לשלוח",
         "Debug builds only": "גרסאות פיתוח בלבד",
         "Enabling...": "מפעיל...",
         "Image": "תמונה",
