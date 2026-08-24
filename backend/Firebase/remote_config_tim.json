@@ -7203,6 +7203,94 @@
         }
       },
       "valueType": "STRING"
+    },
+    "mic_denied_audio_enable": {
+      "defaultValue": {
+        "value": "Microphone access is required for an audio session. Enable it in Settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת גישה למיקרופון לשיחת שמע. הפעילו אותה בהגדרות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "mic_denied_video_enable": {
+      "defaultValue": {
+        "value": "Microphone access is required for a video session. Enable it in Settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת גישה למיקרופון לשיחת וידאו. הפעילו אותה בהגדרות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "mic_camera_denied_video_enable": {
+      "defaultValue": {
+        "value": "Microphone and camera access are required for a video session. Enable them in Settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת גישה למיקרופון ולמצלמה לשיחת וידאו. הפעילו אותן בהגדרות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_requesting_audio_mic": {
+      "defaultValue": {
+        "value": "The student is requesting an audio call. Enable microphone access to accept."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד מבקש שיחת שמע. הפעילו גישה למיקרופון כדי לקבל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_requesting_video_mic": {
+      "defaultValue": {
+        "value": "The student is requesting a video call. Enable microphone access to accept."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד מבקש שיחת וידאו. הפעילו גישה למיקרופון כדי לקבל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_requesting_video_camera": {
+      "defaultValue": {
+        "value": "The student is requesting a video call. Enable camera access to accept."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד מבקש שיחת וידאו. הפעילו גישה למצלמה כדי לקבל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "notifications_title": {
+      "defaultValue": {
+        "value": "Notifications"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התראות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "alerts_when_teacher_accepts": {
+      "defaultValue": {
+        "value": "Alerts when a teacher accepts your request or replies"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התראות כשמורה מקבל את בקשתך או עונה"
+        }
+      },
+      "valueType": "STRING"
     }
   }
 }

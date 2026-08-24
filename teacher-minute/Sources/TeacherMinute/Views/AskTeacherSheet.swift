@@ -10,6 +10,7 @@
 import SwiftUI
 #if !os(Android)
 @preconcurrency import PhotosUI
+import AVFoundation
 import FirebaseAuth
 #else
 import SkipBridge
@@ -34,10 +35,21 @@ struct AskTeacherSheet: View {
 
     init(viewModel: any StudentHomeViewModeling) {
         self.viewModel = viewModel
-        // The default session type is configurable in Settings and defaults to
-        // an audio call when the student has not chosen otherwise.
         let stored = UserDefaults.standard.string(forKey: SessionPreferences.defaultQuestionTypeKey)
-        _conversationType = State(initialValue: stored ?? ConversationType.audio.rawValue)
+        let preferred = stored ?? ConversationType.audio.rawValue
+        // Only keep audio/video as the default if mic is already granted; any other
+        // state (not determined, denied) defaults to text so the student isn't stuck
+        // on a mode they can't use before granting permission.
+        #if !os(Android)
+        let micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        if !micGranted && (preferred == ConversationType.audio.rawValue || preferred == ConversationType.video.rawValue) {
+            _conversationType = State(initialValue: ConversationType.text.rawValue)
+        } else {
+            _conversationType = State(initialValue: preferred)
+        }
+        #else
+        _conversationType = State(initialValue: preferred)
+        #endif
     }
 
     @State  var selectedTopic = ("Algebra")
@@ -239,7 +251,7 @@ struct AskTeacherSheet: View {
     func sessionTypeSegment(value: String, icon: String, title: String) -> some View {
         let isSelected = conversationType == value
         return Button {
-            conversationType = value
+            Task { await selectConversationType(value) }
         } label: {
             VStack(spacing: 5) {
                 PlatformIcon(
@@ -435,31 +447,81 @@ struct AskTeacherSheet: View {
         isRequestingPermission = true
         defer { isRequestingPermission = false }
 
-        if conversationType == "audio" || conversationType == "video" {
-            let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
-            if !micState.isGranted {
-                permissionAlertMessage = conversationType == "video"
-                    ? LocalizationSupport.localized("Microphone and camera access are required for a video session.")
-                    : LocalizationSupport.localized("Microphone access is required for an audio session.")
-                return
-            }
-        }
-
-        if conversationType == "video" {
-            let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
-            if !cameraState.isGranted {
-                permissionAlertMessage = LocalizationSupport.localized("Microphone and camera access are required for a video session.")
-                return
-            }
-        }
-
+        // Permission was already validated when the user tapped the session type
+        // segment, so just capture the current type and submit.
+        let finalType = conversationType
         closeAskTeacher()
         await viewModel.askTeacher(
             topic: selectedTopic.lowercased(),
             text: questionText.trimmingCharacters(in: .whitespaces),
             photoUrls: uploadedPhotoUrls,
-            conversationType: conversationType
+            conversationType: finalType
         )
+    }
+
+    /// Validates permissions for the requested session type and updates
+    /// `conversationType` to reflect what is actually allowed. Called when the
+    /// student taps a segment — before they hit "Find a Teacher" — so the
+    /// selected type always reflects real permission state by submit time.
+    func selectConversationType(_ type: String) async {
+        guard !isRequestingPermission else { return }
+
+        // Text needs no permission.
+        guard type == ConversationType.audio.rawValue || type == ConversationType.video.rawValue else {
+            conversationType = type
+            return
+        }
+
+        if type == ConversationType.audio.rawValue {
+            let micState = PermissionService.shared.captureStatus(for: .microphone)
+            if micState == .granted {
+                conversationType = ConversationType.audio.rawValue
+            } else if micState == .denied {
+                // Stay on text and explain what to do.
+                conversationType = ConversationType.text.rawValue
+                permissionAlertMessage = LocalizationSupport.localized("Microphone access is required for an audio session. Enable it in Settings.")
+            } else {
+                // Not determined — show system dialog immediately.
+                isRequestingPermission = true
+                let result = await PermissionService.shared.requestCapturePermission(for: .microphone)
+                isRequestingPermission = false
+                conversationType = result.isGranted ? ConversationType.audio.rawValue : ConversationType.text.rawValue
+            }
+            return
+        }
+
+        // Video
+        var micState = PermissionService.shared.captureStatus(for: .microphone)
+        var cameraState = PermissionService.shared.captureStatus(for: .camera)
+
+        if micState == .denied && cameraState == .denied {
+            conversationType = ConversationType.text.rawValue
+            permissionAlertMessage = LocalizationSupport.localized("Microphone and camera access are required for a video session. Enable them in Settings.")
+            return
+        }
+
+        // Request any permissions that haven't been asked yet (system dialog).
+        isRequestingPermission = true
+        if micState == .notDetermined {
+            micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+        }
+        if cameraState == .notDetermined {
+            cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+        }
+        isRequestingPermission = false
+
+        if micState.isGranted && cameraState.isGranted {
+            conversationType = ConversationType.video.rawValue
+        } else if micState.isGranted {
+            // Camera unavailable but mic works — silently downgrade to audio.
+            conversationType = ConversationType.audio.rawValue
+        } else {
+            // Mic denied — revert to text and explain.
+            conversationType = ConversationType.text.rawValue
+            permissionAlertMessage = cameraState.isGranted
+                ? LocalizationSupport.localized("Microphone access is required for a video session. Enable it in Settings.")
+                : LocalizationSupport.localized("Microphone and camera access are required for a video session. Enable them in Settings.")
+        }
     }
 
     // MARK: - Photos

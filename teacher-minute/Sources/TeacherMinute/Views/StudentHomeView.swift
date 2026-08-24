@@ -14,7 +14,6 @@ struct StudentHomeView: View {
   @State var showingCouponAlert = false
   @State var showingPurchaseSummaryAlert = false
   @State var showsAskTeacher = false
-  @State var showsNotificationExplainer = false
   @State var showsPricingOptions: Bool
   @State var selectedPricingOptionID: String?
   @State var pendingCheckoutOption: PricingOption?
@@ -46,16 +45,7 @@ struct StudentHomeView: View {
 	  }
 	  .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
 	}
-	.sheet(isPresented: $showsNotificationExplainer) {
-	  NotificationPermissionExplainerView {
-		NotificationPromptStore.markExplanationShown()
-		showsNotificationExplainer = false
-	  }
-	  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-	  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-	  .id(languagePreference)
-		}
-		.task {
+	.task {
 		  await viewModel.loadProfileIfNeeded()
 		  updatePricingVisibilityForCurrentBalance()
 		}
@@ -544,11 +534,6 @@ struct StudentHomeView: View {
           await viewModel.refreshAfterLessonEnded()
           updatePricingVisibilityForCurrentBalance()
           viewModel.resetSearch()
-          // After the student's first lesson, offer notifications behind a
-          // custom explanation (the system prompt only appears if they opt in).
-          if await NotificationPromptStore.shouldPresentExplanation() {
-            showsNotificationExplainer = true
-          }
         }
       }
       .onAppear { hidesTabBar = true }

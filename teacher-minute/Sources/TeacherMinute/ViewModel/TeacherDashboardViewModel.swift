@@ -57,6 +57,8 @@ final class TeacherDashboardViewModel {
   var activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
+  var permissionAlertMessage: String? = nil
+  var permissionAlertQuestionId: String? = nil
   var isAcceptingCalls = false
   var isVerified = false
   var subjects: [String] = []
@@ -373,21 +375,37 @@ final class TeacherDashboardViewModel {
 	  guard let self else { return }
 	  
 	  if conversationType == "audio" || conversationType == "video" {
-		let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
-		if !micState.isGranted {
-		  errorMessage = conversationType == "video"
-		  ? LocalizationSupport.localized("Microphone and camera access are required to accept a video session.")
-		  : LocalizationSupport.localized("Microphone access is required to accept an audio session.")
+		var micState = PermissionService.shared.captureStatus(for: .microphone)
+		if micState == .denied {
+		  permissionAlertQuestionId = questionId
+		  permissionAlertMessage = conversationType == "video"
+			? LocalizationSupport.localized("The student is requesting a video call. Enable microphone access to accept.")
+			: LocalizationSupport.localized("The student is requesting an audio call. Enable microphone access to accept.")
 		  logger.info("[VM] acceptInvite blocked — mic permission denied qid=\(questionId)")
 		  return
 		}
+		if micState == .notDetermined {
+		  micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+		  if !micState.isGranted {
+			logger.info("[VM] acceptInvite — mic permission refused by user qid=\(questionId)")
+			return
+		  }
+		}
 	  }
 	  if conversationType == "video" {
-		let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
-		if !cameraState.isGranted {
-		  errorMessage = LocalizationSupport.localized("Microphone and camera access are required to accept a video session.")
+		var cameraState = PermissionService.shared.captureStatus(for: .camera)
+		if cameraState == .denied {
+		  permissionAlertQuestionId = questionId
+		  permissionAlertMessage = LocalizationSupport.localized("The student is requesting a video call. Enable camera access to accept.")
 		  logger.info("[VM] acceptInvite blocked — camera permission denied qid=\(questionId)")
 		  return
+		}
+		if cameraState == .notDetermined {
+		  cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+		  if !cameraState.isGranted {
+			logger.info("[VM] acceptInvite — camera permission refused by user qid=\(questionId)")
+			return
+		  }
 		}
 	  }
 	  

@@ -144,6 +144,18 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "The demo student service did not respond. Make sure it is running on your machine.": "שירות תלמיד ההדגמה לא הגיב. ודאו שהוא פועל במחשב שלכם.",
         "The demo student service could not create the question.": "שירות תלמיד ההדגמה לא הצליח ליצור את השאלה.",
         "Camera access is required to take a photo.": "נדרשת גישה למצלמה כדי לצלם תמונה.",
+        // Permission-denied dialog title and per-context messages with Settings deep-link.
+        "Permission required": "נדרשת הרשאה",
+        "Microphone access is required for an audio session. Enable it in Settings.": "נדרשת גישה למיקרופון לשיחת שמע. הפעילו אותה בהגדרות.",
+        "Microphone access is required for a video session. Enable it in Settings.": "נדרשת גישה למיקרופון לשיחת וידאו. הפעילו אותה בהגדרות.",
+        "Microphone and camera access are required for a video session. Enable them in Settings.": "נדרשת גישה למיקרופון ולמצלמה לשיחת וידאו. הפעילו אותן בהגדרות.",
+        // Teacher incoming-question permission prompts.
+        "The student is requesting an audio call. Enable microphone access to accept.": "התלמיד מבקש שיחת שמע. הפעילו גישה למיקרופון כדי לקבל.",
+        "The student is requesting a video call. Enable microphone access to accept.": "התלמיד מבקש שיחת וידאו. הפעילו גישה למיקרופון כדי לקבל.",
+        "The student is requesting a video call. Enable camera access to accept.": "התלמיד מבקש שיחת וידאו. הפעילו גישה למצלמה כדי לקבל.",
+        // App Permissions screen — notification row.
+        "Notifications": "התראות",
+        "Alerts when a teacher accepts your request or replies": "התראות כשמורה מקבל את בקשתך או עונה",
         // Contextual permission prompts (replacing the removed onboarding permissions screen).
         "App Permissions": "הרשאות אפליקציה",
         "Microphone and camera": "מיקרופון ומצלמה",
@@ -257,6 +269,18 @@ enum LocalizationKey {
         "Microphone access is required to accept an audio session.": "microphone_access_accept_audio",
         "Microphone and camera access are required for a video session.": "microphone_camera_video_session",
         "Microphone and camera access are required to accept a video session.": "microphone_camera_accept_video",
+        // Permission-denied prompts with Settings deep-link (replacing the older strings above).
+        "Permission required": "permission_required",
+        "Microphone access is required for an audio session. Enable it in Settings.": "mic_denied_audio_enable",
+        "Microphone access is required for a video session. Enable it in Settings.": "mic_denied_video_enable",
+        "Microphone and camera access are required for a video session. Enable them in Settings.": "mic_camera_denied_video_enable",
+        // Incoming-question teacher prompts — all share the same auto-generated prefix.
+        "The student is requesting an audio call. Enable microphone access to accept.": "student_requesting_audio_mic",
+        "The student is requesting a video call. Enable microphone access to accept.": "student_requesting_video_mic",
+        "The student is requesting a video call. Enable camera access to accept.": "student_requesting_video_camera",
+        // App Permissions screen — notification row.
+        "Notifications": "notifications_title",
+        "Alerts when a teacher accepts your request or replies": "alerts_when_teacher_accepts",
         "No messages": "messages_b",
         "OFF": "off_caps",
         "OK": "ok",

@@ -124,7 +124,7 @@ struct SettingsView: View {
         case .notifications:
             NotificationPreferencesSettingsView(role: role)
         case .mediaPermissions:
-            MediaPermissionsSettingsView()
+            MediaPermissionsSettingsView(role: role)
         case .privacyControls:
             PrivacyControlsSettingsView()
         }
@@ -672,9 +672,6 @@ struct NotificationPreferencesSettingsView: View {
         }
         .task {
             notificationState = await PermissionService.shared.notificationStatus()
-            if notificationState == .notDetermined {
-                await requestNotifications()
-            }
         }
     }
 
@@ -712,10 +709,13 @@ struct NotificationPreferencesSettingsView: View {
 }
 
 struct MediaPermissionsSettingsView: View {
+    let role: AppUserMode
     @State var micState: PermissionState = .notDetermined
     @State var cameraState: PermissionState = .notDetermined
+    @State var notificationState: PermissionState = .notDetermined
     @State var isRequestingMic = false
     @State var isRequestingCamera = false
+    @State var isRequestingNotifications = false
 
     var body: some View {
         Form {
@@ -736,11 +736,20 @@ struct MediaPermissionsSettingsView: View {
                     isRequesting: isRequestingCamera,
                     onEnable: { Task { await requestCamera() } }
                 )
+                permissionRow(
+                    title: LocalizationSupport.localized("Notifications"),
+                    subtitle: LocalizationSupport.localized("Alerts when a teacher accepts your request or replies"),
+                    icon: "bell.fill",
+                    state: notificationState,
+                    isRequesting: isRequestingNotifications,
+                    onEnable: { Task { await requestNotifications() } }
+                )
             }
         }
         .task {
             micState = PermissionService.shared.captureStatus(for: .microphone)
             cameraState = PermissionService.shared.captureStatus(for: .camera)
+            notificationState = await PermissionService.shared.notificationStatus()
         }
     }
 
@@ -779,8 +788,7 @@ struct MediaPermissionsSettingsView: View {
                 }
                 .foregroundStyle(.red)
             case .granted:
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                PlatformIcon(systemName: "checkmark.circle.fill", size: 20, weight: .regular, color: .green)
             }
         }
     }
@@ -795,6 +803,15 @@ struct MediaPermissionsSettingsView: View {
         isRequestingCamera = true
         defer { isRequestingCamera = false }
         cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+    }
+
+    private func requestNotifications() async {
+        isRequestingNotifications = true
+        defer { isRequestingNotifications = false }
+        notificationState = await PermissionService.shared.requestNotifications()
+        if notificationState == .granted {
+            PushNotificationService.shared.registerCurrentDevice(role: role)
+        }
     }
 }
 

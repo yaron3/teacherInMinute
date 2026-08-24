@@ -194,6 +194,27 @@ struct TeacherDashboardView: View {
 		  viewModel.refreshPermissionStatus()
 		}
 	  }
+	  .appDialog(
+		LocalizationSupport.localized("Permission required"),
+		isPresented: Binding(
+		  get: { viewModel.permissionAlertMessage != nil },
+		  set: { if !$0 {
+			viewModel.permissionAlertMessage = nil
+			viewModel.permissionAlertQuestionId = nil
+		  } }
+		),
+		message: viewModel.permissionAlertMessage ?? "",
+		actions: [
+		  AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+			PermissionService.shared.openAppSettings()
+		  },
+		  AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel) {
+			if let qid = viewModel.permissionAlertQuestionId {
+			  viewModel.declineInvite(questionId: qid)
+			}
+		  }
+		]
+	  )
 
 	}
   }
@@ -808,5 +829,19 @@ struct TeacherIncomingQuestionOverlay: View {
 	  }
 	}
 	.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+	.appDialog(
+	  LocalizationSupport.localized("Permission required"),
+	  isPresented: Binding(
+		get: { viewModel.permissionAlertMessage != nil },
+		set: { if !$0 { viewModel.permissionAlertMessage = nil } }
+	  ),
+	  message: viewModel.permissionAlertMessage ?? "",
+	  actions: [
+		AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+		  PermissionService.shared.openAppSettings()
+		},
+		AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
+	  ]
+	)
   }
 }
