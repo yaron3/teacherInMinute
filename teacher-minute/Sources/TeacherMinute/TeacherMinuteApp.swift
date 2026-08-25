@@ -104,9 +104,11 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
               PaymentReturnStore.shared.handle(url: url)
             }
 					.task {
-			  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
-			  await performLaunchSessionResume()
-			  withAnimation(.easeOut(duration: 0.25)) {
+				  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
+				  let remoteConfigReady = await RemoteConfigService.shared.readyForLaunch()
+				  logger.info("[RemoteConfig] launch gate finished ready=\(remoteConfigReady)")
+				  await performLaunchSessionResume()
+				  withAnimation(.easeOut(duration: 0.25)) {
 				isLaunching = false
 			  }
 			}

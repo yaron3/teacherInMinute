@@ -46,6 +46,9 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Title of the photo-source dialog; its buttons already had Hebrew, so
         // only the heading was showing through in English.
         "Add a photo": "הוספת תמונה",
+        "Camera disabled": "המצלמה כבויה",
+        "Camera access is disabled. Open Settings and enable camera access to take a photo.": "הגישה למצלמה כבויה. פתחו את ההגדרות ואפשרו גישה למצלמה כדי לצלם תמונה.",
+        "Open Settings": "פתיחת הגדרות",
         // Grade ordinals, mirroring the `grade_1`...`grade_12` Remote Config
         // entries so the chips read correctly even before the template is
         // published to the console.
@@ -137,6 +140,8 @@ enum LocalizationKey {
         "I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)": "agree_terms_privacy_markdown",
         "Are you sure you want to end this session?": "are_you_sure_end_session",
         "Audio": "audio_title",
+        "Camera disabled": "camera_disabled",
+        "Camera access is disabled. Open Settings and enable camera access to take a photo.": "camera_access_disabled_settings_photo",
         "Could not send rating. Please try again next time.": "could_not_send_dot_a",
         "Could not send your message.": "could_not_send_dot_b",
         "Could not start the audio/video connection. Please try again.": "could_not_start_audio_video",
@@ -176,6 +181,7 @@ enum LocalizationKey {
         "OFF": "off_caps",
         "OK": "ok",
         "ON": "on_caps",
+        "Open Settings": "open_settings",
         "ORIGINAL QUESTION": "original_question_caps",
         "On": "on",
         "PAYMENTS": "payments_caps",

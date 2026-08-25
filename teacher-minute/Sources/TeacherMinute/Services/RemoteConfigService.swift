@@ -25,11 +25,24 @@ enum RemoteConfigKey: String {
     case paymentMethods = "payment_methods"
 }
 
+enum RemoteConfigLaunchError: LocalizedError {
+    case initialFetchTimedOut(seconds: Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .initialFetchTimedOut(let seconds):
+            return "Remote Config initial fetch did not complete within \(seconds) seconds."
+        }
+    }
+}
+
 @MainActor
 final class RemoteConfigService {
     static let shared = RemoteConfigService()
 
     private var firstFetch: Task<Void, Never>?
+    private var didRecordLaunchTimeout = false
+    private let launchTimeoutSeconds = 30
 
     private init() {}
 
@@ -61,6 +74,39 @@ final class RemoteConfigService {
                 logger.error("[RemoteConfig] initial fetchAndActivate failed: \(error.localizedDescription)")
             }
         }
+    }
+
+    /// Await this when startup must hold until Remote Config is ready. Returns
+    /// `false` only when the launch timeout wins; the fetch task continues so a
+    /// late result can still activate values for the running app.
+    func readyForLaunch() async -> Bool {
+        if firstFetch == nil {
+            start()
+        }
+        guard let firstFetch else { return true }
+
+        let timeoutSeconds = launchTimeoutSeconds
+        let completedBeforeTimeout = await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                await firstFetch.value
+                return true
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
+                return false
+            }
+
+            let result = await group.next() ?? false
+            group.cancelAll()
+            return result
+        }
+
+        if completedBeforeTimeout {
+            logger.info("[RemoteConfig] initial fetch completed before launch gate timeout")
+        } else {
+            recordLaunchTimeout(seconds: timeoutSeconds)
+        }
+        return completedBeforeTimeout
     }
 
     /// Await this when a caller needs to be sure the first fetch has completed.
@@ -104,11 +150,22 @@ final class RemoteConfigService {
         let remoteConfig = RemoteConfig.remoteConfig()
         let settings = RemoteConfigSettings()
         settings.minimumFetchInterval = 3600
-        settings.fetchTimeout = 15
+        settings.fetchTimeout = Double(launchTimeoutSeconds)
         remoteConfig.configSettings = settings
         #if os(Android)
         logger.info("[RemoteConfig][Android] configured; minimumFetchInterval=\(settings.minimumFetchInterval) fetchTimeout=\(settings.fetchTimeout)")
         #endif
+    }
+
+    private func recordLaunchTimeout(seconds: Int) {
+        guard !didRecordLaunchTimeout else { return }
+        didRecordLaunchTimeout = true
+        let error = RemoteConfigLaunchError.initialFetchTimedOut(seconds: seconds)
+        logger.error("[RemoteConfig] launch gate timed out after \(seconds) seconds")
+        AnalyticsService.shared.logEvent("remote_config_launch_timeout", parameters: [
+            "timeout_seconds": seconds
+        ])
+        AnalyticsService.shared.recordError(error, context: "remoteConfigLaunch")
     }
 
     // MARK: - Sync accessors
