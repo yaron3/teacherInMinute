@@ -45,6 +45,18 @@ struct MainTabView: View {
 		  .tag(MainTab.lessons)
 		  .badge(viewModel.shouldShowLessonsBadge ? 1 : 0)
 
+		if viewModel.userMode == .teacher {
+		  tabContent(.earnings)
+			.tabItem {
+			  Label {
+				Text(LocalizationSupport.localized("Earnings"))
+			  } icon: {
+				tabIcon(.earnings)
+			  }
+			}
+			.tag(MainTab.earnings)
+		}
+
 		tabContent(.profile)
 		  .tabItem {
 			Label {
@@ -152,7 +164,10 @@ struct MainTabView: View {
 		  TeacherLessonHistoryView()
 			.trackScreen(AnalyticsScreen.teacherLessonHistory)
 		}
-		
+
+	  case .earnings:
+		TeacherEarningsView()
+
 	  case .profile:
 		ProfileView(viewModel: ProfileViewModel(roleType: viewModel.userMode == .teacher ? .teacher : .student))
 		  .trackScreen(AnalyticsScreen.profile)

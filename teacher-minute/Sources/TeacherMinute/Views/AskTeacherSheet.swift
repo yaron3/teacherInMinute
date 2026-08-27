@@ -21,6 +21,8 @@ struct AskTeacherSheet: View {
 
     static let topics = [("Algebra"), ("Geometry"), ("Trigonometry"), ("Calculus"), ("Statistics"), ("Arithmetic")]
     static let maxPhotoCount = 4
+    static let mathSymbolsRow1 = ["≥", "≠", "÷", "×", "±", "π", "³", "²", "√"]
+    static let mathSymbolsRow2 = ["xⁿ", "¾", "½", "¼", "Σ", "∞", "≤"]
 
     init(viewModel: any StudentHomeViewModeling) {
         self.viewModel = viewModel
@@ -33,7 +35,6 @@ struct AskTeacherSheet: View {
     @State  var selectedTopic = ("Algebra")
     @State  var questionText = ""
     @State  var conversationType: String
-    @State  var composerMode: ChatComposerMode = .regular
     @State  var permissionAlertMessage: String? = nil
     @State  var isRequestingPermission = false
     @State  var uploadedPhotoUrls: [String] = []
@@ -47,7 +48,6 @@ struct AskTeacherSheet: View {
     @Environment(\.dismiss) var dismiss
   private var canSubmit: Bool {
     questionText.trimmingCharacters(in: .whitespaces).count >= 10
-      || composerMode == .algebra
       || !uploadedPhotoUrls.isEmpty
   }
   @Environment(\.colorScheme) var colorScheme
@@ -170,37 +170,21 @@ struct AskTeacherSheet: View {
 						.frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(theme.primaryText)
 
-                    if composerMode == .regular {
-                        TextEditor(text: $questionText)
-                            .focused($isQuestionFocused)
-                            .textInputAutocapitalization(.sentences)
-                            .autocorrectionDisabled(true)
-                            .font(.system(size: 14))
-                            .multilineTextAlignment(.leading)
-                            .foregroundStyle(theme.primaryText)
-                            .tint(theme.accent)
-                            .scrollContentBackground(.hidden)
-                            .padding(12)
-                            .frame(minHeight: editorMinHeight, alignment: .leading)
-                            .background(theme.fieldBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    } else {
-                        Text(questionText.isEmpty
-                             ? LocalizationSupport.localized("Tap math keys, then send to add to your question.")
-                             : questionText)
-                            .font(.system(size: 14))
-                            .multilineTextAlignment(.leading)
-                            .foregroundStyle(questionText.isEmpty ? theme.secondaryText : theme.primaryText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .frame(minHeight: editorMinHeight, alignment: .leading)
-                            .background(theme.fieldBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
+                    TextEditor(text: $questionText)
+                        .focused($isQuestionFocused)
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled(true)
+                        .font(.system(size: 14))
+                        .multilineTextAlignment(.leading)
+                        .foregroundStyle(theme.primaryText)
+                        .tint(theme.accent)
+                        .scrollContentBackground(.hidden)
+                        .padding(12)
+                        .frame(minHeight: editorMinHeight, alignment: .leading)
+                        .background(theme.fieldBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                    composerModeToggle
-
-                    if uploadedPhotoUrls.isEmpty && composerMode == .regular {
+                    if uploadedPhotoUrls.isEmpty {
                         Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
                             .font(.system(size: 11))
                             .multilineTextAlignment(.leading)
@@ -209,19 +193,18 @@ struct AskTeacherSheet: View {
                     }
                 }
 
+                mathSymbolsSection
+
                 photoAttachmentSection
 
+                infoCard
 
                 let isFindDisabled = !canSubmit || isRequestingPermission
                 Button {
                     Task { await findTeacherTapped() }
                 } label: {
-                    Text(LocalizationSupport.localized("Find a Teacher"))
+                    Text(LocalizationSupport.localized("Find me a Teacher Now"))
                         .font(.system(size: 16, weight: .bold))
-                        // Enabled, this sits on `accent`, so the label needs the
-                        // on-accent token; `primaryText` is black in light mode.
-                        // Disabled it sits on `cardBackground`, where secondary
-                        // text is the readable choice.
                         .foregroundStyle(isFindDisabled ? theme.secondaryText : theme.onAccentText)
                         .frame(maxWidth: .infinity)
                         .frame(height: findButtonHeight)
@@ -231,20 +214,12 @@ struct AskTeacherSheet: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isFindDisabled)
+
+                footerText
             }
             .padding(sheetPadding)
         }
         .scrollDismissesKeyboard(.immediately)
-
-        if composerMode == .algebra {
-            MathEquationEditorView { latex in
-                appendEquation(latex)
-            }
-            .environment(\.layoutDirection, .leftToRight)
-            .padding(.horizontal, sheetPadding)
-            .padding(.bottom, sheetPadding)
-            .background(theme.cardBackground)
-        }
         }
         .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
         .navigationBarTitleDisplayMode(.inline)
@@ -310,16 +285,20 @@ struct AskTeacherSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .foregroundStyle(theme.primaryText)
 
-            HStack(spacing: 10) {
-                ForEach(uploadedPhotoUrls, id: \.self) { url in
-                    photoThumbnail(url: url)
-                }
+            if uploadedPhotoUrls.isEmpty {
+                largeAddPhotoButton
+            } else {
+                HStack(spacing: 10) {
+                    ForEach(uploadedPhotoUrls, id: \.self) { url in
+                        photoThumbnail(url: url)
+                    }
 
-                if uploadedPhotoUrls.count < AskTeacherSheet.maxPhotoCount {
-                    addPhotoButton
-                }
+                    if uploadedPhotoUrls.count < AskTeacherSheet.maxPhotoCount {
+                        addPhotoButton
+                    }
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
             }
 
             if let photoUploadError {
@@ -362,6 +341,62 @@ struct AskTeacherSheet: View {
             Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
         }
 #endif
+    }
+
+    @ViewBuilder
+    var largeAddPhotoButton: some View {
+#if !os(Android)
+        PhotoSourceButton(onImageData: { data in
+            uploadPhotoData(data)
+        }) {
+            largeAddPhotoLabel
+        }
+        .disabled(isUploadingPhoto)
+#else
+        Button {
+            showAndroidPhotoSourceDialog = true
+        } label: {
+            largeAddPhotoLabel
+        }
+        .buttonStyle(.plain)
+        .disabled(isUploadingPhoto)
+        .confirmationDialog(
+            LocalizationSupport.localized("Add a photo"),
+            isPresented: $showAndroidPhotoSourceDialog,
+            titleVisibility: .visible
+        ) {
+            Button(LocalizationSupport.localized("Take Photo")) {
+                pickAndroidPhoto(source: .camera)
+            }
+            Button(LocalizationSupport.localized("Choose from Library")) {
+                pickAndroidPhoto(source: .gallery)
+            }
+            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+        }
+#endif
+    }
+
+    var largeAddPhotoLabel: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(theme.controlBorder, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                .frame(maxWidth: .infinity)
+                .frame(height: 90)
+
+            if isUploadingPhoto {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(theme.secondaryText)
+            } else {
+                VStack(spacing: 6) {
+                    PlatformIcon(systemName: "camera.fill", size: 20, weight: .semibold, color: theme.secondaryText)
+                    Text(LocalizationSupport.localized("Tap to upload a photo of your question"))
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.secondaryText)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        }
     }
 
     var addPhotoLabel: some View {
@@ -483,42 +518,85 @@ struct AskTeacherSheet: View {
         dismiss()
     }
 
-    var composerModeToggle: some View {
-        HStack(spacing: 6) {
-            composerModePill(title: LocalizationSupport.localized("Regular"), isSelected: composerMode == .regular) {
-                composerMode = .regular
-                isQuestionFocused = true
+    var mathSymbolsSection: some View {
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            HStack {
+                Text(LocalizationSupport.localized("Mathematical symbols – tap to add:"))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                Spacer()
+                PlatformIcon(systemName: "squareshape.split.3x3", size: 14, weight: .semibold, color: theme.secondaryText)
             }
-            composerModePill(title: LocalizationSupport.localized("Algebra"), isSelected: composerMode == .algebra) {
-                composerMode = .algebra
-                isQuestionFocused = false
+
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    ForEach(AskTeacherSheet.mathSymbolsRow1, id: \.self) { symbol in
+                        mathSymbolButton(symbol)
+                    }
+                }
+                HStack(spacing: 6) {
+                    ForEach(AskTeacherSheet.mathSymbolsRow2, id: \.self) { symbol in
+                        mathSymbolButton(symbol)
+                    }
+                    Spacer(minLength: 0)
+                }
             }
-            Spacer()
         }
     }
 
-    func composerModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    func mathSymbolButton(_ symbol: String) -> some View {
         Button {
-            action()
+            questionText += symbol
+            isQuestionFocused = false
         } label: {
-            Text(LocalizationSupport.localized(title))
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
-                .padding(.horizontal, 14)
-                .frame(height: 28)
-                .background(isSelected ? theme.accentStrong : theme.cardBackground)
-                .clipShape(Capsule())
+            Text(symbol)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(theme.primaryText)
+                .frame(minWidth: 36, maxWidth: .infinity)
+                .frame(height: 36)
+                .background(theme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
     }
 
-    func appendEquation(_ latex: String) {
-        let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if !questionText.isEmpty && !questionText.hasSuffix(" ") && !questionText.hasSuffix("\n") {
-            questionText += " "
+    var infoCard: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(LocalizationSupport.localized("Average response time: 90 seconds"))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(theme.accent)
+                Text(String(format: LocalizationSupport.localized("%d teachers available now"), 5))
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.secondaryText)
+            }
+            Spacer()
+
         }
-        questionText += trimmed
+        .padding(12)
+        .background(theme.accent.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
+    var footerText: some View {
+        if viewModel.remainingMinutes > 0 {
+            Text(footerTextString)
+                .font(.system(size: 12))
+                .foregroundStyle(theme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var footerTextString: String {
+        let minutes = viewModel.remainingMinutes
+        let minutesStr = String(format: LocalizationSupport.localized("You have %d minutes"), minutes)
+        let priceCents = viewModel.selectedPricePerMinuteCents
+        guard priceCents > 0 else { return minutesStr }
+        let valueStr = LessonFormatting.currencyText(cents: minutes * priceCents)
+        let approxStr = String(format: LocalizationSupport.localized("~%@ value"), valueStr)
+        return minutesStr + " · " + approxStr
     }
 }
 

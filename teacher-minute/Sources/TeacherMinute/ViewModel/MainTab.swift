@@ -12,6 +12,7 @@ import Observation
 enum MainTab: Hashable, CaseIterable {
   case home
   case lessons
+  case earnings
   case profile
   case settings
   
@@ -19,6 +20,7 @@ enum MainTab: Hashable, CaseIterable {
 	switch self {
 	  case .home: LocalizationSupport.localized("Home")
 	  case .lessons: LocalizationSupport.localized("Lessons")
+	  case .earnings: LocalizationSupport.localized("Earnings")
 	  case .profile: LocalizationSupport.localized("Profile")
 	  case .settings: LocalizationSupport.localized("Settings")
 	}
@@ -28,6 +30,7 @@ enum MainTab: Hashable, CaseIterable {
 	switch self {
 	  case .home: "house"
 	  case .lessons: "teaching_tab_icon"
+	  case .earnings: "dollarsign.circle"
 	  case .profile: "person"
 	  case .settings: "gearshape"
 	}
@@ -37,6 +40,7 @@ enum MainTab: Hashable, CaseIterable {
 	switch self {
 	  case .home: "house.fill"
 	  case .lessons: "teaching_tab_icon.fill"
+	  case .earnings: "dollarsign.circle.fill"
 	  case .profile: "person.fill"
 	  case .settings: "gearshape.fill"
 	}

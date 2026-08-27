@@ -18,7 +18,6 @@ struct ProfileView: View {
   @State var isShowingProfileEditor = false
   @State var isShowingSubjectEditor = false
   @State var isShowingDocuments = false
-  @State var hasProfileDataForDisplay = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
 #if os(Android)
   @State var showAndroidPhotoSourceDialog = false
@@ -32,27 +31,82 @@ struct ProfileView: View {
   }
   var body: some View {
 	ScrollView(.vertical, showsIndicators: false) {
-      if hasProfileDataForDisplay {
+      if viewModel.hasDisplayableProfileData {
     VStack(alignment: .leading, spacing: 0) {
-      profileHeader
-        .padding(.top, 20)
-
-      FlatSectionHeader(LocalizationSupport.localized("Account Info"))
-        .padding(.top, 32)
-
       FlatCard(padding: 0, outlined: true) {
         VStack(spacing: 0) {
-          ForEach($viewModel.contactRows, id: \.description) { $row in
-            ProfileInfoRow(parameter: $row, isEditing: viewModel.isEditing)
+          profileHeader
+            .padding(16)
 
-            if row.description != viewModel.contactRows.last?.description {
-              FlatRule()
-            }
-          }
+          FlatRule()
+
+          ProfileInfoRow(
+            parameter: .constant(Parameter(
+              description: LocalizationSupport.localized("Email"),
+              value: viewModel.email,
+              image: "envelope.fill"
+            )),
+            isEditing: false
+          )
+          FlatRule()
+          ProfileInfoRow(
+            parameter: .constant(Parameter(
+              description: LocalizationSupport.localized("Phone"),
+              value: viewModel.phoneNumber,
+              image: "phone.fill"
+            )),
+            isEditing: false
+          )
+          FlatRule()
+          ProfileInfoRow(
+            parameter: .constant(Parameter(
+              description: LocalizationSupport.localized("Username"),
+              value: viewModel.username,
+              image: "person.text.rectangle.fill"
+            )),
+            isEditing: false
+          )
         }
       }
-      .padding(.top, 14)
-
+      .padding(.top, 20)
+	  if viewModel.shouldShowTeacherPaymentsMethod {
+		FlatSectionHeader("")
+		  .padding(.top, 32)
+		FlatCard {
+		  VStack {
+			HStack {
+			  Label(LocalizationSupport.localized("Payments method"), systemImage: "creditcard")
+			  Spacer()
+			  Button(action: showProfileEditor) {
+				Text(LocalizationSupport.localized("Edit"))
+				  .font(.system(size: 14, weight: .bold))
+				  .foregroundStyle(theme.primaryText)
+			  }
+			  .buttonStyle(.plain)
+			}
+			.padding(6)
+			
+			HStack {
+			  PlatformIcon(systemName: "apps.iphone")
+			  VStack(alignment: .leading, spacing: 4) {
+				Text("Bit")
+				  .font(.system(size: 14, weight: .bold))
+				  .foregroundStyle(theme.primaryText)
+				Text("052-445-5556")
+			  }
+			  Spacer()
+			}
+		  }
+		}
+//		teachingCard(
+//		  title: LocalizationSupport.localized("Active accounts"),
+//		  chips: viewModel.paymentsMethdsLabels,
+//		  includeAdd: viewModel.paymentsMethdsLabels.isEmpty,
+//		  editAction: showProfileEditor,
+//		  addAction: showProfileEditor
+//		)
+		
+	  }
       if viewModel.shouldShowTeachingDetails {
         FlatSectionHeader(LocalizationSupport.localized("Teaching Details"))
           .padding(.top, 32)
@@ -187,42 +241,44 @@ struct ProfileView: View {
     .padding(.horizontal, 20)
   }
 
-	  // Name leads at page-title scale with the photo trailing it, matching the
-	  // account screen in the reference.
 	  var profileHeader: some View {
-	VStack(alignment: .leading, spacing: 0) {
-	  HStack(alignment: .top, spacing: 16) {
-		VStack(alignment: .leading, spacing: 8) {
-		  Text(viewModel.name)
-			.font(.system(size: 34, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(2)
-			.minimumScaleFactor(0.7)
+	HStack(alignment: .center, spacing: 16) {
+	  ZStack(alignment: .bottomTrailing) {
+		profilePhotoButton
+	  }
+	  VStack(alignment: .leading, spacing: 6) {
+		Text(viewModel.name)
+		  .font(.system(size: 22, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+		  .lineLimit(2)
+		  .minimumScaleFactor(0.7)
 
-		  FlatChip(title: viewModel.role)
+		Text(viewModel.role)
+		  .font(.system(size: 14))
+		  .foregroundStyle(theme.secondaryText)
 
-		  // Teacher verification badge is intentionally hidden for now.
-		}
+		if viewModel.rating > 0 {
+		  HStack(spacing: 4) {
+			Text(String(format: "%.1f", viewModel.rating))
+			  .font(.system(size: 13, weight: .semibold))
+			  .foregroundStyle(theme.primaryText)
 
-		Spacer()
-
-		ZStack(alignment: .bottomTrailing) {
-		  profilePhotoButton
+			HStack(spacing: 2) {
+			  ForEach(0..<5, id: \.self) { index in
+				PlatformIcon(
+				  systemName: Double(index) < viewModel.rating ? "star.fill" : "star",
+				  size: 12,
+				  color: Color.yellow
+				)
+			  }
+			}
+		  }
 		}
 	  }
 
-	  Text(viewModel.memberSince)
-		.font(.system(size: 14))
-		.foregroundStyle(theme.secondaryText)
-		.padding(.top, 12)
+	  
 
-	  Button {
-		showProfileEditor()
-	  } label: {
-		FlatChip(title: LocalizationSupport.localized("Edit Profile"), systemImage: "pencil")
-	  }
-	  .buttonStyle(.plain)
-	  .padding(.top, 14)
+
 	}
 	.frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -265,8 +321,9 @@ struct ProfileView: View {
           imageURL: viewModel.profileImageURL,
           size: 88,
           fallbackSystemImage: "person.crop.circle.fill",
-          background: theme.cardBackground,
-          tint: theme.primaryText
+          background: theme.accentBackground,
+          tint: theme.accentStrong,
+          initial: viewModel.nameInitial
         )
       }
       .frame(width: 88, height: 88)
@@ -318,26 +375,8 @@ struct ProfileView: View {
   }
 
   private func loadProfileForDisplay() async {
-    if viewModel.hasDisplayableProfileData {
-      hasProfileDataForDisplay = true
-      return
-    }
-
-    hasProfileDataForDisplay = false
-    var didStartLoad = false
-    while !Task.isCancelled {
-      if viewModel.hasDisplayableProfileData {
-        hasProfileDataForDisplay = true
-        return
-      }
-
-      if !didStartLoad || !viewModel.isLoading {
-        didStartLoad = true
-        Task { await viewModel.loadProfile() }
-      }
-
-      try? await Task.sleep(for: .seconds(1))
-    }
+    guard !viewModel.hasDisplayableProfileData else { return }
+    await viewModel.loadProfile()
   }
 
   var documentsButton: some View {
@@ -953,36 +992,76 @@ struct ProfileInfoRow: View {
   }
   let isEditing: Bool
   var body: some View {
-	HStack(spacing: 14) {
-	  FlatIconTile(systemName: parameter.image, size: 44)
+	HStack(spacing: 10) {
+	  FlatIconTile(systemName: parameter.image, size: 28)
 
-	  VStack(alignment: .leading, spacing: 3) {
-		Text(parameter.description)
-		  .font(.system(size: 13))
-		  .foregroundStyle(theme.secondaryText)
-
-		if isEditing {
-		  TextField(parameter.description, text: $parameter.value)
-			.font(.system(size: 16, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.75)
-			.multilineTextAlignment(.leading)
-			.environment(\.layoutDirection, .leftToRight)
-		} else {
-		  Text(parameter.value.isEmpty ? "-" : parameter.value)
-			.font(.system(size: 16, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.75)
-			.frame(maxWidth: .infinity, alignment: .leading)
-			.multilineTextAlignment(.leading)
-		}
-	  }
+	  Text(parameter.description)
+		.font(.system(size: 13))
+		.foregroundStyle(theme.secondaryText)
 
 	  Spacer()
+
+	  if isEditing {
+		TextField(parameter.description, text: $parameter.value)
+		  .font(.system(size: 15, weight: .semibold))
+		  .foregroundStyle(theme.primaryText)
+		  .lineLimit(1)
+		  .minimumScaleFactor(0.75)
+		  .multilineTextAlignment(.trailing)
+		  .environment(\.layoutDirection, .leftToRight)
+	  } else {
+		Text(parameter.value.isEmpty ? "-" : parameter.value)
+		  .font(.system(size: 15, weight: .semibold))
+		  .foregroundStyle(theme.primaryText)
+		  .lineLimit(1)
+		  .minimumScaleFactor(0.75)
+	  }
 	}
 	.padding(.horizontal, 16)
 	.padding(.vertical, 14)
   }
 }
+
+#if !os(Android)
+#Preview("Teacher Profile") {
+  let vm = ProfileViewModel(roleType: .teacher, repository: ProfileRepository())
+  vm.name = "Dr. Miri Cohen"
+  vm.role = "Mathematics"
+  vm.email = "miri@gmail.com"
+  vm.phoneNumber = "0521234567"
+  vm.username = "miri"
+  vm.rating = 4.9
+  vm.subjects = ["Math", "Algebra", "Calculus"]
+  vm.grade = "Grade 9, Grade 10, Grade 11"
+  vm.hasMissingDocuments = false
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+}
+
+#Preview("Teacher Profile - Hebrew") {
+  let vm = ProfileViewModel(roleType: .teacher, repository: ProfileRepository())
+  vm.name = "ד\"ר מירי כהן"
+  vm.role = "מתמטיקה"
+  vm.email = "miri@gmail.com"
+  vm.phoneNumber = "0521234567"
+  vm.username = "miri"
+  vm.rating = 4.9
+  vm.subjects = ["מתמטיקה", "אלגברה", "חדו\"א"]
+  vm.grade = "Grade 9, Grade 10, Grade 11"
+  vm.hasMissingDocuments = false
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+    .environment(\.locale, Locale(identifier: "he"))
+    .environment(\.layoutDirection, .rightToLeft)
+}
+#Preview("Student Profile") {
+  let vm = ProfileViewModel(roleType: .student, repository: ProfileRepository())
+  vm.name = "Alex Ben-David"
+  vm.role = "Student"
+  vm.email = "alex@gmail.com"
+  vm.phoneNumber = "0541112233"
+  vm.username = "alex"
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+}
+#endif

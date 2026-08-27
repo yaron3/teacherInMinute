@@ -31,7 +31,7 @@ struct StudentHomeView: View {
 	self._viewModel = State(initialValue: viewModel)
 	self._hidesTabBar = hidesTabBar
   }
-  
+
   var body: some View {
 	homeContent
 	.fullScreenCover(isPresented: $showsAskTeacher) {
@@ -104,7 +104,7 @@ struct StudentHomeView: View {
 	  homeScroll
 
 	  searchStateOverlay
-	  
+
 #if os(Android)
 	  if let result = paymentReturnStore.latestResult {
 		paymentReturnOverlay(result)
@@ -167,67 +167,581 @@ struct StudentHomeView: View {
   }
 
   var homeSections: some View {
-		VStack(alignment: .leading, spacing: 0) {
-      FlatTopHeader(
-        eyebrow: LocalizationSupport.localized("Welcome Back"),
-        name: viewModel.name,
-        avatarImageURL: viewModel.profileImageURL,
-        avatarSystemImage: "person.crop.circle.fill",
-        showNotificationBadge: viewModel.hasUnreadMessages,
-        onMessagesDismissed: {
-          Task { await viewModel.refreshUnreadMessages() }
-        }
+    VStack(alignment: .leading, spacing: 0) {
+      studentHero
+
+      studentSectionHeader(
+        title: LocalizationSupport.localized("Available Subjects"),
+        caption: String(format: LocalizationSupport.localized("%d registered teachers"), registeredTeacherCount)
       )
-      .padding(.top, 8)
+      .padding(.top, 28)
 
-		  askTeacherCard
-			.padding(.top, 14)
-		  
-		  EmptyView() // Coupon entry hidden on the Home tab (bug #28).
-			.padding(.top, 0)
-		  
-		  sectionHeader(title: LocalizationSupport.localized("Pricing Options"))
-			.padding(.top, 24)
+      popularSubjectsGrid
+        .padding(.top, 14)
 
-		  pricingStrip
-		  .padding(.top, 10)
-		  
-		  statsStrip
-			.padding(.top, 24)
-		  
-		  tipsCard
-			.padding(.top, 28)
-		  
-		  Group {
-			sectionHeader(title: LocalizationSupport.localized("Recent Lessons"), actionTitle: "")
-			
-		  }
-		  .padding(.top, 28)
-		  
-      if viewModel.recentLessons.isEmpty {
-        Text(LocalizationSupport.localized("No lessons yet. Ask a teacher to get started!"))
-          .font(.system(size: 17))
+      studentSectionHeader(
+        title: LocalizationSupport.localized("Teachers online now"),
+        caption: LocalizationSupport.localized("All")
+      )
+      .padding(.top, 30)
+
+      onlineTeachersGrid
+        .padding(.top, 14)
+
+      howItWorksPanel
+        .padding(.top, 30)
+
+      studentOverviewCards
+        .padding(.top, 18)
+
+      if !viewModel.pricingOptions.isEmpty {
+        studentSectionHeader(title: LocalizationSupport.localized("Credits"))
+          .padding(.top, 30)
+
+        pricingGrid
+          .padding(.top, 14)
+      }
+
+//      recentLessonsSection
+//        .padding(.top, 30)
+    }
+    .padding(.horizontal, 20)
+    .padding(.top, 8)
+    .padding(.bottom, 40)
+  }
+
+  var studentHero: some View {
+    VStack(spacing: 0) {
+      HStack(spacing: 12) {
+		PlatformIcon(systemName: "books.vertical.fill", size: 19, weight: .semibold, color: theme.onAccentText)
+          Text(LocalizationSupport.localized("Teacher in a Moment"))
+            .font(.system(size: 18, weight: .bold))
+            .foregroundStyle(theme.onAccentText)
+          
+		Spacer()
+        }
+      .padding(.horizontal, 18)
+      .padding(.top, 18)
+      .padding(.bottom, 18)
+
+      VStack(alignment: .leading, spacing: 22) {
+        HStack(alignment: .center, spacing: 18) {
+          
+
+          VStack(alignment: .leading, spacing: 8) {
+            Text(String(format: LocalizationSupport.localized("Hello, %@"), studentDisplayName))
+              .font(.system(size: 18, weight: .bold))
+              .foregroundStyle(theme.info)
+
+            Text(LocalizationSupport.localized("Teacher in a Moment"))
+              .font(.system(size: 36, weight: .bold))
+              .foregroundStyle(theme.onAccentText)
+              .lineLimit(2)
+              .minimumScaleFactor(0.75)
+
+            Text(LocalizationSupport.localized("When AI gets stuck, a human teacher connects in 90 seconds"))
+              .font(.system(size: 15, weight: .semibold))
+              .foregroundStyle(theme.onAccentText.opacity(0.65))
+              .lineLimit(2)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+		  balancePill
+        }
+
+        onlineStatusBar
+
+        heroAskTeacherButton
+
+        Text(LocalizationSupport.localized("2 NIS connection fee • pay only for time used"))
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(theme.onAccentText.opacity(0.55))
+          .frame(maxWidth: .infinity, alignment: .center)
+      }
+      .padding(22)
+      .padding(.top, 20)
+    }
+    .background(theme.accentBackground)
+    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+  }
+
+  var balancePill: some View {
+    VStack(spacing: 8) {
+      Text("\(viewModel.remainingMinutes)")
+        .font(.system(size: 26, weight: .bold))
+        .foregroundStyle(theme.warning)
+      Text(LocalizationSupport.localized("minutes"))
+        .font(.system(size: 13, weight: .bold))
+        .foregroundStyle(theme.onAccentText.opacity(0.65))
+      Text(LessonFormatting.minutesText(viewModel.remainingMinutes))
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(theme.onAccentText.opacity(0.45))
+    }
+    .frame(width: 92, height: 120)
+    .background(theme.cardBackground.opacity(0.2))
+    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+        .stroke(theme.cardBackground.opacity(0.2), lineWidth: 1)
+    }
+  }
+
+  @ViewBuilder
+  var heroAskTeacherButton: some View {
+    if viewModel.remainingMinutes >= 2 {
+      Button {
+        showsAskTeacher = true
+      } label: {
+        heroAskTeacherButtonContent
+      }
+      .buttonStyle(.plain)
+    } else {
+      Button {
+        showingLowBalanceAlert = true
+      } label: {
+        heroAskTeacherButtonContent
+      }
+      .buttonStyle(.plain)
+    }
+  }
+
+  var heroAskTeacherButtonContent: some View {
+    HStack(spacing: 10) {
+      PlatformIcon(systemName: "hand.raised.fill", size: 22, weight: .bold, color: theme.ctaForeground)
+      Text(LocalizationSupport.localized("Ask a question now"))
+        .font(.system(size: 24, weight: .bold))
+        .foregroundStyle(theme.ctaForeground)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+    }
+    .frame(maxWidth: .infinity)
+    .frame(height: 76)
+    .background(theme.ctaBackground)
+    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+  }
+
+  var onlineStatusBar: some View {
+    HStack(spacing: 10) {
+      FlatStatusDot(color: theme.positive, size: 16)
+      Text(String(format: LocalizationSupport.localized("%d teachers available now"), onlineTeacherCount))
+        .font(.system(size: 15, weight: .bold))
+        .foregroundStyle(theme.positive)
+      Spacer()
+      Text(LocalizationSupport.localized("90 sec avg to connect"))
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(theme.onAccentText.opacity(0.55))
+    }
+    .padding(.horizontal, 14)
+    .frame(height: 54)
+    .background(theme.positiveBackground.opacity(0.18))
+    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+        .stroke(theme.positive.opacity(0.35), lineWidth: 1)
+    }
+  }
+
+  var studentOverviewCards: some View {
+    HStack(spacing: 12) {
+      lastLessonInfoCard
+
+      dashboardInfoCard(
+        title: LocalizationSupport.localized("Your Balance"),
+        value: "\(viewModel.remainingMinutes)",
+        detail: LessonFormatting.minutesText(viewModel.remainingMinutes),
+        systemImage: "creditcard.fill",
+        actionTitle: LocalizationSupport.localized("Buy More +"),
+        action: selectFirstPricingOption
+      )
+    }
+  }
+
+  var lastLessonInfoCard: some View {
+    FlatCard(outlined: true) {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack(spacing: 8) {
+          PlatformIcon(systemName: "calendar", size: 16, weight: .semibold, color: theme.secondaryText)
+          Text(LocalizationSupport.localized("Last Lesson"))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        }
+
+        if let lesson = viewModel.recentLessons.last {
+          Text(lesson.teacher)
+            .font(.system(size: lesson.teacher.count > 8 ? 20 : 28, weight: .bold))
+            .foregroundStyle(theme.primaryText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+
+          Text(lesson.title)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+            .lineLimit(1)
+
+          HStack(spacing: 2) {
+            ForEach(0..<5, id: \.self) { _ in
+              PlatformIcon(systemName: "star.fill", size: 10, weight: .bold, color: theme.ratingStar)
+            }
+          }
+
+          Text(lesson.duration)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        } else {
+          Text(LocalizationSupport.localized("None yet"))
+            .font(.system(size: 28, weight: .bold))
+            .foregroundStyle(theme.primaryText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+
+          Text(LocalizationSupport.localized("Ask a teacher to start"))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
+        }
+      }
+      .frame(minHeight: 170, alignment: .top)
+    }
+  }
+
+  var popularSubjectsGrid: some View {
+    LazyVGrid(columns: twoColumnGrid, spacing: 14) {
+      subjectCard(title: LocalizationSupport.localized("Math"), teacherCount: 78, topics: LocalizationSupport.localized("Algebra, trigonometry, 5 units"), systemImage: "ruler.fill", tint: theme.accent)
+      subjectCard(title: LocalizationSupport.localized("Physics"), teacherCount: 41, topics: LocalizationSupport.localized("Mechanics, electricity, optics"), systemImage: "bolt.fill", tint: theme.warning)
+      subjectCard(title: LocalizationSupport.localized("Chemistry"), teacherCount: 33, topics: LocalizationSupport.localized("Organic, physical, matriculation"), systemImage: "testtube.2", tint: theme.positive)
+      subjectCard(title: LocalizationSupport.localized("Statistics"), teacherCount: 32, topics: LocalizationSupport.localized("Probability, regression, SPSS"), systemImage: "chart.bar.fill", tint: theme.info)
+      subjectCard(title: LocalizationSupport.localized("Computer Science"), teacherCount: 29, topics: LocalizationSupport.localized("Python, algorithms, data structures"), systemImage: "laptopcomputer", tint: theme.accent)
+      subjectCard(title: LocalizationSupport.localized("Biology"), teacherCount: 24, topics: LocalizationSupport.localized("Genetics, cells, molecular"), systemImage: "leaf.fill", tint: theme.danger)
+    }
+  }
+
+  var onlineTeachersGrid: some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 14) {
+        onlineTeacherCard(name: LocalizationSupport.localized("Cohen"), subject: LocalizationSupport.localized("Math"), rating: "4.9", initial: LocalizationSupport.localized("C"), tint: theme.accent).frame(width: 155)
+        onlineTeacherCard(name: LocalizationSupport.localized("Levi"), subject: LocalizationSupport.localized("Physics"), rating: "4.7", initial: LocalizationSupport.localized("L"), tint: theme.warning).frame(width: 155)
+        onlineTeacherCard(name: LocalizationSupport.localized("Mizrahi"), subject: LocalizationSupport.localized("Chemistry"), rating: "4.8", initial: LocalizationSupport.localized("M"), tint: theme.positive).frame(width: 155)
+        onlineTeacherCard(name: LocalizationSupport.localized("Shalev"), subject: LocalizationSupport.localized("Statistics"), rating: "4.8", initial: LocalizationSupport.localized("S"), tint: theme.info).frame(width: 155)
+      }
+    }
+  }
+
+  var howItWorksPanel: some View {
+    VStack(alignment: .leading, spacing: 22) {
+      Text(LocalizationSupport.localized("How it works"))
+        .font(.system(size: 24, weight: .bold))
+        .foregroundStyle(theme.onAccentText)
+		.frame(maxWidth: .infinity, alignment: .leading)
+
+      VStack(spacing: 24) {
+        howItWorksStep(
+          number: 1,
+          title: LocalizationSupport.localized("Ask a question"),
+          subtitle: LocalizationSupport.localized("Describe the problem – text, image, or whiteboard drawing"),
+          tint: theme.info
+        )
+        howItWorksStep(
+          number: 2,
+          title: LocalizationSupport.localized("Teacher connects within 90 sec"),
+          subtitle: LocalizationSupport.localized("The system finds an available teacher for your subject"),
+          tint: theme.warning
+        )
+        howItWorksStep(
+          number: 3,
+          title: LocalizationSupport.localized("Live lesson"),
+          subtitle: LocalizationSupport.localized("Chat, whiteboard, voice messages – real time"),
+          tint: theme.accent
+        )
+        howItWorksStep(
+          number: 4,
+          title: LocalizationSupport.localized("Pay only for what you used"),
+          subtitle: LocalizationSupport.localized("2 NIS connection • only billed minutes count"),
+          tint: theme.positive
+        )
+      }
+    }
+    .padding(22)
+    .background(theme.accentStrong)
+    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+  }
+
+  func howItWorksStep(number: Int, title: String, subtitle: String, tint: Color) -> some View {
+    HStack(alignment: .top, spacing: 16) {
+      Circle()
+        .stroke(tint, lineWidth: 3)
+        .frame(width: 46, height: 46)
+        .overlay {
+          Text("\(number)")
+            .font(.system(size: 18, weight: .bold))
+            .foregroundStyle(tint)
+        }
+
+      VStack(alignment: .leading, spacing: 6) {
+        Text(title)
+          .font(.system(size: 18, weight: .bold))
+          .foregroundStyle(theme.onAccentText)
+          .lineLimit(2)
+          .minimumScaleFactor(0.82)
+
+        Text(subtitle)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(theme.onAccentText.opacity(0.6))
+          .lineLimit(2)
+          .minimumScaleFactor(0.82)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+
+  var pricingGrid: some View {
+    LazyVGrid(columns: twoColumnGrid, spacing: 14) {
+      ForEach(viewModel.pricingOptions) { option in
+        creditOptionCard(option)
+      }
+    }
+  }
+
+//  var recentLessonsSection: some View {
+//    VStack(alignment: .leading, spacing: 12) {
+//      studentSectionHeader(title: LocalizationSupport.localized("Recent Lessons"))
+//
+//      if viewModel.recentLessons.isEmpty {
+//        Text(LocalizationSupport.localized("No lessons yet. Ask a teacher to get started!"))
+//          .font(.system(size: 15, weight: .semibold))
+//          .foregroundStyle(theme.secondaryText)
+//          .frame(maxWidth: .infinity, alignment: .leading)
+//          .padding(.vertical, 4)
+//      } else {
+//        FlatCard(padding: 0, outlined: true) {
+//          VStack(spacing: 0) {
+//            ForEach(viewModel.recentLessons) { lesson in
+//              RecentLessonRow(lesson: lesson)
+//
+//              if lesson.id != viewModel.recentLessons.last?.id {
+//                FlatRule()
+//              }
+//            }
+//          }
+//        }
+//      }
+//    }
+//  }
+
+  var studentDisplayName: String {
+    let trimmed = viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? LocalizationSupport.localized("Student") : trimmed
+  }
+
+  var lastLessonTeacherText: String {
+    viewModel.recentLessons.first?.teacher.isEmpty == false ? viewModel.recentLessons.first?.teacher ?? LocalizationSupport.localized("None yet") : LocalizationSupport.localized("None yet")
+  }
+
+  var lastLessonDetailText: String {
+    guard let lesson = viewModel.recentLessons.first else { return LocalizationSupport.localized("Ask a teacher to start") }
+    return String(format: LocalizationSupport.localized("%@ • %@"), lesson.title, lesson.duration)
+  }
+
+  var registeredTeacherCount: Int { 237 }
+
+  var onlineTeacherCount: Int { 5 }
+
+  var twoColumnGrid: [GridItem] {
+    [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
+  }
+
+  func selectFirstPricingOption() {
+    pendingCheckoutOption = viewModel.pricingOptions.first
+  }
+
+  func dashboardInfoCard(title: String, value: String, detail: String, systemImage: String, actionTitle: String? = nil, action: (@MainActor @Sendable () -> Void)? = nil) -> some View {
+    FlatCard(outlined: true) {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack(spacing: 8) {
+          PlatformIcon(systemName: systemImage, size: 16, weight: .semibold, color: theme.secondaryText)
+          Text(title)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        }
+
+        Text(value)
+          .font(.system(size: value.count > 8 ? 20 : 34, weight: .bold))
+          .foregroundStyle(systemImage == "creditcard.fill" ? theme.info : theme.primaryText)
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
+
+        Text(detail)
+          .font(.system(size: 13, weight: .semibold))
           .foregroundStyle(theme.secondaryText)
-          .padding(.top, 16)
-      } else {
-        FlatCard(padding: 0, outlined: true) {
-          VStack(spacing: 0) {
-            ForEach(viewModel.recentLessons) { lesson in
-              RecentLessonRow(lesson: lesson)
+          .lineLimit(2)
+          .minimumScaleFactor(0.8)
 
-              if lesson.id != viewModel.recentLessons.last?.id {
-                FlatRule()
+        if let actionTitle, let action {
+          Button(action: action) {
+            Text(actionTitle)
+              .font(.system(size: 15, weight: .bold))
+              .foregroundStyle(theme.info)
+              .frame(maxWidth: .infinity)
+              .frame(height: 42)
+              .background(theme.info.opacity(0.12))
+              .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+              .overlay {
+                RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
+                  .stroke(theme.info, lineWidth: 1)
               }
+          }
+          .buttonStyle(.plain)
+        }
+      }
+      .frame(minHeight: 170, alignment: .top)
+    }
+  }
+
+  func studentSectionHeader(title: String, caption: String? = nil) -> some View {
+    HStack(alignment: .firstTextBaseline) {
+      Text(title)
+        .font(.system(size: 24, weight: .bold))
+        .foregroundStyle(theme.primaryText)
+      Spacer()
+      if let caption {
+        Text(caption)
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(caption == LocalizationSupport.localized("All") ? theme.info : theme.secondaryText)
+      }
+    }
+  }
+
+  func subjectCard(title: String, teacherCount: Int, topics: String, systemImage: String, tint: Color) -> some View {
+    FlatCard(outlined: true) {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack(alignment: .top) {
+          VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+              .font(.system(size: 20, weight: .bold))
+              .foregroundStyle(theme.primaryText)
+              .lineLimit(1)
+              .minimumScaleFactor(0.75)
+            Text(String(format: LocalizationSupport.localized("%d teachers"), teacherCount))
+              .font(.system(size: 13, weight: .bold))
+              .foregroundStyle(tint)
+          }
+          Spacer()
+          FlatIconTile(systemName: systemImage, size: 48, tint: tint, background: tint.opacity(0.12))
+        }
+
+        Text(topics)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(theme.secondaryText)
+          .lineLimit(2)
+          .minimumScaleFactor(0.82)
+
+        HStack(spacing: 7) {
+          FlatStatusDot(color: teacherCount > 30 ? theme.positive : theme.secondaryText, size: 9)
+          Text(teacherCount > 30 ? LocalizationSupport.localized("Teacher available now") : LocalizationSupport.localized("No one available now"))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        }
+      }
+      .frame(minHeight: 150, alignment: .top)
+      .overlay(alignment: .top) {
+        Rectangle()
+          .fill(tint)
+          .frame(height: 4)
+          .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+          .offset(y: -16)
+      }
+    }
+  }
+
+  func onlineTeacherCard(name: String, subject: String, rating: String, initial: String, tint: Color) -> some View {
+    FlatCard(outlined: true) {
+      VStack(alignment: .center, spacing: 10) {
+        ZStack(alignment: .bottomTrailing) {
+          Circle()
+            .fill(tint.opacity(0.82))
+            .frame(width: 74, height: 74)
+            .overlay {
+              Text(initial)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(theme.onAccentText)
+            }
+          Circle()
+            .fill(theme.positive)
+            .frame(width: 18, height: 18)
+            .overlay { Circle().stroke(theme.screenBackground, lineWidth: 3) }
+        }
+
+        Text(name)
+          .font(.system(size: 17, weight: .bold))
+          .foregroundStyle(theme.primaryText)
+          .lineLimit(1)
+
+        Text(subject)
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(tint)
+          .lineLimit(1)
+
+        HStack(spacing: 4) {
+          Text(rating)
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(theme.secondaryText)
+          HStack(spacing: 1) {
+            ForEach(0..<5, id: \.self) { _ in
+              PlatformIcon(systemName: "star.fill", size: 10, weight: .bold, color: theme.ratingStar)
             }
           }
         }
-        .padding(.top, 12)
+
+        Button {
+          showsAskTeacher = true
+        } label: {
+          Text(LocalizationSupport.localized("Meet"))
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.info)
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .background(theme.info.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+        }
+        .buttonStyle(.plain)
+      }
+      .frame(maxWidth: .infinity)
+      .frame(minHeight: 210)
+    }
+  }
+
+  func creditOptionCard(_ option: PricingOption) -> some View {
+    Button {
+      pendingCheckoutOption = option
+    } label: {
+      FlatCard(outlined: true) {
+        VStack(alignment: .leading, spacing: 10) {
+          HStack {
+            Text(LocalizationSupport.localized(option.name))
+              .font(.system(size: 14, weight: .bold))
+              .foregroundStyle(theme.secondaryText)
+              .lineLimit(1)
+            Spacer()
+            PlatformIcon(systemName: "creditcard.fill", size: 16, weight: .semibold, color: theme.info)
+          }
+
+          Text(option.minutesText ?? option.priceText)
+            .font(.system(size: 26, weight: .bold))
+            .foregroundStyle(theme.primaryText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+
+          Text(option.minutesText == nil ? LocalizationSupport.localized(option.description) : option.priceText)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
+        }
+        .frame(minHeight: 112, alignment: .top)
       }
     }
-    .padding(.horizontal, 20)
-    .padding(.bottom, 40)
+    .buttonStyle(.plain)
+    .disabled(viewModel.isStartingCheckout)
   }
-  
 
   var pricingStrip: some View {
 		  ScrollView(.horizontal, showsIndicators: false) {

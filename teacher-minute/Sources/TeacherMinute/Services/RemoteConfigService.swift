@@ -7,6 +7,7 @@ import Foundation
 
 #if !os(Android)
 import FirebaseRemoteConfig
+import FirebaseCore
 #else
 import SkipFirebaseRemoteConfig
 #endif
@@ -33,6 +34,24 @@ enum RemoteConfigLaunchError: LocalizedError {
         case .initialFetchTimedOut(let seconds):
             return "Remote Config initial fetch did not complete within \(seconds) seconds."
         }
+    }
+}
+
+private final class RemoteConfigLaunchContinuation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didResume = false
+    private let continuation: CheckedContinuation<Bool, Never>
+
+    init(_ continuation: CheckedContinuation<Bool, Never>) {
+        self.continuation = continuation
+    }
+
+    func resumeOnce(_ value: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !didResume else { return }
+        didResume = true
+        continuation.resume(returning: value)
     }
 }
 
@@ -86,20 +105,10 @@ final class RemoteConfigService {
         guard let firstFetch else { return true }
 
         let timeoutSeconds = launchTimeoutSeconds
-        let completedBeforeTimeout = await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
-                await firstFetch.value
-                return true
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
-                return false
-            }
-
-            let result = await group.next() ?? false
-            group.cancelAll()
-            return result
-        }
+        let completedBeforeTimeout = await firstFetchCompletedWithinLaunchTimeout(
+            firstFetch,
+            timeoutSeconds: timeoutSeconds
+        )
 
         if completedBeforeTimeout {
             logger.info("[RemoteConfig] initial fetch completed before launch gate timeout")
@@ -107,6 +116,25 @@ final class RemoteConfigService {
             recordLaunchTimeout(seconds: timeoutSeconds)
         }
         return completedBeforeTimeout
+    }
+
+    private nonisolated func firstFetchCompletedWithinLaunchTimeout(
+        _ firstFetch: Task<Void, Never>,
+        timeoutSeconds: Int
+    ) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let launchContinuation = RemoteConfigLaunchContinuation(continuation)
+
+            Task {
+                await firstFetch.value
+                launchContinuation.resumeOnce(true)
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
+                launchContinuation.resumeOnce(false)
+            }
+        }
     }
 
     /// Await this when a caller needs to be sure the first fetch has completed.
@@ -160,12 +188,10 @@ final class RemoteConfigService {
     private func recordLaunchTimeout(seconds: Int) {
         guard !didRecordLaunchTimeout else { return }
         didRecordLaunchTimeout = true
-        let error = RemoteConfigLaunchError.initialFetchTimedOut(seconds: seconds)
-        logger.error("[RemoteConfig] launch gate timed out after \(seconds) seconds")
+        logger.warning("[RemoteConfig] launch gate timed out after \(seconds) seconds; continuing with cached/default values")
         AnalyticsService.shared.logEvent("remote_config_launch_timeout", parameters: [
             "timeout_seconds": seconds
         ])
-        AnalyticsService.shared.recordError(error, context: "remoteConfigLaunch")
     }
 
     // MARK: - Sync accessors
@@ -195,6 +221,9 @@ final class RemoteConfigService {
     /// run outside the main actor. Firebase Remote Config reads are thread-safe
     /// once `start()` has activated the initial fetch.
     nonisolated static func readString(_ key: String) -> String {
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return "" }
+        #endif
         let value = RemoteConfig.remoteConfig().configValue(forKey: key)
         let stringValue = value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         #if os(Android)
@@ -209,7 +238,10 @@ final class RemoteConfigService {
     }
 
     func getBool(_ key: String) -> Bool {
-        RemoteConfig.remoteConfig().configValue(forKey: key).boolValue
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return false }
+        #endif
+        return RemoteConfig.remoteConfig().configValue(forKey: key).boolValue
     }
 
     func getURL(_ key: String) -> URL? {
@@ -221,6 +253,9 @@ final class RemoteConfigService {
     }
 
     func getStringArray(_ key: String) -> [String] {
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return [] }
+        #endif
         let value = RemoteConfig.remoteConfig().configValue(forKey: key)
         #if os(Android)
         logger.info("[RemoteConfig][Android] read array key='\(key)' source=\(Self.debugSourceName(value.source)) rawLength=\(value.stringValue.count)")

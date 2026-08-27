@@ -17,12 +17,15 @@ import SkipFirebaseAuth
 @Observable
 @MainActor
 final class ProfileViewModel {
+    private let repository: ProfileRepository
     var name = "Profile"
     var role = "User"
     var isVerified = false
     var memberSince = "Member"
     var email = ""
     var phoneNumber = ""
+    var username = ""
+    var rating: Double = 0.0
     var grade = ""
     /// Date of birth is collected only here in Profile (never during onboarding).
     /// `nil` means the student has not provided one, so it is never shown to a teacher.
@@ -43,6 +46,10 @@ final class ProfileViewModel {
     /// Whether the teacher still has verification documents left to upload
     /// (only the front ID is mandatory during onboarding — bug #24).
     var hasMissingDocuments = false
+
+    var nameInitial: String {
+        name.first.map(String.init) ?? ""
+    }
 
     /// Formatted date of birth for display, or empty when it has not been set.
     var dateOfBirthDisplay: String {
@@ -65,7 +72,13 @@ final class ProfileViewModel {
     var shouldShowTeachingDetails: Bool {
         roleType == .teacher
     }
-
+  
+	var shouldShowTeacherPaymentsMethod: Bool {
+		roleType == .teacher
+	}
+  var shouldShowStudentPaymentsMethod: Bool {
+	roleType == .student
+  }
     /// Canonical grade values, as stored on the profile. Selection and saving
     /// both key off these, so they stay English in every language.
     var gradeLevels: [String] {
@@ -76,7 +89,9 @@ final class ProfileViewModel {
     var gradeLevelLabels: [String] {
         gradeLevels.map(LocalizationSupport.localizedGradeLabel)
     }
-
+  var paymentsMethdsLabels: [String] {
+	[LocalizationSupport.localized("PayPal")]
+  }
     var selectedTeachingGrades: Set<String> {
         get {
             Set(gradeLevels)
@@ -98,18 +113,19 @@ final class ProfileViewModel {
         name != "Profile" && role != "User" && !contactRows.isEmpty
     }
 
-    init(roleType: AuthRole = .student) {
+    init(roleType: AuthRole = .student, repository: ProfileRepository = FirebaseProfileRepository()) {
         self.roleType = roleType
+        self.repository = repository
         role = roleType == .teacher ? "Math Teacher" : "Student"
         isVerified = false
         rebuildContactRows()
     }
 
     func loadProfile() async {
-        guard let uid = Auth.auth().currentUser?.uid else {
+        guard let uid = repository.currentUserId else {
             errorMessage = "Could not load profile."
             isProfileLoaded = false
-			isLoading = false
+            isLoading = false
             return
         }
         isLoading = true
@@ -120,17 +136,16 @@ final class ProfileViewModel {
         await refreshPermissions()
 
         do {
-		  logger.info("[Profile] loading profile")
-		  isProfileLoaded = false
-            guard let profile = try await UserService.shared.fetchProfileSummary(uid: uid) else {
+            logger.info("[Profile] loading profile")
+            isProfileLoaded = false
+            guard let profile = try await repository.fetchProfileSummary(uid: uid) else {
                 errorMessage = "Could not load profile."
                 return
             }
             apply(profile)
             if profile.role == .teacher {
-                isVerified = (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
-                let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
-                let docs = (data["uploadedDocuments"] as? [String]) ?? []
+                isVerified = try await repository.isTeacherVerified(uid: uid)
+                let docs = (try? await repository.fetchUploadedDocuments(uid: uid)) ?? []
                 hasMissingDocuments = TeacherDocumentsPromptStore.hasMissingDocuments(docs)
             }
             isProfileLoaded = true
@@ -266,6 +281,8 @@ final class ProfileViewModel {
         memberSince = profile.memberSinceText
         email = profile.email
         phoneNumber = profile.phoneNumber
+        username = profile.email.components(separatedBy: "@").first ?? ""
+        rating = profile.role == .teacher ? 4.9 : 0.0
         grade = profile.grade
         dateOfBirth = profile.dateOfBirth
         subjects = profile.subjects

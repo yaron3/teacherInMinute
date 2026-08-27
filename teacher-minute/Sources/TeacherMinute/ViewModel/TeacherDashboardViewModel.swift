@@ -68,6 +68,9 @@ final class TeacherDashboardViewModel {
   var lastWeekEarningsCents = 0
   var totalMinutes = 0
   var lessonCount = 0
+  var monthEarningsCents = 0
+  var teacherRating: Double = 4.9
+  var reviewCount: Int = 312
   var ratePerMinuteCents = 50
   var hasMicAccess = false
   var hasCameraAccess = false
@@ -79,6 +82,10 @@ final class TeacherDashboardViewModel {
   
   var formattedWeekEarnings: String {
 	Self.formatCents(weekEarningsCents, currency: earningsCurrencyCode)
+  }
+
+  var formattedMonthEarnings: String {
+	Self.formatCents(monthEarningsCents, currency: earningsCurrencyCode)
   }
   
   var formattedRate: String {
@@ -587,14 +594,16 @@ final class TeacherDashboardViewModel {
 	let now = Date()
 	let startOfToday = calendar.startOfDay(for: now)
 	guard let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)),
-		  let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfWeek) else { return }
-	
+		  let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfWeek),
+		  let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) else { return }
+
 	var todayEarnings = 0
 	var todayMinutes = 0
 	var weekEarnings = 0
 	var weekMinutes = 0
 	var lastWeekEarnings = 0
-	
+	var monthEarnings = 0
+
 	for lesson in lessons {
 	  let date = lesson.acceptedAt
 	  if date >= startOfToday {
@@ -608,6 +617,9 @@ final class TeacherDashboardViewModel {
 	  if date >= startOfLastWeek && date < startOfWeek {
 		lastWeekEarnings += lesson.teacherEarningsCents
 	  }
+	  if date >= startOfMonth {
+		monthEarnings += lesson.teacherEarningsCents
+	  }
 	}
 	
 	earningsCurrencyCode = lessons.first?.currencyCode ?? LessonFormatting.defaultCurrencyCode
@@ -616,6 +628,7 @@ final class TeacherDashboardViewModel {
 	weekEarningsCents = weekEarnings
 	weekMinutesTutored = weekMinutes
 	lastWeekEarningsCents = lastWeekEarnings
+	monthEarningsCents = monthEarnings
 	lessonCount = lessons.count
 	logger.info("[Earnings] dashboard uid=\(uid) currency=\(self.earningsCurrencyCode) lessonCount=\(lessons.count) todayCents=\(todayEarnings) todayMins=\(todayMinutes) weekCents=\(weekEarnings) weekMins=\(weekMinutes) lastWeekCents=\(lastWeekEarnings)")
   }

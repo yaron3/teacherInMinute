@@ -16,6 +16,7 @@ struct TeacherDashboardView: View {
   let showsIncomingOverlay: Bool
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
+  @State var showsMessages = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -71,19 +72,13 @@ struct TeacherDashboardView: View {
 	  ZStack {
 		ScrollView(.vertical, showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 0) {
-			FlatTopHeader(
-			  eyebrow: LocalizationSupport.localized("Teacher Dashboard"),
-			  name: viewModel.teacherName,
-			  avatarSystemImage: "person.crop.circle.fill",
-			  showNotificationBadge: viewModel.isOnline
-			)
-			.padding(.top, 16)
+			teacherHeader
+			  .padding(.top, 16)
 
-			statusHero
-			  .padding(.top, 28)
+			statusToggleCard
+			  .padding(.top, 20)
+
 			if viewModel.isOnline {
-
-
 			  liveEarningsCard
 				.padding(.top, 28)
 
@@ -98,13 +93,14 @@ struct TeacherDashboardView: View {
 				}
 			  }
 			} else {
-
-
 			  teacherStatusCard
 				.padding(.top, 28)
 
-			  earningsSnapshot
+			  statsCards
 				.padding(.top, 28)
+
+			  ratingSection
+				.padding(.top, 16)
 
 			  readinessChecklist
 				.padding(.top, 28)
@@ -124,6 +120,9 @@ struct TeacherDashboardView: View {
 			  hidesTabBar = false
 			}
 		}
+	  }
+	  .sheet(isPresented: $showsMessages) {
+		NotificationMessagesView()
 	  }
 	  .sheet(isPresented: $viewModel.showsSubjectEditor, onDismiss: {
 		viewModel.reloadSubjects()
@@ -166,41 +165,147 @@ struct TeacherDashboardView: View {
 	}
   }
 
-  // Status is carried by type weight and a single solid dot rather than a
-  // stacked-circle badge, so the block reads as one clean left-aligned column.
-  var statusHero: some View {
-	VStack(alignment: .leading, spacing: 0) {
-	  HStack(spacing: 8) {
-		FlatStatusDot(color: viewModel.isOnline ? theme.positive : theme.secondaryText)
+  var teacherHeader: some View {
+	HStack(alignment: .center, spacing: 14) {
+	  ZStack(alignment: .topTrailing) {
+		ProfileAvatarView(
+		  imageURL: viewModel.teacherImageURL,
+		  size: 72,
+		  fallbackSystemImage: "person.crop.circle.fill",
+		  background: theme.cardBackground,
+		  tint: theme.primaryText
+		)
 
-		Text(viewModel.isOnline ? LocalizationSupport.localized("ONLINE") : LocalizationSupport.localized("OFFLINE"))
-		  .font(.system(size: 11, weight: .bold))
-		  .foregroundStyle(viewModel.isOnline ? theme.positive : theme.secondaryText)
+		Button {
+		  showsMessages = true
+		} label: {
+		  ZStack {
+			Circle()
+			  .fill(theme.cardBackground)
+			  .frame(width: 20, height: 20)
+			  .overlay {
+				Circle()
+				  .stroke(theme.screenBackground, lineWidth: 2)
+			  }
+			PlatformIcon(systemName: "bell.fill", size: 9, weight: .medium, color: theme.primaryText)
+		  }
+		}
+		.buttonStyle(.plain)
+		.offset(x: 4, y: -4)
 	  }
 
-	  FlatPageTitle(title: viewModel.isOnline ? LocalizationSupport.localized("You're Online") : LocalizationSupport.localized("You're Offline"))
-		.padding(.top, 10)
+	  Spacer()
 
-	  Text(viewModel.isOnline ? LocalizationSupport.localized("Waiting for students...") : LocalizationSupport.localized("Go online to start receiving student requests and\nearn money."))
-		.font(.system(size: 15))
-		.foregroundStyle(theme.secondaryText)
-		.lineSpacing(4)
-		.padding(.top, 6)
-		.frame(maxWidth: .infinity, alignment: .leading)
+	  VStack(alignment: .trailing, spacing: 4) {
+		Text(LocalizationSupport.localized("Teacher Dashboard"))
+		  .font(.system(size: 12, weight: .semibold))
+		  .foregroundStyle(theme.accent)
 
-	  if viewModel.isOnline {
-		FlatSecondaryButton(title: LocalizationSupport.localized("Go Offline"), systemImage: "moon.fill") {
-		  viewModel.toggleOnline()
-		}
-		.padding(.top, 22)
-	  } else {
-		FlatPrimaryButton(title: LocalizationSupport.localized("Go Online"), systemImage: "antenna.radiowaves.left.and.right") {
-		  viewModel.toggleOnline()
-		}
-		.padding(.top, 22)
+		Text(viewModel.teacherName)
+		  .font(.system(size: 22, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+		  .multilineTextAlignment(.trailing)
 	  }
 	}
-	.frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  var statusToggleCard: some View {
+	HStack(spacing: 16) {
+	  Toggle("", isOn: Binding(
+		get: { viewModel.isOnline },
+		set: { _ in viewModel.toggleOnline() }
+	  ))
+	  .labelsHidden()
+
+	  Spacer()
+
+	  VStack(alignment: .trailing, spacing: 4) {
+		HStack(spacing: 6) {
+		  Text(viewModel.isOnline
+			   ? LocalizationSupport.localized("Available")
+			   : LocalizationSupport.localized("Not available"))
+			.font(.system(size: 14, weight: .semibold))
+			.foregroundStyle(theme.primaryText)
+		  Circle()
+			.fill(viewModel.isOnline ? theme.positive : theme.primaryText)
+			.frame(width: 8, height: 8)
+		}
+		Text(viewModel.isOnline
+			 ? LocalizationSupport.localized("Waiting for students...")
+			 : LocalizationSupport.localized("Tap to start"))
+		  .font(.system(size: 12))
+		  .foregroundStyle(theme.secondaryText)
+		  .frame(maxWidth: .infinity, alignment: .trailing)
+	  }
+	}
+	.padding(16)
+	.background(theme.cardBackground)
+	.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
+
+  var statsCards: some View {
+	HStack(spacing: 12) {
+	  statCard(
+		value: "\(viewModel.lessonCount)",
+		label: LocalizationSupport.localized("Lessons"),
+		valueColor: theme.accent
+	  )
+	  statCard(
+		value: viewModel.formattedMonthEarnings,
+		label: LocalizationSupport.localized("Monthly income"),
+		valueColor: theme.positive
+	  )
+	}
+  }
+
+  func statCard(value: String, label: String, valueColor: Color) -> some View {
+	FlatCard {
+	  VStack(alignment: .leading, spacing: 6) {
+		Text(value)
+		  .font(.system(size: 32, weight: .bold))
+		  .foregroundStyle(valueColor)
+		Text(label)
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.secondaryText)
+	  }
+	  .frame(maxWidth: .infinity, alignment: .leading)
+	}
+	.frame(maxWidth: .infinity)
+  }
+
+  var ratingSection: some View {
+	FlatCard {
+	  VStack(alignment: .trailing, spacing: 8) {
+		Text(LocalizationSupport.localized("My Rating"))
+		  .font(.system(size: 14, weight: .semibold))
+		  .foregroundStyle(theme.primaryText)
+		  .frame(maxWidth: .infinity, alignment: .trailing)
+
+		HStack(spacing: 8) {
+		  Text(String(format: LocalizationSupport.localized("%d reviews"), viewModel.reviewCount))
+			.font(.system(size: 13))
+			.foregroundStyle(theme.secondaryText)
+
+		  Spacer()
+
+		  HStack(spacing: 2) {
+			ForEach(0..<5, id: \.self) { index in
+			  let filled = Double(index) < viewModel.teacherRating
+			  PlatformIcon(
+				systemName: filled ? "star.fill" : "star",
+				size: 16,
+				weight: .medium,
+				color: filled ? theme.warning : theme.secondaryText
+			  )
+			}
+		  }
+
+		  Text(String(format: "%.1f", viewModel.teacherRating))
+			.font(.system(size: 15, weight: .bold))
+			.foregroundStyle(theme.primaryText)
+		}
+	  }
+	}
   }
 
   var teacherStatusCard: some View {

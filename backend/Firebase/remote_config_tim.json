@@ -6257,6 +6257,94 @@
         }
       },
       "valueType": "STRING"
+    },
+    "available_subjects": {
+      "defaultValue": {
+        "value": "Available Subjects"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מקצועות זמינים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "meet": {
+      "defaultValue": {
+        "value": "Meet"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "פגוש"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "ask_question": {
+      "defaultValue": {
+        "value": "Ask a question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שאל שאלה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "describe_the_problem": {
+      "defaultValue": {
+        "value": "Describe the problem – text, image, or whiteboard drawing"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תאר את הבעיה – טקסט, תמונה, או ציור בלוח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teacher_connects_within": {
+      "defaultValue": {
+        "value": "Teacher connects within 90 sec"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה מחובר תוך 90 שני׳"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_system_finds": {
+      "defaultValue": {
+        "value": "The system finds an available teacher for your subject"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המערכת מוצאת מורה פנוי ומתאים למקצוע"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "chat_whiteboard_voice": {
+      "defaultValue": {
+        "value": "Chat, whiteboard, voice messages – real time"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צ׳אט, לוח לבן, הודעות קוליות – בזמן אמת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "nis_connection_only": {
+      "defaultValue": {
+        "value": "2 NIS connection • only billed minutes count"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "2₪ לחיבור • דקות נספרות בשרת בלבד"
+        }
+      },
+      "valueType": "STRING"
     }
   }
 }

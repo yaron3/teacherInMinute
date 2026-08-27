@@ -63,7 +63,7 @@ struct AppTheme {
     /// any other dark fill. White in both schemes — those fills stay dark.
     var onAccentText: Color {
         adaptive(
-            light: (255, 255, 255),
+		  light: (0, 0,0),
             dark: (255, 255, 255)
         )
     }
@@ -82,7 +82,7 @@ struct AppTheme {
     var cardBackground: Color {
         adaptive(
             light: (242, 242, 244),
-            dark: (35, 35, 38)
+            dark: (25, 25, 28)
         )
     }
 
@@ -367,6 +367,20 @@ struct AppTheme {
             dark: (255, 214, 51)
         )
     }
+  
+  var ctaBackground : Color {
+	adaptive(
+	  light: (203, 60, 57),
+	  dark: (203, 60, 57)
+	)
+  }
+  
+  var ctaForeground : Color {
+	adaptive(
+	  light: (255, 255, 255),
+	  dark: (255, 255, 255)
+	)
+  }
 }
 
 #if os(iOS)
