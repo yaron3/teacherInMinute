@@ -35,6 +35,7 @@ let package = Package(
                 .product(name: "LiveKit", package: "client-sdk-swift", condition: .when(platforms: [.iOS])),
                 .product(name: "BraintreeCore", package: "braintree_ios", condition: .when(platforms: [.iOS])),
                 .product(name: "BraintreeApplePay", package: "braintree_ios", condition: .when(platforms: [.iOS])),
+                .product(name: "BraintreePayPal", package: "braintree_ios", condition: .when(platforms: [.iOS])),
             ],
             resources: [.process("Resources")],
             plugins: [.plugin(name: "skipstone", package: "skip")]

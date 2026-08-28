@@ -47,6 +47,14 @@ final class ProfileViewModel {
     /// (only the front ID is mandatory during onboarding — bug #24).
     var hasMissingDocuments = false
 
+    // MARK: - Saved PayPal (student payment method)
+
+    /// The email of the student's vaulted PayPal account, or `nil` if none is
+    /// saved yet.
+    var savedPayPalEmail: String?
+    var isSavingPayPal = false
+    var payPalVaultErrorMessage: String?
+
     var nameInitial: String {
         name.first.map(String.init) ?? ""
     }
@@ -147,6 +155,8 @@ final class ProfileViewModel {
                 isVerified = try await repository.isTeacherVerified(uid: uid)
                 let docs = (try? await repository.fetchUploadedDocuments(uid: uid)) ?? []
                 hasMissingDocuments = TeacherDocumentsPromptStore.hasMissingDocuments(docs)
+            } else {
+                savedPayPalEmail = try? await UserService.shared.fetchSavedPayPalEmail(uid: uid)
             }
             isProfileLoaded = true
         } catch {
@@ -238,6 +248,52 @@ final class ProfileViewModel {
 
     func logout() {
         // Settings owns logout confirmation and routing.
+    }
+
+    // MARK: - Saved PayPal
+
+#if canImport(UIKit)
+    /// Runs PayPal's login/consent flow and vaults the resulting account, so
+    /// future purchases can charge it directly with no PayPal login.
+    func addSavedPayPal() async {
+        guard !isSavingPayPal else { return }
+        isSavingPayPal = true
+        payPalVaultErrorMessage = nil
+        defer { isSavingPayPal = false }
+
+        do {
+            let session = try await FunctionsService.shared.createPayPalVaultClientToken()
+            let nonce = try await PayPalVaultService.shared.vaultPayPalAccount(clientToken: session.clientToken)
+            let email = try await FunctionsService.shared.savePayPalVault(nonce: nonce)
+            savedPayPalEmail = email
+            logger.info("[Profile] saved PayPal vault")
+        } catch let error as PayPalVaultService.PayPalVaultServiceError {
+            if case .cancelled = error {
+                logger.info("[Profile] saving PayPal cancelled")
+            } else {
+                payPalVaultErrorMessage = error.localizedDescription
+                logger.error("[Profile] failed saving PayPal: \(error.localizedDescription)")
+            }
+        } catch {
+            payPalVaultErrorMessage = LocalizationSupport.localized("Could not save your PayPal account. Please try again.")
+            logger.error("[Profile] failed saving PayPal: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.addSavedPayPal")
+        }
+    }
+#endif
+
+    func removeSavedPayPal() async {
+        let previousEmail = savedPayPalEmail
+        savedPayPalEmail = nil
+        do {
+            try await FunctionsService.shared.removeSavedPayPal()
+            logger.info("[Profile] removed saved PayPal vault")
+        } catch {
+            savedPayPalEmail = previousEmail
+            payPalVaultErrorMessage = LocalizationSupport.localized("Could not remove your saved PayPal account. Please try again.")
+            logger.error("[Profile] failed removing saved PayPal: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.removeSavedPayPal")
+        }
     }
 
     private func persistProfileEdits() async {

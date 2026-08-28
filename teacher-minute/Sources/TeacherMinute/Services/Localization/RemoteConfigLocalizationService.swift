@@ -163,7 +163,17 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Weekly Breakdown": "פירוט שבועי",
         "Week %d (%d-%d)": "שבוע %d (%d-%d)",
         "Teacher profile coming soon": "פרופיל מורה בקרוב",
-        "Username": "שם משתמש"
+        "Username": "שם משתמש",
+        // Saved PayPal (student profile)
+        "Saved PayPal": "פייפאל שמור",
+        "+ Add": "+ הוסף",
+        "PayPal": "פייפאל",
+        "Remove": "הסר",
+        "No saved PayPal account. Tap \"+ Add\" to save one.": "אין חשבון פייפאל שמור. לחץ \"+ הוסף\" לשמירה חד פעמית.",
+        "Quick Payment": "תשלום מהיר",
+        "After saving your PayPal account, every future purchase is one tap away — no need to log in again.": "אחרי שמירת חשבון הפייפאל, כל רכישה עתידית תהיה בלחיצה אחת – ללא צורך להתחבר שוב.",
+        "Could not save your PayPal account. Please try again.": "לא ניתן היה לשמור את חשבון הפייפאל. נסה שוב.",
+        "Could not remove your saved PayPal account. Please try again.": "לא ניתן היה להסיר את חשבון הפייפאל השמור. נסה שוב."
     ]
 
     #if os(Android)

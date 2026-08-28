@@ -105,8 +105,14 @@ struct ProfileView: View {
 //		  editAction: showProfileEditor,
 //		  addAction: showProfileEditor
 //		)
-		
+
 	  }
+#if canImport(UIKit)
+      if viewModel.shouldShowStudentPaymentsMethod {
+        savedPayPalSection
+          .padding(.top, 32)
+      }
+#endif
       if viewModel.shouldShowTeachingDetails {
         FlatSectionHeader(LocalizationSupport.localized("Teaching Details"))
           .padding(.top, 32)
@@ -378,6 +384,87 @@ struct ProfileView: View {
     guard !viewModel.hasDisplayableProfileData else { return }
     await viewModel.loadProfile()
   }
+
+#if canImport(UIKit)
+  var savedPayPalSection: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      FlatSectionHeader(LocalizationSupport.localized("Saved PayPal")) {
+        if viewModel.savedPayPalEmail == nil {
+          Button {
+            Task { await viewModel.addSavedPayPal() }
+          } label: {
+            if viewModel.isSavingPayPal {
+              ProgressView()
+            } else {
+              FlatChip(title: LocalizationSupport.localized("+ Add"), outlined: true)
+            }
+          }
+          .buttonStyle(.plain)
+          .disabled(viewModel.isSavingPayPal)
+        }
+      }
+
+      FlatCard(outlined: true) {
+        if let email = viewModel.savedPayPalEmail {
+          HStack(spacing: 14) {
+            FlatIconTile(systemName: "checkmark.circle.fill", tint: theme.positive, background: theme.screenBackground)
+
+            VStack(alignment: .leading, spacing: 3) {
+              Text(LocalizationSupport.localized("PayPal"))
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(theme.primaryText)
+              Text(email)
+                .font(.system(size: 13))
+                .foregroundStyle(theme.secondaryText)
+                .lineLimit(1)
+            }
+
+            Spacer()
+
+            Button {
+              Task { await viewModel.removeSavedPayPal() }
+            } label: {
+              Text(LocalizationSupport.localized("Remove"))
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(theme.danger)
+            }
+            .buttonStyle(.plain)
+          }
+        } else {
+          Text(LocalizationSupport.localized("No saved PayPal account. Tap \"+ Add\" to save one."))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        }
+      }
+
+      if let errorMessage = viewModel.payPalVaultErrorMessage {
+        Text(errorMessage)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.danger)
+      }
+
+      HStack(alignment: .top, spacing: 10) {
+        PlatformIcon(systemName: "bolt.fill", size: 16, weight: .bold, color: theme.warning)
+        VStack(alignment: .leading, spacing: 4) {
+          Text(LocalizationSupport.localized("Quick Payment"))
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.warning)
+          Text(LocalizationSupport.localized("After saving your PayPal account, every future purchase is one tap away — no need to log in again."))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        }
+      }
+      .padding(14)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(theme.warning.opacity(0.12))
+      .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
+          .stroke(theme.warning, lineWidth: 1)
+      }
+    }
+  }
+#endif
 
   var documentsButton: some View {
 	Button {

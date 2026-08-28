@@ -154,6 +154,15 @@ export interface UserDoc {
   totalMinutes: number;      // teachers: cumulative minutes taught
   questions?: string[];
   currency?: string;         // ISO 4217 code; controls pricing for students and display for teachers
+  /** A student's vaulted PayPal account (see ./braintree.ts), for one-tap
+   *  future purchases without a PayPal login redirect. Unrelated to
+   *  `paypalEmail` below, which is a teacher's payout destination. */
+  savedPayPal?: {
+    paymentMethodToken: string;
+    email: string;
+    updatedAt: Timestamp;
+  };
+  paypalEmail?: string;       // teachers: PayPal payout destination
 }
 
 // ─── Firestore — coupons/{couponId} ──────────────────────────────────────────

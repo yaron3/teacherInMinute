@@ -133,7 +133,9 @@ protocol StudentHomeViewModeling: AnyObject {
   var questionId: String? { get set }
   var pricingOptions: [PricingOption] { get }
   var availablePaymentMethods: [PaymentMethod] { get }
+  var savedPayPalEmail: String? { get set }
   var recentLessons: [RecentLesson] { get set }
+  var onlineTeachers: [OnlineTeacher] { get set }
   var totalTimeLearnedText: String { get }
   var totalPurchasedText: String { get }
   var lessonCount: Int { get }
@@ -166,6 +168,7 @@ protocol StudentHomeViewModeling: AnyObject {
   func redeemCoupon() async
   func resetCouponState()
   func consumePurchaseSummary()
+  func isSubjectEnabled(_ key: String) -> Bool
 }
 
 // MARK: - ViewModel
@@ -184,8 +187,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   var pricingOptions: [PricingOption] = []
   var availablePaymentMethods: [PaymentMethod] = PaymentMethod.availableForCurrentPlatform
+  var savedPayPalEmail: String?
 
   var recentLessons: [RecentLesson] = []
+  var onlineTeachers: [OnlineTeacher] = []
   var totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: [])
   var totalPurchasedText = LessonFormatting.minutesText(0)
   var lessonCount = 0
@@ -201,6 +206,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var purchaseSummary: PurchaseSummary?
 
   private var pollingTask: Task<Void, Never>?
+  private var onlineTeachersStore: OnlineTeachersStore?
+  private var resolveOnlineTeachersTask: Task<Void, Never>?
+  /// Subject keys (e.g. "math", "physics") enabled via Remote Config
+  /// (`enable_<key>`). "math" is the only one on by default; every other
+  /// subject stays hidden until its flag is explicitly turned on remotely.
+  private var enabledSubjectKeys: Set<String> = ["math"]
   private var didLoadProfile = false
   private var checkoutStartedRemainingMinutes = 0
   /// The option being bought. Unlike `checkoutPricingOptionID` this survives
@@ -293,6 +304,13 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       return
     }
 
+#if canImport(UIKit)
+    if method == .savedPayPal {
+      await checkoutWithSavedPayPal(option)
+      return
+    }
+#endif
+
     do {
       let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: method)
       checkoutURL = result.checkoutURL
@@ -342,6 +360,30 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   private func checkoutWithApplePay(_ option: PricingOption) async {
     logger.error("[PaymentReturn] Apple Pay checkout requested on a platform without UIKit")
     searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+  }
+  #endif
+
+  /// Charges the student's previously vaulted PayPal account directly — no
+  /// checkout URL, no PayPal login, mirroring the wallet flows above.
+  #if canImport(UIKit)
+  private func checkoutWithSavedPayPal(_ option: PricingOption) async {
+    do {
+      try await FunctionsService.shared.chargeSavedPayPal(pricingOptionID: option.id)
+      logger.info("[PaymentReturn] saved PayPal charged pricingOptionID=\(option.id)")
+      announcePurchase(option)
+
+      if let uid = Auth.auth().currentUser?.uid {
+        _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
+      }
+    } catch let error as FunctionsError {
+      logger.error("[PaymentReturn] saved PayPal charge failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.chargeSavedPayPal")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    } catch {
+      logger.error("[PaymentReturn] saved PayPal charge failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.chargeSavedPayPal")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    }
   }
   #endif
 
@@ -478,6 +520,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func loadProfileIfNeeded() async {
     await loadPricingOptions()
+    await loadSubjectAvailability()
+    startObservingOnlineTeachersIfNeeded()
     guard !didLoadProfile, let uid = Auth.auth().currentUser?.uid else { return }
     didLoadProfile = true
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
@@ -489,10 +533,62 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     await loadRecentLessons(uid: uid)
   }
 
+  func isSubjectEnabled(_ key: String) -> Bool {
+    enabledSubjectKeys.contains(key)
+  }
+
+  /// Reads `enable_<key>` for each catalog subject; "math" defaults to
+  /// enabled and every other subject defaults to hidden until Remote Config
+  /// turns it on.
+  private func loadSubjectAvailability() async {
+    await RemoteConfigService.shared.ready()
+    var enabled: Set<String> = []
+    for key in StudentSubjectCatalog.keys {
+      if RemoteConfigService.shared.getBool("enable_\(key)", default: key == "math") {
+        enabled.insert(key)
+      }
+    }
+    enabledSubjectKeys = enabled
+  }
+
+  // MARK: - Online Teachers
+
+  private func startObservingOnlineTeachersIfNeeded() {
+    guard onlineTeachersStore == nil else { return }
+    let store = OnlineTeachersStore { [weak self] presences in
+      self?.resolveOnlineTeachers(presences)
+    }
+    store.startListening()
+    onlineTeachersStore = store
+  }
+
+  private func resolveOnlineTeachers(_ presences: [OnlineTeacherPresence]) {
+    resolveOnlineTeachersTask?.cancel()
+    resolveOnlineTeachersTask = Task { [weak self] in
+      guard let self else { return }
+      var resolved: [OnlineTeacher] = []
+      for presence in presences {
+        guard !Task.isCancelled else { return }
+        guard let profile = try? await UserService.shared.fetchProfileSummary(uid: presence.id) else { continue }
+        resolved.append(
+          OnlineTeacher(
+            id: presence.id,
+            name: profile.displayName,
+            subject: presence.subjects.first.map { LocalizationSupport.localized($0) } ?? LocalizationSupport.localized("Math"),
+            profileImageURL: profile.profileImageURL
+          )
+        )
+      }
+      guard !Task.isCancelled else { return }
+      self.onlineTeachers = resolved
+    }
+  }
+
   /// Pull-to-refresh: re-reads the authoritative balance and profile summary
   /// from Firestore, along with recent lessons and unread messages.
   func refresh() async {
     await loadPricingOptions()
+    await loadSubjectAvailability()
     guard let uid = Auth.auth().currentUser?.uid else { return }
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
@@ -555,6 +651,15 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 #if canImport(UIKit)
     if !ApplePayService.shared.canMakePayments() {
       methods = methods.filter { $0 != .applePay }
+    }
+    if let uid = Auth.auth().currentUser?.uid {
+      savedPayPalEmail = try? await UserService.shared.fetchSavedPayPalEmail(uid: uid)
+    }
+    // A saved account replaces the redirect-based PayPal entry outright —
+    // charging it goes through chargeSavedPayPal directly, so both options
+    // would just be two ways to pay with the same PayPal account.
+    if savedPayPalEmail != nil {
+      methods = methods.map { $0 == .paypal ? .savedPayPal : $0 }
     }
 #endif
     availablePaymentMethods = methods
@@ -716,7 +821,14 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   let pricingOptions: [PricingOption]
   var availablePaymentMethods: [PaymentMethod] = PaymentMethod.availableForCurrentPlatform
+  var savedPayPalEmail: String?
   var recentLessons: [RecentLesson]
+  var onlineTeachers: [OnlineTeacher] = [
+    OnlineTeacher(id: "1", name: "Cohen", subject: "Math", profileImageURL: ""),
+    OnlineTeacher(id: "2", name: "Levi", subject: "Physics", profileImageURL: ""),
+    OnlineTeacher(id: "3", name: "Mizrahi", subject: "Chemistry", profileImageURL: ""),
+    OnlineTeacher(id: "4", name: "Shalev", subject: "Statistics", profileImageURL: ""),
+  ]
   var totalTimeLearnedText: String
   var totalPurchasedText: String
   var lessonCount: Int
@@ -841,6 +953,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   }
 
   func viewAllLessons() {}
+
+  func isSubjectEnabled(_ key: String) -> Bool { true }
 
   func loadProfileIfNeeded() async {}
 

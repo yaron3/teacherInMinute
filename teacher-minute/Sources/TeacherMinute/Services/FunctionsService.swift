@@ -99,6 +99,10 @@ struct PaymentSettingsSessionResult {
   let settingsURL: URL
 }
 
+struct PayPalVaultClientTokenResult {
+  let clientToken: String
+}
+
 struct RedeemCouponResult {
   let minutesAdded: Int
 }
@@ -244,6 +248,33 @@ final class FunctionsService {
       let settingsURL = URL(string: urlString)
     else { throw FunctionsError.decodingError() }
     return PaymentSettingsSessionResult(settingsURL: settingsURL)
+  }
+
+  // MARK: - Saved PayPal (Braintree vault)
+
+  func createPayPalVaultClientToken() async throws -> PayPalVaultClientTokenResult {
+    let result = try await call(function: "createPayPalVaultClientToken", data: [:])
+    guard let clientToken = result["clientToken"] as? String else {
+      throw FunctionsError.decodingError(function: "createPayPalVaultClientToken", response: "\(result)")
+    }
+    return PayPalVaultClientTokenResult(clientToken: clientToken)
+  }
+
+  /// Vaults the PayPal account behind `nonce` and returns its (masked) email
+  /// for display.
+  func savePayPalVault(nonce: String) async throws -> String {
+    let result = try await call(function: "savePayPalVault", data: ["nonce": nonce])
+    return result["email"] as? String ?? ""
+  }
+
+  func removeSavedPayPal() async throws {
+    _ = try await call(function: "removeSavedPayPal", data: [:])
+  }
+
+  /// Charges the student's previously saved PayPal account directly — no
+  /// PayPal login, no checkout URL.
+  func chargeSavedPayPal(pricingOptionID: String) async throws {
+    _ = try await call(function: "chargeSavedPayPal", data: ["pricingOptionId": pricingOptionID])
   }
 
   // MARK: - Teacher callables

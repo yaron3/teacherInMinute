@@ -52,6 +52,17 @@ final class UserService {
 			return UserProfileSummary(uid: uid, data: data)
   }
 
+  /// The email of the student's vaulted PayPal account (see FunctionsService's
+  /// savePayPalVault/chargeSavedPayPal), or `nil` if none is saved.
+  func fetchSavedPayPalEmail(uid: String) async throws -> String? {
+    guard let data = try await fetchRaw(uid: uid),
+          let savedPayPal = data["savedPayPal"] as? [String: Any],
+          let email = savedPayPal["email"] as? String,
+          !email.isEmpty
+    else { return nil }
+    return email
+  }
+
   func isTeacherVerified(uid: String) async throws -> Bool {
     let db = Firestore.firestore()
     let snap = try await db.collection("teachers").document(uid).getDocument()

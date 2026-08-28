@@ -59,7 +59,8 @@ struct StudentHomeView: View {
 	  if let option = pendingCheckoutOption {
 		PaymentMethodSheet(
 		  methods: PaymentMethod.supported(viewModel.availablePaymentMethods, forCurrency: option.currency),
-		  theme: theme
+		  theme: theme,
+		  savedPayPalEmail: viewModel.savedPayPalEmail
 		) { method in
 		  pendingCheckoutOption = nil
 		  Task { await viewModel.checkout(option, method: method) }
@@ -404,24 +405,59 @@ struct StudentHomeView: View {
     }
   }
 
+  var subjectCatalogTints: [String: Color] {
+    [
+      "math": theme.accent,
+      "physics": theme.warning,
+      "chemistry": theme.positive,
+      "statistics": theme.info,
+      "computer_science": theme.accent,
+      "biology": theme.danger,
+    ]
+  }
+
+  var visibleSubjects: [StudentSubjectCatalogItem] {
+    StudentSubjectCatalog.items.filter { viewModel.isSubjectEnabled($0.key) }
+  }
+
   var popularSubjectsGrid: some View {
     LazyVGrid(columns: twoColumnGrid, spacing: 14) {
-      subjectCard(title: LocalizationSupport.localized("Math"), teacherCount: 78, topics: LocalizationSupport.localized("Algebra, trigonometry, 5 units"), systemImage: "ruler.fill", tint: theme.accent)
-      subjectCard(title: LocalizationSupport.localized("Physics"), teacherCount: 41, topics: LocalizationSupport.localized("Mechanics, electricity, optics"), systemImage: "bolt.fill", tint: theme.warning)
-      subjectCard(title: LocalizationSupport.localized("Chemistry"), teacherCount: 33, topics: LocalizationSupport.localized("Organic, physical, matriculation"), systemImage: "testtube.2", tint: theme.positive)
-      subjectCard(title: LocalizationSupport.localized("Statistics"), teacherCount: 32, topics: LocalizationSupport.localized("Probability, regression, SPSS"), systemImage: "chart.bar.fill", tint: theme.info)
-      subjectCard(title: LocalizationSupport.localized("Computer Science"), teacherCount: 29, topics: LocalizationSupport.localized("Python, algorithms, data structures"), systemImage: "laptopcomputer", tint: theme.accent)
-      subjectCard(title: LocalizationSupport.localized("Biology"), teacherCount: 24, topics: LocalizationSupport.localized("Genetics, cells, molecular"), systemImage: "leaf.fill", tint: theme.danger)
+      ForEach(visibleSubjects) { subject in
+        subjectCard(
+          title: LocalizationSupport.localized(subject.title),
+          teacherCount: subject.teacherCount,
+          topics: LocalizationSupport.localized(subject.topics),
+          systemImage: subject.systemImage,
+          tint: subjectCatalogTints[subject.key] ?? theme.accent
+        )
+      }
     }
+  }
+
+  var onlineTeacherTints: [Color] {
+    [theme.accent, theme.warning, theme.positive, theme.info]
   }
 
   var onlineTeachersGrid: some View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: 14) {
-        onlineTeacherCard(name: LocalizationSupport.localized("Cohen"), subject: LocalizationSupport.localized("Math"), rating: "4.9", initial: LocalizationSupport.localized("C"), tint: theme.accent).frame(width: 155)
-        onlineTeacherCard(name: LocalizationSupport.localized("Levi"), subject: LocalizationSupport.localized("Physics"), rating: "4.7", initial: LocalizationSupport.localized("L"), tint: theme.warning).frame(width: 155)
-        onlineTeacherCard(name: LocalizationSupport.localized("Mizrahi"), subject: LocalizationSupport.localized("Chemistry"), rating: "4.8", initial: LocalizationSupport.localized("M"), tint: theme.positive).frame(width: 155)
-        onlineTeacherCard(name: LocalizationSupport.localized("Shalev"), subject: LocalizationSupport.localized("Statistics"), rating: "4.8", initial: LocalizationSupport.localized("S"), tint: theme.info).frame(width: 155)
+        let teachers = viewModel.onlineTeachers
+        if teachers.isEmpty {
+          Text(LocalizationSupport.localized("No teachers online right now"))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        } else {
+          ForEach(teachers) { teacher in
+            let index = teachers.firstIndex(where: { $0.id == teacher.id }) ?? 0
+            onlineTeacherCard(
+              name: teacher.name,
+              subject: teacher.subject,
+              initial: teacher.initial,
+              tint: onlineTeacherTints[index % onlineTeacherTints.count]
+            )
+            .frame(width: 155)
+          }
+        }
       }
     }
   }
@@ -543,7 +579,7 @@ struct StudentHomeView: View {
 
   var registeredTeacherCount: Int { 237 }
 
-  var onlineTeacherCount: Int { 5 }
+  var onlineTeacherCount: Int { viewModel.onlineTeachers.count }
 
   var twoColumnGrid: [GridItem] {
     [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
@@ -652,7 +688,7 @@ struct StudentHomeView: View {
     }
   }
 
-  func onlineTeacherCard(name: String, subject: String, rating: String, initial: String, tint: Color) -> some View {
+  func onlineTeacherCard(name: String, subject: String, initial: String, tint: Color) -> some View {
     FlatCard(outlined: true) {
       VStack(alignment: .center, spacing: 10) {
         ZStack(alignment: .bottomTrailing) {
@@ -679,17 +715,6 @@ struct StudentHomeView: View {
           .font(.system(size: 14, weight: .bold))
           .foregroundStyle(tint)
           .lineLimit(1)
-
-        HStack(spacing: 4) {
-          Text(rating)
-            .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(theme.secondaryText)
-          HStack(spacing: 1) {
-            ForEach(0..<5, id: \.self) { _ in
-              PlatformIcon(systemName: "star.fill", size: 10, weight: .bold, color: theme.ratingStar)
-            }
-          }
-        }
 
         Button {
           showsAskTeacher = true

@@ -11,6 +11,10 @@ import {
   createBraintreeSale,
   BraintreeNotConfiguredError,
   BraintreeCurrencyNotSupportedError,
+  generateVaultClientToken,
+  vaultPayPalNonce,
+  deleteVaultedPaymentMethod,
+  createSaleWithVaultedPaymentMethod,
 } from "./braintree";
 import { PricingDoc, PaymentCheckoutDoc, PurchaseDoc } from "./types";
 
@@ -506,6 +510,149 @@ export const createGooglePayCheckout = onCall(async (req) => {
 export const confirmGooglePayPayment = onCall(async (req) => {
   const { uid, checkoutId, nonce } = walletConfirmArgs(req);
   return confirmWalletPayment({ uid, checkoutId, nonce, walletLabel: "Google Pay" });
+});
+
+// ─── Saved PayPal (Braintree vault) ────────────────────────────────────────────
+// Lets a student save their PayPal account once so future purchases skip the
+// PayPal login/approval redirect entirely. Distinct from the plain PayPal
+// flow above (createCheckoutSession with no wallet) — see ./braintree.ts.
+
+export const createPayPalVaultClientToken = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  logger.info(`[payments] createPayPalVaultClientToken uid=${uid}`);
+
+  try {
+    const clientToken = await generateVaultClientToken(uid);
+    return { clientToken };
+  } catch (err) {
+    if (err instanceof BraintreeNotConfiguredError) {
+      throw new HttpsError("failed-precondition", "Saving a PayPal account is not available yet.");
+    }
+    logger.error(`[payments] createPayPalVaultClientToken failed uid=${uid}`, err);
+    throw new HttpsError("internal", "Failed to start saving your PayPal account");
+  }
+});
+
+export const savePayPalVault = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const data = req.data as Record<string, unknown>;
+  const nonce = data.nonce as string | undefined;
+  if (!nonce) throw new HttpsError("invalid-argument", "Missing PayPal nonce");
+
+  let vaulted;
+  try {
+    vaulted = await vaultPayPalNonce(uid, nonce);
+  } catch (err) {
+    logger.error(`[payments] savePayPalVault failed uid=${uid}`, err);
+    throw new HttpsError("internal", "Could not save your PayPal account. Please try again.");
+  }
+
+  await firestore.collection("users").doc(uid).set(
+    {
+      savedPayPal: {
+        paymentMethodToken: vaulted.paymentMethodToken,
+        email: vaulted.email,
+        updatedAt: Timestamp.now(),
+      },
+    },
+    { merge: true }
+  );
+
+  logger.info(`[payments] savePayPalVault saved uid=${uid}`);
+  return { email: vaulted.email };
+});
+
+export const removeSavedPayPal = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const userRef = firestore.collection("users").doc(uid);
+  const snap = await userRef.get();
+  const token = (snap.data()?.savedPayPal as { paymentMethodToken?: string } | undefined)
+    ?.paymentMethodToken;
+
+  if (token) {
+    try {
+      await deleteVaultedPaymentMethod(token);
+    } catch (err) {
+      logger.warn(`[payments] removeSavedPayPal delete failed uid=${uid}`, err);
+    }
+  }
+
+  await userRef.set({ savedPayPal: FieldValue.delete() }, { merge: true });
+  logger.info(`[payments] removeSavedPayPal removed uid=${uid}`);
+  return {};
+});
+
+export const chargeSavedPayPal = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const data = req.data as Record<string, unknown>;
+  const packageId = (data.pricingOptionId ?? data.packageId) as string | undefined;
+  if (!packageId) throw new HttpsError("invalid-argument", "Missing pricing package id");
+
+  const userSnap = await firestore.collection("users").doc(uid).get();
+  const token = (userSnap.data()?.savedPayPal as { paymentMethodToken?: string } | undefined)
+    ?.paymentMethodToken;
+  if (!token) throw new HttpsError("failed-precondition", "No saved PayPal account. Please add one first.");
+
+  logger.info(`[payments] chargeSavedPayPal uid=${uid} packageId=${packageId}`);
+
+  const { checkoutId, checkoutRef, pkg } = await resolvePricingAndCreateCheckout({
+    uid,
+    packageId,
+    paymentMethod: "saved_paypal",
+  });
+
+  let sale;
+  try {
+    sale = await createSaleWithVaultedPaymentMethod({
+      amountCents: pkg.priceCents,
+      currency: pkg.currency,
+      paymentMethodToken: token,
+      orderId: checkoutId,
+    });
+  } catch (err) {
+    logger.error(`[payments] chargeSavedPayPal sale failed checkoutId=${checkoutId}`, err);
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    if (err instanceof BraintreeCurrencyNotSupportedError) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Saved PayPal does not support ${pkg.currency} yet. Please choose another payment method.`
+      );
+    }
+    throw new HttpsError("internal", "Saved PayPal payment failed");
+  }
+
+  if (!sale.success) {
+    logger.warn(
+      `[payments] chargeSavedPayPal declined checkoutId=${checkoutId} message=${sale.message}`
+    );
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    throw new HttpsError("aborted", sale.message ?? "Saved PayPal payment was declined");
+  }
+
+  const checkoutSnap = await checkoutRef.get();
+  const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
+
+  await creditCompletedCheckout({
+    checkoutRef,
+    checkout,
+    checkoutId,
+    provider: "braintree",
+    providerTransactionId: sale.transactionId,
+  });
+
+  logger.info(
+    `[payments] chargeSavedPayPal credited uid=${uid} minutes=${checkout.minutes} checkoutId=${checkoutId}`
+  );
+
+  return { status: "completed" };
 });
 
 // ─── payCardCheckout (HTTP) ────────────────────────────────────────────────────

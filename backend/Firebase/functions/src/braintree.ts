@@ -132,3 +132,117 @@ export async function createBraintreeSale(
     message: result.success ? undefined : result.message,
   };
 }
+
+// ─── PayPal vaulting — "save my PayPal for one-tap future purchases" ─────────
+//
+// Distinct from the plain PayPal Orders v2 flow in ./paypal.ts (used by
+// createCheckoutSession), which never stores anything and requires a fresh
+// PayPal login every purchase. Vaulting instead tokenizes the buyer's PayPal
+// account once via Braintree's client SDK (BTPayPalClient's billing-agreement
+// request) and stores the resulting payment method token, so later purchases
+// can be charged directly with no PayPal redirect at all.
+//
+// The Firebase uid is reused as the Braintree customer id (it fits Braintree's
+// 36-character id limit) so there is no separate id to track or look up.
+
+/** Ensures a Braintree customer exists for this uid, creating one if needed.
+ *  Tolerates a race with another concurrent call for the same uid. */
+async function ensureBraintreeCustomer(gateway: braintree.BraintreeGateway, uid: string): Promise<void> {
+  try {
+    await gateway.customer.find(uid);
+    return;
+  } catch {
+    // Not found — fall through and create it.
+  }
+
+  const result = await gateway.customer.create({ id: uid });
+  if (result.success) return;
+
+  // Another request may have created the customer in between our find/create —
+  // check once more before treating this as a real failure.
+  try {
+    await gateway.customer.find(uid);
+  } catch {
+    throw new Error(result.message ?? "Failed to create Braintree customer");
+  }
+}
+
+/** A client token scoped to this uid's Braintree customer, so the PayPal
+ *  tokenization it authorizes can be vaulted against that customer. */
+export async function generateVaultClientToken(uid: string): Promise<string> {
+  const gateway = getGateway();
+  await ensureBraintreeCustomer(gateway, uid);
+  const response = await gateway.clientToken.generate({ customerId: uid });
+  return response.clientToken;
+}
+
+export interface VaultedPayPalAccount {
+  paymentMethodToken: string;
+  email: string;
+}
+
+/** Vaults the PayPal account behind `nonce` (from a billing-agreement
+ *  tokenization on the client) against this uid's Braintree customer. */
+export async function vaultPayPalNonce(uid: string, nonce: string): Promise<VaultedPayPalAccount> {
+  const gateway = getGateway();
+  await ensureBraintreeCustomer(gateway, uid);
+
+  const result = await gateway.paymentMethod.create({
+    customerId: uid,
+    paymentMethodNonce: nonce,
+    options: { makeDefault: true },
+  });
+
+  if (!result.success || !result.paymentMethod) {
+    throw new Error(result.message ?? "Failed to save PayPal account");
+  }
+
+  const account = result.paymentMethod as unknown as { token?: string; email?: string };
+  if (!account.token) {
+    throw new Error("Braintree did not return a payment method token");
+  }
+
+  return { paymentMethodToken: account.token, email: account.email ?? "" };
+}
+
+/** Best-effort removal of a vaulted payment method from Braintree. */
+export async function deleteVaultedPaymentMethod(token: string): Promise<void> {
+  const gateway = getGateway();
+  await gateway.paymentMethod.delete(token);
+}
+
+export interface BraintreeVaultedSaleParams {
+  amountCents: number;
+  currency: string;
+  paymentMethodToken: string;
+  orderId: string;
+}
+
+/** Charges a previously vaulted payment method directly — no nonce, no
+ *  buyer interaction. Mirrors `createBraintreeSale` but by stored token. */
+export async function createSaleWithVaultedPaymentMethod(
+  params: BraintreeVaultedSaleParams
+): Promise<BraintreeSaleResult> {
+  const merchantAccountId = merchantAccountIdFor(params.currency);
+
+  const gateway = getGateway();
+  const amount = (params.amountCents / 100).toFixed(2);
+
+  const result = await gateway.transaction.sale({
+    amount,
+    paymentMethodToken: params.paymentMethodToken,
+    orderId: params.orderId,
+    merchantAccountId,
+    options: { submitForSettlement: true },
+  });
+
+  logger.info(
+    `[braintree] vaulted sale orderId=${params.orderId} success=${result.success} status=${result.transaction?.status}`
+  );
+
+  return {
+    success: result.success,
+    transactionId: result.transaction?.id ?? "",
+    message: result.success ? undefined : result.message,
+  };
+}

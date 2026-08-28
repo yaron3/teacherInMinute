@@ -244,6 +244,20 @@ final class RemoteConfigService {
         return RemoteConfig.remoteConfig().configValue(forKey: key).boolValue
     }
 
+    /// Like `getBool(_:)` but returns `defaultValue` when Remote Config has no
+    /// value for the key at all (neither fetched from the server nor a local
+    /// default) — i.e. the key has never been configured. Use this for
+    /// feature-style flags that should default on/off client-side until
+    /// someone explicitly sets them remotely.
+    func getBool(_ key: String, default defaultValue: Bool) -> Bool {
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return defaultValue }
+        #endif
+        let value = RemoteConfig.remoteConfig().configValue(forKey: key)
+        guard value.source != .static else { return defaultValue }
+        return value.boolValue
+    }
+
     func getURL(_ key: String) -> URL? {
         let value = getString(key)
         guard !value.isEmpty,
