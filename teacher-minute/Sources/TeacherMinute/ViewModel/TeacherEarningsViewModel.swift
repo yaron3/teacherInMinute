@@ -13,23 +13,44 @@ import FirebaseAuth
 import SkipFirebaseAuth
 #endif
 
+/// One calendar month of teacher earnings. Holds only numbers — every label is
+/// derived from the viewer's locale below, so the same summary renders in
+/// whichever language the app is set to.
 struct MonthSummary: Identifiable {
     let id: String           // "yyyy-MM"
-    let shortName: String    // "יולי"
-    let displayName: String  // "יולי 2026 (שוטף)"
+    let year: Int
+    let month: Int           // 1-12
     let earningsCents: Int
     let minutesCount: Int
     let lessonCount: Int
     let isCurrentMonth: Bool
     let weeklyBreakdown: [WeekSummary]
+
+    /// Month name alone, for the month picker chips.
+    var shortName: String {
+        LessonFormatting.monthName(month: month)
+    }
+
+    /// Month and year, marked when the month is still accruing.
+    var displayName: String {
+        let monthYear = LessonFormatting.monthYearText(year: year, month: month)
+        guard isCurrentMonth else { return monthYear }
+        return String(format: LocalizationSupport.localized("%@ (current)"), monthYear)
+    }
 }
 
 struct WeekSummary: Identifiable {
     let id: String
-    let label: String   // "שבוע 1 (1-7)"
+    let index: Int
+    let startDay: Int
+    let endDay: Int
     let earningsCents: Int
     let minutesCount: Int
     let lessonCount: Int
+
+    var label: String {
+        String(format: LocalizationSupport.localized("Week %d (%d-%d)"), index, startDay, endDay)
+    }
 }
 
 @Observable
@@ -41,11 +62,59 @@ final class TeacherEarningsViewModel {
     var totalMonthsActive: Int = 0
     var currencyCode: String = LessonFormatting.defaultCurrencyCode
     var isLoading: Bool = false
+    var errorMessage: String?
 
-    // Next payment — mock until a payment system is implemented
-    var nextPaymentCents: Int = 7050
-    var nextPaymentDate: String = "03/08/2025"
-    var nextPaymentPhone: String = "0521234567"
+    /// The pending payout, from the backend's payout schedule: a month's
+    /// earnings are paid on the 9th of the month after it (March is paid on
+    /// 9 April). `nil` until the summary loads.
+    var nextPaymentCents: Int = 0
+    var nextPaymentDate: String = ""
+
+    // MARK: - Payout method
+
+    /// Where the payout is sent. `nil` until the teacher sets one up.
+    var payoutMethod: TeacherPayoutMethod?
+    /// Masked destination for display — the backend masks bank accounts to
+    /// their last 4 digits, so the full number is never held here.
+    var payoutMethodSummary: String = ""
+
+    /// The form behind the Edit button. Seeded from `payoutMethod` when the
+    /// sheet opens so the teacher edits what is currently on file.
+    var payoutMethodDraft = TeacherPayoutMethod()
+    var isEditingPayoutMethod = false
+    var isSavingPayoutMethod = false
+    var payoutMethodErrorMessage: String?
+
+    /// The banks the backend will accept, for the form's picker.
+    var banks: [PayoutBank] = []
+
+    /// The phone number already on the teacher's profile, if any.
+    var profilePhone: String = ""
+    /// Set after saving a Bit number that differs from the profile, to ask
+    /// whether the profile should be updated to match.
+    var isOfferingProfilePhoneUpdate = false
+    private var pendingProfilePhone = ""
+
+    /// True while the PayPal login is on screen.
+    var isConnectingPayPal = false
+
+    var hasPayoutMethod: Bool { payoutMethod != nil }
+
+    /// Whether the Bit form can offer the profile number instead of typing.
+    var canUseProfilePhone: Bool {
+        !profilePhone.isEmpty && payoutMethodDraft.phone.trimmingCharacters(in: .whitespacesAndNewlines) != profilePhone
+    }
+
+    func useProfilePhone() {
+        payoutMethodDraft.phone = profilePhone
+    }
+
+    /// False once a load completes with no lessons on record, so the screen can
+    /// say so rather than showing a wall of zeros.
+    var hasEarningsData: Bool { !months.isEmpty }
+
+    /// Only worth showing the payout card once there is a date to show.
+    var hasPendingPayment: Bool { !nextPaymentDate.isEmpty }
 
     var currentMonthSummary: MonthSummary? {
         months.first(where: { $0.isCurrentMonth }) ?? months.last
@@ -71,154 +140,203 @@ final class TeacherEarningsViewModel {
     // MARK: - Private
 
     private func loadData() async {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            applyMock()
-            return
-        }
-        let lessons = (try? await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)) ?? []
-        if lessons.isEmpty {
-            applyMock()
+        guard Auth.auth().currentUser != nil else {
+            errorMessage = LocalizationSupport.localized("Could not load earnings.")
             return
         }
 
-        currencyCode = lessons.first?.currencyCode ?? LessonFormatting.defaultCurrencyCode
-
-        let calendar = Calendar.current
-        let now = Date()
-        let currentComps = calendar.dateComponents([.year, .month], from: now)
-        let currentKey = Self.monthKey(year: currentComps.year ?? 0, month: currentComps.month ?? 0)
-
-        var byMonth: [String: [HistoryLesson]] = [:]
-        for lesson in lessons {
-            let comps = calendar.dateComponents([.year, .month], from: lesson.acceptedAt)
-            let key = Self.monthKey(year: comps.year ?? 0, month: comps.month ?? 0)
-            byMonth[key, default: []].append(lesson)
+        do {
+            let summary = try await FunctionsService.shared.teacherEarningsSummary()
+            apply(summary)
+            errorMessage = nil
+        } catch {
+            logger.error("[Earnings] failed loading summary: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherEarnings.summary")
+            errorMessage = LocalizationSupport.localized("Could not load earnings.")
         }
-
-        let sortedKeys = byMonth.keys.sorted()  // ascending — oldest first
-        var summaries: [MonthSummary] = []
-        for key in sortedKeys {
-            let ml = byMonth[key] ?? []
-            let comps = calendar.dateComponents([.year, .month], from: ml.first?.acceptedAt ?? now)
-            let yr = comps.year ?? 0
-            let mo = comps.month ?? 0
-            let isCurrent = key == currentKey
-            summaries.append(MonthSummary(
-                id: key,
-                shortName: Self.hebrewMonthName(month: mo),
-                displayName: Self.monthDisplayName(year: yr, month: mo, isCurrentMonth: isCurrent),
-                earningsCents: ml.reduce(0) { $0 + $1.teacherEarningsCents },
-                minutesCount: ml.reduce(0) { $0 + max(1, $1.durationSeconds / 60) },
-                lessonCount: ml.count,
-                isCurrentMonth: isCurrent,
-                weeklyBreakdown: buildWeeklyBreakdown(lessons: ml, year: yr, month: mo)
-            ))
-        }
-
-        totalEarningsCents = lessons.reduce(0) { $0 + $1.teacherEarningsCents }
-        totalMonthsActive = byMonth.keys.count
-        months = summaries
-        selectedMonthId = summaries.first(where: { $0.isCurrentMonth })?.id ?? summaries.last?.id ?? ""
     }
 
-    private func buildWeeklyBreakdown(lessons: [HistoryLesson], year: Int, month: Int) -> [WeekSummary] {
-        let calendar = Calendar.current
-        guard let firstOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
-              let nextMonth = calendar.date(byAdding: .month, value: 1, to: firstOfMonth),
-              let lastOfMonth = calendar.date(byAdding: .day, value: -1, to: nextMonth) else { return [] }
+    private func apply(_ summary: TeacherEarningsSummaryResult) {
+        currencyCode = summary.currency
+        totalEarningsCents = summary.totalEarningsCents
+        months = summary.months.map { month in
+            MonthSummary(
+                id: month.id,
+                year: month.year,
+                month: month.month,
+                earningsCents: month.earningsCents,
+                minutesCount: month.minutesCount,
+                lessonCount: month.lessonCount,
+                isCurrentMonth: month.isCurrentMonth,
+                weeklyBreakdown: month.weeks.map { week in
+                    WeekSummary(
+                        id: "week-\(week.index)",
+                        index: week.index,
+                        startDay: week.startDay,
+                        endDay: week.endDay,
+                        earningsCents: week.earningsCents,
+                        minutesCount: week.minutesCount,
+                        lessonCount: week.lessonCount
+                    )
+                }
+            )
+        }
+        totalMonthsActive = months.count
+        selectedMonthId = months.first(where: { $0.isCurrentMonth })?.id ?? months.last?.id ?? ""
 
-        let lastDay = calendar.component(.day, from: lastOfMonth)
-        var summaries: [WeekSummary] = []
-        var weekNum = 1
-        var startDay = 1
+        if let payment = summary.nextPayment {
+            nextPaymentCents = payment.amountCents
+            nextPaymentDate = Self.payoutDateText(payment.payoutDate)
+        } else {
+            nextPaymentCents = 0
+            nextPaymentDate = ""
+        }
 
-        while startDay <= lastDay {
-            let endDay = min(startDay + 6, lastDay)
-            guard let weekStart = calendar.date(from: DateComponents(year: year, month: month, day: startDay)),
-                  let weekEndInclusive = calendar.date(from: DateComponents(year: year, month: month, day: endDay)),
-                  let weekEndExclusive = calendar.date(byAdding: .day, value: 1, to: weekEndInclusive) else {
-                startDay += 7
-                weekNum += 1
-                continue
+        payoutMethod = summary.payoutMethod
+        payoutMethodSummary = summary.payoutMethodSummary
+        banks = summary.banks
+        profilePhone = summary.profilePhone
+    }
+
+    // MARK: - Editing the payout method
+
+    func editPayoutMethod() {
+        var draft = payoutMethod ?? TeacherPayoutMethod()
+        // Starting fresh with a profile number already on file: pre-fill it, so
+        // the common case is one tap rather than retyping.
+        if payoutMethod == nil, !profilePhone.isEmpty {
+            draft.phone = profilePhone
+        }
+        payoutMethodDraft = draft
+        payoutMethodErrorMessage = nil
+        isEditingPayoutMethod = true
+    }
+
+    func cancelPayoutMethodEditing() {
+        isEditingPayoutMethod = false
+        payoutMethodErrorMessage = nil
+    }
+
+    func savePayoutMethod() async {
+        guard !isSavingPayoutMethod, payoutMethodDraft.isComplete else { return }
+        isSavingPayoutMethod = true
+        payoutMethodErrorMessage = nil
+        defer { isSavingPayoutMethod = false }
+
+        do {
+            let summary = try await FunctionsService.shared.updateTeacherPayoutMethod(payoutMethodDraft)
+            payoutMethod = payoutMethodDraft
+            payoutMethodSummary = summary
+            isEditingPayoutMethod = false
+            logger.info("[Earnings] payout method saved type=\(self.payoutMethodDraft.type.rawValue)")
+
+            // A Bit number the profile doesn't have yet is almost always the
+            // teacher's own — offer to keep the profile in step rather than
+            // silently holding two different numbers.
+            let savedPhone = payoutMethodDraft.phone.trimmingCharacters(in: .whitespacesAndNewlines)
+            if payoutMethodDraft.type == .bit, !savedPhone.isEmpty, savedPhone != profilePhone {
+                pendingProfilePhone = savedPhone
+                isOfferingProfilePhoneUpdate = true
             }
-            let weekLessons = lessons.filter { $0.acceptedAt >= weekStart && $0.acceptedAt < weekEndExclusive }
-            summaries.append(WeekSummary(
-                id: "week-\(weekNum)",
-                label: String(format: LocalizationSupport.localized("Week %d (%d-%d)"), weekNum, startDay, endDay),
-                earningsCents: weekLessons.reduce(0) { $0 + $1.teacherEarningsCents },
-                minutesCount: weekLessons.reduce(0) { $0 + max(1, $1.durationSeconds / 60) },
-                lessonCount: weekLessons.count
-            ))
-            startDay += 7
-            weekNum += 1
-        }
-        return summaries
-    }
-
-    private func applyMock() {
-        let calendar = Calendar.current
-        let now = Date()
-        let c = calendar.dateComponents([.year, .month], from: now)
-        let yr = c.year ?? 2026
-        let mo = c.month ?? 8
-        let currentKey = Self.monthKey(year: yr, month: mo)
-
-        let mockWeeks = [
-            WeekSummary(id: "week-1", label: String(format: LocalizationSupport.localized("Week %d (%d-%d)"), 1, 1, 7), earningsCents: 1500, minutesCount: 20, lessonCount: 3),
-            WeekSummary(id: "week-2", label: String(format: LocalizationSupport.localized("Week %d (%d-%d)"), 2, 8, 14), earningsCents: 2500, minutesCount: 33, lessonCount: 4),
-            WeekSummary(id: "week-3", label: String(format: LocalizationSupport.localized("Week %d (%d-%d)"), 3, 15, 21), earningsCents: 1800, minutesCount: 24, lessonCount: 3),
-            WeekSummary(id: "week-4", label: String(format: LocalizationSupport.localized("Week %d (%d-%d)"), 4, 22, 31), earningsCents: 1250, minutesCount: 17, lessonCount: 2),
-        ]
-
-        var mockMonths: [MonthSummary] = []
-        for offset in [2, 1] {
-            if let prevDate = calendar.date(byAdding: .month, value: -offset, to: now) {
-                let pc = calendar.dateComponents([.year, .month], from: prevDate)
-                let py = pc.year ?? yr
-                let pm = pc.month ?? mo
-                mockMonths.append(MonthSummary(
-                    id: Self.monthKey(year: py, month: pm),
-                    shortName: Self.hebrewMonthName(month: pm),
-                    displayName: Self.monthDisplayName(year: py, month: pm, isCurrentMonth: false),
-                    earningsCents: offset == 2 ? 14700 : 20000,
-                    minutesCount: offset == 2 ? 196 : 267,
-                    lessonCount: offset == 2 ? 26 : 34,
-                    isCurrentMonth: false,
-                    weeklyBreakdown: []
-                ))
+        } catch let error as FunctionsError {
+            // The backend names the field that failed validation, so surface its
+            // message rather than a generic one.
+            if case .serverError(let message, let status) = error, status == "INVALID_ARGUMENT" {
+                payoutMethodErrorMessage = message
+            } else {
+                payoutMethodErrorMessage = LocalizationSupport.localized("Could not save your payment method. Please try again.")
             }
+            logger.error("[Earnings] failed saving payout method: \(error.localizedDescription)")
+        } catch {
+            payoutMethodErrorMessage = LocalizationSupport.localized("Could not save your payment method. Please try again.")
+            logger.error("[Earnings] failed saving payout method: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherEarnings.savePayoutMethod")
         }
-        mockMonths.append(MonthSummary(
-            id: currentKey,
-            shortName: Self.hebrewMonthName(month: mo),
-            displayName: Self.monthDisplayName(year: yr, month: mo, isCurrentMonth: true),
-            earningsCents: 7050,
-            minutesCount: 94,
-            lessonCount: 12,
-            isCurrentMonth: true,
-            weeklyBreakdown: mockWeeks
-        ))
-
-        months = mockMonths
-        totalEarningsCents = mockMonths.reduce(0) { $0 + $1.earningsCents }
-        totalMonthsActive = mockMonths.count
-        selectedMonthId = currentKey
-        nextPaymentCents = 7050
     }
 
-    private static func monthKey(year: Int, month: Int) -> String {
-        String(format: "%04d-%02d", year, month)
+    /// Confirms the offer to copy a newly saved Bit number onto the profile.
+    func confirmProfilePhoneUpdate() async {
+        let phone = pendingProfilePhone
+        isOfferingProfilePhoneUpdate = false
+        pendingProfilePhone = ""
+        guard !phone.isEmpty, let uid = Auth.auth().currentUser?.uid else { return }
+
+        do {
+            try await UserService.shared.updateProfileFields(uid: uid, fields: ["phoneNumber": phone])
+            profilePhone = phone
+            logger.info("[Earnings] profile phone updated from payout method")
+        } catch {
+            // The payout method itself already saved, so this is not worth
+            // interrupting the teacher over — the profile just stays as it was.
+            logger.error("[Earnings] failed updating profile phone: \(error.localizedDescription)")
+        }
     }
 
-    static func hebrewMonthName(month: Int) -> String {
-        let names = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
-                     "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"]
-        guard month >= 1, month <= 12 else { return "\(month)" }
-        return names[month - 1]
+    func declineProfilePhoneUpdate() {
+        isOfferingProfilePhoneUpdate = false
+        pendingProfilePhone = ""
     }
 
-    private static func monthDisplayName(year: Int, month: Int, isCurrentMonth: Bool) -> String {
-        let name = hebrewMonthName(month: month)
-        return isCurrentMonth ? "\(name) \(year) (שוטף)" : "\(name) \(year)"
+#if canImport(UIKit)
+    /// Confirms a PayPal payout account by having the teacher log in to PayPal.
+    /// PayPal has no API to check whether an address has an account, so this
+    /// login is the only real proof — which is why the PayPal option is saved
+    /// here rather than through the Save button.
+    func connectPayPalPayoutAccount() async {
+        guard !isConnectingPayPal else { return }
+        isConnectingPayPal = true
+        payoutMethodErrorMessage = nil
+        defer { isConnectingPayPal = false }
+
+        do {
+            let session = try await FunctionsService.shared.createPayPalVaultClientToken()
+            let nonce = try await PayPalVaultService.shared.vaultPayPalAccount(clientToken: session.clientToken)
+            let confirmed = try await FunctionsService.shared.verifyPayPalPayoutAccount(nonce: nonce)
+
+            var method = TeacherPayoutMethod()
+            method.type = .paypal
+            method.email = confirmed.email
+            method.isPayPalVerified = true
+
+            payoutMethodDraft = method
+            payoutMethod = method
+            payoutMethodSummary = confirmed.summary
+            isEditingPayoutMethod = false
+            logger.info("[Earnings] PayPal payout account confirmed")
+        } catch let error as PayPalVaultService.PayPalVaultServiceError {
+            if case .cancelled = error {
+                logger.info("[Earnings] PayPal payout connect cancelled")
+            } else {
+                payoutMethodErrorMessage = error.localizedDescription
+            }
+        } catch let error as FunctionsError {
+            if case .serverError(let message, _) = error {
+                payoutMethodErrorMessage = message
+            } else {
+                payoutMethodErrorMessage = LocalizationSupport.localized("Could not confirm your PayPal account. Please try again.")
+            }
+            logger.error("[Earnings] PayPal payout connect failed: \(error.localizedDescription)")
+        } catch {
+            payoutMethodErrorMessage = LocalizationSupport.localized("Could not confirm your PayPal account. Please try again.")
+            logger.error("[Earnings] PayPal payout connect failed: \(error.localizedDescription)")
+        }
+    }
+#else
+    /// Braintree's PayPal SDK is linked for iOS only (see Package.swift), so
+    /// there is no way to run the login that confirms the account here yet.
+    func connectPayPalPayoutAccount() async {
+        logger.error("[Earnings] PayPal payout connect requested on a platform without the PayPal SDK")
+        payoutMethodErrorMessage = LocalizationSupport.localized("Connecting PayPal is not available on this device yet. Please choose another payment method.")
+    }
+#endif
+
+    /// The backend sends the payout day as "yyyy-MM-dd"; show it the way the
+    /// viewer's locale writes dates.
+    private static func payoutDateText(_ isoDay: String) -> String {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: isoDay) else { return isoDay }
+        return LessonFormatting.dateText(date)
     }
 }

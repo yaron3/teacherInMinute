@@ -107,6 +107,57 @@ struct RedeemCouponResult {
   let minutesAdded: Int
 }
 
+// MARK: - Teacher earnings
+
+/// One 7-day span within a month, as aggregated by the `teacherEarningsSummary`
+/// backend service. Labels are built client-side so they follow the app language.
+struct EarningsWeek {
+  let index: Int
+  let startDay: Int
+  let endDay: Int
+  let earningsCents: Int
+  let minutesCount: Int
+  let lessonCount: Int
+}
+
+struct EarningsMonth {
+  let id: String   // "yyyy-MM"
+  let year: Int
+  let month: Int   // 1-12
+  let earningsCents: Int
+  let minutesCount: Int
+  let lessonCount: Int
+  let isCurrentMonth: Bool
+  let weeks: [EarningsWeek]
+}
+
+/// The pending payout: a month's earnings, paid on the 9th of the month after
+/// it (March is paid on 9 April) — see functions/src/payoutSchedule.ts.
+struct EarningsNextPayment {
+  let amountCents: Int
+  /// Payout day as "yyyy-MM-dd"; formatted for display by the view model.
+  let payoutDate: String
+  /// "yyyy-MM" of the earnings period this payout covers.
+  let periodMonthId: String
+}
+
+struct TeacherEarningsSummaryResult {
+  let currency: String
+  let totalEarningsCents: Int
+  let months: [EarningsMonth]
+  let nextPayment: EarningsNextPayment?
+  /// Where the payout is sent, or `nil` if the teacher has not set one up.
+  let payoutMethod: TeacherPayoutMethod?
+  /// Short, non-sensitive description of the destination — a bank account is
+  /// already masked to its last 4 digits by the backend.
+  let payoutMethodSummary: String
+  /// The banks the backend accepts, for the payout form's picker.
+  let banks: [PayoutBank]
+  /// The teacher's profile phone, offered as the Bit number so they don't have
+  /// to retype a number the app already holds.
+  let profilePhone: String
+}
+
 // MARK: - Service
 
 @MainActor
@@ -277,6 +328,108 @@ final class FunctionsService {
     _ = try await call(function: "chargeSavedPayPal", data: ["pricingOptionId": pricingOptionID])
   }
 
+  // MARK: - Teacher earnings
+
+  /// Server-side aggregation of the teacher's completed lessons into monthly
+  /// and weekly earnings, plus the pending payout. Replaces the client-side
+  /// per-question fetch, which could not see months beyond its page limit.
+  func teacherEarningsSummary() async throws -> TeacherEarningsSummaryResult {
+    let result = try await call(function: "teacherEarningsSummary", data: [:])
+
+    let monthRows = result["months"] as? [[String: Any]] ?? []
+    let months: [EarningsMonth] = monthRows.compactMap { row in
+      guard
+        let id = row["id"] as? String,
+        let year = Self.intValue(row["year"]),
+        let month = Self.intValue(row["month"])
+      else { return nil }
+
+      let weekRows = row["weeks"] as? [[String: Any]] ?? []
+      let weeks: [EarningsWeek] = weekRows.compactMap { weekRow in
+        guard
+          let index = Self.intValue(weekRow["index"]),
+          let startDay = Self.intValue(weekRow["startDay"]),
+          let endDay = Self.intValue(weekRow["endDay"])
+        else { return nil }
+        return EarningsWeek(
+          index: index,
+          startDay: startDay,
+          endDay: endDay,
+          earningsCents: Self.intValue(weekRow["earningsCents"]) ?? 0,
+          minutesCount: Self.intValue(weekRow["minutesCount"]) ?? 0,
+          lessonCount: Self.intValue(weekRow["lessonCount"]) ?? 0
+        )
+      }
+
+      return EarningsMonth(
+        id: id,
+        year: year,
+        month: month,
+        earningsCents: Self.intValue(row["earningsCents"]) ?? 0,
+        minutesCount: Self.intValue(row["minutesCount"]) ?? 0,
+        lessonCount: Self.intValue(row["lessonCount"]) ?? 0,
+        isCurrentMonth: row["isCurrentMonth"] as? Bool ?? false,
+        weeks: weeks
+      )
+    }
+
+    var nextPayment: EarningsNextPayment?
+    if let payment = result["nextPayment"] as? [String: Any],
+       let payoutDate = payment["payoutDate"] as? String {
+      nextPayment = EarningsNextPayment(
+        amountCents: Self.intValue(payment["amountCents"]) ?? 0,
+        payoutDate: payoutDate,
+        periodMonthId: payment["periodMonthId"] as? String ?? ""
+      )
+    }
+
+    var payoutMethod: TeacherPayoutMethod?
+    if let methodRow = result["payoutMethod"] as? [String: Any] {
+      payoutMethod = TeacherPayoutMethod(data: methodRow)
+    }
+
+    let bankRows = result["banks"] as? [[String: Any]] ?? []
+    let banks: [PayoutBank] = bankRows.compactMap { row in
+      guard let code = row["code"] as? String, let name = row["name"] as? String else { return nil }
+      return PayoutBank(code: code, name: name, nameHe: row["nameHe"] as? String ?? name)
+    }
+
+    return TeacherEarningsSummaryResult(
+      currency: result["currency"] as? String ?? LessonFormatting.defaultCurrencyCode,
+      totalEarningsCents: Self.intValue(result["totalEarningsCents"]) ?? 0,
+      months: months,
+      nextPayment: nextPayment,
+      payoutMethod: payoutMethod,
+      payoutMethodSummary: result["payoutMethodSummary"] as? String ?? "",
+      banks: banks,
+      profilePhone: result["profilePhone"] as? String ?? ""
+    )
+  }
+
+  /// Confirms a PayPal payout account from a nonce produced by the teacher
+  /// completing a PayPal login, and saves it. Returns the confirmed email and
+  /// its masked summary — PayPal has no address-lookup API, so completing the
+  /// login is the only way to know the account exists.
+  func verifyPayPalPayoutAccount(nonce: String) async throws -> (email: String, summary: String) {
+    let result = try await call(function: "verifyPayPalPayoutAccount", data: ["nonce": nonce])
+    let method = result["payoutMethod"] as? [String: Any] ?? [:]
+    return (
+      email: method["email"] as? String ?? "",
+      summary: result["payoutMethodSummary"] as? String ?? ""
+    )
+  }
+
+  /// Saves where the teacher's payout is sent. The backend validates the fields
+  /// the chosen type requires and throws `invalid-argument` with a message the
+  /// teacher can act on. Returns the masked destination summary.
+  func updateTeacherPayoutMethod(_ method: TeacherPayoutMethod) async throws -> String {
+    let result = try await call(
+      function: "updateTeacherPayoutMethod",
+      data: ["payoutMethod": method.requestPayload]
+    )
+    return result["payoutMethodSummary"] as? String ?? ""
+  }
+
   // MARK: - Teacher callables
 
   func acceptInvite(questionId: String) async throws -> AcceptInviteResult {
@@ -384,6 +537,15 @@ final class FunctionsService {
 #else
     "ios"
 #endif
+  }
+
+  /// JSON numbers arrive as `Int`, `Double` or `NSNumber` depending on platform
+  /// and magnitude, so every numeric field is read through this.
+  private static func intValue(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? Double { return Int(value) }
+    if let value = value as? String { return Int(value) }
+    return nil
   }
 
   private static func firstString(in dict: [String: Any], keys: [String]) -> String? {

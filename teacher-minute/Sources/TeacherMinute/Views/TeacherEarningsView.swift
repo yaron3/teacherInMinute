@@ -16,23 +16,22 @@ struct TeacherEarningsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .trailing, spacing: 20) {
+            VStack(alignment: .leading, spacing: 20) {
                 headerTitle
-                segmentPicker
-
-                if selectedSegment == 1 {
                     summaryCards
-                    nextPaymentCard
-                    monthSelectorRow
-                    if let selected = viewModel.selectedMonth {
-                        monthDetailCard(selected)
+                    if viewModel.hasPendingPayment {
+                        nextPaymentCard
                     }
-                } else {
-                    Text(LocalizationSupport.localized("Teacher profile coming soon"))
-                        .foregroundStyle(theme.secondaryText)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 40)
-                }
+                    payoutMethodCard
+                    if viewModel.hasEarningsData {
+                        monthSelectorRow
+                        if let selected = viewModel.selectedMonth {
+                            monthDetailCard(selected)
+                        }
+                    } else if !viewModel.isLoading {
+                        emptyState
+                    }
+                
             }
             .padding(20)
         }
@@ -40,6 +39,97 @@ struct TeacherEarningsView: View {
         .task {
             viewModel.load()
         }
+        .sheet(isPresented: $viewModel.isEditingPayoutMethod) {
+            TeacherPayoutMethodSheet(
+                method: $viewModel.payoutMethodDraft,
+                banks: viewModel.banks,
+                isSaving: viewModel.isSavingPayoutMethod,
+                errorMessage: viewModel.payoutMethodErrorMessage,
+                profilePhone: viewModel.profilePhone,
+                isConnectingPayPal: viewModel.isConnectingPayPal,
+                onUseProfilePhone: { viewModel.useProfilePhone() },
+                onConnectPayPal: { Task { await viewModel.connectPayPalPayoutAccount() } },
+                onSave: { Task { await viewModel.savePayoutMethod() } },
+                onCancel: { viewModel.cancelPayoutMethodEditing() }
+            )
+        }
+        .appDialog(
+            LocalizationSupport.localized("Update your profile?"),
+            isPresented: $viewModel.isOfferingProfilePhoneUpdate,
+            message: LocalizationSupport.localized("Save this number as your profile phone number too?"),
+            actions: [
+                AppDialogAction(LocalizationSupport.localized("Update"), kind: .primary) {
+                    Task { await viewModel.confirmProfilePhoneUpdate() }
+                },
+                AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel) {
+                    viewModel.declineProfilePhoneUpdate()
+                },
+            ]
+        )
+    }
+
+    // MARK: - Payout Method
+
+    var payoutMethodCard: some View {
+        FlatCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(LocalizationSupport.localized("Payment Method"))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(theme.primaryText)
+                    Spacer()
+                    Button {
+                        viewModel.editPayoutMethod()
+                    } label: {
+                        Text(viewModel.hasPayoutMethod
+                             ? LocalizationSupport.localized("Edit")
+                             : LocalizationSupport.localized("+ Add"))
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(theme.info)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Divider()
+
+                if let method = viewModel.payoutMethod {
+                    HStack(spacing: 12) {
+                        FlatIconTile(
+                            systemName: method.type.systemImage,
+                            size: 40,
+                            tint: theme.accent,
+                            background: theme.screenBackground
+                        )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(method.type.displayName)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(theme.primaryText)
+                            Text(viewModel.payoutMethodSummary)
+                                .font(.system(size: 13))
+                                .foregroundStyle(theme.secondaryText)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                    }
+                } else {
+                    Text(LocalizationSupport.localized("No payment method yet. Add one so we can pay you."))
+                        .font(.system(size: 14))
+                        .foregroundStyle(theme.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    // MARK: - Empty State
+
+    var emptyState: some View {
+        Text(viewModel.errorMessage ?? LocalizationSupport.localized("No earnings yet. Your first lesson will show up here."))
+            .font(.system(size: 14))
+            .foregroundStyle(theme.secondaryText)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 30)
     }
 
     // MARK: - Header
@@ -48,19 +138,19 @@ struct TeacherEarningsView: View {
         Text(LocalizationSupport.localized("Income and Payments"))
             .font(.system(size: 26, weight: .bold))
             .foregroundStyle(theme.primaryText)
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Segment Picker
 
-    var segmentPicker: some View {
-        HStack(spacing: 0) {
-            segmentTab(title: LocalizationSupport.localized("Teacher Profile"), icon: "person.fill", index: 0)
-            segmentTab(title: LocalizationSupport.localized("Monthly Summary"), icon: "chart.bar.fill", index: 1)
-        }
-        .background(theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
+//    var segmentPicker: some View {
+//        HStack(spacing: 0) {
+//            segmentTab(title: LocalizationSupport.localized("Teacher Profile"), icon: "person.fill", index: 0)
+//            segmentTab(title: LocalizationSupport.localized("Monthly Summary"), icon: "chart.bar.fill", index: 1)
+//        }
+//        .background(theme.cardBackground)
+//        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+//    }
 
     func segmentTab(title: String, icon: String, index: Int) -> some View {
         let isSelected = selectedSegment == index
@@ -105,11 +195,11 @@ struct TeacherEarningsView: View {
     }
 
     func summaryCard(title: String, amount: String, subtitle: String, background: Color) -> some View {
-        VStack(alignment: .trailing, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white.opacity(0.85))
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Text(amount)
                 .font(.system(size: 26, weight: .bold))
                 .foregroundStyle(.white)
@@ -118,7 +208,7 @@ struct TeacherEarningsView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.white.opacity(0.8))
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(background)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -128,27 +218,29 @@ struct TeacherEarningsView: View {
 
     var nextPaymentCard: some View {
         FlatCard {
-            VStack(alignment: .trailing, spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(LocalizationSupport.localized("Next Payment"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Divider()
 
                 paymentRow(icon: "banknote", value: viewModel.formattedEarnings(viewModel.nextPaymentCents))
                 paymentRow(icon: "calendar", value: viewModel.nextPaymentDate)
-                paymentRow(icon: "phone", value: viewModel.nextPaymentPhone)
+                if let method = viewModel.payoutMethod {
+                    paymentRow(icon: method.type.systemImage, value: viewModel.payoutMethodSummary)
 
-                HStack {
-                    Text("ביט")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color(red: 0.91, green: 0.25, blue: 0.36))
-                        .clipShape(Capsule())
-                    Spacer()
+                    HStack {
+                        Text(method.type.displayName)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                            .background(theme.accent)
+                            .clipShape(Capsule())
+                        Spacer()
+                    }
                 }
             }
         }
@@ -191,7 +283,7 @@ struct TeacherEarningsView: View {
 
     func monthDetailCard(_ month: MonthSummary) -> some View {
         FlatCard {
-            VStack(alignment: .trailing, spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center) {
                     if month.isCurrentMonth {
                         Text(LocalizationSupport.localized("In progress"))
@@ -211,12 +303,12 @@ struct TeacherEarningsView: View {
                 Text(viewModel.formattedEarnings(month.earningsCents))
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(theme.primaryText)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("\(month.minutesCount) \(LocalizationSupport.localized("min")) · \(month.lessonCount) \(LocalizationSupport.localized("Lessons"))")
                     .font(.system(size: 13))
                     .foregroundStyle(theme.secondaryText)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if !month.weeklyBreakdown.isEmpty {
                     Divider().padding(.vertical, 4)
@@ -224,7 +316,7 @@ struct TeacherEarningsView: View {
                     Text(LocalizationSupport.localized("Weekly Breakdown"))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(theme.primaryText)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     VStack(spacing: 0) {
                         ForEach(month.weeklyBreakdown) { week in
@@ -251,14 +343,14 @@ struct TeacherEarningsView: View {
                     .foregroundStyle(theme.secondaryText)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.formattedEarnings(week.earningsCents))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                 Text(week.label)
                     .font(.system(size: 11))
                     .foregroundStyle(theme.secondaryText)
-                    .multilineTextAlignment(.trailing)
+                    .multilineTextAlignment(.leading)
             }
         }
         .padding(.vertical, 6)

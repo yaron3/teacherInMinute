@@ -16,6 +16,13 @@ export { startLesson, endLesson, forceEndLesson, rateTeacher } from "./lessons";
 // Coupons
 export { redeemCoupon } from "./coupons";
 
+// Teacher earnings, payout schedule and payout method
+export {
+  teacherEarningsSummary,
+  updateTeacherPayoutMethod,
+  verifyPayPalPayoutAccount,
+} from "./earnings";
+
 // Admin dashboard
 export {
   adminDashboardStatus,

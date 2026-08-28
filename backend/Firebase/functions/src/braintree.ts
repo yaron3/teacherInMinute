@@ -211,6 +211,49 @@ export async function deleteVaultedPaymentMethod(token: string): Promise<void> {
   await gateway.paymentMethod.delete(token);
 }
 
+/**
+ * Confirms a PayPal account exists and the person completing the flow controls
+ * it, returning the email PayPal reports for it.
+ *
+ * PayPal has no "does this address have an account" lookup — by design, to stop
+ * address enumeration — so the only real proof is the account holder completing
+ * a PayPal login. That produces the nonce passed in here; exchanging it with
+ * Braintree yields the authoritative email.
+ *
+ * The payment method is created without `makeDefault` and deleted immediately:
+ * we only want the email, and a teacher may separately have a saved PayPal for
+ * buying credits whose default must not be disturbed.
+ */
+export async function lookupPayPalAccountEmail(uid: string, nonce: string): Promise<string> {
+  const gateway = getGateway();
+  await ensureBraintreeCustomer(gateway, uid);
+
+  const result = await gateway.paymentMethod.create({
+    customerId: uid,
+    paymentMethodNonce: nonce,
+  });
+
+  if (!result.success || !result.paymentMethod) {
+    throw new Error(result.message ?? "PayPal account could not be confirmed");
+  }
+
+  const account = result.paymentMethod as unknown as { token?: string; email?: string };
+  const email = account.email ?? "";
+
+  if (account.token) {
+    // Best effort — an orphaned token is harmless next to failing a
+    // confirmation that actually succeeded.
+    try {
+      await gateway.paymentMethod.delete(account.token);
+    } catch (err) {
+      logger.warn(`[braintree] could not clean up PayPal lookup token uid=${uid}`, err);
+    }
+  }
+
+  if (!email) throw new Error("PayPal did not return an email for this account");
+  return email;
+}
+
 export interface BraintreeVaultedSaleParams {
   amountCents: number;
   currency: string;

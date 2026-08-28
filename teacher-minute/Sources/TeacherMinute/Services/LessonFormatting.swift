@@ -103,4 +103,32 @@ enum LessonFormatting {
 	let displayCurrencyCode = currencyCode ?? lessons.first?.currencyCode ?? defaultCurrencyCode
 	return currencyText(cents: totalCents, currencyCode: displayCurrencyCode)
   }
+
+  // MARK: - Calendar months
+
+  /// The standalone month name in the viewer's language — "August" in English,
+  /// "אוגוסט" in Hebrew. Comes from the locale's own calendar symbols rather
+  /// than a hand-maintained table, so it follows the app's language setting.
+  static func monthName(month: Int) -> String {
+	guard month >= 1, month <= 12 else { return "\(month)" }
+	let formatter = DateFormatter()
+	formatter.locale = LocalizationSupport.currentLocale
+	let symbols: [String]? = formatter.standaloneMonthSymbols
+	guard let symbols, symbols.count == 12 else { return "\(month)" }
+	return symbols[month - 1]
+  }
+
+  /// "August 2026" / "אוגוסט 2026".
+  static func monthYearText(year: Int, month: Int) -> String {
+	String(format: LocalizationSupport.localized("%@ %d"), monthName(month: month), year)
+  }
+
+  /// A calendar date in the viewer's locale — used for the payout date.
+  static func dateText(_ date: Date) -> String {
+	let formatter = DateFormatter()
+	formatter.locale = LocalizationSupport.currentLocale
+	formatter.dateStyle = .medium
+	formatter.timeStyle = .none
+	return formatter.string(from: date)
+  }
 }

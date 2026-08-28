@@ -173,7 +173,48 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Quick Payment": "תשלום מהיר",
         "After saving your PayPal account, every future purchase is one tap away — no need to log in again.": "אחרי שמירת חשבון הפייפאל, כל רכישה עתידית תהיה בלחיצה אחת – ללא צורך להתחבר שוב.",
         "Could not save your PayPal account. Please try again.": "לא ניתן היה לשמור את חשבון הפייפאל. נסה שוב.",
-        "Could not remove your saved PayPal account. Please try again.": "לא ניתן היה להסיר את חשבון הפייפאל השמור. נסה שוב."
+        "Could not remove your saved PayPal account. Please try again.": "לא ניתן היה להסיר את חשבון הפייפאל השמור. נסה שוב.",
+        // Teacher earnings
+        "%@ %d": "%@ %d",
+        "%@ (current)": "%@ (שוטף)",
+        "Bit": "ביט",
+        "No earnings yet. Your first lesson will show up here.": "אין עדיין הכנסות. השיעור הראשון שלך יופיע כאן.",
+        "Could not load earnings.": "לא ניתן היה לטעון את ההכנסות.",
+        // Teacher payout method
+        "Payment Method": "אמצעי תשלום",
+        "Choose where we should send your monthly payout.": "בחר לאן לשלוח את התשלום החודשי שלך.",
+        "No payment method yet. Add one so we can pay you.": "עדיין אין אמצעי תשלום. הוסף אחד כדי שנוכל לשלם לך.",
+        "Bank Account": "חשבון בנק",
+        "Bank Name": "שם הבנק",
+        "e.g. Bank Hapoalim": "לדוגמה: בנק הפועלים",
+        "Branch Number": "מספר סניף",
+        "e.g. 123": "לדוגמה: 123",
+        "Account Number": "מספר חשבון",
+        "e.g. 45678901": "לדוגמה: 45678901",
+        "Account Holder Name": "שם בעל החשבון",
+        "Full name as it appears at the bank": "שם מלא כפי שמופיע בבנק",
+        "Bit Phone Number": "מספר טלפון בביט",
+        "Use the phone number registered with your Bit account.": "השתמש במספר הטלפון הרשום בחשבון הביט שלך.",
+        "name@example.com": "name@example.com",
+        "Use the email address on your PayPal account.": "השתמש בכתובת המייל של חשבון הפייפאל שלך.",
+        "Saving...": "שומר...",
+        "Could not save your payment method. Please try again.": "לא ניתן היה לשמור את אמצעי התשלום. נסה שוב.",
+        // Payout method verification
+        "Bank": "בנק",
+        "Connect PayPal": "התחבר לפייפאל",
+        "Connect a different account": "התחבר לחשבון אחר",
+        "Connecting...": "מתחבר...",
+        "PayPal account confirmed": "חשבון הפייפאל אומת",
+        "You will sign in to PayPal so we can confirm the account is yours. We never see your PayPal password.":
+            "תתחבר לפייפאל כדי שנוכל לוודא שהחשבון שלך. אנחנו לעולם לא רואים את הסיסמה שלך.",
+        "Could not confirm your PayPal account. Please try again.": "לא ניתן היה לאמת את חשבון הפייפאל. נסה שוב.",
+        "Connecting PayPal is not available on this device yet. Please choose another payment method.":
+            "חיבור לפייפאל אינו זמין במכשיר הזה עדיין. בחר אמצעי תשלום אחר.",
+        "Use my profile number (%@)": "השתמש במספר מהפרופיל (%@)",
+        "Update your profile?": "לעדכן את הפרופיל?",
+        "Save this number as your profile phone number too?": "לשמור את המספר הזה גם כמספר הטלפון בפרופיל?",
+        "Update": "עדכן",
+        "Not now": "לא עכשיו"
     ]
 
     #if os(Android)
