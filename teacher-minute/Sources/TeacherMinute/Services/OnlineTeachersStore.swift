@@ -24,26 +24,56 @@ import SkipBridge
 
 @MainActor
 final class OnlineTeachersStore {
+  /// Presence changes are not as time-critical as the 2s invite poll, and each
+  /// tick is one RTDB read, so this trades a little latency for far less work.
+  private static let pollInterval: UInt64 = 5_000_000_000
+
   private let onPresenceUpdated: ([OnlineTeacherPresence]) -> Void
-  private var isStopped = false
+  private var pollingTask: Task<Void, Never>?
+  /// Signature of the last emitted set, so an unchanged poll costs nothing
+  /// downstream. This matters: each emission makes the view model fetch a
+  /// Firestore profile per online teacher, which must not happen every tick.
+  private var lastSignature: String?
 
   init(onPresenceUpdated: @escaping ([OnlineTeacherPresence]) -> Void) {
     self.onPresenceUpdated = onPresenceUpdated
   }
 
-  /// One-shot read rather than a live listener: bridging a continuous Firebase
-  /// callback across JNI buys little here, since the grid is refreshed when the
-  /// home screen loads and on pull-to-refresh.
+  /// Polls rather than observing: the Firebase listener lives in Kotlin and
+  /// there is no callback path back across the JNI bridge, so this mirrors
+  /// `startAndroidInvitePolling` in TeacherDashboardViewModel — the same
+  /// approach the app already uses for live data on Android.
   func startListening() {
-    Task { [weak self] in
-      let json = await Self.fetchOnlineTeachersJSON()
-      guard let self, !self.isStopped else { return }
-      self.onPresenceUpdated(Self.presences(fromJSON: json))
+    pollingTask?.cancel()
+    pollingTask = Task { [weak self] in
+      while !Task.isCancelled {
+        let json = await Self.fetchOnlineTeachersJSON()
+        guard !Task.isCancelled, let self else { return }
+
+        let presences = Self.presences(fromJSON: json)
+        let signature = Self.signature(for: presences)
+        if signature != self.lastSignature {
+          self.lastSignature = signature
+          logger.info("[OnlineTeachers] Android presence changed count=\(presences.count)")
+          self.onPresenceUpdated(presences)
+        }
+
+        try? await Task.sleep(nanoseconds: Self.pollInterval)
+      }
     }
   }
 
   func stopListening() {
-    isStopped = true
+    pollingTask?.cancel()
+    pollingTask = nil
+  }
+
+  /// Order-independent, so a reshuffled read is not mistaken for a change.
+  private static func signature(for presences: [OnlineTeacherPresence]) -> String {
+    presences
+      .map { "\($0.id):\($0.subjects.sorted().joined(separator: ","))" }
+      .sorted()
+      .joined(separator: "|")
   }
 
   private static func fetchOnlineTeachersJSON() async -> String {
@@ -66,7 +96,12 @@ final class OnlineTeachersStore {
     for row in rows {
       guard let id = row["id"] as? String, !id.isEmpty else { continue }
       presences.append(
-        OnlineTeacherPresence(id: id, subjects: row["subjects"] as? [String] ?? [])
+        OnlineTeacherPresence(
+          id: id,
+          subjects: row["subjects"] as? [String] ?? [],
+          displayName: row["displayName"] as? String ?? "",
+          photoUrl: row["photoUrl"] as? String ?? ""
+        )
       )
     }
     return presences
@@ -102,23 +137,30 @@ final class OnlineTeachersStore {
 
   init(onPresenceUpdated: @escaping ([OnlineTeacherPresence]) -> Void) {
     self.onPresenceUpdated = onPresenceUpdated
-    self.ref = FirebaseDatabase.Database.database().reference(withPath: "teachers")
+    self.ref = FirebaseDatabase.Database.database().reference(withPath: "onlineTeachers")
   }
 
   func startListening() {
     handle = ref.observe(.value) { [weak self] snapshot in
       guard let self else { return }
+      // Every entry in the projection is online by construction — the backend
+      // removes it when a teacher goes offline — so there is no status to filter.
       var presences: [OnlineTeacherPresence] = []
       for child in snapshot.children {
         guard
           let snap = child as? DataSnapshot,
-          let dict = snap.value as? [String: Any],
-          let status = dict["status"] as? String,
-          status == "online"
+          let dict = snap.value as? [String: Any]
         else { continue }
-        let subjects = dict["subjects"] as? [String] ?? []
-        presences.append(OnlineTeacherPresence(id: snap.key, subjects: subjects))
+        presences.append(
+          OnlineTeacherPresence(
+            id: snap.key,
+            subjects: dict["subjects"] as? [String] ?? [],
+            displayName: dict["displayName"] as? String ?? "",
+            photoUrl: dict["photoUrl"] as? String ?? ""
+          )
+        )
       }
+      logger.info("[OnlineTeachers] presence updated count=\(presences.count)")
       self.onPresenceUpdated(presences)
     }
   }

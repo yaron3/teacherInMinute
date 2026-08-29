@@ -23,6 +23,10 @@
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid"
       }
+    },
+    "onlineTeachers": {
+      ".read": "auth != null",
+      ".write": false
     }
   }
 }

@@ -239,7 +239,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   private var pollingTask: Task<Void, Never>?
   private var onlineTeachersStore: OnlineTeachersStore?
-  private var resolveOnlineTeachersTask: Task<Void, Never>?
   /// Subject keys (e.g. "math", "physics") enabled via Remote Config
   /// (`enable_<key>`). "math" is the only one on by default; every other
   /// subject stays hidden until its flag is explicitly turned on remotely.
@@ -691,31 +690,22 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   private func resolveOnlineTeachers(_ presences: [OnlineTeacherPresence]) {
     // The subject grid's teacher counts come straight from presence, so they
-    // update the moment a teacher goes online — before the slower per-teacher
-    // profile lookups below finish.
+    // update the moment a teacher goes online.
     onlineTeacherSubjectKeys = presences.map { presence in
       Set(presence.subjects.map { SubjectPresentation.matchKey(for: $0) })
     }
     rebuildSubjects()
 
-    resolveOnlineTeachersTask?.cancel()
-    resolveOnlineTeachersTask = Task { [weak self] in
-      guard let self else { return }
-      var resolved: [OnlineTeacher] = []
-      for presence in presences {
-        guard !Task.isCancelled else { return }
-        guard let profile = try? await UserService.shared.fetchProfileSummary(uid: presence.id) else { continue }
-        resolved.append(
-          OnlineTeacher(
-            id: presence.id,
-            name: profile.displayName,
-            subject: presence.subjects.first.map { LocalizationSupport.localized($0) } ?? LocalizationSupport.localized("Math"),
-            profileImageURL: profile.profileImageURL
-          )
-        )
-      }
-      guard !Task.isCancelled else { return }
-      self.onlineTeachers = resolved
+    // The projection already carries each teacher's name and photo, so the
+    // grid is built straight from presence — no per-teacher profile reads, and
+    // nothing to cache or invalidate.
+    onlineTeachers = presences.map { presence in
+      OnlineTeacher(
+        id: presence.id,
+        name: presence.displayName.isEmpty ? LocalizationSupport.localized("Teacher") : presence.displayName,
+        subject: presence.subjects.first.map { LocalizationSupport.localized($0) } ?? LocalizationSupport.localized("Math"),
+        profileImageURL: presence.photoUrl
+      )
     }
   }
 

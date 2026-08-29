@@ -3,6 +3,7 @@ import { logger } from "firebase-functions";
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { recomputeRegisteredTeacherCount } from "./stats";
+import { republishAllTeacherPresence } from "./presence";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -48,6 +49,17 @@ function serializeDoc(data: Record<string, unknown>): Record<string, unknown> {
  * teachers who registered before the counter existed — after that the
  * `onUserRoleChange` trigger keeps it current on its own.
  */
+/**
+ * Rebuilds the public `onlineTeachers` projection from the authoritative
+ * presence node. Run once after deploying the projection — teachers already
+ * online will not rewrite `status`, so nothing else would publish them.
+ */
+export const adminRepublishOnlineTeachers = onCall(async (req) => {
+  assertAdmin(req);
+  const onlineCount = await republishAllTeacherPresence();
+  return { onlineCount };
+});
+
 export const adminRecomputePlatformStats = onCall(async (req) => {
   assertAdmin(req);
   const registeredTeacherCount = await recomputeRegisteredTeacherCount();

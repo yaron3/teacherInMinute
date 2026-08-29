@@ -13,6 +13,12 @@ export { createQuestion, cancelQuestion, acceptInvite, declineInvite, getQuestio
 // Lesson lifecycle (all callable — FR-B-010)
 export { startLesson, endLesson, forceEndLesson, rateTeacher } from "./lessons";
 
+// Public online-teacher projection students can read
+export {
+  onTeacherPresenceStatusWritten,
+  onTeacherPresenceSubjectsWritten,
+} from "./presence";
+
 // Platform statistics
 export { onUserRoleChange } from "./stats";
 
@@ -46,6 +52,7 @@ export {
   adminVerifyTeacher,
   adminSendTeacherMessage,
   adminRecomputePlatformStats,
+  adminRepublishOnlineTeachers,
 } from "./admin";
 
 // Payments — PayPal Checkout + Braintree (Apple Pay, Google Pay)

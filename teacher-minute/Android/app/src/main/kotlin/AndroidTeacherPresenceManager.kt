@@ -13,35 +13,44 @@ object AndroidTeacherPresenceManager {
     private const val DATABASE_URL = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
     private const val AVAILABILITY_TIMEOUT_SECONDS = 5L
 
+    /**
+     * Whether any teacher is online, from the public `onlineTeachers`
+     * projection. Every entry there is online by construction, so the presence
+     * of any child is the answer.
+     *
+     * Previously read `teachers`, which is owner-only — the read always failed
+     * and the catch below answered "available" regardless of reality.
+     */
     @JvmStatic
     fun hasOnlineTeacher(): Boolean {
         return try {
             val snapshot = Tasks.await(
                 FirebaseDatabase.getInstance(DATABASE_URL)
-                    .getReference("teachers")
+                    .getReference("onlineTeachers")
                     .get(),
                 AVAILABILITY_TIMEOUT_SECONDS,
                 TimeUnit.SECONDS
             )
-            for (child in snapshot.children) {
-                val status = child.child("status").getValue(String::class.java)
-                if (status == "online") {
-                    Log.i(TAG, "hasOnlineTeacher=true uid=${child.key}")
-                    return true
-                }
-            }
-            Log.i(TAG, "hasOnlineTeacher=false (none of ${snapshot.childrenCount} teachers online)")
-            false
+            val hasAny = snapshot.childrenCount > 0
+            Log.i(TAG, "hasOnlineTeacher=$hasAny count=${snapshot.childrenCount}")
+            hasAny
         } catch (error: Throwable) {
+            // Still optimistic: blocking a student from asking because a
+            // presence read failed is worse than dispatching to nobody.
             Log.e(TAG, "hasOnlineTeacher check failed; assuming available", error)
             true
         }
     }
 
     /**
-     * The teachers currently online, as a JSON array of
-     * `{"id": "<uid>", "subjects": [...]}` — the shape OnlineTeachersStore
-     * decodes on the Swift side for the student home "Teachers online now" grid.
+     * The teachers currently online, from the public `onlineTeachers`
+     * projection the backend maintains (functions/src/presence.ts). Returned as
+     * a JSON array of `{"id", "subjects", "displayName", "photoUrl"}`, the shape
+     * OnlineTeachersStore decodes on the Swift side.
+     *
+     * Reads the projection rather than `teachers`, which is owner-only because
+     * it also holds student names under waitingMessages — reading it here fails
+     * with "Permission denied".
      *
      * JSON rather than a bridged object graph because the JNI bridge carries
      * strings cheaply, and this is read once per load rather than continuously.
@@ -53,18 +62,19 @@ object AndroidTeacherPresenceManager {
         return try {
             val snapshot = Tasks.await(
                 FirebaseDatabase.getInstance(DATABASE_URL)
-                    .getReference("teachers")
+                    .getReference("onlineTeachers")
                     .get(),
                 AVAILABILITY_TIMEOUT_SECONDS,
                 TimeUnit.SECONDS
             )
             val teachers = org.json.JSONArray()
             for (child in snapshot.children) {
-                val status = child.child("status").getValue(String::class.java)
-                if (status != "online") continue
+                val uid = child.key ?: continue
                 val entry = org.json.JSONObject()
-                entry.put("id", child.key ?: continue)
-                entry.put("subjects", org.json.JSONArray(normalizedSubjects(child.child("subjects").value)))
+                entry.put("id", uid)
+                entry.put("subjects", org.json.JSONArray(stringList(child.child("subjects").value)))
+                entry.put("displayName", child.child("displayName").getValue(String::class.java) ?: "")
+                entry.put("photoUrl", child.child("photoUrl").getValue(String::class.java) ?: "")
                 teachers.put(entry)
             }
             Log.i(TAG, "onlineTeachersJSON count=${teachers.length()}")
@@ -153,6 +163,15 @@ object AndroidTeacherPresenceManager {
             .addOnFailureListener { error ->
                 Log.e(TAG, "Failed writing teacher status=$status uid=$uid", error)
             }
+    }
+
+    /** Subjects in the projection are already normalized by the writer, so
+     *  they are read verbatim — re-running them through `normalizedSubjects`
+     *  would silently drop every subject outside its math-only whitelist. */
+    private fun stringList(raw: Any?): List<String> = when (raw) {
+        is List<*> -> raw.mapNotNull { it as? String }
+        is String -> listOf(raw)
+        else -> emptyList()
     }
 
     private fun normalizedSubjects(raw: Any?): List<String> {
