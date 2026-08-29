@@ -25,7 +25,11 @@ final class ProfileViewModel {
     var email = ""
     var phoneNumber = ""
     var username = ""
+    /// Star average and review count for a teacher, from the backend. Both stay
+    /// zero for students and for a teacher nobody has rated yet — `hasRating`
+    /// is what the view checks before drawing stars.
     var rating: Double = 0.0
+    var reviewCount: Int = 0
     var grade = ""
     /// Date of birth is collected only here in Profile (never during onboarding).
     /// `nil` means the student has not provided one, so it is never shown to a teacher.
@@ -113,6 +117,33 @@ final class ProfileViewModel {
 
     static let availableTeachingGrades: [String] = (1...12).map { "Grade \($0)" }
 
+    var hasRating: Bool { reviewCount > 0 && rating > 0 }
+
+    var reviewCountText: String { LessonFormatting.reviewCountText(reviewCount) }
+
+    // MARK: - Payout method (teachers)
+
+    /// Where this teacher's payout is sent, loaded from their own user
+    /// document. `nil` until it loads, and while none has been set up.
+    var payoutMethod: TeacherPayoutMethod?
+
+    var hasPayoutMethod: Bool { payoutMethod != nil }
+
+    /// The method's name — "Bit", "PayPal", "Bank Account".
+    var payoutMethodTitle: String {
+        payoutMethod?.type.displayName ?? LocalizationSupport.localized("Not set up yet")
+    }
+
+    /// The masked destination, e.g. a Bit phone number or a bank account's
+    /// last 4 digits.
+    var payoutMethodDetail: String {
+        payoutMethod?.displaySummary ?? LocalizationSupport.localized("Add where your payouts should be sent")
+    }
+
+    var payoutMethodSystemImage: String {
+        payoutMethod?.type.systemImage ?? "creditcard"
+    }
+
     var subjectsOrPlaceholder: [String] {
         subjects.isEmpty ? ["No subjects added yet"] : subjects
     }
@@ -124,7 +155,11 @@ final class ProfileViewModel {
     init(roleType: AuthRole = .student, repository: ProfileRepository = FirebaseProfileRepository()) {
         self.roleType = roleType
         self.repository = repository
-        role = roleType == .teacher ? "Math Teacher" : "Student"
+        // A placeholder only: `apply` replaces it with the label the profile
+        // itself implies (which names the teacher's real subjects).
+        role = roleType == .teacher
+            ? LocalizationSupport.localized("Teacher")
+            : LocalizationSupport.localized("Student")
         isVerified = false
         rebuildContactRows()
     }
@@ -147,23 +182,52 @@ final class ProfileViewModel {
             logger.info("[Profile] loading profile")
             isProfileLoaded = false
             guard let profile = try await repository.fetchProfileSummary(uid: uid) else {
+                logger.error("[Profile] profile summary was nil uid=\(uid)")
                 errorMessage = "Could not load profile."
                 return
             }
+            logger.info("[Profile] summary fetched role=\(profile.role == .teacher ? "teacher" : "student")")
             apply(profile)
             if profile.role == .teacher {
                 isVerified = try await repository.isTeacherVerified(uid: uid)
                 let docs = (try? await repository.fetchUploadedDocuments(uid: uid)) ?? []
                 hasMissingDocuments = TeacherDocumentsPromptStore.hasMissingDocuments(docs)
+                await loadTeacherRating(uid: uid)
+                await loadPayoutMethod(uid: uid)
             } else {
-                savedPayPalEmail = try? await UserService.shared.fetchSavedPayPalEmail(uid: uid)
+                // Comes from the profile document already fetched above — no
+                // second round trip just to read one field.
+                savedPayPalEmail = profile.savedPayPalEmail.isEmpty ? nil : profile.savedPayPalEmail
             }
             isProfileLoaded = true
+            logger.info("[Profile] loaded name=\(self.name) rows=\(self.contactRows.count) displayable=\(self.hasDisplayableProfileData)")
         } catch {
             errorMessage = "Could not load profile."
             isProfileLoaded = false
             logger.error("[Profile] failed loading profile: \(error.localizedDescription)")
             AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.loadProfile")
+        }
+    }
+
+    /// The teacher's real reputation. A failure leaves it at zero rather than
+    /// blocking the profile — the rating row simply does not appear.
+    private func loadTeacherRating(uid: String) async {
+        do {
+            guard let summary = try await repository.fetchTeacherRating(uid: uid) else { return }
+            rating = summary.averageRating
+            reviewCount = summary.ratingCount
+        } catch {
+            logger.error("[Profile] failed loading teacher rating: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.loadTeacherRating")
+        }
+    }
+
+    private func loadPayoutMethod(uid: String) async {
+        do {
+            payoutMethod = try await repository.fetchPayoutMethod(uid: uid)
+        } catch {
+            logger.error("[Profile] failed loading payout method: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.loadPayoutMethod")
         }
     }
 
@@ -338,7 +402,12 @@ final class ProfileViewModel {
         email = profile.email
         phoneNumber = profile.phoneNumber
         username = profile.email.components(separatedBy: "@").first ?? ""
-        rating = profile.role == .teacher ? 4.9 : 0.0
+        // The real rating arrives from the backend in loadTeacherRating; nothing
+        // about a profile document implies a score.
+        if profile.role != .teacher {
+            rating = 0
+            reviewCount = 0
+        }
         grade = profile.grade
         dateOfBirth = profile.dateOfBirth
         subjects = profile.subjects

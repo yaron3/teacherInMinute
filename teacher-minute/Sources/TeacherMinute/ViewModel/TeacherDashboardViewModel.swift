@@ -69,8 +69,11 @@ final class TeacherDashboardViewModel {
   var totalMinutes = 0
   var lessonCount = 0
   var monthEarningsCents = 0
-  var teacherRating: Double = 4.9
-  var reviewCount: Int = 312
+  /// The teacher's own reputation, from `teacherRatingSummary`. Zero until it
+  /// loads and while the teacher has no reviews yet — `hasRating` is what the
+  /// view checks before showing stars.
+  var teacherRating: Double = 0
+  var reviewCount: Int = 0
   var ratePerMinuteCents = 50
   var hasMicAccess = false
   var hasCameraAccess = false
@@ -99,6 +102,18 @@ final class TeacherDashboardViewModel {
 	return String(format: LocalizationSupport.localized("%@%d%% vs last week"), sign, change)
   }
   
+  /// A brand-new teacher has no reviews, so the dashboard says so instead of
+  /// showing an empty five-star row that reads as a score of zero.
+  var hasRating: Bool { reviewCount > 0 }
+
+  var ratingText: String { LessonFormatting.ratingText(teacherRating) }
+
+  var reviewCountText: String {
+	hasRating
+	? String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
+	: LocalizationSupport.localized("No reviews yet")
+  }
+
   var subjectsDisplayText: String {
 	if subjects.isEmpty {
 	  return LocalizationSupport.localized("No subjects selected")
@@ -582,7 +597,22 @@ final class TeacherDashboardViewModel {
 	
 	isVerified = (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
 	checkPermissions()
+	await loadRating()
 	await loadEarnings(uid: uid)
+  }
+
+  /// Star average and review count come from the backend rather than the
+  /// teacher document, which the app cannot aggregate on its own.
+  private func loadRating() async {
+	do {
+	  let summary = try await FunctionsService.shared.teacherRatingSummary()
+	  teacherRating = summary.averageRating
+	  reviewCount = summary.ratingCount
+	  logger.info("[Rating] dashboard rating=\(summary.averageRating) reviews=\(summary.ratingCount)")
+	} catch {
+	  logger.error("[Rating] failed loading teacher rating: \(error.localizedDescription)")
+	  AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.loadRating")
+	}
   }
   
   private var earningsCurrencyCode = LessonFormatting.defaultCurrencyCode

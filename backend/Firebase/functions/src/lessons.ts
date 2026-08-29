@@ -10,12 +10,11 @@ import {
   QuestionDoc,
   LessonDoc,
   HARD_CAP_MINUTES,
-  CONNECTION_FEE_CENTS,
   PurchaseDoc,
 } from "./types";
 import { calculateBilling } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
-import { resolvePricingForStudent } from "./pricing";
+import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -29,6 +28,9 @@ interface TeacherRatingDoc {
 
 interface TeacherAggregateDoc {
   averageRate?: number;
+  /** Denormalised size of the `ratings` subcollection, so reading a teacher's
+   *  review count (see ./ratings.ts) is a single document get. */
+  ratingCount?: number;
 }
 
 function toTimestamp(value: unknown): Timestamp | undefined {
@@ -486,7 +488,10 @@ export const startLesson = onCall(async (req) => {
   // Lock pricing at the moment the lesson starts so RC changes mid-lesson
   // do not retroactively shift the price. Currency is resolved from the
   // student's profile (/users/{uid}.currency).
-  const pricing = await resolvePricingForStudent(q.studentUid);
+  const [pricing, connectionFeeCents] = await Promise.all([
+    resolvePricingForStudent(q.studentUid),
+    getConnectionFeeCents(),
+  ]);
   const pricePerMinuteCents = Math.round(pricing.pricePerMinute * 100);
 
   const lesson: LessonDoc = {
@@ -496,7 +501,7 @@ export const startLesson = onCall(async (req) => {
     startedAt: Timestamp.fromDate(now),
     hardCapAt: Timestamp.fromDate(hardCapAt),
     baseRatePerMinCents: pricePerMinuteCents,
-    connectionFeeCents: CONNECTION_FEE_CENTS,
+    connectionFeeCents,
     currencyCode: pricing.currency,
     pricePerMinute: pricing.pricePerMinute,
     teacherShare: pricing.teacherShare,
@@ -545,7 +550,7 @@ export const startLesson = onCall(async (req) => {
     teacherShare: pricing.teacherShare,
     teacherSharePercent,
     exchangeRateToUsd: pricing.exchangeRateToUsd,
-    connectionFeeCents: CONNECTION_FEE_CENTS,
+    connectionFeeCents,
   });
   logger.info(`[lessons] startLesson RTDB sync complete qid=${questionId}`);
 
@@ -767,7 +772,10 @@ export const rateTeacher = onCall(async (req) => {
     };
 
     tx.set(ratingRef, ratingDoc);
-    tx.set(teacherRef, { averageRate: nextAverage }, { merge: true });
+    tx.set(teacherRef, { averageRate: nextAverage, ratingCount: ratingCount + 1 }, { merge: true });
+    // Mirror the score onto the question so the student who gave it can show it
+    // in their own lesson history — they cannot read the teacher's ratings.
+    tx.update(questionRef, { studentRating: rating, ratedAt: Timestamp.now() });
   });
 
   return { success: true };

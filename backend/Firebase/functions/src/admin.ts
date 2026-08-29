@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { recomputeRegisteredTeacherCount } from "./stats";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -41,6 +42,17 @@ function serializeDoc(data: Record<string, unknown>): Record<string, unknown> {
 }
 
 // ─── adminDashboardStatus ─────────────────────────────────────────────────────
+
+/**
+ * Recomputes the cached platform counters. Seeds `registeredTeacherCount` for
+ * teachers who registered before the counter existed — after that the
+ * `onUserRoleChange` trigger keeps it current on its own.
+ */
+export const adminRecomputePlatformStats = onCall(async (req) => {
+  assertAdmin(req);
+  const registeredTeacherCount = await recomputeRegisteredTeacherCount();
+  return { registeredTeacherCount };
+});
 
 export const adminDashboardStatus = onCall(async (req) => {
   assertAdmin(req);

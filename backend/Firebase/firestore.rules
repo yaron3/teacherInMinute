@@ -90,6 +90,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Aggregate, non-identifying platform counters (e.g. the average time it
+    // takes a question to reach a teacher). Written server-side only; any
+    // signed-in user may read them so the app can show real numbers instead of
+    // baked-in copy.
+    match /stats/{statsDocId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
     match /pricing/{pricingOptionId} {
       allow read: if true;
       allow write: if false;

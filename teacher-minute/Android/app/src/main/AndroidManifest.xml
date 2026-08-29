@@ -73,9 +73,15 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!--
+            launchMode="singleTask" is required by the Braintree PayPal browser
+            switch: the App Link return must reach the existing activity through
+            onNewIntent rather than starting a second MainActivity on top.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
             android:windowSoftInputMode="adjustResize">
@@ -88,6 +94,23 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="teacherminute" />
+            </intent-filter>
+            <!--
+                PayPal App Link return. Braintree v5 requires a verified https
+                link for PayPal; a custom scheme alone is rejected. This host
+                must serve /.well-known/assetlinks.json with this app's signing
+                certificate fingerprint (see backend/Firebase/public), and the
+                URL must be registered in the Braintree Control Panel.
+                Keep in sync with APP_LINK_RETURN_URL in AndroidPayPalManager.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="teacher-in-a-moment.web.app"
+                    android:pathPrefix="/paypal" />
             </intent-filter>
         </activity>
     </application>

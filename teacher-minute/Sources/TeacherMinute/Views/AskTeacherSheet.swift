@@ -563,10 +563,14 @@ struct AskTeacherSheet: View {
     var infoCard: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(LocalizationSupport.localized("Average response time: 90 seconds"))
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(theme.accent)
-                Text(String(format: LocalizationSupport.localized("%d teachers available now"), 5))
+                // Both figures are live: the response time is the backend's
+                // measured average, the count is who is actually online.
+                if !viewModel.averageResponseText.isEmpty {
+                    Text(viewModel.averageResponseText)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(theme.accent)
+                }
+                Text(String(format: LocalizationSupport.localized("%d teachers available now"), viewModel.onlineTeachers.count))
                     .font(.system(size: 12))
                     .foregroundStyle(theme.secondaryText)
             }

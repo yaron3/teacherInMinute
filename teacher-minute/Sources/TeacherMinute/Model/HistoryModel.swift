@@ -26,6 +26,10 @@ struct HistoryLesson: Identifiable, Hashable {
     let costCents: Int
     let teacherEarningsCents: Int
     let currencyCode: String
+    /// The score the student gave this lesson (1–5), or 0 if it was never
+    /// rated. Written onto the question by `rateTeacher`, since the teacher's
+    /// ratings subcollection is not readable by the student.
+    let studentRating: Int
 }
 
 struct LessonMessage: Identifiable {
@@ -162,6 +166,7 @@ final class HistoryModel {
 
         let questionText = Self.firstString(in: data, keys: ["text", "questionText", "originalQuestion", "message"])
         let questionPhotoUrls = Self.stringArray(data["photoUrls"])
+        let studentRating = min(5, max(0, Self.intValue(data["studentRating"]) ?? 0))
 
         return HistoryLesson(
             id: questionId,
@@ -175,7 +180,8 @@ final class HistoryModel {
             durationSeconds: durationSeconds,
             costCents: costCents,
             teacherEarningsCents: teacherEarningsCents,
-            currencyCode: currencyCode
+            currencyCode: currencyCode,
+            studentRating: studentRating
         )
     }
 

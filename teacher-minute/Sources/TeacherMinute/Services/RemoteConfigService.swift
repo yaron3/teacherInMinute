@@ -86,6 +86,9 @@ final class RemoteConfigService {
             let remoteConfig = RemoteConfig.remoteConfig()
             do {
                 let status = try await remoteConfig.fetchAndActivate()
+                // Newly activated values must not be shadowed by strings
+                // resolved against the previous config.
+                RemoteConfigLocalizationService.invalidateCache()
                 #if os(Android)
                 Self.logFetchState(remoteConfig, context: "initial fetchAndActivate", activateStatus: status)
                 #endif
@@ -166,6 +169,7 @@ final class RemoteConfigService {
         do {
             let fetchStatus = try await remoteConfig.fetch(withExpirationDuration: 0)
             let activated = try await remoteConfig.activate()
+            RemoteConfigLocalizationService.invalidateCache()
             #if os(Android)
             Self.logFetchState(remoteConfig, context: "refresh", fetchStatus: fetchStatus, activated: activated)
             #endif
@@ -225,12 +229,11 @@ final class RemoteConfigService {
         guard FirebaseApp.app() != nil else { return "" }
         #endif
         let value = RemoteConfig.remoteConfig().configValue(forKey: key)
-        let stringValue = value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        #if os(Android)
-        let source = Self.debugSourceName(value.source)
-        logger.info("[RemoteConfig][Android] read key='\(key)' source=\(source) empty=\(stringValue.isEmpty) length=\(stringValue.count)")
-        #endif
-        return stringValue
+        // Deliberately not logged per call: this runs for every localized
+        // string, and on Android the extra `value.source` read is a second JNI
+        // round trip. RemoteConfigLocalizationService logs each key once, on
+        // its cache miss, which covers the same diagnostic need.
+        return value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func getNumber(_ key: String) -> Double {

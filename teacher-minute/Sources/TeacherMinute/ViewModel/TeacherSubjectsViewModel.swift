@@ -35,13 +35,14 @@ final class TeacherSubjectsViewModel {
   
   var subjectAreas: [TeachingSubjectArea] = []
   
+  /// Shown only when the Remote Config catalog cannot be read — `loadSubjectCatalog`
+  /// replaces this with the published catalog on every load.
   private let fallbackSubjectAreas: [TeachingSubjectArea] = [
 	TeachingSubjectArea(
 	  id: "math",
 	  englishTitle: "Math",
 	  title: LocalizationSupport.localized("Math"),
 	  systemImage: "function",
-	  // TODO: next version read this data from remoteconfig
 	  subtopics: [
 		SubjectOption(title: LocalizationSupport.localized("General Math"), systemImage: "function",     key: "General Math"),
 		SubjectOption(title: LocalizationSupport.localized("Algebra"),      systemImage: "x.squareroot", key: "Algebra"),
@@ -170,7 +171,10 @@ final class TeacherSubjectsViewModel {
 		  TeachingSubjectArea(
 			id: subjectID(for: remoteSubject.title),
 			englishTitle: remoteSubject.title,   // remote config delivers English titles
-			title: remoteSubject.title,
+			// The catalog writes multi-word subjects with underscores
+			// ("Computer_Science"); only the display copy is cleaned up — the
+			// stored key stays exactly as published.
+			title: LocalizationSupport.localized(SubjectPresentation.displayTitle(for: remoteSubject.title)),
 			systemImage: systemImage(for: remoteSubject.title),
 			subtopics: remoteSubject.subtopics.isEmpty
 			  ? [SubjectOption(title: LocalizationSupport.localized("all"), systemImage: "list.bullet", key: "all")]
@@ -261,22 +265,13 @@ final class TeacherSubjectsViewModel {
 	}
   }
   
+  // Key derivation and iconography are shared with the student subject grid so
+  // both screens name the same catalog entry the same way — see SubjectPresentation.
   private func subjectID(for title: String) -> String {
-	title
-	  .lowercased()
-	  .filter { $0.isLetter || $0.isNumber }
+	SubjectPresentation.matchKey(for: title)
   }
   
   private func systemImage(for title: String) -> String {
-	let lowercasedTitle = title.lowercased()
-	if lowercasedTitle.contains("math") { return "function" }
-	if lowercasedTitle.contains("physics") { return "atom" }
-	if lowercasedTitle.contains("chem") { return "testtube.2" }
-	if lowercasedTitle.contains("algebra") { return "x.squareroot" }
-	if lowercasedTitle.contains("geometry") { return "triangle" }
-	if lowercasedTitle.contains("trigon") { return "angle" }
-	if lowercasedTitle.contains("calculus") { return "chart.xyaxis.line" }
-	if lowercasedTitle.contains("stat") { return "chart.pie" }
-	return "book.closed.fill"
+	SubjectPresentation.systemImage(for: title)
   }
 }

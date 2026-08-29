@@ -1,5 +1,6 @@
 const txGet = jest.fn();
 const txSet = jest.fn();
+const txUpdate = jest.fn();
 const runTransaction = jest.fn();
 const collectionMock = jest.fn();
 const adminFirestore = jest.fn();
@@ -153,9 +154,12 @@ describe("rateTeacher", () => {
     });
 
     txSet.mockResolvedValue(undefined);
-    runTransaction.mockImplementation(async (handler: (tx: { get: typeof txGet; set: typeof txSet }) => Promise<void>) => {
-      await handler({ get: txGet, set: txSet });
-    });
+    txUpdate.mockResolvedValue(undefined);
+    runTransaction.mockImplementation(
+      async (handler: (tx: { get: typeof txGet; set: typeof txSet; update: typeof txUpdate }) => Promise<void>) => {
+        await handler({ get: txGet, set: txSet, update: txUpdate });
+      }
+    );
   });
 
   test("stores a student rating and updates the teacher average", async () => {
@@ -186,8 +190,14 @@ describe("rateTeacher", () => {
     expect(txSet).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ path: teacherRef.path }),
-      expect.objectContaining({ averageRate: 4.333333333333333 }),
+      expect.objectContaining({ averageRate: 4.333333333333333, ratingCount: 3 }),
       { merge: true }
+    );
+    // Mirrored onto the question so the student can see the score they gave —
+    // they cannot read the teacher's ratings subcollection.
+    expect(txUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ path: questionRef.path }),
+      expect.objectContaining({ studentRating: 5 })
     );
   });
 

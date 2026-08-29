@@ -109,8 +109,21 @@ open class MainActivity: AppCompatActivity {
         super.onStart()
     }
 
+    // PayPal returns from the browser as a new App Link intent. singleTask
+    // launchMode (see AndroidManifest) routes it here rather than starting a
+    // second MainActivity, so the pending vault request can be matched.
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        AndroidPayPalManager.handleReturnToApp(this, intent)
+    }
+
     override fun onResume() {
         super.onResume()
+        // Covers the case where the activity was recreated while the buyer was
+        // in the browser, so the return arrived as the launch intent rather
+        // than through onNewIntent.
+        AndroidPayPalManager.handleReturnToApp(this, intent)
         AppDelegate.shared.onResume()
     }
 

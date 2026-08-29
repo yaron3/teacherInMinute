@@ -173,7 +173,7 @@ struct StudentHomeView: View {
 
       studentSectionHeader(
         title: LocalizationSupport.localized("Available Subjects"),
-        caption: String(format: LocalizationSupport.localized("%d registered teachers"), registeredTeacherCount)
+        caption: viewModel.registeredTeacherCountText.isEmpty ? nil : viewModel.registeredTeacherCountText
       )
       .padding(.top, 28)
 
@@ -240,7 +240,7 @@ struct StudentHomeView: View {
               .lineLimit(2)
               .minimumScaleFactor(0.75)
 
-            Text(LocalizationSupport.localized("When AI gets stuck, a human teacher connects in 90 seconds"))
+            Text(viewModel.connectPromiseText)
               .font(.system(size: 15, weight: .semibold))
               .foregroundStyle(theme.onAccentText.opacity(0.65))
               .lineLimit(2)
@@ -253,10 +253,12 @@ struct StudentHomeView: View {
 
         heroAskTeacherButton
 
-        Text(LocalizationSupport.localized("2 NIS connection fee • pay only for time used"))
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(theme.onAccentText.opacity(0.55))
-          .frame(maxWidth: .infinity, alignment: .center)
+        if !viewModel.connectionFeeText.isEmpty {
+          Text(viewModel.connectionFeeText)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.onAccentText.opacity(0.55))
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
       }
       .padding(22)
       .padding(.top, 20)
@@ -327,9 +329,13 @@ struct StudentHomeView: View {
         .font(.system(size: 15, weight: .bold))
         .foregroundStyle(theme.positive)
       Spacer()
-      Text(LocalizationSupport.localized("90 sec avg to connect"))
-        .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(theme.onAccentText.opacity(0.55))
+      // Measured by the backend; nothing is claimed until there is a
+      // measurement to claim.
+      if !viewModel.averageConnectText.isEmpty {
+        Text(viewModel.averageConnectText)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.onAccentText.opacity(0.55))
+      }
     }
     .padding(.horizontal, 14)
     .frame(height: 54)
@@ -378,10 +384,10 @@ struct StudentHomeView: View {
             .foregroundStyle(theme.secondaryText)
             .lineLimit(1)
 
-          HStack(spacing: 2) {
-            ForEach(0..<5, id: \.self) { _ in
-              PlatformIcon(systemName: "star.fill", size: 10, weight: .bold, color: theme.ratingStar)
-            }
+          // The score this student actually gave. Unrated lessons show no
+          // stars rather than a full row.
+          if lesson.hasRating {
+            RatingStarsView(rating: Double(lesson.rating), size: 10)
           }
 
           Text(lesson.duration)
@@ -416,20 +422,12 @@ struct StudentHomeView: View {
     ]
   }
 
-  var visibleSubjects: [StudentSubjectCatalogItem] {
-    StudentSubjectCatalog.items.filter { viewModel.isSubjectEnabled($0.key) }
-  }
-
   var popularSubjectsGrid: some View {
     LazyVGrid(columns: twoColumnGrid, spacing: 14) {
-      ForEach(visibleSubjects) { subject in
-        subjectCard(
-          title: LocalizationSupport.localized(subject.title),
-          teacherCount: subject.teacherCount,
-          topics: LocalizationSupport.localized(subject.topics),
-          systemImage: subject.systemImage,
-          tint: subjectCatalogTints[subject.key] ?? theme.accent
-        )
+      // Titles, subtopics and teacher counts all come from the view model,
+      // which builds them from the published catalog and live presence.
+      ForEach(viewModel.subjects) { subject in
+        subjectCard(subject, tint: subjectCatalogTints[subject.key] ?? theme.accent)
       }
     }
   }
@@ -478,7 +476,7 @@ struct StudentHomeView: View {
         )
         howItWorksStep(
           number: 2,
-          title: LocalizationSupport.localized("Teacher connects within 90 sec"),
+          title: viewModel.connectStepTitle,
           subtitle: LocalizationSupport.localized("The system finds an available teacher for your subject"),
           tint: theme.warning
         )
@@ -491,7 +489,9 @@ struct StudentHomeView: View {
         howItWorksStep(
           number: 4,
           title: LocalizationSupport.localized("Pay only for what you used"),
-          subtitle: LocalizationSupport.localized("2 NIS connection • only billed minutes count"),
+          subtitle: viewModel.connectionFeeText.isEmpty
+            ? LocalizationSupport.localized("Only billed minutes count")
+            : viewModel.connectionFeeText,
           tint: theme.positive
         )
       }
@@ -577,7 +577,6 @@ struct StudentHomeView: View {
     return String(format: LocalizationSupport.localized("%@ • %@"), lesson.title, lesson.duration)
   }
 
-  var registeredTeacherCount: Int { 237 }
 
   var onlineTeacherCount: Int { viewModel.onlineTeachers.count }
 
@@ -646,33 +645,42 @@ struct StudentHomeView: View {
     }
   }
 
-  func subjectCard(title: String, teacherCount: Int, topics: String, systemImage: String, tint: Color) -> some View {
+  func subjectCard(_ subject: StudentSubject, tint: Color) -> some View {
     FlatCard(outlined: true) {
       VStack(alignment: .leading, spacing: 12) {
         HStack(alignment: .top) {
           VStack(alignment: .leading, spacing: 6) {
-            Text(title)
+            Text(subject.title)
               .font(.system(size: 20, weight: .bold))
               .foregroundStyle(theme.primaryText)
               .lineLimit(1)
               .minimumScaleFactor(0.75)
-            Text(String(format: LocalizationSupport.localized("%d teachers"), teacherCount))
+            // A live count of teachers online for this subject, so one is
+            // enough to say so — the old copy only lit up past 30, a threshold
+            // that made sense only against the invented counts.
+            Text(subject.teacherCount == 1
+                 ? LocalizationSupport.localized("1 teacher")
+                 : String(format: LocalizationSupport.localized("%d teachers"), subject.teacherCount))
               .font(.system(size: 13, weight: .bold))
               .foregroundStyle(tint)
           }
           Spacer()
-          FlatIconTile(systemName: systemImage, size: 48, tint: tint, background: tint.opacity(0.12))
+          FlatIconTile(systemName: subject.systemImage, size: 48, tint: tint, background: tint.opacity(0.12))
         }
 
-        Text(topics)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(theme.secondaryText)
-          .lineLimit(2)
-          .minimumScaleFactor(0.82)
+        if !subject.topics.isEmpty {
+          Text(subject.topics)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+            .lineLimit(2)
+            .minimumScaleFactor(0.82)
+        }
 
         HStack(spacing: 7) {
-          FlatStatusDot(color: teacherCount > 30 ? theme.positive : theme.secondaryText, size: 9)
-          Text(teacherCount > 30 ? LocalizationSupport.localized("Teacher available now") : LocalizationSupport.localized("No one available now"))
+          FlatStatusDot(color: subject.hasTeachersOnline ? theme.positive : theme.secondaryText, size: 9)
+          Text(subject.hasTeachersOnline
+               ? LocalizationSupport.localized("Teacher available now")
+               : LocalizationSupport.localized("No one available now"))
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
         }

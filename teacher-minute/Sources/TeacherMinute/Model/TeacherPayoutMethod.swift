@@ -91,6 +91,23 @@ struct TeacherPayoutMethod {
     }
   }
 
+  /// A short, non-sensitive description of where the money goes, mirroring the
+  /// backend's `payoutMethodSummary` (functions/src/payoutMethod.ts) so a
+  /// screen that reads the stored method directly renders it identically to one
+  /// that gets the summary from the earnings service. Bank accounts never show
+  /// more than their last 4 digits.
+  var displaySummary: String {
+    switch type {
+    case .bank:
+      let masked = "••••\(accountNumber.trimmed.suffix(4))"
+      return bankName.trimmed.isEmpty ? masked : "\(bankName.trimmed) \(masked)"
+    case .bit:
+      return phone.trimmed
+    case .paypal:
+      return email.trimmed
+    }
+  }
+
   /// The payload for `updateTeacherPayoutMethod` — only the fields the chosen
   /// type actually uses, so a stale value from another type is never sent.
   var requestPayload: [String: Any] {

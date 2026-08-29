@@ -104,6 +104,56 @@ enum LessonFormatting {
 	return currencyText(cents: totalCents, currencyCode: displayCurrencyCode)
   }
 
+  // MARK: - Ratings
+
+  /// A star average as one decimal in the viewer's locale — "4.9" in English,
+  /// where a locale using a decimal comma writes "4,9".
+  static func ratingText(_ rating: Double) -> String {
+	numberText(amount: rating, maximumFractionDigits: 1)
+  }
+
+  /// "(1 review)" / "(12 reviews)". Returns an empty string when there are no
+  /// reviews, so callers can hide the label rather than print "(0 reviews)".
+  static func reviewCountText(_ count: Int) -> String {
+	guard count > 0 else { return "" }
+	return count == 1
+	? LocalizationSupport.localized("(1 review)")
+	: String(format: LocalizationSupport.localized("(%d reviews)"), count)
+  }
+
+  // MARK: - Connection time
+
+  /// A measured connect time spelled out — "90 seconds", "2 minutes". Empty
+  /// when there is no measurement, so callers can drop the claim rather than
+  /// invent a number.
+  static func connectDurationText(seconds: Int) -> String {
+	guard seconds > 0 else { return "" }
+	if seconds < 120 {
+	  return String(format: LocalizationSupport.localized("%d seconds"), seconds)
+	}
+	let minutes = Int((Double(seconds) / 60.0).rounded())
+	return String(format: LocalizationSupport.localized("%d minutes"), minutes)
+  }
+
+  /// The same figure abbreviated, for tight rows — "90 sec", "2 min".
+  static func connectDurationShortText(seconds: Int) -> String {
+	guard seconds > 0 else { return "" }
+	if seconds < 120 {
+	  return String(format: LocalizationSupport.localized("%d sec"), seconds)
+	}
+	let minutes = Int((Double(seconds) / 60.0).rounded())
+	return String(format: LocalizationSupport.localized("%d min"), minutes)
+  }
+
+  /// How long students currently wait to be connected, e.g. "90 sec avg to
+  /// connect". Measured by the backend (functions/src/stats.ts) — never a
+  /// fixed claim — so callers pass 0 when there is no measurement yet.
+  static func averageConnectText(seconds: Int) -> String {
+	let duration = connectDurationShortText(seconds: seconds)
+	guard !duration.isEmpty else { return "" }
+	return String(format: LocalizationSupport.localized("%@ avg to connect"), duration)
+  }
+
   // MARK: - Calendar months
 
   /// The standalone month name in the viewer's language — "August" in English,

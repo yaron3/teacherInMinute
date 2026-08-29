@@ -13,8 +13,14 @@ export { createQuestion, cancelQuestion, acceptInvite, declineInvite, getQuestio
 // Lesson lifecycle (all callable — FR-B-010)
 export { startLesson, endLesson, forceEndLesson, rateTeacher } from "./lessons";
 
+// Platform statistics
+export { onUserRoleChange } from "./stats";
+
 // Coupons
 export { redeemCoupon } from "./coupons";
+
+// Teacher rating aggregates (star average + review count)
+export { teacherRatingSummary } from "./ratings";
 
 // Teacher earnings, payout schedule and payout method
 export {
@@ -39,6 +45,7 @@ export {
   adminGetTeacherDocs,
   adminVerifyTeacher,
   adminSendTeacherMessage,
+  adminRecomputePlatformStats,
 } from "./admin";
 
 // Payments — PayPal Checkout + Braintree (Apple Pay, Google Pay)

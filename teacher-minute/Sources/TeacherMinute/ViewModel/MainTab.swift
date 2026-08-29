@@ -79,6 +79,24 @@ final class MainTabViewModel {
 	userMode == .teacher && hasUnseenLessons
   }
 
+  /// The tabs to show, in order. Earnings is teacher-only.
+  ///
+  /// The view builds its tab bar from this list rather than wrapping a tab in
+  /// an `if`: on iOS a false branch inside `TabView` omits the tab, but under
+  /// SkipUI it still contributes an empty slot, which showed up on Android as
+  /// a blank tab between Lessons and Profile.
+  var visibleTabs: [MainTab] {
+	if userMode == .teacher {
+	  return [.home, .lessons, .earnings, .profile, .settings]
+	}
+	return [.home, .lessons, .profile, .settings]
+  }
+
+  /// Badge count for `tab` — only Lessons ever carries one; 0 means no badge.
+  func badgeCount(for tab: MainTab) -> Int {
+	tab == .lessons && shouldShowLessonsBadge ? 1 : 0
+  }
+
   init(userMode: AppUserMode = .teacher) {
 	self.userMode = userMode
   }

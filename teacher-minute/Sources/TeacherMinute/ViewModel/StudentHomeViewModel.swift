@@ -88,6 +88,12 @@ struct RecentLesson: Identifiable {
   let teacherImageURL: String
   let time: String
   let duration: String
+  /// What the student scored this lesson, 1–5, or 0 when they never rated it.
+  /// Drives the stars on the "Last Lesson" card, which used to be five filled
+  /// stars regardless of the score.
+  var rating: Int = 0
+
+  var hasRating: Bool { rating > 0 }
 }
 
 // MARK: - Coupon State
@@ -136,6 +142,13 @@ protocol StudentHomeViewModeling: AnyObject {
   var savedPayPalEmail: String? { get set }
   var recentLessons: [RecentLesson] { get set }
   var onlineTeachers: [OnlineTeacher] { get set }
+  var subjects: [StudentSubject] { get }
+  var connectionFeeText: String { get }
+  var averageConnectText: String { get }
+  var connectPromiseText: String { get }
+  var connectStepTitle: String { get }
+  var averageResponseText: String { get }
+  var registeredTeacherCountText: String { get }
   var totalTimeLearnedText: String { get }
   var totalPurchasedText: String { get }
   var lessonCount: Int { get }
@@ -168,7 +181,6 @@ protocol StudentHomeViewModeling: AnyObject {
   func redeemCoupon() async
   func resetCouponState()
   func consumePurchaseSummary()
-  func isSubjectEnabled(_ key: String) -> Bool
 }
 
 // MARK: - ViewModel
@@ -191,6 +203,26 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   var recentLessons: [RecentLesson] = []
   var onlineTeachers: [OnlineTeacher] = []
+  /// The subject grid: the Remote Config catalog joined with how many teachers
+  /// are online for each subject right now.
+  var subjects: [StudentSubject] = []
+  /// "2₪ connection fee • pay only for time used" — the fee is the one the
+  /// backend bills, not a number written into the copy.
+  var connectionFeeText = ""
+  /// "90 sec avg to connect", measured by the backend. Empty until there is a
+  /// measurement, so the view can leave the claim out entirely.
+  var averageConnectText = ""
+  /// "237 registered teachers", counted by the backend. Empty until the counter
+  /// is seeded, so the view omits the caption rather than claiming zero.
+  var registeredTeacherCountText = ""
+  /// The hero line and the "how it works" step, both of which used to promise a
+  /// fixed 90 seconds. They now quote the measured average, and fall back to
+  /// wording that makes no numeric claim when there is nothing to quote.
+  var connectPromiseText = LocalizationSupport.localized("When AI gets stuck, a human teacher connects in moments")
+  var connectStepTitle = LocalizationSupport.localized("A teacher connects quickly")
+  /// The line on the ask-a-question sheet. Empty when nothing has been
+  /// measured, so the sheet drops it instead of quoting a made-up figure.
+  var averageResponseText = ""
   var totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: [])
   var totalPurchasedText = LessonFormatting.minutesText(0)
   var lessonCount = 0
@@ -212,6 +244,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// (`enable_<key>`). "math" is the only one on by default; every other
   /// subject stays hidden until its flag is explicitly turned on remotely.
   private var enabledSubjectKeys: Set<String> = ["math"]
+  /// The subject catalog as published, kept so the grid can be rebuilt with new
+  /// teacher counts whenever presence changes without re-reading Remote Config.
+  private var subjectCatalog: [RemoteTeachingSubject] = []
+  /// Normalized subject keys of every teacher currently online, one entry per
+  /// teacher, so a subject's count is how many of these sets match it.
+  private var onlineTeacherSubjectKeys: [Set<String>] = []
+  /// The student's own currency, so the connection fee is quoted in it.
+  private var currencyCode = LessonFormatting.defaultCurrencyCode
   private var didLoadProfile = false
   private var checkoutStartedRemainingMinutes = 0
   /// The option being bought. Unlike `checkoutPricingOptionID` this survives
@@ -522,33 +562,120 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     await loadPricingOptions()
     await loadSubjectAvailability()
     startObservingOnlineTeachersIfNeeded()
-    guard !didLoadProfile, let uid = Auth.auth().currentUser?.uid else { return }
+    guard !didLoadProfile, let uid = Auth.auth().currentUser?.uid else {
+      // Still worth showing the fee and connect time to a signed-out or
+      // already-loaded screen; it just falls back to the default currency.
+      await loadPlatformFigures()
+      return
+    }
     didLoadProfile = true
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
       remainingMinutes = profile.remainingMinutes
+      currencyCode = profile.currency
     }
+    // After the profile, so the fee is quoted in the student's own currency.
+    await loadPlatformFigures()
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
   }
 
-  func isSubjectEnabled(_ key: String) -> Bool {
-    enabledSubjectKeys.contains(key)
-  }
-
-  /// Reads `enable_<key>` for each catalog subject; "math" defaults to
-  /// enabled and every other subject defaults to hidden until Remote Config
+  /// Loads the published subject catalog — the same list teachers pick the
+  /// subjects they teach from — and reads `enable_<key>` for each one. "math"
+  /// defaults to visible; every other subject stays hidden until Remote Config
   /// turns it on.
   private func loadSubjectAvailability() async {
     await RemoteConfigService.shared.ready()
+    subjectCatalog = (try? await SettingsRemoteConfigService.shared.fetchTeachingSubjects()) ?? []
+
     var enabled: Set<String> = []
-    for key in StudentSubjectCatalog.keys {
+    for subject in subjectCatalog {
+      let key = SubjectPresentation.flagKey(for: subject.title)
       if RemoteConfigService.shared.getBool("enable_\(key)", default: key == "math") {
         enabled.insert(key)
       }
     }
     enabledSubjectKeys = enabled
+    rebuildSubjects()
+  }
+
+  /// Joins the catalog with live presence. Called whenever either side
+  /// changes, so the grid's teacher counts track teachers going on and offline.
+  private func rebuildSubjects() {
+    subjects = subjectCatalog.compactMap { subject in
+      let key = SubjectPresentation.flagKey(for: subject.title)
+      guard enabledSubjectKeys.contains(key) else { return nil }
+
+      let englishTitle = SubjectPresentation.displayTitle(for: subject.title)
+      return StudentSubject(
+        key: key,
+        title: LocalizationSupport.localized(englishTitle),
+        topics: subject.subtopics
+          .map { LocalizationSupport.localized($0) }
+          .joined(separator: ", "),
+        systemImage: SubjectPresentation.systemImage(for: subject.title),
+        teacherCount: onlineTeacherCount(for: subject)
+      )
+    }
+  }
+
+  /// Teachers are online for a subject when any of the subtopic keys they
+  /// published matches one of the subject's — the same normalized form the
+  /// dispatcher matches on. The area name itself counts too, for a teacher who
+  /// registered the area rather than its subtopics.
+  private func onlineTeacherCount(for subject: RemoteTeachingSubject) -> Int {
+    var keys = Set(subject.subtopics.map { SubjectPresentation.matchKey(for: $0) })
+    keys.insert(SubjectPresentation.matchKey(for: subject.title))
+    if subject.subtopics.isEmpty {
+      // A subject published without subtopics is stored by teachers as "all".
+      keys.insert("all")
+    }
+    keys.remove("")
+    return onlineTeacherSubjectKeys.filter { !$0.isDisjoint(with: keys) }.count
+  }
+
+  /// The connection fee and the measured time-to-connect, both from the
+  /// backend. Either can be missing, in which case the view shows nothing
+  /// rather than a figure the app invented.
+  private func loadPlatformFigures(forceRefresh: Bool = false) async {
+    let feeCents = await SettingsRemoteConfigService.shared.fetchConnectionFeeCents()
+    connectionFeeText = String(
+      format: LocalizationSupport.localized("%@ connection fee • pay only for time used"),
+      LessonFormatting.currencyText(cents: feeCents, currencyCode: currencyCode)
+    )
+
+    let stats = await PlatformStatsService.shared.fetchStats(forceRefresh: forceRefresh)
+
+    // Set before the connect-time guard below: the two counters are
+    // independent, and a platform with no connect samples yet can still have
+    // registered teachers.
+    registeredTeacherCountText = stats.hasRegisteredTeachers
+      ? String(format: LocalizationSupport.localized("%d registered teachers"), stats.registeredTeacherCount)
+      : ""
+
+    guard stats.hasConnectTime else {
+      averageConnectText = ""
+      averageResponseText = ""
+      connectPromiseText = LocalizationSupport.localized("When AI gets stuck, a human teacher connects in moments")
+      connectStepTitle = LocalizationSupport.localized("A teacher connects quickly")
+      return
+    }
+
+    averageResponseText = String(
+      format: LocalizationSupport.localized("Average response time: %@"),
+      LessonFormatting.connectDurationText(seconds: stats.averageConnectSeconds)
+    )
+
+    averageConnectText = LessonFormatting.averageConnectText(seconds: stats.averageConnectSeconds)
+    connectPromiseText = String(
+      format: LocalizationSupport.localized("When AI gets stuck, a human teacher connects in %@"),
+      LessonFormatting.connectDurationText(seconds: stats.averageConnectSeconds)
+    )
+    connectStepTitle = String(
+      format: LocalizationSupport.localized("Teacher connects within %@"),
+      LessonFormatting.connectDurationShortText(seconds: stats.averageConnectSeconds)
+    )
   }
 
   // MARK: - Online Teachers
@@ -563,6 +690,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   }
 
   private func resolveOnlineTeachers(_ presences: [OnlineTeacherPresence]) {
+    // The subject grid's teacher counts come straight from presence, so they
+    // update the moment a teacher goes online — before the slower per-teacher
+    // profile lookups below finish.
+    onlineTeacherSubjectKeys = presences.map { presence in
+      Set(presence.subjects.map { SubjectPresentation.matchKey(for: $0) })
+    }
+    rebuildSubjects()
+
     resolveOnlineTeachersTask?.cancel()
     resolveOnlineTeachersTask = Task { [weak self] in
       guard let self else { return }
@@ -594,7 +729,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
       remainingMinutes = profile.remainingMinutes
+      currencyCode = profile.currency
     }
+    // Pull-to-refresh: re-read the measured connect time rather than reuse the
+    // one cached when the screen first appeared.
+    await loadPlatformFigures(forceRefresh: true)
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
   }
@@ -803,7 +942,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       teacher: String(format: LocalizationSupport.localized("with %@"), lesson.otherParticipantName),
       teacherImageURL: lesson.otherParticipantImageURL,
       time: LessonFormatting.relativeDateText(lesson.acceptedAt),
-      duration: LessonFormatting.durationText(seconds: lesson.durationSeconds)
+      duration: LessonFormatting.durationText(seconds: lesson.durationSeconds),
+      rating: lesson.studentRating
     )
   }
 }
@@ -877,8 +1017,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       ),
     ],
     recentLessons: [RecentLesson] = [
-      RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis", teacherImageURL: "", time: "Today, 2:30 PM", duration: "14 mins"),
-      RecentLesson(title: "Algebra II", teacher: "with Ms. Chen", teacherImageURL: "", time: "Yesterday", duration: "22 mins"),
+      RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis", teacherImageURL: "", time: "Today, 2:30 PM", duration: "14 mins", rating: 5),
+      RecentLesson(title: "Algebra II", teacher: "with Ms. Chen", teacherImageURL: "", time: "Yesterday", duration: "22 mins", rating: 4),
     ]
   ) {
     self.name = name
@@ -954,7 +1094,16 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   func viewAllLessons() {}
 
-  func isSubjectEnabled(_ key: String) -> Bool { true }
+  var subjects: [StudentSubject] = [
+    StudentSubject(key: "math", title: "Math", topics: "Algebra, Trigonometry", systemImage: "function", teacherCount: 3),
+    StudentSubject(key: "physics", title: "Physics", topics: "Mechanics", systemImage: "atom", teacherCount: 1),
+  ]
+  var connectionFeeText = "2₪ connection fee • pay only for time used"
+  var averageConnectText = "90 sec avg to connect"
+  var registeredTeacherCountText = "237 registered teachers"
+  var connectPromiseText = "When AI gets stuck, a human teacher connects in 90 seconds"
+  var connectStepTitle = "Teacher connects within 90 sec"
+  var averageResponseText = "Average response time: 90 seconds"
 
   func loadProfileIfNeeded() async {}
 

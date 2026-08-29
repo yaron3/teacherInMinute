@@ -277,11 +277,14 @@ final class TeacherEarningsViewModel {
         pendingProfilePhone = ""
     }
 
-#if canImport(UIKit)
     /// Confirms a PayPal payout account by having the teacher log in to PayPal.
     /// PayPal has no API to check whether an address has an account, so this
     /// login is the only real proof — which is why the PayPal option is saved
     /// here rather than through the Save button.
+    ///
+    /// Works on both platforms: iOS presents PayPal in an
+    /// `ASWebAuthenticationSession`, Android switches out to the browser and
+    /// back through an App Link. See PayPalVaultService.
     func connectPayPalPayoutAccount() async {
         guard !isConnectingPayPal else { return }
         isConnectingPayPal = true
@@ -321,14 +324,6 @@ final class TeacherEarningsViewModel {
             logger.error("[Earnings] PayPal payout connect failed: \(error.localizedDescription)")
         }
     }
-#else
-    /// Braintree's PayPal SDK is linked for iOS only (see Package.swift), so
-    /// there is no way to run the login that confirms the account here yet.
-    func connectPayPalPayoutAccount() async {
-        logger.error("[Earnings] PayPal payout connect requested on a platform without the PayPal SDK")
-        payoutMethodErrorMessage = LocalizationSupport.localized("Connecting PayPal is not available on this device yet. Please choose another payment method.")
-    }
-#endif
 
     /// The backend sends the payout day as "yyyy-MM-dd"; show it the way the
     /// viewer's locale writes dates.

@@ -282,27 +282,21 @@ struct TeacherDashboardView: View {
 		  .frame(maxWidth: .infinity, alignment: .trailing)
 
 		HStack(spacing: 8) {
-		  Text(String(format: LocalizationSupport.localized("%d reviews"), viewModel.reviewCount))
+		  Text(viewModel.reviewCountText)
 			.font(.system(size: 13))
 			.foregroundStyle(theme.secondaryText)
 
 		  Spacer()
 
-		  HStack(spacing: 2) {
-			ForEach(0..<5, id: \.self) { index in
-			  let filled = Double(index) < viewModel.teacherRating
-			  PlatformIcon(
-				systemName: filled ? "star.fill" : "star",
-				size: 16,
-				weight: .medium,
-				color: filled ? theme.warning : theme.secondaryText
-			  )
-			}
-		  }
+		  // Until someone has rated this teacher there is no score to draw, and
+		  // five empty stars would read as a rating of zero.
+		  if viewModel.hasRating {
+			RatingStarsView(rating: viewModel.teacherRating, size: 16, filledColor: theme.warning)
 
-		  Text(String(format: "%.1f", viewModel.teacherRating))
-			.font(.system(size: 15, weight: .bold))
-			.foregroundStyle(theme.primaryText)
+			Text(viewModel.ratingText)
+			  .font(.system(size: 15, weight: .bold))
+			  .foregroundStyle(theme.primaryText)
+		  }
 		}
 	  }
 	}

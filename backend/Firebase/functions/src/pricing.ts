@@ -1,6 +1,8 @@
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 
+import { CONNECTION_FEE_CENTS } from "./types";
+
 const firestore = admin.firestore();
 
 export const DEFAULT_CURRENCY = "ILS";
@@ -92,6 +94,17 @@ export async function getPricePerMinute(currency: string): Promise<number> {
   }
   const rate = await getExchangeRateToUsd(currency);
   return Math.round(usdPrice * rate * 100) / 100;
+}
+
+/** The one-off fee charged when a lesson connects, in cents of the student's
+ *  currency. Source of truth is Remote Config `connection_fee_cents`, which the
+ *  apps read too — so the fee the student is quoted on the home screen is the
+ *  same number this backend bills. Falls back to the built-in constant when the
+ *  key is absent. */
+export async function getConnectionFeeCents(): Promise<number> {
+  const fromRc = await readRcNumber("connection_fee_cents");
+  if (fromRc !== undefined && fromRc >= 0) return Math.round(fromRc);
+  return CONNECTION_FEE_CENTS;
 }
 
 export async function getTeacherShare(): Promise<number> {

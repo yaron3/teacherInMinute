@@ -4,18 +4,65 @@ import Foundation
 /// string to a stable snake-case key (matching the Firebase Remote Config
 /// template), looks it up via `RemoteConfigService`, and falls back to the
 /// source string if the active config has no entry.
+/// Resolved strings, keyed by language + source string.
+///
+/// Every resolution costs a Remote Config lookup, which on Android is a JNI
+/// round trip. A screen can ask for the same string dozens of times across
+/// re-renders (ProfileView alone has ~50 call sites), so without this the cost
+/// scales with render count rather than with the number of distinct strings.
+/// Cleared by `RemoteConfigLocalizationService.invalidateCache()` when Remote
+/// Config activates new values; a language switch needs no invalidation because
+/// the language code is part of the key.
+private final class LocalizationCache: @unchecked Sendable {
+    static let shared = LocalizationCache()
+
+    private let lock = NSLock()
+    private var entries: [String: String] = [:]
+
+    func value(forKey key: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return entries[key]
+    }
+
+    func set(_ value: String, forKey key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        entries[key] = value
+    }
+
+    func removeAll() {
+        lock.lock()
+        defer { lock.unlock() }
+        entries.removeAll()
+    }
+}
+
 struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
     func localized(_ english: String) -> String {
-        let key = LocalizationKey.key(for: english)
         let languageCode = LocalizationSupport.currentLanguageCode
+        let cacheKey = "\(languageCode)|\(english)"
+        if let cached = LocalizationCache.shared.value(forKey: cacheKey) {
+            return cached
+        }
+
+        let key = LocalizationKey.key(for: english)
         let value = RemoteConfigService.readString(key)
         let fallback = Self.localFallback(for: english, languageCode: languageCode)
         let shouldUseFallback = value.isEmpty || (languageCode != "en" && value == english)
         let resolvedValue = shouldUseFallback ? (fallback ?? english) : value
+        LocalizationCache.shared.set(resolvedValue, forKey: cacheKey)
         #if os(Android)
+        // Logged only on a cache miss — i.e. once per string per language —
+        // so the diagnostic survives without re-logging on every render.
         logger.info("[Localization][Android] english='\(Self.debugSnippet(english))' key='\(key)' language=\(languageCode) fallback=\(shouldUseFallback) value='\(Self.debugSnippet(resolvedValue))'")
         #endif
         return resolvedValue
+    }
+
+    /// Drops cached strings so newly activated Remote Config values take effect.
+    static func invalidateCache() {
+        LocalizationCache.shared.removeAll()
     }
 
     private static func localFallback(for english: String, languageCode: String) -> String? {
@@ -110,7 +157,6 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Teachers online now": "מורים מחוברים עכשיו",
         "Credits": "קרדיטים",
         // Subject cards
-        "%d teachers": "%d מורים",
         "Chemistry": "כימיה",
         "Biology": "ביולוגיה",
         "Algebra, trigonometry, 5 units": "אלגברה, טריגונומטריה, 5 יח'",
@@ -121,11 +167,35 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Genetics, cells, molecular": "גנטיקה, תאים, מולקולרית",
         "Teacher available now": "מורה פנוי עכשיו",
         "No one available now": "אין פנויים עכשיו",
-        // Online teacher cards (mock names)
+        // Online teacher cards — preview-only names (MockStudentHomeViewModel)
         "Cohen": "כהן",
         "Levi": "לוי",
         "Mizrahi": "מזרחי",
         "Shalev": "שלו",
+        // Ratings and platform figures. These replaced fixed copy ("4.9",
+        // "(127 reviews)", "90 seconds") once the numbers started coming from
+        // the backend, so the Remote Config template has no entries for them yet.
+        "(1 review)": "(ביקורת אחת)",
+        "(%d reviews)": "(%d ביקורות)",
+        "No reviews yet": "אין ביקורות עדיין",
+        "%d seconds": "%d שניות",
+        "%d minutes": "%d דקות",
+        "%d sec": "%d שנ׳",
+        "%@ avg to connect": "%@ בממוצע לחיבור",
+        "Average response time: %@": "זמן תגובה ממוצע: %@",
+        "When AI gets stuck, a human teacher connects in %@": "כש-AI נתקע – מורה אנושי מתחבר תוך %@",
+        "When AI gets stuck, a human teacher connects in moments": "כש-AI נתקע – מורה אנושי מתחבר תוך רגעים",
+        "Teacher connects within %@": "מורה מתחבר תוך %@",
+        "A teacher connects quickly": "מורה מתחבר במהירות",
+        "%@ connection fee • pay only for time used": "%@ דמי חיבור • משלמים רק על הזמן שנוצל",
+        "Only billed minutes count": "נספרות רק הדקות שחויבו",
+        "1 teacher": "מורה אחד",
+        "%d teachers": "%d מורים",
+        // Teacher payout method on the profile screen
+        "Not set up yet": "טרם הוגדר",
+        "Add where your payouts should be sent": "הוסיפו לאן לשלוח את התשלומים",
+        // A teacher is introduced by the subjects they actually teach
+        "%@ Teacher": "מורה ל%@",
         // How it works panel
         "How it works": "איך זה עובד",
         "Live lesson": "שיעור חי",
@@ -243,6 +313,22 @@ enum LocalizationKey {
     private static let exactKeys: [String: String] = [
         "": "empty_string",
         "(127 reviews)": "reviews_127",
+        // Rating and connect-time strings whose generated keys would collide
+        // with existing ones ("%d reviews" → reviews, "minutes", "seconds").
+        "(1 review)": "review_1",
+        "(%d reviews)": "fmt_reviews_parens",
+        "%d seconds": "fmt_seconds",
+        "%d minutes": "fmt_minutes",
+        "%d sec": "fmt_sec",
+        "When AI gets stuck, a human teacher connects in %@": "fmt_ai_stuck_connects",
+        "When AI gets stuck, a human teacher connects in moments": "ai_stuck_connects_moments",
+        "%@ Teacher": "fmt_subject_teacher",
+        "1 teacher": "teacher_1",
+        "%d teachers": "fmt_teachers",
+        // The published `teacher_connects_within` still holds the old fixed
+        // "Teacher connects within 90 sec"; the format string needs its own key
+        // so that value cannot shadow it.
+        "Teacher connects within %@": "fmt_teacher_connects_within",
         " and": "and_a",
         "!": "exclamation_mark",
         "%@ subtopics": "fmt_subtopics_a",

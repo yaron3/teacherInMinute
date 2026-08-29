@@ -38,6 +38,43 @@ object AndroidTeacherPresenceManager {
         }
     }
 
+    /**
+     * The teachers currently online, as a JSON array of
+     * `{"id": "<uid>", "subjects": [...]}` — the shape OnlineTeachersStore
+     * decodes on the Swift side for the student home "Teachers online now" grid.
+     *
+     * JSON rather than a bridged object graph because the JNI bridge carries
+     * strings cheaply, and this is read once per load rather than continuously.
+     * Returns "[]" on failure: an empty grid is a better outcome than blocking
+     * the home screen on a presence read.
+     */
+    @JvmStatic
+    fun onlineTeachersJSON(): String {
+        return try {
+            val snapshot = Tasks.await(
+                FirebaseDatabase.getInstance(DATABASE_URL)
+                    .getReference("teachers")
+                    .get(),
+                AVAILABILITY_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            val teachers = org.json.JSONArray()
+            for (child in snapshot.children) {
+                val status = child.child("status").getValue(String::class.java)
+                if (status != "online") continue
+                val entry = org.json.JSONObject()
+                entry.put("id", child.key ?: continue)
+                entry.put("subjects", org.json.JSONArray(normalizedSubjects(child.child("subjects").value)))
+                teachers.put(entry)
+            }
+            Log.i(TAG, "onlineTeachersJSON count=${teachers.length()}")
+            teachers.toString()
+        } catch (error: Throwable) {
+            Log.e(TAG, "onlineTeachersJSON failed", error)
+            "[]"
+        }
+    }
+
     @JvmStatic
     fun setCurrentTeacherStatus(status: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid

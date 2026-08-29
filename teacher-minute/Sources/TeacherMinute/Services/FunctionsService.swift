@@ -158,6 +158,23 @@ struct TeacherEarningsSummaryResult {
   let profilePhone: String
 }
 
+// MARK: - Teacher ratings
+
+/// A teacher's public reputation, as aggregated by the `teacherRatingSummary`
+/// backend service. `ratingCount == 0` means nobody has rated this teacher yet,
+/// which the screens render as "no rating" rather than as zero stars.
+struct TeacherRatingSummary {
+  let teacherId: String
+  let averageRating: Double
+  let ratingCount: Int
+
+  var hasRating: Bool { ratingCount > 0 }
+
+  static func empty(teacherId: String) -> TeacherRatingSummary {
+    TeacherRatingSummary(teacherId: teacherId, averageRating: 0, ratingCount: 0)
+  }
+}
+
 // MARK: - Service
 
 @MainActor
@@ -326,6 +343,40 @@ final class FunctionsService {
   /// PayPal login, no checkout URL.
   func chargeSavedPayPal(pricingOptionID: String) async throws {
     _ = try await call(function: "chargeSavedPayPal", data: ["pricingOptionId": pricingOptionID])
+  }
+
+  // MARK: - Teacher ratings
+
+  /// Star average and review count for the given teachers. Teacher documents
+  /// are not readable cross-user, so this is the only way a student can see a
+  /// teacher's rating.
+  func teacherRatingSummaries(teacherIds: [String]) async throws -> [TeacherRatingSummary] {
+    var data: [String: Any] = [:]
+    if !teacherIds.isEmpty {
+      data["teacherIds"] = teacherIds
+    }
+    let result = try await call(function: "teacherRatingSummary", data: data)
+    let rows = result["ratings"] as? [[String: Any]] ?? []
+    return rows.compactMap { row in
+      guard let teacherId = row["teacherId"] as? String else { return nil }
+      return TeacherRatingSummary(
+        teacherId: teacherId,
+        averageRating: Self.doubleValue(row["averageRating"]) ?? 0,
+        ratingCount: Self.intValue(row["ratingCount"]) ?? 0
+      )
+    }
+  }
+
+  /// One teacher's rating, or the signed-in teacher's own when `teacherId` is
+  /// `nil`. Returns an empty summary rather than throwing when nobody has rated
+  /// them yet.
+  func teacherRatingSummary(teacherId: String? = nil) async throws -> TeacherRatingSummary {
+    let requested = teacherId.map { [$0] } ?? []
+    let summaries = try await teacherRatingSummaries(teacherIds: requested)
+    if let teacherId {
+      return summaries.first(where: { $0.teacherId == teacherId }) ?? .empty(teacherId: teacherId)
+    }
+    return summaries.first ?? .empty(teacherId: "")
   }
 
   // MARK: - Teacher earnings
@@ -545,6 +596,15 @@ final class FunctionsService {
     if let value = value as? Int { return value }
     if let value = value as? Double { return Int(value) }
     if let value = value as? String { return Int(value) }
+    return nil
+  }
+
+  /// Same story as `intValue`, for fields that carry a fraction (a star
+  /// average, for instance).
+  private static func doubleValue(_ value: Any?) -> Double? {
+    if let value = value as? Double { return value }
+    if let value = value as? Int { return Double(value) }
+    if let value = value as? String { return Double(value) }
     return nil
   }
 

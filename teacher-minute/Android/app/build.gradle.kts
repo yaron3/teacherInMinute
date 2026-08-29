@@ -241,4 +241,10 @@ dependencies {
     // Google Pay via Braintree — see AndroidGooglePayManager. Pulls in
     // braintree-core and play-services-wallet transitively.
     implementation("com.braintreepayments.api:google-pay:5.13.0")
+
+    // PayPal via Braintree — see AndroidPayPalManager. Used to confirm a
+    // teacher's PayPal payout account. Unlike Google Pay this is a browser
+    // switch, so it also needs the App Link intent-filter in AndroidManifest
+    // and the assetlinks.json served from Firebase Hosting.
+    implementation("com.braintreepayments.api:paypal:5.13.0")
 }

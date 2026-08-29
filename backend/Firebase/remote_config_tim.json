@@ -6576,6 +6576,221 @@
         }
       },
       "valueType": "STRING"
+    },
+    "review_1": {
+      "defaultValue": {
+        "value": "(1 review)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "(ביקורת אחת)"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_reviews_parens": {
+      "defaultValue": {
+        "value": "(%d reviews)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "(%d ביקורות)"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "reviews_yet": {
+      "defaultValue": {
+        "value": "No reviews yet"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין ביקורות עדיין"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_seconds": {
+      "defaultValue": {
+        "value": "%d seconds"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d שניות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_minutes": {
+      "defaultValue": {
+        "value": "%d minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_sec": {
+      "defaultValue": {
+        "value": "%d sec"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d שנ׳"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "avg_connect": {
+      "defaultValue": {
+        "value": "%@ avg to connect"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%@ בממוצע לחיבור"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "average_response_time": {
+      "defaultValue": {
+        "value": "Average response time: %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זמן תגובה ממוצע: %@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_ai_stuck_connects": {
+      "defaultValue": {
+        "value": "When AI gets stuck, a human teacher connects in %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כש-AI נתקע – מורה אנושי מתחבר תוך %@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "ai_stuck_connects_moments": {
+      "defaultValue": {
+        "value": "When AI gets stuck, a human teacher connects in moments"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כש-AI נתקע – מורה אנושי מתחבר תוך רגעים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_teacher_connects_within": {
+      "defaultValue": {
+        "value": "Teacher connects within %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה מתחבר תוך %@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teacher_connects_quickly": {
+      "defaultValue": {
+        "value": "A teacher connects quickly"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה מתחבר במהירות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_fee_pay": {
+      "defaultValue": {
+        "value": "%@ connection fee • pay only for time used"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%@ דמי חיבור • משלמים רק על הזמן שנוצל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "only_billed_minutes": {
+      "defaultValue": {
+        "value": "Only billed minutes count"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נספרות רק הדקות שחויבו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "not_set_yet": {
+      "defaultValue": {
+        "value": "Not set up yet"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "טרם הוגדר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "add_where_your": {
+      "defaultValue": {
+        "value": "Add where your payouts should be sent"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוסיפו לאן לשלוח את התשלומים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_subject_teacher": {
+      "defaultValue": {
+        "value": "%@ Teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה ל%@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_fee_cents": {
+      "defaultValue": {
+        "value": "50"
+      },
+      "valueType": "NUMBER"
+    },
+    "teacher_1": {
+      "defaultValue": {
+        "value": "1 teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה אחד"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_teachers": {
+      "defaultValue": {
+        "value": "%d teachers"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d מורים"
+        }
+      },
+      "valueType": "STRING"
     }
   }
 }

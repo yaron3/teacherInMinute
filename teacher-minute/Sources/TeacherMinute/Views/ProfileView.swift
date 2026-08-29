@@ -31,7 +31,12 @@ struct ProfileView: View {
   }
   var body: some View {
 	ScrollView(.vertical, showsIndicators: false) {
-      if viewModel.hasDisplayableProfileData {
+      // `isProfileLoaded` is a stored property and is read first deliberately.
+      // Gating only on `hasDisplayableProfileData` — which is computed — left
+      // the body with no direct read of an observable stored property, so on
+      // Android the load mutated `name`/`contactRows` without triggering a
+      // recomposition and the profile stayed blank until the tab was revisited.
+      if viewModel.isProfileLoaded || viewModel.hasDisplayableProfileData {
     VStack(alignment: .leading, spacing: 0) {
       FlatCard(padding: 0, outlined: true) {
         VStack(spacing: 0) {
@@ -87,12 +92,14 @@ struct ProfileView: View {
 			.padding(6)
 			
 			HStack {
-			  PlatformIcon(systemName: "apps.iphone")
+			  PlatformIcon(systemName: viewModel.payoutMethodSystemImage)
 			  VStack(alignment: .leading, spacing: 4) {
-				Text("Bit")
+				Text(viewModel.payoutMethodTitle)
 				  .font(.system(size: 14, weight: .bold))
 				  .foregroundStyle(theme.primaryText)
-				Text("052-445-5556")
+				Text(viewModel.payoutMethodDetail)
+				  .font(.system(size: 13))
+				  .foregroundStyle(viewModel.hasPayoutMethod ? theme.primaryText : theme.secondaryText)
 			  }
 			  Spacer()
 			}
@@ -263,21 +270,17 @@ struct ProfileView: View {
 		  .font(.system(size: 14))
 		  .foregroundStyle(theme.secondaryText)
 
-		if viewModel.rating > 0 {
+		if viewModel.hasRating {
 		  HStack(spacing: 4) {
-			Text(String(format: "%.1f", viewModel.rating))
+			Text(LessonFormatting.ratingText(viewModel.rating))
 			  .font(.system(size: 13, weight: .semibold))
 			  .foregroundStyle(theme.primaryText)
 
-			HStack(spacing: 2) {
-			  ForEach(0..<5, id: \.self) { index in
-				PlatformIcon(
-				  systemName: Double(index) < viewModel.rating ? "star.fill" : "star",
-				  size: 12,
-				  color: Color.yellow
-				)
-			  }
-			}
+			RatingStarsView(rating: viewModel.rating, size: 12)
+
+			Text(viewModel.reviewCountText)
+			  .font(.system(size: 12))
+			  .foregroundStyle(theme.secondaryText)
 		  }
 		}
 	  }
@@ -1118,6 +1121,7 @@ struct ProfileInfoRow: View {
   vm.phoneNumber = "0521234567"
   vm.username = "miri"
   vm.rating = 4.9
+  vm.reviewCount = 128
   vm.subjects = ["Math", "Algebra", "Calculus"]
   vm.grade = "Grade 9, Grade 10, Grade 11"
   vm.hasMissingDocuments = false
@@ -1133,6 +1137,7 @@ struct ProfileInfoRow: View {
   vm.phoneNumber = "0521234567"
   vm.username = "miri"
   vm.rating = 4.9
+  vm.reviewCount = 128
   vm.subjects = ["מתמטיקה", "אלגברה", "חדו\"א"]
   vm.grade = "Grade 9, Grade 10, Grade 11"
   vm.hasMissingDocuments = false

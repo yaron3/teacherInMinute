@@ -2,12 +2,16 @@
 //  PayPalVaultService.swift
 //  teacher-minute
 //
-// Vaults the buyer's PayPal account via Braintree so a later purchase can be
-// charged with no PayPal login — distinct from the plain, always-redirect
-// PayPal checkout used elsewhere (see PaymentMethod.swift / paypal.ts on the
-// backend). `BTPayPalClient`'s standard (non app-switch) flow presents its own
-// `ASWebAuthenticationSession` internally, so there is nothing else in the app
-// to wire up (no URL scheme, no `onOpenURL`).
+// Runs Braintree's PayPal login so an account can be confirmed and vaulted —
+// distinct from the plain, always-redirect PayPal checkout used elsewhere (see
+// PaymentMethod.swift / paypal.ts on the backend).
+//
+// The two platforms reach the same result by different routes:
+//   iOS     — `BTPayPalClient` presents its own `ASWebAuthenticationSession`,
+//             so there is nothing else in the app to wire up.
+//   Android — a browser switch back into the app via an App Link, handled by
+//             AndroidPayPalManager (see also the assetlinks.json served from
+//             Firebase Hosting and the intent-filter in AndroidManifest.xml).
 
 #if canImport(UIKit)
 import UIKit
@@ -42,6 +46,74 @@ final class PayPalVaultService: NSObject {
       throw PayPalVaultServiceError.cancelled
     } catch {
       throw PayPalVaultServiceError.tokenizationFailed(error.localizedDescription)
+    }
+  }
+}
+
+#elseif os(Android)
+import Foundation
+import SkipBridge
+
+@MainActor
+final class PayPalVaultService {
+  static let shared = PayPalVaultService()
+  private init() {}
+
+  enum PayPalVaultServiceError: LocalizedError {
+    case cancelled
+    case tokenizationFailed(String)
+
+    var errorDescription: String? {
+      switch self {
+      case .cancelled: return "Saving PayPal was cancelled."
+      case .tokenizationFailed(let message): return message
+      }
+    }
+  }
+
+  /// Opens PayPal in the browser and returns the resulting nonce once the
+  /// buyer comes back. The Kotlin side blocks until the browser switch
+  /// resolves, so it must run off the main thread.
+  func vaultPayPalAccount(clientToken: String) async throws -> String {
+    let result: String
+    do {
+      result = try await Task.detached(priority: .userInitiated) {
+        try AndroidPayPalBridge.requestVaultNonce(clientToken: clientToken)
+      }.value
+    } catch {
+      throw PayPalVaultServiceError.tokenizationFailed(error.localizedDescription)
+    }
+
+    if result == "cancelled" {
+      throw PayPalVaultServiceError.cancelled
+    }
+    // Kotlin reports success as "success|<nonce>" so a nonce can never be
+    // confused with the cancellation sentinel.
+    guard result.hasPrefix("success|") else {
+      throw PayPalVaultServiceError.tokenizationFailed("Unexpected PayPal result")
+    }
+    let nonce = String(result.dropFirst("success|".count))
+    guard !nonce.isEmpty else {
+      throw PayPalVaultServiceError.tokenizationFailed("PayPal returned an empty nonce")
+    }
+    return nonce
+  }
+}
+
+private enum AndroidPayPalBridge {
+  private static let managerClass = try! JClass(name: "teacher/minute/AndroidPayPalManager")
+  private static let requestVaultNonceMethod = managerClass.getStaticMethodID(
+    name: "requestVaultNonce",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
+
+  static func requestVaultNonce(clientToken: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: requestVaultNonceMethod,
+        options: [.kotlincompat],
+        args: [clientToken.toJavaParameter(options: [.kotlincompat])]
+      )
     }
   }
 }

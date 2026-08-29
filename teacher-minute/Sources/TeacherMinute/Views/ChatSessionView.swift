@@ -117,6 +117,9 @@ struct ChatSessionView: View {
           } else {
             ConnectionSetupView(
               participantName: participantName,
+              // Only the student is waiting on a teacher; a teacher's own
+              // rating is not shown back to them here.
+              participantTeacherId: isStudent ? viewModel.teacherId : "",
               conversationType: conversationType,
               viewModel: viewModel,
               liveKitRoom: liveKitRoom,

@@ -10,6 +10,11 @@ import SwiftUI
 struct MainTabView: View {
   @State var viewModel: MainTabViewModel
   @State var teacherDashboardViewModel: TeacherDashboardViewModel?
+  /// Held here rather than built inside `tabContent`: constructing it in the
+  /// body makes a new instance on every evaluation, so the one the load
+  /// mutates need not be the one the view observes — on Android that showed up
+  /// as the profile only appearing after switching tabs and back.
+  @State var profileViewModel: ProfileViewModel
   @State var hidesTabBar = false
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -19,63 +24,29 @@ struct MainTabView: View {
   init(userMode: AppUserMode = .teacher) {
 	self._viewModel = State(wrappedValue: MainTabViewModel(userMode: userMode))
 	self._teacherDashboardViewModel = State(wrappedValue: userMode == .teacher ? TeacherDashboardViewModel() : nil)
+	self._profileViewModel = State(
+	  wrappedValue: ProfileViewModel(roleType: userMode == .teacher ? .teacher : .student)
+	)
   }
   
   var body: some View {
 	ZStack {
+	  // Driven by `visibleTabs` rather than an `if` around the teacher-only
+	  // Earnings tab: a false branch inside TabView still contributes an empty
+	  // slot under SkipUI, which rendered as a blank tab on Android.
 	  TabView(selection: $viewModel.selectedTab) {
-		tabContent(.home)
-		  .tabItem {
-			Label {
-			  Text(LocalizationSupport.localized("Home"))
-			} icon: {
-			  tabIcon(.home)
-			}
-		  }
-		  .tag(MainTab.home)
-
-		tabContent(.lessons)
-		  .tabItem {
-			Label {
-			  Text(LocalizationSupport.localized("Lessons"))
-			} icon: {
-			  tabIcon(.lessons)
-			}
-		  }
-		  .tag(MainTab.lessons)
-		  .badge(viewModel.shouldShowLessonsBadge ? 1 : 0)
-
-		if viewModel.userMode == .teacher {
-		  tabContent(.earnings)
+		ForEach(viewModel.visibleTabs, id: \.self) { tab in
+		  tabContent(tab)
 			.tabItem {
 			  Label {
-				Text(LocalizationSupport.localized("Earnings"))
+				Text(tab.title)
 			  } icon: {
-				tabIcon(.earnings)
+				tabIcon(tab)
 			  }
 			}
-			.tag(MainTab.earnings)
+			.tag(tab)
+			.badge(viewModel.badgeCount(for: tab))
 		}
-
-		tabContent(.profile)
-		  .tabItem {
-			Label {
-			  Text(LocalizationSupport.localized("Profile"))
-			} icon: {
-			  tabIcon(.profile)
-			}
-		  }
-		  .tag(MainTab.profile)
-
-		tabContent(.settings)
-		  .tabItem {
-			Label {
-			  Text(LocalizationSupport.localized("Settings"))
-			} icon: {
-			  tabIcon(.settings)
-			}
-		  }
-		  .tag(MainTab.settings)
 	  }
 	  .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
 	  // Accent selection instead of the system blue.
@@ -169,7 +140,7 @@ struct MainTabView: View {
 		TeacherEarningsView()
 
 	  case .profile:
-		ProfileView(viewModel: ProfileViewModel(roleType: viewModel.userMode == .teacher ? .teacher : .student))
+		ProfileView(viewModel: profileViewModel)
 		  .trackScreen(AnalyticsScreen.profile)
 		
 	  case .settings:

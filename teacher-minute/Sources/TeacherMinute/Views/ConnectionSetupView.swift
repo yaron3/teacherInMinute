@@ -13,6 +13,7 @@ struct ConnectionSetupView: View {
 
   init(
     participantName: String,
+    participantTeacherId: String = "",
     conversationType: String,
     footerText: String = LocalizationSupport.localized("Your teacher will join shortly"),
     viewModel sessionViewModel: (any ChatSessionViewModeling)? = nil,
@@ -25,6 +26,7 @@ struct ConnectionSetupView: View {
     self._viewModel = State(
       initialValue: ConnectionSetupViewModel(
         participantName: participantName,
+        participantTeacherId: participantTeacherId,
         conversationType: conversationType,
         footerText: footerText,
         sessionViewModel: sessionViewModel,
@@ -51,6 +53,9 @@ struct ConnectionSetupView: View {
     }
     .task(id: viewModel.timerKey) {
       await viewModel.startTimeoutTimer()
+    }
+    .task {
+      await viewModel.loadParticipantRating()
     }
     .trackScreen(AnalyticsScreen.connectionSetup)
   }
@@ -198,16 +203,13 @@ struct ConnectionSetupView: View {
         .font(.system(size: 20, weight: .bold))
         .foregroundStyle(theme.primaryText)
 
-      HStack(spacing: 4) {
-        ForEach(0..<5, id: \.self) { _ in
-          PlatformIcon(systemName: "star.fill", size: 11, weight: .bold, color: theme.ratingStar)
-        }
-        Text(LocalizationSupport.localized("4.9"))
-          .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(theme.primaryText)
-        Text(LocalizationSupport.localized("(127 reviews)"))
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(theme.secondaryText)
+      // Only shown once the teacher has actually been rated — the student is
+      // told who is joining, not sold a score nobody gave.
+      if viewModel.showsRating {
+        RatingSummaryView(
+          rating: viewModel.participantRating,
+          reviewCount: viewModel.participantReviewCount
+        )
       }
     }
   }
