@@ -12,7 +12,7 @@ import {
   HARD_CAP_MINUTES,
   PurchaseDoc,
 } from "./types";
-import { calculateBilling } from "./billing";
+import { calculateBilling, billingStartMillis } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
 import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
 
@@ -255,7 +255,7 @@ async function migrateQuestionToFirestore(
     startedAtMs: number | undefined;
   }
 ): Promise<void> {
-  const { questionRef, rtdbQuestion, studentUid, teacherUid, startedAtMs } = context;
+  const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs, startedAtMs } = context;
   logger.info(
     `[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`
   );
@@ -266,9 +266,11 @@ async function migrateQuestionToFirestore(
   const pricing = await resolveLessonPricing(studentUid, lessonRecord?.data);
   const { currencyCode, pricePerMinute, teacherShare, exchangeRateToUsd } = pricing;
 
-  // Bill from the moment both parties were fully connected (startedAt).
-  // If startLesson was never called the lesson never properly began — charge 0.
-  const billingStartMs = startedAtMs ?? endedAtMs;
+  // Bill from the later of startedAt (both parties connected) and acceptedAt
+  // (teacher accepted) — see billingStartMillis. Falling back to endedAtMs only
+  // when neither exists means a lesson with no usable start bills zero rather
+  // than billing from an unknown point.
+  const billingStartMs = billingStartMillis(startedAtMs, acceptedAtMs) ?? endedAtMs;
 
   const {
     rawSeconds,

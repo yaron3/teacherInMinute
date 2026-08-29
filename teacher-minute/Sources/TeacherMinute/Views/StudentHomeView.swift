@@ -275,9 +275,6 @@ struct StudentHomeView: View {
       Text(LocalizationSupport.localized("minutes"))
         .font(.system(size: 13, weight: .bold))
         .foregroundStyle(theme.onAccentText.opacity(0.65))
-      Text(LessonFormatting.minutesText(viewModel.remainingMinutes))
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(theme.onAccentText.opacity(0.45))
     }
     .frame(width: 92, height: 120)
     .background(theme.cardBackground.opacity(0.2))
@@ -353,8 +350,8 @@ struct StudentHomeView: View {
 
       dashboardInfoCard(
         title: LocalizationSupport.localized("Your Balance"),
-        value: "\(viewModel.remainingMinutes)",
-        detail: LessonFormatting.minutesText(viewModel.remainingMinutes),
+        value: LessonFormatting.minutesText(viewModel.remainingMinutes),
+        detail: LocalizationSupport.localized("Left to learn"),
         systemImage: "creditcard.fill",
         actionTitle: LocalizationSupport.localized("Buy More +"),
         action: selectFirstPricingOption

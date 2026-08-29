@@ -730,8 +730,25 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func refreshAfterLessonEnded() async {
     guard let uid = Auth.auth().currentUser?.uid else { return }
-    await loadRemainingMinutes(uid: uid)
-    await loadRecentLessons(uid: uid)
+
+    // `endLesson` debits the balance in a Firestore transaction that has often
+    // not landed by the time the chat closes, so a single read here showed the
+    // pre-lesson balance until the next pull-to-refresh. Wait for the debit the
+    // same way refreshAfterPurchase waits for a credit.
+    //
+    // A lesson billed at zero minutes never changes the balance, so this always
+    // stops after the last attempt rather than depending on seeing a change.
+    let startingMinutes = remainingMinutes
+    for attempt in 1...5 {
+      await loadRemainingMinutes(uid: uid)
+      await loadRecentLessons(uid: uid)
+      if remainingMinutes < startingMinutes {
+        logger.info("[StudentHome] balance debited after lesson attempt=\(attempt) minutes=\(self.remainingMinutes)")
+        return
+      }
+      try? await Task.sleep(nanoseconds: 1_500_000_000)
+    }
+    logger.info("[StudentHome] balance unchanged after lesson startingMinutes=\(startingMinutes)")
   }
 
   private func refreshAfterPurchase(uid: String, startingMinutes: Int) async -> Bool {

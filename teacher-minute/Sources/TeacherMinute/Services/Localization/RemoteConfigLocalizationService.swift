@@ -250,6 +250,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Bit": "ביט",
         "No earnings yet. Your first lesson will show up here.": "אין עדיין הכנסות. השיעור הראשון שלך יופיע כאן.",
         "Could not load earnings.": "לא ניתן היה לטעון את ההכנסות.",
+        "Left to learn": "נותרו ללימוד",
         // Teacher payout method
         "Payment Method": "אמצעי תשלום",
         "Choose where we should send your monthly payout.": "בחר לאן לשלוח את התשלום החודשי שלך.",
