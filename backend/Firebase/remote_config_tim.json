@@ -6791,6 +6791,45 @@
         }
       },
       "valueType": "STRING"
+    },
+    "confirm_password": {
+      "defaultValue": {
+        "value": "Confirm Password"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אימות סיסמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "re_enter_your_password": {
+      "defaultValue": {
+        "value": "Re-enter your password"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הזן שוב את הסיסמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "passwords_not_match": {
+      "defaultValue": {
+        "value": "Passwords do not match."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הסיסמאות אינן תואמות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "enable_paypal_payout": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN"
     }
   }
 }

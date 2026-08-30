@@ -59,12 +59,46 @@ struct AppTheme {
         )
     }
 
-    /// Text and icons drawn on `accent`, `positive`, `danger`, a video feed or
-    /// any other dark fill. White in both schemes — those fills stay dark.
+    // Three fill families need three different foregrounds — a single "text on
+    // a coloured fill" colour cannot serve them, because the fills do not all
+    // stay dark across schemes. Every pairing below clears 4.5:1.
+    //
+    //   onAccentText  — fills that are deep in light mode and bright in dark:
+    //                   `accent`, `positive`, `danger`.
+    //   onDarkFill    — fills that stay dark in both: `accentStrong`,
+    //                   `ctaBackground`, `videoBackground`, and any
+    //                   accent→accentStrong gradient.
+    //   onBrightFill  — fills that stay bright in both: `warning`, `info`.
+    //
+    // On a pale surface (`accentBackground`, `cardBackground`, …) none of these
+    // apply — use `primaryText`, which is what "readable on the page" means.
+
+    /// Text and icons drawn on `accent`, `positive` or `danger`. Those fills
+    /// inverse across schemes, so this does too: white on the deep light-mode
+    /// fill, black on the bright dark-mode one.
     var onAccentText: Color {
         adaptive(
-		  light: (0, 0,0),
+            light: (255, 255, 255),
+            dark: (0, 0, 0)
+        )
+    }
+
+    /// Text and icons on a fill that is dark in both schemes — `accentStrong`,
+    /// `ctaBackground`, a video feed, or an accent→accentStrong gradient
+    /// (whose dark end stays dark in either scheme).
+    var onDarkFill: Color {
+        adaptive(
+            light: (255, 255, 255),
             dark: (255, 255, 255)
+        )
+    }
+
+    /// Text and icons on a fill that is bright in both schemes — `warning` and
+    /// `info`. White on these is barely 2:1; black clears 6:1.
+    var onBrightFill: Color {
+        adaptive(
+            light: (0, 0, 0),
+            dark: (0, 0, 0)
         )
     }
 
@@ -375,12 +409,8 @@ struct AppTheme {
 	)
   }
   
-  var ctaForeground : Color {
-	adaptive(
-	  light: (255, 255, 255),
-	  dark: (255, 255, 255)
-	)
-  }
+  /// `ctaBackground` is dark in both schemes, so this is exactly `onDarkFill`.
+  var ctaForeground : Color { onDarkFill }
 }
 
 #if os(iOS)
@@ -417,7 +447,9 @@ private struct AppThemePreviewView: View {
                     ("primaryText", theme.primaryText),
                     ("secondaryText", theme.secondaryText),
                     ("invertedText", theme.invertedText),
-                    ("onAccentText", theme.onAccentText)
+                    ("onAccentText", theme.onAccentText),
+                    ("onDarkFill", theme.onDarkFill),
+                    ("onBrightFill", theme.onBrightFill)
                 ])
 
                 section("Surfaces", swatches: [

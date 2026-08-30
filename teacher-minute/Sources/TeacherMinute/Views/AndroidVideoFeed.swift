@@ -83,7 +83,7 @@ struct AndroidVideoFeed: View {
               systemName: isCameraOff ? "video.slash.fill" : "video.fill",
               size: 18,
               weight: .semibold,
-              color: theme.onAccentText
+              color: theme.onDarkFill
             )
           }
       }
@@ -92,7 +92,7 @@ struct AndroidVideoFeed: View {
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .stroke(theme.onAccentText.opacity(0.4), lineWidth: 1)
+        .stroke(theme.onDarkFill.opacity(0.4), lineWidth: 1)
     }
   }
 }

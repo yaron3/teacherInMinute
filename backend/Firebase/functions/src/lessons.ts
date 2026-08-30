@@ -689,6 +689,21 @@ export const rateTeacher = onCall(async (req) => {
   const teacherRef = firestore.collection("teachers").doc(teacherId);
   const ratingRef = teacherRef.collection("ratings").doc(questionId);
 
+  // The live RTDB question is removed only after migrateQuestionToFirestore has
+  // committed `status: "completed"` and `endedAt`, so its presence means the
+  // lesson has not been finalized yet. Rejecting here — rather than letting the
+  // transaction below fail on "Lesson must be completed" — is what lets the app
+  // tell a race apart from a genuine refusal: RateSessionView retries only on a
+  // failed-precondition whose message mentions finalizing.
+  const liveQuestionSnap = await db.ref(`questions/${questionId}`).once("value");
+  if (liveQuestionSnap.exists()) {
+    logger.info(`[lessons] rateTeacher deferred, lesson still finalizing qid=${questionId}`);
+    throw new HttpsError(
+      "failed-precondition",
+      "Lesson is still being finalized. Try rating again in a few seconds"
+    );
+  }
+
   await firestore.runTransaction(async (tx) => {
     const [questionSnap, teacherSnap, existingRatingSnap] = await Promise.all([
       tx.get(questionRef),

@@ -42,6 +42,7 @@ struct TeacherEarningsView: View {
         .sheet(isPresented: $viewModel.isEditingPayoutMethod) {
             TeacherPayoutMethodSheet(
                 method: $viewModel.payoutMethodDraft,
+                availableTypes: viewModel.availablePayoutMethodTypes,
                 banks: viewModel.banks,
                 isSaving: viewModel.isSavingPayoutMethod,
                 errorMessage: viewModel.payoutMethodErrorMessage,

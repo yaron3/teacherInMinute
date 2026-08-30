@@ -829,11 +829,11 @@ struct ChatSessionView: View {
             systemName: "video.slash.fill",
             size: 30,
             weight: .semibold,
-            color: theme.onAccentText.opacity(0.9)
+            color: theme.onDarkFill.opacity(0.9)
           )
           Text(peerPausedMessage)
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(theme.onAccentText)
+            .foregroundStyle(theme.onDarkFill)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 18)
         }
@@ -916,7 +916,7 @@ struct ChatSessionView: View {
               systemName: isCameraOff ? "video.slash.fill" : "video.fill",
               size: 18,
               weight: .semibold,
-              color: theme.onAccentText
+              color: theme.onDarkFill
             )
           }
       }
@@ -925,7 +925,7 @@ struct ChatSessionView: View {
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .stroke(theme.onAccentText.opacity(0.4), lineWidth: 1)
+        .stroke(theme.onDarkFill.opacity(0.4), lineWidth: 1)
     }
   }
 #endif
@@ -952,7 +952,7 @@ struct ChatSessionView: View {
         systemName: systemName,
         size: 13,
         weight: .bold,
-        color: isActive ? theme.onAccentText : theme.primaryText
+        color: isActive ? theme.primaryText : theme.primaryText
       )
       .frame(width: 34, height: 34)
       .background(isActive ? theme.accentBackground : theme.cardBackground)
@@ -963,10 +963,10 @@ struct ChatSessionView: View {
 
   var videoBadge: some View {
     HStack(spacing: 4) {
-      PlatformIcon(systemName: "video.fill", size: 10, weight: .bold, color: theme.onAccentText)
+      PlatformIcon(systemName: "video.fill", size: 10, weight: .bold, color: theme.onBrightFill)
       Text(LocalizationSupport.localized("Video"))
         .font(.system(size: 11, weight: .bold))
-        .foregroundStyle(theme.onAccentText)
+        .foregroundStyle(theme.onBrightFill)
     }
     .padding(.horizontal, 10)
     .frame(height: 26)
@@ -1013,7 +1013,7 @@ struct ChatSessionView: View {
     } label: {
       Text(LocalizationSupport.localized(title))
         .font(.system(size: 12, weight: .bold))
-        .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
+        .foregroundStyle(isSelected ? theme.onDarkFill : theme.primaryText)
         .padding(.horizontal, 14)
         .frame(height: 28)
         .background(isSelected ? theme.accentStrong : theme.cardBackground)
@@ -1071,7 +1071,7 @@ struct ChatSessionView: View {
             .fill(theme.positive)
             .frame(width: 10, height: 10)
             .overlay {
-              Circle().stroke(theme.onAccentText, lineWidth: 2)
+              Circle().stroke(theme.screenBackground, lineWidth: 2)
             }
         }
 

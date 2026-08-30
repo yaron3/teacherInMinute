@@ -54,7 +54,7 @@ struct MathEquationEditorView: View {
                     sendCurrent(exported: exported)
                     modelTick &+= 1
                 } label: {
-                    PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.onAccentText)
+                    PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.onDarkFill)
                         .frame(width: 42, height: 42)
                         .background(
                             LinearGradient(

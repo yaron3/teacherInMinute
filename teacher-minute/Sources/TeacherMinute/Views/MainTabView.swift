@@ -105,7 +105,11 @@ struct MainTabView: View {
 	  Image(systemName: name)
 		.environment(\.symbolVariants, .none)
 #else
-	  Image(systemName: name)
+	  // SkipUI maps only a subset of SF Symbols and draws a warning triangle
+	  // for the rest — which is what "dollarsign.circle" was rendering as. Go
+	  // through PlatformIcon so Android uses the app's own icon table, the
+	  // same as every other icon in the app.
+	  PlatformIcon(systemName: name, size: 22)
 #endif
 	}
   }

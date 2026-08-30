@@ -88,6 +88,22 @@ final class TeacherEarningsViewModel {
     /// The banks the backend will accept, for the form's picker.
     var banks: [PayoutBank] = []
 
+    /// Whether PayPal is offered as a payout destination, from Remote Config
+    /// (`enable_paypal_payout`). Off unless explicitly enabled.
+    private var isPayPalPayoutEnabled = false
+
+    /// The destinations the form offers. PayPal appears only when enabled —
+    /// except for a teacher who already has one saved, who would otherwise see
+    /// a picker with no tab selected and could not tell what is on file.
+    var availablePayoutMethodTypes: [PayoutMethodType] {
+        PayoutMethodType.allCases.filter { type in
+            guard type == .paypal else { return true }
+            return isPayPalPayoutEnabled
+                || payoutMethod?.type == .paypal
+                || payoutMethodDraft.type == .paypal
+        }
+    }
+
     /// The phone number already on the teacher's profile, if any.
     var profilePhone: String = ""
     /// Set after saving a Bit number that differs from the profile, to ask
@@ -144,6 +160,8 @@ final class TeacherEarningsViewModel {
             errorMessage = LocalizationSupport.localized("Could not load earnings.")
             return
         }
+
+        isPayPalPayoutEnabled = await SettingsRemoteConfigService.shared.fetchIsPayPalPayoutEnabled()
 
         do {
             let summary = try await FunctionsService.shared.teacherEarningsSummary()

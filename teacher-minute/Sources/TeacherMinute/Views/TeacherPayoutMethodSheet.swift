@@ -11,6 +11,9 @@ import SwiftUI
 
 struct TeacherPayoutMethodSheet: View {
   @Binding var method: TeacherPayoutMethod
+  /// Which destinations to offer. PayPal is gated behind a Remote Config flag,
+  /// so this is not always every `PayoutMethodType`.
+  let availableTypes: [PayoutMethodType]
   let banks: [PayoutBank]
   let isSaving: Bool
   let errorMessage: String?
@@ -84,7 +87,7 @@ struct TeacherPayoutMethodSheet: View {
 
   var typePicker: some View {
     HStack(spacing: 0) {
-      ForEach(PayoutMethodType.allCases) { type in
+      ForEach(availableTypes) { type in
         typeTab(type)
       }
     }
@@ -95,6 +98,10 @@ struct TeacherPayoutMethodSheet: View {
 
   func typeTab(_ type: PayoutMethodType) -> some View {
     let isSelected = method.type == type
+    // The selected tab sits on the saturated `accent` fill, so its label needs
+    // a colour that stays light in both schemes. `onAccentText` is not it: its
+    // light value is black, which leaves near-unreadable dark text on indigo.
+    let selectedForeground = theme.ctaForeground
     return Button {
       method.type = type
     } label: {
@@ -103,11 +110,11 @@ struct TeacherPayoutMethodSheet: View {
           systemName: type.systemImage,
           size: 13,
           weight: .semibold,
-          color: isSelected ? theme.onAccentText : theme.secondaryText
+          color: isSelected ? selectedForeground : theme.secondaryText
         )
         Text(type.displayName)
           .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(isSelected ? theme.onAccentText : theme.secondaryText)
+          .foregroundStyle(isSelected ? selectedForeground : theme.secondaryText)
           .lineLimit(1)
           .minimumScaleFactor(0.8)
       }
@@ -177,7 +184,7 @@ struct TeacherPayoutMethodSheet: View {
             } label: {
               Text(bank.displayName)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
+                .foregroundStyle(isSelected ? theme.primaryText : theme.primaryText)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(isSelected ? theme.accent : theme.cardBackground)

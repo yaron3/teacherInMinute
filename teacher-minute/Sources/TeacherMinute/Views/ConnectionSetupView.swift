@@ -227,7 +227,7 @@ struct ConnectionSetupView: View {
         .frame(width: 62, height: 104)
         .rotationEffect(.degrees(capsuleRotation))
         .overlay {
-          PlatformIcon(systemName: "wifi", size: 20, weight: .bold, color: theme.onAccentText)
+          PlatformIcon(systemName: "wifi", size: 20, weight: .bold, color: theme.onDarkFill)
         }
         .task {
           withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
@@ -331,7 +331,7 @@ struct ConnectionSetupView: View {
 
       Button(action: action) {
         HStack(spacing: 8) {
-          PlatformIcon(systemName: buttonIcon, size: 11, weight: .bold, color: theme.onAccentText)
+          PlatformIcon(systemName: buttonIcon, size: 11, weight: .bold, color: theme.onBrightFill)
           Text(buttonTitle)
             .font(.system(size: 13, weight: .bold))
         }

@@ -214,10 +214,10 @@ struct StudentHomeView: View {
   var studentHero: some View {
     VStack(spacing: 0) {
       HStack(spacing: 12) {
-		PlatformIcon(systemName: "books.vertical.fill", size: 19, weight: .semibold, color: theme.onAccentText)
+		PlatformIcon(systemName: "books.vertical.fill", size: 19, weight: .semibold, color: theme.primaryText)
           Text(LocalizationSupport.localized("Teacher in a Moment"))
             .font(.system(size: 18, weight: .bold))
-            .foregroundStyle(theme.onAccentText)
+            .foregroundStyle(theme.primaryText)
           
 		Spacer()
         }
@@ -236,13 +236,13 @@ struct StudentHomeView: View {
 
             Text(LocalizationSupport.localized("Teacher in a Moment"))
               .font(.system(size: 36, weight: .bold))
-              .foregroundStyle(theme.onAccentText)
+              .foregroundStyle(theme.primaryText)
               .lineLimit(2)
               .minimumScaleFactor(0.75)
 
             Text(viewModel.connectPromiseText)
               .font(.system(size: 15, weight: .semibold))
-              .foregroundStyle(theme.onAccentText.opacity(0.65))
+              .foregroundStyle(theme.primaryText.opacity(0.65))
               .lineLimit(2)
           }
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -256,7 +256,7 @@ struct StudentHomeView: View {
         if !viewModel.connectionFeeText.isEmpty {
           Text(viewModel.connectionFeeText)
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(theme.onAccentText.opacity(0.55))
+            .foregroundStyle(theme.primaryText.opacity(0.55))
             .frame(maxWidth: .infinity, alignment: .center)
         }
       }
@@ -274,7 +274,7 @@ struct StudentHomeView: View {
         .foregroundStyle(theme.warning)
       Text(LocalizationSupport.localized("minutes"))
         .font(.system(size: 13, weight: .bold))
-        .foregroundStyle(theme.onAccentText.opacity(0.65))
+        .foregroundStyle(theme.primaryText.opacity(0.65))
     }
     .frame(width: 92, height: 120)
     .background(theme.cardBackground.opacity(0.2))
@@ -331,7 +331,7 @@ struct StudentHomeView: View {
       if !viewModel.averageConnectText.isEmpty {
         Text(viewModel.averageConnectText)
           .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(theme.onAccentText.opacity(0.55))
+          .foregroundStyle(theme.primaryText.opacity(0.55))
       }
     }
     .padding(.horizontal, 14)
@@ -429,8 +429,16 @@ struct StudentHomeView: View {
     }
   }
 
-  var onlineTeacherTints: [Color] {
-    [theme.accent, theme.warning, theme.positive, theme.info]
+  /// Fill plus the foreground that is actually readable on it — `warning` and
+  /// `info` are bright in both schemes and need dark ink, while `accent` and
+  /// `positive` invert across schemes.
+  var onlineTeacherTints: [(fill: Color, foreground: Color)] {
+    [
+      (theme.accent, theme.onAccentText),
+      (theme.warning, theme.onBrightFill),
+      (theme.positive, theme.onAccentText),
+      (theme.info, theme.onBrightFill),
+    ]
   }
 
   var onlineTeachersGrid: some View {
@@ -444,11 +452,13 @@ struct StudentHomeView: View {
         } else {
           ForEach(teachers) { teacher in
             let index = teachers.firstIndex(where: { $0.id == teacher.id }) ?? 0
+            let tint = onlineTeacherTints[index % onlineTeacherTints.count]
             onlineTeacherCard(
               name: teacher.name,
               subject: teacher.subject,
               initial: teacher.initial,
-              tint: onlineTeacherTints[index % onlineTeacherTints.count]
+              tint: tint.fill,
+              tintForeground: tint.foreground
             )
             .frame(width: 155)
           }
@@ -461,7 +471,7 @@ struct StudentHomeView: View {
     VStack(alignment: .leading, spacing: 22) {
       Text(LocalizationSupport.localized("How it works"))
         .font(.system(size: 24, weight: .bold))
-        .foregroundStyle(theme.onAccentText)
+        .foregroundStyle(theme.onDarkFill)
 		.frame(maxWidth: .infinity, alignment: .leading)
 
       VStack(spacing: 24) {
@@ -512,13 +522,13 @@ struct StudentHomeView: View {
       VStack(alignment: .leading, spacing: 6) {
         Text(title)
           .font(.system(size: 18, weight: .bold))
-          .foregroundStyle(theme.onAccentText)
+          .foregroundStyle(theme.onDarkFill)
           .lineLimit(2)
           .minimumScaleFactor(0.82)
 
         Text(subtitle)
           .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(theme.onAccentText.opacity(0.6))
+          .foregroundStyle(theme.onDarkFill.opacity(0.6))
           .lineLimit(2)
           .minimumScaleFactor(0.82)
       }
@@ -693,7 +703,7 @@ struct StudentHomeView: View {
     }
   }
 
-  func onlineTeacherCard(name: String, subject: String, initial: String, tint: Color) -> some View {
+  func onlineTeacherCard(name: String, subject: String, initial: String, tint: Color, tintForeground: Color) -> some View {
     FlatCard(outlined: true) {
       VStack(alignment: .center, spacing: 10) {
         ZStack(alignment: .bottomTrailing) {
@@ -703,7 +713,7 @@ struct StudentHomeView: View {
             .overlay {
               Text(initial)
                 .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(theme.onAccentText)
+                .foregroundStyle(tintForeground)
             }
           Circle()
             .fill(theme.positive)
@@ -1197,6 +1207,14 @@ struct ConversationTypeChip: View {
 	  case .teal: return theme.info
 	}
   }
+  /// Readable on `accentColor`: `info` is bright in both schemes, `accent`
+  /// inverts across them.
+  var accentForeground: Color {
+	switch accent {
+	  case .pink: return theme.onAccentText
+	  case .teal: return theme.onBrightFill
+	}
+  }
   var body: some View {
 	Button(action: action) {
 	  HStack(spacing: 6) {
@@ -1205,12 +1223,12 @@ struct ConversationTypeChip: View {
 			systemName: icon,
 			size: 12,
 			weight: .semibold,
-			color: isSelected ? theme.onAccentText : theme.primaryText
+			color: isSelected ? accentForeground : theme.primaryText
 		  )
 		}
 		Text(LocalizationSupport.localized(title))
 		  .font(.system(size: 12, weight: .semibold))
-		  .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
+		  .foregroundStyle(isSelected ? accentForeground : theme.primaryText)
 		  .lineLimit(1)
 		  .minimumScaleFactor(0.75)
 	  }

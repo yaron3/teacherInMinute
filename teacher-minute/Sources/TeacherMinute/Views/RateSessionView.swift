@@ -64,7 +64,7 @@ struct RateSessionView: View {
             .overlay {
               PlatformIcon(systemName: "checkmark")
                 .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(theme.onAccentText)
+                .foregroundStyle(theme.onDarkFill)
             }
             .padding(.top, 8)
 
@@ -149,11 +149,11 @@ struct RateSessionView: View {
           Spacer()
           if isSending {
             ProgressView()
-              .tint(theme.onAccentText)
+              .tint(theme.onDarkFill)
           } else {
             Text(LocalizationSupport.localized("Send"))
               .font(.system(size: 16, weight: .bold))
-              .foregroundStyle(theme.onAccentText)
+              .foregroundStyle(theme.onDarkFill)
           }
           Spacer()
         }

@@ -15,6 +15,7 @@
 
 #if canImport(UIKit)
 import UIKit
+import BraintreeCore
 import BraintreePayPal
 
 @MainActor
@@ -44,9 +45,48 @@ final class PayPalVaultService: NSObject {
       return nonce.nonce
     } catch BTPayPalError.canceled {
       throw PayPalVaultServiceError.cancelled
+    } catch let error as BTPayPalError {
+      let message = Self.gatewayMessage(from: error)
+      logger.error("[PayPalVault] tokenize failed: \(message)")
+      throw PayPalVaultServiceError.tokenizationFailed(message)
     } catch {
+      logger.error("[PayPalVault] tokenize failed: \(error.localizedDescription)")
       throw PayPalVaultServiceError.tokenizationFailed(error.localizedDescription)
     }
+  }
+
+  /// Braintree's own message for a failed *vault* flow is unreadable:
+  /// BTPayPalClient takes its detail from `paymentResource.errorDetails.issue`,
+  /// a key only the checkout flow returns, so a billing-agreement failure falls
+  /// through to interpolating the whole response dictionary into the message —
+  /// every header and no reason.
+  ///
+  /// The gateway's own explanation rides along in that dictionary, but it has
+  /// to be read off the enum's payload: `BTPayPalError` conforms to
+  /// `CustomNSError` without implementing `errorUserInfo`, so bridging it to
+  /// `NSError` yields an empty `userInfo` and loses the body entirely.
+  private static func gatewayMessage(from error: BTPayPalError) -> String {
+    guard case .httpPostRequestError(let info) = error,
+          let body = info[BTCoreConstants.jsonResponseBodyKey] as? BTJSON
+    else {
+      return error.localizedDescription
+    }
+
+    let reason = body["error"]["developer_message"].asString()
+      ?? body["error"]["message"].asString()
+      ?? body["agreementSetup"]["errorDetails"][0]["issue"].asString()
+      ?? body["errors"][0]["message"].asString()
+
+    if let reason, !reason.isEmpty {
+      return reason
+    }
+
+    // An unfamiliar shape: show the body itself rather than the headers, so the
+    // failure is still diagnosable from the console.
+    if let raw = body.asDictionary() {
+      return "\(raw)"
+    }
+    return error.localizedDescription
   }
 }
 

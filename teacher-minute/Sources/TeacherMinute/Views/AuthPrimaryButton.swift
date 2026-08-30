@@ -29,7 +29,9 @@ struct AuthPrimaryButton: View {
                 }
             }
             .font(.system(size: 17, weight: .bold))
-            .foregroundStyle(theme.onAccentText)
+            // Disabled drops the accent fill for a pale card, which the
+            // on-accent colour is not readable against.
+            .foregroundStyle(isEnabled ? theme.onAccentText : theme.secondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 54)
             .background(isEnabled ? theme.accent : theme.cardBackground)

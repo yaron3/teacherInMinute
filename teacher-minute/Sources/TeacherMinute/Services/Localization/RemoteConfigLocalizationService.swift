@@ -190,6 +190,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "%@ connection fee • pay only for time used": "%@ דמי חיבור • משלמים רק על הזמן שנוצל",
         "Only billed minutes count": "נספרות רק הדקות שחויבו",
         "1 teacher": "מורה אחד",
+        // Sign-up confirm password field
+        "Confirm Password": "אימות סיסמה",
+        "Re-enter your password": "הזן שוב את הסיסמה",
+        "Passwords do not match.": "הסיסמאות אינן תואמות.",
         "%d teachers": "%d מורים",
         // Teacher payout method on the profile screen
         "Not set up yet": "טרם הוגדר",
@@ -325,6 +329,9 @@ enum LocalizationKey {
         "When AI gets stuck, a human teacher connects in moments": "ai_stuck_connects_moments",
         "%@ Teacher": "fmt_subject_teacher",
         "1 teacher": "teacher_1",
+        // "Re-enter your password" would generate `enter_your_password`, which
+        // the published template already uses for "Enter your password".
+        "Re-enter your password": "re_enter_your_password",
         "%d teachers": "fmt_teachers",
         // The published `teacher_connects_within` still holds the old fixed
         // "Teacher connects within 90 sec"; the format string needs its own key
