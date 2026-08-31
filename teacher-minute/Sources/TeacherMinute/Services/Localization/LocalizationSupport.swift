@@ -17,8 +17,8 @@ enum LocalizationSupport {
         preferredLanguageCode
     }
 
-    static func localized(_ key: String) -> String {
-        RemoteConfigLocalizationService().localized(key)
+   static func localized(_ key: String) -> String {
+	  RemoteConfigLocalizationService.shared.localized(key)
     }
 
     /// Display label for a canonical grade value such as `"Grade 7"`.
@@ -27,7 +27,7 @@ enum LocalizationSupport {
     /// when the user switches language. Each grade has its own translation key
     /// (`grade_1`...`grade_12`) because Hebrew numbers them with letters rather
     /// than digits, so a single format string could not produce them.
-    static func localizedGradeLabel(_ canonicalGrade: String) -> String {
+  @MainActor static func localizedGradeLabel(_ canonicalGrade: String) -> String {
         localized(canonicalGrade)
     }
 

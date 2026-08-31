@@ -46,6 +46,11 @@ struct LocalizationServiceMock: LocalizationServiceProtocol {
   
 }
 struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
+	
+  nonisolated(unsafe) static let shared:LocalizationServiceProtocol = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? LocalizationServiceMock() : RemoteConfigLocalizationService()
+  private init() {
+	
+  }
     func localized(_ english: String) -> String {
         let languageCode = LocalizationSupport.currentLanguageCode
         let cacheKey = "\(languageCode)|\(english)"
