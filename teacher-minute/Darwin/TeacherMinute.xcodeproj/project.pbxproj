@@ -293,7 +293,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
+				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera for profile photos, identity verification, and live lessons.";
@@ -303,7 +303,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.4;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
 			};
@@ -316,7 +316,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Teacher in a Minute";
+				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera for profile photos, identity verification, and live lessons.";
@@ -326,7 +326,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.4;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
 			};

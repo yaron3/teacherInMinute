@@ -36,7 +36,7 @@ struct WelcomeView: View {
             .lineSpacing(-4)
             .padding(.top, 42)
           
-          Image("student")
+          Image("LaunchIcon")
             .resizable()
             .scaledToFit()
             .padding(.top, 32)
@@ -87,18 +87,10 @@ struct WelcomeView: View {
   
   private var header: some View {
 	HStack(spacing: 12) {
-	  RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
-		.fill(theme.screenBackground)
-		.frame(width: 34, height: 34)
-		.overlay {
-		  PlatformIcon(
-			systemName: "graduationcap.fill",
-			size: 15,
-			weight: .semibold,
-			color: theme.primaryText
-		  )
-		}
-	  
+
+	  Image("AppIcon", bundle: .module)
+		.resizable()
+		.frame(width: 30, height: 30)
 	  Text(LocalizationSupport.localized("Teacher in a Minute"))
 		.font(.system(size: 16, weight: .semibold))
 		.foregroundStyle(theme.primaryText)

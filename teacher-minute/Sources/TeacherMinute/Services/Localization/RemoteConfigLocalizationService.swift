@@ -38,6 +38,13 @@ private final class LocalizationCache: @unchecked Sendable {
     }
 }
 
+struct LocalizationServiceMock: LocalizationServiceProtocol {
+  func localized(_ english: String) -> String {
+	return english
+  }
+  
+  
+}
 struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
     func localized(_ english: String) -> String {
         let languageCode = LocalizationSupport.currentLanguageCode
@@ -68,7 +75,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
     private static func localFallback(for english: String, languageCode: String) -> String? {
         guard languageCode == "he" else { return nil }
         return hebrewFallbacks[english]
-    }
+    } 
 
     private static let hebrewFallbacks: [String: String] = [
         // Teacher dashboard and lesson history. The Remote Config template has

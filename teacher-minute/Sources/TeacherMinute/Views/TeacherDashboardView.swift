@@ -10,20 +10,21 @@ import SwiftUI
 
 @MainActor
 struct TeacherDashboardView: View {
-  @State var viewModel: TeacherDashboardViewModel
+  @State var viewModel: any TeacherDashboardViewModeling
   @Binding var hidesTabBar: Bool
   let showsSessionOverlay: Bool
   let showsIncomingOverlay: Bool
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
   @State var showsMessages = false
-  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
+  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? "en" : SettingsLanguageChoice.system.rawValue
+  //@AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
   init(
-	viewModel: TeacherDashboardViewModel = TeacherDashboardViewModel(),
+	viewModel: any TeacherDashboardViewModeling = TeacherDashboardViewModel(),
 	hidesTabBar: Binding<Bool> = .constant(false),
 	showsSessionOverlay: Bool = true,
 	showsIncomingOverlay: Bool = true
@@ -72,8 +73,14 @@ struct TeacherDashboardView: View {
 	  ZStack {
 		ScrollView(.vertical, showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 0) {
-			teacherHeader
-			  .padding(.top, 16)
+			FlatTopHeader(
+			  eyebrow: LocalizationSupport.localized("Teacher"),
+			  name: viewModel.teacherName,
+			  avatarImageURL: viewModel.teacherImageURL,
+			  avatarSystemImage: "person.crop.circle.fill",
+			  showNotificationBadge: false
+			)
+			.padding(.top, 16)
 
 			statusToggleCard
 			  .padding(.top, 20)
@@ -124,7 +131,7 @@ struct TeacherDashboardView: View {
 	  .sheet(isPresented: $showsMessages) {
 		NotificationMessagesView()
 	  }
-	  .sheet(isPresented: $viewModel.showsSubjectEditor, onDismiss: {
+	  .sheet(isPresented: Binding(get: { viewModel.showsSubjectEditor }, set: { viewModel.showsSubjectEditor = $0 }), onDismiss: {
 		viewModel.reloadSubjects()
 	  }) {
 		NavigationStack {
@@ -155,6 +162,7 @@ struct TeacherDashboardView: View {
 		.id(languagePreference)
 	  }
 	  .onAppear {
+		guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
 		Task {
 		  if await TeacherDocumentsPromptStore.shouldPresentSuggestion() {
 			showsDocumentsSuggestion = true
@@ -167,7 +175,6 @@ struct TeacherDashboardView: View {
 
   var teacherHeader: some View {
 	HStack(alignment: .center, spacing: 14) {
-	  ZStack(alignment: .topTrailing) {
 		ProfileAvatarView(
 		  imageURL: viewModel.teacherImageURL,
 		  size: 72,
@@ -176,27 +183,8 @@ struct TeacherDashboardView: View {
 		  tint: theme.primaryText
 		)
 
-		Button {
-		  showsMessages = true
-		} label: {
-		  ZStack {
-			Circle()
-			  .fill(theme.cardBackground)
-			  .frame(width: 20, height: 20)
-			  .overlay {
-				Circle()
-				  .stroke(theme.screenBackground, lineWidth: 2)
-			  }
-			PlatformIcon(systemName: "bell.fill", size: 9, weight: .medium, color: theme.primaryText)
-		  }
-		}
-		.buttonStyle(.plain)
-		.offset(x: 4, y: -4)
-	  }
-
-	  Spacer()
-
-	  VStack(alignment: .trailing, spacing: 4) {
+  
+	  VStack(alignment: .leading, spacing: 4) {
 		Text(LocalizationSupport.localized("Teacher Dashboard"))
 		  .font(.system(size: 12, weight: .semibold))
 		  .foregroundStyle(theme.accent)
@@ -204,39 +192,53 @@ struct TeacherDashboardView: View {
 		Text(viewModel.teacherName)
 		  .font(.system(size: 22, weight: .bold))
 		  .foregroundStyle(theme.primaryText)
-		  .multilineTextAlignment(.trailing)
+		  .multilineTextAlignment(.leading)
 	  }
+	  Spacer()
+	  Button {
+		showsMessages = true
+	  } label: {
+		ZStack {
+		  Circle()
+			.fill(theme.cardBackground)
+			.frame(width: 20, height: 20)
+			.overlay {
+			  Circle()
+				.stroke(theme.screenBackground, lineWidth: 2)
+			}
+		  PlatformIcon(systemName: "bell", size: 20, weight: .medium, color: theme.primaryText)
+		}
+	  }
+	  .buttonStyle(.plain)
+
 	}
   }
 
   var statusToggleCard: some View {
 	HStack(spacing: 16) {
-	  Toggle("", isOn: Binding(
-		get: { viewModel.isOnline },
-		set: { _ in viewModel.toggleOnline() }
-	  ))
-	  .labelsHidden()
 
-	  Spacer()
-
-	  VStack(alignment: .trailing, spacing: 4) {
-		HStack(spacing: 6) {
+	  VStack(alignment: .leading, spacing: 4) {
 		  Text(viewModel.isOnline
 			   ? LocalizationSupport.localized("Available")
 			   : LocalizationSupport.localized("Not available"))
 			.font(.system(size: 14, weight: .semibold))
 			.foregroundStyle(theme.primaryText)
-		  Circle()
-			.fill(viewModel.isOnline ? theme.positive : theme.primaryText)
-			.frame(width: 8, height: 8)
-		}
+		  
+		
 		Text(viewModel.isOnline
 			 ? LocalizationSupport.localized("Waiting for students...")
 			 : LocalizationSupport.localized("Tap to start"))
 		  .font(.system(size: 12))
 		  .foregroundStyle(theme.secondaryText)
-		  .frame(maxWidth: .infinity, alignment: .trailing)
+		  .frame(maxWidth: .infinity, alignment: .leading)
 	  }
+	  Spacer()
+
+	  Toggle("", isOn: Binding(
+		get: { viewModel.isOnline },
+		set: { _ in viewModel.toggleOnline() }
+	  ))
+	  .labelsHidden()
 	}
 	.padding(16)
 	.background(theme.cardBackground)
@@ -275,27 +277,30 @@ struct TeacherDashboardView: View {
 
   var ratingSection: some View {
 	FlatCard {
-	  VStack(alignment: .trailing, spacing: 8) {
-		Text(LocalizationSupport.localized("My Rating"))
-		  .font(.system(size: 14, weight: .semibold))
-		  .foregroundStyle(theme.primaryText)
-		  .frame(maxWidth: .infinity, alignment: .trailing)
-
-		HStack(spacing: 8) {
+	  VStack(alignment: .leading, spacing: 8) {
+		HStack {
+		  Text(LocalizationSupport.localized("My Rating"))
+			.font(.system(size: 14, weight: .semibold))
+			.foregroundStyle(theme.primaryText)
+			.frame(maxWidth: .infinity, alignment: .leading)
+		  Spacer()
 		  Text(viewModel.reviewCountText)
 			.font(.system(size: 13))
 			.foregroundStyle(theme.secondaryText)
-
-		  Spacer()
+		}
+	  
 
 		  // Until someone has rated this teacher there is no score to draw, and
 		  // five empty stars would read as a rating of zero.
-		  if viewModel.hasRating {
+		if viewModel.hasRating {
+		  HStack {
+			Spacer()
 			RatingStarsView(rating: viewModel.teacherRating, size: 16, filledColor: theme.warning)
-
+			
 			Text(viewModel.ratingText)
 			  .font(.system(size: 15, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
+			Spacer()
 		  }
 		}
 	  }
@@ -327,13 +332,16 @@ struct TeacherDashboardView: View {
 
 		  Spacer()
 		}
-
-		Button {
-		  viewModel.editSubjects()
-		} label: {
-		  FlatChip(title: LocalizationSupport.localized("Edit Subjects"), systemImage: "pencil", outlined: true)
+		HStack {
+		  Spacer()
+		  Button {
+			viewModel.editSubjects()
+		  } label: {
+			FlatChip(title: LocalizationSupport.localized("Edit Subjects"), systemImage: "pencil", outlined: true)
+		  }
+		  .buttonStyle(.plain)
+		  Spacer()
 		}
-		.buttonStyle(.plain)
 	  }
 	}
   }
@@ -776,7 +784,7 @@ struct TeacherDashboardView: View {
 }
 struct TeacherIncomingQuestionOverlay: View {
   let inviteID: String
-  let viewModel: TeacherDashboardViewModel
+  let viewModel: any TeacherDashboardViewModeling
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -814,3 +822,21 @@ struct TeacherIncomingQuestionOverlay: View {
 	.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
   }
 }
+
+#if os(iOS)
+#Preview("Offline") {
+  TeacherDashboardView(
+    viewModel: MockTeacherDashboardViewModel(),
+    showsSessionOverlay: false,
+    showsIncomingOverlay: false
+  )
+}
+
+#Preview("Online — Live Queue") {
+  TeacherDashboardView(
+    viewModel: MockTeacherDashboardViewModel(isOnline: true),
+    showsSessionOverlay: false,
+    showsIncomingOverlay: false
+  )
+}
+#endif

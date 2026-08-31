@@ -116,7 +116,7 @@ struct AppTheme {
     var cardBackground: Color {
         adaptive(
             light: (242, 242, 244),
-            dark: (25, 25, 28)
+            dark: (30, 30, 30)
         )
     }
 
@@ -159,8 +159,8 @@ struct AppTheme {
     /// Primary action fill, selected state, highlight.
     var accent: Color {
         adaptive(
-            light: (67, 75, 214),
-            dark: (100, 100, 255)
+            light: (47, 53, 255),
+            dark: (100, 200, 255)
         )
     }
 

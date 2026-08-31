@@ -774,7 +774,7 @@
     },
     "log_teacher_minute": {
       "defaultValue": {
-        "value": "Log in to Teacher in a Minute to continue your\njourney."
+        "value": "Log in to Instant Teacher to continue your\njourney."
       },
       "conditionalValues": {
         "Hebrew": {
@@ -1385,11 +1385,11 @@
     },
     "teacher_minute": {
       "defaultValue": {
-        "value": "Teacher in a Minute"
+        "value": "Instant Teacher"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "Teacher in a Minute"
+          "value": "Instant Teacher"
         }
       },
       "valueType": "STRING"
@@ -1429,7 +1429,7 @@
     },
     "send_occasional_updates_tim_b": {
       "defaultValue": {
-        "value": "Send me occasional updates and tips about\\nTeacher in a Minute."
+        "value": "Send me occasional updates and tips about\\nInstant Teacher."
       },
       "conditionalValues": {
         "Hebrew": {
@@ -1661,11 +1661,11 @@
     },
     "send_occasional_updates_tim_a": {
       "defaultValue": {
-        "value": "Send me occasional updates and tips about\nTeacher in a Minute."
+        "value": "Send me occasional updates and tips about\nInstant Teacher."
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nTeacher in a Minute."
+          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nInstant Teacher."
         }
       },
       "valueType": "STRING"
@@ -2572,11 +2572,11 @@
     },
     "tell_bit_about_tim": {
       "defaultValue": {
-        "value": "Tell us a bit about yourself to get started with\nTeacher in a Minute."
+        "value": "Tell us a bit about yourself to get started with\nInstant Teacher."
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nTeacher in a Minute."
+          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nInstant Teacher."
         }
       },
       "valueType": "STRING"
@@ -3635,11 +3635,11 @@
     },
     "send_occasional_updates_tim_a": {
       "defaultValue": {
-        "value": "Send me occasional updates and tips about\nTeacher in a Minute."
+        "value": "Send me occasional updates and tips about\nInstant Teacher."
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nTeacher in a Minute."
+          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nInstant Teacher."
         }
       },
       "valueType": "STRING"
@@ -5145,7 +5145,7 @@
     },
     "log_teacher_minute": {
       "defaultValue": {
-        "value": "Log in to Teacher in a Minute to continue your\njourney."
+        "value": "Log in to Instant Teacher to continue your\njourney."
       },
       "conditionalValues": {
         "Hebrew": {
@@ -5365,7 +5365,7 @@
     },
     "send_occasional_updates_tim_b": {
       "defaultValue": {
-        "value": "Send me occasional updates and tips about\\nTeacher in a Minute."
+        "value": "Send me occasional updates and tips about\\nInstant Teacher."
       },
       "conditionalValues": {
         "Hebrew": {
@@ -5459,11 +5459,11 @@
     },
     "how_you_want_tim": {
       "defaultValue": {
-        "value": "How do you want to use Teacher in a Minute? You\ncan change this later in settings."
+        "value": "How do you want to use Instant Teacher? You\ncan change this later in settings."
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "איך תרצה להשתמש ב־Teacher in a Minute? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
+          "value": "איך תרצה להשתמש ב־Instant Teacher? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
         }
       },
       "valueType": "STRING"
@@ -5492,11 +5492,11 @@
     },
     "tell_bit_about_tim": {
       "defaultValue": {
-        "value": "Tell us a bit about yourself to get started with\nTeacher in a Minute."
+        "value": "Tell us a bit about yourself to get started with\nInstant Teacher."
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nTeacher in a Minute."
+          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nInstant Teacher."
         }
       },
       "valueType": "STRING"
@@ -6259,11 +6259,11 @@
     },
     "teacher_minute_app": {
       "defaultValue": {
-        "value": "Teacher in a Minute App"
+        "value": "Instant Teacher App"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "אפליקציית מורה בדקה"
+          "value": "אפליקציית מורה ברגע"
         }
       },
       "valueType": "STRING"
@@ -6276,11 +6276,11 @@
     },
     "how_you_want_tim": {
       "defaultValue": {
-        "value": "How do you want to use Teacher in a Minute? You\ncan change this later in settings."
+        "value": "How do you want to use Instant Teacher? You\ncan change this later in settings."
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "איך תרצה להשתמש ב־Teacher in a Minute? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
+          "value": "איך תרצה להשתמש ב־Instant Teacher? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
         }
       },
       "valueType": "STRING"

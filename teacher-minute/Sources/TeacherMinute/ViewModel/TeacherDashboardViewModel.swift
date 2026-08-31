@@ -16,11 +16,75 @@ import AVFoundation
 import SkipFirebaseAuth
 #endif
 
+// MARK: - Protocol
+
+@MainActor
+protocol TeacherDashboardViewModeling: AnyObject {
+  var teacherName: String { get set }
+  var teacherImageURL: String { get set }
+  var isOnline: Bool { get set }
+  var inviteIDs: [String] { get set }
+  var inviteTopics: [String: String] { get set }
+  var inviteTexts: [String: String] { get set }
+  var inviteExpiresAt: [String: Double] { get set }
+  var inviteWaves: [String: Int] { get set }
+  var invitePhotoUrls: [String: [String]] { get set }
+  var inviteHasVoiceMessage: [String: Bool] { get set }
+  var inviteVoiceMessageDurations: [String: Int] { get set }
+  var inviteStudentNames: [String: String] { get set }
+  var inviteStudentImageURLs: [String: String] { get set }
+  var inviteConversationTypes: [String: String] { get set }
+  var activeCallRoom: String? { get set }
+  var activeCallToken: String? { get set }
+  var activeQuestionId: String? { get set }
+  var activeQuestionText: String { get set }
+  var activeStudentName: String { get set }
+  var activeStudentImageURL: String { get set }
+  var activeConversationType: String { get set }
+  var acceptingQuestionId: String? { get set }
+  var errorMessage: String? { get set }
+  var isAcceptingCalls: Bool { get set }
+  var isVerified: Bool { get set }
+  var todayEarningsCents: Int { get set }
+  var todayMinutesTutored: Int { get set }
+  var weekEarningsCents: Int { get set }
+  var weekMinutesTutored: Int { get set }
+  var totalMinutes: Int { get set }
+  var lessonCount: Int { get set }
+  var monthEarningsCents: Int { get set }
+  var teacherRating: Double { get set }
+  var reviewCount: Int { get set }
+  var ratePerMinuteCents: Int { get set }
+  var hasMicAccess: Bool { get set }
+  var hasCameraAccess: Bool { get set }
+  var showsSubjectEditor: Bool { get set }
+
+  var formattedTodayEarnings: String { get }
+  var formattedWeekEarnings: String { get }
+  var formattedMonthEarnings: String { get }
+  var formattedRate: String { get }
+  var weekChangeText: String? { get }
+  var hasRating: Bool { get }
+  var ratingText: String { get }
+  var reviewCountText: String { get }
+  var subjectsDisplayText: String { get }
+
+  func toggleOnline()
+  func acceptInvite(questionId: String)
+  func declineInvite(questionId: String)
+  func cancelAcceptingInvite()
+  func endCall()
+  func editSubjects()
+  func reloadSubjects()
+  func activeChatInitialDetails() -> ChatSessionDetails
+  func refreshEarnings()
+}
+
 // MARK: - ViewModel
 
 @Observable
 @MainActor
-final class TeacherDashboardViewModel {
+final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   // MARK: - State
   
@@ -74,7 +138,7 @@ final class TeacherDashboardViewModel {
   /// view checks before showing stars.
   var teacherRating: Double = 0
   var reviewCount: Int = 0
-  var ratePerMinuteCents = 50
+  var ratePerMinuteCents = 200
   var hasMicAccess = false
   var hasCameraAccess = false
   var showsSubjectEditor = false
@@ -679,5 +743,148 @@ final class TeacherDashboardViewModel {
   
   private static func formatCents(_ cents: Int, currency: String = LessonFormatting.defaultCurrencyCode) -> String {
 	LessonFormatting.currencyText(cents: cents, currencyCode: currency)
+  }
+}
+
+// MARK: - Mock
+
+@Observable
+@MainActor
+final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
+  var teacherName: String
+  var teacherImageURL: String = ""
+  var isOnline: Bool
+  var inviteIDs: [String] = []
+  var inviteTopics: [String: String] = [:]
+  var inviteTexts: [String: String] = [:]
+  var inviteExpiresAt: [String: Double] = [:]
+  var inviteWaves: [String: Int] = [:]
+  var invitePhotoUrls: [String: [String]] = [:]
+  var inviteHasVoiceMessage: [String: Bool] = [:]
+  var inviteVoiceMessageDurations: [String: Int] = [:]
+  var inviteStudentNames: [String: String] = [:]
+  var inviteStudentImageURLs: [String: String] = [:]
+  var inviteConversationTypes: [String: String] = [:]
+  var activeCallRoom: String? = nil
+  var activeCallToken: String? = nil
+  var activeQuestionId: String? = nil
+  var activeQuestionText: String = ""
+  var activeStudentName: String = "Student"
+  var activeStudentImageURL: String = ""
+  var activeConversationType: String = "text"
+  var acceptingQuestionId: String? = nil
+  var errorMessage: String? = nil
+  var isAcceptingCalls: Bool = false
+  var isVerified: Bool
+  var todayEarningsCents: Int
+  var todayMinutesTutored: Int
+  var weekEarningsCents: Int
+  var weekMinutesTutored: Int
+  var totalMinutes: Int
+  var lessonCount: Int
+  var monthEarningsCents: Int
+  var teacherRating: Double
+  var reviewCount: Int
+  var ratePerMinuteCents: Int
+  var hasMicAccess: Bool
+  var hasCameraAccess: Bool
+  var showsSubjectEditor: Bool = false
+  var subjects: [String]
+
+  var formattedTodayEarnings: String { LessonFormatting.currencyText(cents: todayEarningsCents, currencyCode: LessonFormatting.defaultCurrencyCode) }
+  var formattedWeekEarnings: String { LessonFormatting.currencyText(cents: weekEarningsCents, currencyCode: LessonFormatting.defaultCurrencyCode) }
+  var formattedMonthEarnings: String { LessonFormatting.currencyText(cents: monthEarningsCents, currencyCode: LessonFormatting.defaultCurrencyCode) }
+  var formattedRate: String { LessonFormatting.currencyText(cents: ratePerMinuteCents, currencyCode: LessonFormatting.defaultCurrencyCode) }
+  var weekChangeText: String? { nil }
+  var hasRating: Bool { reviewCount > 0 }
+  var ratingText: String { LessonFormatting.ratingText(teacherRating) }
+  var reviewCountText: String {
+    hasRating
+      ? String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
+      : LocalizationSupport.localized("No reviews yet")
+  }
+  var subjectsDisplayText: String {
+    if subjects.isEmpty {
+      return LocalizationSupport.localized("No subjects selected")
+    }
+    return subjects.map { LocalizationSupport.localized($0) }.joined(separator: ", ")
+  }
+
+  init(
+    teacherName: String = "Dr. Sarah Cohen",
+    isOnline: Bool = false,
+    isVerified: Bool = true,
+    subjects: [String] = ["Mathematics", "Physics"],
+    lessonCount: Int = 47,
+    todayEarningsCents: Int = 9600,
+    todayMinutesTutored: Int = 80,
+    weekEarningsCents: Int = 38500,
+    weekMinutesTutored: Int = 320,
+    monthEarningsCents: Int = 142000,
+    totalMinutes: Int = 2840,
+    teacherRating: Double = 4.8,
+    reviewCount: Int = 23,
+    ratePerMinuteCents: Int = 120,
+    hasMicAccess: Bool = true,
+    hasCameraAccess: Bool = true
+  ) {
+    self.teacherName = teacherName
+    self.isOnline = isOnline
+    self.isVerified = isVerified
+    self.subjects = subjects
+    self.lessonCount = lessonCount
+    self.todayEarningsCents = todayEarningsCents
+    self.todayMinutesTutored = todayMinutesTutored
+    self.weekEarningsCents = weekEarningsCents
+    self.weekMinutesTutored = weekMinutesTutored
+    self.monthEarningsCents = monthEarningsCents
+    self.totalMinutes = totalMinutes
+    self.teacherRating = teacherRating
+    self.reviewCount = reviewCount
+    self.ratePerMinuteCents = ratePerMinuteCents
+    self.hasMicAccess = hasMicAccess
+    self.hasCameraAccess = hasCameraAccess
+
+    if isOnline {
+      let id = "mock-invite-1"
+      inviteIDs = [id]
+      inviteTopics = [id: "Calculus"]
+      inviteTexts = [id: "Can you help me solve an integral by parts? I'm stuck on ∫x·eˣ dx"]
+      inviteExpiresAt = [id: Date().timeIntervalSince1970 * 1000 + 30_000]
+      inviteWaves = [id: 1]
+      inviteStudentNames = [id: "Alex Kim"]
+      inviteStudentImageURLs = [id: ""]
+      inviteConversationTypes = [id: "text"]
+      invitePhotoUrls = [id: []]
+      inviteHasVoiceMessage = [id: false]
+    }
+  }
+
+  func toggleOnline() { isOnline.toggle() }
+  func acceptInvite(questionId: String) {}
+  func declineInvite(questionId: String) { inviteIDs = inviteIDs.filter { $0 != questionId } }
+  func cancelAcceptingInvite() {}
+  func endCall() { activeQuestionId = nil }
+  func editSubjects() { showsSubjectEditor = true }
+  func reloadSubjects() {}
+  func refreshEarnings() {}
+  func activeChatInitialDetails() -> ChatSessionDetails {
+    ChatSessionDetails(
+      questionId: "",
+      studentId: "",
+      teacherId: "",
+      studentName: activeStudentName,
+      teacherName: teacherName,
+      studentImageURL: activeStudentImageURL,
+      teacherImageURL: teacherImageURL,
+      questionText: activeQuestionText,
+      questionPhotoUrls: [],
+      createdAt: 0,
+      acceptedAt: 0,
+      connectionFeeCents: 0,
+      pricePerMinuteCents: ratePerMinuteCents,
+      teacherSharePercent: 75,
+      currencyCode: LessonFormatting.defaultCurrencyCode
+    )
   }
 }

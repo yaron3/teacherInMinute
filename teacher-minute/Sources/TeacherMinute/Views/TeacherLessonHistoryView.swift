@@ -20,7 +20,7 @@ struct TeacherLessonHistoryView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     FlatTopHeader(
-                        eyebrow: LocalizationSupport.localized("Teaching History"),
+                        eyebrow: LocalizationSupport.localized("Teacher"),
                         name: viewModel.teacherName,
                         avatarImageURL: viewModel.profileImageURL,
                         avatarSystemImage: "person.crop.circle.fill",

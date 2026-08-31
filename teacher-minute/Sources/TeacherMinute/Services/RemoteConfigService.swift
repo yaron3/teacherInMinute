@@ -233,7 +233,42 @@ final class RemoteConfigService {
         // string, and on Android the extra `value.source` read is a second JNI
         // round trip. RemoteConfigLocalizationService logs each key once, on
         // its cache miss, which covers the same diagnostic need.
-        return value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return decodingEscapes(value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Remote Config stores values as plain text, so a `\n` typed into the
+    /// console arrives as the two characters `\` and `n` and would render
+    /// literally. Decode the escapes an author reasonably expects to work —
+    /// `\n`, `\t`, `\r`, and `\\` for a literal backslash — here, at the one
+    /// point every config string passes through. Any other `\x` sequence is
+    /// left untouched so paths and regexes in config values survive intact.
+    nonisolated static func decodingEscapes(_ value: String) -> String {
+        guard value.contains("\\") else { return value }
+
+        var decoded = ""
+        var isEscaping = false
+        for character in value {
+            if isEscaping {
+                switch character {
+                case "n": decoded.append("\n")
+                case "t": decoded.append("\t")
+                case "r": decoded.append("\r")
+                case "\\": decoded.append("\\")
+                default:
+                    decoded.append("\\")
+                    decoded.append(character)
+                }
+                isEscaping = false
+            } else if character == "\\" {
+                isEscaping = true
+            } else {
+                decoded.append(character)
+            }
+        }
+        if isEscaping {
+            decoded.append("\\")
+        }
+        return decoded
     }
 
     func getNumber(_ key: String) -> Double {
