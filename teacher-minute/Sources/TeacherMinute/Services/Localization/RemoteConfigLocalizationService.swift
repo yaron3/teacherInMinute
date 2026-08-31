@@ -150,7 +150,6 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Teacher connects within 90 sec": "מורה מחובר תוך 90 שני׳",
         "The system finds an available teacher for your subject": "המערכת מוצאת מורה פנוי ומתאים למקצוע",
         "Chat, whiteboard, voice messages – real time": "צ׳אט, לוח לבן, הודעות קוליות – בזמן אמת",
-        "2 NIS connection • only billed minutes count": "2₪ לחיבור • דקות נספרות בשרת בלבד",
         // Hero section
         "Hello, %@": "שלום, %@",
         "Teacher in a Moment": "מורה ברגע",
@@ -158,7 +157,6 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "%d teachers available now": "%d מורים פניים עכשיו",
         "90 sec avg to connect": "ממוצע 90 שנ' להתחברות",
         "Ask a question now": "שאל שאלה עכשיו",
-        "2 NIS connection fee • pay only for time used": "2₪ לחיבור • משלמים רק על זמן שהשתמשת",
         // Section headers
         "%d registered teachers": "%d מורים רשומים",
         "Teachers online now": "מורים מחוברים עכשיו",
@@ -194,7 +192,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "When AI gets stuck, a human teacher connects in moments": "כש-AI נתקע – מורה אנושי מתחבר תוך רגעים",
         "Teacher connects within %@": "מורה מתחבר תוך %@",
         "A teacher connects quickly": "מורה מתחבר במהירות",
-        "%@ connection fee • pay only for time used": "%@ דמי חיבור • משלמים רק על הזמן שנוצל",
+        "%@ per minute • pay only for time used": "%@ לדקה • משלמים רק על הזמן שנוצל",
         "Only billed minutes count": "נספרות רק הדקות שחויבו",
         "1 teacher": "מורה אחד",
         // Sign-up confirm password field
@@ -225,9 +223,9 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "You have %d minutes": "יש לך %d דקות",
         "~%@ value": "כ-%@ שווי",
         // Teacher dashboard — updated UI
-        "Not available": "לא זמינה",
-        "Available": "זמינה",
-        "Tap to start": "לחצי כדי להתחיל",
+        "Not available": "לא זמין",
+        "Available": "זמין",
+        "Tap to start": "לחץ כדי להתחיל",
         "Lessons": "שיעורים",
         "Monthly income": "הכנסה החודש",
         "My Rating": "הדירוג שלי",

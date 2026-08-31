@@ -253,8 +253,8 @@ struct StudentHomeView: View {
 
         heroAskTeacherButton
 
-        if !viewModel.connectionFeeText.isEmpty {
-          Text(viewModel.connectionFeeText)
+        if !viewModel.pricePerMinuteText.isEmpty {
+          Text(viewModel.pricePerMinuteText)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(theme.primaryText.opacity(0.55))
             .frame(maxWidth: .infinity, alignment: .center)
@@ -496,9 +496,9 @@ struct StudentHomeView: View {
         howItWorksStep(
           number: 4,
           title: LocalizationSupport.localized("Pay only for what you used"),
-          subtitle: viewModel.connectionFeeText.isEmpty
+          subtitle: viewModel.pricePerMinuteText.isEmpty
             ? LocalizationSupport.localized("Only billed minutes count")
-            : viewModel.connectionFeeText,
+            : viewModel.pricePerMinuteText,
           tint: theme.positive
         )
       }

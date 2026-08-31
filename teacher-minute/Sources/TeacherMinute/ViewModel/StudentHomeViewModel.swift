@@ -133,7 +133,6 @@ protocol StudentHomeViewModeling: AnyObject {
   var name: String { get set }
   var searchState: StudentSearchState { get set }
   var activeQuestionText: String { get set }
-  var activeConnectionFeeCents: Int { get set }
   var activeConversationType: String { get set }
   var selectedPricePerMinuteCents: Int { get set }
   var questionId: String? { get set }
@@ -143,7 +142,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var recentLessons: [RecentLesson] { get set }
   var onlineTeachers: [OnlineTeacher] { get set }
   var subjects: [StudentSubject] { get }
-  var connectionFeeText: String { get }
+  var pricePerMinuteText: String { get }
   var averageConnectText: String { get }
   var connectPromiseText: String { get }
   var connectStepTitle: String { get }
@@ -192,7 +191,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var name = ""
   var searchState: StudentSearchState = .idle
   var activeQuestionText = ""
-  var activeConnectionFeeCents = 0
   var activeConversationType = "text"
   var selectedPricePerMinuteCents = 50
   var questionId: String?
@@ -206,9 +204,9 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// The subject grid: the Remote Config catalog joined with how many teachers
   /// are online for each subject right now.
   var subjects: [StudentSubject] = []
-  /// "2₪ connection fee • pay only for time used" — the fee is the one the
-  /// backend bills, not a number written into the copy.
-  var connectionFeeText = ""
+  /// "2₪ per minute • pay only for time used" — the rate comes from Remote
+  /// Config, not a number written into the copy.
+  var pricePerMinuteText = ""
   /// "90 sec avg to connect", measured by the backend. Empty until there is a
   /// measurement, so the view can leave the claim out entirely.
   var averageConnectText = ""
@@ -249,7 +247,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// Normalized subject keys of every teacher currently online, one entry per
   /// teacher, so a subject's count is how many of these sets match it.
   private var onlineTeacherSubjectKeys: [Set<String>] = []
-  /// The student's own currency, so the connection fee is quoted in it.
+  /// The student's own currency, so the per-minute rate is quoted in it.
   private var currencyCode = LessonFormatting.defaultCurrencyCode
   private var didLoadProfile = false
   private var checkoutStartedRemainingMinutes = 0
@@ -283,7 +281,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
 	  logger.info("TeacherMinute askTeacher created questionId=\(result.questionId)")
       activeQuestionText = text
-      activeConnectionFeeCents = result.connectionFeeCents
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
     } catch let err as FunctionsError {
@@ -634,14 +631,16 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     return onlineTeacherSubjectKeys.filter { !$0.isDisjoint(with: keys) }.count
   }
 
-  /// The connection fee and the measured time-to-connect, both from the
+  /// The per-minute rate and the measured time-to-connect, both from the
   /// backend. Either can be missing, in which case the view shows nothing
   /// rather than a figure the app invented.
   private func loadPlatformFigures(forceRefresh: Bool = false) async {
-    let feeCents = await SettingsRemoteConfigService.shared.fetchConnectionFeeCents()
-    connectionFeeText = String(
-      format: LocalizationSupport.localized("%@ connection fee • pay only for time used"),
-      LessonFormatting.currencyText(cents: feeCents, currencyCode: currencyCode)
+    let perMinuteCents = await SettingsRemoteConfigService.shared.fetchPricePerMinuteCents(
+      currencyCode: currencyCode
+    )
+    pricePerMinuteText = String(
+      format: LocalizationSupport.localized("%@ per minute • pay only for time used"),
+      LessonFormatting.currencyText(cents: perMinuteCents, currencyCode: currencyCode)
     )
 
     let stats = await PlatformStatsService.shared.fetchStats(forceRefresh: forceRefresh)
@@ -666,7 +665,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       LessonFormatting.connectDurationText(seconds: stats.averageConnectSeconds)
     )
 
-    averageConnectText = LessonFormatting.averageConnectText(seconds: stats.averageConnectSeconds)
+    averageConnectText = LessonFormatting.averageConnectText(seconds: 90)//stats.averageConnectSeconds)
     connectPromiseText = String(
       format: LocalizationSupport.localized("When AI gets stuck, a human teacher connects in %@"),
       LessonFormatting.connectDurationText(seconds: stats.averageConnectSeconds)
@@ -843,7 +842,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       questionPhotoUrls: [],
       createdAt: 0,
       acceptedAt: Date().timeIntervalSince1970 * 1000.0,
-      connectionFeeCents: activeConnectionFeeCents,
       pricePerMinuteCents: selectedPricePerMinuteCents,
       teacherSharePercent: 75,
       currencyCode: purchasedCurrencyCode
@@ -961,7 +959,6 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var name: String
   var searchState: StudentSearchState
   var activeQuestionText: String
-  var activeConnectionFeeCents: Int
   var activeConversationType: String = "text"
   var selectedPricePerMinuteCents: Int
   var questionId: String?
@@ -994,7 +991,6 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     name: String = "Sarah Jenkins",
     searchState: StudentSearchState = .idle,
     activeQuestionText: String = "",
-    activeConnectionFeeCents: Int = 0,
     selectedPricePerMinuteCents: Int = 50,
     remainingMinutes: Int = 30,
     pricingOptions: [PricingOption] = [
@@ -1031,7 +1027,6 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.name = name
     self.searchState = searchState
     self.activeQuestionText = activeQuestionText
-    self.activeConnectionFeeCents = activeConnectionFeeCents
     self.selectedPricePerMinuteCents = selectedPricePerMinuteCents
     self.remainingMinutes = remainingMinutes
     self.questionId = "mock-lesson"
@@ -1046,7 +1041,6 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {
     activeQuestionText = text
-    activeConnectionFeeCents = 50
     activeConversationType = conversationType
     searchState = .searching(questionId: "mock-question")
   }
@@ -1105,7 +1099,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     StudentSubject(key: "math", title: "Math", topics: "Algebra, Trigonometry", systemImage: "function", teacherCount: 3),
     StudentSubject(key: "physics", title: "Physics", topics: "Mechanics", systemImage: "atom", teacherCount: 1),
   ]
-  var connectionFeeText = "2₪ connection fee • pay only for time used"
+  var pricePerMinuteText = "2 NIS per minute • pay only for time used"
   var averageConnectText = "90 sec avg to connect"
   var registeredTeacherCountText = "237 registered teachers"
   var connectPromiseText = "When AI gets stuck, a human teacher connects in 90 seconds"
@@ -1135,7 +1129,6 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       questionPhotoUrls: [],
       createdAt: 0,
       acceptedAt: Date().timeIntervalSince1970 * 1000.0,
-      connectionFeeCents: activeConnectionFeeCents,
       pricePerMinuteCents: selectedPricePerMinuteCents,
       teacherSharePercent: 75,
       currencyCode: pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode

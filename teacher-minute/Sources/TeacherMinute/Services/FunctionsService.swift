@@ -58,7 +58,6 @@ struct AcceptInviteResult {
 
 struct CreateQuestionResult {
   let questionId: String
-  let connectionFeeCents: Int
 }
 
 struct QuestionStatusResult {
@@ -192,11 +191,9 @@ final class FunctionsService {
       function: "createQuestion",
       data: ["topic": topic, "text": text, "photoUrls": photoUrls, "conversationType": conversationType]
     )
-    guard
-      let questionId = result["questionId"] as? String,
-      let feeCents   = result["connectionFeeCents"] as? Int
+    guard let questionId = result["questionId"] as? String
     else { throw FunctionsError.decodingError() }
-    return CreateQuestionResult(questionId: questionId, connectionFeeCents: feeCents)
+    return CreateQuestionResult(questionId: questionId)
   }
 
   func cancelQuestion(questionId: String) async throws {

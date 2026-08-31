@@ -25,7 +25,6 @@ final class SettingsRemoteConfigService {
         static let teacherShare = "teacher_share"
         static let pricePerMinutePrefix = "price_per_minute"
         static let costPerMinute = "cost_per_minute"
-        static let connectionFeeCents = "connection_fee_cents"
         static let payPalPayoutEnabled = "enable_paypal_payout"
         static let contactSupportTitleMaxLength = "contact_support_title_max_length"
         static let contactSupportDescriptionMaxLength = "contact_support_description_max_length"
@@ -34,9 +33,6 @@ final class SettingsRemoteConfigService {
     private let defaultSupportEmail = "support@tim.app"
     private let defaultTeacherShare = 0.75
     private let defaultPricePerMinuteByCurrency: [String: Double] = ["ILS": 2.0, "USD": 0.5]
-    /// Matches `CONNECTION_FEE_CENTS` in functions/src/types.ts, used only when
-    /// Remote Config has no value.
-    private let defaultConnectionFeeCents = 50
     private let defaultContactSupportTitleMaxLength = 50
     private let defaultContactSupportDescriptionMaxLength = 1024
     
@@ -103,16 +99,6 @@ final class SettingsRemoteConfigService {
             amount = defaultPricePerMinuteByCurrency[normalizedCode] ?? 0
         }
         return Int((amount * 100.0).rounded())
-    }
-
-    /// The one-off fee charged when a lesson connects, in cents of the student's
-    /// currency. Source: Remote Config `connection_fee_cents` — the same key the
-    /// backend bills from (functions/src/pricing.ts), so the quoted fee and the
-    /// charged fee cannot drift apart.
-    func fetchConnectionFeeCents() async -> Int {
-        await RemoteConfigService.shared.ready()
-        let cents = Int(RemoteConfigService.shared.getNumber(Key.connectionFeeCents))
-        return cents > 0 ? cents : defaultConnectionFeeCents
     }
 
     /// Whether PayPal is offered as a teacher payout destination.

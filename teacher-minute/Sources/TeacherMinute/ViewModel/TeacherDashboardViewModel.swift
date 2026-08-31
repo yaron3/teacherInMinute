@@ -102,7 +102,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var inviteStudentNames: [String: String] = [:]
   var inviteStudentImageURLs: [String: String] = [:]
   var inviteStudentUids: [String: String] = [:]
-  var inviteConnectionFeeCents: [String: Int] = [:]
   var invitePricePerMinuteCents: [String: Int] = [:]
   var inviteConversationTypes: [String: String] = [:]
   var activeCallRoom: String? = nil
@@ -114,7 +113,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeQuestionPhotoUrls: [String] = []
   var activeStudentName = "Student"
   var activeStudentImageURL = ""
-  var activeConnectionFeeCents = 0
   var activePricePerMinuteCents = 50
   var activeConversationType = "text"
   var activeAcceptedAt = 0.0
@@ -268,7 +266,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 			"studentId": $0.studentId,
 			"studentName": $0.studentName,
 			"studentImageURL": $0.studentImageURL,
-			"connectionFeeCents": $0.connectionFeeCents,
 			"pricePerMinuteCents": $0.pricePerMinuteCents,
 			"conversationType": $0.conversationType,
 		  ]
@@ -366,7 +363,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	var studentNames: [String: String] = [:]
 	var studentImageURLs: [String: String] = [:]
 	var studentIds: [String: String] = [:]
-	var connectionFees: [String: Int] = [:]
 	var pricesPerMinute: [String: Int] = [:]
 	var conversationTypes: [String: String] = [:]
 	
@@ -408,7 +404,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  studentNames[id] = Self.firstString(row, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
 	  studentImageURLs[id] = Self.firstString(row, keys: ["studentImageURL", "studentImageUrl", "studentPhotoUrl", "studentPhotoURL"])
 	  studentIds[id] = Self.firstString(row, keys: ["studentId", "studentUID", "studentId"])
-	  connectionFees[id] = Self.intValue(row["connectionFeeCents"]) ?? Self.intValue(row["connectionFee"]) ?? 0
 	  pricesPerMinute[id] = Self.intValue(row["pricePerMinuteCents"])
 	  ?? Self.intValue(row["ratePerMinuteCents"])
 	  ?? Self.intValue(row["costPerMinuteCents"])
@@ -436,7 +431,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	inviteStudentNames = studentNames
 	inviteStudentImageURLs = studentImageURLs
 	inviteStudentUids = studentIds
-	inviteConnectionFeeCents = connectionFees
 	invitePricePerMinuteCents = pricesPerMinute
 	inviteConversationTypes = conversationTypes
   }
@@ -477,7 +471,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  activeQuestionText = inviteTexts[questionId] ?? ""
 	  activeQuestionPhotoUrls = invitePhotoUrls[questionId] ?? []
 	  activeStudentName = inviteStudentNames[questionId]?.isEmpty == false ? inviteStudentNames[questionId] ?? "Student" : "Student"
-	  activeConnectionFeeCents = inviteConnectionFeeCents[questionId] ?? 0
 	  activePricePerMinuteCents = invitePricePerMinuteCents[questionId] ?? 50
 	  activeConversationType = conversationType
 	  activeAcceptedAt = Date().timeIntervalSince1970 * 1000.0
@@ -581,7 +574,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	activeQuestionPhotoUrls = []
 	activeStudentName = "Student"
 	activeStudentImageURL = ""
-	activeConnectionFeeCents = 0
 	activePricePerMinuteCents = 50
 	activeConversationType = "text"
 	activeAcceptedAt = 0
@@ -616,7 +608,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  questionPhotoUrls: activeQuestionPhotoUrls,
 	  createdAt: 0,
 	  acceptedAt: activeAcceptedAt > 0 ? activeAcceptedAt : Date().timeIntervalSince1970 * 1000.0,
-	  connectionFeeCents: activeConnectionFeeCents,
 	  pricePerMinuteCents: activePricePerMinuteCents,
 	  teacherSharePercent: 75,
 	  currencyCode: activeCurrencyCode
@@ -881,7 +872,6 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
       questionPhotoUrls: [],
       createdAt: 0,
       acceptedAt: 0,
-      connectionFeeCents: 0,
       pricePerMinuteCents: ratePerMinuteCents,
       teacherSharePercent: 75,
       currencyCode: LessonFormatting.defaultCurrencyCode

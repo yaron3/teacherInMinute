@@ -50,7 +50,6 @@ struct ChatSessionDetails: Equatable {
   let questionPhotoUrls: [String]
   let createdAt: Double
   let acceptedAt: Double
-  let connectionFeeCents: Int
   let pricePerMinuteCents: Int
   let teacherSharePercent: Double
   let currencyCode: String
@@ -550,7 +549,6 @@ final class ChatSessionService {
           ?? doubleValue(dict["startedAt"])
           ?? 0
       ),
-      connectionFeeCents: intValue(dict["connectionFeeCents"]) ?? intValue(dict["connectionFee"]) ?? 0,
       pricePerMinuteCents: intValue(dict["pricePerMinuteCents"])
         ?? intValue(dict["ratePerMinuteCents"])
         ?? intValue(dict["costPerMinuteCents"])
@@ -841,7 +839,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func primaryAmountText(at date: Date) -> String {
     let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
-    let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
+    let grossCents = elapsedMinutes * Double(pricePerMinuteCents)
     let cents = isTeacherRole ? grossCents * (teacherSharePercent / 100.0) : grossCents
     return currencyText(cents: max(0, cents))
   }
@@ -1036,10 +1034,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     return role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "teacher"
   }
 
-  private var connectionFeeCents: Int {
-    details?.connectionFeeCents ?? 0
-  }
-
   private var pricePerMinuteCents: Int {
     details?.pricePerMinuteCents ?? 0
   }
@@ -1083,7 +1077,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       questionPhotoUrls: updated.questionPhotoUrls.isEmpty ? current.questionPhotoUrls : updated.questionPhotoUrls,
       createdAt: updated.createdAt > 0 ? updated.createdAt : current.createdAt,
       acceptedAt: updated.acceptedAt > 0 ? updated.acceptedAt : current.acceptedAt,
-      connectionFeeCents: updated.connectionFeeCents > 0 ? updated.connectionFeeCents : current.connectionFeeCents,
       pricePerMinuteCents: updated.pricePerMinuteCents > 0 ? updated.pricePerMinuteCents : current.pricePerMinuteCents,
       teacherSharePercent: updated.teacherSharePercent > 0 ? updated.teacherSharePercent : current.teacherSharePercent,
       currencyCode: nonEmpty(updated.currencyCode) ?? current.currencyCode
@@ -1134,7 +1127,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       questionPhotoUrls: current.questionPhotoUrls,
       createdAt: current.createdAt,
       acceptedAt: current.acceptedAt,
-      connectionFeeCents: current.connectionFeeCents,
       pricePerMinuteCents: current.pricePerMinuteCents,
       teacherSharePercent: current.teacherSharePercent,
       currencyCode: current.currencyCode

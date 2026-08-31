@@ -1389,7 +1389,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "Instant Teacher"
+          "value": "מורה ברגע"
         }
       },
       "valueType": "STRING"
@@ -6711,11 +6711,11 @@
     },
     "connection_fee_pay": {
       "defaultValue": {
-        "value": "%@ connection fee • pay only for time used"
+        "value": "%@ connection fee per minute • pay only for time used"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "%@ דמי חיבור • משלמים רק על הזמן שנוצל"
+          "value": "%@ דמי חיבור לדקה • משלמים רק על הזמן שנוצל"
         }
       },
       "valueType": "STRING"
@@ -6766,7 +6766,7 @@
     },
     "connection_fee_cents": {
       "defaultValue": {
-        "value": "50"
+        "value": "0"
       },
       "valueType": "NUMBER"
     },
