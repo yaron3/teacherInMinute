@@ -71,6 +71,8 @@ struct SettingsRow: Identifiable {
         case .contactUs:
             self.destination = .contactUs
         #if DEBUG
+        case .forceReloadRemoteConfig:
+            self.destination = nil
         case .testCrashlyticsCrash:
             self.destination = nil
         #endif
@@ -97,6 +99,7 @@ enum SettingsAction: Equatable {
     case eula
     case privacyPolicy
     #if DEBUG
+    case forceReloadRemoteConfig
     case testCrashlyticsCrash
     #endif
     
@@ -117,6 +120,7 @@ enum SettingsAction: Equatable {
         case .eula: "eula"
         case .privacyPolicy: "privacyPolicy"
         #if DEBUG
+        case .forceReloadRemoteConfig: "forceReloadRemoteConfig"
         case .testCrashlyticsCrash: "testCrashlyticsCrash"
         #endif
         }
@@ -330,6 +334,16 @@ class SettingsViewModel {
         #if DEBUG
         rows.append(
             SettingsRow(
+                title: LocalizationSupport.localized("Force Reload Remote Config"),
+                subtitle: LocalizationSupport.localized("Debug builds only"),
+                systemImage: "arrow.clockwise",
+                iconColor: .primary,
+                isDestructive: false,
+                action: .forceReloadRemoteConfig
+            )
+        )
+        rows.append(
+            SettingsRow(
                 title: LocalizationSupport.localized("Test Crashlytics Crash"),
                 subtitle: LocalizationSupport.localized("Debug builds only"),
                 systemImage: "exclamationmark.triangle.fill",
@@ -521,6 +535,8 @@ class SettingsViewModel {
         case .privacyPolicy:
             Task { await openPrivacyPolicy() }
         #if DEBUG
+        case .forceReloadRemoteConfig:
+            Task { await forceReloadRemoteConfig() }
         case .testCrashlyticsCrash:
             AnalyticsService.shared.triggerCrashlyticsTestCrash()
         #endif
@@ -539,6 +555,28 @@ class SettingsViewModel {
             return await deleteAccount()
         }
     }
+
+    #if DEBUG
+    /// Remote Config holds a fetched template for `minimumFetchInterval` (an
+    /// hour), so a value edited in the console does not reach a running debug
+    /// build until that expires or the app is reinstalled. `refresh()` fetches
+    /// with a zero expiration and activates, and the localization flags are
+    /// cycled around it in the same order as a language switch so views reading
+    /// `dataFetched` re-read their strings against the template that just
+    /// landed rather than the one they were rendered from.
+    func forceReloadRemoteConfig() async {
+        let localization = LocalizationManager.shared
+        localization.isLoading = true
+        localization.dataFetched = false
+        await RemoteConfigService.shared.refresh()
+        localization.dataFetched = true
+        localization.isLoading = false
+        present(
+            title: LocalizationSupport.localized("Remote Config"),
+            message: LocalizationSupport.localized("Reloaded from Remote Config.")
+        )
+    }
+    #endif
 
     func sendPasswordReset() {
         guard let email = authService.currentUserEmail, !email.isEmpty else {
