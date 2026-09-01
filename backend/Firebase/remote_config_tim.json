@@ -1389,7 +1389,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "מורה ברגע"
+          "value": "מורה לרגע"
         }
       },
       "valueType": "STRING"
@@ -1665,7 +1665,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nInstant Teacher."
+          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nמורה לרגע."
         }
       },
       "valueType": "STRING"
@@ -2576,7 +2576,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nInstant Teacher."
+          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nמורה לרגע."
         }
       },
       "valueType": "STRING"
@@ -3639,7 +3639,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nInstant Teacher."
+          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nמורה לרגע."
         }
       },
       "valueType": "STRING"
@@ -5463,7 +5463,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "איך תרצה להשתמש ב־Instant Teacher? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
+          "value": "איך תרצה להשתמש ב־מורה לרגע? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
         }
       },
       "valueType": "STRING"
@@ -5496,7 +5496,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nInstant Teacher."
+          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nמורה לרגע."
         }
       },
       "valueType": "STRING"
@@ -6263,7 +6263,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "אפליקציית מורה ברגע"
+          "value": "אפליקציית מורה לרגע"
         }
       },
       "valueType": "STRING"
