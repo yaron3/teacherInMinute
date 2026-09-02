@@ -41,7 +41,7 @@ struct StudentHomeView: View {
 		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
 		  .id(languagePreference)
 	  }
-	  .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
+	  .navigationTitle(viewModel.askATeacherSheetTitle)
 	}
 	.sheet(isPresented: $showsNotificationExplainer) {
 	  NotificationPermissionExplainerView {
@@ -115,17 +115,17 @@ struct StudentHomeView: View {
 #endif
 	}
 	.appDialog(
-	  LocalizationSupport.localized("Low Balance"),
+	  viewModel.lowBalanceAlertTitle,
 	  isPresented: $showingLowBalanceAlert,
-	  message: lowBalanceMessage,
-	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	  message: viewModel.lowBalanceMessage,
+	  actions: [AppDialogAction(viewModel.okLabel)]
 	)
 	.appDialog(
-	  LocalizationSupport.localized("Purchase complete"),
+	  viewModel.purchaseCompleteTitle,
 	  isPresented: $showingPurchaseSummaryAlert,
-	  message: purchaseSummaryMessage,
+	  message: viewModel.purchaseSummaryMessage,
 	  actions: [
-		AppDialogAction(LocalizationSupport.localized("OK")) {
+		AppDialogAction(viewModel.okLabel) {
 		  viewModel.consumePurchaseSummary()
 		  // The redirect flows also leave a success result behind; clear it so a
 		  // stale one cannot resurface.
@@ -134,22 +134,22 @@ struct StudentHomeView: View {
 	  ]
 	)
 	.appDialog(
-	  couponAlertTitle,
+	  viewModel.couponAlertTitle,
 	  isPresented: $showingCouponAlert,
-	  message: couponAlertMessage,
+	  message: viewModel.couponAlertMessage,
 	  actions: [
-		AppDialogAction(LocalizationSupport.localized("OK")) {
+		AppDialogAction(viewModel.okLabel) {
 		  viewModel.resetCouponState()
 		}
 	  ]
 	)
 #if !os(Android)
 	.appDialog(
-	  paymentReturnStore.latestResult?.title ?? LocalizationSupport.localized("Payment"),
+	  paymentReturnStore.latestResult?.title ?? viewModel.paymentFallbackTitle,
 	  isPresented: isShowingPaymentReturnResult,
 	  message: paymentReturnStore.latestResult?.message ?? "",
 	  actions: [
-		AppDialogAction(LocalizationSupport.localized("OK")) {
+		AppDialogAction(viewModel.okLabel) {
 		  paymentReturnStore.consumeLatestResult()
 		}
 	  ]
@@ -172,7 +172,7 @@ struct StudentHomeView: View {
       studentHero
 
       studentSectionHeader(
-        title: LocalizationSupport.localized("Available Subjects"),
+        title: viewModel.availableSubjectsTitle,
         caption: viewModel.registeredTeacherCountText.isEmpty ? nil : viewModel.registeredTeacherCountText
       )
       .padding(.top, 28)
@@ -181,8 +181,8 @@ struct StudentHomeView: View {
         .padding(.top, 14)
 
       studentSectionHeader(
-        title: LocalizationSupport.localized("Teachers online now"),
-        caption: LocalizationSupport.localized("All")
+        title: viewModel.teachersOnlineNowTitle,
+        caption: viewModel.teachersOnlineNowCaption
       )
       .padding(.top, 30)
 
@@ -196,7 +196,7 @@ struct StudentHomeView: View {
         .padding(.top, 18)
 
       if !viewModel.pricingOptions.isEmpty {
-        studentSectionHeader(title: LocalizationSupport.localized("Credits"))
+        studentSectionHeader(title: viewModel.creditsTitle)
           .padding(.top, 30)
 
         pricingGrid
@@ -215,7 +215,7 @@ struct StudentHomeView: View {
     VStack(spacing: 0) {
       HStack(spacing: 12) {
 		PlatformIcon(systemName: "books.vertical.fill", size: 19, weight: .semibold, color: theme.primaryText)
-          Text(LocalizationSupport.localized("Teacher in a Moment"))
+          Text(viewModel.appDisplayName)
             .font(.system(size: 18, weight: .bold))
             .foregroundStyle(theme.primaryText)
           
@@ -230,11 +230,11 @@ struct StudentHomeView: View {
           
 
           VStack(alignment: .leading, spacing: 8) {
-            Text(String(format: LocalizationSupport.localized("Hello, %@"), studentDisplayName))
+            Text(viewModel.greetingText)
               .font(.system(size: 18, weight: .bold))
               .foregroundStyle(theme.info)
 
-            Text(LocalizationSupport.localized("Teacher in a Moment"))
+            Text(viewModel.appDisplayName)
               .font(.system(size: 36, weight: .bold))
               .foregroundStyle(theme.primaryText)
               .lineLimit(2)
@@ -249,7 +249,8 @@ struct StudentHomeView: View {
 		  balancePill
         }
 
-        onlineStatusBar
+        //onlineStatusBar
+		onlineTeacherStatus
 
         heroAskTeacherButton
 
@@ -272,7 +273,7 @@ struct StudentHomeView: View {
       Text("\(viewModel.remainingMinutes)")
         .font(.system(size: 26, weight: .bold))
         .foregroundStyle(theme.warning)
-      Text(LocalizationSupport.localized("minutes"))
+      Text(viewModel.minutesLabel)
         .font(.system(size: 13, weight: .bold))
         .foregroundStyle(theme.primaryText.opacity(0.65))
     }
@@ -307,7 +308,7 @@ struct StudentHomeView: View {
   var heroAskTeacherButtonContent: some View {
     HStack(spacing: 10) {
       PlatformIcon(systemName: "hand.raised.fill", size: 22, weight: .bold, color: theme.ctaForeground)
-      Text(LocalizationSupport.localized("Ask a question now"))
+      Text(viewModel.askQuestionNowLabel)
         .font(.system(size: 24, weight: .bold))
         .foregroundStyle(theme.ctaForeground)
         .lineLimit(1)
@@ -319,10 +320,19 @@ struct StudentHomeView: View {
     .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
   }
 
+  var onlineTeacherStatus: some View {
+	HStack {
+	  Spacer()
+	  Text(viewModel.onlineTeachersCountText)
+		.font(.system(size: 18, weight: .bold))
+		.foregroundStyle(theme.positive)
+	  Spacer()
+	}
+  }
   var onlineStatusBar: some View {
     HStack(spacing: 10) {
       FlatStatusDot(color: theme.positive, size: 16)
-      Text(String(format: LocalizationSupport.localized("%d teachers available now"), onlineTeacherCount))
+      Text(viewModel.onlineTeachersCountText)
         .font(.system(size: 15, weight: .bold))
         .foregroundStyle(theme.positive)
       Spacer()
@@ -349,11 +359,11 @@ struct StudentHomeView: View {
       lastLessonInfoCard
 
       dashboardInfoCard(
-        title: LocalizationSupport.localized("Your Balance"),
+        title: viewModel.yourBalanceTitle,
         value: LessonFormatting.minutesText(viewModel.remainingMinutes),
-        detail: LocalizationSupport.localized("Left to learn"),
+        detail: viewModel.leftToLearnDetail,
         systemImage: "creditcard.fill",
-        actionTitle: LocalizationSupport.localized("Buy More +"),
+        actionTitle: viewModel.buyMoreLabel,
         action: selectFirstPricingOption
       )
     }
@@ -364,7 +374,7 @@ struct StudentHomeView: View {
       VStack(alignment: .leading, spacing: 12) {
         HStack(spacing: 8) {
           PlatformIcon(systemName: "calendar", size: 16, weight: .semibold, color: theme.secondaryText)
-          Text(LocalizationSupport.localized("Last Lesson"))
+          Text(viewModel.lastLessonCardTitle)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
         }
@@ -391,13 +401,13 @@ struct StudentHomeView: View {
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
         } else {
-          Text(LocalizationSupport.localized("None yet"))
+          Text(viewModel.noLessonsText)
             .font(.system(size: 28, weight: .bold))
             .foregroundStyle(theme.primaryText)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
 
-          Text(LocalizationSupport.localized("Ask a teacher to start"))
+          Text(viewModel.noLessonsSubtitle)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
             .lineLimit(2)
@@ -446,7 +456,7 @@ struct StudentHomeView: View {
       HStack(spacing: 14) {
         let teachers = viewModel.onlineTeachers
         if teachers.isEmpty {
-          Text(LocalizationSupport.localized("No teachers online right now"))
+          Text(viewModel.noTeachersOnlineText)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
         } else {
@@ -469,7 +479,7 @@ struct StudentHomeView: View {
 
   var howItWorksPanel: some View {
     VStack(alignment: .leading, spacing: 22) {
-      Text(LocalizationSupport.localized("How it works"))
+      Text(viewModel.howItWorksTitle)
         .font(.system(size: 24, weight: .bold))
         .foregroundStyle(theme.onDarkFill)
 		.frame(maxWidth: .infinity, alignment: .leading)
@@ -477,27 +487,27 @@ struct StudentHomeView: View {
       VStack(spacing: 24) {
         howItWorksStep(
           number: 1,
-          title: LocalizationSupport.localized("Ask a question"),
-          subtitle: LocalizationSupport.localized("Describe the problem – text, image, or whiteboard drawing"),
+          title: viewModel.howItWorksStep1Title,
+          subtitle: viewModel.howItWorksStep1Subtitle,
           tint: theme.info
         )
         howItWorksStep(
           number: 2,
           title: viewModel.connectStepTitle,
-          subtitle: LocalizationSupport.localized("The system finds an available teacher for your subject"),
+          subtitle: viewModel.howItWorksStep2Subtitle,
           tint: theme.warning
         )
         howItWorksStep(
           number: 3,
-          title: LocalizationSupport.localized("Live lesson"),
-          subtitle: LocalizationSupport.localized("Chat, whiteboard, voice messages – real time"),
+          title: viewModel.howItWorksStep3Title,
+          subtitle: viewModel.howItWorksStep3Subtitle,
           tint: theme.accent
         )
         howItWorksStep(
           number: 4,
-          title: LocalizationSupport.localized("Pay only for what you used"),
+          title: viewModel.howItWorksStep4Title,
           subtitle: viewModel.pricePerMinuteText.isEmpty
-            ? LocalizationSupport.localized("Only billed minutes count")
+            ? viewModel.howItWorksStep4SubtitleFallback
             : viewModel.pricePerMinuteText,
           tint: theme.positive
         )
@@ -570,22 +580,6 @@ struct StudentHomeView: View {
 //    }
 //  }
 
-  var studentDisplayName: String {
-    let trimmed = viewModel.name.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? LocalizationSupport.localized("Student") : trimmed
-  }
-
-  var lastLessonTeacherText: String {
-    viewModel.recentLessons.first?.teacher.isEmpty == false ? viewModel.recentLessons.first?.teacher ?? LocalizationSupport.localized("None yet") : LocalizationSupport.localized("None yet")
-  }
-
-  var lastLessonDetailText: String {
-    guard let lesson = viewModel.recentLessons.first else { return LocalizationSupport.localized("Ask a teacher to start") }
-    return String(format: LocalizationSupport.localized("%@ • %@"), lesson.title, lesson.duration)
-  }
-
-
-  var onlineTeacherCount: Int { viewModel.onlineTeachers.count }
 
   var twoColumnGrid: [GridItem] {
     [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
@@ -647,7 +641,7 @@ struct StudentHomeView: View {
       if let caption {
         Text(caption)
           .font(.system(size: 14, weight: .bold))
-          .foregroundStyle(caption == LocalizationSupport.localized("All") ? theme.info : theme.secondaryText)
+          .foregroundStyle(caption == viewModel.teachersOnlineNowCaption ? theme.info : theme.secondaryText)
       }
     }
   }
@@ -665,9 +659,7 @@ struct StudentHomeView: View {
             // A live count of teachers online for this subject, so one is
             // enough to say so — the old copy only lit up past 30, a threshold
             // that made sense only against the invented counts.
-            Text(subject.teacherCount == 1
-                 ? LocalizationSupport.localized("1 teacher")
-                 : String(format: LocalizationSupport.localized("%d teachers"), subject.teacherCount))
+            Text(viewModel.teacherCountText(for: subject))
               .font(.system(size: 13, weight: .bold))
               .foregroundStyle(tint)
           }
@@ -685,9 +677,7 @@ struct StudentHomeView: View {
 
         HStack(spacing: 7) {
           FlatStatusDot(color: subject.hasTeachersOnline ? theme.positive : theme.secondaryText, size: 9)
-          Text(subject.hasTeachersOnline
-               ? LocalizationSupport.localized("Teacher available now")
-               : LocalizationSupport.localized("No one available now"))
+          Text(viewModel.teacherAvailabilityText(for: subject))
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
         }
@@ -731,18 +721,18 @@ struct StudentHomeView: View {
           .foregroundStyle(tint)
           .lineLimit(1)
 
-        Button {
-          showsAskTeacher = true
-        } label: {
-          Text(LocalizationSupport.localized("Meet"))
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(theme.info)
-            .frame(maxWidth: .infinity)
-            .frame(height: 36)
-            .background(theme.info.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
-        }
-        .buttonStyle(.plain)
+//        Button {
+//          showsAskTeacher = true
+//        } label: {
+//          Text(viewModel.meetLabel)
+//            .font(.system(size: 14, weight: .bold))
+//            .foregroundStyle(theme.info)
+//            .frame(maxWidth: .infinity)
+//            .frame(height: 36)
+//            .background(theme.info.opacity(0.12))
+//            .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+//        }
+//        .buttonStyle(.plain)
       }
       .frame(maxWidth: .infinity)
       .frame(minHeight: 210)
@@ -756,7 +746,7 @@ struct StudentHomeView: View {
       FlatCard(outlined: true) {
         VStack(alignment: .leading, spacing: 10) {
           HStack {
-            Text(LocalizationSupport.localized(option.name))
+            Text(viewModel.localizedName(for: option))
               .font(.system(size: 14, weight: .bold))
               .foregroundStyle(theme.secondaryText)
               .lineLimit(1)
@@ -770,7 +760,7 @@ struct StudentHomeView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.75)
 
-          Text(option.minutesText == nil ? LocalizationSupport.localized(option.description) : option.priceText)
+          Text(option.minutesText == nil ? viewModel.localizedDescription(for: option) : option.priceText)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
             .lineLimit(2)
@@ -809,7 +799,7 @@ struct StudentHomeView: View {
 	let isLoading = viewModel.couponState == .loading
 	let isDisabled = trimmedCode.isEmpty || isLoading
 	return HStack(spacing: 10) {
-	  TextField(LocalizationSupport.localized("Have a code?"), text: couponBinding)
+	  TextField(viewModel.couponPlaceholder, text: couponBinding)
 		.textInputAutocapitalization(.never)
 		.autocorrectionDisabled(true)
 		.padding(.horizontal, 12)
@@ -832,7 +822,7 @@ struct StudentHomeView: View {
 		if isLoading {
 		  ProgressView()
 		} else {
-		  Text(LocalizationSupport.localized("Redeem"))
+		  Text(viewModel.redeemLabel)
 		}
 	  }
 	  .buttonStyle(.borderedProminent)
@@ -861,37 +851,6 @@ struct StudentHomeView: View {
 	}
   }
 
-  var couponAlertTitle: String {
-	switch viewModel.couponState {
-	case .success:
-	  return LocalizationSupport.localized("Success")
-	case .alreadyActivated:
-	  return LocalizationSupport.localized("Code Already Used")
-	case .invalid:
-	  return LocalizationSupport.localized("Invalid Code")
-	case .error:
-	  return LocalizationSupport.localized("Error")
-	default:
-	  return ""
-	}
-  }
-
-  var couponAlertMessage: String {
-	switch viewModel.couponState {
-	case .success(let minutes):
-	  let format = LocalizationSupport.localized("Code applied! Added %d minutes.")
-	  return String(format: format, minutes)
-	case .alreadyActivated(let date):
-	  let format = LocalizationSupport.localized("This code was already activated on %@.")
-	  return String(format: format, date)
-	case .invalid:
-	  return LocalizationSupport.localized("This code is not valid.")
-	case .error(let msg):
-	  return msg
-	default:
-	  return ""
-	}
-  }
 
 #if os(Android)
   func paymentReturnOverlay(_ result: PaymentReturnResult) -> some View {
@@ -913,7 +872,7 @@ struct StudentHomeView: View {
 		Button {
 		  paymentReturnStore.consumeLatestResult()
 		} label: {
-		  Text(LocalizationSupport.localized("OK"))
+		  Text(viewModel.okLabel)
 			.font(.system(size: 15, weight: .bold))
 			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
@@ -933,11 +892,6 @@ struct StudentHomeView: View {
   }
 #endif
   
-  var lowBalanceMessage: String {
-	let format = LocalizationSupport.localized("You have %@ remaining. You need at least 2 minutes to ask a teacher. Please buy more minutes to continue.")
-	return String(format: format, LessonFormatting.minutesText(viewModel.remainingMinutes))
-  }
-  
   var isShowingPaymentReturnResult: Binding<Bool> {
 	Binding(
 	  get: {
@@ -956,20 +910,6 @@ struct StudentHomeView: View {
 	)
   }
 
-  var purchaseSummaryMessage: String {
-	guard let summary = viewModel.purchaseSummary else { return "" }
-	let purchased = String(
-	  format: LocalizationSupport.localized("%@ purchased for %@."),
-	  summary.packageName,
-	  summary.priceText
-	)
-	guard let minutesText = summary.minutesText else { return purchased }
-	let added = String(
-	  format: LocalizationSupport.localized("Added %@ to your balance."),
-	  minutesText
-	)
-	return purchased + "\n" + added
-  }
 
   var isChoosingPaymentMethod: Binding<Bool> {
 	Binding(
@@ -1026,7 +966,7 @@ struct StudentHomeView: View {
       ChatSessionView(
         questionId: questionId,
         role: "student",
-        title: LocalizationSupport.localized("Teacher"),
+        title: viewModel.chatTeacherTitle,
         conversationType: viewModel.activeConversationType,
         liveKitRoom: liveKitRoom,
         liveKitToken: liveKitToken,
@@ -1056,14 +996,14 @@ struct StudentHomeView: View {
   var statsStrip: some View {
     HStack(spacing: 12) {
       HistoryMetricCard(
-        title: LocalizationSupport.localized("Time Learned"),
+        title: viewModel.timeLearnedTitle,
         value: viewModel.totalTimeLearnedText,
         systemImage: "clock.fill",
         tint: theme.primaryText
       )
 
       HistoryMetricCard(
-        title: LocalizationSupport.localized("Total Purchased"),
+        title: viewModel.totalPurchasedTitle,
         value: viewModel.totalPurchasedText,
         systemImage: "clock.badge.checkmark.fill",
         tint: theme.primaryText
@@ -1099,18 +1039,18 @@ struct StudentHomeView: View {
       VStack(alignment: .leading, spacing: 0) {
         Spacer()
 
-        Text(LocalizationSupport.localized("Ask a math teacher"))
+        Text(viewModel.askMathTeacherLabel)
           .font(.system(size: 26, weight: .bold))
           .foregroundStyle(theme.onAccentText)
 
         HStack(spacing: 6) {
-          Text(String(format: LocalizationSupport.localized("%d min remaining"), viewModel.remainingMinutes))
+          Text(viewModel.remainingMinutesText)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(theme.onAccentText.opacity(0.75))
-          Text(LocalizationSupport.localized("•"))
+          Text("•")
             .font(.system(size: 14))
             .foregroundStyle(theme.onAccentText.opacity(0.5))
-          Text(LocalizationSupport.localized("Per-minute billing"))
+          Text(viewModel.perMinuteBillingLabel)
             .font(.system(size: 14))
             .foregroundStyle(theme.onAccentText.opacity(0.75))
         }
@@ -1146,12 +1086,12 @@ struct StudentHomeView: View {
         FlatIconTile(systemName: "lightbulb.fill", size: 44, background: theme.screenBackground)
 
         VStack(alignment: .leading, spacing: 10) {
-          Text(LocalizationSupport.localized("Tips for faster matches"))
+          Text(viewModel.tipsTitle)
             .font(.system(size: 16, weight: .bold))
             .foregroundStyle(theme.primaryText)
 
-          tipLine(LocalizationSupport.localized("Upload a clear photo of your math problem"))
-          tipLine(LocalizationSupport.localized("Specify the exact topic (e.g., \u{201C}Derivatives\u{201D})"))
+          tipLine(viewModel.tip1Text)
+          tipLine(viewModel.tip2Text)
         }
 
         Spacer()
@@ -1171,7 +1111,7 @@ struct StudentHomeView: View {
   
   func sectionHeader(title: String, actionTitle: String? = nil, action: (@MainActor @Sendable () -> Void)? = nil) -> some View {
     HStack {
-      Text(LocalizationSupport.localized(title))
+      Text(title)
         .font(.system(size: 24, weight: .bold))
         .foregroundStyle(theme.primaryText)
 
@@ -1179,7 +1119,7 @@ struct StudentHomeView: View {
 
       if let actionTitle, let action {
         Button(action: action) {
-          Text(LocalizationSupport.localized(actionTitle))
+          Text(actionTitle)
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(theme.primaryText)
         }

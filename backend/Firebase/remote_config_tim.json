@@ -1198,11 +1198,11 @@
     },
     "help_you_anywhere": {
       "defaultValue": {
-        "value": "Help you anywhere"
+        "value": ""
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "עזרה מכל מקום"
+          "value": ""
         }
       },
       "valueType": "STRING"
@@ -2819,17 +2819,6 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "שמור שינויים"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "help_you_anywhere": {
-      "defaultValue": {
-        "value": "Help you anywhere"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "עזרה מכל מקום"
         }
       },
       "valueType": "STRING"

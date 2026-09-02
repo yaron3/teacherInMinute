@@ -24,8 +24,7 @@ struct AuthPrimaryButton: View {
                 Text(title)
 
                 if let systemImage {
-                    PlatformIcon(systemName: systemImage)
-                        .font(.system(size: 15, weight: .bold))
+				  PlatformIcon(systemName: systemImage, size: 20, weight: .bold , color: isEnabled ? theme.onAccentText : theme.secondaryText)
                 }
             }
             .font(.system(size: 17, weight: .bold))
@@ -53,9 +52,7 @@ struct AuthIconHeader: View {
             .fill(theme.cardBackground)
             .frame(width: 56, height: 56)
             .overlay {
-                PlatformIcon(systemName: systemImage)
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(theme.primaryText)
+                PlatformIcon(systemName: systemImage, size: 26, weight: .semibold, color: theme.primaryText)
             }
     }
 }
@@ -189,8 +186,7 @@ struct SubjectChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 7) {
-                PlatformIcon(systemName: subject.systemImage)
-                    .font(.system(size: 14, weight: .semibold))
+                PlatformIcon(systemName: subject.systemImage, size: 14, weight: .semibold)
 
                 Text(LocalizationSupport.localized(subject.title))
                     .font(.system(size: 15, weight: .medium))

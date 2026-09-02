@@ -101,7 +101,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Tell us a bit about yourself to get started with\nTeacher in a Minute.": "ספר לנו קצת על עצמך כדי להתחיל עם\nTeacher in a Minute.",
         "How do you want to use Teacher in a Minute? You\ncan change this later in settings.": "איך תרצה להשתמש ב־Teacher in a Minute? תוכל\nלשנות זאת מאוחר יותר בהגדרות.",
         "Send me occasional updates and tips about\nTeacher in a Minute.": "שלחו לי מדי פעם עדכונים וטיפים על\nTeacher in a Minute.",
-        "Help you anywhere": "עזרה מכל מקום",
+        "Help you anywhere": "",
         // Title of the photo-source dialog; its buttons already had Hebrew, so
         // only the heading was showing through in English.
         "Add a photo": "הוספת תמונה",
@@ -157,7 +157,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Chat, whiteboard, voice messages – real time": "צ׳אט, לוח לבן, הודעות קוליות – בזמן אמת",
         // Hero section
         "Hello, %@": "שלום, %@",
-        "Teacher in a Moment": "מורה ברגע",
+        "Teacher in a Moment": "מורה לרגע",
         "When AI gets stuck, a human teacher connects in 90 seconds": "כש-AI נתקע – מורה אנושי ב-90 שניות",
         "%d teachers available now": "%d מורים פניים עכשיו",
         "90 sec avg to connect": "ממוצע 90 שנ' להתחברות",

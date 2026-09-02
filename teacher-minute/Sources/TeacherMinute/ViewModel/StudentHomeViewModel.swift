@@ -182,6 +182,145 @@ protocol StudentHomeViewModeling: AnyObject {
   func consumePurchaseSummary()
 }
 
+// MARK: - Default Localized Strings
+
+extension StudentHomeViewModeling {
+
+  // MARK: Dialog & button labels
+  var askATeacherSheetTitle: String { LocalizationSupport.localized("Ask a Teacher") }
+  var lowBalanceAlertTitle: String { LocalizationSupport.localized("Low Balance") }
+  var okLabel: String { LocalizationSupport.localized("OK") }
+  var purchaseCompleteTitle: String { LocalizationSupport.localized("Purchase complete") }
+  var paymentFallbackTitle: String { LocalizationSupport.localized("Payment") }
+  var meetLabel: String { LocalizationSupport.localized("Meet") }
+  var redeemLabel: String { LocalizationSupport.localized("Redeem") }
+  var couponPlaceholder: String { LocalizationSupport.localized("Have a code?") }
+  var chatTeacherTitle: String { LocalizationSupport.localized("Teacher") }
+  var perMinuteSuffix: String { LocalizationSupport.localized("/min") }
+
+  // MARK: Section headers & captions
+  var availableSubjectsTitle: String { LocalizationSupport.localized("Available Subjects") }
+  var teachersOnlineNowTitle: String { LocalizationSupport.localized("Teachers online now") }
+  var teachersOnlineNowCaption: String { LocalizationSupport.localized("All") }
+  var creditsTitle: String { LocalizationSupport.localized("Credits") }
+
+  // MARK: Hero section
+  var appDisplayName: String { LocalizationSupport.localized("Teacher in a Moment") }
+  var minutesLabel: String { LocalizationSupport.localized("minutes") }
+  var askQuestionNowLabel: String { LocalizationSupport.localized("Ask a question now") }
+
+  // MARK: Overview cards
+  var yourBalanceTitle: String { LocalizationSupport.localized("Your Balance") }
+  var leftToLearnDetail: String { LocalizationSupport.localized("Left to learn") }
+  var buyMoreLabel: String { LocalizationSupport.localized("Buy More +") }
+  var lastLessonCardTitle: String { LocalizationSupport.localized("Last Lesson") }
+  var noLessonsText: String { LocalizationSupport.localized("None yet") }
+  var noLessonsSubtitle: String { LocalizationSupport.localized("Ask a teacher to start") }
+  var noTeachersOnlineText: String { LocalizationSupport.localized("No teachers online right now") }
+
+  // MARK: How it works
+  var howItWorksTitle: String { LocalizationSupport.localized("How it works") }
+  var howItWorksStep1Title: String { LocalizationSupport.localized("Ask a question") }
+  var howItWorksStep1Subtitle: String { LocalizationSupport.localized("Describe the problem – text, image, or whiteboard drawing") }
+  var howItWorksStep2Subtitle: String { LocalizationSupport.localized("The system finds an available teacher for your subject") }
+  var howItWorksStep3Title: String { LocalizationSupport.localized("Live lesson") }
+  var howItWorksStep3Subtitle: String { LocalizationSupport.localized("Chat, whiteboard, voice messages – real time") }
+  var howItWorksStep4Title: String { LocalizationSupport.localized("Pay only for what you used") }
+  var howItWorksStep4SubtitleFallback: String { LocalizationSupport.localized("Only billed minutes count") }
+
+  // MARK: Stats strip
+  var timeLearnedTitle: String { LocalizationSupport.localized("Time Learned") }
+  var totalPurchasedTitle: String { LocalizationSupport.localized("Total Purchased") }
+
+  // MARK: Ask card
+  var askMathTeacherLabel: String { LocalizationSupport.localized("Ask a math teacher") }
+  var perMinuteBillingLabel: String { LocalizationSupport.localized("Per-minute billing") }
+
+  // MARK: Tips card
+  var tipsTitle: String { LocalizationSupport.localized("Tips for faster matches") }
+  var tip1Text: String { LocalizationSupport.localized("Upload a clear photo of your math problem") }
+  var tip2Text: String { LocalizationSupport.localized("Specify the exact topic (e.g., \u{201C}Derivatives\u{201D})") }
+
+  // MARK: Dynamic computed strings
+
+  var studentDisplayName: String {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? LocalizationSupport.localized("Student") : trimmed
+  }
+
+  var greetingText: String {
+    String(format: LocalizationSupport.localized("Hello, %@"), studentDisplayName)
+  }
+
+  var onlineTeachersCountText: String {
+    String(format: LocalizationSupport.localized("%d teachers available now"), onlineTeachers.count)
+  }
+
+  var remainingMinutesText: String {
+    String(format: LocalizationSupport.localized("%d min remaining"), remainingMinutes)
+  }
+
+  var lowBalanceMessage: String {
+    let format = LocalizationSupport.localized("You have %@ remaining. You need at least 2 minutes to ask a teacher. Please buy more minutes to continue.")
+    return String(format: format, LessonFormatting.minutesText(remainingMinutes))
+  }
+
+  var couponAlertTitle: String {
+    switch couponState {
+    case .success: return LocalizationSupport.localized("Success")
+    case .alreadyActivated: return LocalizationSupport.localized("Code Already Used")
+    case .invalid: return LocalizationSupport.localized("Invalid Code")
+    case .error: return LocalizationSupport.localized("Error")
+    default: return ""
+    }
+  }
+
+  var couponAlertMessage: String {
+    switch couponState {
+    case .success(let minutes):
+      return String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), minutes)
+    case .alreadyActivated(let date):
+      return String(format: LocalizationSupport.localized("This code was already activated on %@."), date)
+    case .invalid:
+      return LocalizationSupport.localized("This code is not valid.")
+    case .error(let msg):
+      return msg
+    default:
+      return ""
+    }
+  }
+
+  var purchaseSummaryMessage: String {
+    guard let summary = purchaseSummary else { return "" }
+    let purchased = String(format: LocalizationSupport.localized("%@ purchased for %@."), summary.packageName, summary.priceText)
+    guard let minutesText = summary.minutesText else { return purchased }
+    let added = String(format: LocalizationSupport.localized("Added %@ to your balance."), minutesText)
+    return purchased + "\n" + added
+  }
+
+  // MARK: Per-item text helpers
+
+  func teacherCountText(for subject: StudentSubject) -> String {
+    subject.teacherCount == 1
+      ? LocalizationSupport.localized("1 teacher")
+      : String(format: LocalizationSupport.localized("%d teachers"), subject.teacherCount)
+  }
+
+  func teacherAvailabilityText(for subject: StudentSubject) -> String {
+    subject.hasTeachersOnline
+      ? LocalizationSupport.localized("Teacher available now")
+      : LocalizationSupport.localized("No one available now")
+  }
+
+  func localizedName(for option: PricingOption) -> String {
+    LocalizationSupport.localized(option.name)
+  }
+
+  func localizedDescription(for option: PricingOption) -> String {
+    LocalizationSupport.localized(option.description)
+  }
+}
+
 // MARK: - ViewModel
 
 @Observable
