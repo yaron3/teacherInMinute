@@ -16,6 +16,8 @@ import {
 } from "./payoutMethod";
 import { ISRAELI_BANKS } from "./israeliBanks";
 import { lookupPayPalAccountEmail, BraintreeNotConfiguredError } from "./braintree";
+import { validateEmail, emailRejectionMessage } from "./emailValidation";
+import { requiresOwnershipVerification } from "./emailOwnership";
 
 const firestore = admin.firestore();
 
@@ -201,6 +203,29 @@ export const updateTeacherPayoutMethod = onCall(async (req) => {
       throw new HttpsError("invalid-argument", err.message);
     }
     throw err;
+  }
+
+  // A typed PayPal address has to be somewhere mail can actually reach, or the
+  // payout has nowhere to land and the teacher gets no notice of the failure.
+  if (method.type === "paypal") {
+    const check = await validateEmail(method.email);
+    if (!check.valid) {
+      logger.info(
+        `[earnings] payout email rejected uid=${uid} reason=${check.reason ?? "mailbox"}`
+      );
+      throw new HttpsError("invalid-argument", emailRejectionMessage(check));
+    }
+    method = { ...method, email: check.email };
+
+    // An address the teacher already proved they hold — by signing in through
+    // Google/Apple/etc. with it, or by confirming it on an email/password
+    // account — needs no second proof. Anything else stays unverified until
+    // they confirm it; PayPal rejecting a transfer to a non-PayPal address is
+    // the backstop either way.
+    if (!method.verified && !(await requiresOwnershipVerification(uid, method.email))) {
+      method = { ...method, verified: true };
+      logger.info(`[earnings] payout email already proven for uid=${uid}`);
+    }
   }
 
   await firestore.collection("users").doc(uid).set(

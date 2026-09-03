@@ -94,6 +94,14 @@ struct GooglePayCheckoutSession {
   let countryCode: String
 }
 
+struct EmailValidationResult {
+  /// Trimmed and lowercased by the backend — store this, not what was typed.
+  let email: String
+  let isValid: Bool
+  /// Why it was rejected, ready to show. Nil when the address is usable.
+  let message: String?
+}
+
 struct PaymentSettingsSessionResult {
   let settingsURL: URL
 }
@@ -475,6 +483,22 @@ final class FunctionsService {
   /// Saves where the teacher's payout is sent. The backend validates the fields
   /// the chosen type requires and throws `invalid-argument` with a message the
   /// teacher can act on. Returns the masked destination summary.
+  /// Checks an address before it is submitted anywhere — the payout form
+  /// today, email signup next. Stores nothing and needs no sign-in.
+  ///
+  /// `valid == false` carries a `message` explaining which check failed
+  /// (malformed, or a domain that accepts no mail). Mailbox existence is only
+  /// reported when the backend has a verification provider configured; when it
+  /// does not, a well-formed address on a real mail domain reads as valid.
+  func validateEmailAddress(_ email: String) async throws -> EmailValidationResult {
+    let result = try await call(function: "validateEmailAddress", data: ["email": email])
+    return EmailValidationResult(
+      email: result["email"] as? String ?? email,
+      isValid: result["valid"] as? Bool ?? false,
+      message: result["message"] as? String
+    )
+  }
+
   func updateTeacherPayoutMethod(_ method: TeacherPayoutMethod) async throws -> String {
     let result = try await call(
       function: "updateTeacherPayoutMethod",

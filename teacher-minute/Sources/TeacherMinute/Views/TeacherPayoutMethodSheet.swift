@@ -55,20 +55,16 @@ struct TeacherPayoutMethodSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
 
-        // PayPal saves itself when the login completes, so it has no Save
-        // button — there is nothing to submit that PayPal has not confirmed.
-        if method.type != .paypal {
-          AuthPrimaryButton(
-            title: isSaving
-              ? LocalizationSupport.localized("Saving...")
-              : LocalizationSupport.localized("Save"),
-            systemImage: "checkmark",
-            isEnabled: method.isComplete && !isSaving
-          ) {
-            onSave()
-          }
-          .padding(.top, 4)
+        AuthPrimaryButton(
+          title: isSaving
+            ? LocalizationSupport.localized("Saving...")
+            : LocalizationSupport.localized("Save Changes"),
+          systemImage: "checkmark",
+          isEnabled: method.isComplete && !isSaving
+        ) {
+          onSave()
         }
+        .padding(.top, 4)
 
         Button(LocalizationSupport.localized("Cancel")) {
           onCancel()
@@ -204,6 +200,11 @@ struct TeacherPayoutMethodSheet: View {
     return !phone.isEmpty && !phone.isValidPhoneNumber
   }
 
+  var showsPayPalEmailError: Bool {
+    let email = method.email.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !email.isEmpty && !email.isEmail
+  }
+
   var bitFields: some View {
     VStack(alignment: .leading, spacing: 18) {
       AuthInputField(
@@ -241,47 +242,75 @@ struct TeacherPayoutMethodSheet: View {
     }
   }
 
-  /// No email field: PayPal offers no way to check whether an address has an
-  /// account, so the address is taken from a completed PayPal login instead of
-  /// being typed — that is also what proves the teacher controls it.
+  /// PayPal offers no API to check whether an address has an account, so the
+  /// address is simply typed and saved. Signing in to PayPal (below) still
+  /// proves ownership and marks the account confirmed, but it is optional —
+  /// a payout to an address with no PayPal account is rejected by PayPal at
+  /// transfer time, which is the backstop.
   var payPalFields: some View {
     VStack(alignment: .leading, spacing: 18) {
-      if method.isPayPalVerified, !method.email.isEmpty {
-        HStack(spacing: 12) {
-          FlatIconTile(
-            systemName: "checkmark.seal.fill",
-            size: 40,
-            tint: theme.positive,
-            background: theme.screenBackground
-          )
-          VStack(alignment: .leading, spacing: 3) {
-            Text(LocalizationSupport.localized("PayPal account confirmed"))
-              .font(.system(size: 14, weight: .bold))
-              .foregroundStyle(theme.primaryText)
-            Text(method.email)
-              .font(.system(size: 13))
-              .foregroundStyle(theme.secondaryText)
-              .lineLimit(1)
-          }
-          Spacer()
-        }
-      }
+      AuthInputField(
+        title: LocalizationSupport.localized("PayPal Email"),
+        placeholder: LocalizationSupport.localized("name@example.com"),
+        systemImage: "envelope",
+        text: $method.email,
+        keyboardType: .emailAddress,
+        textContentType: .emailAddress,
+        isValid: !showsPayPalEmailError,
+        errorMessage: LocalizationSupport.localized("Enter a valid PayPal email address.")
+      )
 
-      AuthPrimaryButton(
-        title: isConnectingPayPal
-          ? LocalizationSupport.localized("Connecting...")
-          : (method.isPayPalVerified
-             ? LocalizationSupport.localized("Connect a different account")
-             : LocalizationSupport.localized("Connect PayPal")),
-        systemImage: "link",
-        isEnabled: !isConnectingPayPal
-      ) {
-        onConnectPayPal()
-      }
+//      if method.isPayPalVerified, !method.email.isEmpty {
+//        HStack(spacing: 12) {
+//          FlatIconTile(
+//            systemName: "checkmark.seal.fill",
+//            size: 40,
+//            tint: theme.positive,
+//            background: theme.screenBackground
+//          )
+//          VStack(alignment: .leading, spacing: 3) {
+//            Text(LocalizationSupport.localized("PayPal account confirmed"))
+//              .font(.system(size: 14, weight: .bold))
+//              .foregroundStyle(theme.primaryText)
+//            Text(method.email)
+//              .font(.system(size: 13))
+//              .foregroundStyle(theme.secondaryText)
+//              .lineLimit(1)
+//          }
+//          Spacer()
+//        }
+//      }
 
-      Text(LocalizationSupport.localized("You will sign in to PayPal so we can confirm the account is yours. We never see your PayPal password."))
-        .font(.system(size: 13))
-        .foregroundStyle(theme.secondaryText)
+      // A secondary link, not a second primary button: it looked identical to
+      // Save, and teachers were tapping it by mistake to submit a typed
+      // address — landing on an unrelated PayPal-account-linking flow instead.
+//      Button {
+//        onConnectPayPal()
+//      } label: {
+//        HStack(spacing: 8) {
+//          if isConnectingPayPal {
+//            ProgressView()
+//          } else {
+//            PlatformIcon(systemName: "link", size: 14, weight: .semibold, color: theme.info)
+//          }
+//          Text(
+//            isConnectingPayPal
+//              ? LocalizationSupport.localized("Connecting...")
+//              : (method.isPayPalVerified
+//                 ? LocalizationSupport.localized("Connect a different account")
+//                 : LocalizationSupport.localized("Or sign in to PayPal to confirm it's you"))
+//          )
+//          .font(.system(size: 13, weight: .semibold))
+//          .foregroundStyle(theme.info)
+//          Spacer()
+//        }
+//      }
+//      .buttonStyle(.plain)
+//      .disabled(isConnectingPayPal)
+//
+//      Text(LocalizationSupport.localized("We never see your PayPal password."))
+//        .font(.system(size: 13))
+//        .foregroundStyle(theme.secondaryText)
     }
   }
 }

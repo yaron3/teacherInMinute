@@ -88,9 +88,12 @@ struct TeacherPayoutMethod {
       // before the round-trip.
       return phone.trimmed.isValidPhoneNumber
     case .paypal:
-      // PayPal is saved by completing the login, not by typing — see
-      // TeacherEarningsViewModel.connectPayPalPayoutAccount.
-      return isPayPalVerified && !email.trimmed.isEmpty
+      // A well-formed address is enough to save. Signing in to PayPal
+      // (connectPayPalPayoutAccount) additionally marks it confirmed, but is
+      // not required: PayPal exposes no way to check an address for an
+      // account, and a payout to an address without one is rejected at
+      // transfer time.
+      return email.trimmed.isEmail
     }
   }
 

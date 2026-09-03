@@ -35,6 +35,9 @@ export {
   verifyPayPalPayoutAccount,
 } from "./earnings";
 
+// Shared email checking — used by the payout form and available to signup
+export { validateEmailAddress } from "./emailValidation";
+
 // Admin dashboard
 export {
   adminDashboardStatus,

@@ -59,6 +59,7 @@ struct PlatformIcon: View {
 	  case "antenna.radiowaves.left.and.right": return "📡"
 	  case "checkmark.seal":                    return "☑️"
 	  case "checkmark.seal.fill":               return "✅"
+	  case "link":                              return "🔗"
 	  case "checkmark.circle.fill":             return "✓"
 	  case "questionmark.circle":               return "?"
 	  case "photo.fill":                        return "▧"

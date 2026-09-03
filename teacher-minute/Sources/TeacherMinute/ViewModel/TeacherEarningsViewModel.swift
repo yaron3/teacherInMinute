@@ -153,6 +153,18 @@ final class TeacherEarningsViewModel {
         }
     }
 
+    /// Used by the Settings payout screen, which — unlike the Earnings tab —
+    /// exists only to edit the payout method: it loads the same data `load()`
+    /// does, then opens the editor immediately instead of waiting for an
+    /// "Edit" tap.
+    func loadForPayoutMethodEditing() async {
+        guard !isLoading else { return }
+        isLoading = true
+        await loadData()
+        isLoading = false
+        editPayoutMethod()
+    }
+
     // MARK: - Private
 
     private func loadData() async {
@@ -296,9 +308,10 @@ final class TeacherEarningsViewModel {
     }
 
     /// Confirms a PayPal payout account by having the teacher log in to PayPal.
-    /// PayPal has no API to check whether an address has an account, so this
-    /// login is the only real proof — which is why the PayPal option is saved
-    /// here rather than through the Save button.
+    /// PayPal has no API to check whether an address has an account, so a typed
+    /// address (saved through the Save button, see `savePayoutMethod`) is taken
+    /// on trust and left unverified; logging in here is the only real proof of
+    /// ownership, and marks the same address confirmed instead of replacing it.
     ///
     /// Works on both platforms: iOS presents PayPal in an
     /// `ASWebAuthenticationSession`, Android switches out to the browser and

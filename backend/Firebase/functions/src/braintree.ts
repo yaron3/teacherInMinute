@@ -1,8 +1,6 @@
 import { logger } from "firebase-functions";
 import * as braintree from "braintree";
 
-import { DEFAULT_CURRENCY } from "./pricing";
-
 // ─── Braintree — native Apple Pay processing ──────────────────────────────
 //
 // Apple Pay needs a real native PassKit sheet in the app, which PayPal's
@@ -172,20 +170,20 @@ async function ensureBraintreeCustomer(gateway: braintree.BraintreeGateway, uid:
 /** A client token scoped to this uid's Braintree customer, so the PayPal
  *  tokenization it authorizes can be vaulted against that customer.
  *
- *  Names a merchant account for the same reason `generateBraintreeClientToken`
- *  does. Omitting it leaves Braintree to fall back to the gateway's default
- *  account, and when no default resolves, PayPal rejects the billing agreement
- *  with "Merchant account not found" — the whole flow fails before the login
- *  even opens. No amount is charged through this token (see
- *  `lookupPayPalAccountEmail`), so the account only decides which PayPal
- *  configuration runs the login; the platform's default currency is the right
- *  one to borrow. */
+ *  Deliberately does NOT name a merchant account, unlike
+ *  `generateBraintreeClientToken`. PayPal is configured gateway-wide here, not
+ *  per merchant account, so naming one makes Braintree report
+ *  `paypalEnabled: false` in the configuration this token fetches — and the
+ *  SDK then refuses to open the login at all with "PayPal is not enabled for
+ *  this merchant". Verified against the gateway: an unscoped token reports
+ *  paypalEnabled true and billingAgreementsEnabled true, while tokens scoped
+ *  to either merchant account report false. No amount is charged through this
+ *  token (see `lookupPayPalAccountEmail`), so there is no currency to match. */
 export async function generateVaultClientToken(uid: string): Promise<string> {
   const gateway = getGateway();
   await ensureBraintreeCustomer(gateway, uid);
   const response = await gateway.clientToken.generate({
     customerId: uid,
-    merchantAccountId: merchantAccountIdFor(DEFAULT_CURRENCY),
   });
   return response.clientToken;
 }

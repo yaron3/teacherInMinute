@@ -256,9 +256,7 @@ protocol SettingsViewModeling: AnyObject {
     var showReauthPasswordPrompt: Bool { get set }
     var reauthPassword: String { get set }
     var isOpeningPaymentSettings: Bool { get set }
-    var isSavingPayoutSettings: Bool { get set }
     var isSubmittingContactSupport: Bool { get set }
-    var teacherPayPalEmail: String { get set }
     var contactSupportTitle: String { get set }
     var contactSupportDescription: String { get set }
     var contactSupportTitleMaxLength: Int { get set }
@@ -271,8 +269,6 @@ protocol SettingsViewModeling: AnyObject {
     func updateLanguage(_ language: SettingsLanguageChoice)
     func sendPasswordReset()
     func openPaymentSettings()
-    func loadTeacherPayoutSettings() async
-    func saveTeacherPayoutSettings()
     func deleteAccount() async -> Bool
     func completeAccountDeletion(withPassword password: String) async -> Bool
     func logOut() -> Bool
@@ -602,18 +598,6 @@ extension SettingsViewModeling {
     var noPaymentsTitle: String { LocalizationSupport.localized("No payments yet") }
     var noPaymentsSubtitle: String { LocalizationSupport.localized("Your lesson payments will appear here.") }
 
-    // MARK: Teacher payouts
-    var teacherPayoutIntroText: String {
-        LocalizationSupport.localized("Teachers must add and keep a valid PayPal email in order to receive payouts. Payments cannot be sent until this information is valid.")
-    }
-    var payPalEmailSectionTitle: String { LocalizationSupport.localized("PayPal Email") }
-    var payPalEmailPlaceholder: String { LocalizationSupport.localized("teacher@example.com") }
-    var savePayoutButtonLabel: String {
-        isSavingPayoutSettings
-            ? LocalizationSupport.localized("Saving...")
-            : LocalizationSupport.localized("Save PayPal Info")
-    }
-
     // MARK: Change password
     var changePasswordIntroText: String {
         LocalizationSupport.localized("Send a password reset email to the email address on this account.")
@@ -679,9 +663,7 @@ class SettingsViewModel: SettingsViewModeling {
     var showReauthPasswordPrompt = false
     var reauthPassword = ""
     var isOpeningPaymentSettings = false
-    var isSavingPayoutSettings = false
     var isSubmittingContactSupport = false
-    var teacherPayPalEmail = ""
     var contactSupportTitle = ""
     var contactSupportDescription = ""
     var contactSupportTitleMaxLength = 50
@@ -785,48 +767,6 @@ class SettingsViewModel: SettingsViewModeling {
         }
     }
 
-    func loadTeacherPayoutSettings() async {
-        guard role == .teacher, let uid = authService.currentUserID else { return }
-        do {
-            let data = try await UserService.shared.fetchRaw(uid: uid) ?? [:]
-            teacherPayPalEmail = data["paypalEmail"] as? String ?? ""
-        } catch {
-            present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("Could not load PayPal payout settings."))
-            logger.error("[Settings] failed loading teacher payout settings: \(error.localizedDescription)")
-            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Settings.loadTeacherPayoutSettings")
-        }
-    }
-
-    func saveTeacherPayoutSettings() {
-        guard !isSavingPayoutSettings else { return }
-        let trimmedEmail = teacherPayPalEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedEmail.isEmail else {
-            present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("Enter a valid PayPal email address."))
-            return
-        }
-        guard let uid = authService.currentUserID else {
-            present(message: SettingsError.missingUser.localizedDescription)
-            return
-        }
-
-        isSavingPayoutSettings = true
-        Task {
-            defer { isSavingPayoutSettings = false }
-            do {
-                try await UserService.shared.updateProfileFields(uid: uid, fields: [
-                    "paypalEmail": trimmedEmail,
-                    "updatedAt": ISO8601DateFormatter().string(from: Date())
-                ])
-                teacherPayPalEmail = trimmedEmail
-                present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("PayPal payout email updated."))
-            } catch {
-                present(title: LocalizationSupport.localized("Teacher Payout Settings"), message: LocalizationSupport.localized("Could not update PayPal payout settings."))
-                logger.error("[Settings] failed saving teacher payout settings: \(error.localizedDescription)")
-                AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Settings.saveTeacherPayoutSettings")
-            }
-        }
-    }
-    
     func deleteAccount() async -> Bool {
         // Email/password users can't be re-authenticated silently — prompt for the
         // password first, then finish the deletion in `completeAccountDeletion(withPassword:)`.
@@ -1042,9 +982,7 @@ final class MockSettingsViewModel: SettingsViewModeling {
     var showReauthPasswordPrompt = false
     var reauthPassword = ""
     var isOpeningPaymentSettings = false
-    var isSavingPayoutSettings = false
     var isSubmittingContactSupport = false
-    var teacherPayPalEmail: String
     var contactSupportTitle = ""
     var contactSupportDescription = ""
     var contactSupportTitleMaxLength = 50
@@ -1054,12 +992,10 @@ final class MockSettingsViewModel: SettingsViewModeling {
 
     init(
         role: AppUserMode = .student,
-        selectedLanguage: SettingsLanguageChoice = .system,
-        teacherPayPalEmail: String = "teacher@example.com"
+        selectedLanguage: SettingsLanguageChoice = .system
     ) {
         self.role = role
         self.selectedLanguage = selectedLanguage
-        self.teacherPayPalEmail = teacherPayPalEmail
     }
 
     func updateLanguage(_ language: SettingsLanguageChoice) {
@@ -1075,15 +1011,6 @@ final class MockSettingsViewModel: SettingsViewModeling {
 
     func openPaymentSettings() {
         externalURL = previewURL(path: "payment-settings")
-    }
-
-    func loadTeacherPayoutSettings() async {}
-
-    func saveTeacherPayoutSettings() {
-        present(
-            title: LocalizationSupport.localized("Teacher Payout Settings"),
-            message: LocalizationSupport.localized("PayPal payout email updated.")
-        )
     }
 
     func deleteAccount() async -> Bool {

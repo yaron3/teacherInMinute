@@ -114,12 +114,12 @@ struct ProfileView: View {
 //		)
 
 	  }
-#if canImport(UIKit)
-      if viewModel.shouldShowStudentPaymentsMethod {
+      // Teacher payouts only for now; the student's saved-for-charging PayPal
+      // comes later and needs a vaulted account rather than an address.
+      if viewModel.shouldShowTeacherPaymentsMethod {
         savedPayPalSection
           .padding(.top, 32)
       }
-#endif
       if viewModel.shouldShowTeachingDetails {
         FlatSectionHeader(LocalizationSupport.localized("Teaching Details"))
           .padding(.top, 32)
@@ -388,13 +388,12 @@ struct ProfileView: View {
     await viewModel.loadProfile()
   }
 
-#if canImport(UIKit)
   var savedPayPalSection: some View {
     VStack(alignment: .leading, spacing: 14) {
       FlatSectionHeader(LocalizationSupport.localized("Saved PayPal")) {
-        if viewModel.savedPayPalEmail == nil {
+        if viewModel.payPalPayoutEmail == nil, !viewModel.isEditingPayPalEmail {
           Button {
-            Task { await viewModel.addSavedPayPal() }
+            Task { await viewModel.addPayPalPayoutEmail() }
           } label: {
             if viewModel.isSavingPayPal {
               ProgressView()
@@ -408,7 +407,9 @@ struct ProfileView: View {
       }
 
       FlatCard(outlined: true) {
-        if let email = viewModel.savedPayPalEmail {
+        if viewModel.isEditingPayPalEmail {
+          payPalEmailEditor
+        } else if let email = viewModel.payPalPayoutEmail {
           HStack(spacing: 14) {
             FlatIconTile(systemName: "checkmark.circle.fill", tint: theme.positive, background: theme.screenBackground)
 
@@ -425,11 +426,11 @@ struct ProfileView: View {
             Spacer()
 
             Button {
-              Task { await viewModel.removeSavedPayPal() }
+              viewModel.editPayPalPayoutEmail()
             } label: {
-              Text(LocalizationSupport.localized("Remove"))
+              Text(LocalizationSupport.localized("Change"))
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(theme.danger)
+                .foregroundStyle(theme.info)
             }
             .buttonStyle(.plain)
           }
@@ -449,10 +450,10 @@ struct ProfileView: View {
       HStack(alignment: .top, spacing: 10) {
         PlatformIcon(systemName: "bolt.fill", size: 16, weight: .bold, color: theme.warning)
         VStack(alignment: .leading, spacing: 4) {
-          Text(LocalizationSupport.localized("Quick Payment"))
+          Text(LocalizationSupport.localized("Where you get paid"))
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(theme.warning)
-          Text(LocalizationSupport.localized("After saving your PayPal account, every future purchase is one tap away — no need to log in again."))
+          Text(LocalizationSupport.localized("Your monthly payout is sent to this address, so it must be the email on your PayPal account."))
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
         }
@@ -467,7 +468,48 @@ struct ProfileView: View {
       }
     }
   }
-#endif
+
+  /// Shown when there is no usable address on the profile yet, or the teacher
+  /// asked to change the one there is.
+  var payPalEmailEditor: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      AuthInputField(
+        title: LocalizationSupport.localized("PayPal Email"),
+        placeholder: LocalizationSupport.localized("name@example.com"),
+        systemImage: "envelope",
+        text: $viewModel.payPalEmailDraft,
+        keyboardType: .emailAddress,
+        textContentType: .emailAddress
+      )
+
+      HStack(spacing: 12) {
+        Button {
+          Task { await viewModel.savePayPalPayoutEmail() }
+        } label: {
+          if viewModel.isSavingPayPal {
+            ProgressView()
+              .frame(maxWidth: .infinity)
+          } else {
+            Text(LocalizationSupport.localized("Save Changes"))
+              .font(.system(size: 15, weight: .bold))
+              .frame(maxWidth: .infinity)
+          }
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(viewModel.isSavingPayPal)
+
+        Button {
+          viewModel.cancelPayPalEmailEditing()
+        } label: {
+          Text(LocalizationSupport.localized("Cancel"))
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(theme.secondaryText)
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isSavingPayPal)
+      }
+    }
+  }
 
   var documentsButton: some View {
 	Button {
