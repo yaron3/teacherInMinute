@@ -162,7 +162,7 @@ final class CreateAccountViewModel {
 	} catch {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": error.localizedDescription])
 	  AnalyticsService.shared.recordError(error, context: "signup")
-	  alertMessage = error.localizedDescription
+	  alertMessage = localizedAuthErrorMessage(error)
 	  showAlert = true
 	}
   }
@@ -181,7 +181,7 @@ final class CreateAccountViewModel {
 		case .failure(let error):
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 		  Task { @MainActor in
-			self?.alertMessage = error.localizedDescription
+			self?.alertMessage = localizedAuthErrorMessage(error)
 			self?.showAlert = true
 		  }
 	  }
@@ -195,7 +195,7 @@ final class CreateAccountViewModel {
 		await resolveRouteAfterSocialSignIn(method: "google", uidOverride: AndroidGoogleAuth.uid(from: signInResult))
 	  } catch {
 		AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
-		alertMessage = error.localizedDescription
+		alertMessage = localizedAuthErrorMessage(error)
 		showAlert = true
 	  }
 	}
@@ -214,7 +214,7 @@ final class CreateAccountViewModel {
 		case .failure(let error):
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
 		  Task { @MainActor in
-			self?.alertMessage = error.localizedDescription
+			self?.alertMessage = localizedAuthErrorMessage(error)
 			self?.showAlert = true
 		  }
 	  }
@@ -225,7 +225,7 @@ final class CreateAccountViewModel {
   private func resolveRouteAfterSocialSignIn(method: String, uidOverride: String? = nil) async {
 	guard let uid = Auth.auth().currentUser?.uid ?? uidOverride else {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": method, "reason": "no_session"])
-	  alertMessage = "Could not retrieve user session. Please try again."
+	  alertMessage = LocalizationSupport.localized("Could not retrieve user session. Please try again.")
 	  showAlert = true
 	  return
 	}
@@ -235,7 +235,7 @@ final class CreateAccountViewModel {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
 	  destination = resume
 	} catch {
-	  alertMessage = error.localizedDescription
+	  alertMessage = localizedAuthErrorMessage(error)
 	  showAlert = true
 	}
   }

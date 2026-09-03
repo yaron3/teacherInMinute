@@ -198,6 +198,12 @@ struct TeacherPayoutMethodSheet: View {
     }
   }
 
+  /// Quiet until something has been typed, so the field does not open in red.
+  var showsPhoneError: Bool {
+    let phone = method.phone.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !phone.isEmpty && !phone.isValidPhoneNumber
+  }
+
   var bitFields: some View {
     VStack(alignment: .leading, spacing: 18) {
       AuthInputField(
@@ -206,7 +212,9 @@ struct TeacherPayoutMethodSheet: View {
         systemImage: "phone",
         text: $method.phone,
         keyboardType: .phonePad,
-        textContentType: .telephoneNumber
+        textContentType: .telephoneNumber,
+        isValid: !showsPhoneError,
+        errorMessage: LocalizationSupport.localized("Enter a valid phone number.")
       )
 
       if !profilePhone.isEmpty, method.phone.trimmingCharacters(in: .whitespacesAndNewlines) != profilePhone {

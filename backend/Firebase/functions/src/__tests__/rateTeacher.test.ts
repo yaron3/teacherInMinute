@@ -201,6 +201,45 @@ describe("rateTeacher", () => {
     );
   });
 
+  test("stores a trimmed student comment when one is written", async () => {
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: {
+        questionId: "question-1",
+        teacherId: "teacher-1",
+        rating: 5,
+        comment: "   Explained fractions really clearly.  ",
+      },
+    });
+
+    expect(txSet).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ path: ratingRef.path }),
+      expect.objectContaining({ studentComment: "Explained fractions really clearly." })
+    );
+  });
+
+  test("omits the comment field when the student wrote nothing", async () => {
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: {
+        questionId: "question-1",
+        teacherId: "teacher-1",
+        rating: 5,
+        comment: "   ",
+      },
+    });
+
+    const [, ratingDoc] = txSet.mock.calls[0] as [unknown, Record<string, unknown>];
+    expect(ratingDoc).not.toHaveProperty("studentComment");
+  });
+
   test("rejects non-integer ratings", async () => {
     const { rateTeacher } = await import("../lessons");
     const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;

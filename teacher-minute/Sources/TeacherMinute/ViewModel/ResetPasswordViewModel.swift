@@ -25,8 +25,18 @@ final class ResetPasswordViewModel {
 	  case .email:
 		!email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 	  case .phone:
-		!phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+		phone.trimmingCharacters(in: .whitespacesAndNewlines).isValidPhoneNumber
 	}
+  }
+
+  /// Quiet until something has been typed, so the field does not open in red.
+  var showsPhoneError: Bool {
+	let trimmedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+	return !trimmedPhone.isEmpty && !trimmedPhone.isValidPhoneNumber
+  }
+
+  var phoneErrorMessage: String {
+	LocalizationSupport.localized("Enter a valid phone number.")
   }
   
   func sendResetLink() {

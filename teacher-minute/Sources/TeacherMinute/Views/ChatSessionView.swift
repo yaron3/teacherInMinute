@@ -66,9 +66,9 @@ struct ChatSessionView: View {
   var hasVideo: Bool { conversationType == "video" }
   var isStudent: Bool { viewModel.role == "student" }
   var connectionModeText: String {
-    if hasVideo { return LocalizationSupport.localized("Connected - Video session") }
-    if hasAudio { return LocalizationSupport.localized("Connected - Audio session") }
-    return LocalizationSupport.localized("Connected")
+    if hasVideo { return viewModel.connectedVideoText }
+    if hasAudio { return viewModel.connectedAudioText }
+    return viewModel.connectedText
   }
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.horizontalSizeClass) var hSizeClass
@@ -295,7 +295,7 @@ struct ChatSessionView: View {
               Button {
                 endSessionAfterSnapshot(saveToChat: true, saveToGallery: false)
               } label: {
-                Text(LocalizationSupport.localized("Save to chat only"))
+                Text(viewModel.saveToChatOnlyLabel)
                   .font(.system(size: 14, weight: .semibold))
                   .foregroundStyle(theme.primaryText)
                   .frame(maxWidth: .infinity)
@@ -311,7 +311,7 @@ struct ChatSessionView: View {
             Button {
               finalizeEndSession()
             } label: {
-              Text(LocalizationSupport.localized("Don't save"))
+              Text(viewModel.dontSaveLabel)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity)
@@ -323,7 +323,7 @@ struct ChatSessionView: View {
             Button {
               endSessionPrompt = nil
             } label: {
-              Text(LocalizationSupport.localized("Cancel"))
+              Text(viewModel.cancelLabel)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity)
@@ -348,7 +348,7 @@ struct ChatSessionView: View {
       ProgressView()
         .progressViewStyle(.circular)
         .tint(theme.accentBackground)
-      Text(LocalizationSupport.localized("Switching to text chat…"))
+      Text(viewModel.switchingToTextChatText)
         .font(.system(size: 13, weight: .medium))
         .foregroundStyle(theme.secondaryText)
     }
@@ -403,30 +403,30 @@ struct ChatSessionView: View {
   func endSessionPromptTitle(_ prompt: EndSessionPrompt) -> String {
     switch prompt {
     case .confirmEnd:
-      return LocalizationSupport.localized("End session?")
+      return viewModel.endSessionTitleLabel
     case .saveBoard:
-      return LocalizationSupport.localized("Save board to gallery?")
+      return viewModel.saveBoardTitleLabel
     }
   }
 
   func endSessionPromptMessage(_ prompt: EndSessionPrompt) -> String {
     switch prompt {
     case .confirmEnd:
-      return LocalizationSupport.localized("Are you sure you want to end this session?")
+      return viewModel.endSessionConfirmMessage
     case .saveBoard:
       if saveBoardIsRemoteInitiated {
-        return LocalizationSupport.localized("The session ended. Do you want to save the board image to your device gallery?")
+        return viewModel.saveBoardRemoteMessage
       }
-      return LocalizationSupport.localized("The board will be saved to the chat. Do you also want to save it to your device gallery?")
+      return viewModel.saveBoardLocalMessage
     }
   }
 
   func endSessionPromptPrimaryTitle(_ prompt: EndSessionPrompt) -> String {
     switch prompt {
     case .confirmEnd:
-      return LocalizationSupport.localized("End session")
+      return viewModel.endSessionActionLabel
     case .saveBoard:
-      return LocalizationSupport.localized("Save to gallery")
+      return viewModel.saveToGalleryLabel
     }
   }
 
@@ -722,7 +722,7 @@ struct ChatSessionView: View {
           } else {
             videoPlaceholder(
               icon: "video.fill",
-              text: LocalizationSupport.localized("Waiting for video…")
+              text: viewModel.waitingForVideoText
             )
           }
           if isStudent {
@@ -793,7 +793,7 @@ struct ChatSessionView: View {
         } else {
           videoPlaceholder(
             icon: "video.fill",
-            text: LocalizationSupport.localized("Waiting for video…")
+            text: viewModel.waitingForVideoText
           )
           .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -842,10 +842,7 @@ struct ChatSessionView: View {
   }
 
   var peerPausedMessage: String {
-    if isStudent {
-      return LocalizationSupport.localized("Teacher is reading chat — video paused")
-    }
-    return LocalizationSupport.localized("Student is reading chat — video paused")
+    viewModel.peerPausedMessage
   }
 
   @ViewBuilder
@@ -964,7 +961,7 @@ struct ChatSessionView: View {
   var videoBadge: some View {
     HStack(spacing: 4) {
       PlatformIcon(systemName: "video.fill", size: 10, weight: .bold, color: theme.onBrightFill)
-      Text(LocalizationSupport.localized("Video"))
+      Text(viewModel.videoLabel)
         .font(.system(size: 11, weight: .bold))
         .foregroundStyle(theme.onBrightFill)
     }
@@ -995,11 +992,11 @@ struct ChatSessionView: View {
 
   var composerModeToggle: some View {
     HStack(spacing: 6) {
-      composerModePill(title: LocalizationSupport.localized("Regular"), isSelected: composerMode == .regular) {
+      composerModePill(title: viewModel.regularModeLabel, isSelected: composerMode == .regular) {
         composerMode = .regular
         isMessageFieldFocused = true
       }
-      composerModePill(title: LocalizationSupport.localized("Algebra"), isSelected: composerMode == .algebra) {
+      composerModePill(title: viewModel.algebraModeLabel, isSelected: composerMode == .algebra) {
         composerMode = .algebra
         isMessageFieldFocused = false
       }
@@ -1011,7 +1008,7 @@ struct ChatSessionView: View {
     Button {
       action()
     } label: {
-      Text(LocalizationSupport.localized(title))
+      Text(title)
         .font(.system(size: 12, weight: .bold))
         .foregroundStyle(isSelected ? theme.onDarkFill : theme.primaryText)
         .padding(.horizontal, 14)
@@ -1115,7 +1112,7 @@ struct ChatSessionView: View {
       Button {
         requestEndSession()
       } label: {
-        Text(isEndingSession ? LocalizationSupport.localized("Ending...") : LocalizationSupport.localized("End"))
+        Text(isEndingSession ? viewModel.endingLabel : viewModel.endLabel)
           .font(.system(size: 12, weight: .bold))
           .foregroundStyle(theme.onAccentText)
           .padding(.horizontal, 12)
@@ -1142,7 +1139,7 @@ struct ChatSessionView: View {
 		.padding(.top, 2)
 		.padding(.trailing, 8)
 	  VStack(alignment: .leading, spacing: 0) {
-		Text(LocalizationSupport.localized("ORIGINAL QUESTION"))
+		Text(viewModel.originalQuestionLabel)
 		  .font(.system(size: 10, weight: .bold))
 		  .foregroundStyle(theme.warning)
 		Text(viewModel.originalQuestion)
@@ -1154,7 +1151,7 @@ struct ChatSessionView: View {
 	  .frame(maxWidth: .infinity, alignment: .leading)
 	  Spacer(minLength: 2)
       VStack(alignment: .trailing, spacing: 2) {
-        Text(LocalizationSupport.localized("Session Time"))
+        Text(viewModel.sessionTimeLabel)
           .font(.system(size: 11, weight: .medium))
           .foregroundStyle(theme.secondaryText)
         Text(viewModel.sessionTimeText(at: sessionFrozenDate ?? displayDate))
@@ -1163,7 +1160,7 @@ struct ChatSessionView: View {
           .minimumScaleFactor(0.85)
           .frame(width: 92, alignment: .trailing)
           .foregroundStyle(theme.primaryText)
-        Text(LocalizationSupport.localized("minutes"))
+        Text(viewModel.minutesLabel)
           .font(.system(size: 10, weight: .medium))
           .foregroundStyle(theme.secondaryText)
       }
@@ -1181,7 +1178,7 @@ struct ChatSessionView: View {
 	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.warning)
         .padding(.top, 2)
       VStack(alignment: .leading, spacing: 5) {
-        Text(LocalizationSupport.localized("ORIGINAL QUESTION"))
+        Text(viewModel.originalQuestionLabel)
           .font(.system(size: 10, weight: .bold))
           .foregroundStyle(theme.warning)
         Text(viewModel.originalQuestion)
@@ -1250,13 +1247,13 @@ struct ChatSessionView: View {
 
   var sessionTabs: some View {
     HStack(spacing: 0) {
-	  tabButton(id: .CHAT, title: LocalizationSupport.localized("Chat"), icon: "bubble.left.fill", showsBadge: hasUnreadChat)
-	  tabButton(id: .BOARD, title: LocalizationSupport.localized("Board"), icon: "pencil.and.list.clipboard", showsBadge: hasUnreadBoard)
+	  tabButton(id: .CHAT, title: viewModel.chatTabTitle, icon: "bubble.left.fill", showsBadge: hasUnreadChat)
+	  tabButton(id: .BOARD, title: viewModel.boardTabTitle, icon: "pencil.and.list.clipboard", showsBadge: hasUnreadBoard)
       if hasVideo {
-		tabButton(id: .VIDEO, title: LocalizationSupport.localized("Video"), icon: "video.fill", showsBadge: false)
+		tabButton(id: .VIDEO, title: viewModel.videoTabTitle, icon: "video.fill", showsBadge: false)
       }
       if !viewModel.questionPhotoUrls.isEmpty {
-        tabButton(id: .IMAGES, title: LocalizationSupport.localized("Images"), icon: "photo.fill", showsBadge: false)
+        tabButton(id: .IMAGES, title: viewModel.imagesTabTitle, icon: "photo.fill", showsBadge: false)
       }
     }
     .frame(height: 40)
@@ -1289,7 +1286,7 @@ struct ChatSessionView: View {
                 .offset(x: 8, y: -6)
             }
           }
-          Text(LocalizationSupport.localized(title))
+          Text(title)
             .font(.system(size: 12, weight: .bold))
             .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.accentBackground : theme.secondaryText))
             .padding(.horizontal, showsBadge ? 18 : 0)

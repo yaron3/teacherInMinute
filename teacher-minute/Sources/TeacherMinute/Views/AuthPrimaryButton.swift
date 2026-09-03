@@ -66,6 +66,12 @@ struct AuthInputField: View {
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType?
     var autocapitalization: TextInputAutocapitalization = .never
+    /// False draws the field in the danger colour and shows `errorMessage`
+    /// under it. Callers own the wording and decide when to start complaining —
+    /// typically only once the field is non-empty, so it stays quiet while the
+    /// number is still being typed.
+    var isValid = true
+    var errorMessage: String?
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.layoutDirection) var layoutDirection
   var theme: AppTheme {
@@ -94,15 +100,29 @@ struct AuthInputField: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 56)
-            .background(theme.cardBackground)
+            .background(
+                RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+                    .fill(theme.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
+                            .stroke(theme.danger.opacity(isValid ? 0 : 0.5), lineWidth: 1.5)
+                    )
+            )
             .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+
+            if !isValid, let errorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.danger)
+                    .padding(.horizontal, 4)
+            }
         }
     }
 
     var fieldIcon: some View {
         PlatformIcon(systemName: systemImage)
             .font(.system(size: 18))
-            .foregroundStyle(theme.secondaryText)
+            .foregroundStyle(isValid ? theme.secondaryText : theme.danger.opacity(0.8))
     }
 
     var inputField: some View {

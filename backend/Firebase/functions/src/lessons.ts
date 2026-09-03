@@ -24,6 +24,25 @@ interface TeacherRatingDoc {
   endedAt: Timestamp;
   studentId: string;
   studentRate: number;
+  /** Optional free text the student wrote about the lesson. Shown back to the
+   *  teacher without `studentId` (see ./ratings.ts `teacherReviews`), so it is
+   *  the only part of a rating a teacher ever reads. */
+  studentComment?: string;
+}
+
+/** Long enough for a paragraph of feedback, short enough that one rating stays
+ *  a small document. Anything longer is truncated rather than rejected — the
+ *  student has already finished the lesson and should not lose the rating to a
+ *  validation error. */
+const MAX_RATING_COMMENT_LENGTH = 500;
+
+/** The comment as it should be stored: trimmed, capped, and `undefined` when
+ *  the student left the box empty. */
+function normalizedComment(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return undefined;
+  return trimmed.slice(0, MAX_RATING_COMMENT_LENGTH);
 }
 
 interface TeacherAggregateDoc {
@@ -673,11 +692,13 @@ export const rateTeacher = onCall(async (req) => {
     questionId?: string;
     teacherId?: string;
     rating?: number;
+    comment?: string;
   };
 
   const questionId = data.questionId;
   const teacherId = data.teacherId;
   const rating = Number(data.rating);
+  const comment = normalizedComment(data.comment);
 
   if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
   if (!teacherId) throw new HttpsError("invalid-argument", "teacherId required");
@@ -787,6 +808,9 @@ export const rateTeacher = onCall(async (req) => {
       studentId: uid,
       studentRate: rating,
     };
+    if (comment) {
+      ratingDoc.studentComment = comment;
+    }
 
     tx.set(ratingRef, ratingDoc);
     tx.set(teacherRef, { averageRate: nextAverage, ratingCount: ratingCount + 1 }, { merge: true });

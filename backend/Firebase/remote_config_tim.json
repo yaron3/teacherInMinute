@@ -17,68 +17,13 @@
     }
   ],
   "parameters": {
-    "teachers_online_now": {
+    "earn_while_teaching": {
       "defaultValue": {
-        "value": "Teachers online now"
+        "value": "Earn while teaching"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "מורים זמינים עכשיו"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "how_it_works": {
-      "defaultValue": {
-        "value": "How it works"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "איך זה עובד"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "last_lesson": {
-      "defaultValue": {
-        "value": "Last Lesson"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "שיעור אחרון"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "your_balance": {
-      "defaultValue": {
-        "value": "Your Balance"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "היתרה שלך"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "buy_more": {
-      "defaultValue": {
-        "value": "Buy More +"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "קנה עוד +"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "credits": {
-      "defaultValue": {
-        "value": "Credits"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "קרדיטים"
+          "value": "להרוויח בזמנך הפנוי"
         }
       },
       "valueType": "STRING"
@@ -336,6 +281,17 @@
       },
       "valueType": "STRING"
     },
+    "fmt_seconds": {
+      "defaultValue": {
+        "value": "%d seconds"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d שניות"
+        }
+      },
+      "valueType": "STRING"
+    },
     "take_clear_selfie": {
       "defaultValue": {
         "value": "Take a clear selfie to match with your Government ID."
@@ -346,6 +302,12 @@
         }
       },
       "valueType": "STRING"
+    },
+    "enable_paypal_payout": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN"
     },
     "on_caps": {
       "defaultValue": {
@@ -376,6 +338,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "סוג שיעור"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "help_from_real": {
+      "defaultValue": {
+        "value": "Help from a real teacher, exactly when you need it."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עזרה ממורה אמיתי, בדיוק כשצריך."
         }
       },
       "valueType": "STRING"
@@ -453,6 +426,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "הוסף כותרת ותיאור לפני השליחה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "add_where_your": {
+      "defaultValue": {
+        "value": "Add where your payouts should be sent"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוסיפו לאן לשלוח את התשלומים"
         }
       },
       "valueType": "STRING"
@@ -541,6 +525,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "כרטיסים והיסטוריית חיובים יהיו זמינים כאן."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "how_it_works": {
+      "defaultValue": {
+        "value": "How it works"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "איך זה עובד"
         }
       },
       "valueType": "STRING"
@@ -667,6 +662,17 @@
       },
       "valueType": "STRING"
     },
+    "fmt_sec": {
+      "defaultValue": {
+        "value": "%d sec"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d שנ׳"
+        }
+      },
+      "valueType": "STRING"
+    },
     "verified_expert": {
       "defaultValue": {
         "value": "Verified Expert"
@@ -778,7 +784,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "התחבר כדי להמשיך\nאת הדרך שלך."
+          "value": "התחבר כדי להכנס למערכת."
         }
       },
       "valueType": "STRING"
@@ -834,17 +840,6 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "שמע"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "earn_while_teaching": {
-      "defaultValue": {
-        "value": "Earn while teaching"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "הרווח בזמן ההוראה"
         }
       },
       "valueType": "STRING"
@@ -1185,6 +1180,17 @@
       },
       "valueType": "STRING"
     },
+    "fmt_subject_teacher": {
+      "defaultValue": {
+        "value": "%@ Teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה ל%@"
+        }
+      },
+      "valueType": "STRING"
+    },
     "full_name": {
       "defaultValue": {
         "value": "Full Name"
@@ -1192,17 +1198,6 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "שם מלא"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "help_you_anywhere": {
-      "defaultValue": {
-        "value": ""
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": ""
         }
       },
       "valueType": "STRING"
@@ -1280,6 +1275,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "סיום"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_teachers": {
+      "defaultValue": {
+        "value": "%d teachers"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d מורים"
         }
       },
       "valueType": "STRING"
@@ -1527,6 +1533,17 @@
       },
       "valueType": "STRING"
     },
+    "re_enter_your_password": {
+      "defaultValue": {
+        "value": "Re-enter your password"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הזן שוב את הסיסמה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "board": {
       "defaultValue": {
         "value": "Board"
@@ -1534,6 +1551,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "לוח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teachers_online_now": {
+      "defaultValue": {
+        "value": "Teachers online now"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורים זמינים עכשיו"
         }
       },
       "valueType": "STRING"
@@ -1655,17 +1683,6 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "אודות"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "send_occasional_updates_tim_a": {
-      "defaultValue": {
-        "value": "Send me occasional updates and tips about\nInstant Teacher."
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "שלחו לי מדי פעם עדכונים וטיפים על\nמורה לרגע."
         }
       },
       "valueType": "STRING"
@@ -1830,9 +1847,31 @@
       },
       "valueType": "STRING"
     },
+    "your_balance": {
+      "defaultValue": {
+        "value": "Your Balance"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "היתרה שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
     "usd": {
       "defaultValue": {
         "value": "$"
+      },
+      "valueType": "STRING"
+    },
+    "avg_connect": {
+      "defaultValue": {
+        "value": "%@ avg to connect"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%@ בממוצע לחיבור"
+        }
       },
       "valueType": "STRING"
     },
@@ -2073,6 +2112,17 @@
       },
       "valueType": "STRING"
     },
+    "teacher_1": {
+      "defaultValue": {
+        "value": "1 teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה אחד"
+        }
+      },
+      "valueType": "STRING"
+    },
     "privacy_protected": {
       "defaultValue": {
         "value": "Privacy Protected"
@@ -2123,6 +2173,17 @@
       },
       "valueType": "STRING"
     },
+    "continue_upload_later": {
+      "defaultValue": {
+        "value": "Continue - upload later"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המשך - עדכן אח״כ"
+        }
+      },
+      "valueType": "STRING"
+    },
     "privacy_dot": {
       "defaultValue": {
         "value": "Privacy."
@@ -2163,6 +2224,28 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "נדרש לשיעורי שמע."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_fee_pay": {
+      "defaultValue": {
+        "value": "120 ILS for an hour (60 minutes)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "120 ש״ח לשעה (60 ד׳ות)"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "credits": {
+      "defaultValue": {
+        "value": "Credits"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "קרדיטים"
         }
       },
       "valueType": "STRING"
@@ -2250,6 +2333,17 @@
       },
       "valueType": "STRING"
     },
+    "fmt_reviews_parens": {
+      "defaultValue": {
+        "value": "(%d reviews)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "(%d ביקורות)"
+        }
+      },
+      "valueType": "STRING"
+    },
     "make_sure_your": {
       "defaultValue": {
         "value": "Make sure your microphone is enabled for the best learning experience."
@@ -2307,6 +2401,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "התראות פוש"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "last_lesson": {
+      "defaultValue": {
+        "value": "Last Lesson"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שיעור אחרון"
         }
       },
       "valueType": "STRING"
@@ -2504,6 +2609,17 @@
       },
       "valueType": "STRING"
     },
+    "default_session_type": {
+      "defaultValue": {
+        "value": ""
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": ""
+        }
+      },
+      "valueType": "STRING"
+    },
     "open_camera_settings": {
       "defaultValue": {
         "value": "Open Camera Settings"
@@ -2548,6 +2664,17 @@
       },
       "valueType": "STRING"
     },
+    "confirm_password": {
+      "defaultValue": {
+        "value": "Confirm Password"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אימות סיסמה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "waiting_for_video": {
       "defaultValue": {
         "value": "Waiting for video…"
@@ -2566,17 +2693,6 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "ישראל ישראלי"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "tell_bit_about_tim": {
-      "defaultValue": {
-        "value": "Tell us a bit about yourself to get started with\nInstant Teacher."
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "ספר לנו קצת על עצמך כדי להתחיל עם\nמורה לרגע."
         }
       },
       "valueType": "STRING"
@@ -2768,17 +2884,6 @@
       },
       "valueType": "STRING"
     },
-    "add_photo": {
-      "defaultValue": {
-        "value": "Add a photo"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "הוספת תמונה"
-        }
-      },
-      "valueType": "STRING"
-    },
     "take_photo": {
       "defaultValue": {
         "value": "Take Photo"
@@ -2819,6 +2924,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "שמור שינויים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "help_you_anywhere": {
+      "defaultValue": {
+        "value": ""
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": ""
         }
       },
       "valueType": "STRING"
@@ -3171,6 +3287,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "הזן כתובת אימייל תקינה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "enter_valid_phone": {
+      "defaultValue": {
+        "value": "Enter a valid phone number."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "יש להזין מספר טלפון תקין."
         }
       },
       "valueType": "STRING"
@@ -3556,6 +3683,17 @@
       },
       "valueType": "STRING"
     },
+    "passwords_not_match": {
+      "defaultValue": {
+        "value": "Passwords do not match."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הסיסמאות אינן תואמות."
+        }
+      },
+      "valueType": "STRING"
+    },
     "send_message_support": {
       "defaultValue": {
         "value": "Send a message to support. You will preview the data before it is sent."
@@ -3743,6 +3881,17 @@
       },
       "valueType": "STRING"
     },
+    "review_1": {
+      "defaultValue": {
+        "value": "(1 review)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "(ביקורת אחת)"
+        }
+      },
+      "valueType": "STRING"
+    },
     "messages_a": {
       "defaultValue": {
         "value": "Messages"
@@ -3855,8 +4004,9 @@
     },
     "subjects": {
       "defaultValue": {
-        "value": "[\"Math\", \"Physics\", \"Chemistry\", \"Computer_Science\"]"
+        "value": "[\"Math\"]"
       },
+      "description": "can add:  \"Physics\", \"Chemistry\", \"Computer_Science\"",
       "valueType": "JSON"
     },
     "lesson_transcript_will": {
@@ -4019,6 +4169,17 @@
       },
       "valueType": "STRING"
     },
+    "average_response_time": {
+      "defaultValue": {
+        "value": "Average response time: %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זמן תגובה ממוצע: %@"
+        }
+      },
+      "valueType": "STRING"
+    },
     "live_earnings": {
       "defaultValue": {
         "value": "Live Earnings"
@@ -4091,6 +4252,28 @@
       },
       "valueType": "NUMBER"
     },
+    "not_set_yet": {
+      "defaultValue": {
+        "value": "Not set up yet"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "טרם הוגדר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_teacher_connects_within": {
+      "defaultValue": {
+        "value": "Teacher connects within %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה מתחבר תוך %@"
+        }
+      },
+      "valueType": "STRING"
+    },
     "checking_session_requirements": {
       "defaultValue": {
         "value": "Checking session requirements"
@@ -4142,6 +4325,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "נושא"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_minutes": {
+      "defaultValue": {
+        "value": "%d minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d דקות"
         }
       },
       "valueType": "STRING"
@@ -4564,6 +4758,28 @@
       },
       "valueType": "STRING"
     },
+    "fmt_ai_stuck_connects": {
+      "defaultValue": {
+        "value": "When AI gets stuck, a human teacher connects in %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כש-AI נתקע – מורה אנושי מתחבר תוך %@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "ai_stuck_connects_moments": {
+      "defaultValue": {
+        "value": "When AI gets stuck, a human teacher connects in moments"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כש-AI נתקע – מורה אנושי מתחבר תוך רגעים"
+        }
+      },
+      "valueType": "STRING"
+    },
     "live_queue": {
       "defaultValue": {
         "value": "Live Queue"
@@ -4851,6 +5067,17 @@
       },
       "valueType": "STRING"
     },
+    "teacher_connects_quickly": {
+      "defaultValue": {
+        "value": "A teacher connects immediate."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה מתחבר מיידית"
+        }
+      },
+      "valueType": "STRING"
+    },
     "physics": {
       "defaultValue": {
         "value": "Physics"
@@ -4883,6 +5110,12 @@
         }
       },
       "valueType": "STRING"
+    },
+    "connection_fee_cents": {
+      "defaultValue": {
+        "value": "0"
+      },
+      "valueType": "NUMBER"
     },
     "the_purchase_did": {
       "defaultValue": {
@@ -4979,6 +5212,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "השאלה שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "only_billed_minutes": {
+      "defaultValue": {
+        "value": "Only billed minutes count"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נספרות רק הדקות שחויבו"
         }
       },
       "valueType": "STRING"
@@ -5128,17 +5372,6 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "חיוב לפי דקות"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "log_teacher_minute": {
-      "defaultValue": {
-        "value": "Log in to Instant Teacher to continue your\njourney."
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "התחבר כדי להמשיך\nאת הדרך שלך."
         }
       },
       "valueType": "STRING"
@@ -5352,17 +5585,6 @@
       },
       "valueType": "STRING"
     },
-    "send_occasional_updates_tim_b": {
-      "defaultValue": {
-        "value": "Send me occasional updates and tips about\\nInstant Teacher."
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "שלח לי עידכונים לעיתים על האפליקציה"
-        }
-      },
-      "valueType": "STRING"
-    },
     "recent_lessons": {
       "defaultValue": {
         "value": "Recent Lessons"
@@ -5381,6 +5603,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "בודק את הנושאים שלך…"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "view_your_lesson": {
+      "defaultValue": {
+        "value": "View your lessons payment history."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הצג את היסטוריית התשלומים עבור דקות שיעורים"
         }
       },
       "valueType": "STRING"
@@ -5452,7 +5685,7 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "איך תרצה להשתמש ב־מורה לרגע? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
+          "value": "איך תרצה להשתמש ב־Instant Teacher? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
         }
       },
       "valueType": "STRING"
@@ -5617,6 +5850,17 @@
       },
       "valueType": "STRING"
     },
+    "stucked_you_will": {
+      "defaultValue": {
+        "value": "Stucked? you will have a teacher immediately"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נתקעת? יש לך מורה לרגע."
+        }
+      },
+      "valueType": "STRING"
+    },
     "loading_messages": {
       "defaultValue": {
         "value": "Loading messages"
@@ -5701,6 +5945,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "מערכת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "buy_more": {
+      "defaultValue": {
+        "value": "Buy More +"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "קנה עוד +"
         }
       },
       "valueType": "STRING"
@@ -5953,6 +6208,17 @@
       },
       "valueType": "STRING"
     },
+    "pay_only_for": {
+      "defaultValue": {
+        "value": "Pay only for what you used"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "משלמים רק על הזמן שנוצל"
+        }
+      },
+      "valueType": "STRING"
+    },
     "save_and_continue": {
       "defaultValue": {
         "value": "Save and continue"
@@ -5960,6 +6226,17 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "שמור והמשך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "reviews_yet": {
+      "defaultValue": {
+        "value": "No reviews yet"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין ביקורות עדיין"
         }
       },
       "valueType": "STRING"
@@ -6124,6 +6401,17 @@
       },
       "valueType": "STRING"
     },
+    "payment_history": {
+      "defaultValue": {
+        "value": "Payment History"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "היסטוריית תשלומים"
+        }
+      },
+      "valueType": "STRING"
+    },
     "earnings_snapshot": {
       "defaultValue": {
         "value": "Earnings Snapshot"
@@ -6260,17 +6548,6 @@
     "privacy_policy_en": {
       "defaultValue": {
         "value": "https://teacher-in-a-moment.web.app/privacypolicy.html"
-      },
-      "valueType": "STRING"
-    },
-    "how_you_want_tim": {
-      "defaultValue": {
-        "value": "How do you want to use Instant Teacher? You\ncan change this later in settings."
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "איך תרצה להשתמש ב־Instant Teacher? תוכל\nלשנות זאת מאוחר יותר בהגדרות."
-        }
       },
       "valueType": "STRING"
     },
@@ -6478,347 +6755,80 @@
       },
       "valueType": "STRING"
     },
-    "available_subjects": {
+    "add_your_subjects": {
       "defaultValue": {
-        "value": "Available Subjects"
+        "value": "Add your subjects, bio, and verification documents"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "מקצועות זמינים"
+          "value": "הוסף את המקצועות שלך, פרופיל ומסמכי אימות"
         }
       },
       "valueType": "STRING"
     },
-    "meet": {
+    "student_requests_help": {
       "defaultValue": {
-        "value": "Meet"
+        "value": "A student requests help"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "פגוש"
+          "value": "תלמיד מבקש עזרה"
         }
       },
       "valueType": "STRING"
     },
-    "ask_question": {
+    "get_matched_students": {
       "defaultValue": {
-        "value": "Ask a question"
+        "value": "Get matched to students who need your subject"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "שאל שאלה"
+          "value": "קבל התאמה לתלמידים שצריכים עזרה במקצוע שלך"
         }
       },
       "valueType": "STRING"
     },
-    "describe_the_problem": {
+    "teach_live": {
       "defaultValue": {
-        "value": "Describe the problem – text, image, or whiteboard drawing"
+        "value": "Teach live"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "תאר את הבעיה – טקסט, תמונה, או ציור בלוח"
+          "value": "לַמֵּד בשידור חי"
         }
       },
       "valueType": "STRING"
     },
-    "teacher_connects_within": {
+    "add_comment_optional": {
       "defaultValue": {
-        "value": "Teacher connects within 90 sec"
+        "value": "Add a comment (optional)"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "מורה מחובר תוך 90 שני׳"
+          "value": "הוסיפו תגובה (לא חובה)"
         }
       },
       "valueType": "STRING"
     },
-    "the_system_finds": {
+    "your_teacher_sees": {
       "defaultValue": {
-        "value": "The system finds an available teacher for your subject"
+        "value": "Your teacher sees this without your name."
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "המערכת מוצאת מורה פנוי ומתאים למקצוע"
+          "value": "המורה רואה את זה בלי השם שלכם."
         }
       },
       "valueType": "STRING"
-    },
-    "chat_whiteboard_voice": {
-      "defaultValue": {
-        "value": "Chat, whiteboard, voice messages – real time"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "צ׳אט, לוח לבן, הודעות קוליות – בזמן אמת"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "nis_connection_only": {
-      "defaultValue": {
-        "value": "2 NIS connection • only billed minutes count"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "2₪ לחיבור • דקות נספרות בשרת בלבד"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "review_1": {
-      "defaultValue": {
-        "value": "(1 review)"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "(ביקורת אחת)"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "fmt_reviews_parens": {
-      "defaultValue": {
-        "value": "(%d reviews)"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "(%d ביקורות)"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "reviews_yet": {
-      "defaultValue": {
-        "value": "No reviews yet"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "אין ביקורות עדיין"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "fmt_seconds": {
-      "defaultValue": {
-        "value": "%d seconds"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "%d שניות"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "fmt_minutes": {
-      "defaultValue": {
-        "value": "%d minutes"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "%d דקות"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "fmt_sec": {
-      "defaultValue": {
-        "value": "%d sec"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "%d שנ׳"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "avg_connect": {
-      "defaultValue": {
-        "value": "%@ avg to connect"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "%@ בממוצע לחיבור"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "average_response_time": {
-      "defaultValue": {
-        "value": "Average response time: %@"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "זמן תגובה ממוצע: %@"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "fmt_ai_stuck_connects": {
-      "defaultValue": {
-        "value": "When AI gets stuck, a human teacher connects in %@"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "כש-AI נתקע – מורה אנושי מתחבר תוך %@"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "ai_stuck_connects_moments": {
-      "defaultValue": {
-        "value": "When AI gets stuck, a human teacher connects in moments"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "כש-AI נתקע – מורה אנושי מתחבר תוך רגעים"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "fmt_teacher_connects_within": {
-      "defaultValue": {
-        "value": "Teacher connects within %@"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "מורה מתחבר תוך %@"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "teacher_connects_quickly": {
-      "defaultValue": {
-        "value": "A teacher connects quickly"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "מורה מתחבר במהירות"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "connection_fee_pay": {
-      "defaultValue": {
-        "value": "%@ connection fee per minute • pay only for time used"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "%@ דמי חיבור לדקה • משלמים רק על הזמן שנוצל"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "only_billed_minutes": {
-      "defaultValue": {
-        "value": "Only billed minutes count"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "נספרות רק הדקות שחויבו"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "not_set_yet": {
-      "defaultValue": {
-        "value": "Not set up yet"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "טרם הוגדר"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "add_where_your": {
-      "defaultValue": {
-        "value": "Add where your payouts should be sent"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "הוסיפו לאן לשלוח את התשלומים"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "fmt_subject_teacher": {
-      "defaultValue": {
-        "value": "%@ Teacher"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "מורה ל%@"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "connection_fee_cents": {
-      "defaultValue": {
-        "value": "0"
-      },
-      "valueType": "NUMBER"
-    },
-    "teacher_1": {
-      "defaultValue": {
-        "value": "1 teacher"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "מורה אחד"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "fmt_teachers": {
-      "defaultValue": {
-        "value": "%d teachers"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "%d מורים"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "confirm_password": {
-      "defaultValue": {
-        "value": "Confirm Password"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "אימות סיסמה"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "re_enter_your_password": {
-      "defaultValue": {
-        "value": "Re-enter your password"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "הזן שוב את הסיסמה"
-        }
-      },
-      "valueType": "STRING"
-    },
-    "passwords_not_match": {
-      "defaultValue": {
-        "value": "Passwords do not match."
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "הסיסמאות אינן תואמות."
-        }
-      },
-      "valueType": "STRING"
-    },
-    "enable_paypal_payout": {
-      "defaultValue": {
-        "value": "false"
-      },
-      "valueType": "BOOLEAN"
     }
+  },
+  "version": {
+    "versionNumber": "70",
+    "updateTime": "2026-09-02T13:41:26.968510Z",
+    "updateUser": {
+      "email": "yaronj3@gmail.com"
+    },
+    "updateOrigin": "CONSOLE",
+    "updateType": "INCREMENTAL_UPDATE"
   }
 }

@@ -613,7 +613,11 @@ struct ProfileEditView: View {
                 date: $viewModel.dateOfBirth
               )
             } else {
-              ProfileEditInfoRow(parameter: $row)
+              ProfileEditInfoRow(
+                parameter: $row,
+                isValid: !(viewModel.isPhoneRow(row) && viewModel.showsPhoneRowError),
+                errorMessage: viewModel.phoneErrorMessage
+              )
             }
           }
 
@@ -636,7 +640,7 @@ struct ProfileEditView: View {
         AuthPrimaryButton(
           title: viewModel.isLoading ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save Changes"),
           systemImage: "checkmark",
-          isEnabled: !viewModel.isLoading
+          isEnabled: !viewModel.isLoading && viewModel.isPhoneRowValid
         ) {
           Task { @MainActor in
             viewModel.saveProfileEdits()
@@ -965,6 +969,8 @@ struct ProfileTeachingGradeChip: View {
 
 struct ProfileEditInfoRow: View {
   @Binding var parameter: Parameter
+  var isValid = true
+  var errorMessage: String?
 
   var body: some View {
     AuthInputField(
@@ -973,7 +979,9 @@ struct ProfileEditInfoRow: View {
       systemImage: parameter.image,
       text: $parameter.value,
       keyboardType: keyboardType,
-      textContentType: textContentType
+      textContentType: textContentType,
+      isValid: isValid,
+      errorMessage: errorMessage
     )
   }
 

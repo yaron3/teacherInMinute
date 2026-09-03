@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @State var viewModel: SettingsViewModel
+    @State var viewModel: any SettingsViewModeling
     @Environment(\.appRouter) var router
     @Environment(\.openURL) var openURL
     @Environment(\.colorScheme) var colorScheme
@@ -16,7 +16,7 @@ struct SettingsView: View {
     var theme: AppTheme {
         AppTheme(colorScheme: colorScheme)
     }
-    init(role: AppUserMode, viewModel: SettingsViewModel?) {
+    init(role: AppUserMode, viewModel: (any SettingsViewModeling)?) {
         if let viewModel {
             self._viewModel = State(wrappedValue: viewModel)
         } else {
@@ -26,7 +26,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $viewModel.navigationPath) {
+        NavigationStack(path: navigationPath) {
             ZStack {
                 List {
                     ForEach(viewModel.sections) { section in
@@ -49,7 +49,7 @@ struct SettingsView: View {
 
                 loadingOverlay
             }
-            .navigationTitle(LocalizationSupport.localized("Settings"))
+            .navigationTitle(viewModel.settingsTitle)
             .navigationDestination(for: SettingsDestination.self) { destination in
                 destinationView(destination)
                     .navigationTitle(destination.title)
@@ -57,23 +57,23 @@ struct SettingsView: View {
             }
         }
         .appDialog(
-            viewModel.activeConfirmation?.title ?? LocalizationSupport.localized("Settings"),
+            viewModel.activeConfirmation?.title ?? viewModel.settingsTitle,
             isPresented: isShowingConfirmation,
             message: viewModel.activeConfirmation?.message ?? "",
             actions: confirmationDialogActions
         )
         .appDialog(
             viewModel.alertTitle,
-            isPresented: $viewModel.showAlert,
+            isPresented: isShowingAlert,
             message: viewModel.alertMessage ?? "",
-            actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+            actions: [AppDialogAction(viewModel.okLabel)]
         )
-        .alert(LocalizationSupport.localized("Delete Account"), isPresented: $viewModel.showReauthPasswordPrompt) {
-            SecureField(LocalizationSupport.localized("Password"), text: $viewModel.reauthPassword)
-            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {
+        .alert(viewModel.deleteAccountTitle, isPresented: isShowingReauthPasswordPrompt) {
+            SecureField(viewModel.passwordPlaceholder, text: reauthPassword)
+            Button(viewModel.cancelLabel, role: .cancel) {
                 viewModel.reauthPassword = ""
             }
-            Button(LocalizationSupport.localized("Delete"), role: .destructive) {
+            Button(viewModel.deleteLabel, role: .destructive) {
                 let password = viewModel.reauthPassword
                 viewModel.reauthPassword = ""
                 Task {
@@ -83,10 +83,11 @@ struct SettingsView: View {
                 }
             }
         } message: {
-            Text(LocalizationSupport.localized("Enter your password to confirm account deletion."))
+            Text(viewModel.reauthPasswordMessage)
         }
-        .sheet(item: $viewModel.contactSupportPreview) { request in
+        .sheet(item: contactSupportPreview) { request in
             ContactSupportPreviewSheet(
+                viewModel: viewModel,
                 request: request,
                 isSubmitting: viewModel.isSubmittingContactSupport,
                 onCancel: { viewModel.cancelContactSupportPreview() },
@@ -106,7 +107,7 @@ struct SettingsView: View {
         case .accountSecurity:
             AccountSecuritySettingsView(viewModel: viewModel)
         case .appPreferences:
-            AppPreferencesSettingsView(role: role)
+            AppPreferencesSettingsView(viewModel: viewModel)
         case .language:
             LanguageSettingsView(viewModel: viewModel)
         case .about:
@@ -116,15 +117,15 @@ struct SettingsView: View {
         case .webPage(let title, let url):
             AboutWebView(url: url, title: title)
         case .studentPayments:
-            StudentPaymentHistoryView()
+            StudentPaymentHistoryView(viewModel: viewModel)
         case .teacherPayouts:
             TeacherPayoutSettingsView(viewModel: viewModel)
         case .changePassword:
             ChangePasswordSettingsView(viewModel: viewModel)
         case .notifications:
-            NotificationPreferencesSettingsView(role: role)
+            NotificationPreferencesSettingsView(viewModel: viewModel)
         case .privacyControls:
-            PrivacyControlsSettingsView()
+            PrivacyControlsSettingsView(viewModel: viewModel)
         }
     }
 
@@ -143,7 +144,7 @@ struct SettingsView: View {
     /// destructive confirmations get the danger styling.
     var confirmationDialogActions: [AppDialogAction] {
         var actions = [
-            AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel) {
+            AppDialogAction(viewModel.cancelLabel, kind: .cancel) {
                 viewModel.activeConfirmation = nil
             }
         ]
@@ -158,6 +159,48 @@ struct SettingsView: View {
             )
         }
         return actions
+    }
+
+    // The view model is held as an existential, so the bindings SwiftUI needs
+    // are built by hand instead of through `$viewModel`.
+    var navigationPath: Binding<[SettingsDestination]> {
+        Binding {
+            viewModel.navigationPath
+        } set: { path in
+            viewModel.navigationPath = path
+        }
+    }
+
+    var reauthPassword: Binding<String> {
+        Binding {
+            viewModel.reauthPassword
+        } set: { password in
+            viewModel.reauthPassword = password
+        }
+    }
+
+    var contactSupportPreview: Binding<ContactSupportRequest?> {
+        Binding {
+            viewModel.contactSupportPreview
+        } set: { request in
+            viewModel.contactSupportPreview = request
+        }
+    }
+
+    var isShowingAlert: Binding<Bool> {
+        Binding {
+            viewModel.showAlert
+        } set: { isPresented in
+            viewModel.showAlert = isPresented
+        }
+    }
+
+    var isShowingReauthPasswordPrompt: Binding<Bool> {
+        Binding {
+            viewModel.showReauthPasswordPrompt
+        } set: { isPresented in
+            viewModel.showReauthPasswordPrompt = isPresented
+        }
     }
 
     var isShowingConfirmation: Binding<Bool> {
@@ -182,7 +225,7 @@ struct SettingsView: View {
 }
 
 struct AccountSecuritySettingsView: View {
-    let viewModel: SettingsViewModel
+    let viewModel: any SettingsViewModeling
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
         AppTheme(colorScheme: colorScheme)
@@ -207,7 +250,7 @@ struct AccountSecuritySettingsView: View {
 }
 
 struct LanguageSettingsView: View {
-    let viewModel: SettingsViewModel
+    let viewModel: any SettingsViewModeling
     @State var localizationManager = LocalizationManager.shared
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
@@ -263,6 +306,9 @@ struct LanguageSettingsView: View {
         }
     }
 
+    // These read through the localization service rather than the view model so
+    // the rows re-render against the Remote Config template that lands when the
+    // user switches language from this very screen.
     private func localizedTitle(for language: SettingsLanguageChoice) -> String {
         switch language {
         case .system: service.localized("System Language")
@@ -280,7 +326,7 @@ struct LanguageSettingsView: View {
 }
 
 struct AboutSettingsView: View {
-    let viewModel: SettingsViewModel
+    let viewModel: any SettingsViewModeling
     @Environment(\.colorScheme) var colorScheme
     var theme: AppTheme {
         AppTheme(colorScheme: colorScheme)
@@ -295,7 +341,7 @@ struct AboutSettingsView: View {
 }
 
 struct ContactSupportView: View {
-    @Bindable var viewModel: SettingsViewModel
+    let viewModel: any SettingsViewModeling
 
     var titleBinding: Binding<String> {
         Binding {
@@ -316,24 +362,24 @@ struct ContactSupportView: View {
     var body: some View {
         Form {
             Section {
-                Text(LocalizationSupport.localized("Send a message to support. You will preview the data before it is sent."))
+                Text(viewModel.contactSupportIntroText)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
-            Section(header: Text(LocalizationSupport.localized("Title"))) {
-                TextField(LocalizationSupport.localized("What can we help with?"), text: titleBinding)
+            Section(header: Text(viewModel.contactSupportTitleSectionTitle)) {
+                TextField(viewModel.contactSupportTitlePlaceholder, text: titleBinding)
                     .textInputAutocapitalization(.sentences)
-                Text("\(viewModel.contactSupportTitle.count)/\(viewModel.contactSupportTitleMaxLength)")
+                Text(viewModel.contactSupportTitleCounterText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
-            Section(header: Text(LocalizationSupport.localized("Description"))) {
+            Section(header: Text(viewModel.contactSupportDescriptionSectionTitle)) {
                 TextEditor(text: descriptionBinding)
                     .frame(minHeight: 160)
-                Text("\(viewModel.contactSupportDescription.count)/\(viewModel.contactSupportDescriptionMaxLength)")
+                Text(viewModel.contactSupportDescriptionCounterText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -350,7 +396,7 @@ struct ContactSupportView: View {
                             ProgressView()
                                 .scaleEffect(0.8)
                         }
-                        Text(LocalizationSupport.localized("Preview and Submit"))
+                        Text(viewModel.contactSupportSubmitLabel)
                     }
                 }
                 .disabled(viewModel.isLoading || viewModel.isSubmittingContactSupport)
@@ -363,6 +409,7 @@ struct ContactSupportView: View {
 }
 
 struct ContactSupportPreviewSheet: View {
+    let viewModel: any SettingsViewModeling
     let request: ContactSupportRequest
     let isSubmitting: Bool
     let onCancel: () -> Void
@@ -385,14 +432,14 @@ struct ContactSupportPreviewSheet: View {
                         .padding(.vertical, 4)
                     }
                 } header: {
-                    Text(LocalizationSupport.localized("Data to be sent"))
+                    Text(viewModel.contactSupportPreviewSectionTitle)
                 }
             }
-            .navigationTitle(LocalizationSupport.localized("Preview"))
+            .navigationTitle(viewModel.previewTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(LocalizationSupport.localized("Cancel")) {
+                    Button(viewModel.cancelLabel) {
                         onCancel()
                         dismiss()
                     }
@@ -406,7 +453,7 @@ struct ContactSupportPreviewSheet: View {
                         if isSubmitting {
                             ProgressView()
                         } else {
-                            Text(LocalizationSupport.localized("Send"))
+                            Text(viewModel.sendLabel)
                         }
                     }
                     .disabled(isSubmitting)
@@ -453,6 +500,7 @@ struct SettingsPlaceholderView: View {
 }
 
 struct StudentPaymentHistoryView: View {
+    let viewModel: any SettingsViewModeling
     @State  var monthSections: [PaymentHistoryMonthSection] = []
     @State  var isLoading = true
     private let authService = AuthService()
@@ -467,9 +515,9 @@ struct StudentPaymentHistoryView: View {
                     Image(systemName: "creditcard")
                         .font(.system(size: 40))
                         .foregroundStyle(.secondary)
-                    Text(LocalizationSupport.localized("No payments yet"))
+                    Text(viewModel.noPaymentsTitle)
                         .font(.headline)
-                    Text(LocalizationSupport.localized("Your lesson payments will appear here."))
+                    Text(viewModel.noPaymentsSubtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -583,18 +631,26 @@ struct StudentPaymentHistoryView: View {
 }
 
 struct TeacherPayoutSettingsView: View {
-    @Bindable var viewModel: SettingsViewModel
+    let viewModel: any SettingsViewModeling
+
+    var payPalEmailBinding: Binding<String> {
+        Binding {
+            viewModel.teacherPayPalEmail
+        } set: { value in
+            viewModel.teacherPayPalEmail = value
+        }
+    }
 
     var body: some View {
         Form {
             Section {
-                Text(LocalizationSupport.localized("Teachers must add and keep a valid PayPal email in order to receive payouts. Payments cannot be sent until this information is valid."))
+                Text(viewModel.teacherPayoutIntroText)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
-            Section(header: Text(LocalizationSupport.localized("PayPal Email"))) {
-                TextField(LocalizationSupport.localized("teacher@example.com"), text: $viewModel.teacherPayPalEmail)
+            Section(header: Text(viewModel.payPalEmailSectionTitle)) {
+                TextField(viewModel.payPalEmailPlaceholder, text: payPalEmailBinding)
                     .keyboardType(.emailAddress)
                     .textContentType(.emailAddress)
                     .textInputAutocapitalization(.never)
@@ -610,7 +666,7 @@ struct TeacherPayoutSettingsView: View {
                             ProgressView()
                                 .scaleEffect(0.8)
                         }
-                        Text(viewModel.isSavingPayoutSettings ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save PayPal Info"))
+                        Text(viewModel.savePayoutButtonLabel)
                     }
                 }
                 .disabled(viewModel.isSavingPayoutSettings)
@@ -623,18 +679,18 @@ struct TeacherPayoutSettingsView: View {
 }
 
 struct ChangePasswordSettingsView: View {
-    let viewModel: SettingsViewModel
+    let viewModel: any SettingsViewModeling
 
     var body: some View {
         Form {
             Section {
-                Text(LocalizationSupport.localized("Send a password reset email to the email address on this account."))
+                Text(viewModel.changePasswordIntroText)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Button(LocalizationSupport.localized("Send Reset Email")) {
+                Button(viewModel.sendResetEmailLabel) {
                     viewModel.sendPasswordReset()
                 }
             }
@@ -643,17 +699,17 @@ struct ChangePasswordSettingsView: View {
 }
 
 struct NotificationPreferencesSettingsView: View {
+    let viewModel: any SettingsViewModeling
     @AppStorage("notifyIncomingTeacherMessage") var notifyIncomingTeacherMessage = true
     @AppStorage("notifyGeneralAnnouncements") var notifyGeneralAnnouncements = true
     @State var notificationState: PermissionState = .notDetermined
     @State var isRequesting = false
-	let role: AppUserMode
 
     var body: some View {
         Form {
-            Section(header: Text(LocalizationSupport.localized("System Permission"))) {
+            Section(header: Text(viewModel.systemPermissionSectionTitle)) {
                 HStack {
-                    Text(LocalizationSupport.localized("Push Notifications"))
+                    Text(viewModel.pushNotificationsLabel)
                     Spacer()
                     Text(notificationState.subtitle)
                         .foregroundStyle(.secondary)
@@ -661,10 +717,10 @@ struct NotificationPreferencesSettingsView: View {
                 actionButton
             }
 
-            Section(header: Text(LocalizationSupport.localized("Notifications"))) {
-			  Toggle(LocalizationSupport.localized(role == .student ? "Notify me when a teacher sends an incoming message" :"Notify me when a student sends an incoming message"), isOn: $notifyIncomingTeacherMessage)
+            Section(header: Text(viewModel.notificationsSectionTitle)) {
+                Toggle(viewModel.incomingMessageNotificationLabel, isOn: $notifyIncomingTeacherMessage)
                     .disabled(!notificationState.isGranted)
-                Toggle(LocalizationSupport.localized("Notify me about general announcements"), isOn: $notifyGeneralAnnouncements)
+                Toggle(viewModel.generalAnnouncementsNotificationLabel, isOn: $notifyGeneralAnnouncements)
                     .disabled(!notificationState.isGranted)
             }
         }
@@ -684,7 +740,7 @@ struct NotificationPreferencesSettingsView: View {
                 Task { await requestNotifications() }
             } label: {
                 HStack {
-                    Text(LocalizationSupport.localized("Enable Notifications"))
+                    Text(viewModel.enableNotificationsLabel)
                     Spacer()
                     if isRequesting {
                         ProgressView().scaleEffect(0.8)
@@ -693,7 +749,7 @@ struct NotificationPreferencesSettingsView: View {
             }
             .disabled(isRequesting)
         case .denied:
-            Button(LocalizationSupport.localized("Open System Settings")) {
+            Button(viewModel.openSystemSettingsLabel) {
                 PermissionService.shared.openAppSettings()
             }
         case .granted:
@@ -710,43 +766,38 @@ struct NotificationPreferencesSettingsView: View {
 }
 
 struct AppPreferencesSettingsView: View {
-    let role: AppUserMode
+    let viewModel: any SettingsViewModeling
     @AppStorage(SessionPreferences.defaultQuestionTypeKey) var defaultQuestionType = ConversationType.audio.rawValue
     @AppStorage("appearanceMode") var appearanceMode = "system"
 
     var body: some View {
         Form {
-            if role == .student {
+            if viewModel.role == .student {
                 Section(
-                    header: Text(LocalizationSupport.localized("Default Session Type")),
-                    footer: Text(LocalizationSupport.localized("This session type is preselected when you ask a teacher a question. You can still change it for each question."))
+                    header: Text(viewModel.defaultSessionTypeSectionTitle),
+                    footer: Text(viewModel.defaultSessionTypeFooterText)
                 ) {
-                    Picker(LocalizationSupport.localized("Default Session Type"), selection: $defaultQuestionType) {
-                        ForEach(ConversationType.allCases, id: \.rawValue) { type in
-                            Text(type.displayName).tag(type.rawValue)
-                        }
-                    }
-                    .pickerStyle(.segmented)
+                    MultilineConversationTypePicker(selection: $defaultQuestionType)
                 }
             }
 
             Section(
-                header: Text(LocalizationSupport.localized("Currency")),
-                footer: Text(LocalizationSupport.localized("Your currency is set to Israeli Shekel (ILS) and cannot be changed for now."))
+                header: Text(viewModel.currencySectionTitle),
+                footer: Text(viewModel.currencyFooterText)
             ) {
                 HStack {
-                    Text(LocalizationSupport.localized("Currency"))
+                    Text(viewModel.currencySectionTitle)
                     Spacer()
-                    Text(LocalizationSupport.localized("ILS"))
+                    Text(viewModel.currencyValueLabel)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Section(header: Text(LocalizationSupport.localized("Appearance"))) {
-                Picker(LocalizationSupport.localized("Appearance"), selection: $appearanceMode) {
-                    Text(LocalizationSupport.localized("System")).tag("system")
-                    Text(LocalizationSupport.localized("Light")).tag("light")
-                    Text(LocalizationSupport.localized("Dark")).tag("dark")
+            Section(header: Text(viewModel.appearanceSectionTitle)) {
+                Picker(viewModel.appearanceSectionTitle, selection: $appearanceMode) {
+                    Text(viewModel.appearanceSystemLabel).tag("system")
+                    Text(viewModel.appearanceLightLabel).tag("light")
+                    Text(viewModel.appearanceDarkLabel).tag("dark")
                 }
                 .pickerStyle(.segmented)
             }
@@ -754,7 +805,46 @@ struct AppPreferencesSettingsView: View {
     }
 }
 
+ struct MultilineConversationTypePicker: View {
+    @Binding var selection: String
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(ConversationType.allCases, id: \.rawValue) { type in
+                Button {
+                    selection = type.rawValue
+                } label: {
+                    Text(type.displayName)
+                        .font(.system(size: 15, weight: isSelected(type) ? .semibold : .regular))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .padding(.horizontal, 6)
+                        .background {
+                            if isSelected(type) {
+                                Capsule()
+                                    .fill(.background)
+                                    .shadow(color: .black.opacity(0.08), radius: 1, x: 0, y: 1)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+               // .accessibilityLabel(type.displayName)
+                .accessibilityAddTraits(isSelected(type) ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(Color.primary.opacity(0.08), in: Capsule())
+    }
+
+    private func isSelected(_ type: ConversationType) -> Bool {
+        selection == type.rawValue
+    }
+}
+
 struct PrivacyControlsSettingsView: View {
+    let viewModel: any SettingsViewModeling
     @AppStorage("showProfileImage") var showProfileImage = true
     @AppStorage("allowTeacherMessagesOutsideCalls") var allowTeacherMessagesOutsideCalls = true
 
@@ -763,11 +853,11 @@ struct PrivacyControlsSettingsView: View {
     var body: some View {
         Form {
             Section(
-                header: Text(LocalizationSupport.localized("Privacy")),
-                footer: Text(LocalizationSupport.localized("When turned off, your profile photo won't be shared with the other participant during a session."))
+                header: Text(viewModel.privacySectionTitle),
+                footer: Text(viewModel.privacyFooterText)
             ) {
-                Toggle(LocalizationSupport.localized("Show my profile image"), isOn: $showProfileImage)
-                Toggle(LocalizationSupport.localized("Allow incoming messages from a teacher while not in a call"), isOn: $allowTeacherMessagesOutsideCalls)
+                Toggle(viewModel.showProfileImageLabel, isOn: $showProfileImage)
+                Toggle(viewModel.allowMessagesOutsideCallsLabel, isOn: $allowTeacherMessagesOutsideCalls)
             }
         }
         .task { await loadShowProfileImage() }

@@ -224,6 +224,20 @@ final class AuthService {
   }
 }
 
+/// Maps a Firebase Auth error code to a localized, user-visible message.
+/// Firebase's `localizedDescription` always returns English strings from the SDK;
+/// this function translates the numeric code into a key that LocalizationSupport can look up.
+func localizedAuthErrorMessage(_ error: Error) -> String {
+    switch (error as NSError).code {
+    case 17007: return LocalizationSupport.localized("This email address is already in use.")
+    case 17008: return LocalizationSupport.localized("Please enter a valid email address.")
+    case 17009, 17011: return LocalizationSupport.localized("Incorrect email or password.")
+    case 17010: return LocalizationSupport.localized("Too many failed attempts. Please try again later.")
+    case 17020: return LocalizationSupport.localized("A network error occurred. Please try again.")
+    default:    return LocalizationSupport.localized("An unexpected error occurred. Please try again.")
+    }
+}
+
 enum AuthReauthError: LocalizedError {
   /// The user signed in with email/password and must supply it to re-authenticate.
   case passwordRequired

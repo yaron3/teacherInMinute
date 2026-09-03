@@ -99,7 +99,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // stand in until the template is republished.
         "Log in to Teacher in a Minute to continue your\njourney.": "התחבר כדי להמשיך\nאת הדרך שלך.",
         "Tell us a bit about yourself to get started with\nTeacher in a Minute.": "ספר לנו קצת על עצמך כדי להתחיל עם\nTeacher in a Minute.",
-        "How do you want to use Teacher in a Minute? You\ncan change this later in settings.": "איך תרצה להשתמש ב־Teacher in a Minute? תוכל\nלשנות זאת מאוחר יותר בהגדרות.",
+		"Choose your role": "בחר תפקיד",
         "Send me occasional updates and tips about\nTeacher in a Minute.": "שלחו לי מדי פעם עדכונים וטיפים על\nTeacher in a Minute.",
         "Help you anywhere": "",
         // Title of the photo-source dialog; its buttons already had Hebrew, so
@@ -125,6 +125,16 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Grade 12": "כיתה י״ב",
         "I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)": "אני מסכים/ה ל[תנאי השירות](teacherminute://terms) ול[מדיניות הפרטיות.](teacherminute://privacy)",
         "Terms of Service": "תנאי השירות",
+        // Phone validation, shown under every field that takes a number. Stands
+        // in until `enter_valid_phone` is published to the template.
+        "Enter a valid phone number.": "יש להזין מספר טלפון תקין.",
+        // Firebase Auth errors — the SDK always returns English; these provide Hebrew fallbacks.
+        "This email address is already in use.": "כתובת המייל הזו כבר רשומה במערכת.",
+        "Incorrect email or password.": "כתובת המייל או הסיסמה שגויים.",
+        "Too many failed attempts. Please try again later.": "יותר מדי ניסיונות כושלים. נסה שוב מאוחר יותר.",
+        "A network error occurred. Please try again.": "שגיאת רשת. בדוק את החיבור ונסה שוב.",
+        "An unexpected error occurred. Please try again.": "אירעה שגיאה בלתי צפויה. נסה שוב.",
+        "Could not retrieve user session. Please try again.": "לא ניתן לאחזר את פרטי המשתמש. נסה שוב.",
         "Save board to gallery?": "לשמור את הלוח לגלריה?",
         "The session ended. Do you want to save the board image to your device gallery?": "השיעור הסתיים. האם ברצונך לשמור את תמונת הלוח לגלריית המכשיר?",
         "The board will be saved to the chat. Do you also want to save it to your device gallery?": "הלוח יישמר בצ׳אט. האם ברצונך לשמור אותו גם לגלריית המכשיר?",
@@ -138,6 +148,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Pay with": "תשלום באמצעות",
         // Confirmation shown after a successful purchase.
         "Purchase complete": "הרכישה הושלמה",
+        "Opening secure checkout\u{2026}": "פותח תשלום מאובטח\u{2026}",
         "%@ purchased for %@.": "נרכש %@ בעלות %@.",
         "Added %@ to your balance.": "נוספו %@ ליתרה שלך.",
         "Pay with PayPal": "תשלום באמצעות PayPal",

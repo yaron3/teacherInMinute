@@ -240,9 +240,64 @@ enum SettingsConfirmation: Identifiable {
 //    }
 //}
 
-@Observable
+// MARK: - ViewModel Protocol
+
 @MainActor
-class SettingsViewModel {
+protocol SettingsViewModeling: AnyObject {
+    var role: AppUserMode { get }
+
+    var navigationPath: [SettingsDestination] { get set }
+    var activeConfirmation: SettingsConfirmation? { get set }
+    var externalURL: URL? { get set }
+    var showAlert: Bool { get set }
+    var alertTitle: String { get set }
+    var alertMessage: String? { get set }
+    var isLoading: Bool { get set }
+    var showReauthPasswordPrompt: Bool { get set }
+    var reauthPassword: String { get set }
+    var isOpeningPaymentSettings: Bool { get set }
+    var isSavingPayoutSettings: Bool { get set }
+    var isSubmittingContactSupport: Bool { get set }
+    var teacherPayPalEmail: String { get set }
+    var contactSupportTitle: String { get set }
+    var contactSupportDescription: String { get set }
+    var contactSupportTitleMaxLength: Int { get set }
+    var contactSupportDescriptionMaxLength: Int { get set }
+    var contactSupportPreview: ContactSupportRequest? { get set }
+    var selectedLanguage: SettingsLanguageChoice { get set }
+
+    func select(_ row: SettingsRow)
+    func confirm(_ confirmation: SettingsConfirmation) async -> Bool
+    func updateLanguage(_ language: SettingsLanguageChoice)
+    func sendPasswordReset()
+    func openPaymentSettings()
+    func loadTeacherPayoutSettings() async
+    func saveTeacherPayoutSettings()
+    func deleteAccount() async -> Bool
+    func completeAccountDeletion(withPassword password: String) async -> Bool
+    func logOut() -> Bool
+    func contactSupportAppeared()
+    func updateContactSupportTitle(_ value: String)
+    func updateContactSupportDescription(_ value: String)
+    func loadContactSupportLimits() async
+    func previewContactSupport()
+    func cancelContactSupportPreview()
+    func submitContactSupport()
+    func openEULA() async
+    func openPrivacyPolicy() async
+    func openAbout() async
+    func present(title: String, message: String)
+    func consumeExternalURL()
+
+    #if DEBUG
+    func forceReloadRemoteConfig() async
+    #endif
+}
+
+// MARK: - Default Sections & Navigation
+
+extension SettingsViewModeling {
+
     var appVersion: String {
         let appName = LocalizationSupport.localized("Teacher in a Minute App")
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
@@ -258,39 +313,6 @@ class SettingsViewModel {
         case (.none, .none):
             return appName
         }
-    }
-    var navigationPath: [SettingsDestination] = []
-    var activeConfirmation: SettingsConfirmation?
-    var externalURL: URL?
-    var showAlert = false
-    var alertTitle = LocalizationSupport.localized("Settings")
-    var alertMessage: String?
-    var isLoading = false
-    var showReauthPasswordPrompt = false
-    var reauthPassword = ""
-    var isOpeningPaymentSettings = false
-    var isSavingPayoutSettings = false
-    var isSubmittingContactSupport = false
-    var teacherPayPalEmail = ""
-    var contactSupportTitle = ""
-    var contactSupportDescription = ""
-    var contactSupportTitleMaxLength = 50
-    var contactSupportDescriptionMaxLength = 1024
-    var contactSupportPreview: ContactSupportRequest?
-    var selectedLanguage: SettingsLanguageChoice
-    private let authService: AuthService
-    private let remoteConfigService: SettingsRemoteConfigService
-	let role:AppUserMode
-    init(
-        authService: AuthService = AuthService(),
-        remoteConfigService: SettingsRemoteConfigService = .shared,
-		role: AppUserMode
-    ) {
-        self.authService = authService
-        self.remoteConfigService = remoteConfigService
-        let savedLanguage = UserDefaults.standard.string(forKey: LocalizationSupport.languagePreferenceKey)
-        self.selectedLanguage = savedLanguage.flatMap(SettingsLanguageChoice.init(rawValue:)) ?? .system
-        self.role = role
     }
 
     var preferenceRows: [SettingsRow] {
@@ -359,11 +381,9 @@ class SettingsViewModel {
 
     var sections: [SettingsSection] {
         [
-		  
-		  role == .teacher ? SettingsSection(
+            role == .teacher ? SettingsSection(
                 title: LocalizationSupport.localized("PAYOUTS"),
                 rows: [
-				  
                     SettingsRow(
                         title: LocalizationSupport.localized("Teacher Payout Settings"),
                         subtitle: LocalizationSupport.localized("Update PayPal payout email"),
@@ -371,11 +391,11 @@ class SettingsViewModel {
                         iconColor: .purple,
                         isDestructive: false,
                         action: .teacherPayouts
-					)
-					]
-		  ): SettingsSection(
-			title: LocalizationSupport.localized("PAYMENTS"),
-			rows: [
+                    )
+                ]
+            ): SettingsSection(
+                title: LocalizationSupport.localized("PAYMENTS"),
+                rows: [
                     SettingsRow(
                         title: LocalizationSupport.localized("Payment History"),
                         subtitle: LocalizationSupport.localized("View your lesson payment history"),
@@ -403,19 +423,19 @@ class SettingsViewModel {
                     )
                 ]
             ),
-			SettingsSection(
-			  title: LocalizationSupport.localized("ACCOUNT"),
-			  rows: [
-				SettingsRow(
-				  title: LocalizationSupport.localized("Account & Security"),
-				  subtitle: LocalizationSupport.localized("Password, logout and account removal"),
-				  systemImage: "lock.fill",
-				  iconColor: .primary,
-				  isDestructive: false,
-				  action: .accountSecurity
-				)
-			  ]
-			)
+            SettingsSection(
+                title: LocalizationSupport.localized("ACCOUNT"),
+                rows: [
+                    SettingsRow(
+                        title: LocalizationSupport.localized("Account & Security"),
+                        subtitle: LocalizationSupport.localized("Password, logout and account removal"),
+                        systemImage: "lock.fill",
+                        iconColor: .primary,
+                        isDestructive: false,
+                        action: .accountSecurity
+                    )
+                ]
+            )
         ]
     }
 
@@ -482,32 +502,9 @@ class SettingsViewModel {
             ]
         )
     }
-  
-  func updateLanguage(_ language: SettingsLanguageChoice) {
-    selectedLanguage = language
-	Analytics.setUserProperty(language.remoteConfigLanguageCode, forName: "app_language")
-    let managerCode = localizationManagerCode(for: language)
-    Task {
-      await LocalizationManager.shared.updateLanguageCode(to: managerCode)
-      // Write the @AppStorage-observed key only after Remote Config has the
-      // new translations cached, so the root view's locale/layout flip and
-      // the localized text refresh happen in the same render pass.
-      UserDefaults.standard.set(language.rawValue, forKey: LocalizationSupport.languagePreferenceKey)
-    }
-  }
 
-  /// Bridges `SettingsLanguageChoice` to the `LocalizationManager` convention
-  /// where empty string means "follow system" and an ISO code pins the
-  /// language. Keeping it private to this view-model avoids leaking the new
-  /// manager's vocabulary into the rest of the settings layer.
-  private func localizationManagerCode(for language: SettingsLanguageChoice) -> String {
-    switch language {
-    case .system: return ""
-    case .english: return "en"
-    case .hebrew: return "he"
-    }
-  }
-
+    /// Row routing is identical for the live and mock view models — only the
+    /// handlers they land on differ — so it lives here and both inherit it.
     func select(_ row: SettingsRow) {
         switch row.action {
         case .accountSecurity:
@@ -546,7 +543,7 @@ class SettingsViewModel {
             activeConfirmation = .deleteAccount
         }
     }
-    
+
     func confirm(_ confirmation: SettingsConfirmation) async -> Bool {
         switch confirmation {
         case .logOut:
@@ -555,6 +552,181 @@ class SettingsViewModel {
             return await deleteAccount()
         }
     }
+
+    func present(message: String) {
+        present(title: settingsTitle, message: message)
+    }
+}
+
+// MARK: - Default Localized Strings
+
+extension SettingsViewModeling {
+
+    // MARK: Screen titles
+    var settingsTitle: String { LocalizationSupport.localized("Settings") }
+    var previewTitle: String { LocalizationSupport.localized("Preview") }
+
+    // MARK: Generic button labels
+    var okLabel: String { LocalizationSupport.localized("OK") }
+    var cancelLabel: String { LocalizationSupport.localized("Cancel") }
+    var deleteLabel: String { LocalizationSupport.localized("Delete") }
+    var sendLabel: String { LocalizationSupport.localized("Send") }
+
+    // MARK: Account deletion
+    var deleteAccountTitle: String { LocalizationSupport.localized("Delete Account") }
+    var passwordPlaceholder: String { LocalizationSupport.localized("Password") }
+    var reauthPasswordMessage: String {
+        LocalizationSupport.localized("Enter your password to confirm account deletion.")
+    }
+    var previewOnlyDeleteMessage: String {
+        LocalizationSupport.localized("Preview only. No account was deleted.")
+    }
+
+    // MARK: Contact support
+    var contactSupportIntroText: String {
+        LocalizationSupport.localized("Send a message to support. You will preview the data before it is sent.")
+    }
+    var contactSupportTitleSectionTitle: String { LocalizationSupport.localized("Title") }
+    var contactSupportTitlePlaceholder: String { LocalizationSupport.localized("What can we help with?") }
+    var contactSupportDescriptionSectionTitle: String { LocalizationSupport.localized("Description") }
+    var contactSupportSubmitLabel: String { LocalizationSupport.localized("Preview and Submit") }
+    var contactSupportPreviewSectionTitle: String { LocalizationSupport.localized("Data to be sent") }
+    var contactSupportTitleCounterText: String {
+        "\(contactSupportTitle.count)/\(contactSupportTitleMaxLength)"
+    }
+    var contactSupportDescriptionCounterText: String {
+        "\(contactSupportDescription.count)/\(contactSupportDescriptionMaxLength)"
+    }
+
+    // MARK: Payment history
+    var noPaymentsTitle: String { LocalizationSupport.localized("No payments yet") }
+    var noPaymentsSubtitle: String { LocalizationSupport.localized("Your lesson payments will appear here.") }
+
+    // MARK: Teacher payouts
+    var teacherPayoutIntroText: String {
+        LocalizationSupport.localized("Teachers must add and keep a valid PayPal email in order to receive payouts. Payments cannot be sent until this information is valid.")
+    }
+    var payPalEmailSectionTitle: String { LocalizationSupport.localized("PayPal Email") }
+    var payPalEmailPlaceholder: String { LocalizationSupport.localized("teacher@example.com") }
+    var savePayoutButtonLabel: String {
+        isSavingPayoutSettings
+            ? LocalizationSupport.localized("Saving...")
+            : LocalizationSupport.localized("Save PayPal Info")
+    }
+
+    // MARK: Change password
+    var changePasswordIntroText: String {
+        LocalizationSupport.localized("Send a password reset email to the email address on this account.")
+    }
+    var sendResetEmailLabel: String { LocalizationSupport.localized("Send Reset Email") }
+
+    // MARK: Notification preferences
+    var systemPermissionSectionTitle: String { LocalizationSupport.localized("System Permission") }
+    var pushNotificationsLabel: String { LocalizationSupport.localized("Push Notifications") }
+    var notificationsSectionTitle: String { LocalizationSupport.localized("Notifications") }
+    var incomingMessageNotificationLabel: String {
+        role == .student
+            ? LocalizationSupport.localized("Notify me when a teacher sends an incoming message")
+            : LocalizationSupport.localized("Notify me when a student sends an incoming message")
+    }
+    var generalAnnouncementsNotificationLabel: String {
+        LocalizationSupport.localized("Notify me about general announcements")
+    }
+    var enableNotificationsLabel: String { LocalizationSupport.localized("Enable Notifications") }
+    var openSystemSettingsLabel: String { LocalizationSupport.localized("Open System Settings") }
+
+    // MARK: App preferences
+    var defaultSessionTypeSectionTitle: String { LocalizationSupport.localized("Default Session Type") }
+    var defaultSessionTypeFooterText: String {
+        LocalizationSupport.localized("This session type is preselected when you ask a teacher a question. You can still change it for each question.")
+    }
+    var currencySectionTitle: String { LocalizationSupport.localized("Currency") }
+    var currencyFooterText: String {
+        LocalizationSupport.localized("Your currency is set to Israeli Shekel (ILS) and cannot be changed for now.")
+    }
+    var currencyValueLabel: String { LocalizationSupport.localized("ILS") }
+    var appearanceSectionTitle: String { LocalizationSupport.localized("Appearance") }
+    var appearanceSystemLabel: String { LocalizationSupport.localized("System") }
+    var appearanceLightLabel: String { LocalizationSupport.localized("Light") }
+    var appearanceDarkLabel: String { LocalizationSupport.localized("Dark") }
+
+    // MARK: Privacy controls
+    var privacySectionTitle: String { LocalizationSupport.localized("Privacy") }
+    var privacyFooterText: String {
+        LocalizationSupport.localized("When turned off, your profile photo won't be shared with the other participant during a session.")
+    }
+    var showProfileImageLabel: String { LocalizationSupport.localized("Show my profile image") }
+    var allowMessagesOutsideCallsLabel: String {
+        LocalizationSupport.localized("Allow incoming messages from a teacher while not in a call")
+    }
+
+    // MARK: Language
+    var languageSectionTitle: String { LocalizationSupport.localized("Language") }
+    var systemLanguageTitle: String { LocalizationSupport.localized("System Language") }
+    var systemLanguageSubtitle: String { LocalizationSupport.localized("Use the device language") }
+}
+
+@Observable
+@MainActor
+class SettingsViewModel: SettingsViewModeling {
+    var navigationPath: [SettingsDestination] = []
+    var activeConfirmation: SettingsConfirmation?
+    var externalURL: URL?
+    var showAlert = false
+    var alertTitle = LocalizationSupport.localized("Settings")
+    var alertMessage: String?
+    var isLoading = false
+    var showReauthPasswordPrompt = false
+    var reauthPassword = ""
+    var isOpeningPaymentSettings = false
+    var isSavingPayoutSettings = false
+    var isSubmittingContactSupport = false
+    var teacherPayPalEmail = ""
+    var contactSupportTitle = ""
+    var contactSupportDescription = ""
+    var contactSupportTitleMaxLength = 50
+    var contactSupportDescriptionMaxLength = 1024
+    var contactSupportPreview: ContactSupportRequest?
+    var selectedLanguage: SettingsLanguageChoice
+    private let authService: AuthService
+    private let remoteConfigService: SettingsRemoteConfigService
+	let role:AppUserMode
+    init(
+        authService: AuthService = AuthService(),
+        remoteConfigService: SettingsRemoteConfigService = .shared,
+		role: AppUserMode
+    ) {
+        self.authService = authService
+        self.remoteConfigService = remoteConfigService
+        let savedLanguage = UserDefaults.standard.string(forKey: LocalizationSupport.languagePreferenceKey)
+        self.selectedLanguage = savedLanguage.flatMap(SettingsLanguageChoice.init(rawValue:)) ?? .system
+        self.role = role
+    }
+  
+  func updateLanguage(_ language: SettingsLanguageChoice) {
+    selectedLanguage = language
+	Analytics.setUserProperty(language.remoteConfigLanguageCode, forName: "app_language")
+    let managerCode = localizationManagerCode(for: language)
+    Task {
+      await LocalizationManager.shared.updateLanguageCode(to: managerCode)
+      // Write the @AppStorage-observed key only after Remote Config has the
+      // new translations cached, so the root view's locale/layout flip and
+      // the localized text refresh happen in the same render pass.
+      UserDefaults.standard.set(language.rawValue, forKey: LocalizationSupport.languagePreferenceKey)
+    }
+  }
+
+  /// Bridges `SettingsLanguageChoice` to the `LocalizationManager` convention
+  /// where empty string means "follow system" and an ISO code pins the
+  /// language. Keeping it private to this view-model avoids leaking the new
+  /// manager's vocabulary into the rest of the settings layer.
+  private func localizationManagerCode(for language: SettingsLanguageChoice) -> String {
+    switch language {
+    case .system: return ""
+    case .english: return "en"
+    case .hebrew: return "he"
+    }
+  }
 
     #if DEBUG
     /// Remote Config holds a fetched template for `minimumFetchInterval` (an
@@ -818,7 +990,7 @@ class SettingsViewModel {
         }
     }
     
-    func present(title: String = LocalizationSupport.localized("Settings"), message: String) {
+    func present(title: String, message: String) {
         alertTitle = title
         alertMessage = message
         showAlert = true
@@ -852,46 +1024,150 @@ class SettingsViewModel {
     }
 }
 
+/// Preview / test double for `SettingsViewModeling`. It keeps the same state as
+/// the live view model but never touches Firebase, so previews render every
+/// settings screen and destructive actions stay inert.
+@Observable
 @MainActor
-final class MockSettingsViewModel: SettingsViewModel {
-    override init(
-        authService: AuthService = AuthService(),
-        remoteConfigService: SettingsRemoteConfigService = .shared,
-		role: AppUserMode
+final class MockSettingsViewModel: SettingsViewModeling {
+    let role: AppUserMode
+
+    var navigationPath: [SettingsDestination] = []
+    var activeConfirmation: SettingsConfirmation?
+    var externalURL: URL?
+    var showAlert = false
+    var alertTitle = LocalizationSupport.localized("Settings")
+    var alertMessage: String?
+    var isLoading = false
+    var showReauthPasswordPrompt = false
+    var reauthPassword = ""
+    var isOpeningPaymentSettings = false
+    var isSavingPayoutSettings = false
+    var isSubmittingContactSupport = false
+    var teacherPayPalEmail: String
+    var contactSupportTitle = ""
+    var contactSupportDescription = ""
+    var contactSupportTitleMaxLength = 50
+    var contactSupportDescriptionMaxLength = 1024
+    var contactSupportPreview: ContactSupportRequest?
+    var selectedLanguage: SettingsLanguageChoice
+
+    init(
+        role: AppUserMode = .student,
+        selectedLanguage: SettingsLanguageChoice = .system,
+        teacherPayPalEmail: String = "teacher@example.com"
     ) {
-	  super.init(authService: authService, remoteConfigService: remoteConfigService, role: role)
+        self.role = role
+        self.selectedLanguage = selectedLanguage
+        self.teacherPayPalEmail = teacherPayPalEmail
     }
 
-    override func confirm(_ confirmation: SettingsConfirmation) async -> Bool {
-        switch confirmation {
-        case .logOut:
-            return true
-        case .deleteAccount:
-            present(title: LocalizationSupport.localized("Delete Account"), message: LocalizationSupport.localized("Preview only. No account was deleted."))
-            return false
-        }
+    func updateLanguage(_ language: SettingsLanguageChoice) {
+        selectedLanguage = language
     }
 
-    override func logOut() -> Bool {
-        true
+    func sendPasswordReset() {
+        present(
+            title: LocalizationSupport.localized("Change Password"),
+            message: LocalizationSupport.localized("Password reset email sent.")
+        )
     }
 
-    override func deleteAccount() async -> Bool {
-        present(title: LocalizationSupport.localized("Delete Account"), message: LocalizationSupport.localized("Preview only. No account was deleted."))
+    func openPaymentSettings() {
+        externalURL = previewURL(path: "payment-settings")
+    }
+
+    func loadTeacherPayoutSettings() async {}
+
+    func saveTeacherPayoutSettings() {
+        present(
+            title: LocalizationSupport.localized("Teacher Payout Settings"),
+            message: LocalizationSupport.localized("PayPal payout email updated.")
+        )
+    }
+
+    func deleteAccount() async -> Bool {
+        present(title: deleteAccountTitle, message: previewOnlyDeleteMessage)
         return false
     }
 
-    override func openEULA() async {
+    func completeAccountDeletion(withPassword password: String) async -> Bool {
+        present(title: deleteAccountTitle, message: previewOnlyDeleteMessage)
+        return false
+    }
+
+    func logOut() -> Bool { true }
+
+    func contactSupportAppeared() {}
+
+    func updateContactSupportTitle(_ value: String) {
+        contactSupportTitle = String(value.prefix(contactSupportTitleMaxLength))
+    }
+
+    func updateContactSupportDescription(_ value: String) {
+        contactSupportDescription = String(value.prefix(contactSupportDescriptionMaxLength))
+    }
+
+    func loadContactSupportLimits() async {}
+
+    func previewContactSupport() {
+        contactSupportPreview = ContactSupportService.shared.makeRequest(
+            title: contactSupportTitle,
+            description: contactSupportDescription,
+            userID: "mock-user",
+            userName: "Sarah Jenkins",
+            userEmail: "sarah@example.com",
+            role: role
+        )
+    }
+
+    func cancelContactSupportPreview() {
+        contactSupportPreview = nil
+    }
+
+    func submitContactSupport() {
+        contactSupportPreview = nil
+        contactSupportTitle = ""
+        contactSupportDescription = ""
+        if navigationPath.last == .contactUs {
+            navigationPath.removeLast()
+        }
+        present(
+            title: LocalizationSupport.localized("Contact Us"),
+            message: LocalizationSupport.localized("Your message was sent.")
+        )
+    }
+
+    func openEULA() async {
         navigationPath.append(.webPage(title: LocalizationSupport.localized("EULA"), url: previewURL(path: "eula")))
     }
 
-    override func openPrivacyPolicy() async {
+    func openPrivacyPolicy() async {
         navigationPath.append(.webPage(title: LocalizationSupport.localized("Privacy Policy"), url: previewURL(path: "privacy")))
     }
 
-    override func openAbout() async {
+    func openAbout() async {
         navigationPath.append(.webPage(title: LocalizationSupport.localized("About"), url: previewURL(path: "about")))
     }
+
+    func present(title: String, message: String) {
+        alertTitle = title
+        alertMessage = message
+        showAlert = true
+    }
+
+    func consumeExternalURL() {
+        externalURL = nil
+    }
+
+    #if DEBUG
+    func forceReloadRemoteConfig() async {
+        present(
+            title: LocalizationSupport.localized("Remote Config"),
+            message: LocalizationSupport.localized("Reloaded from Remote Config.")
+        )
+    }
+    #endif
 
     private func previewURL(path: String) -> URL {
         URL(string: "https://example.com/\(path)") ?? URL(fileURLWithPath: "/")

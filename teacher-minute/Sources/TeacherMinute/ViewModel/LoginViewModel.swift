@@ -56,7 +56,7 @@ final class LoginViewModel {
 
 	  // 2. Get the Firebase UID
 	  guard let uid = Auth.auth().currentUser?.uid else {
-		present(message: "Could not retrieve user session. Please try again.")
+		present(message: LocalizationSupport.localized("Could not retrieve user session. Please try again."))
 		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "email", "reason": "no_session"])
 		return
 	  }
@@ -70,7 +70,7 @@ final class LoginViewModel {
 	} catch {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "email", "reason": error.localizedDescription])
 	  AnalyticsService.shared.recordError(error, context: "login")
-	  present(message: error.localizedDescription)
+	  present(message: localizedAuthErrorMessage(error))
 	}
   }
   
@@ -85,7 +85,7 @@ final class LoginViewModel {
 		  Task { @MainActor in
 			guard let uid = Auth.auth().currentUser?.uid else {
 			  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": "no_session"])
-			  self?.present(message: "Could not retrieve user session. Please try again.")
+			  self?.present(message: LocalizationSupport.localized("Could not retrieve user session. Please try again."))
 			  return
 			}
 			AnalyticsService.shared.setUser(uid: uid)
@@ -94,12 +94,12 @@ final class LoginViewModel {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
 			  self?.destination = resume
 			} catch {
-			  self?.present(message: error.localizedDescription)
+			  self?.present(message: localizedAuthErrorMessage(error))
 			}
 		  }
 		case .failure(let error):
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
-		  Task { @MainActor in self?.present(message: error.localizedDescription) }
+		  Task { @MainActor in self?.present(message: localizedAuthErrorMessage(error)) }
 	  }
 	}
 #endif
@@ -110,7 +110,7 @@ final class LoginViewModel {
 		let signInResult = try await AndroidGoogleAuth().signIn()
 		guard let uid = Auth.auth().currentUser?.uid ?? AndroidGoogleAuth.uid(from: signInResult) else {
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": "no_session"])
-		  present(message: "Could not retrieve user session. Please try again.")
+		  present(message: LocalizationSupport.localized("Could not retrieve user session. Please try again."))
 		  return
 		}
 		AnalyticsService.shared.setUser(uid: uid)
@@ -119,7 +119,7 @@ final class LoginViewModel {
 		destination = resume
 	  } catch {
 		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
-		present(message: error.localizedDescription)
+		present(message: localizedAuthErrorMessage(error))
 	  }
 	}
 #endif
@@ -134,7 +134,7 @@ final class LoginViewModel {
 		  Task { @MainActor in
 			guard let uid = Auth.auth().currentUser?.uid else {
 			  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": "no_session"])
-			  self?.present(message: "Could not retrieve user session. Please try again.")
+			  self?.present(message: LocalizationSupport.localized("Could not retrieve user session. Please try again."))
 			  return
 			}
 			AnalyticsService.shared.setUser(uid: uid)
@@ -143,12 +143,12 @@ final class LoginViewModel {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
 			  self?.destination = resume
 			} catch {
-			  self?.present(message: error.localizedDescription)
+			  self?.present(message: localizedAuthErrorMessage(error))
 			}
 		  }
 		case .failure(let error):
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
-		  Task { @MainActor in self?.present(message: error.localizedDescription) }
+		  Task { @MainActor in self?.present(message: localizedAuthErrorMessage(error)) }
 	  }
 	}
 #endif
@@ -168,7 +168,7 @@ final class LoginViewModel {
         present(message: LocalizationSupport.localized("Password reset email sent."))
       } catch {
         AnalyticsService.shared.recordError(error, context: "forgotPassword")
-        present(message: error.localizedDescription)
+        present(message: localizedAuthErrorMessage(error))
       }
     }
   }

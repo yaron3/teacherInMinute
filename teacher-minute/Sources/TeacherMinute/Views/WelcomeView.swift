@@ -34,12 +34,12 @@ struct WelcomeView: View {
             .font(.system(size: 35, weight: .bold, design: .default))
             .foregroundStyle(theme.primaryText)
             .lineSpacing(-4)
-            .padding(.top, 42)
+            .padding(.top, 12)
           
           Image("LaunchIcon")
             .resizable()
             .scaledToFit()
-            .padding(.top, 32)
+            .padding(.top, 6)
           
           Text(LocalizationSupport.localized("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise."))
             .font(.system(size: 16, weight: .regular))

@@ -83,7 +83,10 @@ struct TeacherPayoutMethod {
         && !accountNumber.trimmed.isEmpty
         && !accountHolderName.trimmed.isEmpty
     case .bit:
-      return !phone.trimmed.isEmpty
+      // The one exception to "empty check only": `requirePhone` on the backend
+      // rejects a malformed number outright, and the teacher can see that
+      // before the round-trip.
+      return phone.trimmed.isValidPhoneNumber
     case .paypal:
       // PayPal is saved by completing the login, not by typing — see
       // TeacherEarningsViewModel.connectPayPalPayoutAccount.
@@ -121,7 +124,10 @@ struct TeacherPayoutMethod {
         "accountHolderName": accountHolderName.trimmed,
       ]
     case .bit:
-      return ["type": type.rawValue, "phone": phone.trimmed]
+      // Sent in canonical local digits: `requirePhone` on the backend only
+      // strips spaces and dashes, so parentheses from the placeholder's own
+      // format ("+972 (52) 000-0000") would be rejected if forwarded as typed.
+      return ["type": type.rawValue, "phone": phone.normalizedPhoneNumber]
     case .paypal:
       return ["type": type.rawValue, "email": email.trimmed]
     }

@@ -106,6 +106,9 @@ struct StudentHomeView: View {
 
 	  searchStateOverlay
 
+	  checkoutPreparingOverlay
+		.zIndex(5)
+
 #if os(Android)
 	  if let result = paymentReturnStore.latestResult {
 		paymentReturnOverlay(result)
@@ -230,23 +233,26 @@ struct StudentHomeView: View {
           
 
           VStack(alignment: .leading, spacing: 8) {
+			
             Text(viewModel.greetingText)
               .font(.system(size: 18, weight: .bold))
               .foregroundStyle(theme.info)
-
-            Text(viewModel.appDisplayName)
-              .font(.system(size: 36, weight: .bold))
-              .foregroundStyle(theme.primaryText)
-              .lineLimit(2)
-              .minimumScaleFactor(0.75)
-
+			HStack{
+			  Text(viewModel.appMainIssueText)
+				.font(.system(size: 25, weight: .bold))
+				.foregroundStyle(theme.primaryText)
+				.lineLimit(2)
+				.minimumScaleFactor(0.75)
+			  Spacer()
+			  balancePill
+			}
             Text(viewModel.connectPromiseText)
               .font(.system(size: 15, weight: .semibold))
               .foregroundStyle(theme.primaryText.opacity(0.65))
               .lineLimit(2)
           }
           .frame(maxWidth: .infinity, alignment: .leading)
-		  balancePill
+		  
         }
 
         //onlineStatusBar
@@ -270,19 +276,24 @@ struct StudentHomeView: View {
 
   var balancePill: some View {
     VStack(spacing: 8) {
-      Text("\(viewModel.remainingMinutes)")
-        .font(.system(size: 26, weight: .bold))
-        .foregroundStyle(theme.warning)
+      Circle()
+        .stroke(theme.warning, lineWidth: 2.5)
+        .frame(width: 54, height: 54)
+        .overlay {
+          Text("\(viewModel.remainingMinutes)")
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(theme.warning)
+        }
       Text(viewModel.minutesLabel)
         .font(.system(size: 13, weight: .bold))
         .foregroundStyle(theme.primaryText.opacity(0.65))
     }
-    .frame(width: 92, height: 120)
+    .frame(width: 92, height: 96)
     .background(theme.cardBackground.opacity(0.2))
     .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-        .stroke(theme.cardBackground.opacity(0.2), lineWidth: 1)
+        .stroke(theme.cardBackground.opacity(0.2), lineWidth: 2)
     }
   }
 
@@ -478,72 +489,16 @@ struct StudentHomeView: View {
   }
 
   var howItWorksPanel: some View {
-    VStack(alignment: .leading, spacing: 22) {
-      Text(viewModel.howItWorksTitle)
-        .font(.system(size: 24, weight: .bold))
-        .foregroundStyle(theme.onDarkFill)
-		.frame(maxWidth: .infinity, alignment: .leading)
-
-      VStack(spacing: 24) {
-        howItWorksStep(
-          number: 1,
-          title: viewModel.howItWorksStep1Title,
-          subtitle: viewModel.howItWorksStep1Subtitle,
-          tint: theme.info
-        )
-        howItWorksStep(
-          number: 2,
-          title: viewModel.connectStepTitle,
-          subtitle: viewModel.howItWorksStep2Subtitle,
-          tint: theme.warning
-        )
-        howItWorksStep(
-          number: 3,
-          title: viewModel.howItWorksStep3Title,
-          subtitle: viewModel.howItWorksStep3Subtitle,
-          tint: theme.accent
-        )
-        howItWorksStep(
-          number: 4,
-          title: viewModel.howItWorksStep4Title,
-          subtitle: viewModel.pricePerMinuteText.isEmpty
-            ? viewModel.howItWorksStep4SubtitleFallback
-            : viewModel.pricePerMinuteText,
-          tint: theme.positive
-        )
-      }
-    }
-    .padding(22)
-    .background(theme.accentStrong)
-    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-  }
-
-  func howItWorksStep(number: Int, title: String, subtitle: String, tint: Color) -> some View {
-    HStack(alignment: .top, spacing: 16) {
-      Circle()
-        .stroke(tint, lineWidth: 3)
-        .frame(width: 46, height: 46)
-        .overlay {
-          Text("\(number)")
-            .font(.system(size: 18, weight: .bold))
-            .foregroundStyle(tint)
-        }
-
-      VStack(alignment: .leading, spacing: 6) {
-        Text(title)
-          .font(.system(size: 18, weight: .bold))
-          .foregroundStyle(theme.onDarkFill)
-          .lineLimit(2)
-          .minimumScaleFactor(0.82)
-
-        Text(subtitle)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(theme.onDarkFill.opacity(0.6))
-          .lineLimit(2)
-          .minimumScaleFactor(0.82)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    HowItWorksPanel(
+      title: viewModel.howItWorksTitle,
+      steps: [
+        HowItWorksStep(number: 1, title: viewModel.howItWorksStep1Title, subtitle: viewModel.howItWorksStep1Subtitle, tint: theme.info),
+        HowItWorksStep(number: 2, title: viewModel.connectStepTitle, subtitle: viewModel.howItWorksStep2Subtitle, tint: theme.warning),
+        HowItWorksStep(number: 3, title: viewModel.howItWorksStep3Title, subtitle: viewModel.howItWorksStep3Subtitle, tint: theme.penGreen),
+        HowItWorksStep(number: 4, title: viewModel.howItWorksStep4Title, subtitle: viewModel.pricePerMinuteText.isEmpty ? viewModel.howItWorksStep4SubtitleFallback : viewModel.pricePerMinuteText, tint: theme.positive),
+      ],
+      theme: theme
+    )
   }
 
   var pricingGrid: some View {
@@ -949,6 +904,35 @@ struct StudentHomeView: View {
   
   // MARK: - State overlay
   
+  /// Covers the gap between picking a payment method and the buyer seeing
+  /// something happen — the wallet sheet, or the browser. The per-card spinner
+  /// alone is easy to miss: the card sits in a horizontal strip that may be
+  /// scrolled away, and the method sheet has just been dismissed over it.
+  @ViewBuilder
+  var checkoutPreparingOverlay: some View {
+	if viewModel.isPreparingCheckout {
+	  ZStack {
+		Color.black.opacity(0.35)
+		  .ignoresSafeArea()
+		checkoutPreparingCard
+	  }
+	}
+  }
+
+  var checkoutPreparingCard: some View {
+	VStack(spacing: 14) {
+	  ProgressView()
+	  Text(viewModel.openingCheckoutText)
+		.font(.system(size: 15, weight: .medium))
+		.foregroundStyle(theme.primaryText)
+		.multilineTextAlignment(.center)
+	}
+	.padding(.horizontal, 28)
+	.padding(.vertical, 24)
+	.background(theme.cardBackground)
+	.cornerRadius(14)
+  }
+
   @ViewBuilder
   var searchStateOverlay: some View {
     switch viewModel.searchState {

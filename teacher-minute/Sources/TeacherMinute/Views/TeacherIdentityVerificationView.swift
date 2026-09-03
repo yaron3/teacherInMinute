@@ -258,7 +258,7 @@ struct TeacherIdentityVerificationView: View {
 		  .background((viewModel.canSubmit ? theme.positive : theme.controlDisabled).opacity(0.12))
 		  .clipShape(Capsule())
 	  }
-	  StatusRow(title: LocalizationSupport.localized("Government ID – Front"), isDone: viewModel.hasGovernmentIDFront, isMandatory: true)
+	  StatusRow(title: LocalizationSupport.localized("Government ID – Front"), isDone: viewModel.hasGovernmentIDFront, isMandatory: false)
 	}
 	.padding(16)
 	.background(theme.cardBackground)
@@ -342,7 +342,7 @@ struct StatusRow: View {
 		.foregroundStyle(theme.secondaryText)
 	  
 	  if isMandatory && !isDone {
-		Text(LocalizationSupport.localized("required"))
+		Text(isMandatory ? LocalizationSupport.localized("Required") : LocalizationSupport.localized("Optional"))
 		  .font(.system(size: 9, weight: .semibold))
 		  .foregroundStyle(theme.warning)
 		  .padding(.horizontal, 6)

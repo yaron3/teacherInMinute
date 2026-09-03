@@ -40,7 +40,7 @@ struct TeacherDashboardView: View {
 	  ConnectionSetupView(
 		participantName: viewModel.activeStudentName,
 		conversationType: viewModel.activeConversationType,
-		footerText: LocalizationSupport.localized("Setting up the session"),
+		footerText: viewModel.settingUpSessionText,
 		onCancel: {
 		  viewModel.cancelAcceptingInvite()
 		}
@@ -55,7 +55,7 @@ struct TeacherDashboardView: View {
 	  ChatSessionView(
 		questionId: questionId,
 			role: "teacher",
-			title: LocalizationSupport.localized("Student"),
+			title: viewModel.chatStudentTitle,
 			conversationType: viewModel.activeConversationType,
             liveKitRoom: viewModel.activeCallRoom ?? "",
             liveKitToken: viewModel.activeCallToken ?? "",
@@ -74,7 +74,7 @@ struct TeacherDashboardView: View {
 		ScrollView(.vertical, showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 0) {
 			FlatTopHeader(
-			  eyebrow: LocalizationSupport.localized("Teacher"),
+			  eyebrow: viewModel.teacherEyebrow,
 			  name: viewModel.teacherName,
 			  avatarImageURL: viewModel.teacherImageURL,
 			  avatarSystemImage: "person.crop.circle.fill",
@@ -185,7 +185,7 @@ struct TeacherDashboardView: View {
 
   
 	  VStack(alignment: .leading, spacing: 4) {
-		Text(LocalizationSupport.localized("Teacher Dashboard"))
+		Text(viewModel.teacherDashboardTitle)
 		  .font(.system(size: 12, weight: .semibold))
 		  .foregroundStyle(theme.accent)
 
@@ -218,16 +218,12 @@ struct TeacherDashboardView: View {
 	HStack(spacing: 16) {
 
 	  VStack(alignment: .leading, spacing: 4) {
-		  Text(viewModel.isOnline
-			   ? LocalizationSupport.localized("Available")
-			   : LocalizationSupport.localized("Not available"))
+		  Text(viewModel.statusToggleTitle)
 			.font(.system(size: 14, weight: .semibold))
 			.foregroundStyle(theme.primaryText)
 		  
 		
-		Text(viewModel.isOnline
-			 ? LocalizationSupport.localized("Waiting for students...")
-			 : LocalizationSupport.localized("Tap to start"))
+		Text(viewModel.statusToggleSubtitle)
 		  .font(.system(size: 12))
 		  .foregroundStyle(theme.secondaryText)
 		  .frame(maxWidth: .infinity, alignment: .leading)
@@ -249,12 +245,12 @@ struct TeacherDashboardView: View {
 	HStack(spacing: 12) {
 	  statCard(
 		value: "\(viewModel.lessonCount)",
-		label: LocalizationSupport.localized("Lessons"),
+		label: viewModel.lessonsLabel,
 		valueColor: theme.accent
 	  )
 	  statCard(
 		value: viewModel.formattedMonthEarnings,
-		label: LocalizationSupport.localized("Monthly income"),
+		label: viewModel.monthlyIncomeLabel,
 		valueColor: theme.positive
 	  )
 	}
@@ -279,7 +275,7 @@ struct TeacherDashboardView: View {
 	FlatCard {
 	  VStack(alignment: .leading, spacing: 8) {
 		HStack {
-		  Text(LocalizationSupport.localized("My Rating"))
+		  Text(viewModel.myRatingLabel)
 			.font(.system(size: 14, weight: .semibold))
 			.foregroundStyle(theme.primaryText)
 			.frame(maxWidth: .infinity, alignment: .leading)
@@ -321,7 +317,7 @@ struct TeacherDashboardView: View {
 		  )
 
 		  VStack(alignment: .leading, spacing: 3) {
-			Text(viewModel.isVerified ? LocalizationSupport.localized("Verified Expert") : LocalizationSupport.localized("Pending Verification"))
+			Text(viewModel.verificationStatusText)
 			  .font(.system(size: 15, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
 
@@ -337,7 +333,7 @@ struct TeacherDashboardView: View {
 		  Button {
 			viewModel.editSubjects()
 		  } label: {
-			FlatChip(title: LocalizationSupport.localized("Edit Subjects"), systemImage: "pencil", outlined: true)
+			FlatChip(title: viewModel.editSubjectsLabel, systemImage: "pencil", outlined: true)
 		  }
 		  .buttonStyle(.plain)
 		  Spacer()
@@ -348,19 +344,19 @@ struct TeacherDashboardView: View {
 
   var earningsSnapshot: some View {
 	VStack(alignment: .leading, spacing: 12) {
-	  FlatSectionHeader(LocalizationSupport.localized("Earnings Snapshot"))
+	  FlatSectionHeader(viewModel.earningsSnapshotHeader)
 
 	  HStack(spacing: 12) {
-		EarningsCard(title: LocalizationSupport.localized("Today"), amount: viewModel.formattedTodayEarnings, subtitle: String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
+		EarningsCard(title: viewModel.earningsTodayTitle, amount: viewModel.formattedTodayEarnings, subtitle: viewModel.todayMinutesTutoredText)
 		  .frame(maxWidth: .infinity)
-		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.positive : nil)
+		EarningsCard(title: viewModel.earningsThisWeekTitle, amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? viewModel.weekMinutesTutoredText, subtitleColor: viewModel.weekChangeText != nil ? theme.positive : nil)
 		  .frame(maxWidth: .infinity)
 	  }
 
 	  EarningsCard(
-		title: LocalizationSupport.localized("All Time"),
-		amount: String(format: LocalizationSupport.localized("%d min"), viewModel.totalMinutes),
-		subtitle: LocalizationSupport.localized("Total minutes tutored")
+		title: viewModel.earningsAllTimeTitle,
+		amount: viewModel.totalMinutesText,
+		subtitle: viewModel.totalMinutesTutoredLabel
 	  )
 	  .frame(maxWidth: .infinity)
 	}
@@ -372,7 +368,7 @@ struct TeacherDashboardView: View {
 	FlatCard(padding: 20) {
 	  HStack(alignment: .top) {
 		VStack(alignment: .leading, spacing: 6) {
-		  Text(LocalizationSupport.localized("Live Earnings Today"))
+		  Text(viewModel.liveEarningsTodayLabel)
 			.font(.system(size: 14))
 			.foregroundStyle(theme.secondaryText)
 
@@ -380,14 +376,14 @@ struct TeacherDashboardView: View {
 			.font(.system(size: 40, weight: .bold))
 			.foregroundStyle(theme.primaryText)
 
-		  Text(String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
+		  Text(viewModel.todayMinutesTutoredText)
 			.font(.system(size: 13))
 			.foregroundStyle(theme.secondaryText)
 		}
 
 		Spacer()
 
-		FlatBadge(title: String(format: LocalizationSupport.localized("%@/min"), viewModel.formattedRate))
+		FlatBadge(title: viewModel.ratePerMinBadgeText)
 	  }
 	}
   }
@@ -395,11 +391,11 @@ struct TeacherDashboardView: View {
   var onlineStatusCard: some View {
 	FlatCard(padding: 14) {
 	  HStack(spacing: 0) {
-		statusItem(icon: "mic.fill", title: LocalizationSupport.localized("Mic"), subtitle: viewModel.hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off"), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
+		statusItem(icon: "mic.fill", title: viewModel.micStatusTitle, subtitle: viewModel.micStatusSubtitle, color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
 		verticalRule
-		statusItem(icon: "video.fill", title: LocalizationSupport.localized("Cam"), subtitle: viewModel.hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off"), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
+		statusItem(icon: "video.fill", title: viewModel.camStatusTitle, subtitle: viewModel.camStatusSubtitle, color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
 		verticalRule
-		statusItem(icon: "circle.fill", title: LocalizationSupport.localized("Status"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
+		statusItem(icon: "circle.fill", title: viewModel.connectionStatusTitle, subtitle: viewModel.connectionStatusSubtitle, color: theme.positive)
 	  }
 	}
   }
@@ -412,8 +408,8 @@ struct TeacherDashboardView: View {
 
   var liveQueue: some View {
 	VStack(alignment: .leading, spacing: 12) {
-	  FlatSectionHeader(LocalizationSupport.localized("Live Queue")) {
-		FlatChip(title: String(format: LocalizationSupport.localized("%d Waiting"), viewModel.inviteIDs.count))
+	  FlatSectionHeader(viewModel.liveQueueHeader) {
+		FlatChip(title: viewModel.liveQueueWaitingText)
 	  }
 
 	  ForEach(viewModel.inviteIDs, id: \.self) { inviteID in
@@ -483,15 +479,15 @@ struct TeacherDashboardView: View {
 
   var readinessChecklist: some View {
 	VStack(alignment: .leading, spacing: 12) {
-	  FlatSectionHeader(LocalizationSupport.localized("Readiness Checklist"))
+	  FlatSectionHeader(viewModel.readinessChecklistHeader)
 
 	  FlatCard(padding: 0, outlined: true) {
 		VStack(spacing: 0) {
-		  checklistRow(icon: "mic.fill", title: viewModel.hasMicAccess ? LocalizationSupport.localized("Microphone Enabled") : LocalizationSupport.localized("Microphone Disabled"), subtitle: LocalizationSupport.localized("Required for voice sessions."), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
+		  checklistRow(icon: "mic.fill", title: viewModel.micChecklistTitle, subtitle: viewModel.micChecklistSubtitle, color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
 		  FlatRule()
-		  checklistRow(icon: "camera.fill", title: viewModel.hasCameraAccess ? LocalizationSupport.localized("Camera Enabled") : LocalizationSupport.localized("Camera Disabled"), subtitle: LocalizationSupport.localized("Enable for video tutoring."), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
+		  checklistRow(icon: "camera.fill", title: viewModel.camChecklistTitle, subtitle: viewModel.camChecklistSubtitle, color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
 		  FlatRule()
-		  checklistRow(icon: "wifi", title: LocalizationSupport.localized("Connection"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
+		  checklistRow(icon: "wifi", title: viewModel.connectionChecklistTitle, subtitle: viewModel.connectionChecklistSubtitle, color: theme.positive)
 		}
 	  }
 	}

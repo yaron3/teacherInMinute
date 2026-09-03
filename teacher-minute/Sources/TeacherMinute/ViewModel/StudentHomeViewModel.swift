@@ -145,6 +145,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var pricePerMinuteText: String { get }
   var averageConnectText: String { get }
   var connectPromiseText: String { get }
+  var appMainIssueText: String { get }
   var connectStepTitle: String { get }
   var averageResponseText: String { get }
   var registeredTeacherCountText: String { get }
@@ -156,6 +157,7 @@ protocol StudentHomeViewModeling: AnyObject {
   var remainingMinutes: Int { get set }
   var checkoutURL: URL? { get set }
   var isStartingCheckout: Bool { get set }
+  var isPreparingCheckout: Bool { get set }
   var checkoutPricingOptionID: String? { get set }
   var isAwaitingPaymentReturn: Bool { get set }
   var couponCode: String { get set }
@@ -191,6 +193,7 @@ extension StudentHomeViewModeling {
   var lowBalanceAlertTitle: String { LocalizationSupport.localized("Low Balance") }
   var okLabel: String { LocalizationSupport.localized("OK") }
   var purchaseCompleteTitle: String { LocalizationSupport.localized("Purchase complete") }
+  var openingCheckoutText: String { LocalizationSupport.localized("Opening secure checkout\u{2026}") }
   var paymentFallbackTitle: String { LocalizationSupport.localized("Payment") }
   var meetLabel: String { LocalizationSupport.localized("Meet") }
   var redeemLabel: String { LocalizationSupport.localized("Redeem") }
@@ -355,7 +358,9 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// The hero line and the "how it works" step, both of which used to promise a
   /// fixed 90 seconds. They now quote the measured average, and fall back to
   /// wording that makes no numeric claim when there is nothing to quote.
-  var connectPromiseText = LocalizationSupport.localized("When AI gets stuck, a human teacher connects in moments")
+  var appMainIssueText = LocalizationSupport.localized("Stucked? you will have a teacher immediately")
+  var connectPromiseText = LocalizationSupport.localized("Help from a real teacher, exactly when you need it") 
+
   var connectStepTitle = LocalizationSupport.localized("A teacher connects quickly")
   /// The line on the ask-a-question sheet. Empty when nothing has been
   /// measured, so the sheet drops it instead of quoting a made-up figure.
@@ -368,6 +373,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var remainingMinutes = 0
   var checkoutURL: URL?
   var isStartingCheckout = false
+  /// True from the moment checkout starts until the buyer is handed off to
+  /// something they can see — the wallet sheet, or the browser. Distinct from
+  /// `isStartingCheckout`, which stays true for the whole wallet payment and
+  /// so would leave a spinner sitting behind the Apple Pay sheet.
+  var isPreparingCheckout = false
   var checkoutPricingOptionID: String?
   var isAwaitingPaymentReturn = false
   var couponCode = ""
@@ -460,11 +470,15 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     guard !isStartingCheckout else { return }
     logger.info("[PaymentReturn] checkout start pricingOptionID=\(option.id) method=\(method.rawValue)")
     isStartingCheckout = true
+    isPreparingCheckout = true
     checkoutPricingOptionID = option.id
     checkoutStartedRemainingMinutes = remainingMinutes
     pendingPurchaseOption = option
     defer {
       isStartingCheckout = false
+      // Belt and braces: each path clears this the moment the buyer sees the
+      // wallet or the browser, but a throw must never strand the spinner.
+      isPreparingCheckout = false
       checkoutPricingOptionID = nil
     }
     selectTier(option)
@@ -489,6 +503,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     do {
       let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: method)
       checkoutURL = result.checkoutURL
+      isPreparingCheckout = false
       logger.info("[PaymentReturn] checkout session created url=\(result.checkoutURL.absoluteString)")
     } catch let error as FunctionsError {
       logger.error("[PaymentReturn] createCheckoutSession failed details=\(error.localizedDescription)")
@@ -507,6 +522,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   private func checkoutWithApplePay(_ option: PricingOption) async {
     do {
       let session = try await FunctionsService.shared.createApplePayCheckout(pricingOptionID: option.id)
+      isPreparingCheckout = false
       let nonce = try await ApplePayService.shared.startPayment(
         clientToken: session.clientToken,
         amountCents: session.amountCents,
@@ -568,6 +584,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   private func checkoutWithGooglePay(_ option: PricingOption) async {
     do {
       let session = try await FunctionsService.shared.createGooglePayCheckout(pricingOptionID: option.id)
+      isPreparingCheckout = false
       let nonce = try await GooglePayService.shared.startPayment(
         clientToken: session.clientToken,
         amountCents: session.amountCents,
@@ -700,7 +717,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     guard !didLoadProfile, let uid = Auth.auth().currentUser?.uid else {
       // Still worth showing the fee and connect time to a signed-out or
       // already-loaded screen; it just falls back to the default currency.
-      await loadPlatformFigures()
       return
     }
     didLoadProfile = true
@@ -711,7 +727,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       currencyCode = profile.currency
     }
     // After the profile, so the fee is quoted in the student's own currency.
-    await loadPlatformFigures()
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
   }
@@ -770,50 +785,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     return onlineTeacherSubjectKeys.filter { !$0.isDisjoint(with: keys) }.count
   }
 
-  /// The per-minute rate and the measured time-to-connect, both from the
-  /// backend. Either can be missing, in which case the view shows nothing
-  /// rather than a figure the app invented.
-  private func loadPlatformFigures(forceRefresh: Bool = false) async {
-    let perMinuteCents = await SettingsRemoteConfigService.shared.fetchPricePerMinuteCents(
-      currencyCode: currencyCode
-    )
-    pricePerMinuteText = String(
-      format: LocalizationSupport.localized("%@ per minute • pay only for time used"),
-      LessonFormatting.currencyText(cents: perMinuteCents, currencyCode: currencyCode)
-    )
-
-    let stats = await PlatformStatsService.shared.fetchStats(forceRefresh: forceRefresh)
-
-    // Set before the connect-time guard below: the two counters are
-    // independent, and a platform with no connect samples yet can still have
-    // registered teachers.
-    registeredTeacherCountText = stats.hasRegisteredTeachers
-      ? String(format: LocalizationSupport.localized("%d registered teachers"), stats.registeredTeacherCount)
-      : ""
-
-    guard stats.hasConnectTime else {
-      averageConnectText = ""
-      averageResponseText = ""
-      connectPromiseText = LocalizationSupport.localized("When AI gets stuck, a human teacher connects in moments")
-      connectStepTitle = LocalizationSupport.localized("A teacher connects quickly")
-      return
-    }
-
-    averageResponseText = String(
-      format: LocalizationSupport.localized("Average response time: %@"),
-      LessonFormatting.connectDurationText(seconds: stats.averageConnectSeconds)
-    )
-
-    averageConnectText = LessonFormatting.averageConnectText(seconds: 90)//stats.averageConnectSeconds)
-    connectPromiseText = String(
-      format: LocalizationSupport.localized("When AI gets stuck, a human teacher connects in %@"),
-      LessonFormatting.connectDurationText(seconds: stats.averageConnectSeconds)
-    )
-    connectStepTitle = String(
-      format: LocalizationSupport.localized("Teacher connects within %@"),
-      LessonFormatting.connectDurationShortText(seconds: stats.averageConnectSeconds)
-    )
-  }
 
   // MARK: - Online Teachers
 
@@ -861,7 +832,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
     // Pull-to-refresh: re-read the measured connect time rather than reuse the
     // one cached when the screen first appeared.
-    await loadPlatformFigures(forceRefresh: true)
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
   }
@@ -1120,6 +1090,11 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var remainingMinutes: Int
   var checkoutURL: URL?
   var isStartingCheckout = false
+  /// True from the moment checkout starts until the buyer is handed off to
+  /// something they can see — the wallet sheet, or the browser. Distinct from
+  /// `isStartingCheckout`, which stays true for the whole wallet payment and
+  /// so would leave a spinner sitting behind the Apple Pay sheet.
+  var isPreparingCheckout = false
   var checkoutPricingOptionID: String?
   var isAwaitingPaymentReturn = false
   var couponCode = ""
@@ -1241,7 +1216,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var pricePerMinuteText = "2 NIS per minute • pay only for time used"
   var averageConnectText = "90 sec avg to connect"
   var registeredTeacherCountText = "237 registered teachers"
-  var connectPromiseText = "When AI gets stuck, a human teacher connects in 90 seconds"
+  var connectPromiseText = "Help from a real teacher, exactly when you need it Mock"
+  var appMainIssueText = "Stucked? you will have a teacher immediately"
   var connectStepTitle = "Teacher connects within 90 sec"
   var averageResponseText = "Average response time: 90 seconds"
 

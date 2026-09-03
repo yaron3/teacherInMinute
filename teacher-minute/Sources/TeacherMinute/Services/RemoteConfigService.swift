@@ -24,6 +24,8 @@ enum RemoteConfigKey: String {
     /// this key, so the client reads a single key and falls back to the built-in
     /// per-platform defaults when the key is absent.
     case paymentMethods = "payment_methods"
+    case teacherDescription = "teacher_description"
+    case studentDescription = "student_description"
 }
 
 enum RemoteConfigLaunchError: LocalizedError {
@@ -212,9 +214,18 @@ final class RemoteConfigService {
         return value.isEmpty ? fallback : value
     }
 
+    static func getLocalizedStringArray(for key: RemoteConfigKey) -> [String] {
+        shared.getLocalizedStringArray(key.rawValue)
+    }
+
     func getLocalizedString(_ key: String) -> String {
         let localizedKey = "\(key)_\(LocalizationSupport.currentLanguageCode)"
         return getString(localizedKey)
+    }
+
+    func getLocalizedStringArray(_ key: String) -> [String] {
+        let localizedKey = "\(key)_\(LocalizationSupport.currentLanguageCode)"
+        return getStringArray(localizedKey)
     }
 
     func getString(_ key: String) -> String {

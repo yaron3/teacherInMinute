@@ -47,7 +47,9 @@ struct CompleteProfileView: View {
                     systemImage: "phone",
                     text: $viewModel.phoneNumber,
                     keyboardType: .phonePad,
-                    textContentType: .telephoneNumber
+                    textContentType: .telephoneNumber,
+                    isValid: !viewModel.showsPhoneError,
+                    errorMessage: viewModel.phoneErrorMessage
                 )
                 .padding(.top, 20)
 

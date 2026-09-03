@@ -32,14 +32,33 @@ final class CompleteProfileViewModel {
   
   let grades: [String] = (1...12).map { LocalizationSupport.localized("Grade \($0)") } + [LocalizationSupport.localized("College"), LocalizationSupport.localized("Adult Learner")]
   
+  /// Phone is optional for students and required for teachers, but a number
+  /// that was typed has to be a real one either way — a teacher's is what the
+  /// Bit payout is later sent to.
+  var isPhoneValid: Bool {
+	let trimmedPhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+	if trimmedPhone.isEmpty {
+	  return role == .student
+	}
+	return trimmedPhone.isValidPhoneNumber
+  }
+
+  /// Stays quiet on an untouched field so the error only appears once there is
+  /// something wrong to point at.
+  var showsPhoneError: Bool {
+	!phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isPhoneValid
+  }
+
+  var phoneErrorMessage: String {
+	LocalizationSupport.localized("Enter a valid phone number.")
+  }
+
   var canContinue: Bool {
 	let hasName = !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-	guard !isLoading, hasName else { return false }
+	guard !isLoading, hasName, isPhoneValid else { return false }
 	if role == .student {
-	  // Phone is optional for students.
 	  return true
 	}
-	guard !phoneNumber.isEmpty else { return false }
 	let trimmedPayPalEmail = paypalEmail.trimmingCharacters(in: .whitespacesAndNewlines)
 	return trimmedPayPalEmail.isEmpty || trimmedPayPalEmail.isEmail
   }
@@ -118,7 +137,12 @@ final class CompleteProfileViewModel {
 
   private func saveAndContinue() {
 	isLoading = true
-	
+
+	// Store the canonical local form ("0521234567") whatever spelling was
+	// typed, so the payout sheet's "use my profile number" shortcut hands the
+	// backend a number it already accepts.
+	phoneNumber = phoneNumber.normalizedPhoneNumber
+
 	Task {
 	  do {
 		guard let user = Auth.auth().currentUser else {
@@ -126,7 +150,7 @@ final class CompleteProfileViewModel {
 		  isLoading = false
 		  return
 		}
-		
+
 		let profile = UserProfile(
 		  uid:         user.uid,
 		  email:       user.email ?? "",

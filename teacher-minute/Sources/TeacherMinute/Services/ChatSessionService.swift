@@ -644,6 +644,74 @@ protocol ChatSessionViewModeling: AnyObject {
   func endLesson() async
 }
 
+// MARK: - ChatSessionViewModeling UI Strings
+extension ChatSessionViewModeling {
+
+  // MARK: Header / connection
+
+  var connectedVideoText: String { LocalizationSupport.localized("Connected - Video session") }
+  var connectedAudioText: String { LocalizationSupport.localized("Connected - Audio session") }
+  var connectedText: String { LocalizationSupport.localized("Connected") }
+
+  // MARK: End-session prompt
+
+  var endSessionTitleLabel: String { LocalizationSupport.localized("End session?") }
+  var saveBoardTitleLabel: String { LocalizationSupport.localized("Save board to gallery?") }
+  var endSessionConfirmMessage: String { LocalizationSupport.localized("Are you sure you want to end this session?") }
+  var saveBoardRemoteMessage: String { LocalizationSupport.localized("The session ended. Do you want to save the board image to your device gallery?") }
+  var saveBoardLocalMessage: String { LocalizationSupport.localized("The board will be saved to the chat. Do you also want to save it to your device gallery?") }
+  var endSessionActionLabel: String { LocalizationSupport.localized("End session") }
+  var saveToGalleryLabel: String { LocalizationSupport.localized("Save to gallery") }
+  var saveToChatOnlyLabel: String { LocalizationSupport.localized("Save to chat only") }
+  var dontSaveLabel: String { LocalizationSupport.localized("Don't save") }
+  var cancelLabel: String { LocalizationSupport.localized("Cancel") }
+
+  // MARK: End-session button (header)
+
+  var endLabel: String { LocalizationSupport.localized("End") }
+  var endingLabel: String { LocalizationSupport.localized("Ending...") }
+
+  // MARK: Text-transition overlay
+
+  var switchingToTextChatText: String { LocalizationSupport.localized("Switching to text chat…") }
+
+  // MARK: Video placeholders
+
+  var waitingForVideoText: String { LocalizationSupport.localized("Waiting for video…") }
+
+  // MARK: Peer-paused panel (role-dependent)
+
+  var peerPausedMessage: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    if isStudentRole {
+      return LocalizationSupport.localized("Teacher is reading chat — video paused")
+    }
+    return LocalizationSupport.localized("Student is reading chat — video paused")
+  }
+
+  // MARK: Video badge
+
+  var videoLabel: String { LocalizationSupport.localized("Video") }
+
+  // MARK: Composer mode pills
+
+  var regularModeLabel: String { LocalizationSupport.localized("Regular") }
+  var algebraModeLabel: String { LocalizationSupport.localized("Algebra") }
+
+  // MARK: Session stats
+
+  var originalQuestionLabel: String { LocalizationSupport.localized("ORIGINAL QUESTION") }
+  var sessionTimeLabel: String { LocalizationSupport.localized("Session Time") }
+  var minutesLabel: String { LocalizationSupport.localized("minutes") }
+
+  // MARK: Tab bar
+
+  var chatTabTitle: String { LocalizationSupport.localized("Chat") }
+  var boardTabTitle: String { LocalizationSupport.localized("Board") }
+  var videoTabTitle: String { LocalizationSupport.localized("Video") }
+  var imagesTabTitle: String { LocalizationSupport.localized("Images") }
+}
+
 @Observable
 @MainActor
 final class ChatSessionViewModel: ChatSessionViewModeling {

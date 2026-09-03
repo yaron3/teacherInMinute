@@ -80,6 +80,125 @@ protocol TeacherDashboardViewModeling: AnyObject {
   func refreshEarnings()
 }
 
+// MARK: - Protocol default strings
+
+extension TeacherDashboardViewModeling {
+
+  // MARK: Navigation / overlay titles
+
+  var settingUpSessionText: String { LocalizationSupport.localized("Setting up the session") }
+  var chatStudentTitle: String { LocalizationSupport.localized("Student") }
+  var teacherEyebrow: String { LocalizationSupport.localized("Teacher") }
+  var teacherDashboardTitle: String { LocalizationSupport.localized("Teacher Dashboard") }
+
+  // MARK: Status toggle card
+
+  var statusToggleTitle: String {
+    isOnline
+      ? LocalizationSupport.localized("Available")
+      : LocalizationSupport.localized("Not available")
+  }
+
+  var statusToggleSubtitle: String {
+    isOnline
+      ? LocalizationSupport.localized("Waiting for students...")
+      : LocalizationSupport.localized("Tap to start")
+  }
+
+  // MARK: Stats cards
+
+  var lessonsLabel: String { LocalizationSupport.localized("Lessons") }
+  var monthlyIncomeLabel: String { LocalizationSupport.localized("Monthly income") }
+
+  // MARK: Rating section
+
+  var myRatingLabel: String { LocalizationSupport.localized("My Rating") }
+
+  // MARK: Teacher status card
+
+  var verificationStatusText: String {
+    isVerified
+      ? LocalizationSupport.localized("Verified Expert")
+      : LocalizationSupport.localized("Pending Verification")
+  }
+
+  var editSubjectsLabel: String { LocalizationSupport.localized("Edit Subjects") }
+
+  // MARK: Earnings snapshot
+
+  var earningsSnapshotHeader: String { LocalizationSupport.localized("Earnings Snapshot") }
+  var earningsTodayTitle: String { LocalizationSupport.localized("Today") }
+  var earningsThisWeekTitle: String { LocalizationSupport.localized("This Week") }
+  var earningsAllTimeTitle: String { LocalizationSupport.localized("All Time") }
+  var totalMinutesTutoredLabel: String { LocalizationSupport.localized("Total minutes tutored") }
+
+  var todayMinutesTutoredText: String {
+    String(format: LocalizationSupport.localized("%d mins tutored"), todayMinutesTutored)
+  }
+
+  var weekMinutesTutoredText: String {
+    String(format: LocalizationSupport.localized("%d mins tutored"), weekMinutesTutored)
+  }
+
+  var totalMinutesText: String {
+    String(format: LocalizationSupport.localized("%d min"), totalMinutes)
+  }
+
+  // MARK: Live earnings card
+
+  var liveEarningsTodayLabel: String { LocalizationSupport.localized("Live Earnings Today") }
+
+  var ratePerMinBadgeText: String {
+    String(format: LocalizationSupport.localized("%@/min"), formattedRate)
+  }
+
+  // MARK: Online status card
+
+  var micStatusTitle: String { LocalizationSupport.localized("Mic") }
+  var micStatusSubtitle: String {
+    hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off")
+  }
+
+  var camStatusTitle: String { LocalizationSupport.localized("Cam") }
+  var camStatusSubtitle: String {
+    hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off")
+  }
+
+  var connectionStatusTitle: String { LocalizationSupport.localized("Status") }
+  var connectionStatusSubtitle: String { LocalizationSupport.localized("Connected") }
+
+  // MARK: Live queue
+
+  var liveQueueHeader: String { LocalizationSupport.localized("Live Queue") }
+
+  var liveQueueWaitingText: String {
+    String(format: LocalizationSupport.localized("%d Waiting"), inviteIDs.count)
+  }
+
+  // MARK: Readiness checklist
+
+  var readinessChecklistHeader: String { LocalizationSupport.localized("Readiness Checklist") }
+
+  var micChecklistTitle: String {
+    hasMicAccess
+      ? LocalizationSupport.localized("Microphone Enabled")
+      : LocalizationSupport.localized("Microphone Disabled")
+  }
+
+  var micChecklistSubtitle: String { LocalizationSupport.localized("Required for voice sessions.") }
+
+  var camChecklistTitle: String {
+    hasCameraAccess
+      ? LocalizationSupport.localized("Camera Enabled")
+      : LocalizationSupport.localized("Camera Disabled")
+  }
+
+  var camChecklistSubtitle: String { LocalizationSupport.localized("Enable for video tutoring.") }
+
+  var connectionChecklistTitle: String { LocalizationSupport.localized("Connection") }
+  var connectionChecklistSubtitle: String { LocalizationSupport.localized("Connected") }
+}
+
 // MARK: - ViewModel
 
 @Observable

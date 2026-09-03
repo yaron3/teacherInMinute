@@ -200,15 +200,20 @@ final class FunctionsService {
     _ = try await call(function: "cancelQuestion", data: ["questionId": questionId])
   }
 
-  func rateTeacher(questionId: String, teacherId: String, rating: Int) async throws {
-    _ = try await call(
-      function: "rateTeacher",
-      data: [
-        "questionId": questionId,
-        "teacherId": teacherId,
-        "rating": rating
-      ]
-    )
+  /// `comment` is the student's optional written feedback. The backend trims it
+  /// and stores it on the rating; the teacher later reads it without the
+  /// student's identity attached.
+  func rateTeacher(questionId: String, teacherId: String, rating: Int, comment: String = "") async throws {
+    var data: [String: Any] = [
+      "questionId": questionId,
+      "teacherId": teacherId,
+      "rating": rating
+    ]
+    let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty {
+      data["comment"] = trimmed
+    }
+    _ = try await call(function: "rateTeacher", data: data)
   }
 
   func getQuestionStatus(questionId: String) async throws -> QuestionStatusResult {

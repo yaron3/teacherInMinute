@@ -242,7 +242,43 @@ final class ProfileViewModel {
         rebuildContactRows()
     }
 
+    // MARK: - Phone validation
+
+    /// The description carries the localized label, so both spellings are
+    /// matched here for the same reason `syncFieldsFromRows` matches both.
+    func isPhoneRow(_ row: Parameter) -> Bool {
+        row.description == "Phone" || row.description == LocalizationSupport.localized("Phone")
+    }
+
+    private var editedPhoneNumber: String {
+        contactRows.first(where: isPhoneRow)?.value.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    /// Teachers are paid through this number, so it stays mandatory for them;
+    /// for students it is optional, but a number that was typed has to be real.
+    var isPhoneRowValid: Bool {
+        if editedPhoneNumber.isEmpty {
+            return roleType != .teacher
+        }
+        return editedPhoneNumber.isValidPhoneNumber
+    }
+
+    /// Unlike the onboarding form, this one opens on saved data with Save as
+    /// its only affordance, so a teacher who has cleared the field is told why
+    /// Save is greyed out rather than being left to guess.
+    var showsPhoneRowError: Bool {
+        !isPhoneRowValid
+    }
+
+    var phoneErrorMessage: String {
+        LocalizationSupport.localized("Enter a valid phone number.")
+    }
+
     func saveProfileEdits() {
+        guard isPhoneRowValid else {
+            errorMessage = phoneErrorMessage
+            return
+        }
         Task { await persistProfileEdits() }
     }
 
@@ -442,7 +478,9 @@ final class ProfileViewModel {
             } else if description == "Email" || description == LocalizationSupport.localized("Email") {
                 email = value
             } else if description == "Phone" || description == LocalizationSupport.localized("Phone") {
-                phoneNumber = value
+                // Stored in the canonical local form so it matches what the
+                // payout backend accepts, whatever spelling was typed.
+                phoneNumber = value.normalizedPhoneNumber
             } else if description == "Grade" || description == LocalizationSupport.localized("Grade") {
                 grade = value
             }

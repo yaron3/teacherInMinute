@@ -21,8 +21,8 @@ enum ConversationType: String, CaseIterable {
     var displayName: String {
         switch self {
         case .text: return LocalizationSupport.localized("Text")
-        case .audio: return LocalizationSupport.localized("Audio")
-        case .video: return LocalizationSupport.localized("Video")
+        case .audio: return LocalizationSupport.localized("Audio + Text")
+        case .video: return LocalizationSupport.localized("Video + Audio + Text")
         }
     }
 }
