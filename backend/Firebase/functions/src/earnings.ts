@@ -4,7 +4,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 
 import { Timestamp } from "firebase-admin/firestore";
 
-import { LessonDoc } from "./types";
+import { QuestionDoc } from "./types";
 import { DEFAULT_CURRENCY } from "./pricing";
 import { monthKey, nextPayoutFor } from "./payoutSchedule";
 import {
@@ -35,7 +35,7 @@ const firestore = admin.firestore();
  *  but bounds the read cost of a single call. */
 const MAX_LESSONS = 2000;
 
-interface WeekBucket {
+export interface WeekBucket {
   index: number;
   startDay: number;
   endDay: number;
@@ -44,7 +44,7 @@ interface WeekBucket {
   lessonCount: number;
 }
 
-interface MonthBucket {
+export interface MonthBucket {
   id: string; // "yyyy-MM"
   year: number;
   month: number; // 1-12
@@ -55,7 +55,22 @@ interface MonthBucket {
   weeks: WeekBucket[];
 }
 
-/** `teacherEarnings` on a lesson is stored in major units (e.g. 12.5 ILS). */
+/** The fields `endLesson` (./lessons.ts) writes onto a completed question that
+ *  this summary needs. Kept local rather than added to `QuestionDoc`, since
+ *  `teacherUid`/`teacherEarnings`/`currencyCode` reach that document via a
+ *  spread of the RTDB question node rather than a single well-typed write, and
+ *  `durationSeconds` (billed seconds, already rounded per the billing rules)
+ *  is easy to mistake for the differently-named `billedSeconds` that only
+ *  ever exists on the separate, largely-unpopulated `lessons` collection —
+ *  that mix-up is exactly what left this summary always reading zero. */
+export type CompletedQuestion = QuestionDoc & {
+  teacherUid?: string;
+  teacherEarnings?: number;
+  currencyCode?: string;
+  durationSeconds?: number;
+};
+
+/** `teacherEarnings` on a question is stored in major units (e.g. 12.5 ILS). */
 function toCents(majorUnits: unknown): number {
   const n = Number(majorUnits);
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
@@ -77,37 +92,34 @@ function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-export const teacherEarningsSummary = onCall(async (req) => {
-  const uid = req.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
-
-  const snap = await firestore
-    .collection("lessons")
-    .where("teacherUid", "==", uid)
-    .limit(MAX_LESSONS)
-    .get();
-
-  const now = new Date();
+/** Groups a teacher's completed questions into calendar months with a weekly
+ *  breakdown. Pure and Firestore-free — takes plain data, not a query — so it
+ *  can be unit tested directly with fixtures rather than mocked Firestore
+ *  docs; see ./__tests__/earnings.test.ts. */
+export function summarizeCompletedQuestions(
+  questions: CompletedQuestion[],
+  now: Date
+): { months: MonthBucket[]; totalEarningsCents: number; currency: string; byMonth: Map<string, MonthBucket> } {
   const currentKey = monthKey(now.getUTCFullYear(), now.getUTCMonth() + 1);
 
   let currency = "";
   const byMonth = new Map<string, MonthBucket>();
 
-  for (const doc of snap.docs) {
-    const lesson = doc.data() as LessonDoc;
+  for (const question of questions) {
+    if (question.status !== "completed") continue;
     // Only settled lessons carry earnings; an in-progress one has none yet.
-    const endedAt = lesson.endedAt?.toDate?.();
+    const endedAt = question.endedAt?.toDate?.();
     if (!endedAt) continue;
 
-    const earningsCents = toCents(lesson.teacherEarnings);
-    const minutes = toMinutes(lesson.billedSeconds);
+    const earningsCents = toCents(question.teacherEarnings);
+    const minutes = toMinutes(question.durationSeconds);
 
     const year = endedAt.getUTCFullYear();
     const month = endedAt.getUTCMonth() + 1;
     const key = monthKey(year, month);
 
-    if (!currency && typeof lesson.currencyCode === "string" && lesson.currencyCode.trim()) {
-      currency = lesson.currencyCode.trim().toUpperCase();
+    if (!currency && typeof question.currencyCode === "string" && question.currencyCode.trim()) {
+      currency = question.currencyCode.trim().toUpperCase();
     }
 
     let bucket = byMonth.get(key);
@@ -151,6 +163,30 @@ export const teacherEarningsSummary = onCall(async (req) => {
 
   const months = [...byMonth.values()].sort((a, b) => a.id.localeCompare(b.id));
   const totalEarningsCents = months.reduce((sum, m) => sum + m.earningsCents, 0);
+
+  return { months, totalEarningsCents, currency, byMonth };
+}
+
+export const teacherEarningsSummary = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  // The `lessons` collection doc for a question is only created at
+  // startLesson and only re-merged with earnings/endedAt if that doc is still
+  // findable at endLesson — in practice most lessons never accumulate that
+  // second write and the collection sits at status "in_progress" forever.
+  // `endLesson` unconditionally writes earnings onto the `questions` doc
+  // instead, which is also what the client's own lesson history already
+  // reads (see HistoryModel.swift) — so that is the source of truth here too.
+  const snap = await firestore
+    .collection("questions")
+    .where("teacherUid", "==", uid)
+    .limit(MAX_LESSONS)
+    .get();
+
+  const now = new Date();
+  const questions = snap.docs.map((doc) => doc.data() as CompletedQuestion);
+  const { months, totalEarningsCents, currency, byMonth } = summarizeCompletedQuestions(questions, now);
 
   const { periodMonthId, payoutDate } = nextPayoutFor(now);
   const pendingAmountCents = byMonth.get(periodMonthId)?.earningsCents ?? 0;
