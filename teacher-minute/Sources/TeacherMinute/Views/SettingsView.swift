@@ -563,47 +563,51 @@ struct StudentPaymentHistoryView: View {
         guard let uid = authService.currentUserID else { return }
         do {
             let currencyCode = try await HistoryModel.shared.fetchPurchasedCurrencyCode(for: uid)
-            let lessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 200)
-            monthSections = Self.groupByMonth(lessons, currencyCode: currencyCode)
+            let purchases = try await HistoryModel.shared.fetchPurchases(for: uid)
+            monthSections = Self.groupByMonth(purchases, currencyCode: currencyCode)
         } catch {
             logger.error("[PaymentHistory] failed loading: \(error.localizedDescription)")
         }
     }
 
-    private static func groupByMonth(_ lessons: [HistoryLesson], currencyCode: String) -> [PaymentHistoryMonthSection] {
+    /// Files each purchase under the month it was paid for. This used to group
+    /// lessons by when they were taught, which answered a different question:
+    /// a student who bought a package in March and used it through May saw the
+    /// money spread across three months, and never saw the payment itself.
+    private static func groupByMonth(_ purchases: [HistoryPurchase], currencyCode: String) -> [PaymentHistoryMonthSection] {
         let calendar = Calendar.current
         let monthFormatter = DateFormatter()
         monthFormatter.dateFormat = "MMMM yyyy"
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "MMM d, HH:mm"
 
-        var lessonsByKey: [String: [HistoryLesson]] = [:]
+        var purchasesByKey: [String: [HistoryPurchase]] = [:]
         var monthTitleByKey: [String: String] = [:]
 
-        for lesson in lessons {
-            let comps = calendar.dateComponents([.year, .month], from: lesson.acceptedAt)
+        for purchase in purchases {
+            let comps = calendar.dateComponents([.year, .month], from: purchase.purchasedAt)
             let key = String(format: "%04d-%02d", comps.year ?? 0, comps.month ?? 0)
-            var existing = lessonsByKey[key] ?? []
-            existing.append(lesson)
-            lessonsByKey[key] = existing
+            var existing = purchasesByKey[key] ?? []
+            existing.append(purchase)
+            purchasesByKey[key] = existing
             if monthTitleByKey[key] == nil {
-                monthTitleByKey[key] = monthFormatter.string(from: lesson.acceptedAt)
+                monthTitleByKey[key] = monthFormatter.string(from: purchase.purchasedAt)
             }
         }
 
-        return lessonsByKey.keys
+        return purchasesByKey.keys
             .sorted(by: >)
             .compactMap { key in
-                guard let monthLessons = lessonsByKey[key], let title = monthTitleByKey[key] else { return nil }
-                let sorted = monthLessons.sorted { $0.acceptedAt > $1.acceptedAt }
-                let totalCents = sorted.reduce(0) { $0 + $1.costCents }
+                guard let monthPurchases = purchasesByKey[key], let title = monthTitleByKey[key] else { return nil }
+                let sorted = monthPurchases.sorted { $0.purchasedAt > $1.purchasedAt }
+                let totalCents = sorted.reduce(0) { $0 + $1.amountCents }
                 let monthCurrencyCode = sorted.first?.currencyCode ?? currencyCode
-                let entries = sorted.map { lesson in
+                let entries = sorted.map { purchase in
                     PaymentHistoryEntry(
-                        id: lesson.id,
-                        title: lesson.title,
-                        dateText: dayFormatter.string(from: lesson.acceptedAt),
-                        amountText: LessonFormatting.currencyText(cents: lesson.costCents, currencyCode: lesson.currencyCode)
+                        id: purchase.id,
+                        title: purchase.title,
+                        dateText: dayFormatter.string(from: purchase.purchasedAt),
+                        amountText: LessonFormatting.currencyText(cents: purchase.amountCents, currencyCode: purchase.currencyCode)
                     )
                 }
                 return PaymentHistoryMonthSection(

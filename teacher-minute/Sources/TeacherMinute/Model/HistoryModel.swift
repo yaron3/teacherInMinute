@@ -32,6 +32,21 @@ struct HistoryLesson: Identifiable, Hashable {
     let studentRating: Int
 }
 
+/// One purchase of minutes, as recorded by the payments backend under
+/// `users/{uid}/purchases`. Distinct from a lesson: this is money going in,
+/// at the moment it was paid, whereas a lesson is that balance being spent.
+struct HistoryPurchase: Identifiable, Hashable {
+    let id: String
+    let purchasedAt: Date
+    let amountCents: Int
+    let currencyCode: String
+    let minutesPurchased: Int
+    /// The package name when its pricing option still exists, otherwise the
+    /// minutes the purchase granted — the purchase snapshots the minutes, so
+    /// that fallback survives a package being renamed or withdrawn.
+    let title: String
+}
+
 struct LessonMessage: Identifiable {
 	let id: String
     let text: String
@@ -66,6 +81,60 @@ final class HistoryModel {
 
         return snapshot.documents.reduce(0) { total, document in
             total + max(0, Self.intValue(document.data()["minutesPurchased"]) ?? 0)
+        }
+    }
+
+    /// Every purchase the student has made, newest first, dated by when it was
+    /// paid for. The payment history is built from these rather than from
+    /// lessons: a lesson is when the balance was spent, which is a different
+    /// event at a different time, and often a different amount.
+    func fetchPurchases(for uid: String) async throws -> [HistoryPurchase] {
+        let snapshot = try await Firestore.firestore()
+            .collection("users")
+            .document(uid)
+            .collection("purchases")
+            .getDocuments()
+
+        let pricingNamesById = await Self.pricingNameById()
+        let fallbackCurrencyCode = LessonFormatting.defaultCurrencyCode
+
+        let purchases: [HistoryPurchase] = snapshot.documents.compactMap { document in
+            let data = document.data()
+            // Without a purchase time there is nothing to file it under, and
+            // guessing a date would put real money in the wrong month.
+            guard let purchasedAt = Self.dateValue(data["purchasedAt"])
+                ?? Self.dateValue(data["createdAt"]) else { return nil }
+
+            let minutes = max(0, Self.intValue(data["minutesPurchased"]) ?? 0)
+            let pricingOptionId = Self.firstString(in: data, keys: ["pricingOptionId", "packageId"])
+            let packageName = pricingNamesById[pricingOptionId]
+
+            return HistoryPurchase(
+                id: document.documentID,
+                purchasedAt: purchasedAt,
+                amountCents: max(0, Self.intValue(data["amountCents"]) ?? 0),
+                currencyCode: (data["currency"] as? String)?.uppercased() ?? fallbackCurrencyCode,
+                minutesPurchased: minutes,
+                title: packageName.map { LocalizationSupport.localized($0) }
+                    ?? LessonFormatting.minutesText(minutes)
+            )
+        }
+
+        return purchases.sorted { $0.purchasedAt > $1.purchasedAt }
+    }
+
+    private static func pricingNameById() async -> [String: String] {
+        do {
+            return try await PricingService.shared.fetchPricingOptions()
+                .reduce(into: [:]) { result, option in
+                    result[option.id] = option.name
+                }
+        } catch {
+            // A missing name only costs the nicer label; the minutes fallback
+            // still describes the purchase.
+            logger.error("[HistoryModel] failed loading pricing names: \(error.localizedDescription)")
+            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "HistoryModel.pricingNameById")
+            return [:]
         }
     }
 
@@ -377,10 +446,19 @@ final class HistoryModel {
         durationSeconds: Int,
         pricePerMinuteCents: Int
     ) -> Int {
-        // Only trust an explicit amount when it's actually positive. The question
-        // doc often carries a placeholder `0` (written before billing runs), and
-        // short-circuiting on it would strand the cost at 0 forever. A non-positive
-        // value falls through to the duration × per-minute derivation below.
+        // `cost` is the one field the billing pipeline actually writes (see
+        // endLesson in functions/src/lessons.ts), and it lands only once
+        // billing has run — so a stored 0 is the answer, not a placeholder.
+        // Billing rounds to the nearest minute, which makes a session under
+        // ~30 seconds free, and the student really was charged nothing for it.
+        // Estimating over that 0 billed them for time nobody collected.
+        if let amount = doubleValue(data["cost"]) {
+            return Int((amount * 100.0).rounded())
+        }
+
+        // The names below are older document shapes, kept for lessons that
+        // predate that pipeline. There a `0` genuinely can be an unfilled
+        // placeholder, so those are still only trusted when positive.
         let explicitCents = [
             intValue(data["costCents"]),
             intValue(data["totalCostCents"]),
@@ -392,7 +470,6 @@ final class HistoryModel {
         }
 
         let explicitAmount = [
-            doubleValue(data["cost"]),
             doubleValue(data["totalCost"]),
             doubleValue(data["price"]),
             doubleValue(data["costPerQuestion"]),
@@ -409,15 +486,22 @@ final class HistoryModel {
     /// Reads the authoritative `teacherEarnings` written by the backend, falling
     /// back to `costCents * teacherShare` only when the backend value is absent
     /// (legacy lessons predating the unified billing pipeline).
+    ///
+    /// Present-but-zero is an answer, not a missing value: `endLesson` writes
+    /// this field only once billing has run, and billing rounds to the nearest
+    /// minute — so a session under ~30 seconds is genuinely worth nothing and
+    /// the student was not charged for it either. Treating that 0 as "absent"
+    /// and estimating from duration invented earnings the teacher will never be
+    /// paid, which is why this list disagreed with the Earnings tab.
     private static func teacherEarningsCents(
         from data: [String: Any],
         costCents: Int,
         defaultTeacherShare: Double
     ) -> Int {
-        if let cents = intValue(data["teacherEarningsCents"]), cents > 0 {
+        if let cents = intValue(data["teacherEarningsCents"]) {
             return cents
         }
-        if let amount = doubleValue(data["teacherEarnings"]), amount > 0 {
+        if let amount = doubleValue(data["teacherEarnings"]) {
             return Int((amount * 100.0).rounded())
         }
         let share = doubleValue(data["teacherShare"])
