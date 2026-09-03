@@ -66,7 +66,7 @@ struct TeacherIdentityVerificationView: View {
 				title: LocalizationSupport.localized("Front Side"),
 				isCompleted: hasFront,
 				isUploading: frontSpinning,
-				isMandatory: true,
+				isMandatory: false,
 				action: {}
 			  )
 			}
