@@ -168,9 +168,11 @@ protocol StudentHomeViewModeling: AnyObject {
   func cancelSearch() async
   func resetSearch()
   func selectTier(_ option: PricingOption)
+  func preparePaymentOptions() async
   func checkout(_ option: PricingOption, method: PaymentMethod) async
   func consumeCheckoutURL()
   func checkoutDidOpen()
+  func resumeCheckoutSpinner()
   func handlePaymentReturn(_ result: PaymentReturnResult) async
   func handleCheckoutReturnWithoutResult() async -> Bool
   func viewAllLessons()
@@ -410,6 +412,9 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// the end of `checkout(_:method:)`, because the redirect flows only learn
   /// the purchase succeeded once the buyer comes back from the browser.
   private var pendingPurchaseOption: PricingOption?
+  /// Last-resort timer that takes the checkout spinner down if the browser
+  /// hand-off never happened. See `checkoutDidOpen`.
+  private var checkoutHandoffWatchdog: Task<Void, Never>?
   private var purchasedCurrencyCode = LessonFormatting.defaultCurrencyCode
 
   // MARK: - Actions
@@ -472,6 +477,21 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     selectedPricePerMinuteCents = option.priceCents
   }
 
+  /// Settles everything the payment picker needs before it is put on screen, so
+  /// the buyer sees the finished list of methods rather than one that grows a
+  /// row at a time. Deliberately leaves `isPreparingCheckout` set: the caller
+  /// clears it once the picker is up, so the spinner hands straight over to the
+  /// sheet with no bare frame in between.
+  func preparePaymentOptions() async {
+    isPreparingCheckout = true
+    await loadPaymentMethods()
+#if canImport(UIKit)
+    if availablePaymentMethods.contains(.applePay) {
+      ApplePayService.shared.warmUpPaymentButton()
+    }
+#endif
+  }
+
   func checkout(_ option: PricingOption, method: PaymentMethod = .paypal) async {
     guard !isStartingCheckout else { return }
     logger.info("[PaymentReturn] checkout start pricingOptionID=\(option.id) method=\(method.rawValue)")
@@ -482,26 +502,30 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     pendingPurchaseOption = option
     defer {
       isStartingCheckout = false
-      // Belt and braces: each path clears this the moment the buyer sees the
-      // wallet or the browser, but a throw must never strand the spinner.
-      isPreparingCheckout = false
       checkoutPricingOptionID = nil
     }
     selectTier(option)
 
+    // The wallets run the whole payment inside the awaited call below, so the
+    // spinner covers everything from the tap to the charge being confirmed or
+    // rejected — including the beat after the wallet sheet closes, while the
+    // nonce is sent to the backend.
     if method == .applePay {
       await checkoutWithApplePay(option)
+      isPreparingCheckout = false
       return
     }
 
     if method == .googlePay {
       await checkoutWithGooglePay(option)
+      isPreparingCheckout = false
       return
     }
 
 #if canImport(UIKit)
     if method == .savedPayPal {
       await checkoutWithSavedPayPal(option)
+      isPreparingCheckout = false
       return
     }
 #endif
@@ -509,13 +533,19 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     do {
       let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: method)
       checkoutURL = result.checkoutURL
-      isPreparingCheckout = false
+      // Left running on purpose. The browser takes over from here, and the
+      // purchase is only finished once we are back in the app and the balance
+      // has been refreshed — `handlePaymentReturn` /
+      // `handleCheckoutReturnWithoutResult` clear it, so the buyer comes back
+      // to a spinner rather than an idle screen.
       logger.info("[PaymentReturn] checkout session created url=\(result.checkoutURL.absoluteString)")
     } catch let error as FunctionsError {
+      isPreparingCheckout = false
       logger.error("[PaymentReturn] createCheckoutSession failed details=\(error.localizedDescription)")
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.createCheckoutSession")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     } catch {
+      isPreparingCheckout = false
       logger.error("[StudentHome] failed creating checkout session: \(error.localizedDescription)")
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.createCheckoutSession")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
@@ -528,7 +558,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   private func checkoutWithApplePay(_ option: PricingOption) async {
     do {
       let session = try await FunctionsService.shared.createApplePayCheckout(pricingOptionID: option.id)
-      isPreparingCheckout = false
       let nonce = try await ApplePayService.shared.startPayment(
         clientToken: session.clientToken,
         amountCents: session.amountCents,
@@ -536,11 +565,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
       try await FunctionsService.shared.confirmApplePayPayment(checkoutId: session.checkoutId, nonce: nonce)
       logger.info("[PaymentReturn] Apple Pay confirmed checkoutId=\(session.checkoutId)")
-      announcePurchase(option)
-
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
       }
+      // Announced last so the summary appears with the new balance already in
+      // place, rather than on top of the spinner that is still refreshing it.
+      announcePurchase(option)
     } catch ApplePayService.ApplePayServiceError.cancelled {
       logger.info("[PaymentReturn] Apple Pay cancelled by user")
     } catch let error as FunctionsError {
@@ -567,11 +597,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     do {
       try await FunctionsService.shared.chargeSavedPayPal(pricingOptionID: option.id)
       logger.info("[PaymentReturn] saved PayPal charged pricingOptionID=\(option.id)")
-      announcePurchase(option)
-
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
       }
+      announcePurchase(option)
     } catch let error as FunctionsError {
       logger.error("[PaymentReturn] saved PayPal charge failed details=\(error.localizedDescription)")
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.chargeSavedPayPal")
@@ -590,7 +619,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   private func checkoutWithGooglePay(_ option: PricingOption) async {
     do {
       let session = try await FunctionsService.shared.createGooglePayCheckout(pricingOptionID: option.id)
-      isPreparingCheckout = false
       let nonce = try await GooglePayService.shared.startPayment(
         clientToken: session.clientToken,
         amountCents: session.amountCents,
@@ -601,11 +629,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
       try await FunctionsService.shared.confirmGooglePayPayment(checkoutId: session.checkoutId, nonce: nonce)
       logger.info("[PaymentReturn] Google Pay confirmed checkoutId=\(session.checkoutId)")
-      announcePurchase(option)
-
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
       }
+      announcePurchase(option)
     } catch GooglePayServiceError.cancelled {
       logger.info("[PaymentReturn] Google Pay cancelled by user")
     } catch let error as FunctionsError {
@@ -632,28 +659,61 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   func checkoutDidOpen() {
     isAwaitingPaymentReturn = true
     logger.info("[PaymentReturn] checkout opened; awaiting payment return")
+    // The spinner is meant to sit under the browser and still be there on the
+    // way back, but if the browser never actually opened there is nothing to
+    // come back from — this stops that case from stranding a modal overlay the
+    // buyer cannot dismiss. Coming back into the app re-arms it
+    // (`resumeCheckoutSpinner`), so a long stay in the browser is unaffected.
+    checkoutHandoffWatchdog?.cancel()
+    checkoutHandoffWatchdog = Task { @MainActor [weak self] in
+      try? await Task.sleep(nanoseconds: 90_000_000_000)
+      guard !Task.isCancelled, let self, self.isAwaitingPaymentReturn else { return }
+      self.isPreparingCheckout = false
+    }
+  }
+
+  /// Puts the spinner back while a return from the browser is being resolved,
+  /// so the buyer is not looking at an idle home screen between the payment
+  /// finishing and the confirmation appearing.
+  func resumeCheckoutSpinner() {
+    guard isAwaitingPaymentReturn else { return }
+    checkoutHandoffWatchdog?.cancel()
+    isPreparingCheckout = true
   }
 
   func handlePaymentReturn(_ result: PaymentReturnResult) async {
     logger.info("[PaymentReturn] handling result status=\(String(describing: result.status)) rawURL=\(result.rawURL.absoluteString)")
     isAwaitingPaymentReturn = false
+    checkoutHandoffWatchdog?.cancel()
+    // The spinner has been up since the browser opened; it comes down here,
+    // once the outcome is known and the balance is up to date, so the buyer
+    // never sees an idle screen between returning and the confirmation.
+    defer { isPreparingCheckout = false }
     if case .success = result.status {
-      announcePurchase(pendingPurchaseOption)
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
         logger.info("[PaymentReturn] success handled; refreshed lessons and remaining minutes")
       }
+      announcePurchase(pendingPurchaseOption)
     }
   }
 
   func handleCheckoutReturnWithoutResult() async -> Bool {
     guard isAwaitingPaymentReturn else { return false }
     isAwaitingPaymentReturn = false
+    checkoutHandoffWatchdog?.cancel()
+    // Same hand-off as `handlePaymentReturn`: the spinner started when the
+    // browser opened and only stops once we know where the purchase landed.
+    defer { isPreparingCheckout = false }
     logger.info("[PaymentReturn] checkout returned without a deep link result")
     guard let uid = Auth.auth().currentUser?.uid else { return false }
 
     let startingMinutes = checkoutStartedRemainingMinutes
-    let credited = await refreshAfterPurchase(uid: uid, startingMinutes: startingMinutes)
+    let credited = await refreshAfterPurchase(
+      uid: uid,
+      startingMinutes: startingMinutes,
+      retryDelays: Self.unconfirmedReturnPollDelays
+    )
     // Only a confirmed balance increase proves the purchase went through; the
     // caller shows a "pending confirmation" notice otherwise.
     if credited {
@@ -865,18 +925,40 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     logger.info("[StudentHome] balance unchanged after lesson startingMinutes=\(startingMinutes)")
   }
 
-  private func refreshAfterPurchase(uid: String, startingMinutes: Int) async -> Bool {
-    for attempt in 1...8 {
+  /// Gaps between balance re-reads when we know money moved — a deep link said
+  /// so, or a wallet returned a confirmed charge. PayPal's capture webhook is
+  /// not instant, so this stays patient, but it looks several times in the
+  /// first two seconds: when the credit has already landed, it has almost
+  /// always landed by then, and the old flat 2s cadence made the buyer wait
+  /// for a result we could have had immediately.
+  private static let confirmedPurchasePollDelays: [Double] = [0.3, 0.5, 0.9, 1.5, 2.5, 4, 4, 4]
+
+  /// Gaps to use when the buyer came back from the browser with nothing to say
+  /// a payment was ever made. PayPal captures during its own return redirect,
+  /// so a completed payment nearly always arrives with a deep link — no deep
+  /// link means a cancel in all but the rarest case. This gives a late credit
+  /// a couple of seconds to appear and then stops, instead of holding the
+  /// spinner for the full patient schedule before saying "cancelled".
+  private static let unconfirmedReturnPollDelays: [Double] = [0.4, 0.6, 1.0]
+
+  private func refreshAfterPurchase(
+    uid: String,
+    startingMinutes: Int,
+    retryDelays: [Double] = StudentHomeViewModel.confirmedPurchasePollDelays
+  ) async -> Bool {
+    var attempt = 0
+    while true {
       await loadRemainingMinutes(uid: uid)
       await loadRecentLessons(uid: uid)
-      logger.info("[PaymentReturn] balance refresh attempt=\(attempt) startingMinutes=\(startingMinutes) currentMinutes=\(self.remainingMinutes)")
+      logger.info("[PaymentReturn] balance refresh attempt=\(attempt + 1) startingMinutes=\(startingMinutes) currentMinutes=\(self.remainingMinutes)")
       if remainingMinutes > startingMinutes {
         logger.info("[PaymentReturn] balance increased after checkout")
         return true
       }
-      try? await Task.sleep(nanoseconds: 2_000_000_000)
+      guard attempt < retryDelays.count else { return false }
+      try? await Task.sleep(nanoseconds: UInt64(retryDelays[attempt] * 1_000_000_000))
+      attempt += 1
     }
-    return false
   }
 
   /// Reads the authoritative remaining-minutes balance straight from the
@@ -1177,6 +1259,10 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     selectedPricePerMinuteCents = option.priceCents
   }
 
+  func preparePaymentOptions() async {
+    isPreparingCheckout = true
+  }
+
   func checkout(_ option: PricingOption, method: PaymentMethod = .paypal) async {
     selectTier(option)
   }
@@ -1188,6 +1274,11 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   func checkoutDidOpen() {
     isAwaitingPaymentReturn = true
     logger.info("[PaymentReturn] mock checkout opened")
+  }
+
+  func resumeCheckoutSpinner() {
+    guard isAwaitingPaymentReturn else { return }
+    isPreparingCheckout = true
   }
 
   func handlePaymentReturn(_ result: PaymentReturnResult) async {

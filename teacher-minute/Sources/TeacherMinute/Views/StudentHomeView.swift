@@ -696,7 +696,7 @@ struct StudentHomeView: View {
 
   func creditOptionCard(_ option: PricingOption) -> some View {
     Button {
-      pendingCheckoutOption = option
+      beginCheckout(option)
     } label: {
       FlatCard(outlined: true) {
         VStack(alignment: .leading, spacing: 10) {
@@ -736,7 +736,7 @@ struct StudentHomeView: View {
 				  option: option,
 				  isLoading: viewModel.isStartingCheckout && viewModel.checkoutPricingOptionID == option.id
 				) {
-				  pendingCheckoutOption = option
+				  beginCheckout(option)
 				}
 			  }
 			}
@@ -866,6 +866,19 @@ struct StudentHomeView: View {
   }
 
 
+  /// Tapping a package does not open the picker straight away: the payment
+  /// options are settled first (Remote Config, the saved-PayPal lookup, and
+  /// PassKit's first-button cost) behind the spinner, so the sheet arrives
+  /// complete instead of filling in a row at a time.
+  private func beginCheckout(_ option: PricingOption) {
+	guard !viewModel.isPreparingCheckout else { return }
+	Task { @MainActor in
+	  await viewModel.preparePaymentOptions()
+	  pendingCheckoutOption = option
+	  viewModel.isPreparingCheckout = false
+	}
+  }
+
   var isChoosingPaymentMethod: Binding<Bool> {
 	Binding(
 	  get: { pendingCheckoutOption != nil },
@@ -879,17 +892,27 @@ struct StudentHomeView: View {
   
   private func handleActiveAfterExternalCheckout() {
 	guard viewModel.isAwaitingPaymentReturn else { return }
+	// Back from the browser with the outcome still unresolved — put the spinner
+	// back up so the wait for the deep link (or the balance check below) is not
+	// a blank home screen.
+	viewModel.resumeCheckoutSpinner()
 	let resultVersionBeforeWait = paymentReturnStore.resultVersion
 	logger.info("[PaymentReturn] app active after checkout; waiting for deep link resultVersion=\(resultVersionBeforeWait)")
 	Task { @MainActor in
-	  try? await Task.sleep(nanoseconds: 5_000_000_000)
-	  guard viewModel.isAwaitingPaymentReturn else {
-		logger.info("[PaymentReturn] fallback skipped; no longer awaiting return")
-		return
-	  }
-	  guard paymentReturnStore.resultVersion == resultVersionBeforeWait, paymentReturnStore.latestResult == nil else {
-		logger.info("[PaymentReturn] fallback skipped; payment result arrived resultVersion=\(paymentReturnStore.resultVersion)")
-		return
+	  // PayPal's return redirect fires while the app is coming back, so the deep
+	  // link — cancel or success — lands within a moment of this point. Checking
+	  // in short slices lets a cancel surface as soon as it arrives, instead of
+	  // sitting behind a fixed wait long enough that the buyer notices it.
+	  for _ in 0..<12 {
+		try? await Task.sleep(nanoseconds: 100_000_000)
+		guard viewModel.isAwaitingPaymentReturn else {
+		  logger.info("[PaymentReturn] fallback skipped; no longer awaiting return")
+		  return
+		}
+		guard paymentReturnStore.resultVersion == resultVersionBeforeWait, paymentReturnStore.latestResult == nil else {
+		  logger.info("[PaymentReturn] fallback skipped; payment result arrived resultVersion=\(paymentReturnStore.resultVersion)")
+		  return
+		}
 	  }
 	  logger.info("[PaymentReturn] no payment return URL arrived after wait; refreshing balance before fallback")
 	  let confirmedByBalance = await viewModel.handleCheckoutReturnWithoutResult()
