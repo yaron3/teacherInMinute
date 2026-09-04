@@ -142,6 +142,9 @@ final class CompleteProfileViewModel {
 	// typed, so the payout sheet's "use my profile number" shortcut hands the
 	// backend a number it already accepts.
 	phoneNumber = phoneNumber.normalizedPhoneNumber
+	// `canContinue` checks the trimmed name, so store the trimmed one too —
+	// otherwise a name typed with a stray space is saved with it.
+	fullName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
 
 	Task {
 	  do {

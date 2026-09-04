@@ -3269,6 +3269,39 @@
       },
       "valueType": "STRING"
     },
+    "updating": {
+      "defaultValue": {
+        "value": "Updating…"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתעדכן…"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "enter_your_full": {
+      "defaultValue": {
+        "value": "Enter your full name."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "יש להזין שם מלא."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "since": {
+      "defaultValue": {
+        "value": "Since %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "החל מ-%@"
+        }
+      },
+      "valueType": "STRING"
+    },
     "manage_saved_cards": {
       "defaultValue": {
         "value": "Manage saved cards and billing details securely with our payment provider."

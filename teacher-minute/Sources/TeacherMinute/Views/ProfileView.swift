@@ -657,8 +657,8 @@ struct ProfileEditView: View {
             } else {
               ProfileEditInfoRow(
                 parameter: $row,
-                isValid: !(viewModel.isPhoneRow(row) && viewModel.showsPhoneRowError),
-                errorMessage: viewModel.phoneErrorMessage
+                isValid: viewModel.isRowValid(row),
+                errorMessage: viewModel.rowErrorMessage(for: row)
               )
             }
           }
@@ -682,7 +682,7 @@ struct ProfileEditView: View {
         AuthPrimaryButton(
           title: viewModel.isLoading ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save Changes"),
           systemImage: "checkmark",
-          isEnabled: !viewModel.isLoading && viewModel.isPhoneRowValid
+          isEnabled: viewModel.canSaveProfileEdits
         ) {
           Task { @MainActor in
             viewModel.saveProfileEdits()

@@ -28,7 +28,7 @@ struct TeacherEarningsView: View {
                         if let selected = viewModel.selectedMonth {
                             monthDetailCard(selected)
                         }
-                    } else if !viewModel.isLoading {
+                    } else if viewModel.showsEmptyState {
                         emptyState
                     }
                 
@@ -75,20 +75,20 @@ struct TeacherEarningsView: View {
         FlatCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text(LocalizationSupport.localized("Payment Method"))
+                    Text(viewModel.payoutMethodTitle)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(theme.primaryText)
                     Spacer()
-                    Button {
-                        viewModel.editPayoutMethod()
-                    } label: {
-                        Text(viewModel.hasPayoutMethod
-                             ? LocalizationSupport.localized("Edit")
-                             : LocalizationSupport.localized("+ Add"))
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(theme.info)
+                    if viewModel.showsPayoutMethodAction {
+                        Button {
+                            viewModel.editPayoutMethod()
+                        } label: {
+                            Text(viewModel.payoutMethodActionLabel)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(theme.info)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
 
                 Divider()
@@ -113,7 +113,7 @@ struct TeacherEarningsView: View {
                         Spacer()
                     }
                 } else {
-                    Text(LocalizationSupport.localized("No payment method yet. Add one so we can pay you."))
+                    Text(viewModel.noPayoutMethodText)
                         .font(.system(size: 14))
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,7 +125,7 @@ struct TeacherEarningsView: View {
     // MARK: - Empty State
 
     var emptyState: some View {
-        Text(viewModel.errorMessage ?? LocalizationSupport.localized("No earnings yet. Your first lesson will show up here."))
+        Text(viewModel.emptyStateText)
             .font(.system(size: 14))
             .foregroundStyle(theme.secondaryText)
             .multilineTextAlignment(.center)
@@ -181,15 +181,15 @@ struct TeacherEarningsView: View {
     var summaryCards: some View {
         HStack(spacing: 12) {
             summaryCard(
-                title: LocalizationSupport.localized("Current Month"),
-                amount: viewModel.formattedEarnings(viewModel.currentMonthSummary?.earningsCents ?? 0),
-                subtitle: LessonFormatting.minutesText(viewModel.currentMonthSummary?.minutesCount ?? 0),
+                title: viewModel.currentMonthTitle,
+                amount: viewModel.currentMonthEarningsText,
+                subtitle: viewModel.currentMonthMinutesText,
                 background: theme.accent
             )
             summaryCard(
-                title: LocalizationSupport.localized("Total Income"),
-                amount: viewModel.formattedEarnings(viewModel.totalEarningsCents),
-                subtitle: String(format: LocalizationSupport.localized("%d months"), viewModel.totalMonthsActive),
+                title: viewModel.totalIncomeTitle,
+                amount: viewModel.totalEarningsText,
+                subtitle: viewModel.totalMonthsActiveText,
                 background: theme.positive
             )
         }
@@ -204,7 +204,10 @@ struct TeacherEarningsView: View {
             Text(amount)
                 .font(.system(size: 26, weight: .bold))
                 .foregroundStyle(.white)
-                .minimumScaleFactor(0.7)
+                // The loading placeholder is a word, not an amount, and would
+                // wrap instead of scaling without an explicit single line.
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
             Text(subtitle)
                 .font(.system(size: 12))
                 .foregroundStyle(.white.opacity(0.8))

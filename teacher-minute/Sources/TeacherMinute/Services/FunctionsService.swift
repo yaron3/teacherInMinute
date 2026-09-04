@@ -152,6 +152,15 @@ struct TeacherEarningsSummaryResult {
   let currency: String
   let totalEarningsCents: Int
   let months: [EarningsMonth]
+  /// Exactly the lessons the totals above were computed from, newest first.
+  /// The teacher's history list renders these rather than assembling its own
+  /// set from the `questions` array on the user document — that array is
+  /// maintained by a separate write and drifts, which is how the two screens
+  /// came to show different totals for the same teacher.
+  let lessons: [HistoryLesson]
+  /// When the oldest counted lesson ended, so the running total can say what
+  /// period it covers. `nil` when there are no lessons yet.
+  let firstLessonAt: Date?
   let nextPayment: EarningsNextPayment?
   /// Where the payout is sent, or `nil` if the teacher has not set one up.
   let payoutMethod: TeacherPayoutMethod?
@@ -455,10 +464,43 @@ final class FunctionsService {
       return PayoutBank(code: code, name: name, nameHe: row["nameHe"] as? String ?? name)
     }
 
+    let summaryCurrency = result["currency"] as? String ?? LessonFormatting.defaultCurrencyCode
+    let lessonRows = result["lessons"] as? [[String: Any]] ?? []
+    let lessons: [HistoryLesson] = lessonRows.compactMap { row in
+      guard let questionId = row["questionId"] as? String, !questionId.isEmpty else { return nil }
+      let text = row["text"] as? String ?? ""
+      let photoUrls = row["photoUrls"] as? [String] ?? []
+      let studentName = row["studentName"] as? String ?? ""
+      return HistoryLesson(
+        id: questionId,
+        questionId: questionId,
+        title: HistoryModel.lessonTitle(
+          questionText: text,
+          photoUrls: photoUrls,
+          topic: row["topic"] as? String ?? ""
+        ),
+        otherParticipantName: studentName.isEmpty ? LocalizationSupport.localized("Student") : studentName,
+        otherParticipantImageURL: row["studentImageURL"] as? String ?? "",
+        questionText: text,
+        questionPhotoUrls: photoUrls,
+        acceptedAt: Self.isoDate(row["acceptedAt"]) ?? Self.isoDate(row["endedAt"]) ?? Date.distantPast,
+        durationSeconds: Self.intValue(row["durationSeconds"]) ?? 0,
+        costCents: Self.intValue(row["costCents"]) ?? 0,
+        teacherEarningsCents: Self.intValue(row["earningsCents"]) ?? 0,
+        // Older lessons predate the per-lesson currency field; the summary's
+        // own currency is the same money, so it stands in rather than letting
+        // the row fall back to a different default than the totals used.
+        currencyCode: (row["currency"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? summaryCurrency,
+        studentRating: Self.intValue(row["studentRating"]) ?? 0
+      )
+    }
+
     return TeacherEarningsSummaryResult(
-      currency: result["currency"] as? String ?? LessonFormatting.defaultCurrencyCode,
+      currency: summaryCurrency,
       totalEarningsCents: Self.intValue(result["totalEarningsCents"]) ?? 0,
       months: months,
+      lessons: lessons,
+      firstLessonAt: Self.isoDate(result["firstLessonAt"]),
       nextPayment: nextPayment,
       payoutMethod: payoutMethod,
       payoutMethodSummary: result["payoutMethodSummary"] as? String ?? "",
@@ -632,6 +674,17 @@ final class FunctionsService {
     if let value = value as? Int { return Double(value) }
     if let value = value as? String { return Double(value) }
     return nil
+  }
+
+  /// Callable results carry dates as ISO-8601 strings — the transport has no
+  /// Timestamp — and the backend writes them with fractional seconds, which
+  /// the plain formatter does not accept.
+  private static func isoDate(_ value: Any?) -> Date? {
+    guard let text = value as? String, !text.isEmpty else { return nil }
+    let withFraction = ISO8601DateFormatter()
+    withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = withFraction.date(from: text) { return date }
+    return ISO8601DateFormatter().date(from: text)
   }
 
   private static func firstString(in dict: [String: Any], keys: [String]) -> String? {

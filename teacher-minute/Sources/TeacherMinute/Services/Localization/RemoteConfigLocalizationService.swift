@@ -94,6 +94,8 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Earnings": "הכנסות",
         "Time Taught": "זמן הוראה",
         "%@%d%% vs last week": "%@%d%% מהשבוע שעבר",
+        "Updating\u{2026}": "מתעדכן\u{2026}",
+        "Since %@": "החל מ-%@",
         // Onboarding copy, rebranded from the old "Math Connect" placeholder.
         // The published Remote Config values still carry the old name, so these
         // stand in until the template is republished.
@@ -128,6 +130,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Phone validation, shown under every field that takes a number. Stands
         // in until `enter_valid_phone` is published to the template.
         "Enter a valid phone number.": "יש להזין מספר טלפון תקין.",
+        "Enter your full name.": "יש להזין שם מלא.",
         // Firebase Auth errors — the SDK always returns English; these provide Hebrew fallbacks.
         "This email address is already in use.": "כתובת המייל הזו כבר רשומה במערכת.",
         "Incorrect email or password.": "כתובת המייל או הסיסמה שגויים.",

@@ -60,8 +60,17 @@ final class TeacherEarningsViewModel {
     var selectedMonthId: String = ""
     var totalEarningsCents: Int = 0
     var totalMonthsActive: Int = 0
+    /// When the oldest counted lesson ended. The total is a running figure
+    /// with no period of its own, so the card says what it covers rather than
+    /// leaving the teacher to guess whether it is all time or this year.
+    var firstLessonAt: Date?
     var currencyCode: String = LessonFormatting.defaultCurrencyCode
     var isLoading: Bool = false
+    /// True until the first summary fetch has come back, one way or the other.
+    /// `isLoading` cannot stand in for this: it starts false and only flips
+    /// once `load()` runs, so the opening frame would show a screen of zeros
+    /// — and the "no earnings yet" empty state — before anything was asked for.
+    var isLoadingInitialData = true
     var errorMessage: String?
 
     /// The pending payout, from the backend's payout schedule: a month's
@@ -140,8 +149,84 @@ final class TeacherEarningsViewModel {
         months.first(where: { $0.id == selectedMonthId })
     }
 
+    /// Raw formatter. Safe to use unguarded from the month and week rows, which
+    /// only render once `hasEarningsData` is true; the summary cards below go
+    /// through `loadedValue` instead, because they are on screen from the start.
     func formattedEarnings(_ cents: Int) -> String {
         LessonFormatting.currencyText(cents: cents, currencyCode: currencyCode)
+    }
+
+    // MARK: - Values shown before the data arrives
+
+    /// Stands in for any figure that has not been fetched yet. Zero is a
+    /// plausible answer for a month's income, so it must not be shown until it
+    /// is the real one.
+    var updatingValueText: String { LocalizationSupport.localized("Updating\u{2026}") }
+
+    private func loadedValue(_ settled: String) -> String {
+        isLoadingInitialData ? updatingValueText : settled
+    }
+
+    var currentMonthTitle: String { LocalizationSupport.localized("Current Month") }
+    var totalIncomeTitle: String { LocalizationSupport.localized("Total Income") }
+
+    var currentMonthEarningsText: String {
+        loadedValue(formattedEarnings(currentMonthSummary?.earningsCents ?? 0))
+    }
+
+    var currentMonthMinutesText: String {
+        loadedValue(LessonFormatting.minutesText(currentMonthSummary?.minutesCount ?? 0))
+    }
+
+    var totalEarningsText: String {
+        loadedValue(formattedEarnings(totalEarningsCents))
+    }
+
+    /// What period the running total covers. Prefers the actual start date —
+    /// "Since 19 May 2026" says more than "3 months" — and falls back to the
+    /// month count for a teacher whose lessons carry no usable end date.
+    var totalMonthsActiveText: String {
+        loadedValue(
+            firstLessonAt.map {
+                String(format: LocalizationSupport.localized("Since %@"), Self.sinceDateText($0))
+            } ?? String(format: LocalizationSupport.localized("%d months"), totalMonthsActive)
+        )
+    }
+
+    /// Day and month, plus the year only when it is not the current one — the
+    /// card is narrow, and "Since 19 May" is enough for a recent start.
+    private static func sinceDateText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = LocalizationSupport.currentLocale
+        let isThisYear = Calendar.current.component(.year, from: date)
+            == Calendar.current.component(.year, from: Date())
+        formatter.setLocalizedDateFormatFromTemplate(isThisYear ? "d MMM" : "d MMM yyyy")
+        return formatter.string(from: date)
+    }
+
+    var payoutMethodTitle: String { LocalizationSupport.localized("Payment Method") }
+
+    /// Shown in place of the saved destination. Until the fetch lands there is
+    /// no basis for telling a teacher who has set one up that they have not.
+    var noPayoutMethodText: String {
+        loadedValue(LocalizationSupport.localized("No payment method yet. Add one so we can pay you."))
+    }
+
+    var payoutMethodActionLabel: String {
+        hasPayoutMethod
+            ? LocalizationSupport.localized("Edit")
+            : LocalizationSupport.localized("+ Add")
+    }
+
+    /// Hidden while loading — the label has to say either "Edit" or "+ Add",
+    /// and neither is a claim we can make before knowing what is on file.
+    var showsPayoutMethodAction: Bool { !isLoadingInitialData }
+
+    /// The empty state is only the truth once a load has finished.
+    var showsEmptyState: Bool { !hasEarningsData && !isLoadingInitialData && !isLoading }
+
+    var emptyStateText: String {
+        errorMessage ?? LocalizationSupport.localized("No earnings yet. Your first lesson will show up here.")
     }
 
     func load() {
@@ -168,6 +253,10 @@ final class TeacherEarningsViewModel {
     // MARK: - Private
 
     private func loadData() async {
+        // Cleared however this ends, including the failure paths: an error or a
+        // genuinely empty account is a real answer, and the screen should say
+        // so rather than sit on "Updating…" forever.
+        defer { isLoadingInitialData = false }
         guard Auth.auth().currentUser != nil else {
             errorMessage = LocalizationSupport.localized("Could not load earnings.")
             return
@@ -176,7 +265,11 @@ final class TeacherEarningsViewModel {
         isPayPalPayoutEnabled = await SettingsRemoteConfigService.shared.fetchIsPayPalPayoutEnabled()
 
         do {
-            let summary = try await FunctionsService.shared.teacherEarningsSummary()
+            // Shared with the dashboard and the Lessons tab so all three show
+            // the same money — see TeacherEarningsStore. Cached rather than
+            // forced: this screen is opened by a tab switch, and each call
+            // scans every question the teacher has ever taken.
+            let summary = try await TeacherEarningsStore.shared.summary()
             apply(summary)
             errorMessage = nil
         } catch {
@@ -212,6 +305,7 @@ final class TeacherEarningsViewModel {
             )
         }
         totalMonthsActive = months.count
+        firstLessonAt = summary.firstLessonAt
         selectedMonthId = months.first(where: { $0.isCurrentMonth })?.id ?? months.last?.id ?? ""
 
         if let payment = summary.nextPayment {

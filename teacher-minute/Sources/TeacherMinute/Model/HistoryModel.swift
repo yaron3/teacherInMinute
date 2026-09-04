@@ -255,13 +255,23 @@ final class HistoryModel {
     }
 
     private static func lessonTitle(from data: [String: Any], questionText: String, questionPhotoUrls: [String]) -> String {
+        lessonTitle(
+            questionText: questionText,
+            photoUrls: questionPhotoUrls,
+            topic: firstString(in: data, keys: ["topic", "subject", "title"])
+        )
+    }
+
+    /// What a lesson is called in a history row. Shared with the teacher's
+    /// backend-supplied history (see `FunctionsService.teacherEarningsSummary`)
+    /// so a lesson is titled the same however it reached the screen.
+    static func lessonTitle(questionText: String, photoUrls: [String], topic: String) -> String {
         if !questionText.isEmpty {
             return questionText
         }
-        if !questionPhotoUrls.isEmpty {
+        if !photoUrls.isEmpty {
             return LocalizationSupport.localized("Image")
         }
-        let topic = firstString(in: data, keys: ["topic", "subject", "title"])
         if !topic.isEmpty {
             return LocalizationSupport.localized(topic)
         }

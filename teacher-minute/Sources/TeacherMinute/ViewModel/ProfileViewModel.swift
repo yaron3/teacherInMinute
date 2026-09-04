@@ -256,12 +256,36 @@ final class ProfileViewModel {
         rebuildContactRows()
     }
 
-    // MARK: - Phone validation
+    // MARK: - Edit-form validation
 
     /// The description carries the localized label, so both spellings are
     /// matched here for the same reason `syncFieldsFromRows` matches both.
     func isPhoneRow(_ row: Parameter) -> Bool {
         row.description == "Phone" || row.description == LocalizationSupport.localized("Phone")
+    }
+
+    func isNameRow(_ row: Parameter) -> Bool {
+        row.description == "Full Name" || row.description == LocalizationSupport.localized("Full Name")
+    }
+
+    private var editedName: String {
+        contactRows.first(where: isNameRow)?.value.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    /// A name is how everyone else identifies this person — in the teacher
+    /// list, on an invite, in a lesson header — so an empty one is never a
+    /// valid answer. Saving one used to be possible by clearing the field,
+    /// which left the app substituting the word "Teacher" or "Student".
+    var isNameRowValid: Bool {
+        !editedName.isEmpty
+    }
+
+    var showsNameRowError: Bool {
+        !isNameRowValid
+    }
+
+    var nameErrorMessage: String {
+        LocalizationSupport.localized("Enter your full name.")
     }
 
     private var editedPhoneNumber: String {
@@ -288,7 +312,27 @@ final class ProfileViewModel {
         LocalizationSupport.localized("Enter a valid phone number.")
     }
 
+    /// Per-row validity, so the edit form does not have to know which fields
+    /// are checked or which message belongs to which one.
+    func isRowValid(_ row: Parameter) -> Bool {
+        if isNameRow(row) { return isNameRowValid }
+        if isPhoneRow(row) { return isPhoneRowValid }
+        return true
+    }
+
+    func rowErrorMessage(for row: Parameter) -> String {
+        isNameRow(row) ? nameErrorMessage : phoneErrorMessage
+    }
+
+    var canSaveProfileEdits: Bool {
+        !isLoading && isNameRowValid && isPhoneRowValid
+    }
+
     func saveProfileEdits() {
+        guard isNameRowValid else {
+            errorMessage = nameErrorMessage
+            return
+        }
         guard isPhoneRowValid else {
             errorMessage = phoneErrorMessage
             return

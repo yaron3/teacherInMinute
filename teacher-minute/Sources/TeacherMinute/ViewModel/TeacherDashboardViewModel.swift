@@ -58,6 +58,15 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var hasMicAccess: Bool { get set }
   var hasCameraAccess: Bool { get set }
   var showsSubjectEditor: Bool { get set }
+  /// True from launch until the first earnings and rating fetch has come back.
+  /// The counters all start at zero, and zero is a perfectly plausible answer
+  /// for a teacher's income — so until this clears, the dashboard says the
+  /// numbers are still coming rather than showing a total nobody earned.
+  var isLoadingStats: Bool { get }
+  /// The same idea for the teacher's own profile. Its defaults are not neutral
+  /// either: an unloaded profile claims the teacher is awaiting verification,
+  /// teaches nothing, and charges the built-in starter rate.
+  var isLoadingProfile: Bool { get }
 
   var formattedTodayEarnings: String { get }
   var formattedWeekEarnings: String { get }
@@ -117,9 +126,11 @@ extension TeacherDashboardViewModeling {
   // MARK: Teacher status card
 
   var verificationStatusText: String {
-    isVerified
-      ? LocalizationSupport.localized("Verified Expert")
-      : LocalizationSupport.localized("Pending Verification")
+    loadedProfileValue(
+      isVerified
+        ? LocalizationSupport.localized("Verified Expert")
+        : LocalizationSupport.localized("Pending Verification")
+    )
   }
 
   var editSubjectsLabel: String { LocalizationSupport.localized("Edit Subjects") }
@@ -132,16 +143,38 @@ extension TeacherDashboardViewModeling {
   var earningsAllTimeTitle: String { LocalizationSupport.localized("All Time") }
   var totalMinutesTutoredLabel: String { LocalizationSupport.localized("Total minutes tutored") }
 
+  /// Stands in for any figure the dashboard has not fetched yet.
+  var updatingValueText: String { LocalizationSupport.localized("Updating\u{2026}") }
+
+  /// Wraps a figure so it is only shown once it means something. Every number
+  /// on the dashboard that comes from the earnings or rating fetch goes
+  /// through here — see `isLoadingStats`.
+  func loadedValue(_ settled: String) -> String {
+    isLoadingStats ? updatingValueText : settled
+  }
+
+  /// The profile equivalent of `loadedValue`. Kept separate because the
+  /// profile arrives before the earnings do, and there is no reason to hold
+  /// back a subject list that is already known.
+  func loadedProfileValue(_ settled: String) -> String {
+    isLoadingProfile ? updatingValueText : settled
+  }
+
+  var lessonCountText: String {
+    loadedValue("\(lessonCount)")
+  }
+
   var todayMinutesTutoredText: String {
-    String(format: LocalizationSupport.localized("%d mins tutored"), todayMinutesTutored)
+    loadedValue(String(format: LocalizationSupport.localized("%d mins tutored"), todayMinutesTutored))
   }
 
   var weekMinutesTutoredText: String {
-    String(format: LocalizationSupport.localized("%d mins tutored"), weekMinutesTutored)
+    loadedValue(String(format: LocalizationSupport.localized("%d mins tutored"), weekMinutesTutored))
   }
 
+  /// Lifetime minutes come off the profile document, not the earnings fetch.
   var totalMinutesText: String {
-    String(format: LocalizationSupport.localized("%d min"), totalMinutes)
+    loadedProfileValue(String(format: LocalizationSupport.localized("%d min"), totalMinutes))
   }
 
   // MARK: Live earnings card
@@ -149,7 +182,7 @@ extension TeacherDashboardViewModeling {
   var liveEarningsTodayLabel: String { LocalizationSupport.localized("Live Earnings Today") }
 
   var ratePerMinBadgeText: String {
-    String(format: LocalizationSupport.localized("%@/min"), formattedRate)
+    loadedProfileValue(String(format: LocalizationSupport.localized("%@/min"), formattedRate))
   }
 
   // MARK: Online status card
@@ -259,17 +292,22 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var hasMicAccess = false
   var hasCameraAccess = false
   var showsSubjectEditor = false
-  
+  /// Cleared once — after the first profile/rating/earnings load. Later
+  /// refreshes (`refreshEarnings`) leave it alone, so finishing a lesson
+  /// updates the figures in place instead of blanking them out again.
+  var isLoadingStats = true
+  var isLoadingProfile = true
+
   var formattedTodayEarnings: String {
-	Self.formatCents(todayEarningsCents, currency: earningsCurrencyCode)
+	loadedValue(Self.formatCents(todayEarningsCents, currency: earningsCurrencyCode))
   }
-  
+
   var formattedWeekEarnings: String {
-	Self.formatCents(weekEarningsCents, currency: earningsCurrencyCode)
+	loadedValue(Self.formatCents(weekEarningsCents, currency: earningsCurrencyCode))
   }
 
   var formattedMonthEarnings: String {
-	Self.formatCents(monthEarningsCents, currency: earningsCurrencyCode)
+	loadedValue(Self.formatCents(monthEarningsCents, currency: earningsCurrencyCode))
   }
   
   var formattedRate: String {
@@ -284,24 +322,27 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   }
   
   /// A brand-new teacher has no reviews, so the dashboard says so instead of
-  /// showing an empty five-star row that reads as a score of zero.
-  var hasRating: Bool { reviewCount > 0 }
+  /// showing an empty five-star row that reads as a score of zero. Suppressed
+  /// while the rating is still loading, for the same reason.
+  var hasRating: Bool { !isLoadingStats && reviewCount > 0 }
 
   var ratingText: String { LessonFormatting.ratingText(teacherRating) }
 
   var reviewCountText: String {
-	hasRating
-	? String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
-	: LocalizationSupport.localized("No reviews yet")
+	loadedValue(
+	  reviewCount > 0
+	  ? String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
+	  : LocalizationSupport.localized("No reviews yet")
+	)
   }
 
   var subjectsDisplayText: String {
 	if subjects.isEmpty {
-	  return LocalizationSupport.localized("No subjects selected")
+	  return loadedProfileValue(LocalizationSupport.localized("No subjects selected"))
 	}
 	return subjects.map { LocalizationSupport.localized($0) }.joined(separator: ", ")
   }
-  
+
   // MARK: - Private
   
   private var presenceService: TeacherPresenceService?
@@ -770,9 +811,16 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	}
 	
 	isVerified = (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
+	// Verification status, subjects and the rate are all known now, so they are
+	// released before waiting on the slower rating and earnings queries.
+	isLoadingProfile = false
 	checkPermissions()
 	await loadRating()
 	await loadEarnings(uid: uid)
+	// Every figure on the dashboard is settled by this point, including the
+	// ones a failed fetch left at zero — that is a real answer now, not a
+	// placeholder, so the counters can show it.
+	isLoadingStats = false
   }
 
   /// Star average and review count come from the backend rather than the
@@ -791,22 +839,23 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   private var earningsCurrencyCode = LessonFormatting.defaultCurrencyCode
   
+  /// Reads the same backend summary the Lessons and Earnings tabs do, so the
+  /// three screens cannot report different money — see TeacherEarningsStore.
   private func loadEarnings(uid: String) async {
-	let lessons = (try? await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)) ?? []
-	
+	guard let summary = try? await TeacherEarningsStore.shared.summary() else { return }
+	let lessons = summary.lessons
+
 	let calendar = Calendar.current
 	let now = Date()
 	let startOfToday = calendar.startOfDay(for: now)
 	guard let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)),
-		  let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfWeek),
-		  let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) else { return }
+		  let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfWeek) else { return }
 
 	var todayEarnings = 0
 	var todayMinutes = 0
 	var weekEarnings = 0
 	var weekMinutes = 0
 	var lastWeekEarnings = 0
-	var monthEarnings = 0
 
 	for lesson in lessons {
 	  let date = lesson.acceptedAt
@@ -821,27 +870,30 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  if date >= startOfLastWeek && date < startOfWeek {
 		lastWeekEarnings += lesson.teacherEarningsCents
 	  }
-	  if date >= startOfMonth {
-		monthEarnings += lesson.teacherEarningsCents
-	  }
 	}
-	
-	earningsCurrencyCode = lessons.first?.currencyCode ?? LessonFormatting.defaultCurrencyCode
+
+	earningsCurrencyCode = summary.currency
 	todayEarningsCents = todayEarnings
 	todayMinutesTutored = todayMinutes
 	weekEarningsCents = weekEarnings
 	weekMinutesTutored = weekMinutes
 	lastWeekEarningsCents = lastWeekEarnings
-	monthEarningsCents = monthEarnings
+	// Taken from the backend's own month bucket rather than re-added here, so
+	// this is the identical figure the Earnings tab labels "Current Month".
+	monthEarningsCents = summary.months.first(where: { $0.isCurrentMonth })?.earningsCents ?? 0
 	lessonCount = lessons.count
-	logger.info("[Earnings] dashboard uid=\(uid) currency=\(self.earningsCurrencyCode) lessonCount=\(lessons.count) todayCents=\(todayEarnings) todayMins=\(todayMinutes) weekCents=\(weekEarnings) weekMins=\(weekMinutes) lastWeekCents=\(lastWeekEarnings)")
+	logger.info("[Earnings] dashboard uid=\(uid) currency=\(self.earningsCurrencyCode) lessonCount=\(lessons.count) todayCents=\(todayEarnings) todayMins=\(todayMinutes) weekCents=\(weekEarnings) weekMins=\(weekMinutes) lastWeekCents=\(lastWeekEarnings) monthCents=\(self.monthEarningsCents)")
   }
-  
+
   /// Re-fetches lessons/earnings so the dashboard and the Lessons-tab badge
   /// reflect a lesson that was just completed.
   func refreshEarnings() {
 	guard let uid = Auth.auth().currentUser?.uid else { return }
-	Task { await loadEarnings(uid: uid) }
+	Task {
+	  // A lesson just ended, so the cached summary is known to be stale.
+	  TeacherEarningsStore.shared.invalidate()
+	  await loadEarnings(uid: uid)
+	}
   }
   
   private func checkPermissions() {
@@ -899,6 +951,9 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var hasMicAccess: Bool
   var hasCameraAccess: Bool
   var showsSubjectEditor: Bool = false
+  /// The mock is handed its figures up front, so nothing is ever pending.
+  var isLoadingStats: Bool = false
+  var isLoadingProfile: Bool = false
   var subjects: [String]
 
   var formattedTodayEarnings: String { LessonFormatting.currencyText(cents: todayEarningsCents, currencyCode: LessonFormatting.defaultCurrencyCode) }

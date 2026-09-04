@@ -64,11 +64,53 @@ export interface MonthBucket {
  *  ever exists on the separate, largely-unpopulated `lessons` collection —
  *  that mix-up is exactly what left this summary always reading zero. */
 export type CompletedQuestion = QuestionDoc & {
+  /** The Firestore document id, copied in by the caller — the history list
+   *  addresses lessons by it. Most documents also carry it as a `questionId`
+   *  field, which is the fallback. */
+  id?: string;
+  questionId?: string;
   teacherUid?: string;
   teacherEarnings?: number;
   currencyCode?: string;
   durationSeconds?: number;
+  cost?: number;
+  studentRating?: number;
+  // Older documents reached Firestore as a spread of the RTDB question node
+  // and carry these alternative spellings instead of the typed ones above.
+  questionText?: string;
+  originalQuestion?: string;
+  message?: string;
+  subject?: string;
+  title?: string;
+  studentProfileImageURL?: string;
+  connectedAt?: unknown;
+  completedAt?: unknown;
+  finishedAt?: unknown;
 };
+
+/** One lesson as the teacher's history screen shows it. Returned alongside the
+ *  monthly buckets so the history list and the earnings totals are the same
+ *  set of lessons, counted the same way — the two used to be assembled from
+ *  different sources (this query vs. the `questions` array on the teacher's
+ *  user document) and disagreed whenever the two drifted apart. */
+export interface EarningsLesson {
+  questionId: string;
+  /** ISO-8601. When the lesson finished — what the earnings are bucketed by. */
+  endedAt: string;
+  /** ISO-8601. When the teacher picked it up — what the history list sorts and
+   *  dates rows by. Falls back to `endedAt` when the document has no start. */
+  acceptedAt: string;
+  durationSeconds: number;
+  earningsCents: number;
+  costCents: number;
+  currency: string;
+  studentName: string;
+  studentImageURL: string;
+  text: string;
+  topic: string;
+  photoUrls: string[];
+  studentRating: number;
+}
 
 /** `teacherEarnings` on a question is stored in major units (e.g. 12.5 ILS). */
 function toCents(majorUnits: unknown): number {
@@ -80,6 +122,46 @@ function toMinutes(billedSeconds: unknown): number {
   const n = Math.floor(Number(billedSeconds));
   if (!Number.isFinite(n) || n <= 0) return 0;
   return Math.max(1, Math.round(n / 60));
+}
+
+/** These documents arrive by two routes — the typed `endLesson` write and a
+ *  spread of the RTDB question node — so a date is a Timestamp on some and
+ *  epoch millis or an ISO string on others. */
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  const ts = value as { toDate?: () => Date };
+  if (typeof ts.toDate === "function") return ts.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === "number") {
+    // Seconds and milliseconds are both in the wild; anything before 2001 as
+    // millis is really a seconds value.
+    const ms = value < 1_000_000_000_000 ? value * 1000 : value;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function firstString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim() !== "");
+}
+
+/** `cost` is stored in major units, like `teacherEarnings`. */
+function toCostCents(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
 }
 
 /** Weeks are fixed 7-day spans from the 1st, so the last one runs short —
@@ -99,20 +181,54 @@ function daysInMonth(year: number, month: number): number {
 export function summarizeCompletedQuestions(
   questions: CompletedQuestion[],
   now: Date
-): { months: MonthBucket[]; totalEarningsCents: number; currency: string; byMonth: Map<string, MonthBucket> } {
+): {
+  months: MonthBucket[];
+  totalEarningsCents: number;
+  currency: string;
+  byMonth: Map<string, MonthBucket>;
+  lessons: EarningsLesson[];
+  /** ISO-8601 end date of the oldest lesson counted, or "" when none were.
+   *  The total is a running figure with no start date of its own, so the
+   *  screen says which lesson it starts from. */
+  firstLessonAt: string;
+} {
   const currentKey = monthKey(now.getUTCFullYear(), now.getUTCMonth() + 1);
 
   let currency = "";
   const byMonth = new Map<string, MonthBucket>();
+  const lessons: EarningsLesson[] = [];
 
   for (const question of questions) {
     if (question.status !== "completed") continue;
     // Only settled lessons carry earnings; an in-progress one has none yet.
-    const endedAt = question.endedAt?.toDate?.();
+    const endedAt =
+      toDate(question.endedAt) ?? toDate(question.completedAt) ?? toDate(question.finishedAt);
     if (!endedAt) continue;
 
     const earningsCents = toCents(question.teacherEarnings);
     const minutes = toMinutes(question.durationSeconds);
+    const acceptedAt =
+      toDate(question.acceptedAt) ??
+      toDate(question.connectedAt) ??
+      toDate(question.startedAt) ??
+      toDate(question.createdAt) ??
+      endedAt;
+
+    lessons.push({
+      questionId: firstString(question.id, question.questionId),
+      endedAt: endedAt.toISOString(),
+      acceptedAt: acceptedAt.toISOString(),
+      durationSeconds: Math.max(0, Math.floor(Number(question.durationSeconds) || 0)),
+      earningsCents,
+      costCents: toCostCents(question.cost),
+      currency: firstString(question.currencyCode).toUpperCase(),
+      studentName: firstString(question.studentName),
+      studentImageURL: firstString(question.studentImageURL, question.studentProfileImageURL),
+      text: firstString(question.text, question.questionText, question.originalQuestion, question.message),
+      topic: firstString(question.topic, question.subject, question.title),
+      photoUrls: toStringArray(question.photoUrls),
+      studentRating: Math.min(5, Math.max(0, Math.floor(Number(question.studentRating) || 0))),
+    });
 
     const year = endedAt.getUTCFullYear();
     const month = endedAt.getUTCMonth() + 1;
@@ -164,7 +280,14 @@ export function summarizeCompletedQuestions(
   const months = [...byMonth.values()].sort((a, b) => a.id.localeCompare(b.id));
   const totalEarningsCents = months.reduce((sum, m) => sum + m.earningsCents, 0);
 
-  return { months, totalEarningsCents, currency, byMonth };
+  // Newest first — the order the history list shows them in.
+  lessons.sort((a, b) => b.acceptedAt.localeCompare(a.acceptedAt));
+  const firstLessonAt = lessons.reduce(
+    (oldest, lesson) => (oldest === "" || lesson.endedAt < oldest ? lesson.endedAt : oldest),
+    ""
+  );
+
+  return { months, totalEarningsCents, currency, byMonth, lessons, firstLessonAt };
 }
 
 export const teacherEarningsSummary = onCall(async (req) => {
@@ -185,8 +308,9 @@ export const teacherEarningsSummary = onCall(async (req) => {
     .get();
 
   const now = new Date();
-  const questions = snap.docs.map((doc) => doc.data() as CompletedQuestion);
-  const { months, totalEarningsCents, currency, byMonth } = summarizeCompletedQuestions(questions, now);
+  const questions = snap.docs.map((doc) => ({ ...(doc.data() as CompletedQuestion), id: doc.id }));
+  const { months, totalEarningsCents, currency, byMonth, lessons, firstLessonAt } =
+    summarizeCompletedQuestions(questions, now);
 
   const { periodMonthId, payoutDate } = nextPayoutFor(now);
   const pendingAmountCents = byMonth.get(periodMonthId)?.earningsCents ?? 0;
@@ -198,13 +322,17 @@ export const teacherEarningsSummary = onCall(async (req) => {
   const payoutMethod = (user.payoutMethod ?? null) as PayoutMethod | null;
 
   logger.info(
-    `[earnings] teacherEarningsSummary uid=${uid} lessons=${snap.size} months=${months.length} totalCents=${totalEarningsCents} payoutPeriod=${periodMonthId} payoutDate=${payoutDate}`
+    `[earnings] teacherEarningsSummary uid=${uid} scanned=${snap.size} counted=${lessons.length} months=${months.length} totalCents=${totalEarningsCents} since=${firstLessonAt} payoutPeriod=${periodMonthId} payoutDate=${payoutDate}`
   );
 
   return {
     currency: currency || DEFAULT_CURRENCY,
     totalEarningsCents,
     months,
+    // The same lessons the totals above were computed from, so the teacher's
+    // history list cannot show a different set from the earnings screen.
+    lessons,
+    firstLessonAt,
     nextPayment: {
       amountCents: pendingAmountCents,
       payoutDate,

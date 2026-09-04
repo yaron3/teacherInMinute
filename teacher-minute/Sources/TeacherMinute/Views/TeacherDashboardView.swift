@@ -244,7 +244,7 @@ struct TeacherDashboardView: View {
   var statsCards: some View {
 	HStack(spacing: 12) {
 	  statCard(
-		value: "\(viewModel.lessonCount)",
+		value: viewModel.lessonCountText,
 		label: viewModel.lessonsLabel,
 		valueColor: theme.accent
 	  )
@@ -262,6 +262,10 @@ struct TeacherDashboardView: View {
 		Text(value)
 		  .font(.system(size: 32, weight: .bold))
 		  .foregroundStyle(valueColor)
+		  // The placeholder shown while the figures load is a word, not a
+		  // number, and is far wider than anything this card was sized for.
+		  .lineLimit(1)
+		  .minimumScaleFactor(0.5)
 		Text(label)
 		  .font(.system(size: 13))
 		  .foregroundStyle(theme.secondaryText)
@@ -375,6 +379,8 @@ struct TeacherDashboardView: View {
 		  Text(viewModel.formattedTodayEarnings)
 			.font(.system(size: 40, weight: .bold))
 			.foregroundStyle(theme.primaryText)
+			.lineLimit(1)
+			.minimumScaleFactor(0.5)
 
 		  Text(viewModel.todayMinutesTutoredText)
 			.font(.system(size: 13))
@@ -550,10 +556,14 @@ struct TeacherDashboardView: View {
 		  Text(amount)
 			.font(.system(size: 26, weight: .bold))
 			.foregroundStyle(theme.primaryText)
+			.lineLimit(1)
+			.minimumScaleFactor(0.5)
 
 		  Text(subtitle)
 			.font(.system(size: 12))
 			.foregroundStyle(subtitleColor ?? theme.secondaryText)
+			.lineLimit(1)
+			.minimumScaleFactor(0.7)
 		}
 		.frame(maxWidth: .infinity, alignment: .leading)
 	  }
