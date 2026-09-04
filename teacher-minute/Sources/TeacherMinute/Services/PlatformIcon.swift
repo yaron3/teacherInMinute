@@ -68,6 +68,41 @@ struct PlatformIcon: View {
 	  case "video.fill":                        return "📷"
 	  case "circle.fill":                       return "🟢"
 	  case "bell.fill":                         return "🔔"
+	  // Unfilled and badged variants of symbols already mapped above: iOS picks
+	  // them for weight, but Android has one emoji either way, so they must be
+	  // listed explicitly or they fall through to the "missing" dot below.
+	  case "bell":                              return "🔔"
+	  case "bell.badge.fill":                   return "🔔"
+	  case "doc.text":                          return "📄"
+	  case "graduationcap":                     return "🎓"
+	  case "photo":                             return "▧"
+	  case "calendar":                          return "📅"
+	  case "arrow.clockwise":                   return "↻"
+	  case "arrow.down.doc":                    return "⬇"
+	  case "arrow.up.doc.fill":                 return "⬆"
+	  case "exclamationmark.triangle.fill":     return "⚠️"
+	  // "…slash" symbols mean the thing is off or unavailable, so they read as
+	  // a prohibition rather than as the thing itself.
+	  case "person.slash.fill":                 return "🚫"
+	  case "video.slash.fill":                  return "🚫"
+	  case "waveform":                          return "🎵"
+	  case "squareshape.split.3x3":             return "▦"
+	  // Subject tiles (TeacherSubjectsViewModel), which reach here through
+	  // SubjectChip/FlatIconTile rather than a literal at the call site.
+	  case "angle":                             return "📐"
+	  case "chart.pie":                         return "📊"
+	  case "chart.xyaxis.line":                 return "📈"
+	  case "gearshape.2":                       return "⚙"
+	  case "waveform.path.ecg":                 return "〰"
+	  case "chevron.left.forwardslash.chevron.right": return "</>"
+	  case "list.bullet":                       return "☰"
+	  // Form fields, settings rows and payout details — all of which render
+	  // their icon via AuthInputField / FlatIconTile, and so land here too.
+	  case "number":                            return "#"
+	  case "key.fill":                          return "🔑"
+	  case "slider.horizontal.3":               return "🎚"
+	  case "creditcard":                        return "💳"
+	  case "banknote":                          return "💵"
 	  case "lock.fill":                         return "🔒"
 	  case "rectangle.portrait.and.arrow.right":return "↪"
 	  case "trash.fill":                        return "🗑"
