@@ -315,7 +315,24 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Update your profile?": "לעדכן את הפרופיל?",
         "Save this number as your profile phone number too?": "לשמור את המספר הזה גם כמספר הטלפון בפרופיל?",
         "Update": "עדכן",
-        "Not now": "לא עכשיו"
+        "Not now": "לא עכשיו",
+        // Fixing the "Stucked?" typo moved this to a new key (`stuck_you_will`),
+        // which the published config does not carry yet, so Hebrew would fall
+        // through to the English source until the template is republished.
+        "Stuck? You will have a teacher immediately": "נתקעת? יש לך מורה לרגע.",
+        // Singular counterpart of "%d teachers available now"; a lone format
+        // string rendered "1 מורים פנויים עכשיו".
+        "1 teacher available now": "מורה אחד פנוי עכשיו",
+        // Ask a Teacher sheet — the heading stayed English above its Hebrew
+        // description.
+        "Attach a photo (optional)": "צירוף תמונה (לא חובה)",
+        // "How it works" panel on the teacher role card. Only the first step
+        // title and the last subtitle had Hebrew, so the panel rendered half in
+        // English.
+        "Add your subjects, bio, and verification documents": "הוסיפו מקצועות, תיאור קצר ומסמכי אימות",
+        "A student requests help": "תלמיד מבקש עזרה",
+        "Get matched to students who need your subject": "מתחברים לתלמידים שצריכים את המקצוע שלכם",
+        "Teach live": "מלמדים בשידור חי"
     ]
 
     #if os(Android)
@@ -426,12 +443,19 @@ enum LocalizationKey {
         "Microphone and camera access are required to accept a video session.": "microphone_camera_accept_video",
         "No messages": "messages_b",
         "OFF": "off_caps",
-//        "OK": "ok",
+        // Every word in "OK" is two letters, and `generatedKey` drops words of
+        // two characters or fewer — so without this override the key comes out
+        // empty and the dialog button stays English in Hebrew.
+        "OK": "ok",
         "ON": "on_caps",
         "Open Settings": "open_settings",
         "ORIGINAL QUESTION": "original_question_caps",
         "On": "on",
         "PAYMENTS": "payments_caps",
+        // "Preferences" and "PREFERENCES" both reduce to `preferences`, so the
+        // caps section header's value was serving the sentence-case row too and
+        // the row rendered as "PREFERENCES".
+        "PREFERENCES": "preferences_caps",
         "PayPal Checkout": "paypal_checkout_a",
         "PayPal at checkout": "paypal_checkout_b",
         "Privacy Policy": "privacy_policy_title",

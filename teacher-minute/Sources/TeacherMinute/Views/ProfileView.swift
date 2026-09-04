@@ -80,7 +80,7 @@ struct ProfileView: View {
 		FlatCard {
 		  VStack {
 			HStack {
-			  Label(LocalizationSupport.localized("Payments method"), systemImage: "creditcard")
+			  Label(LocalizationSupport.localized("Payment Method"), systemImage: "creditcard")
 			  Spacer()
 			  Button(action: showProfileEditor) {
 				Text(LocalizationSupport.localized("Edit"))

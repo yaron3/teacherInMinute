@@ -69,7 +69,7 @@ struct PermissionsSetupView: View {
                     icon: "mic.fill",
                     iconColor: theme.accent,
                     iconBackground: theme.accentBackground,
-                    title: "Microphone",
+                    title: LocalizationSupport.localized("Microphone"),
                     subtitle: LocalizationSupport.localized("Talk live with\nteachers to solve\nmath problems\ntogether in real-\ntime."),
                     isOn: $viewModel.microphoneEnabled
                 )
@@ -78,8 +78,8 @@ struct PermissionsSetupView: View {
                     icon: "camera.fill",
                     iconColor: theme.positive,
                     iconBackground: theme.positive.opacity(0.14),
-                    title: "Camera",
-                    subtitle: LocalizationSupport.localized("Use video in live\\nlessons and update\\nyour profile photo\\nwhen needed."),
+                    title: LocalizationSupport.localized("Camera"),
+                    subtitle: LocalizationSupport.localized("Use video in live\nlessons and update\nyour profile photo\nwhen needed."),
                     isOn: $viewModel.cameraEnabled
                 )
                 // Notifications are requested after the first lesson (with a

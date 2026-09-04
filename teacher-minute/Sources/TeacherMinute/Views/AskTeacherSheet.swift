@@ -570,7 +570,7 @@ struct AskTeacherSheet: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(theme.accent)
                 }
-                Text(String(format: LocalizationSupport.localized("%d teachers available now"), viewModel.onlineTeachers.count))
+                Text(viewModel.onlineTeachersCountText)
                     .font(.system(size: 12))
                     .foregroundStyle(theme.secondaryText)
             }

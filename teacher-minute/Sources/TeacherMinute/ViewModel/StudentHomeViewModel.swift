@@ -255,8 +255,14 @@ extension StudentHomeViewModeling {
     String(format: LocalizationSupport.localized("Hello, %@"), studentDisplayName)
   }
 
+  /// Hebrew and English both read wrong as "1 teachers available now", and a
+  /// single format string cannot carry both forms, so the singular gets its own
+  /// string the way "1 teacher"/"%d teachers" already do.
   var onlineTeachersCountText: String {
-    String(format: LocalizationSupport.localized("%d teachers available now"), onlineTeachers.count)
+    if onlineTeachers.count == 1 {
+      return LocalizationSupport.localized("1 teacher available now")
+    }
+    return String(format: LocalizationSupport.localized("%d teachers available now"), onlineTeachers.count)
   }
 
   var remainingMinutesText: String {
@@ -358,7 +364,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// The hero line and the "how it works" step, both of which used to promise a
   /// fixed 90 seconds. They now quote the measured average, and fall back to
   /// wording that makes no numeric claim when there is nothing to quote.
-  var appMainIssueText = LocalizationSupport.localized("Stucked? you will have a teacher immediately")
+  var appMainIssueText = LocalizationSupport.localized("Stuck? You will have a teacher immediately")
   var connectPromiseText = LocalizationSupport.localized("Help from a real teacher, exactly when you need it") 
 
   var connectStepTitle = LocalizationSupport.localized("A teacher connects quickly")
@@ -1217,7 +1223,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var averageConnectText = "90 sec avg to connect"
   var registeredTeacherCountText = "237 registered teachers"
   var connectPromiseText = "Help from a real teacher, exactly when you need it Mock"
-  var appMainIssueText = "Stucked? you will have a teacher immediately"
+  var appMainIssueText = "Stuck? You will have a teacher immediately"
   var connectStepTitle = "Teacher connects within 90 sec"
   var averageResponseText = "Average response time: 90 seconds"
 
