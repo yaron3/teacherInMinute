@@ -92,7 +92,9 @@
   .stat-purple .stat-value { color: var(--accent2); }
 
   /* ── Tables ── */
-  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  /* Scroll rather than clip: the questions and lessons tables carry more
+     columns than a narrow window fits. */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; overflow-y: hidden; }
   .table-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .table-header h3 { font-size: .95rem; font-weight: 600; }
   table { width: 100%; border-collapse: collapse; font-size: .8rem; }
@@ -211,8 +213,10 @@
     <div class="nav-section">Data</div>
     <div class="nav-item" onclick="showPage('users')">👥 Users</div>
     <div class="nav-item" onclick="showPage('questions')">❓ Questions</div>
+    <div class="nav-item" onclick="showPage('lessons')">📚 Lessons</div>
     <div class="nav-item" onclick="showPage('coupons')">🎟 Coupons</div>
     <div class="nav-item" onclick="showPage('payments')">💳 Payments</div>
+    <div class="nav-item" onclick="showPage('pricing')">🏷 Pricing</div>
     <div class="nav-item" onclick="showPage('support')">📩 Support</div>
     <div class="nav-item" id="nav-verify" onclick="showPage('verify')" style="display:flex;align-items:center">📋 Verify Teachers<span class="nav-badge" id="verify-badge" style="display:none">0</span></div>
     <div class="nav-signout" onclick="doSignOut()">↩ Sign out</div>
@@ -224,7 +228,10 @@
     <div id="page-overview" class="page active">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="page-title">System Overview</div>
-        <button class="refresh-btn" onclick="loadOverview()">↻ Refresh</button>
+        <div style="display:flex;gap:6px">
+          <button class="refresh-btn" onclick="recomputeStats()">Σ Recompute stats</button>
+          <button class="refresh-btn" onclick="loadOverview()">↻ Refresh</button>
+        </div>
       </div>
       <div class="page-sub" id="overview-updated">—</div>
       <div id="overview-stats" class="stat-grid">
@@ -241,17 +248,20 @@
         </div>
         <div>
           <div class="table-wrap">
-            <div class="table-header"><h3>🟢 Online Teachers</h3></div>
-            <table><thead><tr><th>Teacher</th><th>Subjects</th><th>Rating</th></tr></thead>
-            <tbody id="online-teachers-table"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
+            <div class="table-header">
+              <h3>🟢 Online Teachers</h3>
+              <button class="refresh-btn" onclick="republishPresence()">⟳ Republish presence</button>
+            </div>
+            <table><thead><tr><th>Teacher</th><th>Subjects</th><th>Rating</th><th>Online</th></tr></thead>
+            <tbody id="online-teachers-table"><tr class="empty-row"><td colspan="4">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
       </div>
       <div class="table-wrap">
         <div class="table-header"><h3>📚 Active Lessons</h3></div>
-        <table><thead><tr><th>Lesson ID</th><th>Student</th><th>Teacher</th><th>Started</th><th>Hard Cap</th></tr></thead>
-        <tbody id="active-lessons-table"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody>
+        <table><thead><tr><th>Lesson ID</th><th>Student</th><th>Teacher</th><th>Started</th><th>Hard Cap</th><th>Rate</th></tr></thead>
+        <tbody id="active-lessons-table"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -270,8 +280,8 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th></th><th>Email</th><th>Display Name</th><th>Remaining Min</th><th>Total Min</th><th>Joined</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="users-table"><tr class="empty-row"><td colspan="9">Loading…</td></tr></tbody>
+          <thead><tr><th></th><th>Email</th><th>Display Name</th><th>Role</th><th>Remaining Min</th><th>Total Min</th><th>Joined</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="users-table"><tr class="empty-row"><td colspan="10">Loading…</td></tr></tbody>
         </table>
       </div>
       <div id="users-load-more" style="text-align:center;margin-top:14px;display:none">
@@ -282,7 +292,11 @@
     <!-- ── Questions ── -->
     <div id="page-questions" class="page">
       <div class="page-title">Questions</div>
-      <div class="page-sub">All student questions from Firestore</div>
+      <div class="page-sub">
+        Every question in Firestore. A completed question carries the settlement
+        <code>endLesson</code> wrote onto it — duration, cost and the teacher's
+        share, all in the question's own currency.
+      </div>
       <div class="filter-tabs" id="q-filter-tabs">
         <div class="filter-tab active" onclick="setQFilter('all',this)">All</div>
         <div class="filter-tab" onclick="setQFilter('searching',this)">Searching</div>
@@ -294,12 +308,35 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Topic</th><th>Type</th><th>Student</th><th>Status</th><th>Wave</th><th>Created</th><th>Duration</th><th>Cost</th><th>Photos</th></tr></thead>
-          <tbody id="questions-table"><tr class="empty-row"><td colspan="10">Loading…</td></tr></tbody>
+          <thead><tr><th>ID</th><th>Topic</th><th>Type</th><th>Student</th><th>Teacher</th><th>Status</th><th>Wave</th><th>Created</th><th>Duration</th><th>Cost</th><th>Earned</th><th>Rating</th><th>Photos</th></tr></thead>
+          <tbody id="questions-table"><tr class="empty-row"><td colspan="13">Loading…</td></tr></tbody>
         </table>
       </div>
       <div id="q-load-more" style="text-align:center;margin-top:14px;display:none">
         <button class="btn-ghost btn-sm" onclick="loadMoreQuestions()">Load more</button>
+      </div>
+    </div>
+
+    <!-- ── Lessons ── -->
+    <div id="page-lessons" class="page">
+      <div class="page-title">Lessons</div>
+      <div class="page-sub">
+        The <code>lessons</code> collection — one document per lesson that
+        actually connected, with the pricing snapshot frozen at start.
+      </div>
+      <div class="filter-tabs" id="l-filter-tabs">
+        <div class="filter-tab active" onclick="setLFilter('all',this)">All</div>
+        <div class="filter-tab" onclick="setLFilter('in_progress',this)">In Progress</div>
+        <div class="filter-tab" onclick="setLFilter('completed',this)">Completed</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Lesson ID</th><th>Question</th><th>Student</th><th>Teacher</th><th>Status</th><th>Started</th><th>Ended</th><th>Duration</th><th>Cost</th><th>Teacher Earned</th><th>Ended By</th></tr></thead>
+          <tbody id="lessons-table"><tr class="empty-row"><td colspan="11">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="l-load-more" style="text-align:center;margin-top:14px;display:none">
+        <button class="btn-ghost btn-sm" onclick="loadMoreLessons()">Load more</button>
       </div>
     </div>
 
@@ -322,18 +359,40 @@
     <!-- ── Payments ── -->
     <div id="page-payments" class="page">
       <div class="page-title">Payments</div>
-      <div class="page-sub">PayPal checkout history</div>
+      <div class="page-sub">
+        Checkout history across every provider — PayPal, and Braintree for Apple
+        Pay, Google Pay and cards.
+      </div>
       <div class="filter-tabs">
         <div class="filter-tab active" onclick="setPayFilter('all',this)">All</div>
         <div class="filter-tab" onclick="setPayFilter('completed',this)">Completed</div>
         <div class="filter-tab" onclick="setPayFilter('cancelled',this)">Cancelled</div>
-        <div class="filter-tab" onclick="setPayFilter('paypal_created',this)">Pending</div>
+        <div class="filter-tab" onclick="setPayFilter('created',this)">Started</div>
+        <div class="filter-tab" onclick="setPayFilter('paypal_created',this)">Awaiting PayPal</div>
       </div>
       <div id="payment-stats" class="stat-grid" style="display:none"></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Checkout ID</th><th>User UID</th><th>Package</th><th>Amount</th><th>Minutes</th><th>Status</th><th>Created</th><th>Completed</th></tr></thead>
-          <tbody id="payments-table"><tr class="empty-row"><td colspan="8">Loading…</td></tr></tbody>
+          <thead><tr><th>Checkout ID</th><th>User UID</th><th>Package</th><th>Amount</th><th>Minutes</th><th>Method</th><th>Status</th><th>Created</th><th>Completed</th></tr></thead>
+          <tbody id="payments-table"><tr class="empty-row"><td colspan="9">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Pricing ── -->
+    <div id="page-pricing" class="page">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="page-title">Pricing Packages</div>
+        <button class="refresh-btn" onclick="loadPricing()">↻ Refresh</button>
+      </div>
+      <div class="page-sub">
+        The <code>pricing</code> collection the checkout flows read. Per-minute
+        lesson pricing is not here — it lives in Remote Config.
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Price</th><th>Minutes</th><th>Order</th><th>Flags</th></tr></thead>
+          <tbody id="pricing-table"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -341,7 +400,7 @@
     <!-- ── Support ── -->
     <div id="page-support" class="page">
       <div class="page-title">Support Requests</div>
-      <div class="page-sub">Contact requests submitted by users</div>
+      <div class="page-sub">Contact requests submitted from the app</div>
       <div class="toolbar"><button class="btn-ghost btn-sm" onclick="loadSupport()">↻ Reload</button></div>
       <div class="table-wrap">
         <table>
@@ -446,15 +505,16 @@
 <div class="modal-overlay" id="teacher-msg-modal">
   <div class="modal" style="max-width:460px">
     <div class="modal-head">
-      <h2>Send Message to Teacher</h2>
+      <h2>Send Message</h2>
       <button class="btn-icon" onclick="closeModal('teacher-msg-modal')">✕</button>
     </div>
     <div class="modal-body">
       <p style="font-size:.85rem;color:var(--muted2);margin-bottom:16px">
-        To: <strong id="msg-teacher-label"></strong>
+        To: <strong id="msg-teacher-label"></strong> — lands in their in-app inbox
+        (<code>users/{uid}/incomingMessages</code>).
       </p>
       <div class="form-group"><label>Title</label><input id="msg-title" placeholder="e.g. Document Review Update"></div>
-      <div class="form-group"><label>Message</label><textarea id="msg-text" rows="5" placeholder="Write your message to the teacher…"></textarea></div>
+      <div class="form-group"><label>Message</label><textarea id="msg-text" rows="5" placeholder="Write your message…"></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn-ghost btn-sm" onclick="closeModal('teacher-msg-modal')">Cancel</button>
@@ -528,8 +588,33 @@ function formatRevenue(rev) {
   }
   return money(rev?.totalCents ?? 0, rev?.currency);
 }
+/** Money whose currency is known per-row. Lessons and completed questions are
+ *  priced in their own `currencyCode`, so rendering them in the dashboard's
+ *  default currency would quietly relabel shekels as dollars. */
+function moneyIn(cents, currency) {
+  if (cents == null) return "—";
+  return money(cents, currency || defaultCurrency);
+}
+/** `durationSeconds` on a question, `billedSeconds` on a lesson — both are the
+ *  billed, already-rounded length. */
+function duration(seconds) {
+  if (!seconds) return "—";
+  const m = Math.floor(seconds / 60);
+  const sec = Math.round(seconds % 60);
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}
+function stars(avg, count) {
+  if (avg == null || !(avg > 0)) return "—";
+  return `⭐ ${Number(avg).toFixed(1)}${count ? ` <span style="color:var(--muted)">(${count})</span>` : ""}`;
+}
 function esc(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+/** A UID with the person's name when we have one, so rows are readable. */
+function person(name, uid) {
+  const short = uid ? `${esc(String(uid).slice(0,8))}…` : "—";
+  if (!name) return `<span class="td-mono">${short}</span>`;
+  return `<div style="font-size:.8rem">${esc(name)}</div><div class="td-mono">${short}</div>`;
 }
 function badge(label, type) { return `<span class="badge badge-${type}">${esc(label)}</span>`; }
 function statusBadge(s) {
@@ -608,8 +693,10 @@ function showPage(name) {
   if (name === "overview") loadOverview();
   else if (name === "users") loadUsers();
   else if (name === "questions") loadQuestions();
+  else if (name === "lessons") loadLessons();
   else if (name === "coupons") loadCoupons();
   else if (name === "payments") loadPayments();
+  else if (name === "pricing") loadPricing();
   else if (name === "support") loadSupport();
   else if (name === "verify") loadVerify();
 }
@@ -632,27 +719,29 @@ function renderOverview(d) {
   const q = d.questions;
   const rev = d.revenue;
   const pendingV = d.pendingVerifications || 0;
+  const stale = d.teachers.staleProjections || 0;
+  const platform = d.platform || {};
 
   document.getElementById("overview-stats").innerHTML = `
-    <div class="stat-card stat-green">
+    <div class="stat-card ${stale > 0 ? 'stat-red' : 'stat-green'}">
       <div class="stat-label">Online Teachers</div>
       <div class="stat-value">${d.teachers.online}</div>
-      <div class="stat-sub">${d.teachers.total} total registered</div>
+      <div class="stat-sub">${d.teachers.total} with a teacher role${stale > 0 ? ` · <span style="color:var(--red)">⚠ ${stale} out of sync</span>` : ""}</div>
     </div>
     <div class="stat-card stat-yellow">
       <div class="stat-label">Searching Questions</div>
       <div class="stat-value">${q.searching}</div>
-      <div class="stat-sub">${q.rtdbActive} in RTDB</div>
+      <div class="stat-sub">${q.rtdbActive} live in RTDB · ${q.accepted} accepted</div>
     </div>
     <div class="stat-card stat-blue">
       <div class="stat-label">Active Lessons</div>
       <div class="stat-value">${d.lessons.active.length}</div>
-      <div class="stat-sub">${q.inProgress} in_progress status</div>
+      <div class="stat-sub">${q.inProgress} questions in_progress</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Total Users</div>
       <div class="stat-value">${d.users.total}</div>
-      <div class="stat-sub">Firebase Auth accounts</div>
+      <div class="stat-sub">${platform.registeredTeacherCount ?? "?"} registered teachers</div>
     </div>
     <div class="stat-card ${rev.maxPaymentCents > 500000 ? 'stat-red' : 'stat-green'}">
       <div class="stat-label">Total Revenue</div>
@@ -664,6 +753,11 @@ function renderOverview(d) {
       <div class="stat-value">${q.completed}</div>
       <div class="stat-sub">${q.unanswered} unanswered, ${q.cancelled} cancelled</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Time to Connect</div>
+      <div class="stat-value">${platform.averageConnectSeconds != null ? platform.averageConnectSeconds + "s" : "—"}</div>
+      <div class="stat-sub">${platform.connectedQuestionCount ?? 0} samples · stats/platform</div>
+    </div>
     <div class="stat-card ${pendingV > 0 ? 'stat-red' : ''}">
       <div class="stat-label">Pending Verifications</div>
       <div class="stat-value">${pendingV}</div>
@@ -671,52 +765,95 @@ function renderOverview(d) {
     </div>
   `;
 
-  // Searching queue
+  // Searching queue — the RTDB mirror is what the dispatcher works from.
   const qtb = document.getElementById("searching-table");
-  if (q.searching === 0) {
-    qtb.innerHTML = `<tr class="empty-row"><td colspan="3">No questions searching</td></tr>`;
+  const searchingRows = (q.rtdbList || []).filter(x => !x.status || x.status === "searching");
+  if (searchingRows.length === 0) {
+    qtb.innerHTML = `<tr class="empty-row"><td colspan="3">${q.searching === 0 ? "No questions searching" : "Firestore only — nothing live in RTDB"}</td></tr>`;
   } else {
-    const rows = (q.rtdbList || []).filter(x => !x.status || x.status === "searching" || x.status === undefined)
-      .map(x => `<tr>
-        <td class="td-mono">${esc(x.qid.slice(0,8))}…</td>
-        <td>${esc(x.topic || "—")}</td>
-        <td>${ago(x.createdAt)}</td>
-      </tr>`).join("");
-    qtb.innerHTML = rows || `<tr class="empty-row"><td colspan="3">Data in Firestore only</td></tr>`;
+    qtb.innerHTML = searchingRows.map(x => `<tr>
+      <td class="td-mono">${esc(x.qid.slice(0,8))}…</td>
+      <td>${esc(x.topic || "—")}</td>
+      <td>${ago(x.createdAt)}</td>
+    </tr>`).join("");
   }
 
-  // Online teachers
+  // Online teachers. `published` is the RTDB `onlineTeachers` projection the
+  // students' app actually reads; a teacher present in only one of the two
+  // nodes is invisible (or stuck visible) and needs a republish.
   const otb = document.getElementById("online-teachers-table");
   if (d.teachers.online === 0) {
-    otb.innerHTML = `<tr class="empty-row"><td colspan="3">No teachers online</td></tr>`;
+    otb.innerHTML = `<tr class="empty-row"><td colspan="4">No teachers online</td></tr>`;
   } else {
     otb.innerHTML = d.teachers.list.map(t => `<tr>
       <td>
         <div class="flex-center">
           ${t.photoUrl ? `<img class="avatar" src="${esc(t.photoUrl)}" onerror="this.style.display='none'">` : `<div class="avatar">T</div>`}
           <div>
-            <div style="font-size:.8rem">${esc(t.displayName)}</div>
+            <div style="font-size:.8rem">${esc(t.displayName)}${t.verified ? "" : ` ${badge("unverified","yellow")}`}</div>
             <div class="td-mono">${esc(t.uid.slice(0,8))}…</div>
           </div>
         </div>
       </td>
       <td>${(t.subjects||[]).map(s => `<span class="tag">${esc(s)}</span>`).join("") || "—"}</td>
-      <td>${t.ratingAvg != null ? "⭐ " + Number(t.ratingAvg).toFixed(1) : "—"}</td>
+      <td>${stars(t.averageRate, t.ratingCount)}</td>
+      <td>
+        ${t.stale
+          ? badge(t.published ? "published, not online" : "online, not published", "red")
+          : `<span style="font-size:.75rem">${t.since ? ago(t.since) : "—"}</span>`}
+        <div style="margin-top:4px"><button class="btn-ghost btn-sm" onclick="forceOffline('${esc(t.uid)}','${esc(t.displayName)}')">Go offline</button></div>
+      </td>
     </tr>`).join("");
   }
 
-  // Active lessons
+  // Active lessons, with the pricing snapshot frozen at startLesson.
   const ltb = document.getElementById("active-lessons-table");
   if (d.lessons.active.length === 0) {
-    ltb.innerHTML = `<tr class="empty-row"><td colspan="5">No active lessons</td></tr>`;
+    ltb.innerHTML = `<tr class="empty-row"><td colspan="6">No active lessons</td></tr>`;
   } else {
     ltb.innerHTML = d.lessons.active.map(l => `<tr>
       <td class="td-mono">${esc(l.id.slice(0,8))}…</td>
-      <td class="td-mono">${esc((l.studentUid||"—").slice(0,8))}…</td>
-      <td class="td-mono">${esc((l.teacherUid||"—").slice(0,8))}…</td>
+      <td>${person(l.studentName, l.studentUid)}</td>
+      <td>${person(l.teacherName, l.teacherUid)}</td>
       <td>${fmt(l.startedAt)}</td>
       <td>${fmt(l.hardCapAt)}</td>
+      <td>${l.pricePerMinute != null ? `${moneyIn(Math.round(l.pricePerMinute*100), l.currencyCode)}/min` : "—"}</td>
     </tr>`).join("");
+  }
+}
+
+/** Recounts `stats/platform.registeredTeacherCount`. The `onUserRoleChange`
+ *  trigger keeps it current, so this is for repairing drift. */
+async function recomputeStats() {
+  try {
+    const d = await call("adminRecomputePlatformStats");
+    showToast(`Recounted — ${d.registeredTeacherCount} registered teachers`);
+    loadOverview();
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
+  }
+}
+
+async function republishPresence() {
+  try {
+    const d = await call("adminRepublishOnlineTeachers");
+    showToast(`Republished — ${d.onlineCount} teacher(s) online`);
+    loadOverview();
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
+  }
+}
+
+/** Signing out does not clear presence, so a teacher can keep receiving
+ *  dispatched questions. Clears both the presence node and the projection. */
+async function forceOffline(uid, name) {
+  if (!confirm(`Take "${name}" offline?\n\nClears their RTDB presence and removes them from onlineTeachers, so dispatch stops sending them questions.`)) return;
+  try {
+    await call("adminMutateUser", { action: "goOffline", uid });
+    showToast(`${name} is now offline`);
+    loadOverview();
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
   }
 }
 
@@ -746,33 +883,43 @@ function filterUsers() {
 function renderUsers() {
   const q = document.getElementById("user-search").value.trim().toLowerCase();
   const filtered = q
-    ? allUsers.filter(u => (u.email||"").toLowerCase().includes(q) || (u.displayName||"").toLowerCase().includes(q))
+    ? allUsers.filter(u => (u.email||"").toLowerCase().includes(q)
+        || (u.displayName||"").toLowerCase().includes(q)
+        || u.uid.toLowerCase().includes(q))
     : allUsers;
 
   const tb = document.getElementById("users-table");
   if (filtered.length === 0) {
-    tb.innerHTML = `<tr class="empty-row"><td colspan="9">No users found</td></tr>`;
+    tb.innerHTML = `<tr class="empty-row"><td colspan="10">No users found</td></tr>`;
     return;
   }
-  tb.innerHTML = filtered.map(u => `<tr>
+  // A teacher has no minutes balance and a student no minutes taught, so the
+  // two minute columns mean different things per row — blank the one that does
+  // not apply rather than showing a misleading zero.
+  tb.innerHTML = filtered.map(u => {
+    const isTeacher = u.role === "teacher";
+    return `<tr>
     <td>${u.photoURL ? `<img class="avatar" src="${esc(u.photoURL)}" onerror="this.style.display='none'">` : `<div class="avatar">${esc((u.displayName||u.email||"?")[0].toUpperCase())}</div>`}</td>
     <td>${esc(u.email || "—")}</td>
     <td>${esc(u.displayName || "—")}</td>
-    <td style="font-weight:600;color:${u.remainingMinutes > 0 ? 'var(--green)' : 'var(--muted)'}">${u.remainingMinutes}</td>
-    <td>${u.totalMinutes}</td>
+    <td>${u.role ? badge(u.role, isTeacher ? "purple" : "blue") : badge("no role","gray")}</td>
+    <td style="font-weight:600;color:${u.remainingMinutes > 0 ? 'var(--green)' : 'var(--muted)'}">${isTeacher ? "—" : u.remainingMinutes}</td>
+    <td>${u.totalMinutes}${isTeacher ? " taught" : ""}</td>
     <td>${fmtDate(u.createdAt)}</td>
     <td>${ago(u.lastSignIn)}</td>
-    <td>${u.disabled ? badge("Disabled","red") : badge("Active","green")}</td>
+    <td>${u.disabled ? badge("Disabled","red") : badge("Active","green")}${u.hasProfile ? "" : " " + badge("no profile doc","yellow")}</td>
     <td>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn-ghost btn-sm" onclick="viewUser('${esc(u.uid)}')">View</button>
         <button class="btn-ghost btn-sm" onclick="openAdjust('${esc(u.uid)}','${esc(u.email||u.uid)}')">± Min</button>
+        <button class="btn-ghost btn-sm" onclick="openTeacherMsg('${esc(u.uid)}','${esc(u.displayName||u.email||u.uid)}')">✉</button>
         <button class="btn-ghost btn-sm" onclick="doPasswordReset('${esc(u.uid)}')">Reset PW</button>
-        <button class="btn-${u.disabled ? 'ghost' : 'ghost'} btn-sm" onclick="toggleDisable('${esc(u.uid)}','${u.disabled}')">${u.disabled ? "Enable" : "Disable"}</button>
+        <button class="btn-ghost btn-sm" onclick="toggleDisable('${esc(u.uid)}','${u.disabled}')">${u.disabled ? "Enable" : "Disable"}</button>
         <button class="btn-danger btn-sm" onclick="doDelete('${esc(u.uid)}','${esc(u.email||u.uid)}')">Delete</button>
       </div>
     </td>
-  </tr>`).join("");
+  </tr>`;
+  }).join("");
 }
 
 async function viewUser(uid) {
@@ -788,10 +935,14 @@ async function viewUser(uid) {
 }
 
 function renderUserDetail(d) {
-  const a = d.auth, fs = d.firestore || {}, tr = d.teacherRecord;
+  const a = d.auth, fs = d.firestore || {}, td = d.teacherDoc;
+  const isTeacher = fs.role === "teacher";
+  // Every money field on a user document is in the user's own `currency`
+  // (major units), not in the dashboard's default.
+  const cur = fs.currency || defaultCurrency;
   document.getElementById("user-modal-title").textContent = fs.fullName || a.displayName || a.email || a.uid;
 
-  const photoUrl = fs.profileImageURL || fs.profilePhotoURL || a.photoURL;
+  const photoUrl = fs.profileImageURL || fs.profilePhotoURL || fs.photoURL || a.photoURL;
   const initials = esc((fs.fullName || a.displayName || a.email || "?")[0].toUpperCase());
   const headerHtml = `
     <div class="flex-center section-gap">
@@ -800,7 +951,11 @@ function renderUserDetail(d) {
         : `<div class="avatar" style="width:56px;height:56px;font-size:1.2rem">${initials}</div>`}
       <div>
         <div style="font-weight:700;font-size:1.05rem">${esc(fs.fullName || a.displayName || "—")}</div>
-        <div style="color:var(--muted2);font-size:.82rem">${esc(a.email || "—")} ${fs.role ? badge(fs.role, fs.role === "teacher" ? "purple" : "blue") : ""}</div>
+        <div style="color:var(--muted2);font-size:.82rem">
+          ${esc(a.email || "—")}
+          ${fs.role ? badge(fs.role, isTeacher ? "purple" : "blue") : badge("no role","gray")}
+          ${isTeacher ? (td?.verifiedAt ? badge("verified","green") : badge("unverified","yellow")) : ""}
+        </div>
       </div>
     </div>`;
 
@@ -812,15 +967,34 @@ function renderUserDetail(d) {
         <div class="info-row"><div class="info-key">Phone Number</div><div class="info-val">${esc(fs.phoneNumber || "—")}</div></div>
         <div class="info-row"><div class="info-key">Date of Birth</div><div class="info-val">${fs.dateOfBirth ? fmtDate(Date.parse(fs.dateOfBirth)) : "—"}</div></div>
         <div class="info-row"><div class="info-key">Grade</div><div class="info-val">${esc(fs.grade || "—")}</div></div>
+        <div class="info-row"><div class="info-key">Profile Created</div><div class="info-val">${fs.createdAt ? fmtDate(Date.parse(fs.createdAt)) : "—"}</div></div>
       </div>
       <div>
         <div class="info-row"><div class="info-key">Role</div><div class="info-val">${esc(fs.role || "—")}</div></div>
-        <div class="info-row"><div class="info-key">PayPal Email</div><div class="info-val">${esc(fs.paypalEmail || "—")}</div></div>
-        <div class="info-row"><div class="info-key">Currency</div><div class="info-val">${esc(fs.currency || "—")}</div></div>
+        <div class="info-row"><div class="info-key">Currency</div><div class="info-val">${esc(cur)}</div></div>
+        <div class="info-row"><div class="info-key">Shares Profile Image</div><div class="info-val">${fs.showProfileImage === false ? badge("No","gray") : badge("Yes","green")}</div></div>
+        <div class="info-row"><div class="info-key">Saved PayPal (student)</div><div class="info-val">${esc(fs.savedPayPal?.email || "—")}</div></div>
+        <div class="info-row"><div class="info-key">Payout Email (teacher)</div><div class="info-val">${esc(fs.paypalEmail || "—")}</div></div>
       </div>
     </div>
     <div style="margin-top:10px">${subjectTags(fs.subjectSelections)}</div>
   `;
+
+  // Where a teacher's monthly payout goes — written only by
+  // updateTeacherPayoutMethod, so its shape depends on the chosen type.
+  const pm = fs.payoutMethod;
+  const payoutHtml = pm ? `
+    <hr>
+    <div style="margin-bottom:8px;font-weight:600;font-size:.85rem">Payout Method</div>
+    <div class="info-row"><div class="info-key">Type</div><div class="info-val">${badge(pm.type || "?", "blue")}</div></div>
+    ${pm.type === "bank" ? `
+      <div class="info-row"><div class="info-key">Bank</div><div class="info-val">${esc(pm.bankName || pm.bankCode || "—")}</div></div>
+      <div class="info-row"><div class="info-key">Branch / Account</div><div class="info-val td-mono">${esc(pm.branchNumber || "—")} / ${esc(pm.accountNumber || "—")}</div></div>
+      <div class="info-row"><div class="info-key">Account Holder</div><div class="info-val">${esc(pm.accountHolderName || "—")}</div></div>` : ""}
+    ${pm.type === "bit" ? `<div class="info-row"><div class="info-key">Phone</div><div class="info-val">${esc(pm.phoneNumber || "—")}</div></div>` : ""}
+    ${pm.type === "paypal" ? `<div class="info-row"><div class="info-key">PayPal Email</div><div class="info-val">${esc(pm.email || "—")}</div></div>` : ""}
+    <div class="info-row"><div class="info-key">Updated</div><div class="info-val">${fmt(pm.updatedAt)}</div></div>
+  ` : "";
 
   const documentsHtml = (fs.uploadedDocuments || []).length
     ? `
@@ -836,38 +1010,93 @@ function renderUserDetail(d) {
   const purchasesHtml = d.purchases.length === 0
     ? "<p style='color:var(--muted);font-size:.8rem'>No purchases</p>"
     : `<table style="width:100%;font-size:.78rem;border-collapse:collapse">
-        <thead><tr style="color:var(--muted2)"><th style="text-align:left;padding:6px 0">Package</th><th style="text-align:left">Provider</th><th style="text-align:left">Amount</th><th style="text-align:left">Min</th><th style="text-align:left">Status</th><th style="text-align:left">Date</th></tr></thead>
+        <thead><tr style="color:var(--muted2)"><th style="text-align:left;padding:6px 0">Package</th><th style="text-align:left">Provider</th><th style="text-align:left">Amount</th><th style="text-align:left">Min (left/total)</th><th style="text-align:left">Status</th><th style="text-align:left">Date</th></tr></thead>
         <tbody>${d.purchases.map(p => `<tr style="border-top:1px solid var(--border)">
           <td style="padding:6px 0">${esc(p.pricingOptionId||"—")}</td>
-          <td>${esc(p.provider||"—")}</td>
-          <td>${p.amountCents ? money(p.amountCents) : "—"}</td>
-          <td>${p.minutesPurchased ?? "—"}</td>
+          <td>${badge(p.provider||"?", p.provider==="coupon"?"yellow":p.provider==="braintree"?"purple":"blue")}</td>
+          <td>${moneyIn(p.amountCents, p.currency)}</td>
+          <td>${p.minutesRemaining ?? "—"} / ${p.minutesPurchased ?? "—"}</td>
           <td>${badge(p.status||"?", p.status==="active"?"green":p.status==="expired"?"gray":"red")}</td>
           <td>${fmtDate(p.purchasedAt)}</td>
         </tr>`).join("")}</tbody>
       </table>`;
 
-  const questionsHtml = d.questions.length === 0
-    ? "<p style='color:var(--muted);font-size:.8rem'>No questions</p>"
+  const questionTable = (rows, showTeacher) => rows.length === 0
+    ? "<p style='color:var(--muted);font-size:.8rem'>None</p>"
     : `<table style="width:100%;font-size:.78rem;border-collapse:collapse">
-        <thead><tr style="color:var(--muted2)"><th style="text-align:left;padding:6px 0">Topic</th><th style="text-align:left">Status</th><th style="text-align:left">Created</th><th style="text-align:left">Photos</th></tr></thead>
-        <tbody>${d.questions.map(q => `<tr style="border-top:1px solid var(--border)">
+        <thead><tr style="color:var(--muted2)"><th style="text-align:left;padding:6px 0">Topic</th><th style="text-align:left">Status</th><th style="text-align:left">Created</th><th style="text-align:left">Duration</th><th style="text-align:left">${showTeacher ? "Earned" : "Cost"}</th><th style="text-align:left">Rating</th></tr></thead>
+        <tbody>${rows.map(q => `<tr style="border-top:1px solid var(--border)">
           <td style="padding:6px 0">${esc(q.topic||"—")}</td>
           <td>${statusBadge(q.status)}</td>
           <td>${fmtDate(q.createdAt)}</td>
-          <td>${(q.photoUrls||[]).map(u => `<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" class="photo-thumb" style="width:40px;height:40px"></a>`).join("") || "—"}</td>
+          <td>${duration(q.durationSeconds)}</td>
+          <td>${moneyIn(showTeacher ? q.teacherEarningsCents : q.costCents, q.currency)}</td>
+          <td>${q.studentRating ? "⭐ " + q.studentRating : "—"}</td>
         </tr>`).join("")}</tbody>
       </table>`;
 
-  const teacherSection = tr ? `
+  // Presence is split across two RTDB nodes: `teachers/{uid}` is what the app
+  // writes (status + subjects only) and `onlineTeachers/{uid}` is the backend's
+  // published projection. Showing both makes an out-of-sync teacher obvious.
+  const teacherSection = isTeacher ? `
     <hr>
-    <div style="margin-bottom:8px;font-weight:600;font-size:.85rem">Teacher Profile (RTDB)</div>
-    <div class="info-row"><div class="info-key">Status</div><div class="info-val">${tr.status === "online" ? badge("online","green") : badge("offline","gray")}</div></div>
-    <div class="info-row"><div class="info-key">Subjects</div><div class="info-val">${(tr.subjects||[]).join(", ")||"—"}</div></div>
-    <div class="info-row"><div class="info-key">Rating</div><div class="info-val">${tr.ratingAvg != null ? "⭐ " + Number(tr.ratingAvg).toFixed(2) : "—"}</div></div>
-    <div class="info-row"><div class="info-key">Accept Rate</div><div class="info-val">${tr.acceptRate != null ? (Number(tr.acceptRate)*100).toFixed(0)+"%" : "—"}</div></div>
-    <div class="info-row"><div class="info-key">Last Active</div><div class="info-val">${ago(tr.lastActiveAt)}</div></div>
+    <div style="margin-bottom:8px;font-weight:600;font-size:.85rem">Teacher Record</div>
+    <div class="two-col">
+      <div>
+        <div class="info-row"><div class="info-key">Verified</div><div class="info-val">${td?.verifiedAt ? badge(fmtDate(td.verifiedAt),"green") : badge("Not verified","yellow")}</div></div>
+        <div class="info-row"><div class="info-key">Rating</div><div class="info-val">${stars(td?.averageRate, td?.ratingCount)}</div></div>
+        <div class="info-row"><div class="info-key">Minutes Taught</div><div class="info-val">${fs.totalMinutes ?? 0}</div></div>
+      </div>
+      <div>
+        <div class="info-row"><div class="info-key">Presence (RTDB)</div><div class="info-val">${d.presence?.status === "online" ? badge("online","green") : badge(d.presence?.status || "none","gray")}</div></div>
+        <div class="info-row"><div class="info-key">Published to students</div><div class="info-val">${d.onlineEntry ? badge("yes · " + ago(d.onlineEntry.since),"green") : badge("no","gray")}</div></div>
+        <div class="info-row"><div class="info-key">Push Token</div><div class="info-val">${d.presence?.hasFcmToken ? badge("registered","green") : badge("none","gray")}</div></div>
+      </div>
+    </div>
+    <div style="margin-top:8px">${(d.presence?.subjects || []).map(s => `<span class="tag">${esc(s)}</span>`).join("") || `<span style="color:var(--muted);font-size:.8rem">No subjects in presence</span>`}</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn-ghost btn-sm" onclick="setVerified('${esc(a.uid)}',${td?.verifiedAt ? "false" : "true"})">${td?.verifiedAt ? "Revoke verification" : "✓ Verify teacher"}</button>
+      ${d.presence?.status === "online" || d.onlineEntry
+        ? `<button class="btn-ghost btn-sm" onclick="forceOffline('${esc(a.uid)}','${esc(fs.fullName || a.email || a.uid)}')">Go offline</button>`
+        : ""}
+    </div>
   ` : "";
+
+  const ratingsHtml = (d.ratings || []).length === 0 ? "" : `
+    <hr>
+    <div style="margin-bottom:10px;font-weight:600;font-size:.85rem">Ratings Received (${d.ratings.length})</div>
+    <table style="width:100%;font-size:.78rem;border-collapse:collapse">
+      <thead><tr style="color:var(--muted2)"><th style="text-align:left;padding:6px 0">Stars</th><th style="text-align:left">Comment</th><th style="text-align:left">Ended</th></tr></thead>
+      <tbody>${d.ratings.map(r => `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:6px 0">⭐ ${esc(r.studentRate ?? "—")}</td>
+        <td style="white-space:pre-wrap">${esc(r.studentComment || "—")}</td>
+        <td>${fmtDate(r.endedAt)}</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+
+  const messagesHtml = (d.messages || []).length === 0 ? "" : `
+    <hr>
+    <div style="margin-bottom:10px;font-weight:600;font-size:.85rem">Inbox (${d.messages.length})</div>
+    <table style="width:100%;font-size:.78rem;border-collapse:collapse">
+      <thead><tr style="color:var(--muted2)"><th style="text-align:left;padding:6px 0">Title</th><th style="text-align:left">Sent</th><th style="text-align:left">Read</th></tr></thead>
+      <tbody>${d.messages.map(m => `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:6px 0">${esc(m.title || "—")}</td>
+        <td>${fmt(m.createdAt)}</td>
+        <td>${m.readTimestamp ? badge("read","green") : badge("unread","yellow")}</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+
+  const balanceHtml = isTeacher
+    ? `
+      <div class="info-row"><div class="info-key">Minutes Taught</div><div class="info-val">${fs.totalMinutes ?? 0}</div></div>
+      <div class="info-row"><div class="info-key">Total Earnings</div><div class="info-val" style="color:var(--green);font-weight:700">${moneyIn(fs.totalEarnings != null ? Math.round(fs.totalEarnings*100) : null, cur)}</div></div>
+      <div class="info-row"><div class="info-key">Revenue Generated</div><div class="info-val">${moneyIn(fs.totalRevenueGenerated != null ? Math.round(fs.totalRevenueGenerated*100) : null, cur)}</div></div>
+      <div class="info-row"><div class="info-key">Lessons Taught</div><div class="info-val">${(d.taughtQuestions||[]).length}${(d.taughtQuestions||[]).length === 20 ? "+" : ""}</div></div>`
+    : `
+      <div class="info-row"><div class="info-key">Remaining Minutes</div><div class="info-val" style="color:var(--green);font-weight:700">${fs.remainingMinutes ?? 0}</div></div>
+      <div class="info-row"><div class="info-key">Total Minutes Purchased</div><div class="info-val">${fs.totalMinutes ?? 0}</div></div>
+      <div class="info-row"><div class="info-key">Total Minutes Used</div><div class="info-val">${fs.totalMinutesUsed ?? "—"}</div></div>
+      <div class="info-row"><div class="info-key">Questions Asked</div><div class="info-val">${(fs.questions||[]).length}</div></div>`;
 
   document.getElementById("user-modal-body").innerHTML = `
     ${headerHtml}
@@ -877,36 +1106,65 @@ function renderUserDetail(d) {
         <div class="info-row"><div class="info-key">UID</div><div class="info-val td-mono">${esc(a.uid)}</div></div>
         <div class="info-row"><div class="info-key">Email</div><div class="info-val">${esc(a.email||"—")}</div></div>
         <div class="info-row"><div class="info-key">Email Verified</div><div class="info-val">${a.emailVerified ? badge("Yes","green") : badge("No","red")}</div></div>
+        <div class="info-row"><div class="info-key">Sign-in Providers</div><div class="info-val">${(a.providers||[]).map(p => `<span class="tag">${esc(p)}</span>`).join("") || "—"}</div></div>
         <div class="info-row"><div class="info-key">Account Status</div><div class="info-val">${a.disabled ? badge("Disabled","red") : badge("Active","green")}</div></div>
         <div class="info-row"><div class="info-key">Created</div><div class="info-val">${fmtDate(a.createdAt)}</div></div>
         <div class="info-row"><div class="info-key">Last Sign-In</div><div class="info-val">${ago(a.lastSignIn)}</div></div>
       </div>
       <div>
-        <div style="margin-bottom:8px;font-weight:600;font-size:.85rem">Balance & Stats</div>
-        <div class="info-row"><div class="info-key">Remaining Minutes</div><div class="info-val" style="color:var(--green);font-weight:700">${fs.remainingMinutes ?? 0}</div></div>
-        <div class="info-row"><div class="info-key">Total Minutes Purchased</div><div class="info-val">${fs.totalMinutes ?? 0}</div></div>
-        <div class="info-row"><div class="info-key">Total Minutes Used</div><div class="info-val">${fs.totalMinutesUsed ?? "—"}</div></div>
-        <div class="info-row"><div class="info-key">Total Earnings</div><div class="info-val">${fs.totalEarnings != null ? money(Math.round(fs.totalEarnings*100)) : "—"}</div></div>
-        <div class="info-row"><div class="info-key">Total Revenue Generated</div><div class="info-val">${fs.totalRevenueGenerated != null ? money(Math.round(fs.totalRevenueGenerated*100)) : "—"}</div></div>
+        <div style="margin-bottom:8px;font-weight:600;font-size:.85rem">${isTeacher ? "Earnings & Stats" : "Balance & Stats"}</div>
+        ${balanceHtml}
       </div>
     </div>
     <hr>
     ${profileHtml}
+    ${payoutHtml}
     ${teacherSection}
     ${documentsHtml}
     <hr>
     <div style="margin-bottom:10px;font-weight:600;font-size:.85rem">Purchases (${d.purchases.length})</div>
     ${purchasesHtml}
     <hr>
-    <div style="margin-bottom:10px;font-weight:600;font-size:.85rem">Recent Questions (${d.questions.length})</div>
-    ${questionsHtml}
+    <div style="margin-bottom:10px;font-weight:600;font-size:.85rem">Questions Asked (${d.questions.length})</div>
+    ${questionTable(d.questions, false)}
+    ${isTeacher || (d.taughtQuestions||[]).length ? `
+      <hr>
+      <div style="margin-bottom:10px;font-weight:600;font-size:.85rem">Lessons Taught (${(d.taughtQuestions||[]).length})</div>
+      ${questionTable(d.taughtQuestions || [], true)}` : ""}
+    ${ratingsHtml}
+    ${messagesHtml}
     <hr>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
       <button class="btn-ghost btn-sm" onclick="openAdjust('${esc(a.uid)}','${esc(a.email||a.uid)}')">± Adjust Minutes</button>
+      <button class="btn-ghost btn-sm" onclick="openTeacherMsg('${esc(a.uid)}','${esc(fs.fullName || a.email || a.uid)}')">✉ Send Message</button>
       <button class="btn-ghost btn-sm" onclick="doPasswordReset('${esc(a.uid)}')">Reset Password</button>
+      <button class="btn-ghost btn-sm" onclick="setRole('${esc(a.uid)}','${isTeacher ? "student" : "teacher"}')">Make ${isTeacher ? "student" : "teacher"}</button>
       <button class="btn-danger btn-sm" onclick="doDelete('${esc(a.uid)}','${esc(a.email||a.uid)}')">Delete User</button>
     </div>
   `;
+}
+
+async function setRole(uid, role) {
+  if (!confirm(`Change this user's role to "${role}"?`)) return;
+  try {
+    await call("adminMutateUser", { action: "setRole", uid, role });
+    showToast(`Role set to ${role}`);
+    viewUser(uid);
+    if (allUsers.length) loadUsers();
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
+  }
+}
+
+async function setVerified(uid, verified) {
+  if (!verified && !confirm("Revoke this teacher's verification?")) return;
+  try {
+    await call("adminVerifyTeacher", { uid, verified });
+    showToast(verified ? "Teacher verified ✓" : "Verification revoked");
+    viewUser(uid);
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
+  }
 }
 
 let adjustUid = null;
@@ -986,15 +1244,18 @@ async function loadQuestions(append = false) {
 
     const tb = document.getElementById("questions-table");
     const html = rows.map(q => `<tr>
-      <td class="td-mono">${esc(q.id.slice(0,10))}…</td>
+      <td class="td-mono" title="${esc(q.text||"")}">${esc(q.id.slice(0,10))}…</td>
       <td>${esc(q.topic||"—")}</td>
       <td>${q.conversationType ? badge(q.conversationType, q.conversationType==="video"?"purple":q.conversationType==="audio"?"blue":"gray") : "—"}</td>
-      <td class="td-mono">${esc((q.studentUid||"—").slice(0,8))}…</td>
+      <td>${person(q.studentName, q.studentUid)}</td>
+      <td>${q.teacherUid ? person(q.teacherName, q.teacherUid) : "—"}</td>
       <td>${statusBadge(q.status)}</td>
       <td>${q.dispatchWave ?? "—"}</td>
       <td>${fmt(q.createdAt)}</td>
-      <td>${q.billedSeconds ? Math.round(q.billedSeconds/60)+"m" : "—"}</td>
-      <td>${q.totalCents ? money(q.totalCents) : q.cost ? money(Math.round(q.cost*100)) : "—"}</td>
+      <td>${duration(q.durationSeconds)}</td>
+      <td>${moneyIn(q.costCents, q.currency)}</td>
+      <td>${moneyIn(q.teacherEarningsCents, q.currency)}</td>
+      <td>${q.studentRating ? "⭐ " + q.studentRating : "—"}</td>
       <td>${(q.photoUrls||[]).length > 0
         ? (q.photoUrls||[]).slice(0,3).map(u => `<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" class="photo-thumb"></a>`).join("")
         : "—"}
@@ -1003,7 +1264,7 @@ async function loadQuestions(append = false) {
     if (append) {
       tb.innerHTML += html;
     } else {
-      tb.innerHTML = html || `<tr class="empty-row"><td colspan="10">No questions</td></tr>`;
+      tb.innerHTML = html || `<tr class="empty-row"><td colspan="13">No questions</td></tr>`;
     }
   } catch (e) {
     showToast("Failed to load questions: " + e.message, "error");
@@ -1017,6 +1278,76 @@ function setQFilter(f, el) {
   document.querySelectorAll("#q-filter-tabs .filter-tab").forEach(t => t.classList.remove("active"));
   el.classList.add("active");
   loadQuestions();
+}
+
+// ── Lessons ───────────────────────────────────────────────────────────────────
+let lFilter = "all", lLastStartedAt = null;
+
+async function loadLessons(append = false) {
+  if (!append) { lLastStartedAt = null; }
+  try {
+    const d = await call("adminListLessons", { status: lFilter, limit: 50, startAfter: lLastStartedAt });
+    const rows = d.lessons;
+    if (rows.length) lLastStartedAt = rows[rows.length - 1].startedAt;
+    document.getElementById("l-load-more").style.display = d.hasMore ? "block" : "none";
+
+    const tb = document.getElementById("lessons-table");
+    const html = rows.map(l => `<tr>
+      <td class="td-mono">${esc(l.id.slice(0,8))}…</td>
+      <td class="td-mono">${esc((l.questionId||"—").slice(0,8))}…</td>
+      <td>${person(l.studentName, l.studentUid)}</td>
+      <td>${person(l.teacherName, l.teacherUid)}</td>
+      <td>${badge(l.status||"?", l.status==="completed"?"green":"blue")}</td>
+      <td>${fmt(l.startedAt)}</td>
+      <td>${l.endedAt ? fmt(l.endedAt) : "—"}</td>
+      <td>${duration(l.durationSeconds)}</td>
+      <td>${moneyIn(l.costCents, l.currency)}</td>
+      <td>${moneyIn(l.teacherEarningsCents, l.currency)}</td>
+      <td>${l.endedBy ? badge(l.endedBy, l.endedBy==="system"?"orange":"gray") : "—"}</td>
+    </tr>`).join("");
+    if (append) {
+      tb.innerHTML += html;
+    } else {
+      tb.innerHTML = html || `<tr class="empty-row"><td colspan="11">No lessons</td></tr>`;
+    }
+  } catch (e) {
+    showToast("Failed to load lessons: " + e.message, "error");
+  }
+}
+
+function loadMoreLessons() { loadLessons(true); }
+
+function setLFilter(f, el) {
+  lFilter = f;
+  document.querySelectorAll("#l-filter-tabs .filter-tab").forEach(t => t.classList.remove("active"));
+  el.classList.add("active");
+  loadLessons();
+}
+
+// ── Pricing ───────────────────────────────────────────────────────────────────
+async function loadPricing() {
+  try {
+    const d = await call("adminListPricing");
+    const tb = document.getElementById("pricing-table");
+    if (d.packages.length === 0) {
+      tb.innerHTML = `<tr class="empty-row"><td colspan="7">No pricing packages</td></tr>`;
+      return;
+    }
+    tb.innerHTML = d.packages.map(p => `<tr>
+      <td class="td-mono">${esc(p.id)}</td>
+      <td>${esc(p.name || "—")}</td>
+      <td>${badge(p.type || "?", p.type === "pay_as_you_go" ? "blue" : "purple")}</td>
+      <td style="font-weight:600">${moneyIn(p.priceCents, p.currency)}</td>
+      <td>${p.minutes ?? p.minutesGranted ?? "—"}</td>
+      <td>${p.sortOrder ?? "—"}</td>
+      <td>
+        ${p.active === false ? badge("inactive","red") : badge("active","green")}
+        ${p.isHighlighted ? badge("highlighted","yellow") : ""}
+      </td>
+    </tr>`).join("");
+  } catch (e) {
+    showToast("Failed to load pricing: " + e.message, "error");
+  }
 }
 
 // ── Coupons ───────────────────────────────────────────────────────────────────
@@ -1111,15 +1442,16 @@ async function loadPayments() {
 
     const tb = document.getElementById("payments-table");
     if (payments.length === 0) {
-      tb.innerHTML = `<tr class="empty-row"><td colspan="8">No payments</td></tr>`;
+      tb.innerHTML = `<tr class="empty-row"><td colspan="9">No payments</td></tr>`;
       return;
     }
     tb.innerHTML = payments.map(p => `<tr>
-      <td class="td-mono">${esc(p.id.slice(0,10))}…</td>
+      <td class="td-mono" title="${esc(p.transactionId||"")}">${esc(p.id.slice(0,10))}…</td>
       <td class="td-mono">${esc((p.uid||"—").slice(0,10))}…</td>
-      <td>${esc(p.packageId||"—")}</td>
-      <td style="font-weight:600">${p.priceCents ? money(p.priceCents, p.currency) : "—"}</td>
+      <td>${esc(p.packageId||"—")}${p.packageType ? ` <span class="tag">${esc(p.packageType)}</span>` : ""}</td>
+      <td style="font-weight:600">${moneyIn(p.priceCents, p.currency)}</td>
       <td>${p.minutes ?? "—"} min</td>
+      <td>${p.paymentMethod ? badge(p.paymentMethod, p.provider === "braintree" ? "purple" : "blue") : "—"}</td>
       <td>${payBadge(p.status)}</td>
       <td>${fmt(p.createdAt)}</td>
       <td>${p.completedAt ? fmt(p.completedAt) : "—"}</td>
@@ -1153,7 +1485,7 @@ async function loadSupport() {
       <td>${esc(r.deviceType||"—")}</td>
       <td>${esc(r.osVersion||"—")}</td>
       <td>${esc(r.locale||"—")}</td>
-      <td style="white-space:nowrap">${esc(r.sentAt||"—")}</td>
+      <td style="white-space:nowrap">${r.sentAtMs ? fmt(r.sentAtMs) : esc(r.sentAt||"—")}</td>
       <td style="max-width:280px;white-space:pre-wrap;font-size:.75rem">${esc((r.description||"").slice(0,200))}</td>
     </tr>`).join("");
   } catch (e) {
@@ -1230,7 +1562,9 @@ function renderVerify() {
           <div style="text-align:right;flex-shrink:0">
             <div style="font-size:.75rem;color:var(--muted2)">Joined</div>
             <div style="font-size:.8rem">${fmtDate(t.createdAt)}</div>
+            <div style="font-size:.75rem;color:var(--muted2);margin-top:6px">${esc(t.phoneNumber || "—")}</div>
             <div style="margin-top:6px">${badge(t.uploadedDocuments.length + " docs", "yellow")}</div>
+            <div style="margin-top:4px;font-size:.78rem">${stars(t.averageRate, t.ratingCount)}</div>
           </div>
         </div>
         <div class="teacher-card-body">
@@ -1282,7 +1616,7 @@ async function loadDocPreviews(uid) {
 async function verifyTeacher(uid, name) {
   if (!confirm(`Verify teacher "${name}"?\n\nThis will mark them as verified and allow them to appear in the app as available.`)) return;
   try {
-    await call("adminVerifyTeacher", { uid });
+    await call("adminVerifyTeacher", { uid, verified: true });
     showToast(`Teacher "${name}" verified ✓`);
     pendingTeachers = pendingTeachers.filter(t => t.uid !== uid);
     updateVerifyBadge(pendingTeachers.length);

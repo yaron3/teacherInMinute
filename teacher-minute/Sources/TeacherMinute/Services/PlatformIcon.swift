@@ -114,6 +114,15 @@ struct PlatformIcon: View {
 	  case "clock":								return "⏰"
 	  case "dollarsign.circle.fill":            return "$"
 	  case "dollarsign.circle":            return "$"
+	  // Currency-sign tab icons. Android has no SF Symbols, so each currency
+	  // the Earnings tab can wear (see LessonFormatting.currencySignSymbolName)
+	  // needs its sign here — an unmapped name falls through to a black dot.
+	  case "shekelsign.circle.fill":            return "₪"
+	  case "shekelsign.circle":                 return "₪"
+	  case "eurosign.circle.fill":              return "€"
+	  case "eurosign.circle":                   return "€"
+	  case "sterlingsign.circle.fill":          return "£"
+	  case "sterlingsign.circle":               return "£"
 	  case "person.fill.checkmark":             return "✓"
 	  case "bubble.left.and.bubble.right.fill": return "💬"
 	  case "house":                             return "⌂"

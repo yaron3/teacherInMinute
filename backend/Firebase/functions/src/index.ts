@@ -45,6 +45,8 @@ export {
   adminGetUserDetail,
   adminMutateUser,
   adminListQuestions,
+  adminListLessons,
+  adminListPricing,
   adminListCoupons,
   adminCreateCoupon,
   adminDeleteCoupon,

@@ -225,25 +225,24 @@ struct StudentHomeView: View {
 		Spacer()
         }
       .padding(.horizontal, 18)
-      .padding(.top, 18)
-      .padding(.bottom, 18)
+      .padding(.vertical, 8)
 
-      VStack(alignment: .leading, spacing: 22) {
-        HStack(alignment: .center, spacing: 18) {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack(alignment: .top, spacing: 4) {
           
-
-          VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: 4) {
 			
             Text(viewModel.greetingText)
               .font(.system(size: 18, weight: .bold))
               .foregroundStyle(theme.info)
-			HStack{
+			HStack(alignment: .top, spacing: 12) {
 			  Text(viewModel.appMainIssueText)
 				.font(.system(size: 25, weight: .bold))
 				.foregroundStyle(theme.primaryText)
 				.lineLimit(2)
-				.minimumScaleFactor(0.75)
-			  Spacer()
+				.minimumScaleFactor(0.6)
+				.frame(maxWidth: .infinity, alignment: .center)
+				.padding(.top, 10)
 			  balancePill
 			}
             Text(viewModel.connectPromiseText)
@@ -267,15 +266,16 @@ struct StudentHomeView: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
       }
-      .padding(22)
-      .padding(.top, 20)
+	  .padding(.horizontal, 18)
+	  .padding(.vertical, 4)
+	  .padding(.bottom, 8)
     }
     .background(theme.accentBackground)
     .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
   }
 
   var balancePill: some View {
-    VStack(spacing: 8) {
+    VStack(spacing: 4) {
       Circle()
         .stroke(theme.warning, lineWidth: 2.5)
         .frame(width: 54, height: 54)
@@ -283,18 +283,22 @@ struct StudentHomeView: View {
           Text("\(viewModel.remainingMinutes)")
             .font(.system(size: 22, weight: .bold))
             .foregroundStyle(theme.warning)
+			.lineLimit(2)
+			.minimumScaleFactor(0.8)
+			.frame(maxWidth: .infinity, alignment: .center)
         }
       Text(viewModel.minutesLabel)
         .font(.system(size: 13, weight: .bold))
         .foregroundStyle(theme.primaryText.opacity(0.65))
     }
-    .frame(width: 92, height: 96)
+    .frame(width: 80, height: 80)
     .background(theme.cardBackground.opacity(0.2))
     .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
         .stroke(theme.cardBackground.opacity(0.2), lineWidth: 2)
     }
+	.padding(.top, 10)
   }
 
   @ViewBuilder
@@ -441,11 +445,21 @@ struct StudentHomeView: View {
   }
 
   var popularSubjectsGrid: some View {
-    LazyVGrid(columns: twoColumnGrid, spacing: 14) {
+    VStack(spacing: 14) {
       // Titles, subtopics and teacher counts all come from the view model,
       // which builds them from the published catalog and live presence.
-      ForEach(viewModel.subjects) { subject in
-        subjectCard(subject, tint: subjectCatalogTints[subject.key] ?? theme.accent)
+      ForEach(twoColumnRowStarts(viewModel.subjects.count), id: \.self) { start in
+        HStack(alignment: .top, spacing: 14) {
+          let subject = viewModel.subjects[start]
+          subjectCard(subject, tint: subjectCatalogTints[subject.key] ?? theme.accent)
+
+          if start + 1 < viewModel.subjects.count {
+            let next = viewModel.subjects[start + 1]
+            subjectCard(next, tint: subjectCatalogTints[next.key] ?? theme.accent)
+          } else {
+            twoColumnFiller
+          }
+        }
       }
     }
   }
@@ -502,9 +516,17 @@ struct StudentHomeView: View {
   }
 
   var pricingGrid: some View {
-    LazyVGrid(columns: twoColumnGrid, spacing: 14) {
-      ForEach(viewModel.pricingOptions) { option in
-        creditOptionCard(option)
+    VStack(spacing: 14) {
+      ForEach(twoColumnRowStarts(viewModel.pricingOptions.count), id: \.self) { start in
+        HStack(alignment: .top, spacing: 14) {
+          creditOptionCard(viewModel.pricingOptions[start])
+
+          if start + 1 < viewModel.pricingOptions.count {
+            creditOptionCard(viewModel.pricingOptions[start + 1])
+          } else {
+            twoColumnFiller
+          }
+        }
       }
     }
   }
@@ -536,8 +558,27 @@ struct StudentHomeView: View {
 //  }
 
 
-  var twoColumnGrid: [GridItem] {
-    [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
+  /// Two-column rows are laid out by hand rather than with `LazyVGrid`.
+  /// SkipUI's `LazyVGrid` announces its own vertical scrolling to the enclosing
+  /// `ScrollView`, which then drops its `verticalScroll` modifier entirely — so
+  /// on Android the whole page froze and only the grid scrolled. Both
+  /// collections are small and fully materialised anyway, so laziness bought
+  /// nothing here.
+  func twoColumnRowStarts(_ count: Int) -> [Int] {
+    var starts: [Int] = []
+    var index = 0
+    while index < count {
+      starts.append(index)
+      index += 2
+    }
+    return starts
+  }
+
+  /// Holds the empty half of an odd final row so its card keeps column width
+  /// instead of stretching across.
+  var twoColumnFiller: some View {
+    Color.clear
+      .frame(maxWidth: .infinity)
   }
 
   func selectFirstPricingOption() {
@@ -734,6 +775,10 @@ struct StudentHomeView: View {
 			  ForEach(viewModel.pricingOptions) { option in
 				PricingCard(
 				  option: option,
+				  localizedDescription: viewModel.localizedDescription(for: option),
+				  checkoutLabel: viewModel.checkoutLabel,
+				  checkoutConnectingLabel: viewModel.checkoutConnectingLabel,
+				  perMinuteSuffix: viewModel.perMinuteSuffix,
 				  isLoading: viewModel.isStartingCheckout && viewModel.checkoutPricingOptionID == option.id
 				) {
 				  beginCheckout(option)
@@ -962,13 +1007,19 @@ struct StudentHomeView: View {
     case .idle:
       EmptyView()
     case .error(let message):
-      ErrorOverlay(message: message) {
-        viewModel.resetSearch()
-      }
+      ErrorOverlay(
+        title: viewModel.couldNotSendQuestionTitle,
+        message: message,
+        okLabel: viewModel.okLabel,
+        onDismiss: { viewModel.resetSearch() }
+      )
     case .searching:
-      SearchingOverlay {
-        Task { await viewModel.cancelSearch() }
-      }
+      SearchingOverlay(
+        searchingTitle: viewModel.searchingTitle,
+        searchingSubtitle: viewModel.searchingSubtitle,
+        cancelLabel: viewModel.cancelLabel,
+        onCancel: { Task { await viewModel.cancelSearch() } }
+      )
     case .matched(let questionId, let liveKitRoom, let liveKitToken):
       ChatSessionView(
         questionId: questionId,
@@ -992,9 +1043,12 @@ struct StudentHomeView: View {
       .onAppear { hidesTabBar = true }
       .onDisappear { hidesTabBar = false }
     case .noMatch:
-      NoMatchOverlay {
-        viewModel.resetSearch()
-      }
+      NoMatchOverlay(
+        title: viewModel.noTeachersAvailableTitle,
+        message: viewModel.noTeachersAvailableMessage,
+        okLabel: viewModel.okLabel,
+        onDismiss: { viewModel.resetSearch() }
+      )
     }
   }
   
@@ -1173,7 +1227,7 @@ struct ConversationTypeChip: View {
 			color: isSelected ? accentForeground : theme.primaryText
 		  )
 		}
-		Text(LocalizationSupport.localized(title))
+		Text(title)
 		  .font(.system(size: 12, weight: .semibold))
 		  .foregroundStyle(isSelected ? accentForeground : theme.primaryText)
 		  .lineLimit(1)
@@ -1196,9 +1250,12 @@ enum ConversationTypeChipAccent {
 // MARK: - State Overlays
 
 struct SearchingOverlay: View {
+  let searchingTitle: String
+  let searchingSubtitle: String
+  let cancelLabel: String
   let avatarURLs: [URL?]
   let onCancel: @MainActor @Sendable () -> Void
-  
+
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -1211,7 +1268,10 @@ struct SearchingOverlay: View {
   private let ringDiameter: CGFloat = 240
   private let avatarSize: CGFloat = 60
   
-  init(avatarURLs: [URL?] = [], onCancel: @escaping @MainActor @Sendable () -> Void) {
+  init(searchingTitle: String, searchingSubtitle: String, cancelLabel: String, avatarURLs: [URL?] = [], onCancel: @escaping @MainActor @Sendable () -> Void) {
+	self.searchingTitle = searchingTitle
+	self.searchingSubtitle = searchingSubtitle
+	self.cancelLabel = cancelLabel
 	self.avatarURLs = avatarURLs
 	self.onCancel = onCancel
   }
@@ -1224,17 +1284,17 @@ struct SearchingOverlay: View {
 		avatarRing
 		
 		VStack(spacing: 8) {
-		  Text(LocalizationSupport.localized("Searching for a teacher\u{2026}"))
+		  Text(searchingTitle)
 			.font(.system(size: 17, weight: .semibold))
 			.foregroundStyle(theme.primaryText)
-		  Text(LocalizationSupport.localized("This usually takes under 30 seconds."))
+		  Text(searchingSubtitle)
 			.font(.system(size: 13))
 			.foregroundStyle(theme.secondaryText)
 			.multilineTextAlignment(.center)
 		}
 		
 		Button(action: onCancel) {
-		  Text(LocalizationSupport.localized("Cancel"))
+		  Text(cancelLabel)
 			.font(.system(size: 14, weight: .semibold))
 			.foregroundStyle(theme.primaryText)
 			.padding(.horizontal, 32)
@@ -1331,6 +1391,9 @@ struct SearchingOverlay: View {
 }
 
 struct MatchedOverlay: View {
+  let teacherFoundTitle: String
+  let sessionReadyText: String
+  let doneLabel: String
   let liveKitRoom: String
   let liveKitToken: String
   let onDismiss: @MainActor @Sendable () -> Void
@@ -1354,17 +1417,17 @@ struct MatchedOverlay: View {
 			)
 		  }
 		
-		Text(LocalizationSupport.localized("Teacher Found!"))
+		Text(teacherFoundTitle)
 		  .font(.system(size: 22, weight: .bold))
 		  .foregroundStyle(theme.primaryText)
-		
-		Text(String(format: LocalizationSupport.localized("Your session is ready.\nRoom: %@"), liveKitRoom))
+
+		Text(sessionReadyText)
 		  .font(.system(size: 13))
 		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
-		
+
 		Button(action: onDismiss) {
-		  Text(LocalizationSupport.localized("Done"))
+		  Text(doneLabel)
 			.font(.system(size: 15, weight: .semibold))
 			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
@@ -1381,6 +1444,9 @@ struct MatchedOverlay: View {
 }
 
 struct NoMatchOverlay: View {
+  let title: String
+  let message: String
+  let okLabel: String
   let onDismiss: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -1402,17 +1468,17 @@ struct NoMatchOverlay: View {
 			)
 		  }
 		
-		Text(LocalizationSupport.localized("No Teachers Available"))
+		Text(title)
 		  .font(.system(size: 20, weight: .bold))
 		  .foregroundStyle(theme.primaryText)
-		
-		Text(LocalizationSupport.localized("All teachers are busy right now.\nTry again in a few minutes."))
+
+		Text(message)
 		  .font(.system(size: 13))
 		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
-		
+
 		Button(action: onDismiss) {
-		  Text(LocalizationSupport.localized("OK"))
+		  Text(okLabel)
 			.font(.system(size: 15, weight: .semibold))
 			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
@@ -1429,7 +1495,9 @@ struct NoMatchOverlay: View {
 }
 
 struct ErrorOverlay: View {
+  let title: String
   let message: String
+  let okLabel: String
   let onDismiss: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -1451,17 +1519,17 @@ struct ErrorOverlay: View {
 			)
 		  }
 		
-		Text(LocalizationSupport.localized("Could Not Send Question"))
+		Text(title)
 		  .font(.system(size: 20, weight: .bold))
 		  .foregroundStyle(theme.primaryText)
-		
-		Text(LocalizationSupport.localized(message))
+
+		Text(message)
 		  .font(.system(size: 13))
 		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
-		
+
 		Button(action: onDismiss) {
-		  Text(LocalizationSupport.localized("OK"))
+		  Text(okLabel)
 			.font(.system(size: 15, weight: .semibold))
 			.foregroundStyle(theme.onAccentText)
 			.frame(maxWidth: .infinity)
@@ -1481,6 +1549,10 @@ struct ErrorOverlay: View {
 
 struct PricingCard: View {
   let option: PricingOption
+  let localizedDescription: String
+  let checkoutLabel: String
+  let checkoutConnectingLabel: String
+  let perMinuteSuffix: String
   let isLoading: Bool
   let action: @MainActor @Sendable () -> Void
   @Environment(\.colorScheme) var colorScheme
@@ -1515,7 +1587,7 @@ struct PricingCard: View {
         }
         .padding(.top, 12)
 
-        Text(LocalizationSupport.localized(option.description))
+        Text(localizedDescription)
           .font(.system(size: 13))
           .foregroundStyle(theme.secondaryText)
           .lineSpacing(4)
@@ -1530,7 +1602,7 @@ struct PricingCard: View {
                 .tint(theme.onAccentText)
             }
 
-            Text(isLoading ? LocalizationSupport.localized("checkout_connecting") : LocalizationSupport.localized("Checkout"))
+            Text(isLoading ? checkoutConnectingLabel : checkoutLabel)
               .font(.system(size: 15, weight: .bold))
               .foregroundStyle(theme.onAccentText)
           }
@@ -1555,12 +1627,14 @@ struct PricingCard: View {
 	if let period = option.type.billingPeriodText {
 	  return period
 	}
-	return LocalizationSupport.localized("/min")
+	return perMinuteSuffix
   }
 }
 
 struct RecentLessonRow: View {
   let lesson: RecentLesson
+  let teacherTimeText: String
+  let solvedLabel: String
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -1581,7 +1655,7 @@ struct RecentLessonRow: View {
           .font(.system(size: 16, weight: .bold))
           .foregroundStyle(theme.primaryText)
 
-        Text(String(format: LocalizationSupport.localized("%@ • %@"), lesson.teacher, lesson.time))
+        Text(teacherTimeText)
           .font(.system(size: 13))
           .foregroundStyle(theme.secondaryText)
       }
@@ -1589,7 +1663,7 @@ struct RecentLessonRow: View {
       Spacer()
 
       VStack(alignment: .trailing, spacing: 3) {
-        Text(LocalizationSupport.localized("Solved"))
+        Text(solvedLabel)
           .font(.system(size: 13, weight: .bold))
           .foregroundStyle(theme.positive)
 
@@ -1685,6 +1759,13 @@ struct PricingCard_Previews: PreviewProvider {
 // and add success alert + auto-dismiss on success
 
 struct RedeemCouponSheet: View {
+  let placeholder: String
+  let redeemLabel: String
+  let navigationTitle: String
+  let cancelLabel: String
+  let successLabel: String
+  let okLabel: String
+  let codeAppliedText: (Int) -> String
   @State  var couponCode: String = ""
   @State  var state: RedeemCouponState = .idle
   let onRedeem: (String) async -> RedeemCouponState
@@ -1701,7 +1782,7 @@ struct RedeemCouponSheet: View {
   var body: some View {
 	NavigationStack {
 	  VStack(spacing: 20) {
-		TextField(LocalizationSupport.localized("Have a code?"), text: $couponCode)
+		TextField(placeholder, text: $couponCode)
 		  .textFieldStyle(.roundedBorder)
 		  .textInputAutocapitalization(.never)
 		  .autocorrectionDisabled(true)
@@ -1718,7 +1799,7 @@ struct RedeemCouponSheet: View {
 			  .tint(theme.accent)
 			  .frame(maxWidth: .infinity)
 		  } else {
-			Text(LocalizationSupport.localized("Redeem"))
+			Text(redeemLabel)
 			  .frame(maxWidth: .infinity)
 		  }
 		}
@@ -1728,7 +1809,7 @@ struct RedeemCouponSheet: View {
 		
 		switch state {
 		  case .error(let message):
-			Text(LocalizationSupport.localized(message))
+			Text(message)
 			  .foregroundColor(theme.accent)
 			  .multilineTextAlignment(.center)
 			  .padding(.horizontal)
@@ -1738,10 +1819,10 @@ struct RedeemCouponSheet: View {
 		
 		Spacer()
 	  }
-	  .navigationTitle(LocalizationSupport.localized("Redeem Code"))
+	  .navigationTitle(navigationTitle)
 	  .toolbar {
 		ToolbarItem(placement: .cancellationAction) {
-		  Button(LocalizationSupport.localized("Cancel")) {
+		  Button(cancelLabel) {
 			onDismiss()
 		  }
 		}
@@ -1754,10 +1835,10 @@ struct RedeemCouponSheet: View {
 	  }
 	}
 	.appDialog(
-	  LocalizationSupport.localized("Success"),
+	  successLabel,
 	  isPresented: $showSuccessAlert,
-	  message: String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), successMinutes),
-	  actions: [AppDialogAction(LocalizationSupport.localized("OK")) { onDismiss() }]
+	  message: codeAppliedText(successMinutes),
+	  actions: [AppDialogAction(okLabel) { onDismiss() }]
 	)
   }
 }

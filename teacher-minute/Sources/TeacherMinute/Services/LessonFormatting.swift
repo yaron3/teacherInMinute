@@ -72,6 +72,32 @@ enum LessonFormatting {
 	currencyCode.uppercased() == "ILS" || LocalizationSupport.layoutDirection == .rightToLeft
   }
   
+  /// The SF Symbol *stem* for a currency's sign — "shekelsign", "dollarsign".
+  /// Unknown codes keep the dollar sign, which is what every currency-marked
+  /// icon in the app used before this existed.
+  static func currencySignSymbolName(for currencyCode: String) -> String {
+	switch currencyCode.uppercased() {
+	  case "ILS": return "shekelsign"
+	  case "USD": return "dollarsign"
+	  case "EUR": return "eurosign"
+	  case "GBP": return "sterlingsign"
+	  default: return "dollarsign"
+	}
+  }
+
+  /// The app currency's sign, circled — for anywhere the UI marks a figure as
+  /// money. Every such icon should come from here rather than naming a
+  /// currency directly, so none of them can go on claiming dollars.
+  /// `defaultCurrencyCode` is the app's currency (Settings fixes it to ILS);
+  /// when that becomes a per-user choice, this is the single place to change.
+  static var currencySignIcon: String {
+	currencySignSymbolName(for: defaultCurrencyCode) + ".circle"
+  }
+
+  static var currencySignIconFilled: String {
+	currencySignIcon + ".fill"
+  }
+
   private static func currencySymbol(for currencyCode: String) -> String {
 	if currencyCode.uppercased() == "ILS" {
 	  return "₪"

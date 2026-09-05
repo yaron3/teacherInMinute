@@ -115,7 +115,7 @@ struct TeacherLessonHistoryView: View {
             HistoryMetricCard(
                 title: LocalizationSupport.localized("Earnings"),
                 value: viewModel.totalEarningsText,
-                systemImage: "dollarsign.circle.fill",
+                systemImage: LessonFormatting.currencySignIconFilled,
                 tint: theme.primaryText
             )
         }

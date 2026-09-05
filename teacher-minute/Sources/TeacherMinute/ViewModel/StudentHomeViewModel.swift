@@ -211,7 +211,7 @@ extension StudentHomeViewModeling {
 
   // MARK: Hero section
   var appDisplayName: String { LocalizationSupport.localized("Teacher in a Moment") }
-  var minutesLabel: String { LocalizationSupport.localized("minutes") }
+  var minutesLabel: String { LocalizationSupport.localized(" total minutes") }
   var askQuestionNowLabel: String { LocalizationSupport.localized("Ask a question now") }
 
   // MARK: Overview cards
@@ -330,6 +330,34 @@ extension StudentHomeViewModeling {
   func localizedDescription(for option: PricingOption) -> String {
     LocalizationSupport.localized(option.description)
   }
+
+  // MARK: Overlay & card labels
+
+  var searchingTitle: String { LocalizationSupport.localized("Searching for a teacher\u{2026}") }
+  var searchingSubtitle: String { LocalizationSupport.localized("This usually takes under 30 seconds.") }
+  var cancelLabel: String { LocalizationSupport.localized("Cancel") }
+  var teacherFoundTitle: String { LocalizationSupport.localized("Teacher Found!") }
+  var doneLabel: String { LocalizationSupport.localized("Done") }
+  var noTeachersAvailableTitle: String { LocalizationSupport.localized("No Teachers Available") }
+  var noTeachersAvailableMessage: String { LocalizationSupport.localized("All teachers are busy right now.\nTry again in a few minutes.") }
+  var couldNotSendQuestionTitle: String { LocalizationSupport.localized("Could Not Send Question") }
+  var checkoutLabel: String { LocalizationSupport.localized("Checkout") }
+  var checkoutConnectingLabel: String { LocalizationSupport.localized("checkout_connecting") }
+  var solvedLabel: String { LocalizationSupport.localized("Solved") }
+  var redeemCodeNavigationTitle: String { LocalizationSupport.localized("Redeem Code") }
+  var successLabel: String { LocalizationSupport.localized("Success") }
+
+  func sessionReadyText(room: String) -> String {
+    String(format: LocalizationSupport.localized("Your session is ready.\nRoom: %@"), room)
+  }
+
+  func lessonTeacherTimeText(teacher: String, time: String) -> String {
+    String(format: LocalizationSupport.localized("%@ \u{2022} %@"), teacher, time)
+  }
+
+  func codeAppliedText(minutes: Int) -> String {
+    String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), minutes)
+  }
 }
 
 // MARK: - ViewModel
@@ -356,7 +384,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var subjects: [StudentSubject] = []
   /// "2₪ per minute • pay only for time used" — the rate comes from Remote
   /// Config, not a number written into the copy.
-  var pricePerMinuteText = ""
+  var pricePerMinuteText = LocalizationSupport.localized("2₪ per minute • pay only for time used")
   /// "90 sec avg to connect", measured by the backend. Empty until there is a
   /// measurement, so the view can leave the claim out entirely.
   var averageConnectText = ""
@@ -377,7 +405,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var totalPurchasedText = LessonFormatting.minutesText(0)
   var lessonCount = 0
   var hasUnreadMessages = false
-  var profileImageURL = ""
+  var profileImageURL: String {
+    get { UserPhotoStore.shared.profileImageURL }
+    set { UserPhotoStore.shared.profileImageURL = newValue }
+  }
   var remainingMinutes = 0
   var checkoutURL: URL?
   var isStartingCheckout = false

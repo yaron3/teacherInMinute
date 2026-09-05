@@ -12,7 +12,6 @@ struct SettingsView: View {
     @Environment(\.appRouter) var router
     @Environment(\.openURL) var openURL
     @Environment(\.colorScheme) var colorScheme
-    var role: AppUserMode
     var theme: AppTheme {
         AppTheme(colorScheme: colorScheme)
     }
@@ -22,7 +21,6 @@ struct SettingsView: View {
         } else {
             self._viewModel = State(wrappedValue: SettingsViewModel(role: role))
         }
-        self.role = role
     }
 
     var body: some View {
@@ -831,7 +829,7 @@ struct AppPreferencesSettingsView: View {
                 }
                 .buttonStyle(.plain)
                // .accessibilityLabel(type.displayName)
-                .accessibilityAddTraits(isSelected(type) ? .isSelected : [])
+                .accessibilitySelected(isSelected(type))
             }
         }
         .padding(2)
@@ -840,6 +838,26 @@ struct AppPreferencesSettingsView: View {
 
     private func isSelected(_ type: ConversationType) -> Bool {
         selection == type.rawValue
+    }
+}
+
+extension View {
+    /// Marks a control as selected for assistive technology.
+    ///
+    /// The trait is only ever *added*: never hand `accessibilityAddTraits` an
+    /// empty `AccessibilityTraits` (`[]`, or `AccessibilityTraits()`). On
+    /// Android, SkipFuseUI declares `init() { self = [] }`, and `[]` routes
+    /// through `SetAlgebra`'s default array-literal init straight back into
+    /// `init()` — the recursion overflows the stack and kills the process
+    /// before the screen ever draws. iOS is unaffected, so the crash only
+    /// shows up on device.
+    @ViewBuilder
+    func accessibilitySelected(_ isSelected: Bool) -> some View {
+        if isSelected {
+            self.accessibilityAddTraits(.isSelected)
+        } else {
+            self
+        }
     }
 }
 
@@ -944,9 +962,11 @@ struct SettingsRowView: View {
 }
 
 #if os(iOS)
-struct SettingsView_Previews: PreviewProvider {
-    static var previews: some View {
-	  SettingsView(role: .student, viewModel: MockSettingsViewModel(role: .student))
-    }
+#Preview ("teacher"){
+  SettingsView(role: .teacher, viewModel: MockSettingsViewModel(role: .teacher))
+  
+}
+#Preview ("student"){
+  SettingsView(role: .student, viewModel: MockSettingsViewModel(role: .student))
 }
 #endif

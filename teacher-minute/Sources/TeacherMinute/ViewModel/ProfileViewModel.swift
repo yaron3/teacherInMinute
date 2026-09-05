@@ -353,6 +353,7 @@ final class ProfileViewModel {
                     "updatedAt": ISO8601DateFormatter().string(from: Date())
                 ])
                 profileImageURL = url
+                UserPhotoStore.shared.profileImageURL = url
             } catch {
                 errorMessage = "Could not upload profile photo."
                 logger.error("[Profile] failed uploading profile image: \(error.localizedDescription)")

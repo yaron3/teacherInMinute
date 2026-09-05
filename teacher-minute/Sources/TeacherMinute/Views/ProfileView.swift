@@ -51,7 +51,7 @@ struct ProfileView: View {
               value: viewModel.email,
               image: "envelope.fill"
             )),
-            isEditing: false
+            isEditing: false,
           )
           FlatRule()
           ProfileInfoRow(
@@ -63,14 +63,14 @@ struct ProfileView: View {
             isEditing: false
           )
           FlatRule()
-          ProfileInfoRow(
-            parameter: .constant(Parameter(
-              description: LocalizationSupport.localized("Username"),
-              value: viewModel.username,
-              image: "person.text.rectangle.fill"
-            )),
-            isEditing: false
-          )
+//          ProfileInfoRow(
+//            parameter: .constant(Parameter(
+//              description: LocalizationSupport.localized("Username"),
+//              value: viewModel.username,
+//              image: "person.text.rectangle.fill"
+//            )),
+//            isEditing: false
+//          )
         }
       }
       .padding(.top, 20)
@@ -260,11 +260,20 @@ struct ProfileView: View {
 		profilePhotoButton
 	  }
 	  VStack(alignment: .leading, spacing: 6) {
-		Text(viewModel.name)
-		  .font(.system(size: 22, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-		  .lineLimit(2)
-		  .minimumScaleFactor(0.7)
+		HStack(alignment: .center, spacing: 6) {
+		  Text(viewModel.name)
+			.font(.system(size: 22, weight: .bold))
+			.foregroundStyle(theme.primaryText)
+			.lineLimit(2)
+			.minimumScaleFactor(0.7)
+		  Spacer()
+		  Button(action: showProfileEditor) {
+			PlatformIcon(systemName: "pencil", size: 14, weight: .semibold, color: theme.secondaryText)
+			  
+		  }
+		  .buttonStyle(.plain)
+		  
+		}
 
 		Text(viewModel.role)
 		  .font(.system(size: 14))
@@ -658,7 +667,8 @@ struct ProfileEditView: View {
               ProfileEditInfoRow(
                 parameter: $row,
                 isValid: viewModel.isRowValid(row),
-                errorMessage: viewModel.rowErrorMessage(for: row)
+                errorMessage: viewModel.rowErrorMessage(for: row),
+				
               )
             }
           }
@@ -726,7 +736,7 @@ struct ProfileTeachingGradePicker: View {
   let grades = ProfileViewModel.availableTeachingGrades
 
   var body: some View {
-    VStack(alignment: contentAlignment, spacing: 10) {
+	VStack(alignment: .leading, spacing: 10) {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
@@ -916,7 +926,7 @@ struct ProfileCurrencyPicker: View {
 
 
   var body: some View {
-    VStack(alignment: contentAlignment, spacing: 10) {
+	VStack(alignment: .leading, spacing: 10) {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
@@ -1025,6 +1035,7 @@ struct ProfileEditInfoRow: View {
       isValid: isValid,
       errorMessage: errorMessage
     )
+	.disabled(textContentType == .emailAddress)
   }
 
   private var keyboardType: UIKeyboardType {

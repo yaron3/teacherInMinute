@@ -335,7 +335,11 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Add your subjects, bio, and verification documents": "הוסיפו מקצועות, תיאור קצר ומסמכי אימות",
         "A student requests help": "תלמיד מבקש עזרה",
         "Get matched to students who need your subject": "מתחברים לתלמידים שצריכים את המקצוע שלכם",
-        "Teach live": "מלמדים בשידור חי"
+        "Teach live": "מלמדים בשידור חי",
+        // Rate-the-session screen. Both strings stayed English under the Hebrew
+        // stars, so the whole comment block read as untranslated.
+        "Add a comment (optional)": "הוספת הערה (לא חובה)",
+        "Your teacher sees this without your name.": "המורה רואה את ההערה בלי השם שלך."
     ]
 
     #if os(Android)

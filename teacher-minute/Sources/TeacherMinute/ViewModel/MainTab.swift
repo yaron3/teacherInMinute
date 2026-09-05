@@ -30,21 +30,25 @@ enum MainTab: Hashable, CaseIterable {
 	switch self {
 	  case .home: "house"
 	  case .lessons: "teaching_tab_icon"
-	  case .earnings: "dollarsign.circle"
+	  case .earnings: Self.earningsSymbol
 	  case .profile: "person"
 	  case .settings: "gearshape"
 	}
   }
-  
+
   var selectedSystemImage: String {
 	switch self {
 	  case .home: "house.fill"
 	  case .lessons: "teaching_tab_icon.fill"
-	  case .earnings: "dollarsign.circle.fill"
+	  case .earnings: "\(Self.earningsSymbol).fill"
 	  case .profile: "person.fill"
 	  case .settings: "gearshape.fill"
 	}
   }
+
+  /// The Earnings tab wears the currency the money is actually in, rather than
+  /// a fixed dollar sign — everything the tab leads to is priced in shekels.
+  static var earningsSymbol: String { LessonFormatting.currencySignIcon }
   
   func systemImage(isSelected: Bool) -> String {
 	isSelected ? selectedSystemImage : systemImage

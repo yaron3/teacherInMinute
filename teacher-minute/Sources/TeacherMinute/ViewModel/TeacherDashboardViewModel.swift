@@ -241,7 +241,10 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   // MARK: - State
   
   var teacherName = "Teacher"
-  var teacherImageURL = ""
+  var teacherImageURL: String {
+    get { UserPhotoStore.shared.profileImageURL }
+    set { UserPhotoStore.shared.profileImageURL = newValue }
+  }
   var isOnline = false
   var inviteIDs: [String] = []
   var inviteTopics: [String: String] = [:]
