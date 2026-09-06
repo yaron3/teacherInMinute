@@ -121,9 +121,13 @@ the topic the demo lessons rely on.
 
 ### 4. Teachers land in ID verification on every cold start
 
-**Status: open.** Already documented for iOS; confirmed it reproduces on
-Android. Every launch goes to "Verify Your Identity — Step 1 of 2" and needs
-"Continue - upload later".
+**Status: not a bug — intended, confirmed with the author.**
+
+Every launch goes to "Verify Your Identity — Step 1 of 2" and needs "Continue -
+upload later". A teacher who has not uploaded a government ID is meant to be
+asked again each time; the skip is the escape hatch, not a workaround. Recorded
+here only because it was filed as a defect after being carried over from the iOS
+notes.
 
 ---
 
