@@ -455,66 +455,93 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   // MARK: - Online Toggle
   
+  /// Going online is gated on notification permission, and the check happens
+  /// **before** the toggle rather than after it.
+  ///
+  /// This used to flip the switch, publish `status: online`, and only then ask.
+  /// A teacher who refused was therefore advertised as available for as long as
+  /// the system prompt sat on screen — and dispatch could invite them in exactly
+  /// the state the rule exists to prevent, reachable by nobody. Asking first
+  /// means a refusal never reaches RTDB at all.
+  ///
+  /// Going offline is never gated: it must always be possible.
   func toggleOnline() {
-#if os(Android)
-	if androidInvitePollingTask == nil, let uid = Auth.auth().currentUser?.uid {
-	  logger.info("[VM] toggleOnline — Android invite polling nil, configuring now uid=\(uid)")
-	  configurePresence(uid: uid)
+	guard !isOnline else {
+	  performOnlineToggle()
+	  return
 	}
-	isOnline.toggle()
-	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
-	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
-	let status = isOnline ? "online" : "offline"
-	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
-	logger.info("[VM] Android wrote teacher status=\(status)")
-#elseif SKIP
-	if androidTeacherRef == nil, let uid = Auth.auth().currentUser?.uid {
-	  logger.info("[VM] toggleOnline — Android ref nil, configuring now uid=\(uid)")
-	  configurePresence(uid: uid)
+	Task { @MainActor [weak self] in
+	  guard let self else { return }
+	  // A no-op once granted on both platforms, so re-running it is harmless.
+	  let state = await PermissionService.shared.requestNotifications()
+	  guard state == .granted else {
+		self.errorMessage = self.notificationsRequiredMessage
+		logger.info("[VM] stayed offline — notifications not granted (state=\(String(describing: state)))")
+		return
+	  }
+	  self.performOnlineToggle()
 	}
-	isOnline.toggle()
-	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
-	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
-	guard let ref = androidTeacherRef else { return }
-	let status = isOnline ? "online" : "offline"
-	ref.child("status").setValue(status)
-	if isOnline {
-	  ref.child("subjects").setValue(subjectKeys)
-	}
-	logger.info("[VM] Android wrote teacher status=\(status) subjectKeys=\(isOnline ? subjectKeys : [])")
-#else
-	if presenceService == nil, let uid = Auth.auth().currentUser?.uid {
-	  logger.info("[VM] toggleOnline — presenceService nil, configuring now uid=\(uid)")
-	  configurePresence(uid: uid)
-	}
-	isOnline.toggle()
-	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
-	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
-#if os(Android)
-	let status = isOnline ? "online" : "offline"
-	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
-#else
-	if isOnline {
-	  presenceService?.goOnline(subjects: subjectKeys)
-	} else {
-	  presenceService?.goOffline()
-	}
-#endif
-#endif
-	enforceNotificationRequirement()
   }
 
-  /// A backgrounded teacher only learns about a question from a notification —
-  /// the RTDB invite listener (and, on Android, the invite poll) stops with the
-  /// app. A teacher who has not granted notifications therefore sits in the
-  /// dispatch pool unreachable, and every wave they are picked for burns its
-  /// timeout before moving on. So permission is a precondition for being
-  /// online: it is requested when going online, and refusing takes the teacher
-  /// straight back offline.
+  /// The toggle itself, once the notification rule above has been satisfied.
+  private func performOnlineToggle() {
+#if os(Android)
+  	if androidInvitePollingTask == nil, let uid = Auth.auth().currentUser?.uid {
+  	  logger.info("[VM] toggleOnline — Android invite polling nil, configuring now uid=\(uid)")
+  	  configurePresence(uid: uid)
+  	}
+  	isOnline.toggle()
+  	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+  	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
+  	let status = isOnline ? "online" : "offline"
+  	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
+  	logger.info("[VM] Android wrote teacher status=\(status)")
+#elseif SKIP
+  	if androidTeacherRef == nil, let uid = Auth.auth().currentUser?.uid {
+  	  logger.info("[VM] toggleOnline — Android ref nil, configuring now uid=\(uid)")
+  	  configurePresence(uid: uid)
+  	}
+  	isOnline.toggle()
+  	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+  	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
+  	guard let ref = androidTeacherRef else { return }
+  	let status = isOnline ? "online" : "offline"
+  	ref.child("status").setValue(status)
+  	if isOnline {
+  	  ref.child("subjects").setValue(subjectKeys)
+  	}
+  	logger.info("[VM] Android wrote teacher status=\(status) subjectKeys=\(isOnline ? subjectKeys : [])")
+#else
+  	if presenceService == nil, let uid = Auth.auth().currentUser?.uid {
+  	  logger.info("[VM] toggleOnline — presenceService nil, configuring now uid=\(uid)")
+  	  configurePresence(uid: uid)
+  	}
+  	isOnline.toggle()
+  	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+  	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
+#if os(Android)
+  	let status = isOnline ? "online" : "offline"
+  	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
+#else
+  	if isOnline {
+  	  presenceService?.goOnline(subjects: subjectKeys)
+  	} else {
+  	  presenceService?.goOffline()
+  	}
+#endif
+#endif
+  }
+
+  /// Takes an already-online teacher offline if they can no longer be notified.
   ///
-  /// Called after every toggle and whenever the dashboard returns to the
-  /// foreground, since permission can be revoked in system settings while the
-  /// app is away.
+  /// `toggleOnline` gates going online on permission, so this covers the other
+  /// way in: permission revoked in system settings while the app was away. A
+  /// backgrounded teacher only learns about a question from a notification —
+  /// the RTDB invite listener, and on Android the invite poll, stop with the
+  /// app — so one who cannot be notified sits in the dispatch pool unreachable,
+  /// and every wave they are picked for burns its timeout before moving on.
+  ///
+  /// Called on every return to the foreground. A no-op while already offline.
   func enforceNotificationRequirement() {
 	guard isOnline else { return }
 	Task { @MainActor [weak self] in
