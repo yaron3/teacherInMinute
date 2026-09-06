@@ -248,6 +248,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Lessons": "שיעורים",
         "Monthly income": "הכנסה החודש",
         "My Rating": "הדירוג שלי",
+        "1 review": "ביקורת אחת",
         "%d reviews": "%d ביקורות",
         // Teacher earnings tab
         "Income and Payments": "הכנסות ותשלומים",

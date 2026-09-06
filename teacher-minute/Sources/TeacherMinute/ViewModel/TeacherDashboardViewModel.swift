@@ -335,12 +335,20 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 
   var ratingText: String { LessonFormatting.ratingText(teacherRating) }
 
+  /// "1 reviews" reads wrong in both languages, and one format string cannot
+  /// carry both forms, so the singular gets its own — the same shape as
+  /// `onlineTeachersCountText` and `LessonFormatting.reviewCountText`, which
+  /// already spell "(1 review)" out separately.
   var reviewCountText: String {
-	loadedValue(
-	  reviewCount > 0
-	  ? String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
-	  : LocalizationSupport.localized("No reviews yet")
-	)
+	let text: String
+	if reviewCount == 0 {
+	  text = LocalizationSupport.localized("No reviews yet")
+	} else if reviewCount == 1 {
+	  text = LocalizationSupport.localized("1 review")
+	} else {
+	  text = String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
+	}
+	return loadedValue(text)
   }
 
   var subjectsDisplayText: String {
@@ -1020,9 +1028,13 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var hasRating: Bool { reviewCount > 0 }
   var ratingText: String { LessonFormatting.ratingText(teacherRating) }
   var reviewCountText: String {
-    hasRating
-      ? String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
-      : LocalizationSupport.localized("No reviews yet")
+    if !hasRating {
+      return LocalizationSupport.localized("No reviews yet")
+    }
+    if reviewCount == 1 {
+      return LocalizationSupport.localized("1 review")
+    }
+    return String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
   }
   var subjectsDisplayText: String {
     if subjects.isEmpty {
