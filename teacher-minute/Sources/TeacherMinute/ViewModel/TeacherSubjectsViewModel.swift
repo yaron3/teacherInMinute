@@ -145,6 +145,14 @@ final class TeacherSubjectsViewModel {
 	}
   }
 
+  /// Reduces a subtopic to the form stored subtopics, catalog keys and display
+  /// titles can all be compared on: lowercase letters and digits only. This is
+  /// the same derivation `SubjectOption` uses for its key, so a value written
+  /// against either catalog resolves to the same string.
+  private static func subtopicMatchKey(_ value: String) -> String {
+	value.lowercased().filter { $0.isLetter || $0.isNumber }
+  }
+
   private func restoreExistingSelections() async {
 	guard let uid = Auth.auth().currentUser?.uid else { return }
 	let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
@@ -155,9 +163,21 @@ final class TeacherSubjectsViewModel {
 	  let savedSubtopics = selections[area.englishTitle] ?? selections[area.title] ?? []
 	  guard !savedSubtopics.isEmpty else { continue }
 	  selectedAreaIDs.insert(area.id)
-	  // New format stores English keys; old format stored localized titles — match either.
+	  // New format stores English keys; old format stored localized titles — match
+	  // either, and match them case-insensitively.
+	  //
+	  // A stored subtopic can be spelled three ways: the catalog key ("Algebra"),
+	  // the lowercase form SubjectOption derives when the catalog comes from
+	  // Remote Config ("algebra" — see its init), or an old localized title. An
+	  // exact comparison only happens to work while the remote catalog is the one
+	  // in use, because both sides are then lowercase. The moment the fetch fails
+	  // and the built-in fallback takes over — its keys are capitalised — every
+	  // saved subtopic silently unticks, and saving the sheet writes that empty
+	  // selection back over the teacher's real subjects.
+	  let savedKeys = Set(savedSubtopics.map(Self.subtopicMatchKey))
 	  selectedSubtopicTitlesByArea[area.id] = Set(area.subtopics
-		.filter { savedSubtopics.contains($0.key) || savedSubtopics.contains($0.title) }
+		.filter { savedKeys.contains(Self.subtopicMatchKey($0.key))
+			   || savedKeys.contains(Self.subtopicMatchKey($0.title)) }
 		.map(\.title))
 	}
   }
