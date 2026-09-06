@@ -110,7 +110,23 @@ in the upload path, not the load path, and was never the cause.
 
 ### 3. The subject picker loses backend-added subtopics
 
-**Status: open.**
+**Status: partly fixed in `17b3cef`; the catalog question is still open.**
+
+Fixed: matching stored subtopics against the catalog was exact, so if the Remote
+Config fetch ever failed and the built-in fallback took over — its keys are
+capitalised, the stored ones lowercase — every saved subtopic silently unticked
+and saving the sheet wrote that empty selection over the teacher's real
+subjects. Both sides now reduce to lowercase letters and digits.
+
+Not fixed: Geometry is absent from the published catalog entirely
+(`subjects = ["Math"]`, `subTaskMath = ["Algebra","Trigonometry"]`), so the
+picker still cannot offer it. Closing that means either expanding the published
+catalog or keeping unknown stored subtopics selectable — a product decision, and
+expanding it removes a safety margin: Geometry is currently a safe topic for
+demo questions *because* no real teacher can select it (see CLAUDE.md on never
+sending a demo question to a real teacher).
+
+Original report follows.
 
 Teacher home renders `Math: Algebra, Math: Geometry, Math: Trigonometry`, but
 Edit Subjects opens showing "1 subject, 2 subtopics" with only Algebra and
@@ -135,21 +151,32 @@ notes.
 
 ### 5. Language switching leaves Remote Config strings cached in the old language
 
-**Status: open, needs confirmation via the in-app path.**
+**Status: not a bug — my repro was at fault. Confirmed on device.**
 
-Flipping `settings.language.preference` and relaunching flips layout direction
-and some strings, but leaves many in the previous language — a genuinely mixed
-UI (English tab bar over Hebrew content). Only "Force Reload Remote Config"
-cleared it.
+Selecting עברית in Settings → Language switches the whole UI immediately: tab
+bar, content and RTL layout, with no relaunch and no "Force Reload Remote
+Config".
 
-Caveat: this was reached via the prefs file plus the debug reload, **not** via
-Settings → Language in-app, so the user-facing path may be fine. Worth checking,
-because that debug button does not exist in a release build.
+The mixed UI came from editing `settings.language.preference` in the prefs file
+directly, which bypasses `updateLanguage`. That method awaits
+`LocalizationManager.updateLanguageCode`, which refetches Remote Config for the
+new language, and only then writes the `@AppStorage`-observed key so the locale
+flip and the string refresh land in the same render pass. Writing the key by
+hand skips the refetch, leaving the previous language's strings cached — exactly
+the half-translated screen filed here.
+
+The lesson is about the harness, not the app: driving a setting through its
+storage is not the same as driving it through its code path, and only the latter
+is what a user does.
 
 ### 6. `Computer Science: הכל`
 
-**Status: open.** Hebrew "All" leaking into the English subject list on teacher
-home.
+**Status: fixed in `43b33ed`.** Not a localization bug at all — the write path
+already stores English keys and the read path localizes. Two teacher profiles
+held `Computer_Science: ["הכל"]`, written by an older build; "All" matches no
+subtopic in the catalog, so it could not be translated and came out raw. The
+orphaned area was dropped from both. A sweep of all 32 teacher profiles now
+reports zero Hebrew subtopic values and zero empty areas.
 
 ---
 
@@ -160,13 +187,19 @@ they are a template edit plus a republish.
 
 ### 7. "A teacher connects immediate."
 
-**Status: open.** How-it-works card, step 2. Should be "immediately".
+**Status: fixed in `4a8a9e4`.** Production was already serving the correct
+string; the broken English survived only in this repo's template, which had
+drifted. Worth closing on its own — a `firebase deploy --only remoteconfig` from
+the repo would have pushed the bad value back over the good one. Verified by
+diffing all 661 published parameters against the file: zero differences.
 
 ### 8. "1 reviews"
 
-**Status: open.** Teacher home rating card. Same unpluralized-count class as the
-"1 teachers available now" bug already fixed per the iOS README; this one was
-missed.
+**Status: fixed in `5c2236d`, both languages verified on device.** The rating
+card formatted every count through "%d reviews". The singular now has its own
+string, matching how `onlineTeachersCountText` and
+`LessonFormatting.reviewCountText` already handle it. Renders "1 review" in
+English and "ביקורת אחת" in Hebrew.
 
 ### 9. Teacher home stat cards show "מתעדכן…" placeholders on cold sign-in
 
