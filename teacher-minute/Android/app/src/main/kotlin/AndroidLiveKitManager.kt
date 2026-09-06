@@ -55,10 +55,16 @@ object AndroidLiveKitManager {
             }
 
             if (enableVideo) {
-                val videoEnabled = newRoom.localParticipant.setCameraEnabled(true)
-                if (!videoEnabled) {
-                    newRoom.disconnect()
-                    throw IllegalStateException("LiveKit camera enable failed")
+                // A camera that will not start (emulator, hardware in use,
+                // capture error) must not take the lesson down with it: publish
+                // what we can and let the session run audio-only.
+                try {
+                    val videoEnabled = newRoom.localParticipant.setCameraEnabled(true)
+                    if (!videoEnabled) {
+                        Log.e(TAG, "Camera enable returned false, continuing audio-only")
+                    }
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Camera enable failed, continuing audio-only: ${t.message}")
                 }
             }
 

@@ -75,7 +75,17 @@ final class PermissionService {
             return .denied
         }
 #else
-        return .notDetermined
+        // POST_NOTIFICATIONS reports granted or not: `checkSelfPermission`
+        // answers false both for "denied" and for "never asked", so the two
+        // cannot be told apart here and an ungranted permission reads as
+        // .denied. `hasPermission` already returns true below API 33, where the
+        // runtime permission does not exist. This previously returned
+        // .notDetermined unconditionally, so the profile's notification row —
+        // and the teacher availability rule that now depends on it — read as
+        // unknown on every Android device.
+        return AndroidPermissionBridge.hasPermission(AndroidPermissionBridge.postNotifications)
+            ? .granted
+            : .denied
 #endif
     }
 
@@ -188,13 +198,23 @@ private enum AndroidPermissionBridge {
     }
 
     static func hasPermission(_ permission: String) -> Bool {
-        (try? jniContext {
-            try managerClass.callStatic(
+        // `callStatic` picks its JNI call from the return type it is asked for,
+        // and that has to be spelled out here. Wrapping it in `try? ... ?? false`
+        // breaks the inference chain that `requestPermission` gets for free from
+        // its declared `-> Bool`, and it resolved to CallStaticObjectMethodA
+        // against a method returning `boolean` — which aborts the process with
+        // "JNI DETECTED ERROR IN APPLICATION" rather than failing gracefully.
+        // Nothing called this until notificationStatus() did, so the mismatch
+        // sat here unexercised.
+        let granted: Bool? = try? jniContext {
+            let value: Bool = try managerClass.callStatic(
                 method: hasPermissionMethod,
                 options: [.kotlincompat],
                 args: [permission.toJavaParameter(options: [.kotlincompat])]
             )
-        }) ?? false
+            return value
+        }
+        return granted ?? false
     }
 
     static func requestPermission(_ permission: String) throws -> Bool {

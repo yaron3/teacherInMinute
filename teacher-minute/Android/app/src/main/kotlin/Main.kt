@@ -124,11 +124,17 @@ open class MainActivity: AppCompatActivity {
         // in the browser, so the return arrived as the launch intent rather
         // than through onNewIntent.
         AndroidPayPalManager.handleReturnToApp(this, intent)
+        isResumed = true
+        // Once the app is in front the invite poll takes over and the overlay is
+        // how an invite gets answered, so any invite notification still sitting
+        // in the shade can only lead somewhere stale.
+        AndroidIncomingQuestionNotifier.cancelAll(this)
         AppDelegate.shared.onResume()
     }
 
     override fun onPause() {
         super.onPause()
+        isResumed = false
         AppDelegate.shared.onPause()
     }
 
@@ -184,6 +190,16 @@ open class MainActivity: AppCompatActivity {
     companion object {
         @JvmStatic
         var currentActivity: MainActivity? = null
+
+        /**
+         * Whether the activity is actually in front, which `currentActivity`
+         * does not answer — that outlives a backgrounded activity and is only
+         * cleared on destroy. Invite notifications are suppressed while the app
+         * is resumed, because the dashboard's own poll already shows the
+         * overlay, so this has to distinguish resumed from merely alive.
+         */
+        @JvmStatic
+        var isResumed: Boolean = false
 
         @JvmStatic
         fun setSystemBackBlocked(blocked: Boolean) {

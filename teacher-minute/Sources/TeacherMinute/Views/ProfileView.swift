@@ -14,7 +14,29 @@ import SkipBridge
 #endif
 
 struct ProfileView: View {
-  @State var viewModel: ProfileViewModel
+  /// `@Bindable`, not `@State`. MainTabView already owns this view model in its
+  /// own `@State` and passes it down; wrapping it a second time here left the
+  /// body reading a copy that Skip never re-read, so a completed load updated
+  /// the view model — the logs showed name and contact rows arriving — while
+  /// the screen kept rendering its initial placeholders. `@Bindable` observes
+  /// without taking ownership, and still vends the `$viewModel` bindings the
+  /// editor sheets need.
+  @Bindable var viewModel: ProfileViewModel
+  /// Bumped whenever a load finishes, purely to force this body to re-run.
+  ///
+  /// Mutating the view model is not enough on Android. Instrumenting both sides
+  /// showed one shared instance — `body` and `loadProfile` logged the same
+  /// ObjectIdentifier — with `body` running exactly once, before the load, and
+  /// never again, while the model went on to hold the loaded name and rows. So
+  /// the screen sat on its initial values. MainTabView carries a note about the
+  /// profile "only appearing after switching tabs and back", which is the same
+  /// symptom: a tab switch forces a fresh composition that happens to read the
+  /// current values. A view's own `@State` does reliably invalidate the body,
+  /// so the load drives one.
+  /// Internal, not private: Skip cannot bridge a private `@State` to Android
+  /// ("Private state property ... cannot be bridged"), which is why no `@State`
+  /// in this codebase is private.
+  @State var profileRevision = 0
   @State var isShowingProfileEditor = false
   @State var isShowingSubjectEditor = false
   @State var isShowingDocuments = false
@@ -27,17 +49,23 @@ struct ProfileView: View {
 	AppTheme(colorScheme: colorScheme)
   }
   init(viewModel: ProfileViewModel = ProfileViewModel()) {
-	self._viewModel = State(initialValue: viewModel)
+	self.viewModel = viewModel
   }
   var body: some View {
+	// Read so that bumping `profileRevision` invalidates this body. See the
+	// property's own comment for why the view model's own changes do not.
+	let _ = profileRevision
 	ScrollView(.vertical, showsIndicators: false) {
-      // `isProfileLoaded` is a stored property and is read first deliberately.
-      // Gating only on `hasDisplayableProfileData` — which is computed — left
-      // the body with no direct read of an observable stored property, so on
-      // Android the load mutated `name`/`contactRows` without triggering a
-      // recomposition and the profile stayed blank until the tab was revisited.
-      if viewModel.isProfileLoaded || viewModel.hasDisplayableProfileData {
+      // The profile renders straight away and fills in as the load lands, the
+      // way the home tabs do. Swapping the whole subtree on a loaded flag did
+      // not survive Skip: the load completed in tens of milliseconds and set
+      // `isProfileLoaded`, but the branch never re-evaluated on Android and the
+      // screen sat on "Loading profile..." indefinitely. Rendering one tree and
+      // letting the individual fields update removes the branch entirely.
     VStack(alignment: .leading, spacing: 0) {
+      if let error = viewModel.errorMessage {
+        profileLoadError(error)
+      }
       FlatCard(padding: 0, outlined: true) {
         VStack(spacing: 0) {
           profileHeader
@@ -184,9 +212,6 @@ struct ProfileView: View {
     }
     .padding(.horizontal, 20)
     .padding(.bottom, 40)
-      } else {
-        profileLoadingView
-      }
 	}
     .background(theme.screenBackground)
 			.task {
@@ -203,7 +228,7 @@ struct ProfileView: View {
               .id(languagePreference)
             }
             .sheet(isPresented: $isShowingSubjectEditor, onDismiss: {
-              Task { await viewModel.loadProfile() }
+              Task { await viewModel.loadProfile(); profileRevision += 1 }
             }) {
               NavigationStack {
                 TeacherSubjectsView(isEditing: true)
@@ -215,7 +240,7 @@ struct ProfileView: View {
             .sheet(isPresented: $isShowingDocuments, onDismiss: {
               // Refresh the "Complete Your Documents" prompt after the teacher
               // may have uploaded a missing document (bug #24).
-              Task { await viewModel.loadProfile() }
+              Task { await viewModel.loadProfile(); profileRevision += 1 }
             }) {
               NavigationStack {
                 TeacherDocumentsView()
@@ -226,32 +251,26 @@ struct ProfileView: View {
             }
 	  }
 	  
-  var profileLoadingView: some View {
+  /// Shown above the profile when a load failed, rather than in place of it.
+  /// A failure leaves the fields at their placeholder values, which is still a
+  /// usable screen — the tab bar and the retry stay reachable either way.
+  func profileLoadError(_ error: String) -> some View {
     VStack(spacing: 12) {
-      if let error = viewModel.errorMessage {
-        Text(error)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(theme.danger)
+      Text(error)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(theme.danger)
 
-        Button {
-          Task { await loadProfileForDisplay() }
-        } label: {
-          Text(LocalizationSupport.localized("Retry"))
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(theme.primaryText)
-        }
-        .buttonStyle(.plain)
-      } else {
-        ProgressView()
-          .tint(theme.primaryText)
-
-        Text(LocalizationSupport.localized("Loading profile..."))
-          .font(.system(size: 14))
-          .foregroundStyle(theme.secondaryText)
+      Button {
+        Task { await viewModel.loadProfile(); profileRevision += 1 }
+      } label: {
+        Text(LocalizationSupport.localized("Retry"))
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(theme.primaryText)
       }
+      .buttonStyle(.plain)
     }
-    .frame(maxWidth: .infinity, minHeight: 420)
-    .padding(.horizontal, 20)
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 16)
   }
 
 	  var profileHeader: some View {
@@ -395,6 +414,7 @@ struct ProfileView: View {
   private func loadProfileForDisplay() async {
     guard !viewModel.hasDisplayableProfileData else { return }
     await viewModel.loadProfile()
+    profileRevision += 1
   }
 
   var savedPayPalSection: some View {

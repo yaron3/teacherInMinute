@@ -72,16 +72,31 @@ final class LiveKitService {
     try await newRoom.connect(url: Self.serverUrl, token: token)
     logger.info("[LiveKit] room.connect returned state=\(String(describing: newRoom.connectionState)) localIdentity=\(String(describing: newRoom.localParticipant.identity)) remoteCount=\(newRoom.remoteParticipants.count)")
 
-    _ = try await newRoom.localParticipant.setMicrophone(enabled: true)
-    logger.info("[LiveKit] microphone enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
-
-    if enableVideo {
-      _ = try await newRoom.localParticipant.setCamera(enabled: true)
-      logger.info("[LiveKit] camera enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
-    }
-
+    // Adopt the room before publishing so a publish failure still leaves a
+    // room we can tear down instead of a connected orphan.
     room = newRoom
     roomDelegateAdapter = adapter
+
+    do {
+      _ = try await newRoom.localParticipant.setMicrophone(enabled: true)
+      logger.info("[LiveKit] microphone enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
+    } catch {
+      logger.error("[LiveKit] microphone publish failed room=\(roomName) error=\(error.localizedDescription)")
+      await disconnect()
+      throw error
+    }
+
+    if enableVideo {
+      // A camera that will not start (simulator, hardware in use, capture
+      // error) must not take the lesson down with it: publish what we can and
+      // let the session run audio-only.
+      do {
+        _ = try await newRoom.localParticipant.setCamera(enabled: true)
+        logger.info("[LiveKit] camera enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
+      } catch {
+        logger.error("[LiveKit] camera publish failed, continuing audio-only room=\(roomName) error=\(error.localizedDescription)")
+      }
+    }
     onTracksUpdated?()
     startDiagnostics(roomName: roomName)
 #else

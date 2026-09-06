@@ -20,6 +20,7 @@ struct TeacherDashboardView: View {
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? "en" : SettingsLanguageChoice.system.rawValue
   //@AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.scenePhase) var scenePhase
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
@@ -168,6 +169,13 @@ struct TeacherDashboardView: View {
 			showsDocumentsSuggestion = true
 		  }
 		}
+	  }
+	  .onChange(of: scenePhase) { _, phase in
+		// Notification permission can be revoked in system settings while the
+		// app is away, and an online teacher who can no longer be notified is
+		// unreachable, so the rule is re-checked on every return to the front.
+		guard phase == .active else { return }
+		viewModel.enforceNotificationRequirement()
 	  }
 
 	}

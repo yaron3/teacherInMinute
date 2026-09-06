@@ -1,3 +1,4 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import org.gradle.api.GradleException
 import java.util.Properties
 
@@ -178,6 +179,17 @@ android {
             ndk {
                 debugSymbolLevel = "SYMBOL_TABLE"
             }
+            // Turns the raw addresses in a native crash report back into Swift
+            // frames. The upload is a separate task, so a release build stays
+            // offline unless you ask for it:
+            //   ./gradlew :app:assembleRelease :app:uploadCrashlyticsSymbolFileRelease
+            configure<CrashlyticsExtension> {
+                nativeSymbolUploadEnabled = true
+                // The .so files as Swift produced them, before AGP strips them.
+                unstrippedNativeLibsDir = layout.buildDirectory.dir(
+                    "intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib"
+                )
+            }
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
     }
@@ -234,6 +246,12 @@ dependencies {
     implementation("com.google.firebase:firebase-config")
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-crashlytics")
+    // The line above only reports uncaught JVM exceptions. Our Swift runs as
+    // native code (libTeacherMinute.so), so a crash in the app's own UI or
+    // model layer arrives as a SIGSEGV and never reaches the JVM reporter —
+    // it has to be caught by the NDK signal handler instead. Without this
+    // dependency every Swift crash on Android is invisible in Crashlytics.
+    implementation("com.google.firebase:firebase-crashlytics-ndk")
 
     implementation("com.google.android.gms:play-services-auth:21.1.1")
     implementation("io.livekit:livekit-android:2.25.3")

@@ -79,6 +79,7 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var subjectsDisplayText: String { get }
 
   func toggleOnline()
+  func enforceNotificationRequirement()
   func acceptInvite(questionId: String)
   func declineInvite(questionId: String)
   func cancelAcceptingInvite()
@@ -99,6 +100,9 @@ extension TeacherDashboardViewModeling {
   var chatStudentTitle: String { LocalizationSupport.localized("Student") }
   var teacherEyebrow: String { LocalizationSupport.localized("Teacher") }
   var teacherDashboardTitle: String { LocalizationSupport.localized("Teacher Dashboard") }
+  var notificationsRequiredMessage: String {
+    LocalizationSupport.localized("Turn on notifications to stay online. Questions reach you by notification when the app is in the background.")
+  }
 
   // MARK: Status toggle card
 
@@ -489,8 +493,57 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	}
 #endif
 #endif
+	enforceNotificationRequirement()
   }
-  
+
+  /// A backgrounded teacher only learns about a question from a notification —
+  /// the RTDB invite listener (and, on Android, the invite poll) stops with the
+  /// app. A teacher who has not granted notifications therefore sits in the
+  /// dispatch pool unreachable, and every wave they are picked for burns its
+  /// timeout before moving on. So permission is a precondition for being
+  /// online: it is requested when going online, and refusing takes the teacher
+  /// straight back offline.
+  ///
+  /// Called after every toggle and whenever the dashboard returns to the
+  /// foreground, since permission can be revoked in system settings while the
+  /// app is away.
+  func enforceNotificationRequirement() {
+	guard isOnline else { return }
+	Task { @MainActor [weak self] in
+	  guard let self else { return }
+	  // A no-op once granted on both platforms, so this is safe to re-run.
+	  let state = await PermissionService.shared.requestNotifications()
+	  guard state != .granted else { return }
+	  guard self.isOnline else { return }
+	  self.isOnline = false
+	  self.writePresence(online: false)
+	  self.errorMessage = self.notificationsRequiredMessage
+	  logger.info("[VM] went offline — notifications not granted (state=\(String(describing: state)))")
+	}
+  }
+
+  /// The platform-specific presence write, shared by the toggle and by the
+  /// notification rule above so both take the same path off.
+  private func writePresence(online: Bool) {
+	let status = online ? "online" : "offline"
+#if os(Android)
+	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
+#elseif SKIP
+	guard let ref = androidTeacherRef else { return }
+	ref.child("status").setValue(status)
+	if online {
+	  ref.child("subjects").setValue(subjectKeys)
+	}
+#else
+	if online {
+	  presenceService?.goOnline(subjects: subjectKeys)
+	} else {
+	  presenceService?.goOffline()
+	}
+#endif
+	logger.info("[VM] writePresence status=\(status)")
+  }
+
 #if os(Android)
   private func startAndroidInvitePolling(uid: String) {
 	androidInvitePollingTask?.cancel()
@@ -1029,6 +1082,9 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   }
 
   func toggleOnline() { isOnline.toggle() }
+  /// Inert in previews: the mock never touches the permission system, so a
+  /// preview teacher stays online regardless of the host's notification state.
+  func enforceNotificationRequirement() {}
   func acceptInvite(questionId: String) {}
   func declineInvite(questionId: String) { inviteIDs = inviteIDs.filter { $0 != questionId } }
   func cancelAcceptingInvite() {}
