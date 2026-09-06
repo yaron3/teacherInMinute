@@ -16,13 +16,20 @@ Two devices were used, and the difference between them mattered more than once:
 Statuses below reflect where each item stands after the session, not where it
 stood when first written.
 
+**Where it ended up:** 11 of the 14 fixed and verified on a device, 2 were not
+bugs (#4 intended, #5 a bad repro of my own), and 1 is half-done (#3 — the
+remaining half is a product decision, noted there). The single most useful
+finding is #10: a missing `import SkipFuse` meant `@Observable` view models
+never drove recomposition on Android, which had every screen relying on luck to
+show its data.
+
 ---
 
 ## Production data
 
 ### 1. A demo teacher was live in `onlineTeachers` for two days
 
-**Status: stale entry gone. Fix landed in `2a9b891`; still unverified.**
+**Status: fixed and verified on-device.** Fix in `2a9b891`.
 
 נועה כהן (`Bm4HU3Uv5DSEE8XFLDq5aldYtlH2`), online since 2026-09-04 17:00 UTC,
 carrying algebra, trigonometry and geometry. Meanwhile the app itself showed her
@@ -203,9 +210,12 @@ English and "ביקורת אחת" in Hebrew.
 
 ### 9. Teacher home stat cards show "מתעדכן…" placeholders on cold sign-in
 
-**Status: open (marginal).** The window is wide enough to be captured — three
-Hebrew screenshots came out all-placeholder and had to be retaken behind a load
-guard. Wide enough that a real user sees it.
+**Status: fixed in `6147a7c`.** The placeholder itself is right — zero is a
+plausible income, so the dashboard says the numbers are still coming rather than
+showing a total nobody earned. The complaint was how long. The rating and the
+earnings come from different backends and need nothing from each other, but were
+awaited one after the other, so the cards waited for the sum of both round trips.
+They now overlap. Measured: 3249ms + 3253ms sequential became 3272ms total.
 
 ---
 
@@ -213,7 +223,7 @@ guard. Wide enough that a real user sees it.
 
 ### 10. Skip does not drive recomposition from `@Observable` mutations
 
-**Status: open. Probably the most consequential item here.**
+**Status: fixed in `c0488f7` — and it was not a Skip limitation.**
 
 The evidence in #2 is that a view's `body` never re-ran when its `@Observable`
 view model changed. That is not specific to `ProfileView`:
@@ -222,9 +232,22 @@ their data is present by first render, or because their own `@State` forces a
 recompose. `MainTabView`'s "only appearing after switching tabs and back" note
 points the same way.
 
-Every screen driven by an `@Observable` view model is a candidate. The fix in #2
-is a per-view workaround; the general problem is how Skip's observation is
-wired, and deserves its own look.
+It is an opt-in the app never took. skip-fuse-ui backs `@State` with
+`BridgedStateBox` -> `StateSupport` -> Compose `MutableState`, which is why
+bumping a `@State` reliably invalidates a body; its README states the rest:
+"`@Observable` types require `import SkipFuse` to enable this state tracking."
+
+Twenty-nine files here declare `@Observable`; twenty-seven did not import it.
+The two that did are the Skip template's own `ViewModel.swift` — the pattern was
+in the project all along — and `ProfileViewModel`, from testing this.
+
+So every screen driven by an observable view model was relying on luck: data
+arriving before first render, a `@State` changing alongside, or a tab switch
+forcing a fresh composition. The profile had none of those.
+
+Proven rather than assumed: the import was added and the `profileRevision`
+workaround from #2 deleted outright, and the profile still renders live data.
+The workaround is gone rather than kept alongside.
 
 ### 11. `AndroidPermissionBridge.hasPermission` aborts the process
 
@@ -283,7 +306,7 @@ Small icon is `android.R.drawable.ic_dialog_info`, a placeholder.
 
 ### 14. A teacher with notifications denied stays in the dispatch pool
 
-**Status: implemented in `2a9b891`, not verified.**
+**Status: fixed and verified on-device.** Implemented in `2a9b891`, with a hole closed in `5f933fd`.
 
 Given #13, a backgrounded teacher is only reachable by notification. One who has
 not granted them sits in the pool unreachable, and every wave they are picked
@@ -294,6 +317,14 @@ permission and takes the teacher offline if it is not granted, after every
 toggle and on every return to foreground (permission can be revoked in system
 settings while the app is away).
 
-Unverified: the only real device available is Android 9, where
-`POST_NOTIFICATIONS` does not exist and `hasPermission` returns `true`
-unconditionally, so denial cannot be exercised. Needs an API 33+ device.
+The first version had a hole the size of the system prompt: it flipped the
+toggle and published `status: online`, then asked. A teacher who refused was
+advertised as available for as long as the dialog was up. The check now happens
+before the toggle, so a refusal never reaches RTDB.
+
+Verified on the emulator (Android 14, where POST_NOTIFICATIONS exists — the only
+physical device here is Android 9, where it does not). Revoked: the prompt
+appears, the toggle stays "לא זמין" while it is up, "Don't allow" leaves the
+teacher offline and nothing reaches RTDB. Granted: the toggle goes through and
+RTDB shows `status: online` — the regression check that matters, since too
+strict a gate would stop every teacher going online.
