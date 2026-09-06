@@ -5421,7 +5421,7 @@
     },
     "teacher_connects_quickly": {
       "defaultValue": {
-        "value": "A teacher connects immediate."
+        "value": "A teacher connects immediately."
       },
       "conditionalValues": {
         "Hebrew": {
