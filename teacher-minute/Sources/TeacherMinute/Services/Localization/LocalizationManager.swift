@@ -1,4 +1,5 @@
 import SwiftUI
+import SkipFuse
 #if !os(Android)
 import FirebaseAnalytics
 #else

@@ -7,6 +7,10 @@
 
 import Foundation
 import Observation
+// Required for @Observable state tracking on Android: without it Skip does
+// not wire the class into Compose's reactive state, so mutations never
+// invalidate the views reading them. See skip-fuse-ui's README.
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth

@@ -8,6 +8,7 @@
 import Observation
 import Foundation
 import SwiftUI
+import SkipFuse
 
 #if !os(Android)
 import FirebaseRemoteConfig
