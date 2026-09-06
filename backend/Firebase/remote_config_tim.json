@@ -9,11 +9,6 @@
       "name": "Hebrew",
       "expression": "device.language in ['he']",
       "tagColor": "TEAL"
-    },
-    {
-      "name": "Hebrew - custom",
-      "expression": "app.userProperty['user_language'].contains(['he'])",
-      "tagColor": "ORANGE"
     }
   ],
   "parameters": {
@@ -3676,7 +3671,7 @@
         "value": "Home"
       },
       "conditionalValues": {
-        "Hebrew - custom": {
+        "Hebrew": {
           "value": "בית"
         }
       },
