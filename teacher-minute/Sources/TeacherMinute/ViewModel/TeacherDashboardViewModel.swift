@@ -906,8 +906,16 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	// released before waiting on the slower rating and earnings queries.
 	isLoadingProfile = false
 	checkPermissions()
-	await loadRating()
-	await loadEarnings(uid: uid)
+	// The rating and the earnings come from different backends and neither
+	// needs the other, but they used to be awaited one after the other, so the
+	// stat cards showed "Updating…" for the sum of both round trips. Overlapping
+	// them costs the slower one only. Both are @MainActor, so their state
+	// writes still serialize — it is the waiting that runs in parallel.
+	let startedAt = Date()
+	async let rating: Void = loadRating()
+	async let earnings: Void = loadEarnings(uid: uid)
+	_ = await (rating, earnings)
+	logger.info("[VM] dashboard stats settled in \(Int(Date().timeIntervalSince(startedAt) * 1000))ms")
 	// Every figure on the dashboard is settled by this point, including the
 	// ones a failed fetch left at zero — that is a real answer now, not a
 	// placeholder, so the counters can show it.
@@ -917,6 +925,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Star average and review count come from the backend rather than the
   /// teacher document, which the app cannot aggregate on its own.
   private func loadRating() async {
+	let startedAt = Date()
+	defer { logger.info("[VM] loadRating took \(Int(Date().timeIntervalSince(startedAt) * 1000))ms") }
 	do {
 	  let summary = try await FunctionsService.shared.teacherRatingSummary()
 	  teacherRating = summary.averageRating
@@ -933,6 +943,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Reads the same backend summary the Lessons and Earnings tabs do, so the
   /// three screens cannot report different money — see TeacherEarningsStore.
   private func loadEarnings(uid: String) async {
+	let startedAt = Date()
+	defer { logger.info("[VM] loadEarnings took \(Int(Date().timeIntervalSince(startedAt) * 1000))ms") }
 	guard let summary = try? await TeacherEarningsStore.shared.summary() else { return }
 	let lessons = summary.lessons
 
