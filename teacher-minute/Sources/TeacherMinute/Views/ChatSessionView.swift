@@ -57,6 +57,11 @@ struct ChatSessionView: View {
   @State var sessionFrozenDate: Date?
   @State var isTransitioningToText = false
   @State var inputBarHeight: CGFloat = 0
+  /// Whether the scrolling chat layout still has its tab strip on screen.
+  /// The strip scrolls away with the rest of the chrome, and a badge that
+  /// scrolls away with it stops telling anyone anything — so once it is gone
+  /// `unreadTabIndicator` stands in for it.
+  @State var isSessionTabStripVisible = true
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let liveKitRoom: String
@@ -614,7 +619,11 @@ struct ChatSessionView: View {
 
             sessionStats
 
+            // The lazy stack drops what scrolls out of it, so composition is
+            // the signal: the strip is on screen exactly while it is composed.
             sessionTabs
+              .onAppear { isSessionTabStripVisible = true }
+              .onDisappear { isSessionTabStripVisible = false }
 
             if let errorMessage {
               Text(errorMessage)
@@ -656,6 +665,9 @@ struct ChatSessionView: View {
         }
       }
 
+    }
+    .overlay(alignment: .top) {
+      unreadTabIndicator
     }
 #if os(Android)
     .overlay(alignment: .bottom) {
@@ -1339,15 +1351,55 @@ struct ChatSessionView: View {
 #endif
   }
 
+  /// The tabs in the order the strip lays them out. `unreadTabIndicator` walks
+  /// this list so its mark lands in the same slot as the badge it stands for,
+  /// so the two must keep agreeing about which tabs are present.
+  var sessionTabIds: [TAB_TYPE] {
+    var ids: [TAB_TYPE] = [.CHAT, .BOARD]
+    if hasVideo { ids.append(.VIDEO) }
+    if !viewModel.questionPhotoUrls.isEmpty { ids.append(.IMAGES) }
+    return ids
+  }
+
+  func sessionTabHasUnread(_ id: TAB_TYPE) -> Bool {
+    switch id {
+    case .CHAT: return hasUnreadChat
+    case .BOARD: return hasUnreadBoard
+    case .VIDEO, .IMAGES: return false
+    }
+  }
+
+  /// Stands in for a badge whose tab has scrolled out of reach: a red rule at
+  /// the top of the screen, in the slot the tab itself occupies. Laying it out
+  /// as the same row of equal shares as the strip keeps the mark over its own
+  /// tab under either reading direction — with the board second it sits right
+  /// of centre in English and left of centre in Hebrew, matching the strip.
+  @ViewBuilder var unreadTabIndicator: some View {
+    if !isSessionTabStripVisible, sessionTabIds.contains(where: { sessionTabHasUnread($0) }) {
+      HStack(spacing: 0) {
+        ForEach(sessionTabIds, id: \.self) { id in
+          Rectangle()
+            .fill(sessionTabHasUnread(id) ? theme.danger : Color.clear)
+            .frame(maxWidth: .infinity)
+        }
+      }
+      .frame(height: 3)
+    }
+  }
+
   var sessionTabs: some View {
     HStack(spacing: 0) {
 	  tabButton(id: .CHAT, title: viewModel.chatTabTitle, icon: "bubble.left.fill", showsBadge: hasUnreadChat)
+		.background(selectedTab == .CHAT ? theme.accentBackground : Color.clear)
 	  tabButton(id: .BOARD, title: viewModel.boardTabTitle, icon: "pencil.and.list.clipboard", showsBadge: hasUnreadBoard)
+		.background(selectedTab == .BOARD ? theme.accentBackground : Color.clear)
       if hasVideo {
 		tabButton(id: .VIDEO, title: viewModel.videoTabTitle, icon: "video.fill", showsBadge: false)
+		  .background(selectedTab == .VIDEO ? theme.accentBackground : Color.clear)
       }
       if !viewModel.questionPhotoUrls.isEmpty {
         tabButton(id: .IMAGES, title: viewModel.imagesTabTitle, icon: "photo.fill", showsBadge: false)
+		  .background(selectedTab == .IMAGES ? theme.accentBackground : Color.clear)
       }
     }
     .frame(height: 40)
@@ -1368,7 +1420,7 @@ struct ChatSessionView: View {
               systemName: icon,
               size: 12,
               weight: .semibold,
-              color: selectedTab == id ? theme.accentBackground : theme.secondaryText
+              color: selectedTab == id ? theme.primaryText : theme.secondaryText
             )
             if showsBadge {
               Circle()
@@ -1382,7 +1434,7 @@ struct ChatSessionView: View {
           }
           Text(title)
             .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.accentBackground : theme.secondaryText))
+            .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.primaryText : theme.secondaryText))
             .padding(.horizontal, showsBadge ? 18 : 0)
             .padding(.vertical, showsBadge ? 3 : 0)
             .background {
@@ -1397,8 +1449,10 @@ struct ChatSessionView: View {
           .frame(height: 2)
       }
     }
+	
     .buttonStyle(.plain)
     .frame(maxWidth: .infinity)
+	
   }
 
   var sessionNotice: some View {
