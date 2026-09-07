@@ -57,12 +57,6 @@ struct SettingsView: View {
             }
         }
         .appDialog(
-            viewModel.activeConfirmation?.title ?? viewModel.settingsTitle,
-            isPresented: isShowingConfirmation,
-            message: viewModel.activeConfirmation?.message ?? "",
-            actions: confirmationDialogActions
-        )
-        .appDialog(
             viewModel.alertTitle,
             isPresented: isShowingAlert,
             message: viewModel.alertMessage ?? "",
@@ -140,27 +134,6 @@ struct SettingsView: View {
         }
     }
 
-    /// Cancel first so it reads as the safe default, then the confirm action —
-    /// destructive confirmations get the danger styling.
-    var confirmationDialogActions: [AppDialogAction] {
-        var actions = [
-            AppDialogAction(viewModel.cancelLabel, kind: .cancel) {
-                viewModel.activeConfirmation = nil
-            }
-        ]
-        if let confirmation = viewModel.activeConfirmation {
-            actions.append(
-                AppDialogAction(
-                    confirmation.confirmTitle,
-                    kind: confirmation.isDestructive ? .destructive : .primary
-                ) {
-                    confirm(confirmation)
-                }
-            )
-        }
-        return actions
-    }
-
     // The view model is held as an existential, so the bindings SwiftUI needs
     // are built by hand instead of through `$viewModel`.
     var navigationPath: Binding<[SettingsDestination]> {
@@ -203,25 +176,6 @@ struct SettingsView: View {
         }
     }
 
-    var isShowingConfirmation: Binding<Bool> {
-        Binding {
-            viewModel.activeConfirmation != nil
-        } set: { isPresented in
-            if !isPresented {
-                viewModel.activeConfirmation = nil
-            }
-        }
-    }
-
-    private func confirm(_ confirmation: SettingsConfirmation) {
-        viewModel.activeConfirmation = nil
-
-        Task {
-            if await viewModel.confirm(confirmation) {
-                router.signOut()
-            }
-        }
-    }
 }
 
 #if os(iOS)
