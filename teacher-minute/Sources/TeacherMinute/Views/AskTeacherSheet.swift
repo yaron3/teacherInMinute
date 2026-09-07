@@ -21,8 +21,6 @@ struct AskTeacherSheet: View {
 
     static let topics = [("Algebra"), ("Geometry"), ("Trigonometry"), ("Calculus"), ("Statistics"), ("Arithmetic")]
     static let maxPhotoCount = 4
-    static let mathSymbolsRow1 = ["≥", "≠", "÷", "×", "±", "π", "³", "²", "√"]
-    static let mathSymbolsRow2 = ["xⁿ", "¾", "½", "¼", "Σ", "∞", "≤"]
 
     init(viewModel: any StudentHomeViewModeling) {
         self.viewModel = viewModel
@@ -44,12 +42,22 @@ struct AskTeacherSheet: View {
     @State  var showAndroidPhotoSourceDialog = false
 #endif
     @FocusState var isQuestionFocused: Bool
+    /// Which keyboard writes the question. The same switch the chat composer
+    /// offers, so a student who has used one recognises the other.
+    @State  var keyboardMode: ChatComposerMode = .regular
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
     @Environment(\.dismiss) var dismiss
   private var canSubmit: Bool {
     questionText.trimmingCharacters(in: .whitespaces).count >= 10
       || !uploadedPhotoUrls.isEmpty
+      || hasFormula
   }
+
+  /// A formula built with the algebra keyboard is a whole question on its own:
+  /// `$$x^{2}$$` is nine characters and says everything the student is asking.
+  /// So it clears the ten-character minimum the way a photo does, and the
+  /// character counter steps aside for it too.
+  private var hasFormula: Bool { questionText.contains("$$") }
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -184,7 +192,7 @@ struct AskTeacherSheet: View {
                         .background(theme.fieldBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                    if uploadedPhotoUrls.isEmpty {
+                    if uploadedPhotoUrls.isEmpty, !hasFormula {
                         Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
                             .font(.system(size: 11))
                             .multilineTextAlignment(.leading)
@@ -193,7 +201,7 @@ struct AskTeacherSheet: View {
                     }
                 }
 
-                mathSymbolsSection
+                keyboardSection
 
                 photoAttachmentSection
 
@@ -232,6 +240,13 @@ struct AskTeacherSheet: View {
         .id(languagePreference)
         .task {
             isQuestionFocused = true
+        }
+        .onChange(of: isQuestionFocused) { _, focused in
+            // Tapping into the question field asks for the system keyboard, so
+            // the algebra pad steps aside rather than stacking underneath it.
+            if focused {
+                keyboardMode = .regular
+            }
         }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
         .appDialog(
@@ -518,46 +533,73 @@ struct AskTeacherSheet: View {
         dismiss()
     }
 
-    var mathSymbolsSection: some View {
+    /// Regular keyboard or algebra keyboard, and the algebra one when chosen.
+    ///
+    /// The old version of this was a strip of bare symbols that appended a
+    /// character and dropped focus, so every symbol cost the student their
+    /// keyboard. Now the two keyboards are alternatives the student picks
+    /// between, and the algebra one stays up for as long as they are building
+    /// the formula.
+    var keyboardSection: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
-            HStack {
-                Text(LocalizationSupport.localized("Mathematical symbols – tap to add:"))
+            HStack(spacing: 8) {
+                Text(viewModel.keyboardSectionTitle)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
+
                 Spacer()
-                PlatformIcon(systemName: "squareshape.split.3x3", size: 14, weight: .semibold, color: theme.secondaryText)
+
+                keyboardModePill(title: viewModel.regularKeyboardLabel, isSelected: keyboardMode == .regular) {
+                    keyboardMode = .regular
+                    isQuestionFocused = true
+                }
+                keyboardModePill(title: viewModel.algebraKeyboardLabel, isSelected: keyboardMode == .algebra) {
+                    keyboardMode = .algebra
+                    // The math keys are the keyboard in this mode, so the system
+                    // one gives up the space it was holding.
+                    isQuestionFocused = false
+                }
             }
 
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    ForEach(AskTeacherSheet.mathSymbolsRow1, id: \.self) { symbol in
-                        mathSymbolButton(symbol)
-                    }
+            if keyboardMode == .algebra {
+                Text(viewModel.addFormulaHint)
+                    .font(.system(size: 11))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(theme.secondaryText)
+
+                MathEquationEditorView(actionSystemImage: "plus") { latex in
+                    appendFormula(latex)
                 }
-                HStack(spacing: 6) {
-                    ForEach(AskTeacherSheet.mathSymbolsRow2, id: \.self) { symbol in
-                        mathSymbolButton(symbol)
-                    }
-                    Spacer(minLength: 0)
-                }
+                .environment(\.layoutDirection, .leftToRight)
             }
         }
     }
 
-    func mathSymbolButton(_ symbol: String) -> some View {
+    func keyboardModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button {
-            questionText += symbol
-            isQuestionFocused = false
+            action()
         } label: {
-            Text(symbol)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(theme.primaryText)
-                .frame(minWidth: 36, maxWidth: .infinity)
-                .frame(height: 36)
-                .background(theme.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(isSelected ? theme.onDarkFill : theme.primaryText)
+                .padding(.horizontal, 14)
+                .frame(height: 28)
+                .background(isSelected ? theme.accentStrong : theme.cardBackground)
+                .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Appends the finished equation to the question as display LaTeX. The
+    /// `$$` delimiters are what marks it as a formula for every reader
+    /// downstream — the teacher's incoming-question card and the chat bubbles
+    /// both render what sits between them instead of printing the markup.
+    func appendFormula(_ latex: String) {
+        let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let separator = questionText.isEmpty || questionText.hasSuffix("\n") ? "" : "\n"
+        questionText += "\(separator)$$\(trimmed)$$"
     }
 
     var infoCard: some View {

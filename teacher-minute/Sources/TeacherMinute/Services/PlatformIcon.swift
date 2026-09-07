@@ -187,6 +187,7 @@ struct PlatformIcon: View {
 	  case "line.diagonal":						return "╱"
 	  case "trash":								return "🗑"
 	  case "arrow.up.arrow.down": 				return "↕"
+	  case "plus":								return "＋"
 		
 	  default:
 		logger.error("!!! icon: \(systemName) is missing !!!")

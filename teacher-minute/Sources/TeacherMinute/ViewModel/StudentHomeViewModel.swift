@@ -203,6 +203,14 @@ extension StudentHomeViewModeling {
   var chatTeacherTitle: String { LocalizationSupport.localized("Teacher") }
   var perMinuteSuffix: String { LocalizationSupport.localized("/min") }
 
+  // MARK: Ask-a-teacher keyboard switch
+  var keyboardSectionTitle: String { LocalizationSupport.localized("Keyboard") }
+  var regularKeyboardLabel: String { LocalizationSupport.localized("Regular") }
+  var algebraKeyboardLabel: String { LocalizationSupport.localized("Algebra") }
+  var addFormulaHint: String {
+    LocalizationSupport.localized("Build the formula, then add it to your question.")
+  }
+
   // MARK: Section headers & captions
   var availableSubjectsTitle: String { LocalizationSupport.localized("Available Subjects") }
   var teachersOnlineNowTitle: String { LocalizationSupport.localized("Teachers online now") }

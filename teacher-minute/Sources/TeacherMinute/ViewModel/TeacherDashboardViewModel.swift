@@ -365,6 +365,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   private var authListenerHandle: Any?
   private var acceptingTask: Task<Void, Never>?
   private var didLoadProfile = false
+  private var didApplyLaunchPresence = false
   
   // MARK: - Init
   
@@ -493,7 +494,25 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	}
 #endif
 #endif
+	// `.lastState` restores this on the next launch, so it has to follow every
+	// change of availability, not just the ones made from the dashboard.
+	TeacherPresencePreferences.lastKnownOnline = isOnline
 	enforceNotificationRequirement()
+  }
+
+  /// Puts the teacher online at launch when their setting asks for it — see
+  /// `TeacherLaunchPresence`. Called once the profile is in, because going
+  /// online publishes the teacher's subjects and those arrive with it.
+  ///
+  /// Routed through `toggleOnline()` so the automatic path is the manual one:
+  /// same analytics, same presence write, and the same notification rule, which
+  /// takes the teacher straight back offline if they cannot be reached.
+  private func applyLaunchPresence() {
+	guard !didApplyLaunchPresence else { return }
+	didApplyLaunchPresence = true
+	guard !isOnline, TeacherPresencePreferences.shouldGoOnlineAtLaunch() else { return }
+	logger.info("[VM] applyLaunchPresence — going online, setting=\(TeacherPresencePreferences.launchPresence.rawValue)")
+	toggleOnline()
   }
 
   /// A backgrounded teacher only learns about a question from a notification —
@@ -525,6 +544,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// The platform-specific presence write, shared by the toggle and by the
   /// notification rule above so both take the same path off.
   private func writePresence(online: Bool) {
+	TeacherPresencePreferences.lastKnownOnline = online
 	let status = online ? "online" : "offline"
 #if os(Android)
 	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
@@ -871,6 +891,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	// released before waiting on the slower rating and earnings queries.
 	isLoadingProfile = false
 	checkPermissions()
+	applyLaunchPresence()
 	await loadRating()
 	await loadEarnings(uid: uid)
 	// Every figure on the dashboard is settled by this point, including the

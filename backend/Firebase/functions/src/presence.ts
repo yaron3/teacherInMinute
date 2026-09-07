@@ -1,8 +1,9 @@
 // ─── Public online-teacher projection ────────────────────────────────────────
 //
-// Students need to see who is teaching right now, but `teachers/{uid}` cannot
-// be opened up for cross-user reads: it also holds `waitingMessages`, which
-// carry student names and question topics. Rather than widen that node, the
+// Students need to see who is teaching right now, but `teachers/{uid}` is
+// owner-only under the database rules — it is the teacher's own presence node,
+// writable by nobody else, and opening it for cross-user reads would hand every
+// signed-in user a directory of teacher UIDs. Rather than widen that node, the
 // backend mirrors the handful of non-sensitive fields into `onlineTeachers`,
 // which any signed-in user may read (see database.rules.json).
 //

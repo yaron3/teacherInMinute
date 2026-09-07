@@ -75,21 +75,10 @@ struct ChatBubble: View {
   }
 
   private var formattedContent: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      ForEach(Self.messageSegments(from: Self.readableText(message.text))) { segment in
-        if segment.isFormula {
-          MathFormulaView(latex: segment.text, displayMode: true)
-            .frame(minWidth: 220, maxWidth: 300, minHeight: Self.formulaHeight(segment.text))
-            .environment(\.layoutDirection, .leftToRight)
-        } else {
-          Self.formattedText(segment.text)
-            .font(.system(size: 14))
-            .foregroundStyle(message.isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
-            .lineSpacing(4)
-            .multilineTextAlignment(.leading)
-        }
-      }
-    }
+    FormulaAwareText(
+      text: message.text,
+      textColor: message.isMine ? theme.outgoingBubbleText : theme.incomingBubbleText
+    )
   }
 
   static func formattedText(_ text: String) -> Text {
@@ -131,7 +120,7 @@ struct ChatBubble: View {
     return CGFloat(min(max(estimated, 64), 180))
   }
 
-  private static func messageSegments(from text: String) -> [ChatMessageSegment] {
+  fileprivate static func messageSegments(from text: String) -> [ChatMessageSegment] {
     var segments: [ChatMessageSegment] = []
     var remaining = text[...]
     var index = 0
@@ -212,5 +201,55 @@ struct ChatBubble: View {
       return true
     }
     return trimmed.hasPrefix("\\frac") || trimmed.hasPrefix("\\sqrt")
+  }
+}
+
+/// Text that may carry `$$...$$` formulas, with each formula handed to the math
+/// renderer instead of printed as markup.
+///
+/// Shared, so a formula a student writes reads the same wherever it is shown:
+/// in the chat bubbles, and in the question preview the teacher accepts or
+/// declines from. Splitting the two would mean the teacher deciding on raw
+/// LaTeX while the student sees an equation.
+struct FormulaAwareText: View {
+  let text: String
+  let textColor: Color
+  var font: Font = .system(size: 14)
+  var lineSpacing: CGFloat = 4
+  var formulaMinWidth: CGFloat = 220
+  var formulaMaxWidth: CGFloat = 300
+  /// Lines allowed per text run. Zero means as many as it takes.
+  var lineLimit: Int = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      ForEach(ChatBubble.messageSegments(from: ChatBubble.readableText(text))) { segment in
+        if segment.isFormula {
+          MathFormulaView(latex: segment.text, displayMode: true)
+            .frame(minWidth: formulaMinWidth, maxWidth: formulaMaxWidth, minHeight: ChatBubble.formulaHeight(segment.text))
+            .environment(\.layoutDirection, .leftToRight)
+        } else {
+          textRun(segment.text)
+        }
+      }
+    }
+  }
+
+  // `lineLimit` is applied through a builder rather than passed an optional,
+  // matching how the rest of the app keeps conditional modifiers off Android's
+  // transpiled path.
+  @ViewBuilder
+  private func textRun(_ run: String) -> some View {
+    let styled = ChatBubble.formattedText(run)
+      .font(font)
+      .foregroundStyle(textColor)
+      .lineSpacing(lineSpacing)
+      .multilineTextAlignment(.leading)
+
+    if lineLimit > 0 {
+      styled.lineLimit(lineLimit)
+    } else {
+      styled
+    }
   }
 }

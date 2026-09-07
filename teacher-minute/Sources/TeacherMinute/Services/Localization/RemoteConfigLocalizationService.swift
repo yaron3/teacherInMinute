@@ -235,7 +235,6 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Your Balance": "יתרה שלך",
         "Buy More +": "רכוש עוד +",
         // Ask teacher sheet — updated UI
-        "Mathematical symbols – tap to add:": "סמלים מתמטיים – לחץ להוספה:",
         "Tap to upload a photo of your question": "לחץ להעלאת תמונה של השאלה",
         "Average response time: 90 seconds": "זמן ממוצע לשידור: 90 שניות",
         "Find me a Teacher Now": "מצא לי מורה עכשיו",
@@ -339,7 +338,19 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Rate-the-session screen. Both strings stayed English under the Hebrew
         // stars, so the whole comment block read as untranslated.
         "Add a comment (optional)": "הוספת הערה (לא חובה)",
-        "Your teacher sees this without your name.": "המורה רואה את ההערה בלי השם שלך."
+        "Your teacher sees this without your name.": "המורה רואה את ההערה בלי השם שלך.",
+        // Teacher preference: availability when the app opens.
+        "Availability on launch": "זמינות בפתיחת האפליקציה",
+        "Availability on launch and currency": "זמינות בפתיחה ומטבע",
+        "Online": "זמין",
+        "Offline": "לא זמין",
+        "Last state": "המצב האחרון",
+        "Choose whether you start out available for questions when the app opens. \"Last state\" reuses the availability you left the app on.":
+            "בחרו אם להתחיל כזמינים לשאלות כשהאפליקציה נפתחת. \"המצב האחרון\" משחזר את הזמינות שבה סגרתם את האפליקציה.",
+        // Ask a Teacher sheet: the keyboard switch above the question field.
+        // "Regular" and "Algebra" are already published; only these are new.
+        "Keyboard": "מקלדת",
+        "Build the formula, then add it to your question.": "בנו את הנוסחה ואז הוסיפו אותה לשאלה."
     ]
 
     #if os(Android)
@@ -425,6 +436,10 @@ enum LocalizationKey {
 //        "Go Offline": "go_offline",
         "ONLINE": "online_caps",
         "OFFLINE": "offline_caps",
+        // Same collision for the bare availability-on-launch options, which
+        // reduce to `online` / `offline` just as "Go Online" / "Go Offline" do.
+        "Online": "online_option",
+        "Offline": "offline_option",
         "%@%d%% vs last week": "fmt_vs_last_week",
         "Grade 1": "grade_1",
         "Grade 10": "grade_10",

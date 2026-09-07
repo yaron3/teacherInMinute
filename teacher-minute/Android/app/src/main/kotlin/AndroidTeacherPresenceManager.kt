@@ -48,9 +48,9 @@ object AndroidTeacherPresenceManager {
      * a JSON array of `{"id", "subjects", "displayName", "photoUrl"}`, the shape
      * OnlineTeachersStore decodes on the Swift side.
      *
-     * Reads the projection rather than `teachers`, which is owner-only because
-     * it also holds student names under waitingMessages — reading it here fails
-     * with "Permission denied".
+     * Reads the projection rather than `teachers`, which the database rules
+     * keep owner-only — reading another teacher's node here fails with
+     * "Permission denied".
      *
      * JSON rather than a bridged object graph because the JNI bridge carries
      * strings cheaply, and this is read once per load rather than continuously.

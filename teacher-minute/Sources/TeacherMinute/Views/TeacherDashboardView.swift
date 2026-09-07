@@ -708,12 +708,16 @@ struct TeacherDashboardView: View {
 		  .font(.system(size: 11, weight: .bold))
 		  .foregroundStyle(theme.secondaryText)
 
-		Text(text)
-		  .font(.system(size: 15))
-		  .foregroundStyle(theme.primaryText)
-		  .lineSpacing(4)
-		  .lineLimit(6)
-		  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
+		// A student can build the question out of equations, so this is the
+		// same formula-aware renderer the chat bubbles use: the teacher decides
+		// on the question as the student wrote it, not on raw LaTeX.
+		FormulaAwareText(
+		  text: text,
+		  textColor: theme.primaryText,
+		  font: .system(size: 15),
+		  lineLimit: 6
+		)
+		.frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
 
 		if !photoUrls.isEmpty {
 		  VStack(spacing: 10) {
