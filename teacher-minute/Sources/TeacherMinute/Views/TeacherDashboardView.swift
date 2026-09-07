@@ -175,6 +175,9 @@ struct TeacherDashboardView: View {
 		// unreachable, so the rule is re-checked on every return to the front.
 		guard phase == .active else { return }
 		viewModel.enforceNotificationRequirement()
+		// The mic and camera rows may have been what sent the teacher to
+		// Settings in the first place, so they are re-read on the way back.
+		viewModel.refreshPermissions()
 	  }
 
 	}
@@ -498,9 +501,23 @@ struct TeacherDashboardView: View {
 
 	  FlatCard(padding: 0, outlined: true) {
 		VStack(spacing: 0) {
-		  checklistRow(icon: "mic.fill", title: viewModel.micChecklistTitle, subtitle: viewModel.micChecklistSubtitle, color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
+		  permissionChecklistRow(
+			icon: "mic.fill",
+			title: viewModel.micChecklistTitle,
+			subtitle: viewModel.micChecklistSubtitle,
+			actionTitle: viewModel.micChecklistActionTitle,
+			isGranted: viewModel.hasMicAccess,
+			action: viewModel.requestMicrophoneAccess
+		  )
 		  FlatRule()
-		  checklistRow(icon: "camera.fill", title: viewModel.camChecklistTitle, subtitle: viewModel.camChecklistSubtitle, color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
+		  permissionChecklistRow(
+			icon: "camera.fill",
+			title: viewModel.camChecklistTitle,
+			subtitle: viewModel.camChecklistSubtitle,
+			actionTitle: viewModel.camChecklistActionTitle,
+			isGranted: viewModel.hasCameraAccess,
+			action: viewModel.requestCameraAccess
+		  )
 		  FlatRule()
 		  checklistRow(icon: "wifi", title: viewModel.connectionChecklistTitle, subtitle: viewModel.connectionChecklistSubtitle, color: theme.positive)
 		}
@@ -523,6 +540,48 @@ struct TeacherDashboardView: View {
 	  }
 	}
 	.frame(maxWidth: .infinity)
+  }
+
+  /// A checklist row the teacher can act on. The plain `checklistRow` reports
+  /// something the app cannot change — the network — while these two stand for
+  /// a switch the OS owns, so tapping one goes and asks for it.
+  func permissionChecklistRow(
+	icon: String,
+	title: String,
+	subtitle: String,
+	actionTitle: String,
+	isGranted: Bool,
+	action: @escaping () -> Void
+  ) -> some View {
+	Button(action: action) {
+	  HStack(spacing: 14) {
+		FlatIconTile(systemName: icon, size: 44, tint: isGranted ? theme.positive : theme.secondaryText)
+
+		VStack(alignment: .leading, spacing: 2) {
+		  Text(title)
+			.font(.system(size: 15, weight: .bold))
+			.foregroundStyle(theme.primaryText)
+
+		  Text(subtitle)
+			.font(.system(size: 13))
+			.foregroundStyle(theme.secondaryText)
+		}
+
+		Spacer()
+
+		Text(actionTitle)
+		  .font(.system(size: 14, weight: .bold))
+		  .foregroundStyle(isGranted ? theme.secondaryText : theme.accent)
+	  }
+	  .frame(maxWidth: .infinity, alignment: .leading)
+	  .padding(.horizontal, 16)
+	  .padding(.vertical, 12)
+	  // An opaque background keeps the whole row tappable rather than just the
+	  // glyphs in it; `contentShape` is not available in Skip's SwiftUI. This
+	  // is the outlined card's own fill, so nothing looks different.
+	  .background(theme.screenBackground)
+	}
+	.buttonStyle(.plain)
   }
 
   func checklistRow(icon: String, title: String, subtitle: String, color: Color) -> some View {

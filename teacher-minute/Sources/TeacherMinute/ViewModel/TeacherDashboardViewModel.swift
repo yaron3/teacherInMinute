@@ -12,7 +12,6 @@ import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
-import AVFoundation
 #else
 import SkipFirebaseAuth
 #endif
@@ -56,8 +55,8 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var teacherRating: Double { get set }
   var reviewCount: Int { get set }
   var ratePerMinuteCents: Int { get set }
-  var hasMicAccess: Bool { get set }
-  var hasCameraAccess: Bool { get set }
+  var micPermissionState: PermissionState { get set }
+  var cameraPermissionState: PermissionState { get set }
   var showsSubjectEditor: Bool { get set }
   /// True from launch until the first earnings and rating fetch has come back.
   /// The counters all start at zero, and zero is a perfectly plausible answer
@@ -89,6 +88,12 @@ protocol TeacherDashboardViewModeling: AnyObject {
   func reloadSubjects()
   func activeChatInitialDetails() -> ChatSessionDetails
   func refreshEarnings()
+  /// Re-reads the capture permissions from the OS. The dashboard's readiness
+  /// rows are the app's report on a setting the user can change outside it, so
+  /// they are re-checked on every return to the front.
+  func refreshPermissions()
+  func requestMicrophoneAccess()
+  func requestCameraAccess()
 }
 
 // MARK: - Protocol default strings
@@ -192,6 +197,9 @@ extension TeacherDashboardViewModeling {
 
   // MARK: Online status card
 
+  var hasMicAccess: Bool { micPermissionState.isGranted }
+  var hasCameraAccess: Bool { cameraPermissionState.isGranted }
+
   var micStatusTitle: String { LocalizationSupport.localized("Mic") }
   var micStatusSubtitle: String {
     hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off")
@@ -232,6 +240,12 @@ extension TeacherDashboardViewModeling {
   }
 
   var camChecklistSubtitle: String { LocalizationSupport.localized("Enable for video tutoring.") }
+
+  /// What tapping the row will do: ask the OS, or open the app's settings page
+  /// once the OS will no longer ask. Same wording as the profile's permission
+  /// rows, which is where a teacher meets these first.
+  var micChecklistActionTitle: String { micPermissionState.actionTitle }
+  var camChecklistActionTitle: String { cameraPermissionState.actionTitle }
 
   var connectionChecklistTitle: String { LocalizationSupport.localized("Connection") }
   var connectionChecklistSubtitle: String { LocalizationSupport.localized("Connected") }
@@ -321,8 +335,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var teacherRating: Double = 0
   var reviewCount: Int = 0
   var ratePerMinuteCents = 200
-  var hasMicAccess = false
-  var hasCameraAccess = false
+  var micPermissionState: PermissionState = .notDetermined
+  var cameraPermissionState: PermissionState = .notDetermined
   var showsSubjectEditor = false
   /// Cleared once — after the first profile/rating/earnings load. Later
   /// refreshes (`refreshEarnings`) leave it alone, so finishing a lesson
@@ -1025,10 +1039,27 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   }
   
   private func checkPermissions() {
-#if !os(Android)
-	hasMicAccess = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-	hasCameraAccess = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
-#endif
+	// Asked of `PermissionService` rather than of AVFoundation directly, so
+	// Android answers too — it used to be compiled out there, which left every
+	// readiness row on Android reading "off" whatever the device had granted.
+	micPermissionState = PermissionService.shared.captureStatus(for: .microphone)
+	cameraPermissionState = PermissionService.shared.captureStatus(for: .camera)
+  }
+
+  func refreshPermissions() {
+	checkPermissions()
+  }
+
+  func requestMicrophoneAccess() {
+	Task {
+	  micPermissionState = await PermissionService.shared.resolveCapturePermission(for: .microphone)
+	}
+  }
+
+  func requestCameraAccess() {
+	Task {
+	  cameraPermissionState = await PermissionService.shared.resolveCapturePermission(for: .camera)
+	}
   }
   
   private static func formatCents(_ cents: Int, currency: String = LessonFormatting.defaultCurrencyCode) -> String {
@@ -1076,8 +1107,8 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var teacherRating: Double
   var reviewCount: Int
   var ratePerMinuteCents: Int
-  var hasMicAccess: Bool
-  var hasCameraAccess: Bool
+  var micPermissionState: PermissionState
+  var cameraPermissionState: PermissionState
   var showsSubjectEditor: Bool = false
   /// The mock is handed its figures up front, so nothing is ever pending.
   var isLoadingStats: Bool = false
@@ -1139,8 +1170,8 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
     self.teacherRating = teacherRating
     self.reviewCount = reviewCount
     self.ratePerMinuteCents = ratePerMinuteCents
-    self.hasMicAccess = hasMicAccess
-    self.hasCameraAccess = hasCameraAccess
+    self.micPermissionState = hasMicAccess ? .granted : .denied
+    self.cameraPermissionState = hasCameraAccess ? .granted : .denied
 
     if isOnline {
       let id = "mock-invite-1"
@@ -1168,6 +1199,11 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   func editSubjects() { showsSubjectEditor = true }
   func reloadSubjects() {}
   func refreshEarnings() {}
+  /// Inert in previews, like `enforceNotificationRequirement`: a preview must
+  /// not put the system's permission dialog up.
+  func refreshPermissions() {}
+  func requestMicrophoneAccess() { micPermissionState = .granted }
+  func requestCameraAccess() { cameraPermissionState = .granted }
   func activeChatInitialDetails() -> ChatSessionDetails {
     ChatSessionDetails(
       questionId: "",

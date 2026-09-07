@@ -51,6 +51,17 @@ object AndroidPermissionManager {
         return ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
     }
 
+    /**
+     * Whether the system would still put its dialog up for this permission.
+     * False both before the first ask and after the user has denied it for
+     * good, so it only separates the two once a request has been made.
+     */
+    @JvmStatic
+    fun shouldShowRationale(permission: String): Boolean {
+        val activity = MainActivity.currentActivity ?: return false
+        return ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
+    }
+
     @JvmStatic
     fun requestPermission(permission: String): Boolean {
         if (hasPermission(permission)) {
