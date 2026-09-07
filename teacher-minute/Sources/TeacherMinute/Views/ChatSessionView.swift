@@ -847,8 +847,13 @@ struct ChatSessionView: View {
       .padding(16)
       .id(liveKitRevision)
 #else
-    return AndroidVideoFeed(isStudent: isStudent, isCameraOff: isCameraOff, theme: theme)
-      .padding(16)
+    return AndroidVideoFeed(
+      isStudent: isStudent,
+      isCameraOff: isCameraOff,
+      theme: theme,
+      waitingForVideoText: viewModel.waitingForVideoText
+    )
+    .padding(16)
 #endif
   }
 
@@ -920,9 +925,14 @@ struct ChatSessionView: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
     } else {
-      AndroidVideoFeed(isStudent: isStudent, isCameraOff: isCameraOff, theme: theme)
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+      AndroidVideoFeed(
+        isStudent: isStudent,
+        isCameraOff: isCameraOff,
+        theme: theme,
+        waitingForVideoText: viewModel.waitingForVideoText
+      )
+      .padding(.horizontal, 12)
+      .padding(.bottom, 8)
     }
 #endif
   }
@@ -972,9 +982,9 @@ struct ChatSessionView: View {
       )
       .id(liveKitRevision)
 #else
-    AndroidVideoFeed(isStudent: true, isCameraOff: isCameraOff, theme: theme)
-      .frame(width: 96, height: 132)
-      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    // Your own camera, not the whole feed: the feed carries the remote
+    // participant, and shrinking it to preview size put them in the window.
+    AndroidSelfVideoPreview(isCameraOff: isCameraOff, theme: theme)
       .offset(teacherPreviewOffset)
       .gesture(
         DragGesture()
