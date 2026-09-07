@@ -121,7 +121,7 @@ struct MainTabView: View {
   @ViewBuilder
   func tabIcon(_ tab: MainTab) -> some View {
 	let name = tab.systemImage(isSelected: viewModel.selectedTab == tab)
-	if tab == .lessons {
+	if tab == .lessons || tab == .profile {
 	  // Bundled asset, not an SF Symbol.
 	  Image(name, bundle: .module)
 		.renderingMode(.template)
