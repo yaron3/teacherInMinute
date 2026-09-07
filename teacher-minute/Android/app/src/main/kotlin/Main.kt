@@ -17,9 +17,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -276,10 +273,11 @@ internal fun PresentationRootView(context: ComposeContext) {
     PresentationRoot(defaultColorScheme = colorScheme, context = context) { ctx ->
         SyncSystemBarsWithTheme()
         val contentContext = ctx.content()
+        // No status-bar inset here: SkipUI's `PresentationRoot` has already
+        // padded this content by `WindowInsets.safeDrawing`, so adding one
+        // leaves an empty status-bar-tall band above every screen.
         Box(
-            modifier = ctx.modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.statusBars),
+            modifier = ctx.modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             AppRootView().Compose(context = contentContext)
