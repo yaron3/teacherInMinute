@@ -705,6 +705,12 @@ extension ChatSessionViewModeling {
   var sessionTimeLabel: String { LocalizationSupport.localized("Session Time") }
   var minutesLabel: String { LocalizationSupport.localized("minutes") }
 
+  // MARK: Empty thread
+
+  var emptyThreadHintText: String {
+    LocalizationSupport.localized("Start with a text explanation, then use the board below for the math work.")
+  }
+
   // MARK: Tab bar
 
   var chatTabTitle: String { LocalizationSupport.localized("Chat") }

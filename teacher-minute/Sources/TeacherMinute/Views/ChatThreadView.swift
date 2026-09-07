@@ -21,13 +21,14 @@ struct ChatThreadRow: View {
 
 /// The empty-thread hint, shared for the same reason as `ChatThreadRow`.
 struct ChatThreadEmptyNotice: View {
+  let viewModel: any ChatSessionViewModeling
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
 
   var body: some View {
-    Text(LocalizationSupport.localized("Start with a text explanation, then use the board below for the math work."))
+    Text(viewModel.emptyThreadHintText)
       .font(.system(size: 13))
       .foregroundStyle(theme.secondaryText)
       .multilineTextAlignment(.center)
@@ -53,7 +54,7 @@ struct ChatThreadView: View {
       ScrollView(.vertical, showsIndicators: false) {
         LazyVStack(spacing: 8) {
           if messages.isEmpty {
-            ChatThreadEmptyNotice()
+            ChatThreadEmptyNotice(viewModel: viewModel)
           }
 
           ForEach(messages) { message in

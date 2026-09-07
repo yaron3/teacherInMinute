@@ -437,7 +437,8 @@ struct TeacherDashboardView: View {
 		  voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 		  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
-			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
+			  viewModel: viewModel
 		) {
 		  viewModel.acceptInvite(questionId: inviteID)
 		} decline: {
@@ -464,7 +465,8 @@ struct TeacherDashboardView: View {
 			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
-			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
+			  viewModel: viewModel
 		  ) {
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {
@@ -591,12 +593,13 @@ struct TeacherDashboardView: View {
 	var conversationType: String = "text"
 	var studentName: String = ""
 	var studentImageURL: String = ""
+	let viewModel: any TeacherDashboardViewModeling
 	let accept: () -> Void
 	let decline: () -> Void
 
 	private var displayStudentName: String {
 	  let trimmed = studentName.trimmingCharacters(in: .whitespacesAndNewlines)
-	  return trimmed.isEmpty ? LocalizationSupport.localized("Student") : trimmed
+	  return trimmed.isEmpty ? viewModel.unnamedStudentLabel : trimmed
 	}
 
 	private var sessionIcon: String? {
@@ -625,7 +628,7 @@ struct TeacherDashboardView: View {
 	private var isExpired: Bool { now > expiresAt }
 
 	private var timerCaption: String {
-	  now <= expiresAt ? LocalizationSupport.localized("SECONDS") : LocalizationSupport.localized("WAITING")
+	  viewModel.liveRequestTimerCaption(isExpired: isExpired)
 	}
 	@Environment(\.colorScheme) var colorScheme
 	@Environment(\.horizontalSizeClass) var hSizeClass
@@ -668,7 +671,7 @@ struct TeacherDashboardView: View {
 		  if let icon = sessionIcon {
 			PlatformIcon(systemName: icon, size: 14, weight: .medium, color: theme.primaryText)
 		  }
-		  FlatChip(title: LocalizationSupport.localized(topic.capitalized))
+		  FlatChip(title: viewModel.localizedTopicName(topic))
 		}
 	  }
 	  .padding(.horizontal, 16)
@@ -690,7 +693,7 @@ struct TeacherDashboardView: View {
 			.font(.system(size: 15, weight: .bold))
 			.foregroundStyle(theme.primaryText)
 
-		  Text(LocalizationSupport.localized("Waiting now"))
+		  Text(viewModel.waitingNowLabel)
 			.font(.system(size: 12))
 			.foregroundStyle(theme.secondaryText)
 		}
@@ -703,7 +706,7 @@ struct TeacherDashboardView: View {
 
 	var questionSection: some View {
 	  VStack(alignment: .leading, spacing: 12) {
-		Text(LocalizationSupport.localized("QUESTION"))
+		Text(viewModel.questionSectionHeader)
 		  .font(.system(size: 11, weight: .bold))
 		  .foregroundStyle(theme.secondaryText)
 
@@ -752,7 +755,7 @@ struct TeacherDashboardView: View {
 		FlatIconTile(systemName: "play.fill", size: 40, background: theme.screenBackground)
 
 		VStack(alignment: .leading, spacing: 1) {
-		  Text(LocalizationSupport.localized("Voice Message"))
+		  Text(viewModel.voiceMessageLabel)
 			.font(.system(size: 14, weight: .bold))
 			.foregroundStyle(theme.primaryText)
 		  if let formatted = formattedVoiceMessageDuration {
@@ -779,10 +782,10 @@ struct TeacherDashboardView: View {
 
 	var actions: some View {
 	  VStack(spacing: 10) {
-		FlatPrimaryButton(title: LocalizationSupport.localized("Accept Question"), action: accept)
+		FlatPrimaryButton(title: viewModel.acceptQuestionLabel, action: accept)
 
 		Button(action: decline) {
-		  Text(LocalizationSupport.localized("Decline"))
+		  Text(viewModel.declineLabel)
 			.font(.system(size: 14, weight: .bold))
 			.foregroundStyle(theme.secondaryText)
 			.frame(maxWidth: .infinity)
@@ -819,7 +822,8 @@ struct TeacherIncomingQuestionOverlay: View {
 			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
-			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
+			  viewModel: viewModel
 		  ) {
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {

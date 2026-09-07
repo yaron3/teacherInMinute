@@ -235,6 +235,30 @@ extension TeacherDashboardViewModeling {
 
   var connectionChecklistTitle: String { LocalizationSupport.localized("Connection") }
   var connectionChecklistSubtitle: String { LocalizationSupport.localized("Connected") }
+
+  // MARK: Live request card
+
+  /// Shown in place of a student's name when the invite carries none.
+  var unnamedStudentLabel: String { LocalizationSupport.localized("Student") }
+  var waitingNowLabel: String { LocalizationSupport.localized("Waiting now") }
+  var questionSectionHeader: String { LocalizationSupport.localized("QUESTION") }
+  var voiceMessageLabel: String { LocalizationSupport.localized("Voice Message") }
+  var acceptQuestionLabel: String { LocalizationSupport.localized("Accept Question") }
+  var declineLabel: String { LocalizationSupport.localized("Decline") }
+
+  /// The caption under the countdown: it counts seconds down to the invite's
+  /// expiry, then says the teacher is being waited on.
+  func liveRequestTimerCaption(isExpired: Bool) -> String {
+    isExpired
+      ? LocalizationSupport.localized("WAITING")
+      : LocalizationSupport.localized("SECONDS")
+  }
+
+  /// Topics are stored lowercased and localized by their capitalized form.
+  func localizedTopicName(_ topic: String) -> String {
+    LocalizationSupport.localized(topic.capitalized)
+  }
+
 }
 
 // MARK: - ViewModel

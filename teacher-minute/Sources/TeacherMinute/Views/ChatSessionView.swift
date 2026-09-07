@@ -637,7 +637,7 @@ struct ChatSessionView: View {
             if messages.count == 0 {
               sessionNotice
 
-              ChatThreadEmptyNotice()
+              ChatThreadEmptyNotice(viewModel: viewModel)
             }
 
             ForEach(messages) { message in

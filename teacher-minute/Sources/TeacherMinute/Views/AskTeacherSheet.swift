@@ -100,7 +100,7 @@ struct AskTeacherSheet: View {
         ScrollView(.vertical, showsIndicators: false) {
 			  VStack(alignment: .leading, spacing: sheetSpacing) {
 			VStack(alignment: .leading, spacing: sectionSpacing) {
-                    Text(LocalizationSupport.localized("Session type"))
+                    Text(viewModel.sessionTypeSectionTitle)
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
@@ -108,7 +108,7 @@ struct AskTeacherSheet: View {
 
                     HStack(spacing: 10) {
                         ConversationTypeChip(
-                            title: LocalizationSupport.localized("Text"),
+                            title: viewModel.textSessionTypeLabel,
                             isSelected: conversationType == "text",
                             systemIcons: ["bubble.left.fill"],
                             accent: .teal
@@ -116,7 +116,7 @@ struct AskTeacherSheet: View {
                             conversationType = "text"
                         }
                         ConversationTypeChip(
-                            title: LocalizationSupport.localized("Audio"),
+                            title: viewModel.audioSessionTypeLabel,
                             isSelected: conversationType == "audio",
                             systemIcons: ["mic.fill"],
                             accent: .teal
@@ -124,7 +124,7 @@ struct AskTeacherSheet: View {
                             conversationType = "audio"
                         }
                         ConversationTypeChip(
-                            title: LocalizationSupport.localized("Video"),
+                            title: viewModel.videoSessionTypeLabel,
                             isSelected: conversationType == "video",
                             systemIcons: ["video.fill"],
                             accent: .teal
@@ -136,7 +136,7 @@ struct AskTeacherSheet: View {
                 }
 
 			VStack(alignment: .leading, spacing: sectionSpacing) {
-                    Text(LocalizationSupport.localized("Topic"))
+                    Text(viewModel.topicSectionTitle)
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
@@ -148,7 +148,7 @@ struct AskTeacherSheet: View {
                                 Button {
                                     selectedTopic = topic
                                 } label: {
-                                    Text(LocalizationSupport.localized(topic.capitalized))
+                                    Text(viewModel.localizedTopicName(topic))
                                         .font(.system(size: 13, weight: .semibold))
                                         .foregroundStyle(selectedTopic == topic ? theme.onAccentText : theme.primaryText)
                                         .padding(.horizontal, 16)
@@ -164,7 +164,7 @@ struct AskTeacherSheet: View {
                 }
 
 			  VStack(alignment: .leading, spacing: sectionSpacing) {
-                    Text(LocalizationSupport.localized("Your question"))
+                    Text(viewModel.yourQuestionSectionTitle)
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
@@ -190,7 +190,7 @@ struct AskTeacherSheet: View {
                     // counter so the question can be sent without dismissing it.
                     HStack(spacing: 10) {
                         if uploadedPhotoUrls.isEmpty {
-                            Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
+                            Text(viewModel.minimumCharactersText(count: questionText.count))
                                 .font(.system(size: 11))
                                 .multilineTextAlignment(.leading)
                                 .foregroundStyle(canSubmit ? theme.positive : theme.secondaryText)
@@ -202,7 +202,7 @@ struct AskTeacherSheet: View {
                         Button {
                             Task { await findTeacherTapped() }
                         } label: {
-                            Text(LocalizationSupport.localized("Send"))
+                            Text(viewModel.sendLabel)
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(isSendDisabled ? theme.secondaryText : theme.onAccentText)
                                 .padding(.horizontal, 18)
@@ -227,7 +227,7 @@ struct AskTeacherSheet: View {
                 Button {
                     Task { await findTeacherTapped() }
                 } label: {
-                    Text(LocalizationSupport.localized("Find me a Teacher Now"))
+                    Text(viewModel.findTeacherNowLabel)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(isFindDisabled ? theme.secondaryText : theme.onAccentText)
                         .frame(maxWidth: .infinity)
@@ -245,11 +245,11 @@ struct AskTeacherSheet: View {
         }
         .scrollDismissesKeyboard(.immediately)
         }
-        .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
+        .navigationTitle(viewModel.askATeacherSheetTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(LocalizationSupport.localized("Cancel")) { closeAskTeacher() }
+                Button(viewModel.cancelLabel) { closeAskTeacher() }
             }
         }
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
@@ -259,13 +259,13 @@ struct AskTeacherSheet: View {
         }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
         .appDialog(
-            LocalizationSupport.localized("Permission required"),
+            viewModel.permissionRequiredTitle,
             isPresented: Binding(
                 get: { permissionAlertMessage != nil },
                 set: { if !$0 { permissionAlertMessage = nil } }
             ),
             message: permissionAlertMessage ?? "",
-            actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+            actions: [AppDialogAction(viewModel.okLabel)]
         )
     }
 
@@ -278,8 +278,8 @@ struct AskTeacherSheet: View {
             let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
             if !micState.isGranted {
                 permissionAlertMessage = conversationType == "video"
-                    ? LocalizationSupport.localized("Microphone and camera access are required for a video session.")
-                    : LocalizationSupport.localized("Microphone access is required for an audio session.")
+                    ? viewModel.videoPermissionRequiredMessage
+                    : viewModel.audioPermissionRequiredMessage
                 return
             }
         }
@@ -287,7 +287,7 @@ struct AskTeacherSheet: View {
         if conversationType == "video" {
             let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
             if !cameraState.isGranted {
-                permissionAlertMessage = LocalizationSupport.localized("Microphone and camera access are required for a video session.")
+                permissionAlertMessage = viewModel.videoPermissionRequiredMessage
                 return
             }
         }
@@ -303,7 +303,7 @@ struct AskTeacherSheet: View {
 
     var photoAttachmentSection: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
-            Text(LocalizationSupport.localized("Attach a photo (optional)"))
+            Text(viewModel.attachPhotoSectionTitle)
                 .font(.system(size: 14, weight: .semibold))
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -352,17 +352,17 @@ struct AskTeacherSheet: View {
         .buttonStyle(.plain)
         .disabled(isUploadingPhoto)
         .confirmationDialog(
-            LocalizationSupport.localized("Add a photo"),
+            viewModel.addPhotoDialogTitle,
             isPresented: $showAndroidPhotoSourceDialog,
             titleVisibility: .visible
         ) {
-            Button(LocalizationSupport.localized("Take Photo")) {
+            Button(viewModel.takePhotoLabel) {
                 pickAndroidPhoto(source: .camera)
             }
-            Button(LocalizationSupport.localized("Choose from Library")) {
+            Button(viewModel.chooseFromLibraryLabel) {
                 pickAndroidPhoto(source: .gallery)
             }
-            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+            Button(viewModel.cancelLabel, role: .cancel) {}
         }
 #endif
     }
@@ -385,17 +385,17 @@ struct AskTeacherSheet: View {
         .buttonStyle(.plain)
         .disabled(isUploadingPhoto)
         .confirmationDialog(
-            LocalizationSupport.localized("Add a photo"),
+            viewModel.addPhotoDialogTitle,
             isPresented: $showAndroidPhotoSourceDialog,
             titleVisibility: .visible
         ) {
-            Button(LocalizationSupport.localized("Take Photo")) {
+            Button(viewModel.takePhotoLabel) {
                 pickAndroidPhoto(source: .camera)
             }
-            Button(LocalizationSupport.localized("Choose from Library")) {
+            Button(viewModel.chooseFromLibraryLabel) {
                 pickAndroidPhoto(source: .gallery)
             }
-            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+            Button(viewModel.cancelLabel, role: .cancel) {}
         }
 #endif
     }
@@ -414,7 +414,7 @@ struct AskTeacherSheet: View {
             } else {
                 VStack(spacing: 6) {
                     PlatformIcon(systemName: "camera.fill", size: 20, weight: .semibold, color: theme.secondaryText)
-                    Text(LocalizationSupport.localized("Tap to upload a photo of your question"))
+                    Text(viewModel.tapToUploadPhotoText)
                         .font(.system(size: 13))
                         .foregroundStyle(theme.secondaryText)
                         .multilineTextAlignment(.center)
@@ -483,7 +483,7 @@ struct AskTeacherSheet: View {
                 photoUploadError = nil
                 defer { isUploadingPhoto = false }
                 guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
-                    photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
+                    photoUploadError = viewModel.signInToAttachPhotoError
                     return
                 }
                 let url = try await StorageService.shared.uploadQuestionImage(data: data, uid: uid)
@@ -505,7 +505,7 @@ struct AskTeacherSheet: View {
             if source == .camera {
                 let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
                 guard cameraState.isGranted else {
-                    photoUploadError = LocalizationSupport.localized("Camera access is required to take a photo.")
+                    photoUploadError = viewModel.cameraRequiredForPhotoError
                     return
                 }
             }
@@ -521,11 +521,11 @@ struct AskTeacherSheet: View {
                 }.value
                 guard !base64.isEmpty else { return }
                 guard let data = Data(base64Encoded: base64) else {
-                    photoUploadError = LocalizationSupport.localized("Could not read selected image")
+                    photoUploadError = viewModel.couldNotReadImageError
                     return
                 }
                 guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
-                    photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
+                    photoUploadError = viewModel.signInToAttachPhotoError
                     return
                 }
                 let url = try await StorageService.shared.uploadQuestionImage(data: data, uid: uid)
@@ -545,7 +545,7 @@ struct AskTeacherSheet: View {
     var mathSymbolsSection: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
             HStack {
-                Text(LocalizationSupport.localized("Mathematical symbols – tap to add:"))
+                Text(viewModel.mathSymbolsSectionTitle)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                 Spacer()
@@ -609,7 +609,7 @@ struct AskTeacherSheet: View {
     @ViewBuilder
     var footerText: some View {
         if viewModel.remainingMinutes > 0 {
-            Text(footerTextString)
+            Text(viewModel.askTeacherFooterText)
                 .font(.system(size: 12))
                 .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -617,15 +617,6 @@ struct AskTeacherSheet: View {
         }
     }
 
-    private var footerTextString: String {
-        let minutes = viewModel.remainingMinutes
-        let minutesStr = String(format: LocalizationSupport.localized("You have %d minutes"), minutes)
-        let priceCents = viewModel.selectedPricePerMinuteCents
-        guard priceCents > 0 else { return minutesStr }
-        let valueStr = LessonFormatting.currencyText(cents: minutes * priceCents)
-        let approxStr = String(format: LocalizationSupport.localized("~%@ value"), valueStr)
-        return minutesStr + " · " + approxStr
-    }
 }
 
 #if os(Android)
