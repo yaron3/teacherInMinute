@@ -49,7 +49,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     teacherId: String = "mock-teacher",
     messages: [ChatMessage] = [],
     boardStrokes: [BoardStroke] = [],
-    isConnecting: Bool = true,
+    isConnecting: Bool = false,
     participantName: String = "Michael",
     participantImageURL: String = "",
     currentUserImageURL: String = "",
@@ -200,7 +200,15 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
         senderRole: "student",
         createdAt: Date().timeIntervalSince1970 * 1000.0 - 60_000.0,
         isMine: currentRole == "student"
-      )
+      ),
+	  ChatMessage(
+		id: "mock-3",
+		text: "Do you know the quadratic formula? It's -b ± √(b^2 - 4ac) / 2a. Let's try it out with x^2 - 5x + 6 = 0",
+		senderUid: currentRole == "student" ? "mock-current-user" : "mock-other-user",
+		senderRole: "teacher",
+		createdAt: Date().timeIntervalSince1970 * 1000.0 - 30_000.0,
+		isMine: currentRole == "teacher"
+	  )
     ]
   }
 

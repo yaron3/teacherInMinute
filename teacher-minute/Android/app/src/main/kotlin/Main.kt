@@ -62,6 +62,16 @@ open class MainActivity: AppCompatActivity {
 
     private var blockBackCallback: OnBackPressedCallback? = null
 
+    /**
+     * Back handling while a lesson is on screen. The lesson is a pushed
+     * navigation destination, and Compose Navigation registers its own back
+     * callback from inside `setContent` — added after `blockBackCallback`, so
+     * it wins the dispatcher and pops the lesson out from under a teacher or
+     * student who is still connected and being billed. This callback is added
+     * only when a lesson starts, which puts it last of all and so first to run.
+     */
+    private var sessionBackCallback: OnBackPressedCallback? = null
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         currentActivity = this
@@ -206,6 +216,34 @@ open class MainActivity: AppCompatActivity {
             val activity = currentActivity ?: return
             activity.runOnUiThread {
                 activity.blockBackCallback?.isEnabled = blocked
+            }
+        }
+
+        /**
+         * Takes back away from the navigation stack for the duration of a
+         * lesson, so it backgrounds the app — what it already does on the tabs
+         * — instead of popping a live session.
+         */
+        @JvmStatic
+        fun setSessionBackBlocked(blocked: Boolean) {
+            val activity = currentActivity ?: return
+            activity.runOnUiThread {
+                if (blocked) {
+                    if (activity.sessionBackCallback != null) {
+                        return@runOnUiThread
+                    }
+                    val callback = object : OnBackPressedCallback(true) {
+                        override fun handleOnBackPressed() {
+                            logger.info("[BackNav] suppressing system back during live session")
+                            activity.moveTaskToBack(true)
+                        }
+                    }
+                    activity.sessionBackCallback = callback
+                    activity.onBackPressedDispatcher.addCallback(activity, callback)
+                } else {
+                    activity.sessionBackCallback?.remove()
+                    activity.sessionBackCallback = null
+                }
             }
         }
     }

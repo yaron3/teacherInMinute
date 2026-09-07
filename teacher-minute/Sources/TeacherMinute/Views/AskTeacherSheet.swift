@@ -184,13 +184,37 @@ struct AskTeacherSheet: View {
                         .background(theme.fieldBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                    if uploadedPhotoUrls.isEmpty {
-                        Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
-                            .font(.system(size: 11))
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(canSubmit ? theme.positive : theme.secondaryText)
+                    // The primary "Find me a Teacher Now" button sits below the
+                    // photo and info sections, off-screen while the keyboard is
+                    // up. This second entry point rides alongside the character
+                    // counter so the question can be sent without dismissing it.
+                    HStack(spacing: 10) {
+                        if uploadedPhotoUrls.isEmpty {
+                            Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
+                                .font(.system(size: 11))
+                                .multilineTextAlignment(.leading)
+                                .foregroundStyle(canSubmit ? theme.positive : theme.secondaryText)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        let isSendDisabled = !canSubmit || isRequestingPermission
+                        Button {
+                            Task { await findTeacherTapped() }
+                        } label: {
+                            Text(LocalizationSupport.localized("Send"))
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(isSendDisabled ? theme.secondaryText : theme.onAccentText)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 8)
+                                .background(isSendDisabled ? theme.cardBackground : theme.accent)
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .opacity(isSendDisabled ? 0.6 : 1.0)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSendDisabled)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 mathSymbolsSection

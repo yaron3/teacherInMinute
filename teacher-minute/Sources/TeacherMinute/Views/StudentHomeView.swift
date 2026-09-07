@@ -33,15 +33,18 @@ struct StudentHomeView: View {
   }
 
   var body: some View {
-	homeContent
-	.fullScreenCover(isPresented: $showsAskTeacher) {
-	  NavigationStack {
-		AskTeacherSheet(viewModel: viewModel)
-		  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-		  .id(languagePreference)
-	  }
-	  .navigationTitle(viewModel.askATeacherSheetTitle)
+	// The home screen draws its own header, so the stack's bar stays hidden
+	// here and appears only on the pushed ask screen, which supplies the title
+	// and the back button.
+	NavigationStack {
+	  homeContent
+		.toolbar(.hidden, for: .navigationBar)
+		.navigationDestination(isPresented: $showsAskTeacher) {
+		  askTeacherScreen
+		}
+		.navigationDestination(isPresented: isInLiveSession) {
+		  liveSessionScreen
+		}
 	}
 	.sheet(isPresented: $showsNotificationExplainer) {
 	  NotificationPermissionExplainerView {
@@ -66,6 +69,45 @@ struct StudentHomeView: View {
 		  Task { await viewModel.checkout(option, method: method) }
 		}
 	  }
+	}
+  }
+
+  var askTeacherScreen: some View {
+	AskTeacherSheet(viewModel: viewModel)
+	  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+	  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+	  .id(languagePreference)
+	  // Pushing keeps the tab bar on screen, which the full-screen cover
+	  // covered. The modifier belongs on the pushed view rather than on
+	  // `hidesTabBar`, which drives the TabView itself and so does not
+	  // apply to a screen pushed inside one of its tabs.
+	  .toolbar(.hidden, for: .tabBar)
+  }
+
+  /// Drives the lesson push off `searchState` alone. The setter is inert on
+  /// purpose: a lesson is billed by the minute, so it ends through the
+  /// session's own control — which resets the search state and so pops this
+  /// screen — and never through a back gesture.
+  var isInLiveSession: Binding<Bool> {
+	Binding(
+	  get: {
+		if case .matched = viewModel.searchState { return true }
+		return false
+	  },
+	  set: { _ in }
+	)
+  }
+
+  @ViewBuilder
+  var liveSessionScreen: some View {
+	if case .matched(let questionId, let liveKitRoom, let liveKitToken) = viewModel.searchState {
+	  StudentLiveSessionScreen(
+		viewModel: viewModel,
+		questionId: questionId,
+		liveKitRoom: liveKitRoom,
+		liveKitToken: liveKitToken,
+		onLessonEnded: { showsNotificationExplainer = true }
+	  )
 	}
   }
 
@@ -492,6 +534,7 @@ struct StudentHomeView: View {
               name: teacher.name,
               subject: teacher.subject,
               initial: teacher.initial,
+              imageURL: teacher.profileImageURL,
               tint: tint.fill,
               tintForeground: tint.foreground
             )
@@ -689,18 +732,20 @@ struct StudentHomeView: View {
     }
   }
 
-  func onlineTeacherCard(name: String, subject: String, initial: String, tint: Color, tintForeground: Color) -> some View {
+  func onlineTeacherCard(name: String, subject: String, initial: String, imageURL: String, tint: Color, tintForeground: Color) -> some View {
     FlatCard(outlined: true) {
       VStack(alignment: .center, spacing: 10) {
         ZStack(alignment: .bottomTrailing) {
-          Circle()
-            .fill(tint.opacity(0.82))
-            .frame(width: 74, height: 74)
-            .overlay {
-              Text(initial)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(tintForeground)
-            }
+          // The photo the backend publishes with the presence entry; the tinted
+          // initial stays as the fallback for teachers who have not set one.
+          ProfileAvatarView(
+            imageURL: imageURL,
+            size: 74,
+            fallbackSystemImage: "person.crop.circle.fill",
+            background: tint.opacity(0.82),
+            tint: tintForeground,
+            initial: initial
+          )
           Circle()
             .fill(theme.positive)
             .frame(width: 18, height: 18)
@@ -1020,28 +1065,9 @@ struct StudentHomeView: View {
         cancelLabel: viewModel.cancelLabel,
         onCancel: { Task { await viewModel.cancelSearch() } }
       )
-    case .matched(let questionId, let liveKitRoom, let liveKitToken):
-      ChatSessionView(
-        questionId: questionId,
-        role: "student",
-        title: viewModel.chatTeacherTitle,
-        conversationType: viewModel.activeConversationType,
-        liveKitRoom: liveKitRoom,
-        liveKitToken: liveKitToken,
-        initialDetails: viewModel.chatInitialDetails(questionId: questionId)
-      ) {
-        Task {
-          await viewModel.refreshAfterLessonEnded()
-          viewModel.resetSearch()
-          // After the student's first lesson, offer notifications behind a
-          // custom explanation (the system prompt only appears if they opt in).
-          if await NotificationPromptStore.shouldPresentExplanation() {
-            showsNotificationExplainer = true
-          }
-        }
-      }
-      .onAppear { hidesTabBar = true }
-      .onDisappear { hidesTabBar = false }
+    case .matched:
+      // The matched lesson is pushed instead — see `liveSessionScreen`.
+      EmptyView()
     case .noMatch:
       NoMatchOverlay(
         title: viewModel.noTeachersAvailableTitle,
@@ -1675,6 +1701,63 @@ struct RecentLessonRow: View {
     .padding(.horizontal, 16)
     .padding(.vertical, 14)
     .background(theme.screenBackground)
+  }
+}
+
+
+/// The student's lesson, as a pushed screen.
+///
+/// It pops itself rather than letting `StudentHomeView` pop it by resetting
+/// `searchState`: on Android the pushed destination is the only thing composed,
+/// so the modifier that would notice the reset is not running and the screen
+/// would stay up after the lesson ended.
+struct StudentLiveSessionScreen: View {
+  let viewModel: any StudentHomeViewModeling
+  let questionId: String
+  let liveKitRoom: String
+  let liveKitToken: String
+  /// Called when the first lesson finishes, so home can offer notifications.
+  let onLessonEnded: @MainActor () -> Void
+  @Environment(\.dismiss) var dismiss
+
+  var body: some View {
+	ChatSessionView(
+	  questionId: questionId,
+	  role: "student",
+	  title: viewModel.chatTeacherTitle,
+	  conversationType: viewModel.activeConversationType,
+	  liveKitRoom: liveKitRoom,
+	  liveKitToken: liveKitToken,
+	  initialDetails: viewModel.chatInitialDetails(questionId: questionId)
+	) {
+	  dismiss()
+	  Task {
+		await viewModel.refreshAfterLessonEnded()
+		viewModel.resetSearch()
+		// After the student's first lesson, offer notifications behind a
+		// custom explanation (the system prompt only appears if they opt in).
+		if await NotificationPromptStore.shouldPresentExplanation() {
+		  onLessonEnded()
+		}
+	  }
+	}
+	// The session draws its own header and end control, and must not be
+	// escapable by a back tap or edge swipe while it is running.
+	.toolbar(.hidden, for: .tabBar)
+	.toolbar(.hidden, for: .navigationBar)
+	.navigationBarBackButtonHidden(true)
+	// Compose Navigation would otherwise pop a running lesson on a system
+	// back press, so back is taken over for as long as it lasts.
+	.onAppear {
+#if os(Android)
+	  AndroidBackNavigationBridge.setSessionBackBlocked(true)
+#endif
+	}
+	.onDisappear {
+#if os(Android)
+	  AndroidBackNavigationBridge.setSessionBackBlocked(false)
+#endif
+	}
   }
 }
 

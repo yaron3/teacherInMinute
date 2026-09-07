@@ -55,13 +55,13 @@ struct TeacherDashboardView: View {
 	} else if showsSessionOverlay, let questionId = viewModel.activeQuestionId {
 	  ChatSessionView(
 		questionId: questionId,
-			role: "teacher",
-			title: viewModel.chatStudentTitle,
-			conversationType: viewModel.activeConversationType,
-            liveKitRoom: viewModel.activeCallRoom ?? "",
-            liveKitToken: viewModel.activeCallToken ?? "",
-			initialDetails: viewModel.activeChatInitialDetails()
-		  ) {
+		role: "teacher",
+		title: viewModel.chatStudentTitle,
+		conversationType: viewModel.activeConversationType,
+		liveKitRoom: viewModel.activeCallRoom ?? "",
+		liveKitToken: viewModel.activeCallToken ?? "",
+		initialDetails: viewModel.activeChatInitialDetails()
+	  ) {
 		viewModel.endCall()
 	  }
 	  .onAppear {
@@ -71,8 +71,7 @@ struct TeacherDashboardView: View {
 		hidesTabBar = false
 	  }
 	} else {
-	  ZStack {
-		ScrollView(.vertical, showsIndicators: false) {
+	  ScrollView(.vertical, showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 0) {
 			FlatTopHeader(
 			  eyebrow: viewModel.teacherEyebrow,
@@ -116,9 +115,9 @@ struct TeacherDashboardView: View {
 		  }
 		  .padding(.horizontal, 20)
 		  .padding(.bottom, 40)
-		}
-		.background(theme.screenBackground)
-
+	  }
+	  .background(theme.screenBackground)
+	  .overlay {
 		if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
 		  TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
 			.onAppear {

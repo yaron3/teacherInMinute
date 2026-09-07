@@ -214,3 +214,44 @@ struct ChatBubble: View {
     return trimmed.hasPrefix("\\frac") || trimmed.hasPrefix("\\sqrt")
   }
 }
+
+#if os(iOS)
+#Preview("outgoing") {
+    ChatBubble(
+        message: ChatMessage(id: "1", text: "Hey! Can you help me with the quadratic formula?", senderUid: "me", senderRole: "student", createdAt: Date().timeIntervalSince1970 * 1000, isMine: true),
+        timeText: "Just now",
+        avatarImageURL: ""
+    )
+    .padding()
+}
+
+#Preview("incoming") {
+    ChatBubble(
+        message: ChatMessage(id: "2", text: "Sure! The formula is $x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$. Let me walk you through it.", senderUid: "teacher", senderRole: "teacher", createdAt: Date().timeIntervalSince1970 * 1000, isMine: false),
+        timeText: "1 min ago",
+        avatarImageURL: ""
+    )
+    .padding()
+}
+
+#Preview("both") {
+    VStack(spacing: 12) {
+        ChatBubble(
+            message: ChatMessage(id: "1", text: "Hey! Can you help me with the quadratic formula?", senderUid: "me", senderRole: "student", createdAt: Date().timeIntervalSince1970 * 1000, isMine: true),
+            timeText: "2 min ago",
+            avatarImageURL: ""
+        )
+        ChatBubble(
+            message: ChatMessage(id: "2", text: "Sure! The formula is $x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$.", senderUid: "teacher", senderRole: "teacher", createdAt: Date().timeIntervalSince1970 * 1000, isMine: false),
+            timeText: "1 min ago",
+            avatarImageURL: ""
+        )
+        ChatBubble(
+            message: ChatMessage(id: "3", text: "Oh that makes sense, thank you!", senderUid: "me", senderRole: "student", createdAt: Date().timeIntervalSince1970 * 1000, isMine: true),
+            timeText: "Just now",
+            avatarImageURL: ""
+        )
+    }
+    .padding()
+}
+#endif

@@ -56,6 +56,7 @@ struct ChatSessionView: View {
   @State var saveBoardIsRemoteInitiated = false
   @State var sessionFrozenDate: Date?
   @State var isTransitioningToText = false
+  @State var inputBarHeight: CGFloat = 0
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let liveKitRoom: String
@@ -109,6 +110,7 @@ struct ChatSessionView: View {
   }
 
   var body: some View {
+	
     ZStack {
       Group {
         if isConnecting {
@@ -230,6 +232,7 @@ struct ChatSessionView: View {
       isMessageFieldFocused = selectedTab == .CHAT && composerMode == .regular
     }
     .task {
+      guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
       while !Task.isCancelled {
         displayDate = Date()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -581,7 +584,99 @@ struct ChatSessionView: View {
     return json
   }
 
-  var sessionBody: some View {
+  @ViewBuilder var sessionBody: some View {
+    if selectedTab == .CHAT && !isBoardMaximized && !hasVideo {
+      scrollingChatLayout
+    } else {
+      standardSessionBody
+    }
+  }
+
+  /// The chat tab as one scrolling column.
+  ///
+  /// The header, the pinned question and the tabs used to be fixed chrome above
+  /// a thread that was the only thing able to scroll, so on a short viewport —
+  /// a small phone with the keyboard up — the composer was pushed off the
+  /// bottom with no way to reach it. Everything above the composer now scrolls
+  /// together, and the composer stays pinned where it can always be tapped.
+  var scrollingChatLayout: some View {
+    VStack(spacing: 0) {
+      ScrollViewReader { proxy in
+        ScrollView(.vertical, showsIndicators: false) {
+          // One lazy stack for the whole tab, messages included. It has to be
+          // the scroll view's direct content and the bubbles have to be its
+          // direct items: on Android the lazy stack is the scrolling
+          // LazyColumn, and only it registers the ids that `scrollTo` resolves
+          // against — inside a plain stack the scroll-to-newest call is a
+          // silent no-op, which is why chat did not follow new messages there.
+          LazyVStack(spacing: 0) {
+            header
+
+            sessionStats
+
+            sessionTabs
+
+            if let errorMessage {
+              Text(errorMessage)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(theme.accentBackground)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+            }
+
+            if messages.count == 0 {
+              sessionNotice
+
+              ChatThreadEmptyNotice()
+            }
+
+            ForEach(messages) { message in
+              ChatThreadRow(message: message, now: displayDate, viewModel: viewModel)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .id(message.id)
+            }
+          }
+#if os(Android)
+          .padding(.bottom, inputBarHeight > 0 ? inputBarHeight : 10)
+#else
+          .padding(.bottom, 10)
+#endif
+        }
+        // Claims the space the composer does not take, so the composer is
+        // never the thing that overflows.
+        .frame(maxHeight: .infinity)
+        .onChange(of: messages.count) { _, _ in
+          if let last = messages.last {
+            withAnimation(.easeOut(duration: 0.2)) {
+              proxy.scrollTo(last.id, anchor: .bottom)
+            }
+          }
+        }
+      }
+
+    }
+#if os(Android)
+    .overlay(alignment: .bottom) {
+      inputBar
+        .background(Color.black.opacity(0.15))
+        .onGeometryChange(for: CGFloat.self) { proxy in
+          proxy.size.height
+        } action: { height in
+          inputBarHeight = height
+        }
+    }
+#else
+    .safeAreaInset(edge: .bottom) {
+      inputBar
+        .background(Color.black.opacity(0.15))
+    }
+#endif
+  }
+
+
+  var standardSessionBody: some View {
     VStack(spacing: 0) {
       if !isBoardMaximized {
         header
@@ -636,7 +731,7 @@ struct ChatSessionView: View {
     .safeAreaInset(edge: .bottom) {
       if selectedTab == .CHAT && !isBoardMaximized {
         inputBar
-          .background(theme.cardBackground)
+          .background(.ultraThinMaterial)
       }
     }
 #endif
@@ -1170,7 +1265,6 @@ struct ChatSessionView: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 16)
-    .background(theme.accentBackground.opacity(0.45))
   }
 
   var originalQuestionBanner: some View {
@@ -1367,7 +1461,7 @@ private enum AndroidBoardImageBridge {
 #endif
 
 #if os(iOS)
-#Preview {
+#Preview("teacher") {
   ChatSessionView(
 	viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher"),
 	title: "Student",
@@ -1375,15 +1469,15 @@ private enum AndroidBoardImageBridge {
   )
 }
 
-#Preview {
+#Preview ("student"){
     ChatSessionView(
-      viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: false),
-      title: "Student",
+      viewModel: MockChatSessionViewModel(questionId: "abc", role: "student", isConnecting: false),
+      title: "Teacher",
       onClose: {}
     )
 }
 
-#Preview {
+#Preview ("teacher - connecting"){
     ChatSessionView(
       viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: true),
       title: "Student",

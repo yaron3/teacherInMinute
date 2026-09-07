@@ -30,6 +30,36 @@ struct MainTabView: View {
   }
   
   var body: some View {
+	// The stack exists for the teacher's live session, which is pushed rather
+	// than laid over the tabs. Its own bar stays hidden: every screen here
+	// draws its own header.
+	NavigationStack {
+	  tabLayers
+		.toolbar(.hidden, for: .navigationBar)
+		.navigationDestination(isPresented: isTeacherInLiveSession) {
+		  teacherSessionScreen
+		}
+	}
+  }
+
+  /// Drives the push off `activeQuestionId` alone. As on the student side the
+  /// setter is inert: a lesson is billed by the minute, so it ends through the
+  /// session's own control — which clears the id and so pops this screen.
+  var isTeacherInLiveSession: Binding<Bool> {
+	Binding(
+	  get: { viewModel.userMode == .teacher && teacherDashboardViewModel?.activeQuestionId != nil },
+	  set: { _ in }
+	)
+  }
+
+  @ViewBuilder
+  var teacherSessionScreen: some View {
+	if let teacherDashboardViewModel, let questionId = teacherDashboardViewModel.activeQuestionId {
+	  TeacherLiveSessionScreen(viewModel: teacherDashboardViewModel, questionId: questionId)
+	}
+  }
+
+  var tabLayers: some View {
 	ZStack {
 	  // Driven by `visibleTabs` rather than an `if` around the teacher-only
 	  // Earnings tab: a false branch inside TabView still contributes an empty
@@ -172,26 +202,10 @@ struct MainTabView: View {
 		.onDisappear {
 		  hidesTabBar = false
 		}
-	  } else if let questionId = teacherDashboardViewModel.activeQuestionId {
-		ChatSessionView(
-		  questionId: questionId,
-		  role: "teacher",
-		  title: LocalizationSupport.localized("Student"),
-		  conversationType: teacherDashboardViewModel.activeConversationType,
-		  liveKitRoom: teacherDashboardViewModel.activeCallRoom ?? "",
-		  liveKitToken: teacherDashboardViewModel.activeCallToken ?? "",
-		  initialDetails: teacherDashboardViewModel.activeChatInitialDetails()
-		) {
-		  teacherDashboardViewModel.endCall()
-		}
-		.frame(maxWidth: .infinity, maxHeight: .infinity)
-		.zIndex(20)
-		.onAppear {
-		  hidesTabBar = true
-		}
-		.onDisappear {
-		  hidesTabBar = false
-		}
+	  } else if teacherDashboardViewModel.activeQuestionId != nil {
+		// Pushed instead — see `teacherSessionScreen`. The branch stays so a
+		// running lesson still outranks a queued invite.
+		EmptyView()
 	  } else if let inviteID = teacherDashboardViewModel.inviteIDs.first {
 		TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: teacherDashboardViewModel)
 		  .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
@@ -209,6 +223,56 @@ struct MainTabView: View {
   var isTeacherGlobalOverlayVisible: Bool {
 	guard viewModel.userMode == .teacher, let teacherDashboardViewModel else { return false }
 	return teacherDashboardViewModel.isAcceptingCalls || teacherDashboardViewModel.activeQuestionId != nil || teacherDashboardViewModel.inviteIDs.first != nil
+  }
+}
+
+
+/// The teacher's lesson, as a pushed screen.
+///
+/// It pops itself rather than letting `MainTabView` pop it by clearing
+/// `activeQuestionId`: on Android the pushed destination is the only thing
+/// composed, so the modifier that would notice the cleared state is not running
+/// and the screen would stay up after the lesson ended.
+struct TeacherLiveSessionScreen: View {
+  let viewModel: any TeacherDashboardViewModeling
+  let questionId: String
+  @Environment(\.dismiss) var dismiss
+
+  var body: some View {
+	ChatSessionView(
+	  questionId: questionId,
+	  role: "teacher",
+	  title: LocalizationSupport.localized("Student"),
+	  conversationType: viewModel.activeConversationType,
+	  liveKitRoom: viewModel.activeCallRoom ?? "",
+	  liveKitToken: viewModel.activeCallToken ?? "",
+	  initialDetails: viewModel.activeChatInitialDetails()
+	) {
+	  viewModel.endCall()
+	  dismiss()
+	}
+	// The session draws its own header and end control, and must not be
+	// escapable by a back tap or edge swipe while it is running.
+	.toolbar(.hidden, for: .tabBar)
+	.toolbar(.hidden, for: .navigationBar)
+	.navigationBarBackButtonHidden(true)
+	// Covers the ends this view does not drive itself — a lesson closed out
+	// by the other side, or by the dashboard.
+	.onChange(of: viewModel.activeQuestionId) { _, id in
+	  if id == nil { dismiss() }
+	}
+	// Compose Navigation would otherwise pop a running lesson on a system
+	// back press, so back is taken over for as long as it lasts.
+	.onAppear {
+#if os(Android)
+	  AndroidBackNavigationBridge.setSessionBackBlocked(true)
+#endif
+	}
+	.onDisappear {
+#if os(Android)
+	  AndroidBackNavigationBridge.setSessionBackBlocked(false)
+#endif
+	}
   }
 }
 
