@@ -72,53 +72,59 @@ struct TeacherDashboardView: View {
 	  }
 	} else {
 	  ZStack {
-		ScrollView(.vertical, showsIndicators: false) {
-		  VStack(alignment: .leading, spacing: 0) {
-			FlatTopHeader(
-			  eyebrow: viewModel.teacherEyebrow,
-			  name: viewModel.teacherName,
-			  avatarImageURL: viewModel.teacherImageURL,
-			  avatarSystemImage: "person.crop.circle.fill",
-			  showNotificationBadge: false
-			)
-			.padding(.top, 16)
+		VStack(spacing: 0) {
+			generalWarningHeader
 
-			statusToggleCard
-			  .padding(.top, 20)
-
-			if viewModel.isOnline {
-			  liveEarningsCard
-				.padding(.top, 28)
-
-			  onlineStatusCard
-				.padding(.top, 12)
-			  ZStack {
-				liveQueue
-				  .padding(.top, 28)
-				  .disabled(viewModel.isAcceptingCalls)
-				if viewModel.isAcceptingCalls {
-				  ProgressView()
-				}
-			  }
-			} else {
-			  teacherStatusCard
-				.padding(.top, 28)
-
-			  statsCards
-				.padding(.top, 28)
-
-			  ratingSection
+			ScrollView(.vertical, showsIndicators: false) {
+			  VStack(alignment: .leading, spacing: 0) {
+				FlatTopHeader(
+				  eyebrow: viewModel.teacherEyebrow,
+				  name: viewModel.teacherName,
+				  avatarImageURL: viewModel.teacherImageURL,
+				  avatarSystemImage: "person.crop.circle.fill",
+				  showNotificationBadge: false
+				)
 				.padding(.top, 16)
 
-			  readinessChecklist
-				.padding(.top, 28)
-			}
-		  }
-		  .padding(.horizontal, 20)
-		  .padding(.bottom, 40)
-		}
-		.background(theme.screenBackground)
+				statusToggleCard
+				  .padding(.top, 20)
 
+				if viewModel.isOnline {
+				  liveEarningsCard
+					.padding(.top, 28)
+
+				  onlineStatusCard
+					.padding(.top, 12)
+				  ZStack {
+					liveQueue
+					  .padding(.top, 28)
+					  .disabled(viewModel.isAcceptingCalls)
+					if viewModel.isAcceptingCalls {
+					  ProgressView()
+					}
+				  }
+				} else {
+				  teacherStatusCard
+					.padding(.top, 28)
+
+				  statsCards
+					.padding(.top, 28)
+
+				  ratingSection
+					.padding(.top, 16)
+
+				  readinessChecklist
+					.padding(.top, 28)
+				}
+			  }
+			  .padding(.horizontal, 20)
+			  .padding(.bottom, 40)
+			}
+			.background(theme.screenBackground)
+		}
+
+		// Drawn after the scroll view so the full-screen incoming question
+		// covers the warning rather than leaving a stripe above it.
 		if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
 		  TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
 			.onAppear {
@@ -164,6 +170,9 @@ struct TeacherDashboardView: View {
 	  }
 	  .onAppear {
 		guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
+		// First read of the permission, so the header is right on the first
+		// frame rather than only after the app has been backgrounded once.
+		viewModel.refreshNotificationAccess()
 		Task {
 		  if await TeacherDocumentsPromptStore.shouldPresentSuggestion() {
 			showsDocumentsSuggestion = true
@@ -176,6 +185,9 @@ struct TeacherDashboardView: View {
 		// unreachable, so the rule is re-checked on every return to the front.
 		guard phase == .active else { return }
 		viewModel.enforceNotificationRequirement()
+		// The header's own read of the same permission — silent, so it can run
+		// even when the enforcing check above bails out for an offline teacher.
+		viewModel.refreshNotificationAccess()
 	  }
 
 	}
@@ -398,6 +410,38 @@ struct TeacherDashboardView: View {
 		Spacer()
 
 		FlatBadge(title: viewModel.ratePerMinBadgeText)
+	  }
+	}
+  }
+
+  /// A standing warning that the teacher cannot be reached — notifications
+  /// switched off while online, or no connection to the server. It sits above
+  /// the scrolling dashboard rather than inside it, because the state it
+  /// reports is one a teacher must not be able to scroll past.
+  ///
+  /// The message is the view model's, so what counts as unreachable is decided
+  /// in one place; the view only decides that it is drawn in warning colours.
+  @ViewBuilder
+  var generalWarningHeader: some View {
+	if let warning = viewModel.errorMessageGeneral, !warning.isEmpty {
+	  HStack(alignment: .top, spacing: 10) {
+		PlatformIcon(systemName: "exclamationmark.triangle.fill", size: 14, weight: .bold, color: theme.warning)
+		  .padding(.top, 1)
+
+		Text(warning)
+		  .font(.system(size: 13, weight: .semibold))
+		  .foregroundStyle(theme.warning)
+		  .multilineTextAlignment(.leading)
+		  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
+	  }
+	  .padding(.horizontal, 20)
+	  .padding(.vertical, 12)
+	  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
+	  .background(theme.warningBackground)
+	  .overlay(alignment: .bottom) {
+		Rectangle()
+		  .fill(theme.warningBorder)
+		  .frame(height: flatHairline)
 	  }
 	}
   }
@@ -853,6 +897,16 @@ struct TeacherIncomingQuestionOverlay: View {
 #Preview("Online — Live Queue") {
   TeacherDashboardView(
     viewModel: MockTeacherDashboardViewModel(isOnline: true),
+    showsSessionOverlay: false,
+    showsIncomingOverlay: false
+  )
+}
+
+#Preview("Online — Unreachable") {
+  let viewModel = MockTeacherDashboardViewModel(isOnline: true)
+  viewModel.errorMessageGeneral = viewModel.poorConnectionWarning
+  return TeacherDashboardView(
+    viewModel: viewModel,
     showsSessionOverlay: false,
     showsIncomingOverlay: false
   )

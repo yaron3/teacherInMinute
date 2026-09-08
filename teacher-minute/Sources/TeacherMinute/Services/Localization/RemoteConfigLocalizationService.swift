@@ -347,6 +347,11 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Last state": "המצב האחרון",
         "Choose whether you start out available for questions when the app opens. \"Last state\" reuses the availability you left the app on.":
             "בחרו אם להתחיל כזמינים לשאלות כשהאפליקציה נפתחת. \"המצב האחרון\" משחזר את הזמינות שבה סגרתם את האפליקציה.",
+        // Teacher dashboard warning header — the teacher is unreachable.
+        "Notifications are off, so questions cannot reach you. Turn them on in your device settings to take questions.":
+            "ההתראות כבויות, ולכן שאלות לא יכולות להגיע אליכם. הפעילו אותן בהגדרות המכשיר כדי לקבל שאלות.",
+        "No connection to the server. New questions will not reach you until it is back.":
+            "אין חיבור לשרת. שאלות חדשות לא יגיעו אליכם עד שהחיבור יחזור.",
         // Ask a Teacher sheet: the keyboard switch above the question field.
         // "Regular" and "Algebra" are already published; only these are new.
         "Keyboard": "מקלדת",

@@ -43,6 +43,14 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var activeConversationType: String { get set }
   var acceptingQuestionId: String? { get set }
   var errorMessage: String? { get set }
+  /// A standing warning about the teacher's own reachability, shown as a header
+  /// across the top of the dashboard.
+  ///
+  /// Distinct from `errorMessage`, which reports one action that failed and is
+  /// cleared by the next attempt. This one describes a condition that persists
+  /// until something is fixed, and while it holds the teacher may look
+  /// available without being reachable.
+  var errorMessageGeneral: String? { get set }
   var isAcceptingCalls: Bool { get set }
   var isVerified: Bool { get set }
   var todayEarningsCents: Int { get set }
@@ -80,6 +88,7 @@ protocol TeacherDashboardViewModeling: AnyObject {
 
   func toggleOnline()
   func enforceNotificationRequirement()
+  func refreshNotificationAccess()
   func acceptInvite(questionId: String)
   func declineInvite(questionId: String)
   func cancelAcceptingInvite()
@@ -102,6 +111,16 @@ extension TeacherDashboardViewModeling {
   var teacherDashboardTitle: String { LocalizationSupport.localized("Teacher Dashboard") }
   var notificationsRequiredMessage: String {
     LocalizationSupport.localized("Turn on notifications to stay online. Questions reach you by notification when the app is in the background.")
+  }
+
+  // MARK: Dashboard warning header
+
+  var notificationsOffWarning: String {
+    LocalizationSupport.localized("Notifications are off, so questions cannot reach you. Turn them on in your device settings to take questions.")
+  }
+
+  var poorConnectionWarning: String {
+    LocalizationSupport.localized("No connection to the server. New questions will not reach you until it is back.")
   }
 
   // MARK: Status toggle card
@@ -278,6 +297,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
+  var errorMessageGeneral: String? = nil
   var isAcceptingCalls = false
   var isVerified = false
   var subjects: [String] = []
@@ -366,6 +386,22 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   private var acceptingTask: Task<Void, Never>?
   private var didLoadProfile = false
   private var didApplyLaunchPresence = false
+#if !os(Android)
+  private var connectionMonitor: DatabaseConnectionMonitor?
+#endif
+  /// Both default to the healthy value so the header stays down until something
+  /// has actually been observed — a warning that flashes on every launch is one
+  /// teachers learn to read past.
+  private var hasNotificationAccess = true
+  private var hasServerConnection = true
+  /// Set when the notification rule takes an online teacher offline.
+  ///
+  /// Without it the header would clear in the same frame the rule fires —
+  /// `isOnline` is false again by then — and the reason would go with it:
+  /// nothing on the dashboard renders `errorMessage` outside the
+  /// incoming-question overlay. Cleared as soon as permission is granted, or
+  /// the teacher goes online again.
+  private var wasTakenOfflineForNotifications = false
   
   // MARK: - Init
   
@@ -390,6 +426,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #else
 		  self?.inviteService?.stopListening()
 		  self?.inviteService = nil
+		  self?.connectionMonitor?.stopListening()
+		  self?.connectionMonitor = nil
 #endif
 		  self?.presenceService = nil
 		}
@@ -443,6 +481,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	service.startListening()
 	inviteService = service
 	logger.info("[VM] configurePresence — InviteService listening uid=\(uid)")
+
+	// Same socket the invite listener rides on, so this reports exactly the
+	// outage that would stop a question arriving.
+	let monitor = DatabaseConnectionMonitor { [weak self] connected in
+	  self?.setServerConnection(connected)
+	}
+	monitor.startListening()
+	connectionMonitor = monitor
 #endif
   }
   
@@ -497,7 +543,52 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	// `.lastState` restores this on the next launch, so it has to follow every
 	// change of availability, not just the ones made from the dashboard.
 	TeacherPresencePreferences.lastKnownOnline = isOnline
+	// Going online again is the teacher retrying, so the header stops speaking
+	// for the last time the rule took them off.
+	if isOnline {
+	  wasTakenOfflineForNotifications = false
+	}
+	// The notification half of the header only applies while online, so the
+	// header is recomputed on both edges of the toggle.
+	refreshGeneralWarning()
 	enforceNotificationRequirement()
+  }
+
+  // MARK: - Dashboard warning header
+
+  /// Recomputes `errorMessageGeneral` from the two conditions that leave a
+  /// teacher unreachable. The connection wins when both hold: notifications
+  /// cannot help a teacher the server cannot talk to.
+  private func refreshGeneralWarning() {
+	if !hasServerConnection {
+	  errorMessageGeneral = poorConnectionWarning
+	} else if !hasNotificationAccess, isOnline || wasTakenOfflineForNotifications {
+	  errorMessageGeneral = notificationsOffWarning
+	} else {
+	  errorMessageGeneral = nil
+	}
+  }
+
+  /// Reads the notification permission without asking for it, so the header can
+  /// be refreshed on every return to the foreground without a prompt. The
+  /// prompting version is `enforceNotificationRequirement()`.
+  func refreshNotificationAccess() {
+	Task { @MainActor [weak self] in
+	  guard let self else { return }
+	  let state = await PermissionService.shared.notificationStatus()
+	  self.hasNotificationAccess = state == .granted
+	  if self.hasNotificationAccess {
+		self.wasTakenOfflineForNotifications = false
+	  }
+	  self.refreshGeneralWarning()
+	}
+  }
+
+  private func setServerConnection(_ connected: Bool) {
+	guard hasServerConnection != connected else { return }
+	hasServerConnection = connected
+	logger.info("[VM] server connection changed connected=\(connected)")
+	refreshGeneralWarning()
   }
 
   /// Puts the teacher online at launch when their setting asks for it — see
@@ -532,11 +623,18 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  guard let self else { return }
 	  // A no-op once granted on both platforms, so this is safe to re-run.
 	  let state = await PermissionService.shared.requestNotifications()
+	  self.hasNotificationAccess = state == .granted
+	  if self.hasNotificationAccess {
+		self.wasTakenOfflineForNotifications = false
+	  }
+	  self.refreshGeneralWarning()
 	  guard state != .granted else { return }
 	  guard self.isOnline else { return }
 	  self.isOnline = false
 	  self.writePresence(online: false)
 	  self.errorMessage = self.notificationsRequiredMessage
+	  self.wasTakenOfflineForNotifications = true
+	  self.refreshGeneralWarning()
 	  logger.info("[VM] went offline — notifications not granted (state=\(String(describing: state)))")
 	}
   }
@@ -573,9 +671,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		  let updated = try await AndroidInviteFetcher.fetchInvites(teacherId: uid)
 		  guard !Task.isCancelled else { return }
 		  self?.setInvites(updated)
+		  // This poll is how a question reaches an Android teacher, so its own
+		  // success and failure are the connection signal here — there is no
+		  // Swift-side database handle on this path to watch instead.
+		  self?.setServerConnection(true)
 		  logger.info("[VM] Android invite polling fetched count=\(updated.count) uid=\(uid)")
 		} catch {
 		  guard !Task.isCancelled else { return }
+		  self?.setServerConnection(false)
 		  self?.errorMessage = error.localizedDescription
 		  logger.error("[VM] Android invite polling failed — \(error.localizedDescription)")
 		  AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.androidInvitePolling")
@@ -1013,6 +1116,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeConversationType: String = "text"
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
+  var errorMessageGeneral: String? = nil
   var isAcceptingCalls: Bool = false
   var isVerified: Bool
   var todayEarningsCents: Int
@@ -1106,6 +1210,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Inert in previews: the mock never touches the permission system, so a
   /// preview teacher stays online regardless of the host's notification state.
   func enforceNotificationRequirement() {}
+  func refreshNotificationAccess() {}
   func acceptInvite(questionId: String) {}
   func declineInvite(questionId: String) { inviteIDs = inviteIDs.filter { $0 != questionId } }
   func cancelAcceptingInvite() {}
