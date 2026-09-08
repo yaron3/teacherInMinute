@@ -22,21 +22,6 @@ struct ProfileView: View {
   /// without taking ownership, and still vends the `$viewModel` bindings the
   /// editor sheets need.
   @Bindable var viewModel: ProfileViewModel
-  /// Bumped whenever a load finishes, purely to force this body to re-run.
-  ///
-  /// Mutating the view model is not enough on Android. Instrumenting both sides
-  /// showed one shared instance — `body` and `loadProfile` logged the same
-  /// ObjectIdentifier — with `body` running exactly once, before the load, and
-  /// never again, while the model went on to hold the loaded name and rows. So
-  /// the screen sat on its initial values. MainTabView carries a note about the
-  /// profile "only appearing after switching tabs and back", which is the same
-  /// symptom: a tab switch forces a fresh composition that happens to read the
-  /// current values. A view's own `@State` does reliably invalidate the body,
-  /// so the load drives one.
-  /// Internal, not private: Skip cannot bridge a private `@State` to Android
-  /// ("Private state property ... cannot be bridged"), which is why no `@State`
-  /// in this codebase is private.
-  @State var profileRevision = 0
   @State var isShowingProfileEditor = false
   @State var isShowingSubjectEditor = false
   @State var isShowingDocuments = false
@@ -52,9 +37,6 @@ struct ProfileView: View {
 	self.viewModel = viewModel
   }
   var body: some View {
-	// Read so that bumping `profileRevision` invalidates this body. See the
-	// property's own comment for why the view model's own changes do not.
-	let _ = profileRevision
 	ScrollView(.vertical, showsIndicators: false) {
       // The profile renders straight away and fills in as the load lands, the
       // way the home tabs do. Swapping the whole subtree on a loaded flag did
@@ -228,7 +210,7 @@ struct ProfileView: View {
               .id(languagePreference)
             }
             .sheet(isPresented: $isShowingSubjectEditor, onDismiss: {
-              Task { await viewModel.loadProfile(); profileRevision += 1 }
+              Task { await viewModel.loadProfile() }
             }) {
               NavigationStack {
                 TeacherSubjectsView(isEditing: true)
@@ -240,7 +222,7 @@ struct ProfileView: View {
             .sheet(isPresented: $isShowingDocuments, onDismiss: {
               // Refresh the "Complete Your Documents" prompt after the teacher
               // may have uploaded a missing document (bug #24).
-              Task { await viewModel.loadProfile(); profileRevision += 1 }
+              Task { await viewModel.loadProfile() }
             }) {
               NavigationStack {
                 TeacherDocumentsView()
@@ -261,7 +243,7 @@ struct ProfileView: View {
         .foregroundStyle(theme.danger)
 
       Button {
-        Task { await viewModel.loadProfile(); profileRevision += 1 }
+        Task { await viewModel.loadProfile() }
       } label: {
         Text(LocalizationSupport.localized("Retry"))
           .font(.system(size: 14, weight: .bold))
@@ -414,7 +396,6 @@ struct ProfileView: View {
   private func loadProfileForDisplay() async {
     guard !viewModel.hasDisplayableProfileData else { return }
     await viewModel.loadProfile()
-    profileRevision += 1
   }
 
   var savedPayPalSection: some View {

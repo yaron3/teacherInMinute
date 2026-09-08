@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SkipFuse
 
 @Observable
 @MainActor
@@ -39,7 +40,7 @@ final class ConnectionSetupViewModel {
     participantName: String,
     participantTeacherId: String = "",
     conversationType: String,
-    footerText: String = LocalizationSupport.localized("Your teacher will join shortly"),
+    footerText: String? = nil,
     sessionViewModel: (any ChatSessionViewModeling)? = nil,
     liveKitRoom: String = "",
     liveKitToken: String = "",
@@ -48,7 +49,7 @@ final class ConnectionSetupViewModel {
     self.participantName = participantName
     self.participantTeacherId = participantTeacherId
     self.conversationType = conversationType
-    self.footerText = footerText
+    self.footerText = footerText ?? LocalizationSupport.localized("Your teacher will join shortly")
     self.sessionViewModel = sessionViewModel
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
@@ -83,6 +84,29 @@ final class ConnectionSetupViewModel {
     case .denied: return LocalizationSupport.localized("Open Microphone Settings")
     case .notDetermined: return LocalizationSupport.localized("Allow Microphone")
     }
+  }
+
+  // MARK: - View strings
+
+  var cancelSessionLabel: String { LocalizationSupport.localized("Cancel Session") }
+  var cancelLabel: String { LocalizationSupport.localized("Cancel") }
+  var retryLabel: String { LocalizationSupport.localized("Retry") }
+  var continueWithTextOnlyLabel: String { LocalizationSupport.localized("Continue with text only") }
+  var connectionSlowTitle: String { LocalizationSupport.localized("Connection is taking longer than usual") }
+
+  var connectionSlowMessage: String {
+    hasVideo
+      ? LocalizationSupport.localized("We couldn't establish a video connection. Retry, continue with text only, or cancel.")
+      : LocalizationSupport.localized("We couldn't establish an audio connection. Retry, continue with text only, or cancel.")
+  }
+
+  var microphonePermissionTitle: String { LocalizationSupport.localized("Microphone Permission") }
+  var microphonePermissionMessage: String {
+    LocalizationSupport.localized("Make sure your microphone is enabled for the best learning experience.")
+  }
+  var cameraPermissionTitle: String { LocalizationSupport.localized("Camera Permission") }
+  var cameraPermissionMessage: String {
+    LocalizationSupport.localized("Make sure your camera is enabled so your teacher can see your work.")
   }
 
   var cameraButtonTitle: String {

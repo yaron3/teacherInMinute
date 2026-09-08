@@ -36,7 +36,16 @@ final class PermissionService {
             return .denied
         }
 #else
-        return .notDetermined
+        if AndroidPermissionBridge.hasPermission(kind.androidPermission) {
+            return .granted
+        }
+        // Android cannot tell "never asked" from "denied": `checkSelfPermission`
+        // answers false for both. Whether this app has ever put the dialog up is
+        // the only record of the difference, so it stands in for the missing
+        // state. Without it every capture permission read as .notDetermined
+        // forever here, which is why the teacher dashboard showed the
+        // microphone off on a device that had granted it.
+        return Self.hasRequested(kind) ? .denied : .notDetermined
 #endif
     }
 
@@ -49,6 +58,7 @@ final class PermissionService {
         }
         return captureStatus(for: kind)
 #else
+        Self.markRequested(kind)
         do {
             let granted = try await Task.detached(priority: .userInitiated) {
                 try AndroidPermissionBridge.requestPermission(kind.androidPermission)
@@ -60,6 +70,56 @@ final class PermissionService {
         }
 #endif
     }
+
+    /// Handles a tap on a permission row: asks the OS while it will still ask,
+    /// and sends the user to the app's own settings page once it will not.
+    @discardableResult
+    func resolveCapturePermission(for kind: CapturePermissionKind) async -> PermissionState {
+        let status = captureStatus(for: kind)
+        if status == .granted {
+            // Nothing left to grant, so the row becomes the way to review it.
+            openAppSettings()
+            return status
+        }
+
+        let result = await requestCapturePermission(for: kind)
+        if result.isGranted {
+            return result
+        }
+
+#if os(Android)
+        // A permission the system will no longer prompt for comes back denied
+        // without a dialog ever appearing, and Settings is the only way back.
+        // `shouldShowRationale` is what tells that apart from an ordinary "not
+        // this time": it is false only before the first ask — which just
+        // happened — and after the user has shut the door for good.
+        if !AndroidPermissionBridge.shouldShowRationale(kind.androidPermission) {
+            openAppSettings()
+        }
+#else
+        // A permission already denied never re-prompts on iOS either, so the
+        // request above was a no-op. A denial the user just typed is left
+        // alone: they answered the question a moment ago.
+        if status == .denied {
+            openAppSettings()
+        }
+#endif
+        return result
+    }
+
+#if os(Android)
+    private static func requestedKey(_ kind: CapturePermissionKind) -> String {
+        "permissions.requested.\(kind.androidPermission)"
+    }
+
+    private static func hasRequested(_ kind: CapturePermissionKind) -> Bool {
+        UserDefaults.standard.bool(forKey: requestedKey(kind))
+    }
+
+    private static func markRequested(_ kind: CapturePermissionKind) {
+        UserDefaults.standard.set(true, forKey: requestedKey(kind))
+    }
+#endif
 
     func notificationStatus() async -> PermissionState {
 #if !os(Android)
@@ -186,6 +246,10 @@ private enum AndroidPermissionBridge {
         name: "openAppSettings",
         sig: "()V"
     )!
+    private static let shouldShowRationaleMethod = managerClass.getStaticMethodID(
+        name: "shouldShowRationale",
+        sig: "(Ljava/lang/String;)Z"
+    )!
 
     static func openAppSettings() throws {
         try jniContext {
@@ -215,6 +279,21 @@ private enum AndroidPermissionBridge {
             return value
         }
         return granted ?? false
+    }
+
+    /// Whether the system would still put its dialog up for this permission.
+    /// Spelled out as `Bool` for the same reason `hasPermission` is — see the
+    /// note there about `callStatic` picking its JNI call from the return type.
+    static func shouldShowRationale(_ permission: String) -> Bool {
+        let shouldShow: Bool? = try? jniContext {
+            let value: Bool = try managerClass.callStatic(
+                method: shouldShowRationaleMethod,
+                options: [.kotlincompat],
+                args: [permission.toJavaParameter(options: [.kotlincompat])]
+            )
+            return value
+        }
+        return shouldShow ?? false
     }
 
     static func requestPermission(_ permission: String) throws -> Bool {

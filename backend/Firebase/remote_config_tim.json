@@ -9,14 +9,152 @@
       "name": "Hebrew",
       "expression": "device.language in ['he']",
       "tagColor": "TEAL"
-    },
-    {
-      "name": "Hebrew - custom",
-      "expression": "app.userProperty['user_language'].contains(['he'])",
-      "tagColor": "ORANGE"
     }
   ],
   "parameters": {
+    "availability_launch": {
+      "defaultValue": {
+        "value": "Availability on launch"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זמינות בפתיחת האפליקציה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "availability_launch_and": {
+      "defaultValue": {
+        "value": "Availability on launch and currency"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זמינות בפתיחה ומטבע"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "online_option": {
+      "defaultValue": {
+        "value": "Online"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זמין"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "offline_option": {
+      "defaultValue": {
+        "value": "Offline"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא זמין"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "last_state": {
+      "defaultValue": {
+        "value": "Last state"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המצב האחרון"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "choose_whether_you": {
+      "defaultValue": {
+        "value": "Choose whether you start out available for questions when the app opens. \"Last state\" reuses the availability you left the app on."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בחרו אם להתחיל כזמינים לשאלות כשהאפליקציה נפתחת. \"המצב האחרון\" משחזר את הזמינות שבה סגרתם את האפליקציה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "notifications_are_off": {
+      "defaultValue": {
+        "value": "Notifications are off. You can take questions while the app is open, and you go offline when you leave it."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ההתראות כבויות. אפשר לקבל שאלות כל עוד האפליקציה פתוחה, וברגע שתצאו ממנה תעברו למצב לא זמין."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_the_server": {
+      "defaultValue": {
+        "value": "No connection to the server. New questions will not reach you until it is back."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין חיבור לשרת. שאלות חדשות לא יגיעו אליכם עד שהחיבור יחזור."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "keyboard": {
+      "defaultValue": {
+        "value": "Keyboard"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מקלדת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "build_the_formula": {
+      "defaultValue": {
+        "value": "Build the formula, then add it to your question."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בנו את הנוסחה ואז הוסיפו אותה לשאלה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "camera_unavailable_audio_only": {
+      "defaultValue": {
+        "value": "Camera unavailable — this lesson is audio only."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המצלמה אינה זמינה — השיעור באודיו בלבד."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "weak_connection_audio": {
+      "defaultValue": {
+        "value": "Weak connection — audio and video may stutter."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חיבור חלש — ייתכנו קפיצות באודיו ובווידאו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "reconnecting": {
+      "defaultValue": {
+        "value": "Reconnecting…"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתחבר מחדש…"
+        }
+      },
+      "valueType": "STRING"
+    },
     "total_minutes": {
       "defaultValue": {
         "value": "Total minutes"
@@ -3676,7 +3814,7 @@
         "value": "Home"
       },
       "conditionalValues": {
-        "Hebrew - custom": {
+        "Hebrew": {
           "value": "בית"
         }
       },
@@ -5421,7 +5559,7 @@
     },
     "teacher_connects_quickly": {
       "defaultValue": {
-        "value": "A teacher connects immediate."
+        "value": "A teacher connects immediately."
       },
       "conditionalValues": {
         "Hebrew": {

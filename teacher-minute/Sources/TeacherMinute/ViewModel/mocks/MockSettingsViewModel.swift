@@ -11,6 +11,7 @@
 /// settings screen and destructive actions stay inert.
 ///
 import SwiftUI
+import SkipFuse
 @Observable
 @MainActor
 final class MockSettingsViewModel: SettingsViewModeling {

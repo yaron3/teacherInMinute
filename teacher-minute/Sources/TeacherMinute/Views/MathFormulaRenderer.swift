@@ -26,8 +26,26 @@ struct MathFormulaRenderer: View {
     let displayMode: Bool
     @Environment(\.colorScheme) var colorScheme
 
+    private static let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+
     var body: some View {
-        KaTeXWebView(latex: latex, displayMode: displayMode, colorScheme: colorScheme)
+        if Self.isPreview {
+            plainTextFallback
+        } else {
+            KaTeXWebView(latex: latex, displayMode: displayMode, colorScheme: colorScheme)
+        }
+    }
+
+    private var plainTextFallback: some View {
+        let theme = AppTheme(colorScheme: colorScheme)
+        let display = LatexPlainText.format(latex)
+        return ScrollView(.horizontal, showsIndicators: false) {
+            Text(display.isEmpty ? "Empty equation" : display)
+                .font(.system(size: 16))
+                .foregroundStyle(display.isEmpty ? theme.secondaryText : theme.primaryText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+        }
     }
 }
 
@@ -261,3 +279,15 @@ enum LatexPlainText {
         return s
     }
 }
+
+#if os(iOS)
+#Preview("formula") {
+    VStack(spacing: 20) {
+        MathFormulaView(latex: "\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}", displayMode: true)
+            .frame(height: 80)
+        MathFormulaView(latex: "x^2 + 5x + 6 = 0", displayMode: true)
+            .frame(height: 60)
+    }
+    .padding()
+}
+#endif

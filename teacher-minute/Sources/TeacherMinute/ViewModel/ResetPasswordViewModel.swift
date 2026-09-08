@@ -8,6 +8,7 @@
 
 import SwiftUI
 import Observation
+import SkipFuse
 
 @Observable
 final class ResetPasswordViewModel {

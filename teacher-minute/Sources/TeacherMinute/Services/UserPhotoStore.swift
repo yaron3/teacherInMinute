@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SkipFuse
 
 /// Single source of truth for the current logged-in user's profile image URL.
 ///

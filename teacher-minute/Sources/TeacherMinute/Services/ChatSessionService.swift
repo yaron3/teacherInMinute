@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
@@ -679,6 +680,22 @@ extension ChatSessionViewModeling {
 
   var waitingForVideoText: String { LocalizationSupport.localized("Waiting for video…") }
 
+  // MARK: Session condition notice (header)
+
+  /// Said when a video lesson had to start without a camera. The session is
+  /// otherwise fine, so this explains the missing picture rather than warning.
+  var cameraUnavailableNotice: String {
+    LocalizationSupport.localized("Camera unavailable — this lesson is audio only.")
+  }
+
+  var weakConnectionNotice: String {
+    LocalizationSupport.localized("Weak connection — audio and video may stutter.")
+  }
+
+  var lostConnectionNotice: String {
+    LocalizationSupport.localized("Reconnecting…")
+  }
+
   // MARK: Peer-paused panel (role-dependent)
 
   var peerPausedMessage: String {
@@ -703,6 +720,12 @@ extension ChatSessionViewModeling {
   var originalQuestionLabel: String { LocalizationSupport.localized("ORIGINAL QUESTION") }
   var sessionTimeLabel: String { LocalizationSupport.localized("Session Time") }
   var minutesLabel: String { LocalizationSupport.localized("minutes") }
+
+  // MARK: Empty thread
+
+  var emptyThreadHintText: String {
+    LocalizationSupport.localized("Start with a text explanation, then use the board below for the math work.")
+  }
 
   // MARK: Tab bar
 
