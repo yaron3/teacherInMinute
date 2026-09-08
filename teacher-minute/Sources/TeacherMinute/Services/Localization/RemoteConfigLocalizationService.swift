@@ -437,6 +437,9 @@ enum LocalizationKey {
         "Grade 5": "grade_5",
         "Grade 6": "grade_6",
         "Grade 7": "grade_7",
+        // Generated as `camera_unavailable_this`, which says nothing about what
+        // the string is for.
+        "Camera unavailable \u{2014} this lesson is audio only.": "camera_unavailable_audio_only",
         "Grade 8": "grade_8",
         "Grade 9": "grade_9",
         "I am a Student": "student_a",

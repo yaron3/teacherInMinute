@@ -12,6 +12,39 @@
     }
   ],
   "parameters": {
+    "camera_unavailable_audio_only": {
+      "defaultValue": {
+        "value": "Camera unavailable — this lesson is audio only."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המצלמה אינה זמינה — השיעור באודיו בלבד."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "weak_connection_audio": {
+      "defaultValue": {
+        "value": "Weak connection — audio and video may stutter."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חיבור חלש — ייתכנו קפיצות באודיו ובווידאו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "reconnecting": {
+      "defaultValue": {
+        "value": "Reconnecting…"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתחבר מחדש…"
+        }
+      },
+      "valueType": "STRING"
+    },
     "total_minutes": {
       "defaultValue": {
         "value": "Total minutes"
