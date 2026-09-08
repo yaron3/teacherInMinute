@@ -170,14 +170,11 @@ struct TeacherDashboardView: View {
 		}
 	  }
 	  .onChange(of: scenePhase) { _, phase in
-		// Notification permission can be revoked in system settings while the
-		// app is away, and an online teacher who can no longer be notified is
-		// unreachable, so the rule is re-checked on every return to the front.
-		guard phase == .active else { return }
-		viewModel.enforceNotificationRequirement()
-		// The mic and camera rows may have been what sent the teacher to
-		// Settings in the first place, so they are re-read on the way back.
-		viewModel.refreshPermissions()
+		if phase == .background {
+		  // If notifications are disabled, an online teacher cannot be reached
+		  // in the background, so take them offline immediately.
+		  viewModel.enforceNotificationRequirement()
+		}
 	  }
 
 	}
@@ -478,7 +475,7 @@ struct TeacherDashboardView: View {
 		  .padding(.horizontal, 20)
 		  .padding(.top, 24)
 
-		  if let errorMessage = viewModel.errorMessage {
+		  if let errorMessage = viewModel.errorMessageGeneral {
 			Text(errorMessage)
 			  .font(.system(size: 13, weight: .semibold))
 			  .foregroundStyle(theme.danger)
@@ -910,7 +907,7 @@ struct TeacherIncomingQuestionOverlay: View {
 
 #Preview("Online — Live Queue") {
   TeacherDashboardView(
-    viewModel: MockTeacherDashboardViewModel(isOnline: true),
+	viewModel: MockTeacherDashboardViewModel(isOnline: true, errorMessageGeneral: "Must have notification enabled"),
     showsSessionOverlay: false,
     showsIncomingOverlay: false
   )

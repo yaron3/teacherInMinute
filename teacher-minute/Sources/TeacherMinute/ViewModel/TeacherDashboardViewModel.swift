@@ -43,6 +43,7 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var activeConversationType: String { get set }
   var acceptingQuestionId: String? { get set }
   var errorMessage: String? { get set }
+  var errorMessageGeneral: String? { get set }
   var isAcceptingCalls: Bool { get set }
   var isVerified: Bool { get set }
   var todayEarningsCents: Int { get set }
@@ -107,7 +108,7 @@ extension TeacherDashboardViewModeling {
   var teacherEyebrow: String { LocalizationSupport.localized("Teacher") }
   var teacherDashboardTitle: String { LocalizationSupport.localized("Teacher Dashboard") }
   var notificationsRequiredMessage: String {
-    LocalizationSupport.localized("Turn on notifications to stay online. Questions reach you by notification when the app is in the background.")
+    LocalizationSupport.localized("Enable notifications to stay online. If you go to the background without notifications enabled, you'll automatically go offline.")
   }
 
   // MARK: Status toggle card
@@ -317,6 +318,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
+  var errorMessageGeneral: String? = nil
   var isAcceptingCalls = false
   var isVerified = false
   var subjects: [String] = []
@@ -513,10 +515,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  guard let self else { return }
 	  // A no-op once granted on both platforms, so re-running it is harmless.
 	  let state = await PermissionService.shared.requestNotifications()
-	  guard state == .granted else {
-		self.errorMessage = self.notificationsRequiredMessage
-		logger.info("[VM] stayed offline — notifications not granted (state=\(String(describing: state)))")
-		return
+	  if state == .granted  {
+		self.errorMessageGeneral = self.notificationsRequiredMessage
 	  }
 	  self.performOnlineToggle()
 	}
@@ -1072,6 +1072,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 @Observable
 @MainActor
 final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
+  var errorMessageGeneral: String?
+  
   var teacherName: String
   var teacherImageURL: String = ""
   var isOnline: Bool
@@ -1154,7 +1156,8 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
     reviewCount: Int = 23,
     ratePerMinuteCents: Int = 120,
     hasMicAccess: Bool = true,
-    hasCameraAccess: Bool = true
+    hasCameraAccess: Bool = true,
+	errorMessageGeneral: String? = nil
   ) {
     self.teacherName = teacherName
     self.isOnline = isOnline
@@ -1172,6 +1175,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
     self.ratePerMinuteCents = ratePerMinuteCents
     self.micPermissionState = hasMicAccess ? .granted : .denied
     self.cameraPermissionState = hasCameraAccess ? .granted : .denied
+	self.errorMessageGeneral = errorMessageGeneral
 
     if isOnline {
       let id = "mock-invite-1"
