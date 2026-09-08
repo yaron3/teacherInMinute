@@ -142,7 +142,7 @@ struct MathKeyboardView: View {
     func foreground(for style: MathKey.KeyStyle) -> Color {
         switch style {
         case .standard:    return theme.primaryText
-        case .operatorKey: return theme.accentStrong
+        case .operatorKey: return theme.accent
         case .command:     return theme.accent
         case .destructive: return theme.danger
         }

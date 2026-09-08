@@ -19,6 +19,9 @@ enum EndSessionPrompt {
 }
 
 struct ChatSessionView: View {
+  private static let chatInitialScrollID = "chatInitialScroll"
+  private static let chatBottomScrollID = "chatBottomScroll"
+  private static let chatComposerScrollID = "chatComposerScroll"
   
   enum TAB_TYPE: String {
 	case CHAT
@@ -622,6 +625,10 @@ struct ChatSessionView: View {
           // against — inside a plain stack the scroll-to-newest call is a
           // silent no-op, which is why chat did not follow new messages there.
           LazyVStack(spacing: 0) {
+            Color.clear
+              .frame(height: 0)
+              .id(Self.chatInitialScrollID)
+
             header
 
             sessionConditionNotice
@@ -655,9 +662,26 @@ struct ChatSessionView: View {
                 .padding(.top, 8)
                 .id(message.id)
             }
+
+#if os(Android)
+            inputBar(scrollProxy: proxy)
+              .padding(.top, 8)
+              .id(Self.chatComposerScrollID)
+#else
+            if composerMode == .algebra {
+              inputBar(scrollProxy: proxy)
+                .padding(.top, 8)
+                .id(Self.chatComposerScrollID)
+
+            }
+#endif
+
+            Color.clear
+              .frame(height: 0)
+              .id(Self.chatBottomScrollID)
           }
 #if os(Android)
-          .padding(.bottom, inputBarHeight > 0 ? inputBarHeight : 10)
+          .padding(.bottom, 10)
 #else
           .padding(.bottom, 10)
 #endif
@@ -672,26 +696,26 @@ struct ChatSessionView: View {
             }
           }
         }
+        .onChange(of: composerMode) { _, mode in
+          scrollChatForKeyboardMode(mode, proxy: proxy)
+        }
+        .onChange(of: isMessageFieldFocused) { _, focused in
+          if focused {
+            scrollChatForKeyboardMode(.regular, proxy: proxy)
+          }
+        }
       }
 
     }
     .overlay(alignment: .top) {
       unreadTabIndicator
     }
-#if os(Android)
-    .overlay(alignment: .bottom) {
-      inputBar
-        .background(Color.black.opacity(0.15))
-        .onGeometryChange(for: CGFloat.self) { proxy in
-          proxy.size.height
-        } action: { height in
-          inputBarHeight = height
-        }
-    }
-#else
+#if !os(Android)
     .safeAreaInset(edge: .bottom) {
-      inputBar
-        .background(Color.black.opacity(0.15))
+      if composerMode == .regular {
+        inputBar()
+          .background(Color.black.opacity(0.15))
+      }
     }
 #endif
   }
@@ -744,7 +768,7 @@ struct ChatSessionView: View {
 
 #if os(Android)
       if selectedTab == .CHAT && !isBoardMaximized {
-        inputBar
+        inputBar()
       }
 
 #endif
@@ -753,7 +777,7 @@ struct ChatSessionView: View {
 #if !os(Android)
     .safeAreaInset(edge: .bottom) {
       if selectedTab == .CHAT && !isBoardMaximized {
-        inputBar
+        inputBar()
           .background(.ultraThinMaterial)
       }
     }
@@ -1099,13 +1123,13 @@ struct ChatSessionView: View {
     .clipShape(Capsule())
   }
 
-  var inputBar: some View {
+  func inputBar(scrollProxy: ScrollViewProxy? = nil) -> some View {
     VStack(spacing: 8) {
-      composerModeToggle
+      composerModeToggle(scrollProxy: scrollProxy)
 
       if composerMode == .algebra {
         MathEquationEditorView { latex in
-          sendComposed(latex)
+          sendFormula(latex)
         }
         .environment(\.layoutDirection, .leftToRight)
       } else {
@@ -1118,15 +1142,21 @@ struct ChatSessionView: View {
     .padding(.bottom, 10)
   }
 
-  var composerModeToggle: some View {
+  func composerModeToggle(scrollProxy: ScrollViewProxy? = nil) -> some View {
     HStack(spacing: 6) {
       composerModePill(title: viewModel.regularModeLabel, isSelected: composerMode == .regular) {
         composerMode = .regular
         isMessageFieldFocused = true
+        if let scrollProxy {
+          scrollChatForKeyboardMode(.regular, proxy: scrollProxy)
+        }
       }
       composerModePill(title: viewModel.algebraModeLabel, isSelected: composerMode == .algebra) {
         composerMode = .algebra
         isMessageFieldFocused = false
+        if let scrollProxy {
+          scrollChatForKeyboardMode(.algebra, proxy: scrollProxy)
+        }
       }
       Spacer()
     }
@@ -1147,11 +1177,35 @@ struct ChatSessionView: View {
     .buttonStyle(.plain)
   }
 
+  func scrollChatForKeyboardMode(_ mode: ChatComposerMode, proxy: ScrollViewProxy) {
+#if os(Android)
+    let target = messages.last?.id ?? Self.chatInitialScrollID
+    let anchor: UnitPoint = .top
+#else
+    let target = mode == .algebra ? Self.chatComposerScrollID : Self.chatBottomScrollID
+    let anchor: UnitPoint = .bottom
+#endif
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 80_000_000)
+      withAnimation(.easeInOut(duration: 0.25)) {
+        proxy.scrollTo(target, anchor: anchor)
+      }
+    }
+  }
+
   func sendComposed(_ text: String) {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
     messages = messages + [viewModel.localMessage(text: trimmed)]
     viewModel.send(trimmed)
+  }
+
+  func sendFormula(_ latex: String) {
+    let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    let formulaText = "$$\(trimmed)$$"
+    messages = messages + [viewModel.localMessage(text: formulaText)]
+    viewModel.sendQuestionFormula(formulaText)
   }
 
   var boardRevision: String {
@@ -1307,11 +1361,15 @@ struct ChatSessionView: View {
 		Text(viewModel.originalQuestionLabel)
 		  .font(.system(size: 10, weight: .bold))
 		  .foregroundStyle(theme.warning)
-		Text(viewModel.originalQuestion)
-		  .font(.system(size: 12, weight: .medium))
-		  .foregroundStyle(theme.primaryText)
-		  .lineSpacing(3)
-          .frame(maxWidth: .infinity, alignment: .leading)
+            FormulaAwareText(
+              text: viewModel.originalQuestion,
+              textColor: theme.primaryText,
+              font: .system(size: 12, weight: .medium),
+              lineSpacing: 3,
+              formulaMinWidth: 160,
+              formulaMaxWidth: 260
+            )
+              .frame(maxWidth: .infinity, alignment: .leading)
 	  }
 	  .frame(maxWidth: .infinity, alignment: .leading)
 	  Spacer(minLength: 2)
@@ -1345,10 +1403,14 @@ struct ChatSessionView: View {
         Text(viewModel.originalQuestionLabel)
           .font(.system(size: 10, weight: .bold))
           .foregroundStyle(theme.warning)
-        Text(viewModel.originalQuestion)
-          .font(.system(size: 12, weight: .medium))
-          .foregroundStyle(theme.primaryText)
-          .lineSpacing(3)
+        FormulaAwareText(
+          text: viewModel.originalQuestion,
+          textColor: theme.primaryText,
+          font: .system(size: 12, weight: .medium),
+          lineSpacing: 3,
+          formulaMinWidth: 160,
+          formulaMaxWidth: 260
+        )
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       Spacer(minLength: 0)

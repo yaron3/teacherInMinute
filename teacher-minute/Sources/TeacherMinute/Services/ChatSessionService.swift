@@ -137,7 +137,7 @@ final class ChatSessionService {
 #endif
   }
 
-  func startSessionListening(onEnded: @escaping () -> Void) {
+  func startSessionListening(onEnded: @escaping () -> Void, onUpdate: @escaping (ChatSessionDetails) -> Void = { _ in }) {
 #if !os(Android)
     sessionHandle = questionRef.observe(.value) { snapshot in
       if !snapshot.exists() {
@@ -147,6 +147,10 @@ final class ChatSessionService {
       if let dict = snapshot.value as? [String: Any],
          Self.isTerminalStatus(dict["status"]) {
         onEnded()
+        return
+      }
+      if let dict = snapshot.value as? [String: Any] {
+        onUpdate(Self.details(from: dict))
       }
     }
 #endif
@@ -274,6 +278,36 @@ final class ChatSessionService {
       messagesRef.childByAutoId().setValue(payload) { error, _ in
         if let error { cont.resume(throwing: error); return }
         cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
+  func appendQuestionText(_ addition: String) async throws -> String {
+    let trimmed = addition.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return "" }
+
+#if os(Android)
+    return try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.appendQuestionText(questionId: self.questionId, addition: trimmed)
+    }.value
+#else
+    return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<String, Error>) in
+      questionRef.observeSingleEvent(of: .value) { snapshot in
+        let current = Self.questionText(from: snapshot.value as? [String: Any])
+        let next = Self.appendingQuestionText(addition: trimmed, to: current)
+        self.questionRef.updateChildValues([
+          "text": next,
+          "questionText": next
+        ]) { error, _ in
+          if let error {
+            cont.resume(throwing: error)
+            return
+          }
+          cont.resume(returning: next)
+        }
+      } withCancel: { error in
+        cont.resume(throwing: error)
       }
     }
 #endif
@@ -521,6 +555,20 @@ final class ChatSessionService {
     return nil
   }
 
+  private static func questionText(from dict: [String: Any]?) -> String {
+    guard let dict else { return "" }
+    return firstString(in: dict, keys: ["text", "questionText", "originalQuestion", "message", "topic"])
+  }
+
+  static func appendingQuestionText(addition: String, to current: String) -> String {
+    let trimmedCurrent = current.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedAddition = addition.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedAddition.isEmpty else { return trimmedCurrent }
+    guard !trimmedCurrent.isEmpty else { return trimmedAddition }
+    if trimmedCurrent.contains(trimmedAddition) { return trimmedCurrent }
+    return trimmedCurrent + "\n" + trimmedAddition
+  }
+
   private static func pointsJson(_ points: [BoardPoint]) -> String {
     let rows = points.map { ["x": $0.x, "y": $0.y] }
     guard let data = try? JSONSerialization.data(withJSONObject: rows),
@@ -637,6 +685,7 @@ protocol ChatSessionViewModeling: AnyObject {
   func localMessage(text: String) -> ChatMessage
   func localStroke(points: [BoardPoint]) -> BoardStroke
   func send(_ messageText: String)
+  func sendQuestionFormula(_ formulaText: String)
   func sendStroke(_ points: [BoardPoint])
   func clearBoard()
   func updateBoardViewport(_ viewport: BoardViewport)
@@ -865,12 +914,14 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     pollingTask = Task {
       while !Task.isCancelled {
         do {
-          if try await service.fetchSessionDetails() == nil {
+          guard let updatedDetails = try await service.fetchSessionDetails() else {
             guard !Task.isCancelled else { return }
             await handleRemoteSessionEnded()
             return
           }
           didObserveActiveSession = true
+          details = mergedDetails(current: details, updated: updatedDetails)
+          onSessionDetailsUpdated?()
           let rows = try await service.fetchMessages()
           let strokes = try await service.fetchBoardStrokes()
           let viewports = try await service.fetchBoardViewports()
@@ -892,11 +943,18 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       }
     }
 #else
-    service.startSessionListening { [weak self] in
-      Task { @MainActor in
-        await self?.handleRemoteSessionEnded()
+    service.startSessionListening(
+      onEnded: { [weak self] in
+        Task { @MainActor in
+          await self?.handleRemoteSessionEnded()
+        }
+      },
+      onUpdate: { [weak self] updatedDetails in
+        guard let self else { return }
+        self.details = self.mergedDetails(current: self.details, updated: updatedDetails)
+        self.onSessionDetailsUpdated?()
       }
-    }
+    )
     service.startListening { [weak self] rows in
       self?.messages = rows
       self?.onMessagesUpdated?(rows)
@@ -1000,6 +1058,28 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         errorMessage = error.localizedDescription
         onErrorUpdated?(errorMessage)
 		logger.error("[ChatSession] Chat send failed: \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func sendQuestionFormula(_ formulaText: String) {
+    let text = formulaText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    send(text)
+
+    guard role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student" else { return }
+    let currentText = details?.questionText ?? ""
+    let localQuestionText = ChatSessionService.appendingQuestionText(addition: text, to: currentText)
+    updateLocalQuestionText(localQuestionText)
+
+    Task {
+      do {
+        let remoteQuestionText = try await service.appendQuestionText(text)
+        updateLocalQuestionText(remoteQuestionText)
+      } catch {
+        errorMessage = error.localizedDescription
+        onErrorUpdated?(errorMessage)
+        logger.error("[ChatSession] Question formula append failed: \(error.localizedDescription)")
       }
     }
   }
@@ -1174,6 +1254,29 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     )
   }
 
+  private func updateLocalQuestionText(_ questionText: String) {
+    guard let current = details else { return }
+    let trimmed = questionText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed != current.questionText else { return }
+    details = ChatSessionDetails(
+      questionId: current.questionId,
+      studentId: current.studentId,
+      teacherId: current.teacherId,
+      studentName: current.studentName,
+      teacherName: current.teacherName,
+      studentImageURL: current.studentImageURL,
+      teacherImageURL: current.teacherImageURL,
+      questionText: trimmed,
+      questionPhotoUrls: current.questionPhotoUrls,
+      createdAt: current.createdAt,
+      acceptedAt: current.acceptedAt,
+      pricePerMinuteCents: current.pricePerMinuteCents,
+      teacherSharePercent: current.teacherSharePercent,
+      currencyCode: current.currencyCode
+    )
+    onSessionDetailsUpdated?()
+  }
+
   private func loadParticipantProfiles() async {
     guard let current = details,
           let currentUserId = nonEmpty(Auth.auth().currentUser?.uid) else { return }
@@ -1238,6 +1341,10 @@ private enum AndroidChatBridge {
     name: "sendText",
     sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
   )!
+  private static let appendQuestionTextMethod = managerClass.getStaticMethodID(
+    name: "appendQuestionText",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+  )!
   private static let fetchBoardMethod = managerClass.getStaticMethodID(
     name: "fetchBoardStrokesJson",
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
@@ -1297,6 +1404,19 @@ private enum AndroidChatBridge {
         ]
       )
     }
+  }
+
+  static func appendQuestionText(questionId: String, addition: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: appendQuestionTextMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          addition.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    } as String
   }
 
   static func fetchBoardStrokes(questionId: String) throws -> String {

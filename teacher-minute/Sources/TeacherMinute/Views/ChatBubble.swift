@@ -24,8 +24,8 @@ struct ChatBubble: View {
 
       VStack(alignment: message.isMine ? .trailing : .leading, spacing: 5) {
         if ChatBubble.isLatex(message.text) {
-          MathFormulaView(latex: message.text, displayMode: true)
-            .frame(minWidth: 160, maxWidth: 300, minHeight: Self.formulaHeight(message.text))
+          MathFormulaView(latex: Self.latexContent(message.text), displayMode: true)
+            .frame(minWidth: 160, maxWidth: 300, minHeight: Self.formulaHeight(Self.latexContent(message.text)))
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
             .background(theme.cardBackground)
@@ -201,6 +201,20 @@ struct ChatBubble: View {
       return true
     }
     return trimmed.hasPrefix("\\frac") || trimmed.hasPrefix("\\sqrt")
+  }
+
+  static func latexContent(_ text: String) -> String {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.hasPrefix("$$") && trimmed.hasSuffix("$$"), trimmed.count >= 4 {
+      return String(trimmed.dropFirst(2).dropLast(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    if trimmed.hasPrefix("\\[") && trimmed.hasSuffix("\\]"), trimmed.count >= 4 {
+      return String(trimmed.dropFirst(2).dropLast(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    if trimmed.hasPrefix("\\(") && trimmed.hasSuffix("\\)"), trimmed.count >= 4 {
+      return String(trimmed.dropFirst(2).dropLast(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    return trimmed
   }
 }
 

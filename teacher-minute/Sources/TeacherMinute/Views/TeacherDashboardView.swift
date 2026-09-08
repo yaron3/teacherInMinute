@@ -99,12 +99,14 @@ struct TeacherDashboardView: View {
 
 			  onlineStatusCard
 				.padding(.top, 12)
-			  ZStack {
-				liveQueue
-				  .padding(.top, 28)
-				  .disabled(viewModel.isAcceptingCalls)
-				if viewModel.isAcceptingCalls {
-				  ProgressView()
+			  if viewModel.inviteIDs.count > 0 {
+				ZStack {
+				  liveQueue
+					.padding(.top, 28)
+					.disabled(viewModel.isAcceptingCalls)
+				  if viewModel.isAcceptingCalls {
+					ProgressView()
+				  }
 				}
 			  }
 			} else {

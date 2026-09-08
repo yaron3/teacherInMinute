@@ -69,6 +69,27 @@ object AndroidChatManager {
     }
 
     @JvmStatic
+    fun appendQuestionText(questionId: String, addition: String): String {
+        val trimmedAddition = addition.trim()
+        if (trimmedAddition.isEmpty()) return ""
+
+        val questionRef = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+        val snapshot = Tasks.await(questionRef.get(), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        val current = snapshot.firstString("text", "questionText", "originalQuestion", "message", "topic")
+        val next = appendingQuestionText(trimmedAddition, current)
+        val payload = mapOf(
+            "text" to next,
+            "questionText" to next
+        )
+
+        Log.i(TAG, "Appending formula to question text questionId=$questionId")
+        Tasks.await(questionRef.updateChildren(payload), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        return next
+    }
+
+    @JvmStatic
     fun fetchBoardStrokesJson(questionId: String): String {
         val snapshot = Tasks.await(
             FirebaseDatabase.getInstance(DATABASE_URL)
@@ -320,6 +341,15 @@ object AndroidChatManager {
                     ?: 75.0
             )
             .toString()
+    }
+
+    private fun appendingQuestionText(addition: String, current: String): String {
+        val trimmedCurrent = current.trim()
+        val trimmedAddition = addition.trim()
+        if (trimmedAddition.isEmpty()) return trimmedCurrent
+        if (trimmedCurrent.isEmpty()) return trimmedAddition
+        if (trimmedCurrent.contains(trimmedAddition)) return trimmedCurrent
+        return "$trimmedCurrent\n$trimmedAddition"
     }
 
     private fun Any?.asDoubleOrNull(): Double? {

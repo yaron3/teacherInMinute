@@ -22,6 +22,7 @@ struct MathEquationEditorView: View {
     /// message; the ask-a-teacher sheet appends it to the question being
     /// written, so the same editor needs to promise two different things.
     var actionSystemImage: String = "paperplane.fill"
+    var onDraftChange: (String) -> Void = { _ in }
     /// Called with the finished LaTeX. The editor clears itself first, so the
     /// handler is free to rebuild the view that owns it.
     let onSend: (String) -> Void
@@ -92,6 +93,7 @@ struct MathEquationEditorView: View {
         // clear afterwards lands on the discarded one. The equation then stays
         // in the field, which reads as "the send button did nothing".
         model.clear()
+        onDraftChange("")
         onSend(trimmed)
     }
 
@@ -111,6 +113,7 @@ struct MathEquationEditorView: View {
         case .fraction:
             model.wrapPreviousAsNumerator()
         }
+        onDraftChange(model.exportLatex())
         modelTick &+= 1
         logger.info("[MathEditor] after action tick=\(modelTick) latex='\(model.currentLatex)' cursor=\(model.cursorIndex)")
     }

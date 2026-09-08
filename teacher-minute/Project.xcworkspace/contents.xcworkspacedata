@@ -4,7 +4,4 @@
    <FileRef
       location = "group:Darwin/TeacherMinute.xcodeproj">
    </FileRef>
-   <FileRef
-      location = "group:howItWorks.swift">
-   </FileRef>
 </Workspace>

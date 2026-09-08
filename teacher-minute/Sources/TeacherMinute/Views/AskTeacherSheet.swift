@@ -21,6 +21,9 @@ struct AskTeacherSheet: View {
 
     static let topics = [("Algebra"), ("Geometry"), ("Trigonometry"), ("Calculus"), ("Statistics"), ("Arithmetic")]
     static let maxPhotoCount = 4
+    private static let initialScrollID = "askTeacherInitialScroll"
+    private static let questionScrollID = "askTeacherQuestionScroll"
+    private static let keyboardScrollID = "askTeacherKeyboardScroll"
 
     init(viewModel: any StudentHomeViewModeling) {
         self.viewModel = viewModel
@@ -45,19 +48,35 @@ struct AskTeacherSheet: View {
     /// Which keyboard writes the question. The same switch the chat composer
     /// offers, so a student who has used one recognises the other.
     @State  var keyboardMode: ChatComposerMode = .regular
+    @State  var pendingFormulaLatex = ""
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
     @Environment(\.dismiss) var dismiss
   private var canSubmit: Bool {
-    questionText.trimmingCharacters(in: .whitespaces).count >= 10
+    composedQuestionText.count >= 10
       || !uploadedPhotoUrls.isEmpty
       || hasFormula
+  }
+
+  private var composedQuestionText: String {
+    let text = questionText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let formula = wrappedPendingFormula
+    if text.isEmpty { return formula }
+    if formula.isEmpty { return text }
+    return text + "\n" + formula
+  }
+
+  private var wrappedPendingFormula: String {
+    let trimmed = pendingFormulaLatex.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? "" : "$$\(trimmed)$$"
   }
 
   /// A formula built with the algebra keyboard is a whole question on its own:
   /// `$$x^{2}$$` is nine characters and says everything the student is asking.
   /// So it clears the ten-character minimum the way a photo does, and the
   /// character counter steps aside for it too.
-  private var hasFormula: Bool { questionText.contains("$$") }
+  private var hasFormula: Bool {
+    questionText.contains("$$") || !pendingFormulaLatex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -105,9 +124,14 @@ struct AskTeacherSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
+        ScrollViewReader { scrollProxy in
         ScrollView(.vertical, showsIndicators: false) {
-			  VStack(alignment: .leading, spacing: sheetSpacing) {
-			VStack(alignment: .leading, spacing: sectionSpacing) {
+				  LazyVStack(alignment: .leading, spacing: sheetSpacing) {
+                    Color.clear
+                        .frame(height: 0)
+                        .id(Self.initialScrollID)
+
+				VStack(alignment: .leading, spacing: sectionSpacing) {
                     Text(viewModel.sessionTypeSectionTitle)
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
@@ -200,7 +224,7 @@ struct AskTeacherSheet: View {
                         // A formula clears the minimum on its own, so the
                         // counter steps aside for it as it does for a photo.
                         if uploadedPhotoUrls.isEmpty, !hasFormula {
-                            Text(viewModel.minimumCharactersText(count: questionText.count))
+                            Text(viewModel.minimumCharactersText(count: composedQuestionText.count))
                                 .font(.system(size: 11))
                                 .multilineTextAlignment(.leading)
                                 .foregroundStyle(canSubmit ? theme.positive : theme.secondaryText)
@@ -226,8 +250,10 @@ struct AskTeacherSheet: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .id(Self.questionScrollID)
 
-                keyboardSection
+                keyboardSection(scrollProxy: scrollProxy)
+                    .id(Self.keyboardScrollID)
 
                 photoAttachmentSection
 
@@ -254,6 +280,10 @@ struct AskTeacherSheet: View {
             .padding(sheetPadding)
         }
         .scrollDismissesKeyboard(.immediately)
+        .onChange(of: keyboardMode) { _, mode in
+            scrollForKeyboardMode(mode, proxy: scrollProxy)
+        }
+        }
         }
         .navigationTitle(viewModel.askATeacherSheetTitle)
         .navigationBarTitleDisplayMode(.inline)
@@ -286,6 +316,22 @@ struct AskTeacherSheet: View {
         )
     }
 
+    func scrollForKeyboardMode(_ mode: ChatComposerMode, proxy: ScrollViewProxy) {
+#if os(Android)
+        let target = Self.questionScrollID
+        let anchor: UnitPoint = .top
+#else
+        let target = mode == .algebra ? Self.keyboardScrollID : Self.initialScrollID
+        let anchor: UnitPoint = mode == .algebra ? .bottom : .top
+#endif
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(target, anchor: anchor)
+            }
+        }
+    }
+
     func findTeacherTapped() async {
         guard !isRequestingPermission else { return }
         isRequestingPermission = true
@@ -312,7 +358,7 @@ struct AskTeacherSheet: View {
         closeAskTeacher()
         await viewModel.askTeacher(
             topic: selectedTopic.lowercased(),
-            text: questionText.trimmingCharacters(in: .whitespaces),
+            text: composedQuestionText,
             photoUrls: uploadedPhotoUrls,
             conversationType: conversationType
         )
@@ -566,7 +612,7 @@ struct AskTeacherSheet: View {
     /// keyboard. Now the two keyboards are alternatives the student picks
     /// between, and the algebra one stays up for as long as they are building
     /// the formula.
-    var keyboardSection: some View {
+    func keyboardSection(scrollProxy: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
             HStack(spacing: 8) {
                 Text(viewModel.keyboardSectionTitle)
@@ -577,13 +623,16 @@ struct AskTeacherSheet: View {
 
                 keyboardModePill(title: viewModel.regularKeyboardLabel, isSelected: keyboardMode == .regular) {
                     keyboardMode = .regular
+                    pendingFormulaLatex = ""
                     isQuestionFocused = true
+                    scrollForKeyboardMode(.regular, proxy: scrollProxy)
                 }
                 keyboardModePill(title: viewModel.algebraKeyboardLabel, isSelected: keyboardMode == .algebra) {
                     keyboardMode = .algebra
                     // The math keys are the keyboard in this mode, so the system
                     // one gives up the space it was holding.
                     isQuestionFocused = false
+                    scrollForKeyboardMode(.algebra, proxy: scrollProxy)
                 }
             }
 
@@ -594,7 +643,9 @@ struct AskTeacherSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(theme.secondaryText)
 
-                MathEquationEditorView(actionSystemImage: "plus") { latex in
+                MathEquationEditorView(actionSystemImage: "plus", onDraftChange: { latex in
+                    pendingFormulaLatex = latex
+                }) { latex in
                     appendFormula(latex)
                 }
                 .environment(\.layoutDirection, .leftToRight)
@@ -611,7 +662,7 @@ struct AskTeacherSheet: View {
                 .foregroundStyle(isSelected ? theme.onDarkFill : theme.primaryText)
                 .padding(.horizontal, 14)
                 .frame(height: 28)
-                .background(isSelected ? theme.accentStrong : theme.cardBackground)
+                .background(isSelected ? theme.accentStrong : theme.secondaryText)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -624,6 +675,7 @@ struct AskTeacherSheet: View {
     func appendFormula(_ latex: String) {
         let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        pendingFormulaLatex = ""
         let separator = questionText.isEmpty || questionText.hasSuffix("\n") ? "" : "\n"
         questionText += "\(separator)$$\(trimmed)$$"
     }

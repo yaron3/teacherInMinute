@@ -149,6 +149,10 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     onMessagesUpdated?(messages)
   }
 
+  func sendQuestionFormula(_ formulaText: String) {
+    send(formulaText)
+  }
+
   func sendStroke(_ points: [BoardPoint]) {
     guard !points.isEmpty else { return }
     let stroke = localStroke(points: points)
