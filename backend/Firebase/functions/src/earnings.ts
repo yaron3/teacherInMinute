@@ -1,0 +1,444 @@
+import * as admin from "firebase-admin";
+import { logger } from "firebase-functions";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+
+import { Timestamp } from "firebase-admin/firestore";
+
+import { QuestionDoc } from "./types";
+import { DEFAULT_CURRENCY } from "./pricing";
+import { monthKey, nextPayoutFor } from "./payoutSchedule";
+import {
+  PayoutMethod,
+  PayoutMethodValidationError,
+  parsePayoutMethod,
+  payoutMethodSummary,
+  verifiedPayPalPayoutMethod,
+} from "./payoutMethod";
+import { ISRAELI_BANKS } from "./israeliBanks";
+import { lookupPayPalAccountEmail, BraintreeNotConfiguredError } from "./braintree";
+import { validateEmail, emailRejectionMessage } from "./emailValidation";
+import { requiresOwnershipVerification } from "./emailOwnership";
+
+const firestore = admin.firestore();
+
+// ─── Teacher earnings ────────────────────────────────────────────────────────
+//
+// Authoritative, server-side aggregation of what a teacher earned, grouped by
+// calendar month with a weekly breakdown, plus when the next payout lands
+// (see ./payoutSchedule for the 9th-of-the-following-month rule).
+//
+// The client renders the returned numbers; every label (month names, week
+// labels, dates) is formatted client-side against the viewer's locale, so this
+// service deliberately returns raw values and never display strings.
+
+/** Cap on the lessons scanned per teacher — well beyond a realistic history,
+ *  but bounds the read cost of a single call. */
+const MAX_LESSONS = 2000;
+
+export interface WeekBucket {
+  index: number;
+  startDay: number;
+  endDay: number;
+  earningsCents: number;
+  minutesCount: number;
+  lessonCount: number;
+}
+
+export interface MonthBucket {
+  id: string; // "yyyy-MM"
+  year: number;
+  month: number; // 1-12
+  earningsCents: number;
+  minutesCount: number;
+  lessonCount: number;
+  isCurrentMonth: boolean;
+  weeks: WeekBucket[];
+}
+
+/** The fields `endLesson` (./lessons.ts) writes onto a completed question that
+ *  this summary needs. Kept local rather than added to `QuestionDoc`, since
+ *  `teacherUid`/`teacherEarnings`/`currencyCode` reach that document via a
+ *  spread of the RTDB question node rather than a single well-typed write, and
+ *  `durationSeconds` (billed seconds, already rounded per the billing rules)
+ *  is easy to mistake for the differently-named `billedSeconds` that only
+ *  ever exists on the separate, largely-unpopulated `lessons` collection —
+ *  that mix-up is exactly what left this summary always reading zero. */
+export type CompletedQuestion = QuestionDoc & {
+  /** The Firestore document id, copied in by the caller — the history list
+   *  addresses lessons by it. Most documents also carry it as a `questionId`
+   *  field, which is the fallback. */
+  id?: string;
+  questionId?: string;
+  teacherUid?: string;
+  teacherEarnings?: number;
+  currencyCode?: string;
+  durationSeconds?: number;
+  cost?: number;
+  studentRating?: number;
+  // Older documents reached Firestore as a spread of the RTDB question node
+  // and carry these alternative spellings instead of the typed ones above.
+  questionText?: string;
+  originalQuestion?: string;
+  message?: string;
+  subject?: string;
+  title?: string;
+  studentProfileImageURL?: string;
+  connectedAt?: unknown;
+  completedAt?: unknown;
+  finishedAt?: unknown;
+};
+
+/** One lesson as the teacher's history screen shows it. Returned alongside the
+ *  monthly buckets so the history list and the earnings totals are the same
+ *  set of lessons, counted the same way — the two used to be assembled from
+ *  different sources (this query vs. the `questions` array on the teacher's
+ *  user document) and disagreed whenever the two drifted apart. */
+export interface EarningsLesson {
+  questionId: string;
+  /** ISO-8601. When the lesson finished — what the earnings are bucketed by. */
+  endedAt: string;
+  /** ISO-8601. When the teacher picked it up — what the history list sorts and
+   *  dates rows by. Falls back to `endedAt` when the document has no start. */
+  acceptedAt: string;
+  durationSeconds: number;
+  earningsCents: number;
+  costCents: number;
+  currency: string;
+  studentName: string;
+  studentImageURL: string;
+  text: string;
+  topic: string;
+  photoUrls: string[];
+  studentRating: number;
+}
+
+/** `teacherEarnings` on a question is stored in major units (e.g. 12.5 ILS). */
+function toCents(majorUnits: unknown): number {
+  const n = Number(majorUnits);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+}
+
+function toMinutes(billedSeconds: unknown): number {
+  const n = Math.floor(Number(billedSeconds));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.max(1, Math.round(n / 60));
+}
+
+/** These documents arrive by two routes — the typed `endLesson` write and a
+ *  spread of the RTDB question node — so a date is a Timestamp on some and
+ *  epoch millis or an ISO string on others. */
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  const ts = value as { toDate?: () => Date };
+  if (typeof ts.toDate === "function") return ts.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === "number") {
+    // Seconds and milliseconds are both in the wild; anything before 2001 as
+    // millis is really a seconds value.
+    const ms = value < 1_000_000_000_000 ? value * 1000 : value;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function firstString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim() !== "");
+}
+
+/** `cost` is stored in major units, like `teacherEarnings`. */
+function toCostCents(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+}
+
+/** Weeks are fixed 7-day spans from the 1st, so the last one runs short —
+ *  the same shape the earnings screen has always shown. */
+function weekIndexFor(dayOfMonth: number): number {
+  return Math.floor((dayOfMonth - 1) / 7) + 1;
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** Groups a teacher's completed questions into calendar months with a weekly
+ *  breakdown. Pure and Firestore-free — takes plain data, not a query — so it
+ *  can be unit tested directly with fixtures rather than mocked Firestore
+ *  docs; see ./__tests__/earnings.test.ts. */
+export function summarizeCompletedQuestions(
+  questions: CompletedQuestion[],
+  now: Date
+): {
+  months: MonthBucket[];
+  totalEarningsCents: number;
+  currency: string;
+  byMonth: Map<string, MonthBucket>;
+  lessons: EarningsLesson[];
+  /** ISO-8601 end date of the oldest lesson counted, or "" when none were.
+   *  The total is a running figure with no start date of its own, so the
+   *  screen says which lesson it starts from. */
+  firstLessonAt: string;
+} {
+  const currentKey = monthKey(now.getUTCFullYear(), now.getUTCMonth() + 1);
+
+  let currency = "";
+  const byMonth = new Map<string, MonthBucket>();
+  const lessons: EarningsLesson[] = [];
+
+  for (const question of questions) {
+    if (question.status !== "completed") continue;
+    // Only settled lessons carry earnings; an in-progress one has none yet.
+    const endedAt =
+      toDate(question.endedAt) ?? toDate(question.completedAt) ?? toDate(question.finishedAt);
+    if (!endedAt) continue;
+
+    const earningsCents = toCents(question.teacherEarnings);
+    const minutes = toMinutes(question.durationSeconds);
+    const acceptedAt =
+      toDate(question.acceptedAt) ??
+      toDate(question.connectedAt) ??
+      toDate(question.startedAt) ??
+      toDate(question.createdAt) ??
+      endedAt;
+
+    lessons.push({
+      questionId: firstString(question.id, question.questionId),
+      endedAt: endedAt.toISOString(),
+      acceptedAt: acceptedAt.toISOString(),
+      durationSeconds: Math.max(0, Math.floor(Number(question.durationSeconds) || 0)),
+      earningsCents,
+      costCents: toCostCents(question.cost),
+      currency: firstString(question.currencyCode).toUpperCase(),
+      studentName: firstString(question.studentName),
+      studentImageURL: firstString(question.studentImageURL, question.studentProfileImageURL),
+      text: firstString(question.text, question.questionText, question.originalQuestion, question.message),
+      topic: firstString(question.topic, question.subject, question.title),
+      photoUrls: toStringArray(question.photoUrls),
+      studentRating: Math.min(5, Math.max(0, Math.floor(Number(question.studentRating) || 0))),
+    });
+
+    const year = endedAt.getUTCFullYear();
+    const month = endedAt.getUTCMonth() + 1;
+    const key = monthKey(year, month);
+
+    if (!currency && typeof question.currencyCode === "string" && question.currencyCode.trim()) {
+      currency = question.currencyCode.trim().toUpperCase();
+    }
+
+    let bucket = byMonth.get(key);
+    if (!bucket) {
+      const lastDay = daysInMonth(year, month);
+      const weeks: WeekBucket[] = [];
+      for (let startDay = 1; startDay <= lastDay; startDay += 7) {
+        weeks.push({
+          index: weekIndexFor(startDay),
+          startDay,
+          endDay: Math.min(startDay + 6, lastDay),
+          earningsCents: 0,
+          minutesCount: 0,
+          lessonCount: 0,
+        });
+      }
+      bucket = {
+        id: key,
+        year,
+        month,
+        earningsCents: 0,
+        minutesCount: 0,
+        lessonCount: 0,
+        isCurrentMonth: key === currentKey,
+        weeks,
+      };
+      byMonth.set(key, bucket);
+    }
+
+    bucket.earningsCents += earningsCents;
+    bucket.minutesCount += minutes;
+    bucket.lessonCount += 1;
+
+    const week = bucket.weeks[weekIndexFor(endedAt.getUTCDate()) - 1];
+    if (week) {
+      week.earningsCents += earningsCents;
+      week.minutesCount += minutes;
+      week.lessonCount += 1;
+    }
+  }
+
+  const months = [...byMonth.values()].sort((a, b) => a.id.localeCompare(b.id));
+  const totalEarningsCents = months.reduce((sum, m) => sum + m.earningsCents, 0);
+
+  // Newest first — the order the history list shows them in.
+  lessons.sort((a, b) => b.acceptedAt.localeCompare(a.acceptedAt));
+  const firstLessonAt = lessons.reduce(
+    (oldest, lesson) => (oldest === "" || lesson.endedAt < oldest ? lesson.endedAt : oldest),
+    ""
+  );
+
+  return { months, totalEarningsCents, currency, byMonth, lessons, firstLessonAt };
+}
+
+export const teacherEarningsSummary = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  // The `lessons` collection doc for a question is only created at
+  // startLesson and only re-merged with earnings/endedAt if that doc is still
+  // findable at endLesson — in practice most lessons never accumulate that
+  // second write and the collection sits at status "in_progress" forever.
+  // `endLesson` unconditionally writes earnings onto the `questions` doc
+  // instead, which is also what the client's own lesson history already
+  // reads (see HistoryModel.swift) — so that is the source of truth here too.
+  const snap = await firestore
+    .collection("questions")
+    .where("teacherUid", "==", uid)
+    .limit(MAX_LESSONS)
+    .get();
+
+  const now = new Date();
+  const questions = snap.docs.map((doc) => ({ ...(doc.data() as CompletedQuestion), id: doc.id }));
+  const { months, totalEarningsCents, currency, byMonth, lessons, firstLessonAt } =
+    summarizeCompletedQuestions(questions, now);
+
+  const { periodMonthId, payoutDate } = nextPayoutFor(now);
+  const pendingAmountCents = byMonth.get(periodMonthId)?.earningsCents ?? 0;
+
+  // Where the money goes — the app shows it so the teacher can confirm it, and
+  // offers an edit form backed by updateTeacherPayoutMethod below.
+  const userSnap = await firestore.collection("users").doc(uid).get();
+  const user = userSnap.data() ?? {};
+  const payoutMethod = (user.payoutMethod ?? null) as PayoutMethod | null;
+
+  logger.info(
+    `[earnings] teacherEarningsSummary uid=${uid} scanned=${snap.size} counted=${lessons.length} months=${months.length} totalCents=${totalEarningsCents} since=${firstLessonAt} payoutPeriod=${periodMonthId} payoutDate=${payoutDate}`
+  );
+
+  return {
+    currency: currency || DEFAULT_CURRENCY,
+    totalEarningsCents,
+    months,
+    // The same lessons the totals above were computed from, so the teacher's
+    // history list cannot show a different set from the earnings screen.
+    lessons,
+    firstLessonAt,
+    nextPayment: {
+      amountCents: pendingAmountCents,
+      payoutDate,
+      periodMonthId,
+    },
+    payoutMethod,
+    payoutMethodSummary: payoutMethod ? payoutMethodSummary(payoutMethod) : "",
+    // Sent alongside so the app's bank picker always offers exactly the banks
+    // this backend will accept.
+    banks: ISRAELI_BANKS,
+    // The teacher's profile phone, so the Bit form can offer it rather than
+    // making them retype a number the app already has.
+    profilePhone: typeof user.phoneNumber === "string" ? user.phoneNumber : "",
+  };
+});
+
+// ─── updateTeacherPayoutMethod ───────────────────────────────────────────────
+
+/** Sets where the teacher's monthly payout is sent. Validates per method type
+ *  (see ./payoutMethod) and replaces the stored method outright, so switching
+ *  from, say, Bit to a bank account leaves no stale fields behind. */
+export const updateTeacherPayoutMethod = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  let method: PayoutMethod;
+  try {
+    method = parsePayoutMethod((req.data as Record<string, unknown>)?.payoutMethod ?? req.data);
+  } catch (err) {
+    if (err instanceof PayoutMethodValidationError) {
+      logger.info(`[earnings] payout method rejected uid=${uid} reason=${err.message}`);
+      throw new HttpsError("invalid-argument", err.message);
+    }
+    throw err;
+  }
+
+  // A typed PayPal address has to be somewhere mail can actually reach, or the
+  // payout has nowhere to land and the teacher gets no notice of the failure.
+  if (method.type === "paypal") {
+    const check = await validateEmail(method.email);
+    if (!check.valid) {
+      logger.info(
+        `[earnings] payout email rejected uid=${uid} reason=${check.reason ?? "mailbox"}`
+      );
+      throw new HttpsError("invalid-argument", emailRejectionMessage(check));
+    }
+    method = { ...method, email: check.email };
+
+    // An address the teacher already proved they hold — by signing in through
+    // Google/Apple/etc. with it, or by confirming it on an email/password
+    // account — needs no second proof. Anything else stays unverified until
+    // they confirm it; PayPal rejecting a transfer to a non-PayPal address is
+    // the backstop either way.
+    if (!method.verified && !(await requiresOwnershipVerification(uid, method.email))) {
+      method = { ...method, verified: true };
+      logger.info(`[earnings] payout email already proven for uid=${uid}`);
+    }
+  }
+
+  await firestore.collection("users").doc(uid).set(
+    { payoutMethod: { ...method, updatedAt: Timestamp.now() } },
+    { merge: true }
+  );
+
+  logger.info(`[earnings] payout method updated uid=${uid} type=${method.type}`);
+
+  return { payoutMethod: method, payoutMethodSummary: payoutMethodSummary(method) };
+});
+
+// ─── verifyPayPalPayoutAccount ───────────────────────────────────────────────
+
+/**
+ * Confirms a PayPal payout account and saves it, from a nonce produced by the
+ * teacher completing a PayPal login in the app.
+ *
+ * This is the only path that can mark a PayPal payout method `verified`: the
+ * email comes back from PayPal via Braintree rather than from the form, so a
+ * teacher cannot claim an address they do not control.
+ */
+export const verifyPayPalPayoutAccount = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const nonce = (req.data as Record<string, unknown>)?.nonce;
+  if (typeof nonce !== "string" || !nonce) {
+    throw new HttpsError("invalid-argument", "Missing PayPal nonce");
+  }
+
+  let email: string;
+  try {
+    email = await lookupPayPalAccountEmail(uid, nonce);
+  } catch (err) {
+    if (err instanceof BraintreeNotConfiguredError) {
+      throw new HttpsError("failed-precondition", "PayPal verification is not available yet.");
+    }
+    logger.error(`[earnings] PayPal payout verification failed uid=${uid}`, err);
+    throw new HttpsError("internal", "Could not confirm your PayPal account. Please try again.");
+  }
+
+  const method = verifiedPayPalPayoutMethod(email);
+  await firestore.collection("users").doc(uid).set(
+    { payoutMethod: { ...method, updatedAt: Timestamp.now() } },
+    { merge: true }
+  );
+
+  logger.info(`[earnings] PayPal payout account verified uid=${uid}`);
+
+  return { payoutMethod: method, payoutMethodSummary: payoutMethodSummary(method) };
+});

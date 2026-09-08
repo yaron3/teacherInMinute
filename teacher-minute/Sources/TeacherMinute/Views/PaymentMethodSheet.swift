@@ -12,6 +12,7 @@ import SwiftUI
 struct PaymentMethodSheet: View {
   let methods: [PaymentMethod]
   let theme: AppTheme
+  var savedPayPalEmail: String? = nil
   let onSelect: (PaymentMethod) -> Void
 
   @Environment(\.dismiss) var dismiss
@@ -49,6 +50,8 @@ struct PaymentMethodSheet: View {
         .frame(height: 48)
     } else if method == .paypal {
       payPalRow()
+    } else if method == .savedPayPal {
+      payPalRow(savedEmail: savedPayPalEmail)
     } else if method == .googlePay {
       googlePayRow()
     } else {
@@ -69,15 +72,28 @@ struct PaymentMethodSheet: View {
   /// padding, radius and border weight), but PayPal's own colours and lockup
   /// instead of the app theme — brand marks must not adapt to light/dark, so
   /// these colours are fixed rather than drawn from `theme`.
-  private func payPalRow() -> some View {
+  ///
+  /// When `savedEmail` is set, this selects `.savedPayPal` instead of
+  /// `.paypal` — same PayPal branding, but the saved account's email is shown
+  /// and tapping charges it directly rather than opening a login redirect.
+  private func payPalRow(savedEmail: String? = nil) -> some View {
     Button {
-      onSelect(.paypal)
+      onSelect(savedEmail == nil ? .paypal : .savedPayPal)
     } label: {
-      HStack(spacing: 6) {
-        Text(LocalizationSupport.localized("Pay with"))
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(Self.payPalInk)
-        payPalLockup
+      VStack(spacing: 2) {
+        HStack(spacing: 0) {
+          Text(verbatim: "Pay")
+            .foregroundStyle(Self.payPalNavy)
+          Text(verbatim: "Pal")
+            .foregroundStyle(Self.payPalBlue)
+        }
+        .font(.system(size: 17, weight: .bold))
+        .italic()
+        if let savedEmail {
+          Text(savedEmail)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Self.payPalInk.opacity(0.7))
+        }
       }
       .frame(maxWidth: .infinity)
       .padding(.vertical, 14)
@@ -110,34 +126,6 @@ struct PaymentMethodSheet: View {
         .padding(.vertical, 14)
         .background(Color.black)
         .cornerRadius(12)
-    }
-  }
-
-  /// The PayPal monogram followed by the two-tone wordmark.
-  private var payPalLockup: some View {
-    HStack(spacing: 3) {
-      // Monogram: the light-blue P sits in front of and below the navy one.
-      ZStack(alignment: .leading) {
-        Text(verbatim: "P")
-          .font(.system(size: 17, weight: .bold))
-          .italic()
-          .foregroundStyle(Self.payPalNavy)
-        Text(verbatim: "P")
-          .font(.system(size: 17, weight: .bold))
-          .italic()
-          .foregroundStyle(Self.payPalBlue)
-          .offset(x: 4, y: 2)
-      }
-      .padding(.trailing, 4)
-
-      HStack(spacing: 0) {
-        Text(verbatim: "Pay")
-          .foregroundStyle(Self.payPalNavy)
-        Text(verbatim: "Pal")
-          .foregroundStyle(Self.payPalBlue)
-      }
-      .font(.system(size: 17, weight: .bold))
-      .italic()
     }
   }
 

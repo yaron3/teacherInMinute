@@ -24,16 +24,17 @@ struct ChooseRoleView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
 
-      Text(LocalizationSupport.localized("How do you want to use Teacher in a Minute? You\ncan change this later in settings."))
+      Text(LocalizationSupport.localized("Choose your role"))
         .font(.system(size: 15))
         .foregroundStyle(theme.secondaryText)
         .lineSpacing(5)
         .padding(.top, 8)
 
-      VStack(spacing: 22) {
+      VStack(spacing: 12) {
         RoleCard(
           title: LocalizationSupport.localized("I am a Student"),
           icon: "graduationcap.fill",
+          description: viewModel.studentDescriptionLines,
           details: [
             LocalizationSupport.localized("On-demand help"),
             LocalizationSupport.localized("Per-minute billing")
@@ -47,6 +48,7 @@ struct ChooseRoleView: View {
         RoleCard(
           title: LocalizationSupport.localized("I am a Teacher"),
           icon: "person.crop.rectangle",
+          description: viewModel.teacherDescriptionLines,
           details: [
             LocalizationSupport.localized("Earn while teaching"),
             LocalizationSupport.localized("Verification required")
@@ -58,7 +60,20 @@ struct ChooseRoleView: View {
         }
       }
       .padding(.top, 34)
+	  if viewModel.selectedRole == .teacher {
+		  HowItWorksPanel(
+			title: viewModel.howItWorksTeacherTitle,
+			steps: [
+			  HowItWorksStep(number: 1, title: viewModel.howItWorksTeacherStep1Title, subtitle: viewModel.howItWorksStep1Subtitle, tint: theme.info),
+			  HowItWorksStep(number: 2, title: viewModel.connectTeacherStepTitle, subtitle: viewModel.howItWorksStep2Subtitle, tint: theme.warning),
+			  HowItWorksStep(number: 3, title: viewModel.howItWorksTeacherStep3Title, subtitle: viewModel.howItWorksStep3Subtitle, tint: theme.penGreen),
 
+			],
+			theme: theme
+		  )
+		  .padding(.top,12)
+		
+	  }
       Spacer()
 
       AuthPrimaryButton(title: LocalizationSupport.localized("Continue")) {
@@ -146,6 +161,7 @@ struct ChooseRoleView: View {
 struct RoleCard: View {
   let title: String
   let icon: String
+  let description: [String]
   let details: [String]
   let isSelected: Bool
   let accent: Color
@@ -167,7 +183,13 @@ struct RoleCard: View {
                 .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(accent)
             }
-
+		  VStack {
+			ForEach (description, id: \.self) { detail in
+			  Text(detail)
+				.font(.system(size: 14, weight: .semibold))
+				.foregroundStyle(theme.primaryText)
+			}
+		  }
           Spacer()
 
           if isSelected {

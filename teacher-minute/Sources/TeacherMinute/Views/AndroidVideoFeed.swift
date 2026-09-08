@@ -2,8 +2,8 @@
 //  AndroidVideoFeed.swift
 //  teacher-minute
 //
-//  SwiftUI wrapper around the Kotlin Compose-backed LiveKit video renderer.
-//  Embeds an `AndroidLiveKitVideoView` via Skip's `JavaBackedView` bridge so
+//  SwiftUI wrappers around the Kotlin Compose-backed LiveKit video renderer.
+//  Embed an `AndroidLiveKitVideoView` via Skip's `JavaBackedView` bridge so
 //  the Android target can show the remote teacher feed and the student's
 //  local preview inside the regular SwiftUI tree.
 //
@@ -12,13 +12,17 @@
 import SwiftUI
 import SkipBridge
 
+/// The remote participant's camera, with the student's own camera tucked into
+/// its corner — the Android counterpart of `ChatSessionView.videoFeed`.
 struct AndroidVideoFeed: View {
   let isStudent: Bool
   let isCameraOff: Bool
   let theme: AppTheme
+  /// Handed down rather than localized here: views ask the view model for
+  /// their strings, and this one is too far from it to hold one.
+  let waitingForVideoText: String
 
   @State var remoteComposer: AndroidJavaObject?
-  @State var localComposer: AndroidJavaObject?
 
   var body: some View {
     RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -31,19 +35,19 @@ struct AndroidVideoFeed: View {
               Spacer()
               HStack {
                 Spacer()
-                localPreview
+                AndroidSelfVideoPreview(isCameraOff: isCameraOff, theme: theme)
               }
             }
             .padding(12)
           }
         }
       }
+      // The renderer draws a live camera into this card, so the card has to be
+      // the last word on where it may draw.
+      .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
       .task {
         if remoteComposer == nil {
           remoteComposer = try? AndroidLiveKitBridge.makeVideoComposer(mode: "remote", mirror: false)
-        }
-        if isStudent, localComposer == nil {
-          localComposer = try? AndroidLiveKitBridge.makeVideoComposer(mode: "local", mirror: true)
         }
       }
   }
@@ -61,15 +65,26 @@ struct AndroidVideoFeed: View {
           weight: .semibold,
           color: theme.secondaryText
         )
-        Text(LocalizationSupport.localized("Waiting for video…"))
+        Text(waitingForVideoText)
           .font(.system(size: 13, weight: .medium))
           .foregroundStyle(theme.secondaryText)
       }
     }
   }
+}
 
-  @ViewBuilder
-  private var localPreview: some View {
+/// The local camera on its own, at the size the corner preview is drawn.
+///
+/// Kept apart from `AndroidVideoFeed` because the chat tab floats this over
+/// the thread by itself: sizing the whole feed down to the preview's frame
+/// would put the *other* participant in the window meant for you.
+struct AndroidSelfVideoPreview: View {
+  let isCameraOff: Bool
+  let theme: AppTheme
+
+  @State var localComposer: AndroidJavaObject?
+
+  var body: some View {
     Group {
       if !isCameraOff,
          let composer = localComposer,
@@ -83,7 +98,7 @@ struct AndroidVideoFeed: View {
               systemName: isCameraOff ? "video.slash.fill" : "video.fill",
               size: 18,
               weight: .semibold,
-              color: theme.onAccentText
+              color: theme.onDarkFill
             )
           }
       }
@@ -92,7 +107,12 @@ struct AndroidVideoFeed: View {
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .stroke(theme.onAccentText.opacity(0.4), lineWidth: 1)
+        .stroke(theme.onDarkFill.opacity(0.4), lineWidth: 1)
+    }
+    .task {
+      if localComposer == nil {
+        localComposer = try? AndroidLiveKitBridge.makeVideoComposer(mode: "local", mirror: true)
+      }
     }
   }
 }

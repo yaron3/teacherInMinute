@@ -10,6 +10,9 @@ struct RateSessionView: View {
   let onFinish: @MainActor () -> Void
 
   @State var rating: Int = 0
+  /// Optional free text. The teacher reads it later without knowing who wrote
+  /// it, which is what the placeholder promises.
+  @State var comment: String = ""
   @State var isSending = false
   @State var errorMessage: String?
   @Environment(\.colorScheme) var colorScheme
@@ -64,7 +67,7 @@ struct RateSessionView: View {
             .overlay {
               PlatformIcon(systemName: "checkmark")
                 .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(theme.onAccentText)
+                .foregroundStyle(theme.onDarkFill)
             }
             .padding(.top, 8)
 
@@ -129,6 +132,46 @@ struct RateSessionView: View {
                   .buttonStyle(.plain)
                 }
               }
+
+              // The box appears only once a score is picked: with no stars
+              // chosen the Send button is disabled anyway, so an empty text
+              // field would just be dead space above it.
+              if rating > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                  TextEditor(text: $comment)
+                    .textInputAutocapitalization(.sentences)
+                    .font(.system(size: 14))
+                    .multilineTextAlignment(.leading)
+                    .foregroundStyle(theme.primaryText)
+                    .tint(theme.accent)
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+                    .frame(minHeight: 88, alignment: .leading)
+                    .background(theme.fieldBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    // The card behind it is already a light fill, so without a
+                    // border the field does not read as somewhere to type.
+                    .overlay {
+                      RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(theme.controlBorder, lineWidth: 1)
+                    }
+                    .overlay(alignment: .topLeading) {
+                      if comment.isEmpty {
+                        Text(LocalizationSupport.localized("Add a comment (optional)"))
+                          .font(.system(size: 14))
+                          .foregroundStyle(theme.secondaryText)
+                          .padding(.horizontal, 15)
+                          .padding(.vertical, 18)
+                          .allowsHitTesting(false)
+                      }
+                    }
+
+                  Text(LocalizationSupport.localized("Your teacher sees this without your name."))
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+              }
             }
             .frame(maxWidth: .infinity)
           }
@@ -149,11 +192,11 @@ struct RateSessionView: View {
           Spacer()
           if isSending {
             ProgressView()
-              .tint(theme.onAccentText)
+              .tint(theme.onDarkFill)
           } else {
             Text(LocalizationSupport.localized("Send"))
               .font(.system(size: 16, weight: .bold))
-              .foregroundStyle(theme.onAccentText)
+              .foregroundStyle(theme.onDarkFill)
           }
           Spacer()
         }
@@ -199,7 +242,8 @@ struct RateSessionView: View {
         try await FunctionsService.shared.rateTeacher(
           questionId: questionId,
           teacherId: teacherId,
-          rating: rating
+          rating: rating,
+          comment: comment
         )
         return
       } catch {

@@ -14,11 +14,17 @@ import SkipBridge
 #endif
 
 struct ProfileView: View {
-  @State var viewModel: ProfileViewModel
+  /// `@Bindable`, not `@State`. MainTabView already owns this view model in its
+  /// own `@State` and passes it down; wrapping it a second time here left the
+  /// body reading a copy that Skip never re-read, so a completed load updated
+  /// the view model — the logs showed name and contact rows arriving — while
+  /// the screen kept rendering its initial placeholders. `@Bindable` observes
+  /// without taking ownership, and still vends the `$viewModel` bindings the
+  /// editor sheets need.
+  @Bindable var viewModel: ProfileViewModel
   @State var isShowingProfileEditor = false
   @State var isShowingSubjectEditor = false
   @State var isShowingDocuments = false
-  @State var hasProfileDataForDisplay = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
 #if os(Android)
   @State var showAndroidPhotoSourceDialog = false
@@ -28,31 +34,102 @@ struct ProfileView: View {
 	AppTheme(colorScheme: colorScheme)
   }
   init(viewModel: ProfileViewModel = ProfileViewModel()) {
-	self._viewModel = State(initialValue: viewModel)
+	self.viewModel = viewModel
   }
   var body: some View {
 	ScrollView(.vertical, showsIndicators: false) {
-      if hasProfileDataForDisplay {
+      // The profile renders straight away and fills in as the load lands, the
+      // way the home tabs do. Swapping the whole subtree on a loaded flag did
+      // not survive Skip: the load completed in tens of milliseconds and set
+      // `isProfileLoaded`, but the branch never re-evaluated on Android and the
+      // screen sat on "Loading profile..." indefinitely. Rendering one tree and
+      // letting the individual fields update removes the branch entirely.
     VStack(alignment: .leading, spacing: 0) {
-      profileHeader
-        .padding(.top, 20)
-
-      FlatSectionHeader(LocalizationSupport.localized("Account Info"))
-        .padding(.top, 32)
-
+      if let error = viewModel.errorMessage {
+        profileLoadError(error)
+      }
       FlatCard(padding: 0, outlined: true) {
         VStack(spacing: 0) {
-          ForEach($viewModel.contactRows, id: \.description) { $row in
-            ProfileInfoRow(parameter: $row, isEditing: viewModel.isEditing)
+          profileHeader
+            .padding(16)
 
-            if row.description != viewModel.contactRows.last?.description {
-              FlatRule()
-            }
-          }
+          FlatRule()
+
+          ProfileInfoRow(
+            parameter: .constant(Parameter(
+              description: LocalizationSupport.localized("Email"),
+              value: viewModel.email,
+              image: "envelope.fill"
+            )),
+            isEditing: false,
+          )
+          FlatRule()
+          ProfileInfoRow(
+            parameter: .constant(Parameter(
+              description: LocalizationSupport.localized("Phone"),
+              value: viewModel.phoneNumber,
+              image: "phone.fill"
+            )),
+            isEditing: false
+          )
+          FlatRule()
+//          ProfileInfoRow(
+//            parameter: .constant(Parameter(
+//              description: LocalizationSupport.localized("Username"),
+//              value: viewModel.username,
+//              image: "person.text.rectangle.fill"
+//            )),
+//            isEditing: false
+//          )
         }
       }
-      .padding(.top, 14)
+      .padding(.top, 20)
+	  if viewModel.shouldShowTeacherPaymentsMethod {
+		FlatSectionHeader("")
+		  .padding(.top, 32)
+		FlatCard {
+		  VStack {
+			HStack {
+			  Label(LocalizationSupport.localized("Payment Method"), systemImage: "creditcard")
+			  Spacer()
+			  Button(action: showProfileEditor) {
+				Text(LocalizationSupport.localized("Edit"))
+				  .font(.system(size: 14, weight: .bold))
+				  .foregroundStyle(theme.primaryText)
+			  }
+			  .buttonStyle(.plain)
+			}
+			.padding(6)
+			
+			HStack {
+			  PlatformIcon(systemName: viewModel.payoutMethodSystemImage)
+			  VStack(alignment: .leading, spacing: 4) {
+				Text(viewModel.payoutMethodTitle)
+				  .font(.system(size: 14, weight: .bold))
+				  .foregroundStyle(theme.primaryText)
+				Text(viewModel.payoutMethodDetail)
+				  .font(.system(size: 13))
+				  .foregroundStyle(viewModel.hasPayoutMethod ? theme.primaryText : theme.secondaryText)
+			  }
+			  Spacer()
+			}
+		  }
+		}
+//		teachingCard(
+//		  title: LocalizationSupport.localized("Active accounts"),
+//		  chips: viewModel.paymentsMethdsLabels,
+//		  includeAdd: viewModel.paymentsMethdsLabels.isEmpty,
+//		  editAction: showProfileEditor,
+//		  addAction: showProfileEditor
+//		)
 
+	  }
+      // Teacher payouts only for now; the student's saved-for-charging PayPal
+      // comes later and needs a vaulted account rather than an address.
+      if viewModel.shouldShowTeacherPaymentsMethod {
+        savedPayPalSection
+          .padding(.top, 32)
+      }
       if viewModel.shouldShowTeachingDetails {
         FlatSectionHeader(LocalizationSupport.localized("Teaching Details"))
           .padding(.top, 32)
@@ -117,9 +194,6 @@ struct ProfileView: View {
     }
     .padding(.horizontal, 20)
     .padding(.bottom, 40)
-      } else {
-        profileLoadingView
-      }
 	}
     .background(theme.screenBackground)
 			.task {
@@ -159,70 +233,71 @@ struct ProfileView: View {
             }
 	  }
 	  
-  var profileLoadingView: some View {
+  /// Shown above the profile when a load failed, rather than in place of it.
+  /// A failure leaves the fields at their placeholder values, which is still a
+  /// usable screen — the tab bar and the retry stay reachable either way.
+  func profileLoadError(_ error: String) -> some View {
     VStack(spacing: 12) {
-      if let error = viewModel.errorMessage {
-        Text(error)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(theme.danger)
+      Text(error)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(theme.danger)
 
-        Button {
-          Task { await loadProfileForDisplay() }
-        } label: {
-          Text(LocalizationSupport.localized("Retry"))
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(theme.primaryText)
-        }
-        .buttonStyle(.plain)
-      } else {
-        ProgressView()
-          .tint(theme.primaryText)
-
-        Text(LocalizationSupport.localized("Loading profile..."))
-          .font(.system(size: 14))
-          .foregroundStyle(theme.secondaryText)
+      Button {
+        Task { await viewModel.loadProfile() }
+      } label: {
+        Text(LocalizationSupport.localized("Retry"))
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(theme.primaryText)
       }
+      .buttonStyle(.plain)
     }
-    .frame(maxWidth: .infinity, minHeight: 420)
-    .padding(.horizontal, 20)
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 16)
   }
 
-	  // Name leads at page-title scale with the photo trailing it, matching the
-	  // account screen in the reference.
 	  var profileHeader: some View {
-	VStack(alignment: .leading, spacing: 0) {
-	  HStack(alignment: .top, spacing: 16) {
-		VStack(alignment: .leading, spacing: 8) {
+	HStack(alignment: .center, spacing: 16) {
+	  ZStack(alignment: .bottomTrailing) {
+		profilePhotoButton
+	  }
+	  VStack(alignment: .leading, spacing: 6) {
+		HStack(alignment: .center, spacing: 6) {
 		  Text(viewModel.name)
-			.font(.system(size: 34, weight: .bold))
+			.font(.system(size: 22, weight: .bold))
 			.foregroundStyle(theme.primaryText)
 			.lineLimit(2)
 			.minimumScaleFactor(0.7)
-
-		  FlatChip(title: viewModel.role)
-
-		  // Teacher verification badge is intentionally hidden for now.
+		  Spacer()
+		  Button(action: showProfileEditor) {
+			PlatformIcon(systemName: "pencil", size: 14, weight: .semibold, color: theme.secondaryText)
+			  
+		  }
+		  .buttonStyle(.plain)
+		  
 		}
 
-		Spacer()
+		Text(viewModel.role)
+		  .font(.system(size: 14))
+		  .foregroundStyle(theme.secondaryText)
 
-		ZStack(alignment: .bottomTrailing) {
-		  profilePhotoButton
+		if viewModel.hasRating {
+		  HStack(spacing: 4) {
+			Text(LessonFormatting.ratingText(viewModel.rating))
+			  .font(.system(size: 13, weight: .semibold))
+			  .foregroundStyle(theme.primaryText)
+
+			RatingStarsView(rating: viewModel.rating, size: 12)
+
+			Text(viewModel.reviewCountText)
+			  .font(.system(size: 12))
+			  .foregroundStyle(theme.secondaryText)
+		  }
 		}
 	  }
 
-	  Text(viewModel.memberSince)
-		.font(.system(size: 14))
-		.foregroundStyle(theme.secondaryText)
-		.padding(.top, 12)
+	  
 
-	  Button {
-		showProfileEditor()
-	  } label: {
-		FlatChip(title: LocalizationSupport.localized("Edit Profile"), systemImage: "pencil")
-	  }
-	  .buttonStyle(.plain)
-	  .padding(.top, 14)
+
 	}
 	.frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -265,8 +340,9 @@ struct ProfileView: View {
           imageURL: viewModel.profileImageURL,
           size: 88,
           fallbackSystemImage: "person.crop.circle.fill",
-          background: theme.cardBackground,
-          tint: theme.primaryText
+          background: theme.accentBackground,
+          tint: theme.accentStrong,
+          initial: viewModel.nameInitial
         )
       }
       .frame(width: 88, height: 88)
@@ -318,25 +394,130 @@ struct ProfileView: View {
   }
 
   private func loadProfileForDisplay() async {
-    if viewModel.hasDisplayableProfileData {
-      hasProfileDataForDisplay = true
-      return
+    guard !viewModel.hasDisplayableProfileData else { return }
+    await viewModel.loadProfile()
+  }
+
+  var savedPayPalSection: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      FlatSectionHeader(LocalizationSupport.localized("Saved PayPal")) {
+        if viewModel.payPalPayoutEmail == nil, !viewModel.isEditingPayPalEmail {
+          Button {
+            Task { await viewModel.addPayPalPayoutEmail() }
+          } label: {
+            if viewModel.isSavingPayPal {
+              ProgressView()
+            } else {
+              FlatChip(title: LocalizationSupport.localized("+ Add"), outlined: true)
+            }
+          }
+          .buttonStyle(.plain)
+          .disabled(viewModel.isSavingPayPal)
+        }
+      }
+
+      FlatCard(outlined: true) {
+        if viewModel.isEditingPayPalEmail {
+          payPalEmailEditor
+        } else if let email = viewModel.payPalPayoutEmail {
+          HStack(spacing: 14) {
+            FlatIconTile(systemName: "checkmark.circle.fill", tint: theme.positive, background: theme.screenBackground)
+
+            VStack(alignment: .leading, spacing: 3) {
+              Text(LocalizationSupport.localized("PayPal"))
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(theme.primaryText)
+              Text(email)
+                .font(.system(size: 13))
+                .foregroundStyle(theme.secondaryText)
+                .lineLimit(1)
+            }
+
+            Spacer()
+
+            Button {
+              viewModel.editPayPalPayoutEmail()
+            } label: {
+              Text(LocalizationSupport.localized("Change"))
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(theme.info)
+            }
+            .buttonStyle(.plain)
+          }
+        } else {
+          Text(LocalizationSupport.localized("No saved PayPal account. Tap \"+ Add\" to save one."))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        }
+      }
+
+      if let errorMessage = viewModel.payPalVaultErrorMessage {
+        Text(errorMessage)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.danger)
+      }
+
+      HStack(alignment: .top, spacing: 10) {
+        PlatformIcon(systemName: "bolt.fill", size: 16, weight: .bold, color: theme.warning)
+        VStack(alignment: .leading, spacing: 4) {
+          Text(LocalizationSupport.localized("Where you get paid"))
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.warning)
+          Text(LocalizationSupport.localized("Your monthly payout is sent to this address, so it must be the email on your PayPal account."))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+        }
+      }
+      .padding(14)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(theme.warning.opacity(0.12))
+      .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
+          .stroke(theme.warning, lineWidth: 1)
+      }
     }
+  }
 
-    hasProfileDataForDisplay = false
-    var didStartLoad = false
-    while !Task.isCancelled {
-      if viewModel.hasDisplayableProfileData {
-        hasProfileDataForDisplay = true
-        return
+  /// Shown when there is no usable address on the profile yet, or the teacher
+  /// asked to change the one there is.
+  var payPalEmailEditor: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      AuthInputField(
+        title: LocalizationSupport.localized("PayPal Email"),
+        placeholder: LocalizationSupport.localized("name@example.com"),
+        systemImage: "envelope",
+        text: $viewModel.payPalEmailDraft,
+        keyboardType: .emailAddress,
+        textContentType: .emailAddress
+      )
+
+      HStack(spacing: 12) {
+        Button {
+          Task { await viewModel.savePayPalPayoutEmail() }
+        } label: {
+          if viewModel.isSavingPayPal {
+            ProgressView()
+              .frame(maxWidth: .infinity)
+          } else {
+            Text(LocalizationSupport.localized("Save Changes"))
+              .font(.system(size: 15, weight: .bold))
+              .frame(maxWidth: .infinity)
+          }
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(viewModel.isSavingPayPal)
+
+        Button {
+          viewModel.cancelPayPalEmailEditing()
+        } label: {
+          Text(LocalizationSupport.localized("Cancel"))
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(theme.secondaryText)
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isSavingPayPal)
       }
-
-      if !didStartLoad || !viewModel.isLoading {
-        didStartLoad = true
-        Task { await viewModel.loadProfile() }
-      }
-
-      try? await Task.sleep(for: .seconds(1))
     }
   }
 
@@ -484,7 +665,12 @@ struct ProfileEditView: View {
                 date: $viewModel.dateOfBirth
               )
             } else {
-              ProfileEditInfoRow(parameter: $row)
+              ProfileEditInfoRow(
+                parameter: $row,
+                isValid: viewModel.isRowValid(row),
+                errorMessage: viewModel.rowErrorMessage(for: row),
+				
+              )
             }
           }
 
@@ -507,7 +693,7 @@ struct ProfileEditView: View {
         AuthPrimaryButton(
           title: viewModel.isLoading ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save Changes"),
           systemImage: "checkmark",
-          isEnabled: !viewModel.isLoading
+          isEnabled: viewModel.canSaveProfileEdits
         ) {
           Task { @MainActor in
             viewModel.saveProfileEdits()
@@ -551,7 +737,7 @@ struct ProfileTeachingGradePicker: View {
   let grades = ProfileViewModel.availableTeachingGrades
 
   var body: some View {
-    VStack(alignment: contentAlignment, spacing: 10) {
+	VStack(alignment: .leading, spacing: 10) {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
@@ -741,7 +927,7 @@ struct ProfileCurrencyPicker: View {
 
 
   var body: some View {
-    VStack(alignment: contentAlignment, spacing: 10) {
+	VStack(alignment: .leading, spacing: 10) {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
@@ -836,6 +1022,8 @@ struct ProfileTeachingGradeChip: View {
 
 struct ProfileEditInfoRow: View {
   @Binding var parameter: Parameter
+  var isValid = true
+  var errorMessage: String?
 
   var body: some View {
     AuthInputField(
@@ -844,8 +1032,11 @@ struct ProfileEditInfoRow: View {
       systemImage: parameter.image,
       text: $parameter.value,
       keyboardType: keyboardType,
-      textContentType: textContentType
+      textContentType: textContentType,
+      isValid: isValid,
+      errorMessage: errorMessage
     )
+	.disabled(textContentType == .emailAddress)
   }
 
   private var keyboardType: UIKeyboardType {
@@ -953,36 +1144,78 @@ struct ProfileInfoRow: View {
   }
   let isEditing: Bool
   var body: some View {
-	HStack(spacing: 14) {
-	  FlatIconTile(systemName: parameter.image, size: 44)
+	HStack(spacing: 10) {
+	  FlatIconTile(systemName: parameter.image, size: 28)
 
-	  VStack(alignment: .leading, spacing: 3) {
-		Text(parameter.description)
-		  .font(.system(size: 13))
-		  .foregroundStyle(theme.secondaryText)
-
-		if isEditing {
-		  TextField(parameter.description, text: $parameter.value)
-			.font(.system(size: 16, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.75)
-			.multilineTextAlignment(.leading)
-			.environment(\.layoutDirection, .leftToRight)
-		} else {
-		  Text(parameter.value.isEmpty ? "-" : parameter.value)
-			.font(.system(size: 16, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.75)
-			.frame(maxWidth: .infinity, alignment: .leading)
-			.multilineTextAlignment(.leading)
-		}
-	  }
+	  Text(parameter.description)
+		.font(.system(size: 13))
+		.foregroundStyle(theme.secondaryText)
 
 	  Spacer()
+
+	  if isEditing {
+		TextField(parameter.description, text: $parameter.value)
+		  .font(.system(size: 15, weight: .semibold))
+		  .foregroundStyle(theme.primaryText)
+		  .lineLimit(1)
+		  .minimumScaleFactor(0.75)
+		  .multilineTextAlignment(.trailing)
+		  .environment(\.layoutDirection, .leftToRight)
+	  } else {
+		Text(parameter.value.isEmpty ? "-" : parameter.value)
+		  .font(.system(size: 15, weight: .semibold))
+		  .foregroundStyle(theme.primaryText)
+		  .lineLimit(1)
+		  .minimumScaleFactor(0.75)
+	  }
 	}
 	.padding(.horizontal, 16)
 	.padding(.vertical, 14)
   }
 }
+
+#if !os(Android)
+#Preview("Teacher Profile") {
+  let vm = ProfileViewModel(roleType: .teacher, repository: ProfileRepository())
+  vm.name = "Dr. Miri Cohen"
+  vm.role = "Mathematics"
+  vm.email = "miri@gmail.com"
+  vm.phoneNumber = "0521234567"
+  vm.username = "miri"
+  vm.rating = 4.9
+  vm.reviewCount = 128
+  vm.subjects = ["Math", "Algebra", "Calculus"]
+  vm.grade = "Grade 9, Grade 10, Grade 11"
+  vm.hasMissingDocuments = false
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+}
+
+#Preview("Teacher Profile - Hebrew") {
+  let vm = ProfileViewModel(roleType: .teacher, repository: ProfileRepository())
+  vm.name = "ד\"ר מירי כהן"
+  vm.role = "מתמטיקה"
+  vm.email = "miri@gmail.com"
+  vm.phoneNumber = "0521234567"
+  vm.username = "miri"
+  vm.rating = 4.9
+  vm.reviewCount = 128
+  vm.subjects = ["מתמטיקה", "אלגברה", "חדו\"א"]
+  vm.grade = "Grade 9, Grade 10, Grade 11"
+  vm.hasMissingDocuments = false
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+    .environment(\.locale, Locale(identifier: "he"))
+    .environment(\.layoutDirection, .rightToLeft)
+}
+#Preview("Student Profile") {
+  let vm = ProfileViewModel(roleType: .student, repository: ProfileRepository())
+  vm.name = "Alex Ben-David"
+  vm.role = "Student"
+  vm.email = "alex@gmail.com"
+  vm.phoneNumber = "0541112233"
+  vm.username = "alex"
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+}
+#endif

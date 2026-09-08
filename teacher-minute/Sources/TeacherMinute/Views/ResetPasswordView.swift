@@ -86,7 +86,9 @@ struct ResetPasswordView: View {
                     systemImage: "phone",
                     text: $viewModel.phone,
                     keyboardType: .phonePad,
-                    textContentType: .telephoneNumber
+                    textContentType: .telephoneNumber,
+                    isValid: !viewModel.showsPhoneError,
+                    errorMessage: viewModel.phoneErrorMessage
                 )
             }
         }

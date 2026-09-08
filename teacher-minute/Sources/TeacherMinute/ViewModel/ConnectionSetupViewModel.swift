@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SkipFuse
 
 @Observable
 @MainActor
@@ -7,6 +8,10 @@ final class ConnectionSetupViewModel {
   static let timeoutSeconds: UInt64 = 30
 
   let participantName: String
+  /// The other side's uid, when known. Only a teacher's is looked up: the
+  /// student sees who they are about to be taught by, and students have no
+  /// public rating.
+  let participantTeacherId: String
   var conversationType: String
   let footerText: String
   let liveKitRoom: String
@@ -14,6 +19,14 @@ final class ConnectionSetupViewModel {
   private let onSessionStarted: (@MainActor @Sendable () -> Void)?
   private let sessionViewModel: (any ChatSessionViewModeling)?
   private var didNotifySessionStarted = false
+
+  /// The teacher's real reputation, loaded once the screen appears. Stays at
+  /// zero for a teacher with no reviews and whenever there is no teacher to
+  /// look up, and `showsRating` gates the row on it.
+  var participantRating: Double = 0
+  var participantReviewCount: Int = 0
+
+  var showsRating: Bool { participantReviewCount > 0 }
 
   var hasTimedOut = false
   var attempt = 0
@@ -25,16 +38,18 @@ final class ConnectionSetupViewModel {
 
   init(
     participantName: String,
+    participantTeacherId: String = "",
     conversationType: String,
-    footerText: String = LocalizationSupport.localized("Your teacher will join shortly"),
+    footerText: String? = nil,
     sessionViewModel: (any ChatSessionViewModeling)? = nil,
     liveKitRoom: String = "",
     liveKitToken: String = "",
     onSessionStarted: (@MainActor @Sendable () -> Void)? = nil
   ) {
     self.participantName = participantName
+    self.participantTeacherId = participantTeacherId
     self.conversationType = conversationType
-    self.footerText = footerText
+    self.footerText = footerText ?? LocalizationSupport.localized("Your teacher will join shortly")
     self.sessionViewModel = sessionViewModel
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
@@ -71,11 +86,50 @@ final class ConnectionSetupViewModel {
     }
   }
 
+  // MARK: - View strings
+
+  var cancelSessionLabel: String { LocalizationSupport.localized("Cancel Session") }
+  var cancelLabel: String { LocalizationSupport.localized("Cancel") }
+  var retryLabel: String { LocalizationSupport.localized("Retry") }
+  var continueWithTextOnlyLabel: String { LocalizationSupport.localized("Continue with text only") }
+  var connectionSlowTitle: String { LocalizationSupport.localized("Connection is taking longer than usual") }
+
+  var connectionSlowMessage: String {
+    hasVideo
+      ? LocalizationSupport.localized("We couldn't establish a video connection. Retry, continue with text only, or cancel.")
+      : LocalizationSupport.localized("We couldn't establish an audio connection. Retry, continue with text only, or cancel.")
+  }
+
+  var microphonePermissionTitle: String { LocalizationSupport.localized("Microphone Permission") }
+  var microphonePermissionMessage: String {
+    LocalizationSupport.localized("Make sure your microphone is enabled for the best learning experience.")
+  }
+  var cameraPermissionTitle: String { LocalizationSupport.localized("Camera Permission") }
+  var cameraPermissionMessage: String {
+    LocalizationSupport.localized("Make sure your camera is enabled so your teacher can see your work.")
+  }
+
   var cameraButtonTitle: String {
     switch cameraState {
     case .granted: return LocalizationSupport.localized("Camera Enabled")
     case .denied: return LocalizationSupport.localized("Open Camera Settings")
     case .notDetermined: return LocalizationSupport.localized("Allow Camera")
+    }
+  }
+
+  /// Fetches the waiting teacher's star average and review count. Quiet on
+  /// failure: a rating is nice to see while connecting, never worth an error.
+  func loadParticipantRating() async {
+    let teacherId = participantTeacherId.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !teacherId.isEmpty, participantReviewCount == 0 else { return }
+
+    do {
+      let summary = try await FunctionsService.shared.teacherRatingSummary(teacherId: teacherId)
+      participantRating = summary.averageRating
+      participantReviewCount = summary.ratingCount
+      logger.info("[ConnectionSetup] teacher rating=\(summary.averageRating) reviews=\(summary.ratingCount)")
+    } catch {
+      logger.error("[ConnectionSetup] failed loading teacher rating: \(error.localizedDescription)")
     }
   }
 

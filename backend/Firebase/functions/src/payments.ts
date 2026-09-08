@@ -3,6 +3,7 @@ import { logger } from "firebase-functions";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { v4 as uuidv4 } from "uuid";
+import { randomBytes } from "crypto";
 
 import { createOrder, captureOrder, verifyWebhookSignature, PaymentSource } from "./paypal";
 import { createBitOrder, BitNotConfiguredError } from "./bit";
@@ -11,6 +12,10 @@ import {
   createBraintreeSale,
   BraintreeNotConfiguredError,
   BraintreeCurrencyNotSupportedError,
+  generateVaultClientToken,
+  vaultPayPalNonce,
+  deleteVaultedPaymentMethod,
+  createSaleWithVaultedPaymentMethod,
 } from "./braintree";
 import { PricingDoc, PaymentCheckoutDoc, PurchaseDoc } from "./types";
 
@@ -284,14 +289,30 @@ export const createCheckoutSession = onCall(async (req) => {
 
 // ─── createPaymentSettingsSession ─────────────────────────────────────────────
 
+/** How long a minted billing link stays usable. Long enough to survive the
+ *  hop out to the browser, short enough that a leaked URL (history, referrer,
+ *  screenshot) is worthless soon after. */
+const BILLING_SESSION_TTL_MS = 15 * 60 * 1000;
+
 export const createPaymentSettingsSession = onCall(async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
   const baseUrl = process.env.PUBLIC_BASE_URL ?? FUNCTIONS_BASE_URL;
 
+  // The billing page is a public HTTP endpoint, so the URL cannot carry the
+  // uid: anyone could then read anyone else's payment history by editing it.
+  // Mint an unguessable, expiring token here — where the caller is
+  // authenticated — and let the page resolve it back to this uid.
+  const sessionId = randomBytes(32).toString("hex");
+  await firestore.collection("billingSessions").doc(sessionId).set({
+    uid,
+    createdAt: Timestamp.now(),
+    expiresAt: Timestamp.fromMillis(Date.now() + BILLING_SESSION_TTL_MS),
+  });
+
   logger.info(`[payments] settings session uid=${uid}`);
-  return { settingsUrl: `${baseUrl}/billingPage?uid=${uid}` };
+  return { settingsUrl: `${baseUrl}/billingPage?session=${sessionId}` };
 });
 
 // ─── Wallet checkouts (Apple Pay / Google Pay) ────────────────────────────────
@@ -508,6 +529,149 @@ export const confirmGooglePayPayment = onCall(async (req) => {
   return confirmWalletPayment({ uid, checkoutId, nonce, walletLabel: "Google Pay" });
 });
 
+// ─── Saved PayPal (Braintree vault) ────────────────────────────────────────────
+// Lets a student save their PayPal account once so future purchases skip the
+// PayPal login/approval redirect entirely. Distinct from the plain PayPal
+// flow above (createCheckoutSession with no wallet) — see ./braintree.ts.
+
+export const createPayPalVaultClientToken = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  logger.info(`[payments] createPayPalVaultClientToken uid=${uid}`);
+
+  try {
+    const clientToken = await generateVaultClientToken(uid);
+    return { clientToken };
+  } catch (err) {
+    if (err instanceof BraintreeNotConfiguredError) {
+      throw new HttpsError("failed-precondition", "Saving a PayPal account is not available yet.");
+    }
+    logger.error(`[payments] createPayPalVaultClientToken failed uid=${uid}`, err);
+    throw new HttpsError("internal", "Failed to start saving your PayPal account");
+  }
+});
+
+export const savePayPalVault = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const data = req.data as Record<string, unknown>;
+  const nonce = data.nonce as string | undefined;
+  if (!nonce) throw new HttpsError("invalid-argument", "Missing PayPal nonce");
+
+  let vaulted;
+  try {
+    vaulted = await vaultPayPalNonce(uid, nonce);
+  } catch (err) {
+    logger.error(`[payments] savePayPalVault failed uid=${uid}`, err);
+    throw new HttpsError("internal", "Could not save your PayPal account. Please try again.");
+  }
+
+  await firestore.collection("users").doc(uid).set(
+    {
+      savedPayPal: {
+        paymentMethodToken: vaulted.paymentMethodToken,
+        email: vaulted.email,
+        updatedAt: Timestamp.now(),
+      },
+    },
+    { merge: true }
+  );
+
+  logger.info(`[payments] savePayPalVault saved uid=${uid}`);
+  return { email: vaulted.email };
+});
+
+export const removeSavedPayPal = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const userRef = firestore.collection("users").doc(uid);
+  const snap = await userRef.get();
+  const token = (snap.data()?.savedPayPal as { paymentMethodToken?: string } | undefined)
+    ?.paymentMethodToken;
+
+  if (token) {
+    try {
+      await deleteVaultedPaymentMethod(token);
+    } catch (err) {
+      logger.warn(`[payments] removeSavedPayPal delete failed uid=${uid}`, err);
+    }
+  }
+
+  await userRef.set({ savedPayPal: FieldValue.delete() }, { merge: true });
+  logger.info(`[payments] removeSavedPayPal removed uid=${uid}`);
+  return {};
+});
+
+export const chargeSavedPayPal = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const data = req.data as Record<string, unknown>;
+  const packageId = (data.pricingOptionId ?? data.packageId) as string | undefined;
+  if (!packageId) throw new HttpsError("invalid-argument", "Missing pricing package id");
+
+  const userSnap = await firestore.collection("users").doc(uid).get();
+  const token = (userSnap.data()?.savedPayPal as { paymentMethodToken?: string } | undefined)
+    ?.paymentMethodToken;
+  if (!token) throw new HttpsError("failed-precondition", "No saved PayPal account. Please add one first.");
+
+  logger.info(`[payments] chargeSavedPayPal uid=${uid} packageId=${packageId}`);
+
+  const { checkoutId, checkoutRef, pkg } = await resolvePricingAndCreateCheckout({
+    uid,
+    packageId,
+    paymentMethod: "saved_paypal",
+  });
+
+  let sale;
+  try {
+    sale = await createSaleWithVaultedPaymentMethod({
+      amountCents: pkg.priceCents,
+      currency: pkg.currency,
+      paymentMethodToken: token,
+      orderId: checkoutId,
+    });
+  } catch (err) {
+    logger.error(`[payments] chargeSavedPayPal sale failed checkoutId=${checkoutId}`, err);
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    if (err instanceof BraintreeCurrencyNotSupportedError) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Saved PayPal does not support ${pkg.currency} yet. Please choose another payment method.`
+      );
+    }
+    throw new HttpsError("internal", "Saved PayPal payment failed");
+  }
+
+  if (!sale.success) {
+    logger.warn(
+      `[payments] chargeSavedPayPal declined checkoutId=${checkoutId} message=${sale.message}`
+    );
+    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    throw new HttpsError("aborted", sale.message ?? "Saved PayPal payment was declined");
+  }
+
+  const checkoutSnap = await checkoutRef.get();
+  const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
+
+  await creditCompletedCheckout({
+    checkoutRef,
+    checkout,
+    checkoutId,
+    provider: "braintree",
+    providerTransactionId: sale.transactionId,
+  });
+
+  logger.info(
+    `[payments] chargeSavedPayPal credited uid=${uid} minutes=${checkout.minutes} checkoutId=${checkoutId}`
+  );
+
+  return { status: "completed" };
+});
+
 // ─── payCardCheckout (HTTP) ────────────────────────────────────────────────────
 // Hosted PayPal Advanced Card Payments (Card Fields) page. The app opens this
 // URL in the system browser; on success it redirects to `paypalSuccess`, which
@@ -664,12 +828,24 @@ export const paypalSuccess = onRequest(async (req, res) => {
     return;
   }
 
-  const orderId = token ?? (checkout.paypalOrderId as string | null) ?? "";
-  if (!orderId) {
-    logger.error(`[payments] paypalSuccess no orderId checkoutId=${checkoutId}`);
+  // Bind the order to the checkout rather than trusting the query string.
+  // `token` is attacker-controlled: without this, approving a cheap order and
+  // then calling this endpoint with an expensive checkout's id captured the
+  // cheap amount and credited the expensive package's minutes.
+  const storedOrderId = (checkout.paypalOrderId as string | null) ?? "";
+  if (!storedOrderId) {
+    logger.error(`[payments] paypalSuccess checkout has no paypalOrderId checkoutId=${checkoutId}`);
     res.redirect(302, failRedirect);
     return;
   }
+  if (token && token !== storedOrderId) {
+    logger.error(
+      `[payments] paypalSuccess order mismatch checkoutId=${checkoutId} stored=${storedOrderId} supplied=${token}`
+    );
+    res.redirect(302, failRedirect);
+    return;
+  }
+  const orderId = storedOrderId;
 
   let capture;
   try {
@@ -700,6 +876,16 @@ export const paypalSuccess = onRequest(async (req, res) => {
   if (capture.orderStatus !== "COMPLETED") {
     logger.error(
       `[payments] paypalSuccess unexpected capture status checkoutId=${checkoutId} status=${capture.orderStatus}`
+    );
+    res.redirect(302, failRedirect);
+    return;
+  }
+
+  // Second guard, matching the webhook's reconciliation: never credit a
+  // package that PayPal did not actually charge for.
+  if (capture.amountCents !== checkout.priceCents || capture.currency !== checkout.currency) {
+    logger.error(
+      `[payments] paypalSuccess amount mismatch checkoutId=${checkoutId} captured=${capture.amountCents}/${capture.currency} expected=${checkout.priceCents}/${checkout.currency}`
     );
     res.redirect(302, failRedirect);
     return;
@@ -770,9 +956,15 @@ export const paypalWebhook = onRequest(async (req, res) => {
     return;
   }
 
-  // PayPal sandbox signature verification is unreliable — bypass it in sandbox.
-  const isSandbox = process.env.PAYPAL_ENV !== "live";
-  if (!isSandbox) {
+  // PayPal sandbox signature verification is unreliable, so it can be skipped —
+  // but only on an explicit opt-in, never as a side effect of PAYPAL_ENV.
+  // This endpoint is publicly reachable and credits minutes, so inferring the
+  // skip from the environment meant any deploy that was not yet flipped to
+  // "live" accepted forged CAPTURE.COMPLETED events from anyone.
+  const skipSignature =
+    process.env.PAYPAL_ENV !== "live" &&
+    process.env.PAYPAL_ALLOW_UNSIGNED_WEBHOOKS === "true";
+  if (!skipSignature) {
     const valid = await verifyWebhookSignature({
       transmissionId: (req.headers["paypal-transmission-id"] as string) ?? "",
       transmissionTime: (req.headers["paypal-transmission-time"] as string) ?? "",
@@ -789,7 +981,10 @@ export const paypalWebhook = onRequest(async (req, res) => {
       return;
     }
   } else {
-    logger.info("[payments] webhook signature check skipped (sandbox)");
+    logger.warn(
+      "[payments] webhook signature check SKIPPED — PAYPAL_ALLOW_UNSIGNED_WEBHOOKS is set. " +
+        "Never set this on a deployment reachable from the internet."
+    );
   }
 
   const event = req.body as {
@@ -925,11 +1120,31 @@ async function handleWebhookEvent(
 // ─── billingPage (HTTP) ───────────────────────────────────────────────────────
 
 export const billingPage = onRequest(async (req, res) => {
-  const uid = req.query.uid as string | undefined;
-  if (!uid) {
-    res.status(400).send("Missing uid");
+  // Resolve the caller from a session token minted by
+  // `createPaymentSettingsSession`. Never from a `uid` query parameter — that
+  // let anyone read any user's payment history with no authentication at all.
+  const sessionId = req.query.session as string | undefined;
+  if (!sessionId) {
+    res.status(400).send("Missing session");
     return;
   }
+
+  const sessionSnap = await firestore.collection("billingSessions").doc(sessionId).get();
+  const session = sessionSnap.data();
+  if (!session) {
+    logger.warn(`[payments] billingPage unknown session`);
+    res.status(403).send("This billing link is not valid. Please reopen it from the app.");
+    return;
+  }
+
+  const expiresAt = session.expiresAt as Timestamp | undefined;
+  if (!expiresAt || expiresAt.toMillis() < Date.now()) {
+    logger.info(`[payments] billingPage expired session uid=${session.uid}`);
+    res.status(403).send("This billing link has expired. Please reopen it from the app.");
+    return;
+  }
+
+  const uid = session.uid as string;
 
   const checkoutsSnap = await firestore
     .collection("paymentCheckouts")

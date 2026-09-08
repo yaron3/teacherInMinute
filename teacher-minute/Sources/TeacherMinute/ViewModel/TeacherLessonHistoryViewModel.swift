@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
@@ -65,20 +66,18 @@ final class TeacherLessonHistoryViewModel {
                 teacherName = profile.displayName
                 profileImageURL = profile.profileImageURL
             }
-            let historyLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
+            // Both the rows and the total come from the earnings summary, so
+            // this screen and the Earnings tab are the same set of lessons
+            // counted the same way — see TeacherEarningsStore for why they
+            // used to differ.
+            let summary = try await TeacherEarningsStore.shared.summary()
+            let historyLessons = summary.lessons
             totalTimeTaughtText = LessonFormatting.totalDurationText(lessons: historyLessons)
-            var earningsByCurrency: [String: Int] = [:]
-            for lesson in historyLessons {
-                earningsByCurrency[lesson.currencyCode, default: 0] += lesson.teacherEarningsCents
-            }
-            logger.info("[Earnings] teacher total uid=\(uid) lessonCount=\(historyLessons.count) totalByCurrency=\(earningsByCurrency)")
-            let earningsFormatted = earningsByCurrency
-                .sorted { $0.key < $1.key }
-                .map { LessonFormatting.currencyText(cents: $0.value, currencyCode: $0.key) }
-                .joined(separator: " + ")
-            totalEarningsText = earningsFormatted.isEmpty
-                ? LessonFormatting.currencyText(cents: 0)
-                : earningsFormatted
+            totalEarningsText = LessonFormatting.currencyText(
+                cents: summary.totalEarningsCents,
+                currencyCode: summary.currency
+            )
+            logger.info("[Earnings] teacher total uid=\(uid) lessonCount=\(historyLessons.count) totalCents=\(summary.totalEarningsCents) currency=\(summary.currency)")
             lessons = historyLessons.map { Self.lessonHistoryItem($0, currentUserImageURL: profileImageURL) }
         } catch {
             logger.error("[TeacherLessons] failed loading profile: \(error.localizedDescription)")

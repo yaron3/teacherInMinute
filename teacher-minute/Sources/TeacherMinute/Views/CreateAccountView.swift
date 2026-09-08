@@ -18,6 +18,7 @@ struct CreateAccountView: View {
   @State var viewModel = CreateAccountViewModel()
   @Environment(\.appRouter) var router
   @State var isPasswordVisible = false
+  @State var isConfirmPasswordVisible = false
   @FocusState var focusedField: SignupField?
 
   @Environment(\.colorScheme) var colorScheme
@@ -105,7 +106,8 @@ struct CreateAccountView: View {
 		text: $viewModel.emailOrPhone,
 		isSecure: false,
 		field: .email,
-		isValid: viewModel.emailOrPhone.isEmpty || viewModel.isEmailValid
+		isValid: viewModel.emailOrPhone.isEmpty || viewModel.isEmailValid,
+		errorMessage: LocalizationSupport.localized("Enter a valid email address.")
 	  )
 	  fieldSection(
 		title: LocalizationSupport.localized("Password"),
@@ -115,8 +117,23 @@ struct CreateAccountView: View {
 		isSecure: !isPasswordVisible,
 		field: .password,
 		isValid: viewModel.password.isEmpty || viewModel.isPasswordValid,
+		errorMessage: LocalizationSupport.localized("Must be at least 6 characters."),
 		trailingIcon: isPasswordVisible ? "eye" : "eye.slash",
 		trailingAction: { isPasswordVisible.toggle() }
+	  )
+	  fieldSection(
+		title: LocalizationSupport.localized("Confirm Password"),
+		icon: "lock.fill",
+		placeholder: LocalizationSupport.localized("Re-enter your password"),
+		text: $viewModel.confirmPassword,
+		isSecure: !isConfirmPasswordVisible,
+		field: .confirmPassword,
+		// Stays quiet until there is something to compare, so the field does
+		// not shout mismatch at every keystroke of the first character.
+		isValid: viewModel.confirmPassword.isEmpty || viewModel.doPasswordsMatch,
+		errorMessage: LocalizationSupport.localized("Passwords do not match."),
+		trailingIcon: isConfirmPasswordVisible ? "eye" : "eye.slash",
+		trailingAction: { isConfirmPasswordVisible.toggle() }
 	  )
 	}
 	.padding(24)
@@ -134,6 +151,9 @@ struct CreateAccountView: View {
 	isSecure: Bool,
 	field: SignupField,
 	isValid: Bool,
+	/// Shown under the field while `isValid` is false. Passed in rather than
+	/// derived from `field`, so each field owns its own wording.
+	errorMessage: String,
 	trailingIcon: String? = nil,
 	trailingAction: (() -> Void)? = nil
   ) -> some View {
@@ -181,7 +201,7 @@ struct CreateAccountView: View {
 		)
 	  
 	  if !isValid {
-			Text(field == .email ? LocalizationSupport.localized("Enter a valid email address.") : LocalizationSupport.localized("Must be at least 6 characters."))
+			Text(errorMessage)
 			  .font(.system(size: 11))
 			  .foregroundStyle(theme.danger)
 			  .padding(.leading, 4)

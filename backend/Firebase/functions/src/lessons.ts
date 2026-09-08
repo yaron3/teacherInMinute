@@ -10,12 +10,11 @@ import {
   QuestionDoc,
   LessonDoc,
   HARD_CAP_MINUTES,
-  CONNECTION_FEE_CENTS,
   PurchaseDoc,
 } from "./types";
-import { calculateBilling } from "./billing";
+import { calculateBilling, billingStartMillis } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
-import { resolvePricingForStudent } from "./pricing";
+import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -25,10 +24,32 @@ interface TeacherRatingDoc {
   endedAt: Timestamp;
   studentId: string;
   studentRate: number;
+  /** Optional free text the student wrote about the lesson. Shown back to the
+   *  teacher without `studentId` (see ./ratings.ts `teacherReviews`), so it is
+   *  the only part of a rating a teacher ever reads. */
+  studentComment?: string;
+}
+
+/** Long enough for a paragraph of feedback, short enough that one rating stays
+ *  a small document. Anything longer is truncated rather than rejected — the
+ *  student has already finished the lesson and should not lose the rating to a
+ *  validation error. */
+const MAX_RATING_COMMENT_LENGTH = 500;
+
+/** The comment as it should be stored: trimmed, capped, and `undefined` when
+ *  the student left the box empty. */
+function normalizedComment(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return undefined;
+  return trimmed.slice(0, MAX_RATING_COMMENT_LENGTH);
 }
 
 interface TeacherAggregateDoc {
   averageRate?: number;
+  /** Denormalised size of the `ratings` subcollection, so reading a teacher's
+   *  review count (see ./ratings.ts) is a single document get. */
+  ratingCount?: number;
 }
 
 function toTimestamp(value: unknown): Timestamp | undefined {
@@ -253,7 +274,7 @@ async function migrateQuestionToFirestore(
     startedAtMs: number | undefined;
   }
 ): Promise<void> {
-  const { questionRef, rtdbQuestion, studentUid, teacherUid, startedAtMs } = context;
+  const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs, startedAtMs } = context;
   logger.info(
     `[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`
   );
@@ -264,9 +285,11 @@ async function migrateQuestionToFirestore(
   const pricing = await resolveLessonPricing(studentUid, lessonRecord?.data);
   const { currencyCode, pricePerMinute, teacherShare, exchangeRateToUsd } = pricing;
 
-  // Bill from the moment both parties were fully connected (startedAt).
-  // If startLesson was never called the lesson never properly began — charge 0.
-  const billingStartMs = startedAtMs ?? endedAtMs;
+  // Bill from the later of startedAt (both parties connected) and acceptedAt
+  // (teacher accepted) — see billingStartMillis. Falling back to endedAtMs only
+  // when neither exists means a lesson with no usable start bills zero rather
+  // than billing from an unknown point.
+  const billingStartMs = billingStartMillis(startedAtMs, acceptedAtMs) ?? endedAtMs;
 
   const {
     rawSeconds,
@@ -486,7 +509,10 @@ export const startLesson = onCall(async (req) => {
   // Lock pricing at the moment the lesson starts so RC changes mid-lesson
   // do not retroactively shift the price. Currency is resolved from the
   // student's profile (/users/{uid}.currency).
-  const pricing = await resolvePricingForStudent(q.studentUid);
+  const [pricing, connectionFeeCents] = await Promise.all([
+    resolvePricingForStudent(q.studentUid),
+    getConnectionFeeCents(),
+  ]);
   const pricePerMinuteCents = Math.round(pricing.pricePerMinute * 100);
 
   const lesson: LessonDoc = {
@@ -496,7 +522,7 @@ export const startLesson = onCall(async (req) => {
     startedAt: Timestamp.fromDate(now),
     hardCapAt: Timestamp.fromDate(hardCapAt),
     baseRatePerMinCents: pricePerMinuteCents,
-    connectionFeeCents: CONNECTION_FEE_CENTS,
+    connectionFeeCents,
     currencyCode: pricing.currency,
     pricePerMinute: pricing.pricePerMinute,
     teacherShare: pricing.teacherShare,
@@ -547,7 +573,7 @@ export const startLesson = onCall(async (req) => {
     teacherShare: pricing.teacherShare,
     teacherSharePercent,
     exchangeRateToUsd: pricing.exchangeRateToUsd,
-    connectionFeeCents: CONNECTION_FEE_CENTS,
+    connectionFeeCents,
   });
   logger.info(`[lessons] startLesson RTDB sync complete qid=${questionId}`);
 
@@ -668,11 +694,13 @@ export const rateTeacher = onCall(async (req) => {
     questionId?: string;
     teacherId?: string;
     rating?: number;
+    comment?: string;
   };
 
   const questionId = data.questionId;
   const teacherId = data.teacherId;
   const rating = Number(data.rating);
+  const comment = normalizedComment(data.comment);
 
   if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
   if (!teacherId) throw new HttpsError("invalid-argument", "teacherId required");
@@ -683,6 +711,21 @@ export const rateTeacher = onCall(async (req) => {
   const questionRef = firestore.collection("questions").doc(questionId);
   const teacherRef = firestore.collection("teachers").doc(teacherId);
   const ratingRef = teacherRef.collection("ratings").doc(questionId);
+
+  // The live RTDB question is removed only after migrateQuestionToFirestore has
+  // committed `status: "completed"` and `endedAt`, so its presence means the
+  // lesson has not been finalized yet. Rejecting here — rather than letting the
+  // transaction below fail on "Lesson must be completed" — is what lets the app
+  // tell a race apart from a genuine refusal: RateSessionView retries only on a
+  // failed-precondition whose message mentions finalizing.
+  const liveQuestionSnap = await db.ref(`questions/${questionId}`).once("value");
+  if (liveQuestionSnap.exists()) {
+    logger.info(`[lessons] rateTeacher deferred, lesson still finalizing qid=${questionId}`);
+    throw new HttpsError(
+      "failed-precondition",
+      "Lesson is still being finalized. Try rating again in a few seconds"
+    );
+  }
 
   await firestore.runTransaction(async (tx) => {
     const [questionSnap, teacherSnap, existingRatingSnap] = await Promise.all([
@@ -767,9 +810,15 @@ export const rateTeacher = onCall(async (req) => {
       studentId: uid,
       studentRate: rating,
     };
+    if (comment) {
+      ratingDoc.studentComment = comment;
+    }
 
     tx.set(ratingRef, ratingDoc);
-    tx.set(teacherRef, { averageRate: nextAverage }, { merge: true });
+    tx.set(teacherRef, { averageRate: nextAverage, ratingCount: ratingCount + 1 }, { merge: true });
+    // Mirror the score onto the question so the student who gave it can show it
+    // in their own lesson history — they cannot read the teacher's ratings.
+    tx.update(questionRef, { studentRating: rating, ratedAt: Timestamp.now() });
   });
 
   return { success: true };

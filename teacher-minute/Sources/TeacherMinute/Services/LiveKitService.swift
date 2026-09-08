@@ -15,6 +15,16 @@ import LiveKit
 import SkipBridge
 #endif
 
+/// How well the room is carrying the lesson right now. Deliberately coarser
+/// than either SDK's five-value enum: the header only has room to say whether
+/// the connection is worth mentioning.
+enum SessionMediaQuality: String {
+  case unknown
+  case good
+  case poor
+  case lost
+}
+
 enum LiveKitError: Error, LocalizedError {
   case missingCredentials
 
@@ -52,12 +62,21 @@ final class LiveKitService {
   }
 #endif
 
+  /// True when a video lesson connected without its camera. Both platforms let
+  /// a camera that will not start fall back to audio rather than take the
+  /// lesson down, which otherwise happens in silence — this is what the session
+  /// header reads to say so. Latched at connect: a camera the user turns off
+  /// later is not the same thing.
+  private(set) var didFallBackToAudioOnly = false
+
   private init() {}
 
   func connect(roomName: String, token: String, enableVideo: Bool) async throws {
     guard !roomName.isEmpty, !token.isEmpty else {
       throw LiveKitError.missingCredentials
     }
+
+    didFallBackToAudioOnly = false
 
 #if !os(Android)
     await disconnect()
@@ -72,16 +91,32 @@ final class LiveKitService {
     try await newRoom.connect(url: Self.serverUrl, token: token)
     logger.info("[LiveKit] room.connect returned state=\(String(describing: newRoom.connectionState)) localIdentity=\(String(describing: newRoom.localParticipant.identity)) remoteCount=\(newRoom.remoteParticipants.count)")
 
-    _ = try await newRoom.localParticipant.setMicrophone(enabled: true)
-    logger.info("[LiveKit] microphone enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
-
-    if enableVideo {
-      _ = try await newRoom.localParticipant.setCamera(enabled: true)
-      logger.info("[LiveKit] camera enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
-    }
-
+    // Adopt the room before publishing so a publish failure still leaves a
+    // room we can tear down instead of a connected orphan.
     room = newRoom
     roomDelegateAdapter = adapter
+
+    do {
+      _ = try await newRoom.localParticipant.setMicrophone(enabled: true)
+      logger.info("[LiveKit] microphone enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
+    } catch {
+      logger.error("[LiveKit] microphone publish failed room=\(roomName) error=\(error.localizedDescription)")
+      await disconnect()
+      throw error
+    }
+
+    if enableVideo {
+      // A camera that will not start (simulator, hardware in use, capture
+      // error) must not take the lesson down with it: publish what we can and
+      // let the session run audio-only.
+      do {
+        _ = try await newRoom.localParticipant.setCamera(enabled: true)
+        logger.info("[LiveKit] camera enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
+      } catch {
+        didFallBackToAudioOnly = true
+        logger.error("[LiveKit] camera publish failed, continuing audio-only room=\(roomName) error=\(error.localizedDescription)")
+      }
+    }
     onTracksUpdated?()
     startDiagnostics(roomName: roomName)
 #else
@@ -95,11 +130,38 @@ final class LiveKitService {
         enableVideo: enableVideo
       )
     }.value
-    logger.info("[LiveKit] Android connected room=\(roomName)")
+    if enableVideo {
+      // The Kotlin side takes the same "publish what we can" line, so ask it
+      // whether a camera actually went out.
+      didFallBackToAudioOnly = !AndroidLiveKitBridge.isCameraPublished()
+    }
+    logger.info("[LiveKit] Android connected room=\(roomName) cameraPublished=\(!self.didFallBackToAudioOnly)")
+#endif
+  }
+
+  /// The room's current connection quality, or `.unknown` when there is no room
+  /// or the SDK has not scored it yet. Polled rather than pushed: Android
+  /// reports quality through a Kotlin event stream that is not bridged, and one
+  /// reading a second is enough for a line of text.
+  func currentMediaQuality() -> SessionMediaQuality {
+#if !os(Android)
+    guard let room else { return .unknown }
+    if room.connectionState == .reconnecting || room.connectionState == .connecting {
+      return .lost
+    }
+    var qualities = [room.localParticipant.connectionQuality]
+    qualities.append(contentsOf: room.remoteParticipants.values.map(\.connectionQuality))
+    if qualities.contains(.lost) { return .lost }
+    if qualities.contains(.poor) { return .poor }
+    if qualities.contains(where: { $0 == .good || $0 == .excellent }) { return .good }
+    return .unknown
+#else
+    return SessionMediaQuality(rawValue: AndroidLiveKitBridge.connectionQuality()) ?? .unknown
 #endif
   }
 
   func disconnect() async {
+    didFallBackToAudioOnly = false
 #if !os(Android)
     diagnosticsTask?.cancel()
     diagnosticsTask = nil
@@ -243,6 +305,14 @@ enum AndroidLiveKitBridge {
     name: "setCameraEnabled",
     sig: "(Z)V"
   )!
+  private static let isCameraPublishedMethod = managerClass.getStaticMethodID(
+    name: "isCameraPublished",
+    sig: "()Z"
+  )!
+  private static let connectionQualityMethod = managerClass.getStaticMethodID(
+    name: "connectionQuality",
+    sig: "()Ljava/lang/String;"
+  )!
 
   static func connect(serverUrl: String, roomName: String, token: String, enableVideo: Bool) throws {
     try jniContext {
@@ -287,6 +357,33 @@ enum AndroidLiveKitBridge {
         args: [enabled.toJavaParameter(options: [.kotlincompat])]
       )
     }
+  }
+
+  /// Both spell their return type out for the reason `AndroidPermissionBridge`
+  /// documents: `callStatic` picks its JNI call from the type it is asked for,
+  /// and a mismatch aborts the process rather than failing gracefully.
+  static func isCameraPublished() -> Bool {
+    let published: Bool? = try? jniContext {
+      let value: Bool = try managerClass.callStatic(
+        method: isCameraPublishedMethod,
+        options: [.kotlincompat],
+        args: []
+      )
+      return value
+    }
+    return published ?? false
+  }
+
+  static func connectionQuality() -> String {
+    let quality: String? = try? jniContext {
+      let value: String = try managerClass.callStatic(
+        method: connectionQualityMethod,
+        options: [.kotlincompat],
+        args: []
+      )
+      return value
+    }
+    return quality ?? "unknown"
   }
 
   static func makeVideoComposer(mode: String, mirror: Bool) throws -> AndroidJavaObject {

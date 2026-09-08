@@ -9,11 +9,12 @@ import { sendAcceptedPush } from "./fcm";
 import {
   QuestionDoc,
   DispatchInviteDoc,
-  CONNECTION_FEE_CENTS,
   ConversationType,
   CONVERSATION_TYPES,
   DEFAULT_CONVERSATION_TYPE,
 } from "./types";
+import { getConnectionFeeCents } from "./pricing";
+import { recordQuestionConnected } from "./stats";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -172,7 +173,7 @@ export const createQuestion = onCall(async (req) => {
     `[questions] createQuestion firestore-set done qid=${qid} status=${question.status} dispatchWave=${question.dispatchWave}`
   );
   logger.info(`[questions] created qid=${qid} topic=${topic} student=${uid}`);
-  return { questionId: qid, connectionFeeCents: CONNECTION_FEE_CENTS };
+  return { questionId: qid, connectionFeeCents: await getConnectionFeeCents() };
 });
 
 // ─── cancelQuestion ───────────────────────────────────────────────────────────
@@ -239,6 +240,7 @@ export const acceptInvite = onCall(async (req) => {
   const inviteRef = qRef.collection("invites").doc(teacherUid);
 
   let studentUid = "";
+  let questionCreatedAtMillis: number | undefined;
 
   // Atomic claim — only one teacher can win
   await firestore.runTransaction(async (tx) => {
@@ -278,6 +280,7 @@ export const acceptInvite = onCall(async (req) => {
     }
 
     studentUid = q.studentUid;
+    questionCreatedAtMillis = q.createdAt?.toMillis?.();
 
     tx.update(qRef, {
       status: "accepted",
@@ -374,6 +377,13 @@ export const acceptInvite = onCall(async (req) => {
   await Promise.all(
     alreadyInvited.map((uid) => db.ref(`teacherInvites/${uid}/${questionId}`).remove())
   );
+
+  // Feeds the "avg time to connect" the student home shows. Best-effort: the
+  // teacher has already claimed the question, so a stats failure must not fail
+  // the accept.
+  await recordQuestionConnected(questionId, questionCreatedAtMillis, Date.now()).catch((error) => {
+    logger.warn(`[questions] failed recording connect stat qid=${questionId}`, error);
+  });
 
   logger.info(`[questions] accepted qid=${questionId} teacher=${teacherUid}`);
 

@@ -56,7 +56,6 @@ final class InviteService {
         let studentName = Self.firstString(dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
         let studentImageURL = Self.firstString(dict, keys: ["studentImageURL", "studentImageUrl", "studentPhotoUrl", "studentPhotoURL"])
         let studentId = Self.firstString(dict, keys: ["studentId", "studentUID", "studentId"])
-        let connectionFeeCents = Self.intValue(dict["connectionFeeCents"]) ?? Self.intValue(dict["connectionFee"]) ?? 0
         let pricePerMinuteCents = Self.intValue(dict["pricePerMinuteCents"])
           ?? Self.intValue(dict["ratePerMinuteCents"])
           ?? Self.intValue(dict["costPerMinuteCents"])
@@ -74,7 +73,6 @@ final class InviteService {
           studentId: studentId,
           studentName: studentName,
           studentImageURL: studentImageURL,
-          connectionFeeCents: connectionFeeCents,
           pricePerMinuteCents: pricePerMinuteCents,
           conversationType: conversationType
         )
@@ -157,7 +155,6 @@ final class InviteService {
         let studentName = Self.firstString(dict, keys: ["studentName", "studentFullName", "studentDisplayName", "name"])
         let studentImageURL = Self.firstString(dict, keys: ["studentImageURL", "studentImageUrl", "studentPhotoUrl", "studentPhotoURL"])
         let studentId = Self.firstString(dict, keys: ["studentId", "studentUID", "studentId"])
-        let connectionFeeCents = Self.intValue(dict["connectionFeeCents"]) ?? Self.intValue(dict["connectionFee"]) ?? 0
         let pricePerMinuteCents = Self.intValue(dict["pricePerMinuteCents"])
           ?? Self.intValue(dict["ratePerMinuteCents"])
           ?? Self.intValue(dict["costPerMinuteCents"])
@@ -176,7 +173,6 @@ final class InviteService {
           studentId: studentId,
           studentName: studentName,
           studentImageURL: studentImageURL,
-          connectionFeeCents: connectionFeeCents,
           pricePerMinuteCents: pricePerMinuteCents,
           conversationType: conversationType
         )

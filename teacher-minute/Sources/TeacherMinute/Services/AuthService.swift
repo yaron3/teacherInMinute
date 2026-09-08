@@ -137,9 +137,37 @@ final class AuthService {
     return true
     }
   
+  /// Clears teacher presence before dropping the auth session.
+  ///
+  /// `onDisconnect` is registered on both platforms and covers a killed app or
+  /// a lost network, but it only fires when the RTDB socket actually closes.
+  /// Signing out leaves the process — and the socket — alive, so the dead man's
+  /// switch never ran and `teachers/{uid}/status` stayed "online" for as long
+  /// as the account was signed out. The public `onlineTeachers` projection is
+  /// rebuilt from that status (functions/src/presence.ts), so students kept
+  /// seeing a signed-out teacher and dispatch kept inviting them.
+  ///
+  /// The write has to happen first: afterwards `currentUser` is nil and the
+  /// presence writer has no uid to write for.
   func signOut() throws {
     logger.info("[Auth] signOut requested")
+    clearPresenceBeforeSignOut()
     try Auth.auth().signOut()
+  }
+
+  /// Written for every account, not just teachers. A student has no
+  /// `teachers/{uid}` record and the write simply creates a dormant offline
+  /// one, which is cheaper than threading the current role down to here and
+  /// leaves no way for a role misread to strand a teacher online.
+  private func clearPresenceBeforeSignOut() {
+    guard Auth.auth().currentUser != nil else { return }
+#if os(Android)
+    AndroidTeacherPresenceWriter.setCurrentTeacherStatus("offline")
+#else
+    guard let uid = Auth.auth().currentUser?.uid else { return }
+    TeacherPresenceService(teacherUID: uid).goOffline()
+#endif
+    logger.info("[Auth] cleared teacher presence ahead of sign out")
   }
   
   func deleteCurrentUser() async throws {
@@ -222,6 +250,20 @@ final class AuthService {
     }
 #endif
   }
+}
+
+/// Maps a Firebase Auth error code to a localized, user-visible message.
+/// Firebase's `localizedDescription` always returns English strings from the SDK;
+/// this function translates the numeric code into a key that LocalizationSupport can look up.
+func localizedAuthErrorMessage(_ error: Error) -> String {
+    switch (error as NSError).code {
+    case 17007: return LocalizationSupport.localized("This email address is already in use.")
+    case 17008: return LocalizationSupport.localized("Please enter a valid email address.")
+    case 17009, 17011: return LocalizationSupport.localized("Incorrect email or password.")
+    case 17010: return LocalizationSupport.localized("Too many failed attempts. Please try again later.")
+    case 17020: return LocalizationSupport.localized("A network error occurred. Please try again.")
+    default:    return LocalizationSupport.localized("An unexpected error occurred. Please try again.")
+    }
 }
 
 enum AuthReauthError: LocalizedError {

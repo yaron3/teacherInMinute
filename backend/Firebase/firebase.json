@@ -20,8 +20,17 @@
     "public": "public",
     "ignore": [
       "firebase.json",
-      "**/.*",
+      "**/.git/**",
+      "**/.DS_Store",
       "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ]
+      }
     ]
   },
   "remoteconfig": {

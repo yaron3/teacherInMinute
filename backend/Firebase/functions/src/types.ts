@@ -1,5 +1,7 @@
 import { Timestamp } from "firebase-admin/firestore";
 
+import { PayoutMethod } from "./payoutMethod";
+
 // ─── Pricing / dispatch constants ───
 // Per-minute pricing now lives in Remote Config (see pricing.ts); these
 // constants remain only for dispatch sizing and connection-fee fallback.
@@ -105,6 +107,10 @@ export interface LessonDoc {
   teacherShare: number;          // 0–1, e.g. 0.75
   exchangeRateToUsd: number;     // multiplicative rate USD → currencyCode
   totalCents?: number;
+  /** Settled at endLesson, in major units of `currencyCode` (not cents). */
+  cost?: number;
+  /** The teacher's share of `cost`, also in major units. */
+  teacherEarnings?: number;
   status: LessonStatus;
   liveKitRoom: string;          // "lesson_<questionId>"
   liveKitTokenExpiry: Timestamp;
@@ -160,6 +166,19 @@ export interface UserDoc {
   totalMinutes: number;      // teachers: cumulative minutes taught
   questions?: string[];
   currency?: string;         // ISO 4217 code; controls pricing for students and display for teachers
+  /** A student's vaulted PayPal account (see ./braintree.ts), for one-tap
+   *  future purchases without a PayPal login redirect. Unrelated to
+   *  `paypalEmail` below, which is a teacher's payout destination. */
+  savedPayPal?: {
+    paymentMethodToken: string;
+    email: string;
+    updatedAt: Timestamp;
+  };
+  paypalEmail?: string;       // teachers: PayPal payout destination
+  /** Teachers: where the monthly payout is sent — a bank account, Bit, or
+   *  PayPal. Written only by `updateTeacherPayoutMethod`, which validates the
+   *  fields required for the chosen type (see ./payoutMethod). */
+  payoutMethod?: PayoutMethod & { updatedAt: Timestamp };
 }
 
 // ─── Firestore — coupons/{couponId} ──────────────────────────────────────────

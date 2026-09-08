@@ -7,6 +7,7 @@ import Foundation
 
 #if !os(Android)
 import FirebaseRemoteConfig
+import FirebaseCore
 #else
 import SkipFirebaseRemoteConfig
 #endif
@@ -23,6 +24,37 @@ enum RemoteConfigKey: String {
     /// this key, so the client reads a single key and falls back to the built-in
     /// per-platform defaults when the key is absent.
     case paymentMethods = "payment_methods"
+    case teacherDescription = "teacher_description"
+    case studentDescription = "student_description"
+}
+
+enum RemoteConfigLaunchError: LocalizedError {
+    case initialFetchTimedOut(seconds: Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .initialFetchTimedOut(let seconds):
+            return "Remote Config initial fetch did not complete within \(seconds) seconds."
+        }
+    }
+}
+
+private final class RemoteConfigLaunchContinuation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didResume = false
+    private let continuation: CheckedContinuation<Bool, Never>
+
+    init(_ continuation: CheckedContinuation<Bool, Never>) {
+        self.continuation = continuation
+    }
+
+    func resumeOnce(_ value: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !didResume else { return }
+        didResume = true
+        continuation.resume(returning: value)
+    }
 }
 
 @MainActor
@@ -30,6 +62,8 @@ final class RemoteConfigService {
     static let shared = RemoteConfigService()
 
     private var firstFetch: Task<Void, Never>?
+    private var didRecordLaunchTimeout = false
+    private let launchTimeoutSeconds = 30
 
     private init() {}
 
@@ -54,11 +88,56 @@ final class RemoteConfigService {
             let remoteConfig = RemoteConfig.remoteConfig()
             do {
                 let status = try await remoteConfig.fetchAndActivate()
+                // Newly activated values must not be shadowed by strings
+                // resolved against the previous config.
+                RemoteConfigLocalizationService.invalidateCache()
                 #if os(Android)
                 Self.logFetchState(remoteConfig, context: "initial fetchAndActivate", activateStatus: status)
                 #endif
             } catch {
                 logger.error("[RemoteConfig] initial fetchAndActivate failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Await this when startup must hold until Remote Config is ready. Returns
+    /// `false` only when the launch timeout wins; the fetch task continues so a
+    /// late result can still activate values for the running app.
+    func readyForLaunch() async -> Bool {
+        if firstFetch == nil {
+            start()
+        }
+        guard let firstFetch else { return true }
+
+        let timeoutSeconds = launchTimeoutSeconds
+        let completedBeforeTimeout = await firstFetchCompletedWithinLaunchTimeout(
+            firstFetch,
+            timeoutSeconds: timeoutSeconds
+        )
+
+        if completedBeforeTimeout {
+            logger.info("[RemoteConfig] initial fetch completed before launch gate timeout")
+        } else {
+            recordLaunchTimeout(seconds: timeoutSeconds)
+        }
+        return completedBeforeTimeout
+    }
+
+    private nonisolated func firstFetchCompletedWithinLaunchTimeout(
+        _ firstFetch: Task<Void, Never>,
+        timeoutSeconds: Int
+    ) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let launchContinuation = RemoteConfigLaunchContinuation(continuation)
+
+            Task {
+                await firstFetch.value
+                launchContinuation.resumeOnce(true)
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
+                launchContinuation.resumeOnce(false)
             }
         }
     }
@@ -92,6 +171,7 @@ final class RemoteConfigService {
         do {
             let fetchStatus = try await remoteConfig.fetch(withExpirationDuration: 0)
             let activated = try await remoteConfig.activate()
+            RemoteConfigLocalizationService.invalidateCache()
             #if os(Android)
             Self.logFetchState(remoteConfig, context: "refresh", fetchStatus: fetchStatus, activated: activated)
             #endif
@@ -104,11 +184,20 @@ final class RemoteConfigService {
         let remoteConfig = RemoteConfig.remoteConfig()
         let settings = RemoteConfigSettings()
         settings.minimumFetchInterval = 3600
-        settings.fetchTimeout = 15
+        settings.fetchTimeout = Double(launchTimeoutSeconds)
         remoteConfig.configSettings = settings
         #if os(Android)
         logger.info("[RemoteConfig][Android] configured; minimumFetchInterval=\(settings.minimumFetchInterval) fetchTimeout=\(settings.fetchTimeout)")
         #endif
+    }
+
+    private func recordLaunchTimeout(seconds: Int) {
+        guard !didRecordLaunchTimeout else { return }
+        didRecordLaunchTimeout = true
+        logger.warning("[RemoteConfig] launch gate timed out after \(seconds) seconds; continuing with cached/default values")
+        AnalyticsService.shared.logEvent("remote_config_launch_timeout", parameters: [
+            "timeout_seconds": seconds
+        ])
     }
 
     // MARK: - Sync accessors
@@ -125,9 +214,18 @@ final class RemoteConfigService {
         return value.isEmpty ? fallback : value
     }
 
+    static func getLocalizedStringArray(for key: RemoteConfigKey) -> [String] {
+        shared.getLocalizedStringArray(key.rawValue)
+    }
+
     func getLocalizedString(_ key: String) -> String {
         let localizedKey = "\(key)_\(LocalizationSupport.currentLanguageCode)"
         return getString(localizedKey)
+    }
+
+    func getLocalizedStringArray(_ key: String) -> [String] {
+        let localizedKey = "\(key)_\(LocalizationSupport.currentLanguageCode)"
+        return getStringArray(localizedKey)
     }
 
     func getString(_ key: String) -> String {
@@ -138,13 +236,50 @@ final class RemoteConfigService {
     /// run outside the main actor. Firebase Remote Config reads are thread-safe
     /// once `start()` has activated the initial fetch.
     nonisolated static func readString(_ key: String) -> String {
-        let value = RemoteConfig.remoteConfig().configValue(forKey: key)
-        let stringValue = value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        #if os(Android)
-        let source = Self.debugSourceName(value.source)
-        logger.info("[RemoteConfig][Android] read key='\(key)' source=\(source) empty=\(stringValue.isEmpty) length=\(stringValue.count)")
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return "" }
         #endif
-        return stringValue
+        let value = RemoteConfig.remoteConfig().configValue(forKey: key)
+        // Deliberately not logged per call: this runs for every localized
+        // string, and on Android the extra `value.source` read is a second JNI
+        // round trip. RemoteConfigLocalizationService logs each key once, on
+        // its cache miss, which covers the same diagnostic need.
+        return decodingEscapes(value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Remote Config stores values as plain text, so a `\n` typed into the
+    /// console arrives as the two characters `\` and `n` and would render
+    /// literally. Decode the escapes an author reasonably expects to work —
+    /// `\n`, `\t`, `\r`, and `\\` for a literal backslash — here, at the one
+    /// point every config string passes through. Any other `\x` sequence is
+    /// left untouched so paths and regexes in config values survive intact.
+    nonisolated static func decodingEscapes(_ value: String) -> String {
+        guard value.contains("\\") else { return value }
+
+        var decoded = ""
+        var isEscaping = false
+        for character in value {
+            if isEscaping {
+                switch character {
+                case "n": decoded.append("\n")
+                case "t": decoded.append("\t")
+                case "r": decoded.append("\r")
+                case "\\": decoded.append("\\")
+                default:
+                    decoded.append("\\")
+                    decoded.append(character)
+                }
+                isEscaping = false
+            } else if character == "\\" {
+                isEscaping = true
+            } else {
+                decoded.append(character)
+            }
+        }
+        if isEscaping {
+            decoded.append("\\")
+        }
+        return decoded
     }
 
     func getNumber(_ key: String) -> Double {
@@ -152,7 +287,24 @@ final class RemoteConfigService {
     }
 
     func getBool(_ key: String) -> Bool {
-        RemoteConfig.remoteConfig().configValue(forKey: key).boolValue
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return false }
+        #endif
+        return RemoteConfig.remoteConfig().configValue(forKey: key).boolValue
+    }
+
+    /// Like `getBool(_:)` but returns `defaultValue` when Remote Config has no
+    /// value for the key at all (neither fetched from the server nor a local
+    /// default) — i.e. the key has never been configured. Use this for
+    /// feature-style flags that should default on/off client-side until
+    /// someone explicitly sets them remotely.
+    func getBool(_ key: String, default defaultValue: Bool) -> Bool {
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return defaultValue }
+        #endif
+        let value = RemoteConfig.remoteConfig().configValue(forKey: key)
+        guard value.source != .static else { return defaultValue }
+        return value.boolValue
     }
 
     func getURL(_ key: String) -> URL? {
@@ -164,6 +316,9 @@ final class RemoteConfigService {
     }
 
     func getStringArray(_ key: String) -> [String] {
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return [] }
+        #endif
         let value = RemoteConfig.remoteConfig().configValue(forKey: key)
         #if os(Android)
         logger.info("[RemoteConfig][Android] read array key='\(key)' source=\(Self.debugSourceName(value.source)) rawLength=\(value.stringValue.count)")

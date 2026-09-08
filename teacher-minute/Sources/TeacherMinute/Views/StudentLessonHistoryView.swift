@@ -362,10 +362,14 @@ struct LessonDetailView: View {
                                         .foregroundStyle(theme.warning)
                                 }
                                 if !questionText.isEmpty {
-                                    Text(questionText)
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(theme.primaryText)
-                                        .lineSpacing(4)
+                                    // The question can carry equations built
+                                    // with the algebra keyboard, so it is drawn
+                                    // by the same renderer the chat bubbles and
+                                    // the teacher's preview use.
+                                    FormulaAwareText(
+                                        text: questionText,
+                                        textColor: theme.primaryText
+                                    )
                                 }
                                 ForEach(questionPhotoUrls, id: \.self) { url in
                                     CachedRemoteImage(url: url, contentMode: .fit)
@@ -522,10 +526,14 @@ struct LessonMessageBubble: View {
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
         default:
-            Text(message.text)
-                .font(.system(size: 14))
-                .foregroundStyle(isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
-                .lineSpacing(3)
+            // Formulas sent during the lesson are stored as the LaTeX between
+            // `$$` markers, so the replay uses the same renderer the live chat
+            // does rather than printing the markup back at the student.
+            FormulaAwareText(
+                text: message.text,
+                textColor: isMine ? theme.outgoingBubbleText : theme.incomingBubbleText,
+                lineSpacing: 3
+            )
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
 				.background(isMine ? theme.outgoingBubbleBackground : theme.incomingBubbleBackground)

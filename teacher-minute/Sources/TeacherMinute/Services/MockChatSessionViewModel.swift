@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import SkipFuse
 
 @Observable
 @MainActor
@@ -29,7 +30,6 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   let primaryAmountSubtitle: String
   let sessionNoticeText: String
   let sessionStartedAt: Double
-  let connectionFeeCents: Int
   let pricePerMinuteCents: Int
   let teacherSharePercent: Double
   var onMessagesUpdated: (([ChatMessage]) -> Void)?
@@ -49,7 +49,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     teacherId: String = "mock-teacher",
     messages: [ChatMessage] = [],
     boardStrokes: [BoardStroke] = [],
-    isConnecting: Bool = true,
+    isConnecting: Bool = false,
     participantName: String = "Michael",
     participantImageURL: String = "",
     currentUserImageURL: String = "",
@@ -57,7 +57,6 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     questionPhotoUrls: [String] = [],
     sessionNoticeText: String = "Session started - Billing active",
     sessionStartedAt: Double = Date().timeIntervalSince1970 * 1000.0 - 83_000.0,
-    connectionFeeCents: Int = 0,
     pricePerMinuteCents: Int = 60,
     teacherSharePercent: Double = 75
   ) {
@@ -77,7 +76,6 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.primaryAmountSubtitle = isTeacherRole ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
     self.sessionNoticeText = sessionNoticeText
     self.sessionStartedAt = sessionStartedAt
-    self.connectionFeeCents = connectionFeeCents
     self.pricePerMinuteCents = pricePerMinuteCents
     self.teacherSharePercent = teacherSharePercent
   }
@@ -104,7 +102,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
 
   func primaryAmountText(at date: Date) -> String {
     let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
-    let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
+    let grossCents = elapsedMinutes * Double(pricePerMinuteCents)
     let cents = Self.isTeacherRole(role) ? grossCents * (teacherSharePercent / 100.0) : grossCents
     return String(format: "$%.2f", max(0, cents) / 100.0)
   }
@@ -202,7 +200,15 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
         senderRole: "student",
         createdAt: Date().timeIntervalSince1970 * 1000.0 - 60_000.0,
         isMine: currentRole == "student"
-      )
+      ),
+	  ChatMessage(
+		id: "mock-3",
+		text: "Do you know the quadratic formula? It's -b ± √(b^2 - 4ac) / 2a. Let's try it out with x^2 - 5x + 6 = 0",
+		senderUid: currentRole == "student" ? "mock-current-user" : "mock-other-user",
+		senderRole: "teacher",
+		createdAt: Date().timeIntervalSince1970 * 1000.0 - 30_000.0,
+		isMine: currentRole == "teacher"
+	  )
     ]
   }
 

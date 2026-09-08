@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Observation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
@@ -19,30 +20,35 @@ import SkipFirebaseAuth
 enum SignupValidationError: LocalizedError {
   case invalidEmail
   case passwordTooShort
+  case passwordsDoNotMatch
   case termsNotAccepted
   
   
   
   var errorDescription: String? {
 	switch self {
-	  case .invalidEmail:       return LocalizationSupport.localized("Please enter a valid email address.")
-	  case .passwordTooShort:   return LocalizationSupport.localized("Password must be at least 6 characters.")
-	  case .termsNotAccepted:   return LocalizationSupport.localized("You must agree to the Terms of Service and Privacy Policy to continue.")
+	  case .invalidEmail:         return LocalizationSupport.localized("Please enter a valid email address.")
+	  case .passwordTooShort:     return LocalizationSupport.localized("Password must be at least 6 characters.")
+	  case .passwordsDoNotMatch:  return LocalizationSupport.localized("Passwords do not match.")
+	  case .termsNotAccepted:     return LocalizationSupport.localized("You must agree to the Terms of Service and Privacy Policy to continue.")
 	}
   }
   
   /// Which field to focus after showing the alert
   var focusField: SignupField? {
 	switch self {
-	  case .invalidEmail:     return .email
-	  case .passwordTooShort: return .password
-	  case .termsNotAccepted: return nil
+	  case .invalidEmail:        return .email
+	  case .passwordTooShort:    return .password
+	  // Focus the confirmation, not the password: the first entry is the one
+	  // they meant, so that is the field to correct.
+	  case .passwordsDoNotMatch: return .confirmPassword
+	  case .termsNotAccepted:    return nil
 	}
   }
 }
 
 enum SignupField: Hashable {
-  case email, password
+  case email, password, confirmPassword
 }
 
 // MARK: - ViewModel
@@ -52,6 +58,7 @@ enum SignupField: Hashable {
 final class CreateAccountViewModel {
   var emailOrPhone    = ""
   var password        = ""
+  var confirmPassword = ""
   var agreedToTerms   = false
   var sendUpdates     = false
   var isLoading       = false
@@ -82,9 +89,16 @@ final class CreateAccountViewModel {
 	password.count >= 6
   }
   
+  /// The two entries agree. Compared verbatim — a password's leading or
+  /// trailing spaces are part of it, so trimming here would let a genuine
+  /// mismatch through.
+  var doPasswordsMatch: Bool {
+	!confirmPassword.isEmpty && confirmPassword == password
+  }
+  
   /// True only when ALL rules pass — used to enable/disable the button
   var canSubmit: Bool {
-	isEmailValid && isPasswordValid && agreedToTerms && !isLoading
+	isEmailValid && isPasswordValid && doPasswordsMatch && agreedToTerms && !isLoading
   }
   
   func openTerms() {
@@ -122,6 +136,11 @@ final class CreateAccountViewModel {
 	  present(error: .passwordTooShort)
 	  return
 	}
+	if !doPasswordsMatch {
+	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "passwords_do_not_match"])
+	  present(error: .passwordsDoNotMatch)
+	  return
+	}
 	if !agreedToTerms {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "terms_not_accepted"])
 	  present(error: .termsNotAccepted)
@@ -144,7 +163,7 @@ final class CreateAccountViewModel {
 	} catch {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": error.localizedDescription])
 	  AnalyticsService.shared.recordError(error, context: "signup")
-	  alertMessage = error.localizedDescription
+	  alertMessage = localizedAuthErrorMessage(error)
 	  showAlert = true
 	}
   }
@@ -163,7 +182,7 @@ final class CreateAccountViewModel {
 		case .failure(let error):
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 		  Task { @MainActor in
-			self?.alertMessage = error.localizedDescription
+			self?.alertMessage = localizedAuthErrorMessage(error)
 			self?.showAlert = true
 		  }
 	  }
@@ -177,7 +196,7 @@ final class CreateAccountViewModel {
 		await resolveRouteAfterSocialSignIn(method: "google", uidOverride: AndroidGoogleAuth.uid(from: signInResult))
 	  } catch {
 		AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
-		alertMessage = error.localizedDescription
+		alertMessage = localizedAuthErrorMessage(error)
 		showAlert = true
 	  }
 	}
@@ -196,7 +215,7 @@ final class CreateAccountViewModel {
 		case .failure(let error):
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
 		  Task { @MainActor in
-			self?.alertMessage = error.localizedDescription
+			self?.alertMessage = localizedAuthErrorMessage(error)
 			self?.showAlert = true
 		  }
 	  }
@@ -207,7 +226,7 @@ final class CreateAccountViewModel {
   private func resolveRouteAfterSocialSignIn(method: String, uidOverride: String? = nil) async {
 	guard let uid = Auth.auth().currentUser?.uid ?? uidOverride else {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": method, "reason": "no_session"])
-	  alertMessage = "Could not retrieve user session. Please try again."
+	  alertMessage = LocalizationSupport.localized("Could not retrieve user session. Please try again.")
 	  showAlert = true
 	  return
 	}
@@ -217,7 +236,7 @@ final class CreateAccountViewModel {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
 	  destination = resume
 	} catch {
-	  alertMessage = error.localizedDescription
+	  alertMessage = localizedAuthErrorMessage(error)
 	  showAlert = true
 	}
   }

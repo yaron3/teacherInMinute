@@ -6,6 +6,9 @@
 //  chat input, plus a math keyboard sitting above it. The only difference
 //  from the regular input is the keyboard.
 //
+//  Used by the chat session, where the equation is sent as a message, and by
+//  the ask-a-teacher sheet, where it is appended to the question being typed.
+//
 
 import SwiftUI
 
@@ -15,6 +18,12 @@ struct MathEquationEditorView: View {
     // mutate on Android. Bumping this counter from every mutation forces
     // SwiftUI to re-evaluate body and pick up the new model state.
     @State var modelTick: Int = 0
+    /// Icon on the commit button. The chat composer sends the equation as a
+    /// message; the ask-a-teacher sheet appends it to the question being
+    /// written, so the same editor needs to promise two different things.
+    var actionSystemImage: String = "paperplane.fill"
+    /// Called with the finished LaTeX. The editor clears itself first, so the
+    /// handler is free to rebuild the view that owns it.
     let onSend: (String) -> Void
     @Environment(\.colorScheme) var colorScheme
 
@@ -54,7 +63,7 @@ struct MathEquationEditorView: View {
                     sendCurrent(exported: exported)
                     modelTick &+= 1
                 } label: {
-                    PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.onAccentText)
+                    PlatformIcon(systemName: actionSystemImage, size: 15, weight: .bold, color: theme.onDarkFill)
                         .frame(width: 42, height: 42)
                         .background(
                             LinearGradient(

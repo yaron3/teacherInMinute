@@ -33,7 +33,6 @@ struct AskTeacherSheet: View {
     @State  var selectedTopic = ("Algebra")
     @State  var questionText = ""
     @State  var conversationType: String
-    @State  var composerMode: ChatComposerMode = .regular
     @State  var permissionAlertMessage: String? = nil
     @State  var isRequestingPermission = false
     @State  var uploadedPhotoUrls: [String] = []
@@ -43,13 +42,22 @@ struct AskTeacherSheet: View {
     @State  var showAndroidPhotoSourceDialog = false
 #endif
     @FocusState var isQuestionFocused: Bool
+    /// Which keyboard writes the question. The same switch the chat composer
+    /// offers, so a student who has used one recognises the other.
+    @State  var keyboardMode: ChatComposerMode = .regular
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
     @Environment(\.dismiss) var dismiss
   private var canSubmit: Bool {
     questionText.trimmingCharacters(in: .whitespaces).count >= 10
-      || composerMode == .algebra
       || !uploadedPhotoUrls.isEmpty
+      || hasFormula
   }
+
+  /// A formula built with the algebra keyboard is a whole question on its own:
+  /// `$$x^{2}$$` is nine characters and says everything the student is asking.
+  /// So it clears the ten-character minimum the way a photo does, and the
+  /// character counter steps aside for it too.
+  private var hasFormula: Bool { questionText.contains("$$") }
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -100,7 +108,7 @@ struct AskTeacherSheet: View {
         ScrollView(.vertical, showsIndicators: false) {
 			  VStack(alignment: .leading, spacing: sheetSpacing) {
 			VStack(alignment: .leading, spacing: sectionSpacing) {
-                    Text(LocalizationSupport.localized("Session type"))
+                    Text(viewModel.sessionTypeSectionTitle)
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
@@ -108,7 +116,7 @@ struct AskTeacherSheet: View {
 
                     HStack(spacing: 10) {
                         ConversationTypeChip(
-                            title: LocalizationSupport.localized("Text"),
+                            title: viewModel.textSessionTypeLabel,
                             isSelected: conversationType == "text",
                             systemIcons: ["bubble.left.fill"],
                             accent: .teal
@@ -116,7 +124,7 @@ struct AskTeacherSheet: View {
                             conversationType = "text"
                         }
                         ConversationTypeChip(
-                            title: LocalizationSupport.localized("Audio"),
+                            title: viewModel.audioSessionTypeLabel,
                             isSelected: conversationType == "audio",
                             systemIcons: ["mic.fill"],
                             accent: .teal
@@ -124,7 +132,7 @@ struct AskTeacherSheet: View {
                             conversationType = "audio"
                         }
                         ConversationTypeChip(
-                            title: LocalizationSupport.localized("Video"),
+                            title: viewModel.videoSessionTypeLabel,
                             isSelected: conversationType == "video",
                             systemIcons: ["video.fill"],
                             accent: .teal
@@ -136,7 +144,7 @@ struct AskTeacherSheet: View {
                 }
 
 			VStack(alignment: .leading, spacing: sectionSpacing) {
-                    Text(LocalizationSupport.localized("Topic"))
+                    Text(viewModel.topicSectionTitle)
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
@@ -148,7 +156,7 @@ struct AskTeacherSheet: View {
                                 Button {
                                     selectedTopic = topic
                                 } label: {
-                                    Text(LocalizationSupport.localized(topic.capitalized))
+                                    Text(viewModel.localizedTopicName(topic))
                                         .font(.system(size: 13, weight: .semibold))
                                         .foregroundStyle(selectedTopic == topic ? theme.onAccentText : theme.primaryText)
                                         .padding(.horizontal, 16)
@@ -164,64 +172,73 @@ struct AskTeacherSheet: View {
                 }
 
 			  VStack(alignment: .leading, spacing: sectionSpacing) {
-                    Text(LocalizationSupport.localized("Your question"))
+                    Text(viewModel.yourQuestionSectionTitle)
                         .font(.system(size: 14, weight: .semibold))
 						.multilineTextAlignment(.leading)
 						.frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(theme.primaryText)
 
-                    if composerMode == .regular {
-                        TextEditor(text: $questionText)
-                            .focused($isQuestionFocused)
-                            .textInputAutocapitalization(.sentences)
-                            .autocorrectionDisabled(true)
-                            .font(.system(size: 14))
-                            .multilineTextAlignment(.leading)
-                            .foregroundStyle(theme.primaryText)
-                            .tint(theme.accent)
-                            .scrollContentBackground(.hidden)
-                            .padding(12)
-                            .frame(minHeight: editorMinHeight, alignment: .leading)
-                            .background(theme.fieldBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    } else {
-                        Text(questionText.isEmpty
-                             ? LocalizationSupport.localized("Tap math keys, then send to add to your question.")
-                             : questionText)
-                            .font(.system(size: 14))
-                            .multilineTextAlignment(.leading)
-                            .foregroundStyle(questionText.isEmpty ? theme.secondaryText : theme.primaryText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .frame(minHeight: editorMinHeight, alignment: .leading)
-                            .background(theme.fieldBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
+                    TextEditor(text: $questionText)
+                        .focused($isQuestionFocused)
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled(true)
+                        .font(.system(size: 14))
+                        .multilineTextAlignment(.leading)
+                        .foregroundStyle(theme.primaryText)
+                        .tint(theme.accent)
+                        .scrollContentBackground(.hidden)
+                        .padding(12)
+                        .frame(minHeight: editorMinHeight, alignment: .leading)
+                        .background(theme.fieldBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                    composerModeToggle
+                    // The primary "Find me a Teacher Now" button sits below the
+                    // photo and info sections, off-screen while the keyboard is
+                    // up. This second entry point rides alongside the character
+                    // counter so the question can be sent without dismissing it.
+                    HStack(spacing: 10) {
+                        // A formula clears the minimum on its own, so the
+                        // counter steps aside for it as it does for a photo.
+                        if uploadedPhotoUrls.isEmpty, !hasFormula {
+                            Text(viewModel.minimumCharactersText(count: questionText.count))
+                                .font(.system(size: 11))
+                                .multilineTextAlignment(.leading)
+                                .foregroundStyle(canSubmit ? theme.positive : theme.secondaryText)
+                        }
 
-                    if uploadedPhotoUrls.isEmpty && composerMode == .regular {
-                        Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
-                            .font(.system(size: 11))
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(canSubmit ? theme.positive : theme.secondaryText)
+                        Spacer(minLength: 0)
+
+                        let isSendDisabled = !canSubmit || isRequestingPermission
+                        Button {
+                            Task { await findTeacherTapped() }
+                        } label: {
+                            Text(viewModel.sendLabel)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(isSendDisabled ? theme.secondaryText : theme.onAccentText)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 8)
+                                .background(isSendDisabled ? theme.cardBackground : theme.accent)
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .opacity(isSendDisabled ? 0.6 : 1.0)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSendDisabled)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+
+                keyboardSection
 
                 photoAttachmentSection
 
+                infoCard
 
                 let isFindDisabled = !canSubmit || isRequestingPermission
                 Button {
                     Task { await findTeacherTapped() }
                 } label: {
-                    Text(LocalizationSupport.localized("Find a Teacher"))
+                    Text(viewModel.findTeacherNowLabel)
                         .font(.system(size: 16, weight: .bold))
-                        // Enabled, this sits on `accent`, so the label needs the
-                        // on-accent token; `primaryText` is black in light mode.
-                        // Disabled it sits on `cardBackground`, where secondary
-                        // text is the readable choice.
                         .foregroundStyle(isFindDisabled ? theme.secondaryText : theme.onAccentText)
                         .frame(maxWidth: .infinity)
                         .frame(height: findButtonHeight)
@@ -231,26 +248,18 @@ struct AskTeacherSheet: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isFindDisabled)
+
+                footerText
             }
             .padding(sheetPadding)
         }
         .scrollDismissesKeyboard(.immediately)
-
-        if composerMode == .algebra {
-            MathEquationEditorView { latex in
-                appendEquation(latex)
-            }
-            .environment(\.layoutDirection, .leftToRight)
-            .padding(.horizontal, sheetPadding)
-            .padding(.bottom, sheetPadding)
-            .background(theme.cardBackground)
         }
-        }
-        .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
+        .navigationTitle(viewModel.askATeacherSheetTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(LocalizationSupport.localized("Cancel")) { closeAskTeacher() }
+                Button(viewModel.cancelLabel) { closeAskTeacher() }
             }
         }
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
@@ -258,15 +267,22 @@ struct AskTeacherSheet: View {
         .task {
             isQuestionFocused = true
         }
+        .onChange(of: isQuestionFocused) { _, focused in
+            // Tapping into the question field asks for the system keyboard, so
+            // the algebra pad steps aside rather than stacking underneath it.
+            if focused {
+                keyboardMode = .regular
+            }
+        }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
         .appDialog(
-            LocalizationSupport.localized("Permission required"),
+            viewModel.permissionRequiredTitle,
             isPresented: Binding(
                 get: { permissionAlertMessage != nil },
                 set: { if !$0 { permissionAlertMessage = nil } }
             ),
             message: permissionAlertMessage ?? "",
-            actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+            actions: [AppDialogAction(viewModel.okLabel)]
         )
     }
 
@@ -279,8 +295,8 @@ struct AskTeacherSheet: View {
             let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
             if !micState.isGranted {
                 permissionAlertMessage = conversationType == "video"
-                    ? LocalizationSupport.localized("Microphone and camera access are required for a video session.")
-                    : LocalizationSupport.localized("Microphone access is required for an audio session.")
+                    ? viewModel.videoPermissionRequiredMessage
+                    : viewModel.audioPermissionRequiredMessage
                 return
             }
         }
@@ -288,7 +304,7 @@ struct AskTeacherSheet: View {
         if conversationType == "video" {
             let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
             if !cameraState.isGranted {
-                permissionAlertMessage = LocalizationSupport.localized("Microphone and camera access are required for a video session.")
+                permissionAlertMessage = viewModel.videoPermissionRequiredMessage
                 return
             }
         }
@@ -304,22 +320,26 @@ struct AskTeacherSheet: View {
 
     var photoAttachmentSection: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
-            Text(LocalizationSupport.localized("Attach a photo (optional)"))
+            Text(viewModel.attachPhotoSectionTitle)
                 .font(.system(size: 14, weight: .semibold))
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .foregroundStyle(theme.primaryText)
 
-            HStack(spacing: 10) {
-                ForEach(uploadedPhotoUrls, id: \.self) { url in
-                    photoThumbnail(url: url)
-                }
+            if uploadedPhotoUrls.isEmpty {
+                largeAddPhotoButton
+            } else {
+                HStack(spacing: 10) {
+                    ForEach(uploadedPhotoUrls, id: \.self) { url in
+                        photoThumbnail(url: url)
+                    }
 
-                if uploadedPhotoUrls.count < AskTeacherSheet.maxPhotoCount {
-                    addPhotoButton
-                }
+                    if uploadedPhotoUrls.count < AskTeacherSheet.maxPhotoCount {
+                        addPhotoButton
+                    }
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
             }
 
             if let photoUploadError {
@@ -349,19 +369,75 @@ struct AskTeacherSheet: View {
         .buttonStyle(.plain)
         .disabled(isUploadingPhoto)
         .confirmationDialog(
-            LocalizationSupport.localized("Add a photo"),
+            viewModel.addPhotoDialogTitle,
             isPresented: $showAndroidPhotoSourceDialog,
             titleVisibility: .visible
         ) {
-            Button(LocalizationSupport.localized("Take Photo")) {
+            Button(viewModel.takePhotoLabel) {
                 pickAndroidPhoto(source: .camera)
             }
-            Button(LocalizationSupport.localized("Choose from Library")) {
+            Button(viewModel.chooseFromLibraryLabel) {
                 pickAndroidPhoto(source: .gallery)
             }
-            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+            Button(viewModel.cancelLabel, role: .cancel) {}
         }
 #endif
+    }
+
+    @ViewBuilder
+    var largeAddPhotoButton: some View {
+#if !os(Android)
+        PhotoSourceButton(onImageData: { data in
+            uploadPhotoData(data)
+        }) {
+            largeAddPhotoLabel
+        }
+        .disabled(isUploadingPhoto)
+#else
+        Button {
+            showAndroidPhotoSourceDialog = true
+        } label: {
+            largeAddPhotoLabel
+        }
+        .buttonStyle(.plain)
+        .disabled(isUploadingPhoto)
+        .confirmationDialog(
+            viewModel.addPhotoDialogTitle,
+            isPresented: $showAndroidPhotoSourceDialog,
+            titleVisibility: .visible
+        ) {
+            Button(viewModel.takePhotoLabel) {
+                pickAndroidPhoto(source: .camera)
+            }
+            Button(viewModel.chooseFromLibraryLabel) {
+                pickAndroidPhoto(source: .gallery)
+            }
+            Button(viewModel.cancelLabel, role: .cancel) {}
+        }
+#endif
+    }
+
+    var largeAddPhotoLabel: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(theme.controlBorder, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                .frame(maxWidth: .infinity)
+                .frame(height: 90)
+
+            if isUploadingPhoto {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(theme.secondaryText)
+            } else {
+                VStack(spacing: 6) {
+                    PlatformIcon(systemName: "camera.fill", size: 20, weight: .semibold, color: theme.secondaryText)
+                    Text(viewModel.tapToUploadPhotoText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.secondaryText)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        }
     }
 
     var addPhotoLabel: some View {
@@ -424,7 +500,7 @@ struct AskTeacherSheet: View {
                 photoUploadError = nil
                 defer { isUploadingPhoto = false }
                 guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
-                    photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
+                    photoUploadError = viewModel.signInToAttachPhotoError
                     return
                 }
                 let url = try await StorageService.shared.uploadQuestionImage(data: data, uid: uid)
@@ -446,7 +522,7 @@ struct AskTeacherSheet: View {
             if source == .camera {
                 let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
                 guard cameraState.isGranted else {
-                    photoUploadError = LocalizationSupport.localized("Camera access is required to take a photo.")
+                    photoUploadError = viewModel.cameraRequiredForPhotoError
                     return
                 }
             }
@@ -462,11 +538,11 @@ struct AskTeacherSheet: View {
                 }.value
                 guard !base64.isEmpty else { return }
                 guard let data = Data(base64Encoded: base64) else {
-                    photoUploadError = LocalizationSupport.localized("Could not read selected image")
+                    photoUploadError = viewModel.couldNotReadImageError
                     return
                 }
                 guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
-                    photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
+                    photoUploadError = viewModel.signInToAttachPhotoError
                     return
                 }
                 let url = try await StorageService.shared.uploadQuestionImage(data: data, uid: uid)
@@ -483,27 +559,56 @@ struct AskTeacherSheet: View {
         dismiss()
     }
 
-    var composerModeToggle: some View {
-        HStack(spacing: 6) {
-            composerModePill(title: LocalizationSupport.localized("Regular"), isSelected: composerMode == .regular) {
-                composerMode = .regular
-                isQuestionFocused = true
+    /// Regular keyboard or algebra keyboard, and the algebra one when chosen.
+    ///
+    /// The old version of this was a strip of bare symbols that appended a
+    /// character and dropped focus, so every symbol cost the student their
+    /// keyboard. Now the two keyboards are alternatives the student picks
+    /// between, and the algebra one stays up for as long as they are building
+    /// the formula.
+    var keyboardSection: some View {
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            HStack(spacing: 8) {
+                Text(viewModel.keyboardSectionTitle)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+
+                Spacer()
+
+                keyboardModePill(title: viewModel.regularKeyboardLabel, isSelected: keyboardMode == .regular) {
+                    keyboardMode = .regular
+                    isQuestionFocused = true
+                }
+                keyboardModePill(title: viewModel.algebraKeyboardLabel, isSelected: keyboardMode == .algebra) {
+                    keyboardMode = .algebra
+                    // The math keys are the keyboard in this mode, so the system
+                    // one gives up the space it was holding.
+                    isQuestionFocused = false
+                }
             }
-            composerModePill(title: LocalizationSupport.localized("Algebra"), isSelected: composerMode == .algebra) {
-                composerMode = .algebra
-                isQuestionFocused = false
+
+            if keyboardMode == .algebra {
+                Text(viewModel.addFormulaHint)
+                    .font(.system(size: 11))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(theme.secondaryText)
+
+                MathEquationEditorView(actionSystemImage: "plus") { latex in
+                    appendFormula(latex)
+                }
+                .environment(\.layoutDirection, .leftToRight)
             }
-            Spacer()
         }
     }
 
-    func composerModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    func keyboardModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button {
             action()
         } label: {
-            Text(LocalizationSupport.localized(title))
+            Text(title)
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
+                .foregroundStyle(isSelected ? theme.onDarkFill : theme.primaryText)
                 .padding(.horizontal, 14)
                 .frame(height: 28)
                 .background(isSelected ? theme.accentStrong : theme.cardBackground)
@@ -512,14 +617,50 @@ struct AskTeacherSheet: View {
         .buttonStyle(.plain)
     }
 
-    func appendEquation(_ latex: String) {
+    /// Appends the finished equation to the question as display LaTeX. The
+    /// `$$` delimiters are what marks it as a formula for every reader
+    /// downstream — the teacher's incoming-question card and the chat bubbles
+    /// both render what sits between them instead of printing the markup.
+    func appendFormula(_ latex: String) {
         let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        if !questionText.isEmpty && !questionText.hasSuffix(" ") && !questionText.hasSuffix("\n") {
-            questionText += " "
-        }
-        questionText += trimmed
+        let separator = questionText.isEmpty || questionText.hasSuffix("\n") ? "" : "\n"
+        questionText += "\(separator)$$\(trimmed)$$"
     }
+
+    var infoCard: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                // Both figures are live: the response time is the backend's
+                // measured average, the count is who is actually online.
+                if !viewModel.averageResponseText.isEmpty {
+                    Text(viewModel.averageResponseText)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(theme.accent)
+                }
+                Text(viewModel.onlineTeachersCountText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.secondaryText)
+            }
+            Spacer()
+
+        }
+        .padding(12)
+        .background(theme.accent.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
+    var footerText: some View {
+        if viewModel.remainingMinutes > 0 {
+            Text(viewModel.askTeacherFooterText)
+                .font(.system(size: 12))
+                .foregroundStyle(theme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
+        }
+    }
+
 }
 
 #if os(Android)

@@ -32,6 +32,10 @@
           ".validate": "newData.hasChildren(['teacherUid', 'topic', 'status', 'createdAt'])"
         }
       }
+    },
+    "onlineTeachers": {
+      ".read": "auth != null",
+      ".write": false
     }
   }
 }

@@ -53,11 +53,18 @@ struct UserProfileSummary {
   let role: AuthRole
   let subjects: [String]
   let rawSubjectKeys: [String]   // English normalized, e.g. ["algebra", "geometry"] — used for RTDB matching
+  /// The subject areas as stored (English titles, e.g. ["Math", "Physics"]),
+  /// without their subtopics — what a teacher is introduced as.
+  let subjectAreaTitles: [String]
   let createdAt: Date?
   let profileImageURL: String
   let remainingMinutes: Int
   let totalMinutes: Int
   let currency: String
+  /// Email of the student's vaulted PayPal account, empty when none is saved.
+  /// Read from the same document rather than re-fetched, so showing it costs
+  /// no extra round trip.
+  let savedPayPalEmail: String
 
   init?(uid: String, data: [String: Any]) {
 	let roleString = data["role"] as? String ?? ""
@@ -81,13 +88,15 @@ struct UserProfileSummary {
 	self.subjects = subjectSelections
 	  .sorted { $0.key < $1.key }
 	  .flatMap { subject, subtopics in
-		subtopics.sorted().map { "\(LocalizationSupport.localized(subject)): \(LocalizationSupport.localized($0))" }
+		let areaTitle = LocalizationSupport.localized(SubjectPresentation.displayTitle(for: subject))
+		return subtopics.sorted().map { "\(areaTitle): \(LocalizationSupport.localized($0))" }
 	  }
 	// English normalized keys for RTDB: stored subtopic values are English (e.g. "Algebra"),
 	// so normalizing them always produces locale-independent keys (e.g. "algebra").
 	self.rawSubjectKeys = subjectSelections
 	  .flatMap { _, subtopics in subtopics }
 	  .map { $0.lowercased().filter { $0.isLetter || $0.isNumber } }
+	self.subjectAreaTitles = subjectSelections.keys.sorted()
 
 	if let createdAtString = data["createdAt"] as? String {
 	  self.createdAt = ISO8601DateFormatter().date(from: createdAtString)
@@ -99,6 +108,9 @@ struct UserProfileSummary {
 	self.totalMinutes = Self.intValue(data["totalMinutes"]) ?? 0
 	let rawCurrency = (data["currency"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
 	self.currency = rawCurrency.count == 3 ? rawCurrency : LessonFormatting.defaultCurrencyCode
+
+	let savedPayPal = data["savedPayPal"] as? [String: Any]
+	self.savedPayPalEmail = (savedPayPal?["email"] as? String) ?? ""
   }
 
   private static func intValue(_ value: Any?) -> Int? {
@@ -114,8 +126,13 @@ struct UserProfileSummary {
 	fullName.isEmpty ? LocalizationSupport.localized("Teacher") : fullName
   }
   
+  /// How the user is introduced. A teacher is named by the subjects they
+  /// actually chose rather than assumed to teach maths.
   var roleLabel: String {
-	role == .teacher ? LocalizationSupport.localized("Math Teacher") : LocalizationSupport.localized("Student")
+	guard role == .teacher else { return LocalizationSupport.localized("Student") }
+	let areas = subjectAreaTitles.map { LocalizationSupport.localized(SubjectPresentation.displayTitle(for: $0)) }
+	guard !areas.isEmpty else { return LocalizationSupport.localized("Teacher") }
+	return String(format: LocalizationSupport.localized("%@ Teacher"), areas.joined(separator: ", "))
   }
   
   var dateOfBirthText: String {

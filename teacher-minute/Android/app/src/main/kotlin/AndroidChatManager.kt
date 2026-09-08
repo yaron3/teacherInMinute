@@ -307,12 +307,6 @@ object AndroidChatManager {
                     ?: 0.0
             )
             .put(
-                "connectionFeeCents",
-                snapshot.child("connectionFeeCents").value.asIntOrNull()
-                    ?: snapshot.child("connectionFee").value.asIntOrNull()
-                    ?: 0
-            )
-            .put(
                 "pricePerMinuteCents",
                 snapshot.child("pricePerMinuteCents").value.asIntOrNull()
                     ?: snapshot.child("ratePerMinuteCents").value.asIntOrNull()

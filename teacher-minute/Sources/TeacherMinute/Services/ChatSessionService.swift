@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
@@ -50,7 +51,6 @@ struct ChatSessionDetails: Equatable {
   let questionPhotoUrls: [String]
   let createdAt: Double
   let acceptedAt: Double
-  let connectionFeeCents: Int
   let pricePerMinuteCents: Int
   let teacherSharePercent: Double
   let currencyCode: String
@@ -550,7 +550,6 @@ final class ChatSessionService {
           ?? doubleValue(dict["startedAt"])
           ?? 0
       ),
-      connectionFeeCents: intValue(dict["connectionFeeCents"]) ?? intValue(dict["connectionFee"]) ?? 0,
       pricePerMinuteCents: intValue(dict["pricePerMinuteCents"])
         ?? intValue(dict["ratePerMinuteCents"])
         ?? intValue(dict["costPerMinuteCents"])
@@ -644,6 +643,96 @@ protocol ChatSessionViewModeling: AnyObject {
   func setSelfChatPaused(_ paused: Bool)
   func peerChatPaused() -> Bool
   func endLesson() async
+}
+
+// MARK: - ChatSessionViewModeling UI Strings
+extension ChatSessionViewModeling {
+
+  // MARK: Header / connection
+
+  var connectedVideoText: String { LocalizationSupport.localized("Connected - Video session") }
+  var connectedAudioText: String { LocalizationSupport.localized("Connected - Audio session") }
+  var connectedText: String { LocalizationSupport.localized("Connected") }
+
+  // MARK: End-session prompt
+
+  var endSessionTitleLabel: String { LocalizationSupport.localized("End session?") }
+  var saveBoardTitleLabel: String { LocalizationSupport.localized("Save board to gallery?") }
+  var endSessionConfirmMessage: String { LocalizationSupport.localized("Are you sure you want to end this session?") }
+  var saveBoardRemoteMessage: String { LocalizationSupport.localized("The session ended. Do you want to save the board image to your device gallery?") }
+  var saveBoardLocalMessage: String { LocalizationSupport.localized("The board will be saved to the chat. Do you also want to save it to your device gallery?") }
+  var endSessionActionLabel: String { LocalizationSupport.localized("End session") }
+  var saveToGalleryLabel: String { LocalizationSupport.localized("Save to gallery") }
+  var saveToChatOnlyLabel: String { LocalizationSupport.localized("Save to chat only") }
+  var dontSaveLabel: String { LocalizationSupport.localized("Don't save") }
+  var cancelLabel: String { LocalizationSupport.localized("Cancel") }
+
+  // MARK: End-session button (header)
+
+  var endLabel: String { LocalizationSupport.localized("End") }
+  var endingLabel: String { LocalizationSupport.localized("Ending...") }
+
+  // MARK: Text-transition overlay
+
+  var switchingToTextChatText: String { LocalizationSupport.localized("Switching to text chat…") }
+
+  // MARK: Video placeholders
+
+  var waitingForVideoText: String { LocalizationSupport.localized("Waiting for video…") }
+
+  // MARK: Session condition notice (header)
+
+  /// Said when a video lesson had to start without a camera. The session is
+  /// otherwise fine, so this explains the missing picture rather than warning.
+  var cameraUnavailableNotice: String {
+    LocalizationSupport.localized("Camera unavailable — this lesson is audio only.")
+  }
+
+  var weakConnectionNotice: String {
+    LocalizationSupport.localized("Weak connection — audio and video may stutter.")
+  }
+
+  var lostConnectionNotice: String {
+    LocalizationSupport.localized("Reconnecting…")
+  }
+
+  // MARK: Peer-paused panel (role-dependent)
+
+  var peerPausedMessage: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    if isStudentRole {
+      return LocalizationSupport.localized("Teacher is reading chat — video paused")
+    }
+    return LocalizationSupport.localized("Student is reading chat — video paused")
+  }
+
+  // MARK: Video badge
+
+  var videoLabel: String { LocalizationSupport.localized("Video") }
+
+  // MARK: Composer mode pills
+
+  var regularModeLabel: String { LocalizationSupport.localized("Regular") }
+  var algebraModeLabel: String { LocalizationSupport.localized("Algebra") }
+
+  // MARK: Session stats
+
+  var originalQuestionLabel: String { LocalizationSupport.localized("ORIGINAL QUESTION") }
+  var sessionTimeLabel: String { LocalizationSupport.localized("Session Time") }
+  var minutesLabel: String { LocalizationSupport.localized("minutes") }
+
+  // MARK: Empty thread
+
+  var emptyThreadHintText: String {
+    LocalizationSupport.localized("Start with a text explanation, then use the board below for the math work.")
+  }
+
+  // MARK: Tab bar
+
+  var chatTabTitle: String { LocalizationSupport.localized("Chat") }
+  var boardTabTitle: String { LocalizationSupport.localized("Board") }
+  var videoTabTitle: String { LocalizationSupport.localized("Video") }
+  var imagesTabTitle: String { LocalizationSupport.localized("Images") }
 }
 
 @Observable
@@ -841,7 +930,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func primaryAmountText(at date: Date) -> String {
     let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
-    let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
+    let grossCents = elapsedMinutes * Double(pricePerMinuteCents)
     let cents = isTeacherRole ? grossCents * (teacherSharePercent / 100.0) : grossCents
     return currencyText(cents: max(0, cents))
   }
@@ -1036,10 +1125,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     return role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "teacher"
   }
 
-  private var connectionFeeCents: Int {
-    details?.connectionFeeCents ?? 0
-  }
-
   private var pricePerMinuteCents: Int {
     details?.pricePerMinuteCents ?? 0
   }
@@ -1083,7 +1168,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       questionPhotoUrls: updated.questionPhotoUrls.isEmpty ? current.questionPhotoUrls : updated.questionPhotoUrls,
       createdAt: updated.createdAt > 0 ? updated.createdAt : current.createdAt,
       acceptedAt: updated.acceptedAt > 0 ? updated.acceptedAt : current.acceptedAt,
-      connectionFeeCents: updated.connectionFeeCents > 0 ? updated.connectionFeeCents : current.connectionFeeCents,
       pricePerMinuteCents: updated.pricePerMinuteCents > 0 ? updated.pricePerMinuteCents : current.pricePerMinuteCents,
       teacherSharePercent: updated.teacherSharePercent > 0 ? updated.teacherSharePercent : current.teacherSharePercent,
       currencyCode: nonEmpty(updated.currencyCode) ?? current.currencyCode
@@ -1134,7 +1218,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       questionPhotoUrls: current.questionPhotoUrls,
       createdAt: current.createdAt,
       acceptedAt: current.acceptedAt,
-      connectionFeeCents: current.connectionFeeCents,
       pricePerMinuteCents: current.pricePerMinuteCents,
       teacherSharePercent: current.teacherSharePercent,
       currencyCode: current.currencyCode

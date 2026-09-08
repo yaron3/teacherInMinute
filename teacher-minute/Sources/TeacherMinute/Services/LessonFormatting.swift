@@ -72,6 +72,32 @@ enum LessonFormatting {
 	currencyCode.uppercased() == "ILS" || LocalizationSupport.layoutDirection == .rightToLeft
   }
   
+  /// The SF Symbol *stem* for a currency's sign — "shekelsign", "dollarsign".
+  /// Unknown codes keep the dollar sign, which is what every currency-marked
+  /// icon in the app used before this existed.
+  static func currencySignSymbolName(for currencyCode: String) -> String {
+	switch currencyCode.uppercased() {
+	  case "ILS": return "shekelsign"
+	  case "USD": return "dollarsign"
+	  case "EUR": return "eurosign"
+	  case "GBP": return "sterlingsign"
+	  default: return "dollarsign"
+	}
+  }
+
+  /// The app currency's sign, circled — for anywhere the UI marks a figure as
+  /// money. Every such icon should come from here rather than naming a
+  /// currency directly, so none of them can go on claiming dollars.
+  /// `defaultCurrencyCode` is the app's currency (Settings fixes it to ILS);
+  /// when that becomes a per-user choice, this is the single place to change.
+  static var currencySignIcon: String {
+	currencySignSymbolName(for: defaultCurrencyCode) + ".circle"
+  }
+
+  static var currencySignIconFilled: String {
+	currencySignIcon + ".fill"
+  }
+
   private static func currencySymbol(for currencyCode: String) -> String {
 	if currencyCode.uppercased() == "ILS" {
 	  return "₪"
@@ -102,5 +128,83 @@ enum LessonFormatting {
 	let totalCents = lessons.reduce(0) { $0 + $1.costCents }
 	let displayCurrencyCode = currencyCode ?? lessons.first?.currencyCode ?? defaultCurrencyCode
 	return currencyText(cents: totalCents, currencyCode: displayCurrencyCode)
+  }
+
+  // MARK: - Ratings
+
+  /// A star average as one decimal in the viewer's locale — "4.9" in English,
+  /// where a locale using a decimal comma writes "4,9".
+  static func ratingText(_ rating: Double) -> String {
+	numberText(amount: rating, maximumFractionDigits: 1)
+  }
+
+  /// "(1 review)" / "(12 reviews)". Returns an empty string when there are no
+  /// reviews, so callers can hide the label rather than print "(0 reviews)".
+  static func reviewCountText(_ count: Int) -> String {
+	guard count > 0 else { return "" }
+	return count == 1
+	? LocalizationSupport.localized("(1 review)")
+	: String(format: LocalizationSupport.localized("(%d reviews)"), count)
+  }
+
+  // MARK: - Connection time
+
+  /// A measured connect time spelled out — "90 seconds", "2 minutes". Empty
+  /// when there is no measurement, so callers can drop the claim rather than
+  /// invent a number.
+  static func connectDurationText(seconds: Int) -> String {
+	guard seconds > 0 else { return "" }
+	if seconds < 120 {
+	  return String(format: LocalizationSupport.localized("%d seconds"), seconds)
+	}
+	let minutes = Int((Double(seconds) / 60.0).rounded())
+	return String(format: LocalizationSupport.localized("%d minutes"), minutes)
+  }
+
+  /// The same figure abbreviated, for tight rows — "90 sec", "2 min".
+  static func connectDurationShortText(seconds: Int) -> String {
+	guard seconds > 0 else { return "" }
+	if seconds < 120 {
+	  return String(format: LocalizationSupport.localized("%d sec"), seconds)
+	}
+	let minutes = Int((Double(seconds) / 60.0).rounded())
+	return String(format: LocalizationSupport.localized("%d min"), minutes)
+  }
+
+  /// How long students currently wait to be connected, e.g. "90 sec avg to
+  /// connect". Measured by the backend (functions/src/stats.ts) — never a
+  /// fixed claim — so callers pass 0 when there is no measurement yet.
+  static func averageConnectText(seconds: Int) -> String {
+	let duration = connectDurationShortText(seconds: seconds)
+	guard !duration.isEmpty else { return "" }
+	return String(format: LocalizationSupport.localized("%@ avg to connect"), duration)
+  }
+
+  // MARK: - Calendar months
+
+  /// The standalone month name in the viewer's language — "August" in English,
+  /// "אוגוסט" in Hebrew. Comes from the locale's own calendar symbols rather
+  /// than a hand-maintained table, so it follows the app's language setting.
+  static func monthName(month: Int) -> String {
+	guard month >= 1, month <= 12 else { return "\(month)" }
+	let formatter = DateFormatter()
+	formatter.locale = LocalizationSupport.currentLocale
+	let symbols: [String]? = formatter.standaloneMonthSymbols
+	guard let symbols, symbols.count == 12 else { return "\(month)" }
+	return symbols[month - 1]
+  }
+
+  /// "August 2026" / "אוגוסט 2026".
+  static func monthYearText(year: Int, month: Int) -> String {
+	String(format: LocalizationSupport.localized("%@ %d"), monthName(month: month), year)
+  }
+
+  /// A calendar date in the viewer's locale — used for the payout date.
+  static func dateText(_ date: Date) -> String {
+	let formatter = DateFormatter()
+	formatter.locale = LocalizationSupport.currentLocale
+	formatter.dateStyle = .medium
+	formatter.timeStyle = .none
+	return formatter.string(from: date)
   }
 }
