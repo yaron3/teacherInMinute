@@ -110,13 +110,13 @@ extension TeacherDashboardViewModeling {
   var teacherEyebrow: String { LocalizationSupport.localized("Teacher") }
   var teacherDashboardTitle: String { LocalizationSupport.localized("Teacher Dashboard") }
   var notificationsRequiredMessage: String {
-    LocalizationSupport.localized("Turn on notifications to stay online. Questions reach you by notification when the app is in the background.")
+    LocalizationSupport.localized("Turn on notifications, Questions reach you by notification when the app is in the background.")
   }
 
   // MARK: Dashboard warning header
 
   var notificationsOffWarning: String {
-    LocalizationSupport.localized("Notifications are off, so questions cannot reach you. Turn them on in your device settings to take questions.")
+    LocalizationSupport.localized("Notifications are off, so questions cannot reach you while you are in background. Turn them on in your device settings to take questions.")
   }
 
   var poorConnectionWarning: String {
@@ -625,15 +625,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  let state = await PermissionService.shared.requestNotifications()
 	  self.hasNotificationAccess = state == .granted
 	  if self.hasNotificationAccess {
+		logger.info("[VM] notifications granted")
 		self.wasTakenOfflineForNotifications = false
 	  }
 	  self.refreshGeneralWarning()
-	  guard state != .granted else { return }
 	  guard self.isOnline else { return }
-	  self.isOnline = false
-	  self.writePresence(online: false)
+	 // self.isOnline = false
+	// self.writePresence(online: false)
 	  self.errorMessage = self.notificationsRequiredMessage
-	  self.wasTakenOfflineForNotifications = true
 	  self.refreshGeneralWarning()
 	  logger.info("[VM] went offline — notifications not granted (state=\(String(describing: state)))")
 	}
