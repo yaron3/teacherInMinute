@@ -44,6 +44,12 @@ struct ChatSessionView: View {
   @State var isBoardMaximized = false
   @State var isMicMuted = false
   @State var isCameraOff = false
+  /// What the media session is currently able to do, polled from
+  /// `LiveKitService` once a second. Both of these are conditions the lesson
+  /// silently carried on through before — a camera that never published, a
+  /// connection that is barely holding — and the header now says so.
+  @State var didFallBackToAudioOnly = false
+  @State var mediaQuality: SessionMediaQuality = .unknown
   @State var liveKitRevision = 0
   @State var peerChatPaused = false
   @State var teacherPreviewOffset: CGSize = .zero
@@ -56,6 +62,12 @@ struct ChatSessionView: View {
   @State var saveBoardIsRemoteInitiated = false
   @State var sessionFrozenDate: Date?
   @State var isTransitioningToText = false
+  @State var inputBarHeight: CGFloat = 0
+  /// Whether the scrolling chat layout still has its tab strip on screen.
+  /// The strip scrolls away with the rest of the chrome, and a badge that
+  /// scrolls away with it stops telling anyone anything — so once it is gone
+  /// `unreadTabIndicator` stands in for it.
+  @State var isSessionTabStripVisible = true
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   let liveKitRoom: String
@@ -109,6 +121,7 @@ struct ChatSessionView: View {
   }
 
   var body: some View {
+	
     ZStack {
       Group {
         if isConnecting {
@@ -230,8 +243,10 @@ struct ChatSessionView: View {
       isMessageFieldFocused = selectedTab == .CHAT && composerMode == .regular
     }
     .task {
+      guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
       while !Task.isCancelled {
         displayDate = Date()
+        refreshMediaCondition()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
       }
     }
@@ -581,10 +596,113 @@ struct ChatSessionView: View {
     return json
   }
 
-  var sessionBody: some View {
+  @ViewBuilder var sessionBody: some View {
+    if selectedTab == .CHAT && !isBoardMaximized && !hasVideo {
+      scrollingChatLayout
+    } else {
+      standardSessionBody
+    }
+  }
+
+  /// The chat tab as one scrolling column.
+  ///
+  /// The header, the pinned question and the tabs used to be fixed chrome above
+  /// a thread that was the only thing able to scroll, so on a short viewport —
+  /// a small phone with the keyboard up — the composer was pushed off the
+  /// bottom with no way to reach it. Everything above the composer now scrolls
+  /// together, and the composer stays pinned where it can always be tapped.
+  var scrollingChatLayout: some View {
+    VStack(spacing: 0) {
+      ScrollViewReader { proxy in
+        ScrollView(.vertical, showsIndicators: false) {
+          // One lazy stack for the whole tab, messages included. It has to be
+          // the scroll view's direct content and the bubbles have to be its
+          // direct items: on Android the lazy stack is the scrolling
+          // LazyColumn, and only it registers the ids that `scrollTo` resolves
+          // against — inside a plain stack the scroll-to-newest call is a
+          // silent no-op, which is why chat did not follow new messages there.
+          LazyVStack(spacing: 0) {
+            header
+
+            sessionConditionNotice
+
+            sessionStats
+
+            // The lazy stack drops what scrolls out of it, so composition is
+            // the signal: the strip is on screen exactly while it is composed.
+            sessionTabs
+              .onAppear { isSessionTabStripVisible = true }
+              .onDisappear { isSessionTabStripVisible = false }
+
+            if let errorMessage {
+              Text(errorMessage)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(theme.accentBackground)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+            }
+
+            if messages.count == 0 {
+              sessionNotice
+
+              ChatThreadEmptyNotice(viewModel: viewModel)
+            }
+
+            ForEach(messages) { message in
+              ChatThreadRow(message: message, now: displayDate, viewModel: viewModel)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .id(message.id)
+            }
+          }
+#if os(Android)
+          .padding(.bottom, inputBarHeight > 0 ? inputBarHeight : 10)
+#else
+          .padding(.bottom, 10)
+#endif
+        }
+        // Claims the space the composer does not take, so the composer is
+        // never the thing that overflows.
+        .frame(maxHeight: .infinity)
+        .onChange(of: messages.count) { _, _ in
+          if let last = messages.last {
+            withAnimation(.easeOut(duration: 0.2)) {
+              proxy.scrollTo(last.id, anchor: .bottom)
+            }
+          }
+        }
+      }
+
+    }
+    .overlay(alignment: .top) {
+      unreadTabIndicator
+    }
+#if os(Android)
+    .overlay(alignment: .bottom) {
+      inputBar
+        .background(Color.black.opacity(0.15))
+        .onGeometryChange(for: CGFloat.self) { proxy in
+          proxy.size.height
+        } action: { height in
+          inputBarHeight = height
+        }
+    }
+#else
+    .safeAreaInset(edge: .bottom) {
+      inputBar
+        .background(Color.black.opacity(0.15))
+    }
+#endif
+  }
+
+
+  var standardSessionBody: some View {
     VStack(spacing: 0) {
       if !isBoardMaximized {
         header
+
+        sessionConditionNotice
 
         sessionStats
 
@@ -636,7 +754,7 @@ struct ChatSessionView: View {
     .safeAreaInset(edge: .bottom) {
       if selectedTab == .CHAT && !isBoardMaximized {
         inputBar
-          .background(theme.cardBackground)
+          .background(.ultraThinMaterial)
       }
     }
 #endif
@@ -740,8 +858,13 @@ struct ChatSessionView: View {
       .padding(16)
       .id(liveKitRevision)
 #else
-    return AndroidVideoFeed(isStudent: isStudent, isCameraOff: isCameraOff, theme: theme)
-      .padding(16)
+    return AndroidVideoFeed(
+      isStudent: isStudent,
+      isCameraOff: isCameraOff,
+      theme: theme,
+      waitingForVideoText: viewModel.waitingForVideoText
+    )
+    .padding(16)
 #endif
   }
 
@@ -813,9 +936,14 @@ struct ChatSessionView: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
     } else {
-      AndroidVideoFeed(isStudent: isStudent, isCameraOff: isCameraOff, theme: theme)
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+      AndroidVideoFeed(
+        isStudent: isStudent,
+        isCameraOff: isCameraOff,
+        theme: theme,
+        waitingForVideoText: viewModel.waitingForVideoText
+      )
+      .padding(.horizontal, 12)
+      .padding(.bottom, 8)
     }
 #endif
   }
@@ -865,9 +993,9 @@ struct ChatSessionView: View {
       )
       .id(liveKitRevision)
 #else
-    AndroidVideoFeed(isStudent: true, isCameraOff: isCameraOff, theme: theme)
-      .frame(width: 96, height: 132)
-      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    // Your own camera, not the whole feed: the feed carries the remote
+    // participant, and shrinking it to preview size put them in the window.
+    AndroidSelfVideoPreview(isCameraOff: isCameraOff, theme: theme)
       .offset(teacherPreviewOffset)
       .gesture(
         DragGesture()
@@ -1133,6 +1261,43 @@ struct ChatSessionView: View {
       }
   }
 
+  /// A line under the header for a session that is running, but not in the way
+  /// it was asked for. The connection notices come first: a camera that never
+  /// started is a settled fact of the lesson, while a connection this weak is
+  /// the thing about to interrupt it.
+  @ViewBuilder var sessionConditionNotice: some View {
+    if hasAudio, mediaQuality == .lost {
+      conditionLine(icon: "exclamationmark.triangle.fill", text: viewModel.lostConnectionNotice, color: theme.danger)
+    } else if hasAudio, mediaQuality == .poor {
+      conditionLine(icon: "exclamationmark.triangle.fill", text: viewModel.weakConnectionNotice, color: theme.warning)
+    } else if hasVideo, didFallBackToAudioOnly {
+      conditionLine(icon: "video.slash.fill", text: viewModel.cameraUnavailableNotice, color: theme.warning)
+    }
+  }
+
+  func conditionLine(icon: String, text: String, color: Color) -> some View {
+    HStack(spacing: 8) {
+      PlatformIcon(systemName: icon, size: 12, weight: .bold, color: color)
+
+      Text(text)
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(color)
+        .multilineTextAlignment(.leading)
+
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 6)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(theme.warningBackground)
+  }
+
+  func refreshMediaCondition() {
+    guard hasAudio else { return }
+    didFallBackToAudioOnly = LiveKitService.shared.didFallBackToAudioOnly
+    mediaQuality = LiveKitService.shared.currentMediaQuality()
+  }
+
   var sessionStats: some View {
     HStack(spacing: 0) {
 	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.warning)
@@ -1170,7 +1335,6 @@ struct ChatSessionView: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 16)
-    .background(theme.accentBackground.opacity(0.45))
   }
 
   var originalQuestionBanner: some View {
@@ -1245,15 +1409,55 @@ struct ChatSessionView: View {
 #endif
   }
 
+  /// The tabs in the order the strip lays them out. `unreadTabIndicator` walks
+  /// this list so its mark lands in the same slot as the badge it stands for,
+  /// so the two must keep agreeing about which tabs are present.
+  var sessionTabIds: [TAB_TYPE] {
+    var ids: [TAB_TYPE] = [.CHAT, .BOARD]
+    if hasVideo { ids.append(.VIDEO) }
+    if !viewModel.questionPhotoUrls.isEmpty { ids.append(.IMAGES) }
+    return ids
+  }
+
+  func sessionTabHasUnread(_ id: TAB_TYPE) -> Bool {
+    switch id {
+    case .CHAT: return hasUnreadChat
+    case .BOARD: return hasUnreadBoard
+    case .VIDEO, .IMAGES: return false
+    }
+  }
+
+  /// Stands in for a badge whose tab has scrolled out of reach: a red rule at
+  /// the top of the screen, in the slot the tab itself occupies. Laying it out
+  /// as the same row of equal shares as the strip keeps the mark over its own
+  /// tab under either reading direction — with the board second it sits right
+  /// of centre in English and left of centre in Hebrew, matching the strip.
+  @ViewBuilder var unreadTabIndicator: some View {
+    if !isSessionTabStripVisible, sessionTabIds.contains(where: { sessionTabHasUnread($0) }) {
+      HStack(spacing: 0) {
+        ForEach(sessionTabIds, id: \.self) { id in
+          Rectangle()
+            .fill(sessionTabHasUnread(id) ? theme.danger : Color.clear)
+            .frame(maxWidth: .infinity)
+        }
+      }
+      .frame(height: 3)
+    }
+  }
+
   var sessionTabs: some View {
     HStack(spacing: 0) {
 	  tabButton(id: .CHAT, title: viewModel.chatTabTitle, icon: "bubble.left.fill", showsBadge: hasUnreadChat)
+		.background(selectedTab == .CHAT ? theme.accentBackground : Color.clear)
 	  tabButton(id: .BOARD, title: viewModel.boardTabTitle, icon: "pencil.and.list.clipboard", showsBadge: hasUnreadBoard)
+		.background(selectedTab == .BOARD ? theme.accentBackground : Color.clear)
       if hasVideo {
 		tabButton(id: .VIDEO, title: viewModel.videoTabTitle, icon: "video.fill", showsBadge: false)
+		  .background(selectedTab == .VIDEO ? theme.accentBackground : Color.clear)
       }
       if !viewModel.questionPhotoUrls.isEmpty {
         tabButton(id: .IMAGES, title: viewModel.imagesTabTitle, icon: "photo.fill", showsBadge: false)
+		  .background(selectedTab == .IMAGES ? theme.accentBackground : Color.clear)
       }
     }
     .frame(height: 40)
@@ -1274,7 +1478,7 @@ struct ChatSessionView: View {
               systemName: icon,
               size: 12,
               weight: .semibold,
-              color: selectedTab == id ? theme.accentBackground : theme.secondaryText
+              color: selectedTab == id ? theme.primaryText : theme.secondaryText
             )
             if showsBadge {
               Circle()
@@ -1288,7 +1492,7 @@ struct ChatSessionView: View {
           }
           Text(title)
             .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.accentBackground : theme.secondaryText))
+            .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.primaryText : theme.secondaryText))
             .padding(.horizontal, showsBadge ? 18 : 0)
             .padding(.vertical, showsBadge ? 3 : 0)
             .background {
@@ -1303,8 +1507,10 @@ struct ChatSessionView: View {
           .frame(height: 2)
       }
     }
+	
     .buttonStyle(.plain)
     .frame(maxWidth: .infinity)
+	
   }
 
   var sessionNotice: some View {
@@ -1367,7 +1573,7 @@ private enum AndroidBoardImageBridge {
 #endif
 
 #if os(iOS)
-#Preview {
+#Preview("teacher") {
   ChatSessionView(
 	viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher"),
 	title: "Student",
@@ -1375,15 +1581,15 @@ private enum AndroidBoardImageBridge {
   )
 }
 
-#Preview {
+#Preview ("student"){
     ChatSessionView(
-      viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: false),
-      title: "Student",
+      viewModel: MockChatSessionViewModel(questionId: "abc", role: "student", isConnecting: false),
+      title: "Teacher",
       onClose: {}
     )
 }
 
-#Preview {
+#Preview ("teacher - connecting"){
     ChatSessionView(
       viewModel: MockChatSessionViewModel(questionId: "abc", role: "teacher", isConnecting: true),
       title: "Student",

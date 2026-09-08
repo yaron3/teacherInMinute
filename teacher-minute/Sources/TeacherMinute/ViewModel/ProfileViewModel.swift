@@ -7,6 +7,10 @@
 
 import Foundation
 import Observation
+// Required for @Observable state tracking on Android: without it Skip does
+// not wire the class into Compose's reactive state, so mutations never
+// invalidate the views reading them. See skip-fuse-ui's README.
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
@@ -364,22 +368,18 @@ final class ProfileViewModel {
     }
 
     func requestMicrophonePermission() {
+        // Deferred to the service so this row and the teacher dashboard's
+        // readiness row answer a tap the same way. Android needs more than the
+        // "not determined, so ask" rule this used to apply: a first denial
+        // there can still be re-asked, and only the OS knows when it cannot.
         Task {
-            if microphoneState == .notDetermined {
-                microphoneState = await PermissionService.shared.requestCapturePermission(for: .microphone)
-            } else {
-                PermissionService.shared.openAppSettings()
-            }
+            microphoneState = await PermissionService.shared.resolveCapturePermission(for: .microphone)
         }
     }
 
     func requestCameraPermission() {
         Task {
-            if cameraState == .notDetermined {
-                cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
-            } else {
-                PermissionService.shared.openAppSettings()
-            }
+            cameraState = await PermissionService.shared.resolveCapturePermission(for: .camera)
         }
     }
 

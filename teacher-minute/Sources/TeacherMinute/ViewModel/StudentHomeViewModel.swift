@@ -8,6 +8,7 @@
 import SwiftUI
 import Observation
 import Foundation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
@@ -366,6 +367,60 @@ extension StudentHomeViewModeling {
   func codeAppliedText(minutes: Int) -> String {
     String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), minutes)
   }
+
+  // MARK: Ask-a-teacher sheet
+
+  var sessionTypeSectionTitle: String { LocalizationSupport.localized("Session type") }
+  var textSessionTypeLabel: String { LocalizationSupport.localized("Text") }
+  var audioSessionTypeLabel: String { LocalizationSupport.localized("Audio") }
+  var videoSessionTypeLabel: String { LocalizationSupport.localized("Video") }
+  var topicSectionTitle: String { LocalizationSupport.localized("Topic") }
+  var yourQuestionSectionTitle: String { LocalizationSupport.localized("Your question") }
+  var sendLabel: String { LocalizationSupport.localized("Send") }
+  var findTeacherNowLabel: String { LocalizationSupport.localized("Find me a Teacher Now") }
+
+  /// The topic list is stored lowercased and localized by its capitalized form.
+  func localizedTopicName(_ topic: String) -> String {
+    LocalizationSupport.localized(topic.capitalized)
+  }
+
+  func minimumCharactersText(count: Int) -> String {
+    String(format: LocalizationSupport.localized("%d / 10 minimum characters"), count)
+  }
+
+  // MARK: Ask-a-teacher permissions
+
+  var permissionRequiredTitle: String { LocalizationSupport.localized("Permission required") }
+  var videoPermissionRequiredMessage: String {
+    LocalizationSupport.localized("Microphone and camera access are required for a video session.")
+  }
+  var audioPermissionRequiredMessage: String {
+    LocalizationSupport.localized("Microphone access is required for an audio session.")
+  }
+
+  // MARK: Ask-a-teacher photo attachment
+
+  var attachPhotoSectionTitle: String { LocalizationSupport.localized("Attach a photo (optional)") }
+  var addPhotoDialogTitle: String { LocalizationSupport.localized("Add a photo") }
+  var takePhotoLabel: String { LocalizationSupport.localized("Take Photo") }
+  var chooseFromLibraryLabel: String { LocalizationSupport.localized("Choose from Library") }
+  var tapToUploadPhotoText: String { LocalizationSupport.localized("Tap to upload a photo of your question") }
+  var signInToAttachPhotoError: String { LocalizationSupport.localized("You need to be signed in to attach a photo.") }
+  var cameraRequiredForPhotoError: String { LocalizationSupport.localized("Camera access is required to take a photo.") }
+  var couldNotReadImageError: String { LocalizationSupport.localized("Could not read selected image") }
+
+  // MARK: Ask-a-teacher footer
+
+  /// Both figures come off the protocol, so the whole sentence is built here
+  /// rather than half in the sheet.
+  var askTeacherFooterText: String {
+    let minutesStr = String(format: LocalizationSupport.localized("You have %d minutes"), remainingMinutes)
+    guard selectedPricePerMinuteCents > 0 else { return minutesStr }
+    let valueStr = LessonFormatting.currencyText(cents: remainingMinutes * selectedPricePerMinuteCents)
+    let approxStr = String(format: LocalizationSupport.localized("~%@ value"), valueStr)
+    return minutesStr + " · " + approxStr
+  }
+
 }
 
 // MARK: - ViewModel

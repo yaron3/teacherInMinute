@@ -7,6 +7,7 @@ import io.livekit.android.LiveKit
 import io.livekit.android.events.RoomEvent
 import io.livekit.android.events.collect
 import io.livekit.android.room.Room
+import io.livekit.android.room.participant.ConnectionQuality
 import io.livekit.android.room.track.Track
 import io.livekit.android.room.track.VideoTrack
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,35 @@ object AndroidLiveKitManager {
     val localCameraTrack = mutableStateOf<VideoTrack?>(null)
 
     fun currentRoom(): Room? = synchronized(lock) { room }
+
+    /**
+     * Whether this room is actually sending a camera. A video lesson whose
+     * camera would not start is allowed to run on audio alone, and this is how
+     * the Swift layer finds out that is what happened.
+     */
+    @JvmStatic
+    fun isCameraPublished(): Boolean = localCameraTrack.value != null
+
+    /**
+     * The worst connection quality in the room, as one of "lost", "poor",
+     * "good" or "unknown". A room that is re-establishing itself counts as
+     * lost — nothing is getting through while it does.
+     */
+    @JvmStatic
+    fun connectionQuality(): String {
+        val current = currentRoom() ?: return "unknown"
+        if (current.state == Room.State.RECONNECTING || current.state == Room.State.CONNECTING) {
+            return "lost"
+        }
+        val qualities = mutableListOf(current.localParticipant.connectionQuality)
+        current.remoteParticipants.values.mapTo(qualities) { it.connectionQuality }
+        return when {
+            qualities.any { it == ConnectionQuality.LOST } -> "lost"
+            qualities.any { it == ConnectionQuality.POOR } -> "poor"
+            qualities.any { it == ConnectionQuality.GOOD || it == ConnectionQuality.EXCELLENT } -> "good"
+            else -> "unknown"
+        }
+    }
 
     @JvmStatic
     fun connect(serverUrl: String, roomName: String, token: String, enableVideo: Boolean) {

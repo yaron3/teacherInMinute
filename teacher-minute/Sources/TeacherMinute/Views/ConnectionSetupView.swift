@@ -15,7 +15,7 @@ struct ConnectionSetupView: View {
     participantName: String,
     participantTeacherId: String = "",
     conversationType: String,
-    footerText: String = LocalizationSupport.localized("Your teacher will join shortly"),
+    footerText: String? = nil,
     viewModel sessionViewModel: (any ChatSessionViewModeling)? = nil,
     liveKitRoom: String = "",
     liveKitToken: String = "",
@@ -89,7 +89,7 @@ struct ConnectionSetupView: View {
         .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
 
       Button(action: onCancel) {
-        Text(LocalizationSupport.localized("Cancel Session"))
+        Text(viewModel.cancelSessionLabel)
           .font(.system(size: 12, weight: .semibold))
           .foregroundStyle(theme.accent)
           .frame(height: 36)
@@ -123,16 +123,12 @@ struct ConnectionSetupView: View {
         .background(theme.accentBackground)
         .clipShape(Circle())
 
-        Text(LocalizationSupport.localized("Connection is taking longer than usual"))
+        Text(viewModel.connectionSlowTitle)
           .font(.system(size: 16, weight: .bold))
           .foregroundStyle(theme.primaryText)
           .multilineTextAlignment(.center)
 
-        Text(
-          viewModel.hasVideo
-            ? LocalizationSupport.localized("We couldn't establish a video connection. Retry, continue with text only, or cancel.")
-            : LocalizationSupport.localized("We couldn't establish an audio connection. Retry, continue with text only, or cancel.")
-        )
+        Text(viewModel.connectionSlowMessage)
         .font(.system(size: 12, weight: .medium))
         .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
         .multilineTextAlignment(.center)
@@ -141,7 +137,7 @@ struct ConnectionSetupView: View {
           Button {
             viewModel.retry()
           } label: {
-            Text(LocalizationSupport.localized("Retry"))
+            Text(viewModel.retryLabel)
               .font(.system(size: 14, weight: .bold))
               .foregroundStyle(theme.onAccentText)
               .frame(maxWidth: .infinity)
@@ -156,7 +152,7 @@ struct ConnectionSetupView: View {
               viewModel.continueAsText()
               onContinueAsText()
             } label: {
-              Text(LocalizationSupport.localized("Continue with text only"))
+              Text(viewModel.continueWithTextOnlyLabel)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(theme.primaryText)
                 .frame(maxWidth: .infinity)
@@ -168,7 +164,7 @@ struct ConnectionSetupView: View {
           }
 
           Button(action: onCancel) {
-            Text(LocalizationSupport.localized("Cancel"))
+            Text(viewModel.cancelLabel)
               .font(.system(size: 13, weight: .semibold))
               .foregroundStyle(theme.secondaryText)
               .frame(maxWidth: .infinity)
@@ -287,8 +283,8 @@ struct ConnectionSetupView: View {
   var microphonePermissionCard: some View {
     permissionCard(
       icon: "mic.fill",
-      title: LocalizationSupport.localized("Microphone Permission"),
-      message: LocalizationSupport.localized("Make sure your microphone is enabled for the best learning experience."),
+      title: viewModel.microphonePermissionTitle,
+      message: viewModel.microphonePermissionMessage,
       buttonTitle: viewModel.microphoneButtonTitle,
       buttonIcon: viewModel.microphoneState.isGranted ? "checkmark" : "mic.fill"
     ) {
@@ -299,8 +295,8 @@ struct ConnectionSetupView: View {
   var cameraPermissionCard: some View {
     permissionCard(
       icon: "video.fill",
-      title: "Camera Permission",
-      message: "Make sure your camera is enabled so your teacher can see your work.",
+      title: viewModel.cameraPermissionTitle,
+      message: viewModel.cameraPermissionMessage,
       buttonTitle: viewModel.cameraButtonTitle,
       buttonIcon: viewModel.cameraState.isGranted ? "checkmark" : "video.fill"
     ) {
@@ -319,10 +315,10 @@ struct ConnectionSetupView: View {
           }
 
         VStack(alignment: .leading, spacing: 6) {
-          Text(LocalizationSupport.localized(title))
+          Text(title)
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(theme.primaryText)
-          Text(LocalizationSupport.localized(message))
+          Text(message)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(theme.secondaryText)
             .lineSpacing(3)

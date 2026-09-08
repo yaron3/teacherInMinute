@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Observation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth

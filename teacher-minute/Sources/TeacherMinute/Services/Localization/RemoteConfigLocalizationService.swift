@@ -247,6 +247,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Lessons": "שיעורים",
         "Monthly income": "הכנסה החודש",
         "My Rating": "הדירוג שלי",
+        "1 review": "ביקורת אחת",
         "%d reviews": "%d ביקורות",
         // Teacher earnings tab
         "Income and Payments": "הכנסות ותשלומים",
@@ -348,8 +349,8 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Choose whether you start out available for questions when the app opens. \"Last state\" reuses the availability you left the app on.":
             "בחרו אם להתחיל כזמינים לשאלות כשהאפליקציה נפתחת. \"המצב האחרון\" משחזר את הזמינות שבה סגרתם את האפליקציה.",
         // Teacher dashboard warning header — the teacher is unreachable.
-        "Notifications are off, so questions cannot reach you. Turn them on in your device settings to take questions.":
-            "ההתראות כבויות, ולכן שאלות לא יכולות להגיע אליכם. הפעילו אותן בהגדרות המכשיר כדי לקבל שאלות.",
+        "Notifications are off. You can take questions while the app is open, and you go offline when you leave it.":
+            "ההתראות כבויות. אפשר לקבל שאלות כל עוד האפליקציה פתוחה, וברגע שתצאו ממנה תעברו למצב לא זמין.",
         "No connection to the server. New questions will not reach you until it is back.":
             "אין חיבור לשרת. שאלות חדשות לא יגיעו אליכם עד שהחיבור יחזור.",
         // Ask a Teacher sheet: the keyboard switch above the question field.
@@ -456,6 +457,9 @@ enum LocalizationKey {
         "Grade 5": "grade_5",
         "Grade 6": "grade_6",
         "Grade 7": "grade_7",
+        // Generated as `camera_unavailable_this`, which says nothing about what
+        // the string is for.
+        "Camera unavailable \u{2014} this lesson is audio only.": "camera_unavailable_audio_only",
         "Grade 8": "grade_8",
         "Grade 9": "grade_9",
         "I am a Student": "student_a",

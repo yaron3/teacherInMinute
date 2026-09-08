@@ -17,9 +17,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -61,6 +58,16 @@ open class MainActivity: AppCompatActivity {
     }
 
     private var blockBackCallback: OnBackPressedCallback? = null
+
+    /**
+     * Back handling while a lesson is on screen. The lesson is a pushed
+     * navigation destination, and Compose Navigation registers its own back
+     * callback from inside `setContent` — added after `blockBackCallback`, so
+     * it wins the dispatcher and pops the lesson out from under a teacher or
+     * student who is still connected and being billed. This callback is added
+     * only when a lesson starts, which puts it last of all and so first to run.
+     */
+    private var sessionBackCallback: OnBackPressedCallback? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -208,6 +215,34 @@ open class MainActivity: AppCompatActivity {
                 activity.blockBackCallback?.isEnabled = blocked
             }
         }
+
+        /**
+         * Takes back away from the navigation stack for the duration of a
+         * lesson, so it backgrounds the app — what it already does on the tabs
+         * — instead of popping a live session.
+         */
+        @JvmStatic
+        fun setSessionBackBlocked(blocked: Boolean) {
+            val activity = currentActivity ?: return
+            activity.runOnUiThread {
+                if (blocked) {
+                    if (activity.sessionBackCallback != null) {
+                        return@runOnUiThread
+                    }
+                    val callback = object : OnBackPressedCallback(true) {
+                        override fun handleOnBackPressed() {
+                            logger.info("[BackNav] suppressing system back during live session")
+                            activity.moveTaskToBack(true)
+                        }
+                    }
+                    activity.sessionBackCallback = callback
+                    activity.onBackPressedDispatcher.addCallback(activity, callback)
+                } else {
+                    activity.sessionBackCallback?.remove()
+                    activity.sessionBackCallback = null
+                }
+            }
+        }
     }
 }
 
@@ -238,10 +273,11 @@ internal fun PresentationRootView(context: ComposeContext) {
     PresentationRoot(defaultColorScheme = colorScheme, context = context) { ctx ->
         SyncSystemBarsWithTheme()
         val contentContext = ctx.content()
+        // No status-bar inset here: SkipUI's `PresentationRoot` has already
+        // padded this content by `WindowInsets.safeDrawing`, so adding one
+        // leaves an empty status-bar-tall band above every screen.
         Box(
-            modifier = ctx.modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.statusBars),
+            modifier = ctx.modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             AppRootView().Compose(context = contentContext)

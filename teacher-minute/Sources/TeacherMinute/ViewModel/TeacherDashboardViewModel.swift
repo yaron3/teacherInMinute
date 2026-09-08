@@ -8,10 +8,10 @@
 import SwiftUI
 import Observation
 import Foundation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
-import AVFoundation
 #else
 import SkipFirebaseAuth
 #endif
@@ -23,6 +23,10 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var teacherName: String { get set }
   var teacherImageURL: String { get set }
   var isOnline: Bool { get set }
+  /// True from the tap that asks to go online until the permission round trip
+  /// behind it finishes. `isOnline` is still false through that window, so the
+  /// switch reads this as well to stay where the teacher put it.
+  var isAwaitingOnlinePermission: Bool { get }
   var inviteIDs: [String] { get set }
   var inviteTopics: [String: String] { get set }
   var inviteTexts: [String: String] { get set }
@@ -63,8 +67,8 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var teacherRating: Double { get set }
   var reviewCount: Int { get set }
   var ratePerMinuteCents: Int { get set }
-  var hasMicAccess: Bool { get set }
-  var hasCameraAccess: Bool { get set }
+  var micPermissionState: PermissionState { get set }
+  var cameraPermissionState: PermissionState { get set }
   var showsSubjectEditor: Bool { get set }
   /// True from launch until the first earnings and rating fetch has come back.
   /// The counters all start at zero, and zero is a perfectly plausible answer
@@ -88,7 +92,6 @@ protocol TeacherDashboardViewModeling: AnyObject {
 
   func toggleOnline()
   func enforceNotificationRequirement()
-  func refreshNotificationAccess()
   func acceptInvite(questionId: String)
   func declineInvite(questionId: String)
   func cancelAcceptingInvite()
@@ -97,6 +100,12 @@ protocol TeacherDashboardViewModeling: AnyObject {
   func reloadSubjects()
   func activeChatInitialDetails() -> ChatSessionDetails
   func refreshEarnings()
+  /// Re-reads the capture permissions from the OS. The dashboard's readiness
+  /// rows are the app's report on a setting the user can change outside it, so
+  /// they are re-checked on every return to the front.
+  func refreshPermissions()
+  func requestMicrophoneAccess()
+  func requestCameraAccess()
 }
 
 // MARK: - Protocol default strings
@@ -110,13 +119,13 @@ extension TeacherDashboardViewModeling {
   var teacherEyebrow: String { LocalizationSupport.localized("Teacher") }
   var teacherDashboardTitle: String { LocalizationSupport.localized("Teacher Dashboard") }
   var notificationsRequiredMessage: String {
-    LocalizationSupport.localized("Turn on notifications to stay online. Questions reach you by notification when the app is in the background.")
+    LocalizationSupport.localized("Enable notifications to stay online. If you go to the background without notifications enabled, you'll automatically go offline.")
   }
 
   // MARK: Dashboard warning header
 
   var notificationsOffWarning: String {
-    LocalizationSupport.localized("Notifications are off, so questions cannot reach you. Turn them on in your device settings to take questions.")
+    LocalizationSupport.localized("Notifications are off. You can take questions while the app is open, and you go offline when you leave it.")
   }
 
   var poorConnectionWarning: String {
@@ -210,6 +219,9 @@ extension TeacherDashboardViewModeling {
 
   // MARK: Online status card
 
+  var hasMicAccess: Bool { micPermissionState.isGranted }
+  var hasCameraAccess: Bool { cameraPermissionState.isGranted }
+
   var micStatusTitle: String { LocalizationSupport.localized("Mic") }
   var micStatusSubtitle: String {
     hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off")
@@ -251,8 +263,38 @@ extension TeacherDashboardViewModeling {
 
   var camChecklistSubtitle: String { LocalizationSupport.localized("Enable for video tutoring.") }
 
+  /// What tapping the row will do: ask the OS, or open the app's settings page
+  /// once the OS will no longer ask. Same wording as the profile's permission
+  /// rows, which is where a teacher meets these first.
+  var micChecklistActionTitle: String { micPermissionState.actionTitle }
+  var camChecklistActionTitle: String { cameraPermissionState.actionTitle }
+
   var connectionChecklistTitle: String { LocalizationSupport.localized("Connection") }
   var connectionChecklistSubtitle: String { LocalizationSupport.localized("Connected") }
+
+  // MARK: Live request card
+
+  /// Shown in place of a student's name when the invite carries none.
+  var unnamedStudentLabel: String { LocalizationSupport.localized("Student") }
+  var waitingNowLabel: String { LocalizationSupport.localized("Waiting now") }
+  var questionSectionHeader: String { LocalizationSupport.localized("QUESTION") }
+  var voiceMessageLabel: String { LocalizationSupport.localized("Voice Message") }
+  var acceptQuestionLabel: String { LocalizationSupport.localized("Accept Question") }
+  var declineLabel: String { LocalizationSupport.localized("Decline") }
+
+  /// The caption under the countdown: it counts seconds down to the invite's
+  /// expiry, then says the teacher is being waited on.
+  func liveRequestTimerCaption(isExpired: Bool) -> String {
+    isExpired
+      ? LocalizationSupport.localized("WAITING")
+      : LocalizationSupport.localized("SECONDS")
+  }
+
+  /// Topics are stored lowercased and localized by their capitalized form.
+  func localizedTopicName(_ topic: String) -> String {
+    LocalizationSupport.localized(topic.capitalized)
+  }
+
 }
 
 // MARK: - ViewModel
@@ -269,6 +311,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
     set { UserPhotoStore.shared.profileImageURL = newValue }
   }
   var isOnline = false
+  private(set) var isAwaitingOnlinePermission = false
   var inviteIDs: [String] = []
   var inviteTopics: [String: String] = [:]
   var inviteTexts: [String: String] = [:]
@@ -316,8 +359,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var teacherRating: Double = 0
   var reviewCount: Int = 0
   var ratePerMinuteCents = 200
-  var hasMicAccess = false
-  var hasCameraAccess = false
+  var micPermissionState: PermissionState = .notDetermined
+  var cameraPermissionState: PermissionState = .notDetermined
   var showsSubjectEditor = false
   /// Cleared once — after the first profile/rating/earnings load. Later
   /// refreshes (`refreshEarnings`) leave it alone, so finishing a lesson
@@ -355,12 +398,20 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 
   var ratingText: String { LessonFormatting.ratingText(teacherRating) }
 
+  /// "1 reviews" reads wrong in both languages, and one format string cannot
+  /// carry both forms, so the singular gets its own — the same shape as
+  /// `onlineTeachersCountText` and `LessonFormatting.reviewCountText`, which
+  /// already spell "(1 review)" out separately.
   var reviewCountText: String {
-	loadedValue(
-	  reviewCount > 0
-	  ? String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
-	  : LocalizationSupport.localized("No reviews yet")
-	)
+	let text: String
+	if reviewCount == 0 {
+	  text = LocalizationSupport.localized("No reviews yet")
+	} else if reviewCount == 1 {
+	  text = LocalizationSupport.localized("1 review")
+	} else {
+	  text = String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
+	}
+	return loadedValue(text)
   }
 
   var subjectsDisplayText: String {
@@ -389,19 +440,10 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #if !os(Android)
   private var connectionMonitor: DatabaseConnectionMonitor?
 #endif
-  /// Both default to the healthy value so the header stays down until something
-  /// has actually been observed — a warning that flashes on every launch is one
+  /// Defaults to connected so the header stays down until an outage has
+  /// actually been observed — a warning that flashes on every launch is one
   /// teachers learn to read past.
-  private var hasNotificationAccess = true
   private var hasServerConnection = true
-  /// Set when the notification rule takes an online teacher offline.
-  ///
-  /// Without it the header would clear in the same frame the rule fires —
-  /// `isOnline` is false again by then — and the reason would go with it:
-  /// nothing on the dashboard renders `errorMessage` outside the
-  /// incoming-question overlay. Cleared as soon as permission is granted, or
-  /// the teacher goes online again.
-  private var wasTakenOfflineForNotifications = false
   
   // MARK: - Init
   
@@ -494,101 +536,123 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   // MARK: - Online Toggle
   
+  /// Going online asks for notification permission first, but does not require
+  /// it: a teacher who refuses still goes online.
+  ///
+  /// Refusing costs them the background half of the job, not the job. The RTDB
+  /// invite listener runs for as long as the app is in front, so a foreground
+  /// teacher takes questions through the dashboard with no notification
+  /// involved. It is backgrounding that makes them unreachable, and
+  /// `enforceNotificationRequirement()` takes them offline at that moment.
+  ///
+  /// Asking here rather than after the toggle keeps the prompt off the screen
+  /// of a teacher already advertised as available, and tells the header which
+  /// state to show before the first question can arrive.
+  ///
+  /// Going offline is never gated: it must always be possible.
   func toggleOnline() {
-#if os(Android)
-	if androidInvitePollingTask == nil, let uid = Auth.auth().currentUser?.uid {
-	  logger.info("[VM] toggleOnline — Android invite polling nil, configuring now uid=\(uid)")
-	  configurePresence(uid: uid)
+	guard !isOnline else {
+	  performOnlineToggle()
+	  return
 	}
-	isOnline.toggle()
-	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
-	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
-	let status = isOnline ? "online" : "offline"
-	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
-	logger.info("[VM] Android wrote teacher status=\(status)")
+	// `isOnline` does not flip until the permission round trip below returns,
+	// which is a system dialog's worth of time. Through that window the switch
+	// still reads false and springs back under the teacher's finger, so the
+	// natural response is to tap it again — and a second tap used to pass this
+	// same guard, start a second request, and toggle a second time when both
+	// returned, landing the teacher back offline. One request at a time, and
+	// the switch shows the state being asked for while it runs.
+	guard !isAwaitingOnlinePermission else { return }
+	isAwaitingOnlinePermission = true
+	Task { @MainActor [weak self] in
+	  guard let self else { return }
+	  // A no-op once granted on both platforms, so re-running it is harmless.
+	  let state = await PermissionService.shared.requestNotifications()
+	  // Granted clears the header, refused raises it. The teacher goes online
+	  // either way — refusing costs them the background half of the job, and
+	  // `enforceNotificationRequirement()` collects that when they leave.
+	  self.errorMessageGeneral = state == .granted ? nil : self.notificationsOffWarning
+	  // Cleared before the toggle, so the switch never reads false from both
+	  // at once — they change in the same main-actor turn.
+	  self.isAwaitingOnlinePermission = false
+	  self.performOnlineToggle()
+	}
+  }
+
+  /// The toggle itself, once the notification rule above has been satisfied.
+  private func performOnlineToggle() {
+#if os(Android)
+  	if androidInvitePollingTask == nil, let uid = Auth.auth().currentUser?.uid {
+  	  logger.info("[VM] toggleOnline — Android invite polling nil, configuring now uid=\(uid)")
+  	  configurePresence(uid: uid)
+  	}
+  	isOnline.toggle()
+  	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+  	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
+  	let status = isOnline ? "online" : "offline"
+  	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
+  	logger.info("[VM] Android wrote teacher status=\(status)")
 #elseif SKIP
-	if androidTeacherRef == nil, let uid = Auth.auth().currentUser?.uid {
-	  logger.info("[VM] toggleOnline — Android ref nil, configuring now uid=\(uid)")
-	  configurePresence(uid: uid)
-	}
-	isOnline.toggle()
-	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
-	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
-	guard let ref = androidTeacherRef else { return }
-	let status = isOnline ? "online" : "offline"
-	ref.child("status").setValue(status)
-	if isOnline {
-	  ref.child("subjects").setValue(subjectKeys)
-	}
-	logger.info("[VM] Android wrote teacher status=\(status) subjectKeys=\(isOnline ? subjectKeys : [])")
+  	if androidTeacherRef == nil, let uid = Auth.auth().currentUser?.uid {
+  	  logger.info("[VM] toggleOnline — Android ref nil, configuring now uid=\(uid)")
+  	  configurePresence(uid: uid)
+  	}
+  	isOnline.toggle()
+  	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+  	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
+  	guard let ref = androidTeacherRef else { return }
+  	let status = isOnline ? "online" : "offline"
+  	ref.child("status").setValue(status)
+  	if isOnline {
+  	  ref.child("subjects").setValue(subjectKeys)
+  	}
+  	logger.info("[VM] Android wrote teacher status=\(status) subjectKeys=\(isOnline ? subjectKeys : [])")
 #else
-	if presenceService == nil, let uid = Auth.auth().currentUser?.uid {
-	  logger.info("[VM] toggleOnline — presenceService nil, configuring now uid=\(uid)")
-	  configurePresence(uid: uid)
-	}
-	isOnline.toggle()
-	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
-	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
+  	if presenceService == nil, let uid = Auth.auth().currentUser?.uid {
+  	  logger.info("[VM] toggleOnline — presenceService nil, configuring now uid=\(uid)")
+  	  configurePresence(uid: uid)
+  	}
+  	isOnline.toggle()
+  	logger.info("[VM] toggleOnline — isOnline=\(self.isOnline)")
+  	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherAcceptingToggled, parameters: ["is_online": isOnline])
 #if os(Android)
-	let status = isOnline ? "online" : "offline"
-	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
+  	let status = isOnline ? "online" : "offline"
+  	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
 #else
-	if isOnline {
-	  presenceService?.goOnline(subjects: subjectKeys)
-	} else {
-	  presenceService?.goOffline()
-	}
+  	if isOnline {
+  	  presenceService?.goOnline(subjects: subjectKeys)
+  	} else {
+  	  presenceService?.goOffline()
+  	}
 #endif
 #endif
+
 	// `.lastState` restores this on the next launch, so it has to follow every
 	// change of availability, not just the ones made from the dashboard.
 	TeacherPresencePreferences.lastKnownOnline = isOnline
-	// Going online again is the teacher retrying, so the header stops speaking
-	// for the last time the rule took them off.
-	if isOnline {
-	  wasTakenOfflineForNotifications = false
-	}
-	// The notification half of the header only applies while online, so the
-	// header is recomputed on both edges of the toggle.
-	refreshGeneralWarning()
-	enforceNotificationRequirement()
-  }
-
-  // MARK: - Dashboard warning header
-
-  /// Recomputes `errorMessageGeneral` from the two conditions that leave a
-  /// teacher unreachable. The connection wins when both hold: notifications
-  /// cannot help a teacher the server cannot talk to.
-  private func refreshGeneralWarning() {
-	if !hasServerConnection {
-	  errorMessageGeneral = poorConnectionWarning
-	} else if !hasNotificationAccess, isOnline || wasTakenOfflineForNotifications {
-	  errorMessageGeneral = notificationsOffWarning
-	} else {
+	// Going offline is the teacher's own decision, so the header has nothing
+	// left to warn about.
+	if !isOnline {
 	  errorMessageGeneral = nil
 	}
   }
 
-  /// Reads the notification permission without asking for it, so the header can
-  /// be refreshed on every return to the foreground without a prompt. The
-  /// prompting version is `enforceNotificationRequirement()`.
-  func refreshNotificationAccess() {
-	Task { @MainActor [weak self] in
-	  guard let self else { return }
-	  let state = await PermissionService.shared.notificationStatus()
-	  self.hasNotificationAccess = state == .granted
-	  if self.hasNotificationAccess {
-		self.wasTakenOfflineForNotifications = false
-	  }
-	  self.refreshGeneralWarning()
-	}
-  }
+  // MARK: - Dashboard warning header
 
+  /// Raises the header when the server connection drops, and takes it back down
+  /// when it returns — but only if the connection is what put it up, so this
+  /// never clears a notification warning that is still true.
   private func setServerConnection(_ connected: Bool) {
 	guard hasServerConnection != connected else { return }
 	hasServerConnection = connected
 	logger.info("[VM] server connection changed connected=\(connected)")
-	refreshGeneralWarning()
+	if connected {
+	  if errorMessageGeneral == poorConnectionWarning {
+		errorMessageGeneral = nil
+	  }
+	} else {
+	  errorMessageGeneral = poorConnectionWarning
+	}
   }
 
   /// Puts the teacher online at launch when their setting asks for it — see
@@ -596,8 +660,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// online publishes the teacher's subjects and those arrive with it.
   ///
   /// Routed through `toggleOnline()` so the automatic path is the manual one:
-  /// same analytics, same presence write, and the same notification rule, which
-  /// takes the teacher straight back offline if they cannot be reached.
+  /// same permission gate, same analytics, same presence write.
   private func applyLaunchPresence() {
 	guard !didApplyLaunchPresence else { return }
 	didApplyLaunchPresence = true
@@ -606,35 +669,37 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	toggleOnline()
   }
 
-  /// A backgrounded teacher only learns about a question from a notification —
-  /// the RTDB invite listener (and, on Android, the invite poll) stops with the
-  /// app. A teacher who has not granted notifications therefore sits in the
-  /// dispatch pool unreachable, and every wave they are picked for burns its
-  /// timeout before moving on. So permission is a precondition for being
-  /// online: it is requested when going online, and refusing takes the teacher
-  /// straight back offline.
+  /// Takes an already-online teacher offline if they can no longer be notified.
   ///
-  /// Called after every toggle and whenever the dashboard returns to the
-  /// foreground, since permission can be revoked in system settings while the
-  /// app is away.
+  /// `toggleOnline` gates going online on permission, so this covers the other
+  /// way in: permission revoked in system settings while the app was away. A
+  /// backgrounded teacher only learns about a question from a notification —
+  /// the RTDB invite listener, and on Android the invite poll, stop with the
+  /// app — so one who cannot be notified sits in the dispatch pool unreachable,
+  /// and every wave they are picked for burns its timeout before moving on.
+  ///
+  /// Called on every return to the foreground. A no-op while already offline.
   func enforceNotificationRequirement() {
 	guard isOnline else { return }
+	// The permission dialog raised by `toggleOnline()` pauses the app, and that
+	// pause arrives here as a scene-phase change — so without this the act of
+	// asking to go online triggers the rule that takes the teacher back
+	// offline. A request already in flight is not a teacher leaving the app.
+	guard !isAwaitingOnlinePermission else { return }
 	Task { @MainActor [weak self] in
 	  guard let self else { return }
 	  // A no-op once granted on both platforms, so this is safe to re-run.
 	  let state = await PermissionService.shared.requestNotifications()
-	  self.hasNotificationAccess = state == .granted
-	  if self.hasNotificationAccess {
-		self.wasTakenOfflineForNotifications = false
+	  guard state != .granted else {
+		self.errorMessageGeneral = nil
+		return
 	  }
-	  self.refreshGeneralWarning()
-	  guard state != .granted else { return }
 	  guard self.isOnline else { return }
 	  self.isOnline = false
 	  self.writePresence(online: false)
-	  self.errorMessage = self.notificationsRequiredMessage
-	  self.wasTakenOfflineForNotifications = true
-	  self.refreshGeneralWarning()
+	  // The header stays up: it is the only thing on the dashboard that says
+	  // why the teacher came back to find themselves offline.
+	  self.errorMessageGeneral = self.notificationsOffWarning
 	  logger.info("[VM] went offline — notifications not granted (state=\(String(describing: state)))")
 	}
   }
@@ -995,8 +1060,16 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	isLoadingProfile = false
 	checkPermissions()
 	applyLaunchPresence()
-	await loadRating()
-	await loadEarnings(uid: uid)
+	// The rating and the earnings come from different backends and neither
+	// needs the other, but they used to be awaited one after the other, so the
+	// stat cards showed "Updating…" for the sum of both round trips. Overlapping
+	// them costs the slower one only. Both are @MainActor, so their state
+	// writes still serialize — it is the waiting that runs in parallel.
+	let startedAt = Date()
+	async let rating: Void = loadRating()
+	async let earnings: Void = loadEarnings(uid: uid)
+	_ = await (rating, earnings)
+	logger.info("[VM] dashboard stats settled in \(Int(Date().timeIntervalSince(startedAt) * 1000))ms")
 	// Every figure on the dashboard is settled by this point, including the
 	// ones a failed fetch left at zero — that is a real answer now, not a
 	// placeholder, so the counters can show it.
@@ -1006,6 +1079,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Star average and review count come from the backend rather than the
   /// teacher document, which the app cannot aggregate on its own.
   private func loadRating() async {
+	let startedAt = Date()
+	defer { logger.info("[VM] loadRating took \(Int(Date().timeIntervalSince(startedAt) * 1000))ms") }
 	do {
 	  let summary = try await FunctionsService.shared.teacherRatingSummary()
 	  teacherRating = summary.averageRating
@@ -1022,6 +1097,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Reads the same backend summary the Lessons and Earnings tabs do, so the
   /// three screens cannot report different money — see TeacherEarningsStore.
   private func loadEarnings(uid: String) async {
+	let startedAt = Date()
+	defer { logger.info("[VM] loadEarnings took \(Int(Date().timeIntervalSince(startedAt) * 1000))ms") }
 	guard let summary = try? await TeacherEarningsStore.shared.summary() else { return }
 	let lessons = summary.lessons
 
@@ -1077,10 +1154,27 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   }
   
   private func checkPermissions() {
-#if !os(Android)
-	hasMicAccess = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-	hasCameraAccess = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
-#endif
+	// Asked of `PermissionService` rather than of AVFoundation directly, so
+	// Android answers too — it used to be compiled out there, which left every
+	// readiness row on Android reading "off" whatever the device had granted.
+	micPermissionState = PermissionService.shared.captureStatus(for: .microphone)
+	cameraPermissionState = PermissionService.shared.captureStatus(for: .camera)
+  }
+
+  func refreshPermissions() {
+	checkPermissions()
+  }
+
+  func requestMicrophoneAccess() {
+	Task {
+	  micPermissionState = await PermissionService.shared.resolveCapturePermission(for: .microphone)
+	}
+  }
+
+  func requestCameraAccess() {
+	Task {
+	  cameraPermissionState = await PermissionService.shared.resolveCapturePermission(for: .camera)
+	}
   }
   
   private static func formatCents(_ cents: Int, currency: String = LessonFormatting.defaultCurrencyCode) -> String {
@@ -1093,6 +1187,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 @Observable
 @MainActor
 final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
+  var errorMessageGeneral: String?
+  
   var teacherName: String
   var teacherImageURL: String = ""
   var isOnline: Bool
@@ -1116,7 +1212,6 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeConversationType: String = "text"
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
-  var errorMessageGeneral: String? = nil
   var isAcceptingCalls: Bool = false
   var isVerified: Bool
   var todayEarningsCents: Int
@@ -1129,8 +1224,8 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var teacherRating: Double
   var reviewCount: Int
   var ratePerMinuteCents: Int
-  var hasMicAccess: Bool
-  var hasCameraAccess: Bool
+  var micPermissionState: PermissionState
+  var cameraPermissionState: PermissionState
   var showsSubjectEditor: Bool = false
   /// The mock is handed its figures up front, so nothing is ever pending.
   var isLoadingStats: Bool = false
@@ -1145,9 +1240,13 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var hasRating: Bool { reviewCount > 0 }
   var ratingText: String { LessonFormatting.ratingText(teacherRating) }
   var reviewCountText: String {
-    hasRating
-      ? String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
-      : LocalizationSupport.localized("No reviews yet")
+    if !hasRating {
+      return LocalizationSupport.localized("No reviews yet")
+    }
+    if reviewCount == 1 {
+      return LocalizationSupport.localized("1 review")
+    }
+    return String(format: LocalizationSupport.localized("%d reviews"), reviewCount)
   }
   var subjectsDisplayText: String {
     if subjects.isEmpty {
@@ -1172,7 +1271,8 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
     reviewCount: Int = 23,
     ratePerMinuteCents: Int = 120,
     hasMicAccess: Bool = true,
-    hasCameraAccess: Bool = true
+    hasCameraAccess: Bool = true,
+	errorMessageGeneral: String? = nil
   ) {
     self.teacherName = teacherName
     self.isOnline = isOnline
@@ -1188,8 +1288,9 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
     self.teacherRating = teacherRating
     self.reviewCount = reviewCount
     self.ratePerMinuteCents = ratePerMinuteCents
-    self.hasMicAccess = hasMicAccess
-    self.hasCameraAccess = hasCameraAccess
+    self.micPermissionState = hasMicAccess ? .granted : .denied
+    self.cameraPermissionState = hasCameraAccess ? .granted : .denied
+	self.errorMessageGeneral = errorMessageGeneral
 
     if isOnline {
       let id = "mock-invite-1"
@@ -1206,11 +1307,12 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
     }
   }
 
+  var isAwaitingOnlinePermission: Bool = false
+
   func toggleOnline() { isOnline.toggle() }
   /// Inert in previews: the mock never touches the permission system, so a
   /// preview teacher stays online regardless of the host's notification state.
   func enforceNotificationRequirement() {}
-  func refreshNotificationAccess() {}
   func acceptInvite(questionId: String) {}
   func declineInvite(questionId: String) { inviteIDs = inviteIDs.filter { $0 != questionId } }
   func cancelAcceptingInvite() {}
@@ -1218,6 +1320,11 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   func editSubjects() { showsSubjectEditor = true }
   func reloadSubjects() {}
   func refreshEarnings() {}
+  /// Inert in previews, like `enforceNotificationRequirement`: a preview must
+  /// not put the system's permission dialog up.
+  func refreshPermissions() {}
+  func requestMicrophoneAccess() { micPermissionState = .granted }
+  func requestCameraAccess() { cameraPermissionState = .granted }
   func activeChatInitialDetails() -> ChatSessionDetails {
     ChatSessionDetails(
       questionId: "",
