@@ -44,6 +44,12 @@ struct ChatSessionView: View {
   @State var isBoardMaximized = false
   @State var isMicMuted = false
   @State var isCameraOff = false
+  /// What the media session is currently able to do, polled from
+  /// `LiveKitService` once a second. Both of these are conditions the lesson
+  /// silently carried on through before — a camera that never published, a
+  /// connection that is barely holding — and the header now says so.
+  @State var didFallBackToAudioOnly = false
+  @State var mediaQuality: SessionMediaQuality = .unknown
   @State var liveKitRevision = 0
   @State var peerChatPaused = false
   @State var teacherPreviewOffset: CGSize = .zero
@@ -240,6 +246,7 @@ struct ChatSessionView: View {
       guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
       while !Task.isCancelled {
         displayDate = Date()
+        refreshMediaCondition()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
       }
     }
@@ -617,6 +624,8 @@ struct ChatSessionView: View {
           LazyVStack(spacing: 0) {
             header
 
+            sessionConditionNotice
+
             sessionStats
 
             // The lazy stack drops what scrolls out of it, so composition is
@@ -692,6 +701,8 @@ struct ChatSessionView: View {
     VStack(spacing: 0) {
       if !isBoardMaximized {
         header
+
+        sessionConditionNotice
 
         sessionStats
 
@@ -1248,6 +1259,43 @@ struct ChatSessionView: View {
         .fill(theme.controlBorder)
         .frame(height: 1)
       }
+  }
+
+  /// A line under the header for a session that is running, but not in the way
+  /// it was asked for. The connection notices come first: a camera that never
+  /// started is a settled fact of the lesson, while a connection this weak is
+  /// the thing about to interrupt it.
+  @ViewBuilder var sessionConditionNotice: some View {
+    if hasAudio, mediaQuality == .lost {
+      conditionLine(icon: "exclamationmark.triangle.fill", text: viewModel.lostConnectionNotice, color: theme.danger)
+    } else if hasAudio, mediaQuality == .poor {
+      conditionLine(icon: "exclamationmark.triangle.fill", text: viewModel.weakConnectionNotice, color: theme.warning)
+    } else if hasVideo, didFallBackToAudioOnly {
+      conditionLine(icon: "video.slash.fill", text: viewModel.cameraUnavailableNotice, color: theme.warning)
+    }
+  }
+
+  func conditionLine(icon: String, text: String, color: Color) -> some View {
+    HStack(spacing: 8) {
+      PlatformIcon(systemName: icon, size: 12, weight: .bold, color: color)
+
+      Text(text)
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(color)
+        .multilineTextAlignment(.leading)
+
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 6)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(theme.warningBackground)
+  }
+
+  func refreshMediaCondition() {
+    guard hasAudio else { return }
+    didFallBackToAudioOnly = LiveKitService.shared.didFallBackToAudioOnly
+    mediaQuality = LiveKitService.shared.currentMediaQuality()
   }
 
   var sessionStats: some View {

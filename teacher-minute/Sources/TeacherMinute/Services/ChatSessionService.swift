@@ -680,6 +680,22 @@ extension ChatSessionViewModeling {
 
   var waitingForVideoText: String { LocalizationSupport.localized("Waiting for video…") }
 
+  // MARK: Session condition notice (header)
+
+  /// Said when a video lesson had to start without a camera. The session is
+  /// otherwise fine, so this explains the missing picture rather than warning.
+  var cameraUnavailableNotice: String {
+    LocalizationSupport.localized("Camera unavailable — this lesson is audio only.")
+  }
+
+  var weakConnectionNotice: String {
+    LocalizationSupport.localized("Weak connection — audio and video may stutter.")
+  }
+
+  var lostConnectionNotice: String {
+    LocalizationSupport.localized("Reconnecting…")
+  }
+
   // MARK: Peer-paused panel (role-dependent)
 
   var peerPausedMessage: String {
