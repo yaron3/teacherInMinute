@@ -61,7 +61,6 @@ final class AppRouter: @unchecked Sendable {
   /// in the same breath as swapping the stack out from under it left the login
   /// screen on top of the new root on Android.
   func enterMainTabs(role: AuthRole) {
-	//logger.info("[Router] enterMainTabs role=\(role) pathCount=\(path.count)")
 	path = NavigationPath()
 	rootScreen = .mainTabs(role: role)
   }

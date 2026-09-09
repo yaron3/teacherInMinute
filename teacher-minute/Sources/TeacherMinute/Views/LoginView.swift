@@ -73,7 +73,6 @@ struct LoginView: View {
 	// Push the resolved destination when login completes
 	.navigationTitle(LocalizationSupport.localized("Welcome Back"))
 	.onChange(of: viewModel.destination) { _, resume in
-	  logger.info("[Login] destination changed resume=\(String(describing: resume))")
 	  guard let resume else { return }
 	  router.resume(resume)
 	  viewModel.destination = nil

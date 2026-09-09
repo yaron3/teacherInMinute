@@ -39,7 +39,6 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   
       public var body: some View {
 			@Bindable var router = router
-			let _ = logger.info("[Router] root body rootScreen=\(String(describing: router.rootScreen)) pathCount=\(router.path.count)")
 			ZStack {
 			Group {
 			  switch router.rootScreen {
