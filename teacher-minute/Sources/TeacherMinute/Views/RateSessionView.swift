@@ -98,10 +98,20 @@ struct RateSessionView: View {
                   .font(.system(size: 16, weight: .bold))
                   .foregroundStyle(theme.primaryText)
                 if !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                  Text(subject)
-                    .font(.system(size: 13))
-                    .foregroundStyle(theme.secondaryText)
-                    .lineLimit(2)
+                  // The question can carry a formula the student built with
+                  // the algebra keyboard, so it goes through the same renderer
+                  // the chat bubbles and the question banner use. A plain
+                  // `Text` here printed the `$$...$$` markup back at them on
+                  // the last screen of the lesson.
+                  FormulaAwareText(
+                    text: subject,
+                    textColor: theme.secondaryText,
+                    font: .system(size: 13),
+                    lineSpacing: 3,
+                    formulaMinWidth: 160,
+                    formulaMaxWidth: 240,
+                    lineLimit: 2
+                  )
                 }
               }
               Spacer()

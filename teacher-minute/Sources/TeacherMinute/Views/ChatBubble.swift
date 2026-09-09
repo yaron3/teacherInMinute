@@ -93,10 +93,7 @@ struct ChatBubble: View {
   }
 
   static func readableText(_ text: String) -> String {
-    var readable = text
-      .replacingOccurrences(of: "\\n", with: "\n")
-      .replacingOccurrences(of: "\\t", with: "  ")
-      .replacingOccurrences(of: "\r\n", with: "\n")
+    var readable = unescapingOutsideFormulas(text)
       .trimmingCharacters(in: .whitespacesAndNewlines)
 
     while readable.contains("\n\n\n") {
@@ -104,6 +101,44 @@ struct ChatBubble: View {
     }
 
     return readable
+  }
+
+  /// Turns the escape sequences a backend may have serialised into real
+  /// whitespace, but only in the prose between formulas.
+  ///
+  /// `\times` and `\neq` are LaTeX commands, not an escaped tab and an escaped
+  /// newline. Unescaping the whole string ate their first letter and rendered
+  /// `6\times0.5` as `6  imes0.5`, so what is inside `$...$` is left alone.
+  static func unescapingOutsideFormulas(_ text: String) -> String {
+    var out = ""
+    var rest = text[...]
+
+    while let dollar = rest.firstIndex(of: "$") {
+      out += unescaped(String(rest[..<dollar]))
+
+      let isDisplay = rest[rest.index(after: dollar)...].first == "$"
+      let delimiter = isDisplay ? "$$" : "$"
+      let contentStart = rest.index(dollar, offsetBy: delimiter.count)
+      guard let close = rest[contentStart...].range(of: delimiter)?.lowerBound else {
+        // An unclosed delimiter: the rest is not a formula, so it unescapes
+        // like any other prose.
+        out += unescaped(String(rest[dollar...]))
+        return out
+      }
+
+      let end = rest.index(close, offsetBy: delimiter.count)
+      out += String(rest[dollar..<end])
+      rest = rest[end...]
+    }
+
+    return out + unescaped(String(rest))
+  }
+
+  private static func unescaped(_ text: String) -> String {
+    text
+      .replacingOccurrences(of: "\\n", with: "\n")
+      .replacingOccurrences(of: "\\t", with: "  ")
+      .replacingOccurrences(of: "\r\n", with: "\n")
   }
 
   static func containsFormula(_ text: String) -> Bool {
@@ -234,18 +269,38 @@ struct FormulaAwareText: View {
   var formulaMaxWidth: CGFloat = 300
   /// Lines allowed per text run. Zero means as many as it takes.
   var lineLimit: Int = 0
+  /// `false` draws the formula inline-sized — a fraction still stacks, but
+  /// tighter. What a list row wants, where a display-sized formula would set
+  /// the height of every row in the list.
+  var displayMode: Bool = true
+  /// Overrides the height estimated from the formula itself. A row gives every
+  /// formula the same height so the list keeps an even rhythm.
+  var formulaHeight: CGFloat? = nil
+  /// Space kept either side of the formula. A row sets it to zero so the
+  /// formula starts on the same edge as the line of text beneath it.
+  var formulaInset: CGFloat = 8
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       ForEach(ChatBubble.messageSegments(from: ChatBubble.readableText(text))) { segment in
         if segment.isFormula {
-          MathFormulaView(latex: segment.text, displayMode: true)
-            .frame(minWidth: formulaMinWidth, maxWidth: formulaMaxWidth, minHeight: ChatBubble.formulaHeight(segment.text))
-            .environment(\.layoutDirection, .leftToRight)
+          formulaView(segment.text)
         } else {
           textRun(segment.text)
         }
       }
+    }
+  }
+
+  @ViewBuilder
+  private func formulaView(_ latex: String) -> some View {
+    let view = MathFormulaView(latex: latex, displayMode: displayMode, horizontalInset: formulaInset)
+      .environment(\.layoutDirection, .leftToRight)
+
+    if let formulaHeight {
+      view.frame(minWidth: formulaMinWidth, maxWidth: formulaMaxWidth, minHeight: formulaHeight, maxHeight: formulaHeight)
+    } else {
+      view.frame(minWidth: formulaMinWidth, maxWidth: formulaMaxWidth, minHeight: ChatBubble.formulaHeight(latex))
     }
   }
 

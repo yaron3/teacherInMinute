@@ -81,7 +81,7 @@ struct MathKeyboardView: View {
                 MathKey(label: "∫", action: .insert("\\int "), style: .command),
             ],
             [
-                MathKey(label: "π", action: .insert("\\pi"), style: .command),
+                MathKey(label: "π", action: .insert("\\pi "), style: .command),
                 MathKey(label: "◀", action: .moveLeft, style: .operatorKey),
                 MathKey(label: "▶", action: .moveRight, style: .operatorKey),
                 MathKey(label: "Clear", action: .clear, style: .destructive),

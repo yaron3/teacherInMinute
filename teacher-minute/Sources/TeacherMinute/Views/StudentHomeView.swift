@@ -443,10 +443,17 @@ struct StudentHomeView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
 
-          Text(lesson.title)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(theme.secondaryText)
-            .lineLimit(1)
+          FormulaAwareText(
+            text: lesson.title,
+            textColor: theme.secondaryText,
+            font: .system(size: 13, weight: .semibold),
+            formulaMinWidth: 100,
+            formulaMaxWidth: 200,
+            lineLimit: 1,
+            displayMode: false,
+            formulaHeight: 38,
+            formulaInset: 0
+          )
 
           // The score this student actually gave. Unrated lessons show no
           // stars rather than a full row.
@@ -1677,9 +1684,17 @@ struct RecentLessonRow: View {
       )
 
       VStack(alignment: .leading, spacing: 3) {
-        Text(lesson.title)
-          .font(.system(size: 16, weight: .bold))
-          .foregroundStyle(theme.primaryText)
+        FormulaAwareText(
+          text: lesson.title,
+          textColor: theme.primaryText,
+          font: .system(size: 16, weight: .bold),
+          formulaMinWidth: 120,
+          formulaMaxWidth: 220,
+          lineLimit: 1,
+          displayMode: false,
+          formulaHeight: 44,
+          formulaInset: 0
+        )
 
         Text(teacherTimeText)
           .font(.system(size: 13))

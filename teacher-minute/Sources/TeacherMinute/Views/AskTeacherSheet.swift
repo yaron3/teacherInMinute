@@ -49,6 +49,9 @@ struct AskTeacherSheet: View {
     /// offers, so a student who has used one recognises the other.
     @State  var keyboardMode: ChatComposerMode = .regular
     @State  var pendingFormulaLatex = ""
+    /// Formulas the student has committed with the keyboard's `+`, kept as
+    /// LaTeX and shown rendered. They join the question only as it is sent.
+    @State  var attachedFormulas: [String] = []
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
     @Environment(\.dismiss) var dismiss
   private var canSubmit: Bool {
@@ -58,11 +61,15 @@ struct AskTeacherSheet: View {
   }
 
   private var composedQuestionText: String {
+    var parts: [String] = []
     let text = questionText.trimmingCharacters(in: .whitespacesAndNewlines)
-    let formula = wrappedPendingFormula
-    if text.isEmpty { return formula }
-    if formula.isEmpty { return text }
-    return text + "\n" + formula
+    if !text.isEmpty { parts.append(text) }
+    for latex in attachedFormulas {
+      parts.append("$$\(latex)$$")
+    }
+    let pending = wrappedPendingFormula
+    if !pending.isEmpty { parts.append(pending) }
+    return parts.joined(separator: "\n")
   }
 
   private var wrappedPendingFormula: String {
@@ -75,7 +82,7 @@ struct AskTeacherSheet: View {
   /// So it clears the ten-character minimum the way a photo does, and the
   /// character counter steps aside for it too.
   private var hasFormula: Bool {
-    questionText.contains("$$") || !pendingFormulaLatex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    !attachedFormulas.isEmpty || !pendingFormulaLatex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -221,6 +228,10 @@ struct AskTeacherSheet: View {
                         .frame(minHeight: editorMinHeight, alignment: .leading)
                         .background(theme.fieldBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    if !attachedFormulas.isEmpty {
+                        attachedFormulaStrip
+                    }
 
                     if keyboardMode == .algebra {
                         algebraKeyboard
@@ -742,8 +753,8 @@ struct AskTeacherSheet: View {
     /// see √ and a fraction — and SwiftUI offers no caret position to insert at
     /// anyway, on either platform. So the formula gets its own field, built to
     /// match the question field (same corner radius, same fill) and placed at
-    /// the bottom of it, and its `+` appends the finished formula to the
-    /// question text.
+    /// the bottom of it, and its `+` files the finished formula into
+    /// `attachedFormulas`, where it shows rendered until the question is sent.
     var algebraKeyboard: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
             MathEquationEditorView(
@@ -780,16 +791,49 @@ struct AskTeacherSheet: View {
         .buttonStyle(.plain)
     }
 
-    /// Appends the finished equation to the question as display LaTeX. The
-    /// `$$` delimiters are what marks it as a formula for every reader
-    /// downstream — the teacher's incoming-question card and the chat bubbles
-    /// both render what sits between them instead of printing the markup.
+    /// Keeps the finished equation as LaTeX and shows it rendered above the
+    /// keys. Writing it into the question field instead would print the markup
+    /// at the student — `$$5x^{\\frac{3}{2}}$$` where they just drew a
+    /// fraction — and hand them a string they could break by editing it. The
+    /// `$$` delimiters go on only as the question is sent, which is where they
+    /// matter: they are what tells the teacher's incoming-question card and
+    /// the chat bubbles to render a formula rather than print it.
     func appendFormula(_ latex: String) {
         let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         pendingFormulaLatex = ""
-        let separator = questionText.isEmpty || questionText.hasSuffix("\n") ? "" : "\n"
-        questionText += "\(separator)$$\(trimmed)$$"
+        attachedFormulas.append(trimmed)
+    }
+
+    /// The committed formulas, rendered, each with the `×` that takes it back
+    /// off the question.
+    var attachedFormulaStrip: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(0..<attachedFormulas.count, id: \.self) { index in
+                HStack(spacing: 8) {
+                    MathFormulaView(latex: attachedFormulas[index], displayMode: false)
+                        .frame(height: 44)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .environment(\.layoutDirection, .leftToRight)
+
+                    Button {
+                        attachedFormulas.remove(at: index)
+                    } label: {
+                        Circle()
+                            .fill(theme.primaryText.opacity(0.85))
+                            .frame(width: 20, height: 20)
+                            .overlay {
+                                PlatformIcon(systemName: "xmark", size: 10, weight: .bold, color: theme.invertedText)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(theme.fieldBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
     }
 
     var infoCard: some View {

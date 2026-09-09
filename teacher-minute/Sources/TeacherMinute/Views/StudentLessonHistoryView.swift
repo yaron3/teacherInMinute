@@ -88,7 +88,10 @@ struct StudentLessonHistoryView: View {
                             .padding(.top, 20)
                     } else {
                         FlatCard(padding: 0, outlined: true) {
-                            VStack(spacing: 0) {
+                            // Lazy: a row draws its question, and a drawn
+                            // formula is a web view. Only the rows on screen
+                            // should be paying for one.
+                            LazyVStack(spacing: 0) {
                                 ForEach(viewModel.filteredLessons) { lesson in
                                     LessonHistoryRow(
                                         lesson: lesson,
@@ -195,9 +198,21 @@ struct LessonHistoryRow: View {
             )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(lesson.title)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(theme.primaryText)
+                // Drawn, not flattened: a lesson asked as a fraction is
+                // recognised by its shape. Inline-sized and given a fixed
+                // height so every row in the list is the same height, and the
+                // enclosing lists are lazy so only the visible rows build one.
+                FormulaAwareText(
+                    text: lesson.title,
+                    textColor: theme.primaryText,
+                    font: .system(size: 16, weight: .bold),
+                    formulaMinWidth: 120,
+                    formulaMaxWidth: 220,
+                    lineLimit: 1,
+                    displayMode: false,
+                    formulaHeight: 44,
+                    formulaInset: 0
+                )
 
                 Text(isLoading ? LocalizationSupport.localized("Loading session details") : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
                     .font(.system(size: 13))
@@ -316,9 +331,18 @@ struct LessonDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(lesson.title)
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(theme.primaryText)
+                        // The title is the question's opening line, which is
+                        // usually the formula itself — so it is drawn the same
+                        // way as the Original Question card below rather than
+                        // flattened to `5(x²)/2` in the one place there is room
+                        // to show it properly.
+                        FormulaAwareText(
+                            text: lesson.title,
+                            textColor: theme.primaryText,
+                            font: .system(size: 24, weight: .bold),
+                            formulaMinWidth: 200,
+                            formulaMaxWidth: 320
+                        )
 
                         Text("\(lesson.otherParticipant) \u{2022} \(lesson.completedAt) \u{2022} \(lesson.duration)")
                             .font(.system(size: 13))
