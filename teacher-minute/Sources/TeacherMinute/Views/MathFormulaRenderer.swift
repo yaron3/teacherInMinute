@@ -237,10 +237,13 @@ enum LatexPlainText {
     static func fractionSide(_ arg: String) -> String {
         if arg.isEmpty { return emptySlot }
         if arg.count == 1 { return arg }
-        if arg.allSatisfy({ $0.isNumber || $0 == "." }) { return arg }
-        if arg.allSatisfy({ $0.isLetter }) { return arg }
         if isSingleParenGroup(arg) { return arg }
-        return "(\(arg))"
+        // Only an operator can be read the wrong way once the bar becomes a
+        // slash: `1+2` over 3 has to keep its brackets, but `x²` over 2 is
+        // `x²/2` and bracketing it only adds noise.
+        let operators = "+-−×÷·/= "
+        let hasOperator = arg.contains { operators.contains($0) }
+        return hasOperator ? "(\(arg))" : arg
     }
 
     /// Whether the string is one parenthesised group — `(1+2)` is, `(1)+(2)`

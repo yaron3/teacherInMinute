@@ -266,15 +266,15 @@ final class HistoryModel {
     /// backend-supplied history (see `FunctionsService.teacherEarningsSummary`)
     /// so a lesson is titled the same however it reached the screen.
     static func lessonTitle(questionText: String, photoUrls: [String], topic: String) -> String {
-        // The question can hold a formula the student built with the algebra
-        // keyboard. A row title is one line of plain text, so the LaTeX is read
-        // out compactly — `$$5\frac{x^{2}}{2}$$` becomes `5x²/2` — rather than
-        // printed as markup, which is what a lesson was titled before.
-        if !questionText.isEmpty {
-            let readable = LatexPlainText.summary(questionText)
-            if !readable.isEmpty {
-                return readable
-            }
+        // A lesson is named after the opening line of its question. The rest of
+        // a multi-line one — the second and third formulas of a worked problem
+        // — belongs in the details, not crammed into a one-line title.
+        //
+        // The LaTeX is left as it is so the caller can decide: the details
+        // header draws the formula, a compact row reads it out flat.
+        let opening = firstLine(of: questionText)
+        if !opening.isEmpty {
+            return opening
         }
         if !photoUrls.isEmpty {
             return LocalizationSupport.localized("Image")
@@ -283,6 +283,16 @@ final class HistoryModel {
             return LocalizationSupport.localized(topic)
         }
         return LocalizationSupport.localized("Lesson")
+    }
+
+    /// The first line with something on it. Splits on real newlines only: a
+    /// literal `\n` is left alone because `\neq` starts the same way.
+    private static func firstLine(of text: String) -> String {
+        for line in text.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return ""
     }
 
     private static func firstString(in data: [String: Any], keys: [String]) -> String {

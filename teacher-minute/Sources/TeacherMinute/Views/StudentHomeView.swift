@@ -443,7 +443,7 @@ struct StudentHomeView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
 
-          Text(lesson.title)
+          Text(LatexPlainText.summary(lesson.title))
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
             .lineLimit(1)
@@ -1677,7 +1677,7 @@ struct RecentLessonRow: View {
       )
 
       VStack(alignment: .leading, spacing: 3) {
-        Text(lesson.title)
+        Text(LatexPlainText.summary(lesson.title))
           .font(.system(size: 16, weight: .bold))
           .foregroundStyle(theme.primaryText)
 

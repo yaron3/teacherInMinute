@@ -195,7 +195,9 @@ struct LessonHistoryRow: View {
             )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(lesson.title)
+                // A flat reading, not the drawn formula: this list is built
+                // eagerly, and a rendered formula is a web view per row.
+                Text(LatexPlainText.summary(lesson.title))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(theme.primaryText)
 
@@ -316,9 +318,18 @@ struct LessonDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(lesson.title)
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(theme.primaryText)
+                        // The title is the question's opening line, which is
+                        // usually the formula itself — so it is drawn the same
+                        // way as the Original Question card below rather than
+                        // flattened to `5(x²)/2` in the one place there is room
+                        // to show it properly.
+                        FormulaAwareText(
+                            text: lesson.title,
+                            textColor: theme.primaryText,
+                            font: .system(size: 24, weight: .bold),
+                            formulaMinWidth: 200,
+                            formulaMaxWidth: 320
+                        )
 
                         Text("\(lesson.otherParticipant) \u{2022} \(lesson.completedAt) \u{2022} \(lesson.duration)")
                             .font(.system(size: 13))
