@@ -1153,7 +1153,12 @@ struct ChatSessionView: View {
       }
       composerModePill(title: viewModel.algebraModeLabel, isSelected: composerMode == .algebra) {
         composerMode = .algebra
+        // The math keys are the keyboard in this mode. Dropping the focus state
+        // is not enough to send the system one away on Android — SkipUI's
+        // `.focused(_:)` only ever requests focus — so the pad would sit on top
+        // of a keyboard that never left. Same fix as the ask-a-teacher sheet.
         isMessageFieldFocused = false
+        SoftKeyboard.dismiss()
         if let scrollProxy {
           scrollChatForKeyboardMode(.algebra, proxy: scrollProxy)
         }
@@ -1466,9 +1471,9 @@ struct ChatSessionView: View {
   func dismissChatInput() {
     isMessageFieldFocused = false
     composerMode = .regular
-#if canImport(UIKit) && !os(Android)
-    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-#endif
+    // Was iOS-only, which left the keyboard up on Android whenever the session
+    // wanted the composer out of the way.
+    SoftKeyboard.dismiss()
   }
 
   /// The tabs in the order the strip lays them out. `unreadTabIndicator` walks

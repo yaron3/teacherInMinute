@@ -114,6 +114,7 @@ struct TeacherSubjectsView: View {
 	}
 	.background(Color(.systemBackground))
 	.navigationBarTitleDisplayMode(.inline)
+	.onboardingBackHandling(isActive: !isEditing)
 	.navigationTitle(LocalizationSupport.localized("What can you teach?"))
 	.onAppear {
 	  if isEditing {

@@ -51,7 +51,17 @@ final class AppRouter: @unchecked Sendable {
 	path.append(route)
   }
 
+  /// Swaps the whole app root over to the tab bar.
+  ///
+  /// Called from two places that do not look alike to the navigator: at launch,
+  /// where the path is empty (`performLaunchSessionResume` even guards on it),
+  /// and after a login, where the path still holds the pushed `.login` route
+  /// that the welcome stack is displaying. The second case is why the root view
+  /// gives the root screen its own identity — clearing a bound, non-empty path
+  /// in the same breath as swapping the stack out from under it left the login
+  /// screen on top of the new root on Android.
   func enterMainTabs(role: AuthRole) {
+	//logger.info("[Router] enterMainTabs role=\(role) pathCount=\(path.count)")
 	path = NavigationPath()
 	rootScreen = .mainTabs(role: role)
   }

@@ -108,7 +108,7 @@ struct PermissionsSetupView: View {
         .padding(.horizontal, 18)
         .background(theme.screenBackground)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
+        .onboardingBackHandling()
         .trackScreen(AnalyticsScreen.permissionsSetup)
         .onAppear {
             viewModel.onContinue = {

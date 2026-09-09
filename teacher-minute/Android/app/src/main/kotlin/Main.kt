@@ -69,6 +69,14 @@ open class MainActivity: AppCompatActivity {
      */
     private var sessionBackCallback: OnBackPressedCallback? = null
 
+    /**
+     * Back handling while an onboarding step is on screen. Onboarding is a
+     * stack of steps the user should be able to walk back through, and backing
+     * out of the first one means signing out — decisions the app makes, so this
+     * callback only forwards the press.
+     */
+    private var onboardingBackCallback: OnBackPressedCallback? = null
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         currentActivity = this
@@ -213,6 +221,38 @@ open class MainActivity: AppCompatActivity {
             val activity = currentActivity ?: return
             activity.runOnUiThread {
                 activity.blockBackCallback?.isEnabled = blocked
+            }
+        }
+
+        /**
+         * Routes the system back button to the onboarding step on screen.
+         *
+         * Registered while onboarding is up, which puts it after the callback
+         * Compose Navigation adds for the destination and so first to run —
+         * the same ordering trick [setSessionBackBlocked] relies on. Without
+         * it, back either popped out of onboarding without asking or, with the
+         * tab bar's blocker still installed, backgrounded the app.
+         */
+        @JvmStatic
+        fun setOnboardingBackHandling(enabled: Boolean) {
+            val activity = currentActivity ?: return
+            activity.runOnUiThread {
+                if (enabled) {
+                    if (activity.onboardingBackCallback != null) {
+                        return@runOnUiThread
+                    }
+                    val callback = object : OnBackPressedCallback(true) {
+                        override fun handleOnBackPressed() {
+                            logger.info("[BackNav] onboarding back — handing to the app")
+                            OnboardingBackBridge.shared.handleBack()
+                        }
+                    }
+                    activity.onboardingBackCallback = callback
+                    activity.onBackPressedDispatcher.addCallback(activity, callback)
+                } else {
+                    activity.onboardingBackCallback?.remove()
+                    activity.onboardingBackCallback = null
+                }
             }
         }
 

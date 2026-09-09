@@ -147,6 +147,7 @@ struct TeacherIdentityVerificationView: View {
 	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
+	.onboardingBackHandling()
 	.onAppear {
 	  viewModel.onSubmit = { router.push(.teacherSubjects) }
 	  viewModel.checkAndAutoAdvance()

@@ -39,6 +39,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   
       public var body: some View {
 			@Bindable var router = router
+			let _ = logger.info("[Router] root body rootScreen=\(String(describing: router.rootScreen)) pathCount=\(router.path.count)")
 			ZStack {
 			Group {
 			  switch router.rootScreen {
@@ -88,6 +89,13 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 					.transition(.opacity)
 				}
 				}
+				// The welcome branch owns a NavigationStack bound to the router's
+				// path, and after a login that stack is displaying a pushed
+				// `.login` route at the moment the root swaps to the tab bar.
+				// Without an identity of its own the old subtree survived the
+				// swap on Android and kept the login screen on screen, so a
+				// successful sign-in looked like a failed one.
+				.id(router.rootScreen)
 				.environment(\.appRouter, router)
             .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
             .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))

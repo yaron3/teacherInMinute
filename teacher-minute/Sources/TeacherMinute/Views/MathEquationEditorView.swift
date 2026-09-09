@@ -22,6 +22,11 @@ struct MathEquationEditorView: View {
     /// message; the ask-a-teacher sheet appends it to the question being
     /// written, so the same editor needs to promise two different things.
     var actionSystemImage: String = "paperplane.fill"
+    /// Corner radius for the formula field. `nil` keeps the capsule the chat
+    /// composer wants; a radius lets a caller match a neighbouring text field,
+    /// which is what the ask-a-teacher sheet does so the formula field reads as
+    /// the bottom of the question field rather than a second kind of input.
+    var fieldCornerRadius: CGFloat? = nil
     var onDraftChange: (String) -> Void = { _ in }
     /// Called with the finished LaTeX. The editor clears itself first, so the
     /// handler is free to rebuild the view that owns it.
@@ -53,12 +58,7 @@ struct MathEquationEditorView: View {
         return VStack(spacing: 8) {
 
             HStack(spacing: 10) {
-                MathFormulaView(latex: preview, displayMode: false)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: inputCapsuleHeight)
-                    .padding(.horizontal, 6)
-                    .background(theme.fieldBackground)
-                    .clipShape(Capsule())
+                formulaField(preview: preview)
 
                 Button {
                     sendCurrent(exported: exported)
@@ -82,6 +82,20 @@ struct MathEquationEditorView: View {
         }
         .padding(.top, 10)
         .environment(\.layoutDirection, .leftToRight)
+    }
+
+    @ViewBuilder func formulaField(preview: String) -> some View {
+        let field = MathFormulaView(latex: preview, displayMode: false)
+            .frame(maxWidth: .infinity)
+            .frame(height: inputCapsuleHeight)
+            .padding(.horizontal, 6)
+            .background(theme.fieldBackground)
+
+        if let fieldCornerRadius {
+            field.clipShape(RoundedRectangle(cornerRadius: fieldCornerRadius, style: .continuous))
+        } else {
+            field.clipShape(Capsule())
+        }
     }
 
     func sendCurrent(exported: String) {

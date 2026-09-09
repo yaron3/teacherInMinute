@@ -196,11 +196,17 @@ struct AskTeacherSheet: View {
                 }
 
 			  VStack(alignment: .leading, spacing: sectionSpacing) {
-                    Text(viewModel.yourQuestionSectionTitle)
-                        .font(.system(size: 14, weight: .semibold))
-						.multilineTextAlignment(.leading)
-						.frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(theme.primaryText)
+                    HStack(spacing: 8) {
+                        Text(viewModel.yourQuestionSectionTitle)
+                            .font(.system(size: 14, weight: .semibold))
+                            .multilineTextAlignment(.leading)
+                            .foregroundStyle(theme.primaryText)
+
+                        Spacer(minLength: 0)
+
+                        keyboardModePills(scrollProxy: scrollProxy)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     TextEditor(text: $questionText)
                         .focused($isQuestionFocused)
@@ -215,6 +221,11 @@ struct AskTeacherSheet: View {
                         .frame(minHeight: editorMinHeight, alignment: .leading)
                         .background(theme.fieldBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    if keyboardMode == .algebra {
+                        algebraKeyboard
+                            .id(Self.keyboardScrollID)
+                    }
 
                     // The primary "Find me a Teacher Now" button sits below the
                     // photo and info sections, off-screen while the keyboard is
@@ -252,9 +263,6 @@ struct AskTeacherSheet: View {
                 }
                 .id(Self.questionScrollID)
 
-                keyboardSection(scrollProxy: scrollProxy)
-                    .id(Self.keyboardScrollID)
-
                 photoAttachmentSection
 
                 infoCard
@@ -281,6 +289,13 @@ struct AskTeacherSheet: View {
         }
         .scrollDismissesKeyboard(.immediately)
         .onChange(of: keyboardMode) { _, mode in
+            // Whichever route flipped the mode, the algebra pad is the keyboard
+            // now and the system one has to leave the screen before the scroll
+            // measures what is visible.
+            if mode == .algebra {
+                isQuestionFocused = false
+                SoftKeyboard.dismiss()
+            }
             scrollForKeyboardMode(mode, proxy: scrollProxy)
         }
         }
@@ -295,7 +310,7 @@ struct AskTeacherSheet: View {
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
         .id(languagePreference)
         .task {
-            isQuestionFocused = true
+            await focusQuestionOnAppear()
         }
         .onChange(of: isQuestionFocused) { _, focused in
             // Tapping into the question field asks for the system keyboard, so
@@ -316,16 +331,99 @@ struct AskTeacherSheet: View {
         )
     }
 
+    /// Puts the cursor in the question field when the sheet opens, and keeps the
+    /// keyboard there.
+    ///
+    /// All of the Android trouble is one thing: this screen is pushed with
+    /// `navigationDestination(isPresented:)`, and Skip re-runs that modifier on
+    /// every recomposition — `if id.value == nil || !navigator.isViewPresented(…)`
+    /// pushes again whenever the navigator no longer recognises the entry, which
+    /// happens when `syncState()` rebuilds `backStackState` in a
+    /// `LaunchedEffect { delay(1000) … }` about a second after the push. Every
+    /// push runs `keyboardController?.hide()`, so roughly a second after the
+    /// sheet opens the keyboard is taken away.
+    ///
+    /// That hide leaves Compose focus alone, which is why the focus state cannot
+    /// fix it: `isQuestionFocused` still reads `true`, so setting it changes
+    /// nothing and SkipUI's `requestFocus()` is a no-op on a field that already
+    /// has focus — the student is left tapping a focused field to get the
+    /// keyboard back. So the keyboard itself is what gets watched and re-raised,
+    /// past the reconciliation that takes it.
+    func focusQuestionOnAppear() async {
+        isQuestionFocused = true
+#if os(Android)
+        // Long enough to cover the ~1s back-stack reconciliation and the hide
+        // that rides along with it, checked often enough to put the keyboard
+        // back before the student reaches for it.
+        //
+        // The cap on raises matters as much as the window. Asking whether the
+        // keyboard is up is a best-effort answer — before Android 11 it is a
+        // measurement, not a fact — so a wrong answer must cost a couple of
+        // wasted calls, not a keyboard fighting the student for two seconds.
+        // Only worth doing where the keyboard can be observed. On Android 10
+        // and older the answer is a guess, and a wrong guess asks for a
+        // keyboard that is already up — which is a flicker in the student's
+        // face, worse than the problem being corrected.
+        guard SoftKeyboard.isVisibilityObservable else { return }
+
+        var checks = 0
+        var raises = 0
+        while checks < 8 && raises < 3 {
+            checks += 1
+            try? await Task.sleep(nanoseconds: 250_000_000)
+
+            // Anything the student did themselves outranks this: they may have
+            // switched to the algebra pad, started writing, or put the keyboard
+            // away on purpose after typing.
+            guard keyboardMode == .regular, questionText.isEmpty else { return }
+            guard !SoftKeyboard.isVisible else { continue }
+
+            raises += 1
+            logger.info("[AskTeacher][Android] keyboard gone while the question field held focus; raising it again (\(raises))")
+
+            if !isQuestionFocused {
+                isQuestionFocused = true
+            }
+            SoftKeyboard.show()
+        }
+#endif
+    }
+
+    /// Brings the chosen keyboard into view.
+    ///
+    /// The question section is the Android target in both modes, because the
+    /// algebra field and its keys now live inside it and Skip can only scroll
+    /// to a direct child of the `LazyVStack` — it looks the id up in the lazy
+    /// item collector, which does not see ids nested inside an item. Aligning
+    /// that item's top with the top of the viewport is what shows the question
+    /// field, the formula field under it and the keys under that; Skip ignores
+    /// the anchor on Android, so top alignment is all there is.
+    ///
+    /// The scroll also runs twice on Android. Switching to the algebra pad
+    /// drops focus, and the system keyboard takes a moment to slide away; a
+    /// scroll issued while it is still up is clamped against the shrunken
+    /// viewport and drifts once the space comes back. The second pass lands
+    /// once the keyboard has gone (the delays add up), and is a no-op when the
+    /// first pass already arrived.
     func scrollForKeyboardMode(_ mode: ChatComposerMode, proxy: ScrollViewProxy) {
 #if os(Android)
         let target = Self.questionScrollID
         let anchor: UnitPoint = .top
+        let firstDelay: UInt64 = 120_000_000
+        let settleDelay: UInt64 = 300_000_000
 #else
         let target = mode == .algebra ? Self.keyboardScrollID : Self.initialScrollID
         let anchor: UnitPoint = mode == .algebra ? .bottom : .top
+        let firstDelay: UInt64 = 80_000_000
+        let settleDelay: UInt64 = 0
 #endif
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 80_000_000)
+            try? await Task.sleep(nanoseconds: firstDelay)
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(target, anchor: anchor)
+            }
+            guard settleDelay > 0 else { return }
+            try? await Task.sleep(nanoseconds: settleDelay)
             withAnimation(.easeInOut(duration: 0.25)) {
                 proxy.scrollTo(target, anchor: anchor)
             }
@@ -605,51 +703,65 @@ struct AskTeacherSheet: View {
         dismiss()
     }
 
-    /// Regular keyboard or algebra keyboard, and the algebra one when chosen.
+    /// Which keyboard writes the question, offered next to the question's own
+    /// title so the switch sits with the field it types into.
     ///
     /// The old version of this was a strip of bare symbols that appended a
     /// character and dropped focus, so every symbol cost the student their
     /// keyboard. Now the two keyboards are alternatives the student picks
     /// between, and the algebra one stays up for as long as they are building
     /// the formula.
-    func keyboardSection(scrollProxy: ScrollViewProxy) -> some View {
+    func keyboardModePills(scrollProxy: ScrollViewProxy) -> some View {
+        HStack(spacing: 8) {
+            keyboardModePill(title: viewModel.regularKeyboardLabel, isSelected: keyboardMode == .regular) {
+                keyboardMode = .regular
+                pendingFormulaLatex = ""
+                isQuestionFocused = true
+                scrollForKeyboardMode(.regular, proxy: scrollProxy)
+            }
+            keyboardModePill(title: viewModel.algebraKeyboardLabel, isSelected: keyboardMode == .algebra) {
+                keyboardMode = .algebra
+                // The math keys are the keyboard in this mode, so the system
+                // one gives up the space it was holding. Dropping the focus
+                // state is only half of it — on Android that alone leaves
+                // the IME up and the pad stacks on top of it — so the
+                // keyboard is dismissed outright.
+                isQuestionFocused = false
+                SoftKeyboard.dismiss()
+                scrollForKeyboardMode(.algebra, proxy: scrollProxy)
+            }
+        }
+    }
+
+    /// The algebra keys and the field they write into, sitting immediately
+    /// below the question field.
+    ///
+    /// A formula cannot be typed into the question field itself: it is a
+    /// `TextEditor` holding plain text, so the keys would have to write raw
+    /// LaTeX into it — `\sqrt{}` and `\frac{}{}` where the student expects to
+    /// see √ and a fraction — and SwiftUI offers no caret position to insert at
+    /// anyway, on either platform. So the formula gets its own field, built to
+    /// match the question field (same corner radius, same fill) and placed at
+    /// the bottom of it, and its `+` appends the finished formula to the
+    /// question text.
+    var algebraKeyboard: some View {
         VStack(alignment: .leading, spacing: sectionSpacing) {
-            HStack(spacing: 8) {
-                Text(viewModel.keyboardSectionTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(theme.primaryText)
-
-                Spacer()
-
-                keyboardModePill(title: viewModel.regularKeyboardLabel, isSelected: keyboardMode == .regular) {
-                    keyboardMode = .regular
-                    pendingFormulaLatex = ""
-                    isQuestionFocused = true
-                    scrollForKeyboardMode(.regular, proxy: scrollProxy)
-                }
-                keyboardModePill(title: viewModel.algebraKeyboardLabel, isSelected: keyboardMode == .algebra) {
-                    keyboardMode = .algebra
-                    // The math keys are the keyboard in this mode, so the system
-                    // one gives up the space it was holding.
-                    isQuestionFocused = false
-                    scrollForKeyboardMode(.algebra, proxy: scrollProxy)
-                }
-            }
-
-            if keyboardMode == .algebra {
-                Text(viewModel.addFormulaHint)
-                    .font(.system(size: 11))
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(theme.secondaryText)
-
-                MathEquationEditorView(actionSystemImage: "plus", onDraftChange: { latex in
+            MathEquationEditorView(
+                actionSystemImage: "plus",
+                fieldCornerRadius: 12,
+                onDraftChange: { latex in
                     pendingFormulaLatex = latex
-                }) { latex in
-                    appendFormula(latex)
                 }
-                .environment(\.layoutDirection, .leftToRight)
+            ) { latex in
+                appendFormula(latex)
             }
+            .environment(\.layoutDirection, .leftToRight)
+
+            Text(viewModel.addFormulaHint)
+                .font(.system(size: 11))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(theme.secondaryText)
         }
     }
 

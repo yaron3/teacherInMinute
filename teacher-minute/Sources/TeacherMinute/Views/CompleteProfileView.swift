@@ -89,11 +89,14 @@ struct CompleteProfileView: View {
             .padding(.horizontal, 18)
             .background(theme.screenBackground)
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)
+            .onboardingBackHandling()
             .onAppear {
                 viewModel.onContinue = {
                     if viewModel.shouldShowPermissionsOnContinue && PermissionsSetupStore.shouldShowForCurrentUser() {
-                        router.replace(with: .permissionsSetup(role: viewModel.role))
+                        // Pushed, not replaced: the permissions step is part of
+                        // the same walk-backwards flow, and replacing here wiped
+                        // every earlier step out of the stack.
+                        router.push(.permissionsSetup(role: viewModel.role))
                     } else {
                         router.enterMainTabs(role: viewModel.role)
                     }

@@ -12,6 +12,10 @@ enum AndroidBackNavigationBridge {
         name: "setSessionBackBlocked",
         sig: "(Z)V"
     )!
+    private static let setOnboardingBackHandlingMethod = activityClass.getStaticMethodID(
+        name: "setOnboardingBackHandling",
+        sig: "(Z)V"
+    )!
 
     /// Blocks back for the duration of a lesson. Separate from
     /// `setSystemBackBlocked` because that callback is registered before the
@@ -27,6 +31,24 @@ enum AndroidBackNavigationBridge {
                 )
             } catch {
                 logger.error("[BackNav][Android] failed to set sessionBackBlocked=\(blocked): \(error)")
+            }
+        }
+    }
+
+    /// Hands the system back button to the onboarding step on screen. Unlike
+    /// the two blockers above, this one does not decide anything itself — it
+    /// asks the app, which either walks a step back or asks the user whether
+    /// they mean to sign out.
+    static func setOnboardingBackHandling(_ enabled: Bool) {
+        jniContext {
+            do {
+                try activityClass.callStatic(
+                    method: setOnboardingBackHandlingMethod,
+                    options: [.kotlincompat],
+                    args: [enabled.toJavaParameter(options: [.kotlincompat])]
+                )
+            } catch {
+                logger.error("[BackNav][Android] failed to set onboardingBackHandling=\(enabled): \(error)")
             }
         }
     }

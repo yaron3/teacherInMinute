@@ -108,6 +108,7 @@ struct ChooseRoleView: View {
     .padding(.horizontal, 20)
     .background(theme.screenBackground)
     .navigationBarTitleDisplayMode(.inline)
+    .onboardingBackHandling()
     .sheet(isPresented: $showingTerms) {
       if let termsURL {
         NavigationStack { AboutWebView(url: termsURL, title: LocalizationSupport.localized("EULA")) }
