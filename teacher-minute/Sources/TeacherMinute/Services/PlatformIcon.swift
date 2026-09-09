@@ -41,7 +41,7 @@ struct PlatformIcon: View {
 		.frame(width: size, height: size)
 	} else {
 #if os(Android)
-	  Text(Self.emoji(for: resolvedName))
+	  Text(Self.directionStableGlyph(for: resolvedName))
 		.font(.system(size: size))
 		.foregroundStyle(color)
 #else
@@ -53,6 +53,30 @@ struct PlatformIcon: View {
 	
   }
   
+  /// Characters the bidi algorithm mirrors inside right-to-left text.
+  private static let mirroredCharacters: Set<Character> = ["<", ">", "(", ")", "[", "]", "{", "}"]
+
+  /// The glyph for an icon, pinned so the text renderer cannot turn it around.
+  ///
+  /// Android draws these icons as text, and a few of them are bidi-mirrored
+  /// characters: inside a right-to-left paragraph the renderer reverses them.
+  /// That silently undid the direction `resolvedName` had just chosen — the
+  /// flip fired, the glyph came out `>`, and Hebrew screens drew it as `<`, so
+  /// every back chevron in the app pointed forwards. A left-to-right isolate
+  /// keeps an icon's direction the business of `resolvedName` alone.
+  ///
+  /// Only the mirrored glyphs get it. Wrapping every icon also cost the
+  /// settings gear its glyph — an isolate is a directional run, and the font
+  /// fallback that draws `⚙` does not survive being put inside one.
+  static func directionStableGlyph(for systemName: String) -> String {
+	let glyph = emoji(for: systemName)
+	guard glyph.contains(where: { Self.mirroredCharacters.contains($0) }) else {
+	  return glyph
+	}
+	// U+2066 LEFT-TO-RIGHT ISOLATE … U+2069 POP DIRECTIONAL ISOLATE.
+	return "\u{2066}" + glyph + "\u{2069}"
+  }
+
   static func emoji(for systemName: String) -> String {
 	switch systemName {
 	  case "moon.fill":                         return "🌙"
