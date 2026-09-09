@@ -171,41 +171,91 @@ enum LatexPlainText {
             ("\\infty", "∞"),
         ]
         for (from, to) in symbols {
+            // The space after `\div` is only there to keep the command name
+            // from running into what follows. Once the symbol replaces it the
+            // space is a stray gap, so it goes with the command.
+            s = s.replacingOccurrences(of: from + " ", with: to)
             s = s.replacingOccurrences(of: from, with: to)
         }
 
-        // \frac{A}{B} → (A)/(B), \sqrt{A} → √(A). Repeat to handle nesting.
+        // \frac{A}{B} → A/B, \sqrt{A} → √(A). Repeat to handle nesting.
         for _ in 0..<8 {
-            let next = collapseTwoArg(collapseOneArg(s, command: "\\sqrt", wrap: { "√(\($0))" }),
+            let next = collapseTwoArg(collapseOneArg(s, command: "\\sqrt", wrap: { "√(\($0.isEmpty ? emptySlot : $0))" }),
                                       command: "\\frac",
-                                      wrap: { a, b in "(\(a))/(\(b))" })
+                                      wrap: { a, b in "\(fractionSide(a))/\(fractionSide(b))" })
             if next == s { break }
             s = next
         }
 
-        // Cursor placeholder `|` survives as-is.
-        // ^{N} for single digit → Unicode superscript.
-        let supers: [Character: Character] = [
-            "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
-            "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"
-        ]
-        for (digit, sup) in supers {
-            s = s.replacingOccurrences(of: "^{\(digit)}", with: String(sup))
-        }
-        // _{N} for single digit → Unicode subscript.
-        let subs: [Character: Character] = [
-            "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
-            "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉"
-        ]
-        for (digit, sub) in subs {
-            s = s.replacingOccurrences(of: "_{\(digit)}", with: String(sub))
-        }
-
-        // Generic ^{...} / _{...} → ^... / _...
-        s = collapseOneArg(s, command: "^", wrap: { "^\($0)" })
-        s = collapseOneArg(s, command: "_", wrap: { "_\($0)" })
+        // `^{23}` is x-to-the-23, so the whole run lifts: `²³`. Anything that
+        // is not plain digits keeps brackets, because `x^{3/2}` flattened to
+        // `x^3/2` says x-cubed-over-two — a different number entirely.
+        s = collapseOneArg(s, command: "^", wrap: { scriptText($0, digits: superscriptDigits, marker: "^") })
+        s = collapseOneArg(s, command: "_", wrap: { scriptText($0, digits: subscriptDigits, marker: "_") })
 
         return s
+    }
+
+    /// Stands in for a slot the student has not filled in yet, so an
+    /// unfinished fraction reads as `3/□` rather than trailing off into `3/`.
+    static let emptySlot = "□"
+
+    static let superscriptDigits: [Character: Character] = [
+        "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
+        "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹"
+    ]
+
+    static let subscriptDigits: [Character: Character] = [
+        "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
+        "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉"
+    ]
+
+    /// One side of a fraction. A bare number, a bare name or a group already
+    /// inside its own parentheses reads fine as it is — `3/2`, not `(3)/(2)` —
+    /// but anything holding an operator needs the brackets to keep its meaning.
+    static func fractionSide(_ arg: String) -> String {
+        if arg.isEmpty { return emptySlot }
+        if arg.count == 1 { return arg }
+        if arg.allSatisfy({ $0.isNumber || $0 == "." }) { return arg }
+        if arg.allSatisfy({ $0.isLetter }) { return arg }
+        if isSingleParenGroup(arg) { return arg }
+        return "(\(arg))"
+    }
+
+    /// Whether the string is one parenthesised group — `(1+2)` is, `(1)+(2)`
+    /// only looks like one from its two ends. A root sign in front comes along,
+    /// so `√(9)` over 2 stays `√(9)/2` rather than gaining a second pair.
+    static func isSingleParenGroup(_ arg: String) -> Bool {
+        var arg = arg
+        if arg.hasPrefix("√") { arg = String(arg.dropFirst()) }
+        guard arg.hasPrefix("("), arg.hasSuffix(")") else { return false }
+        let chars = Array(arg)
+        var depth = 0
+        for i in 0..<chars.count {
+            if chars[i] == "(" { depth += 1 }
+            else if chars[i] == ")" {
+                depth -= 1
+                if depth == 0 { return i == chars.count - 1 }
+            }
+        }
+        return false
+    }
+
+    static func scriptText(_ arg: String, digits: [Character: Character], marker: String) -> String {
+        if arg.isEmpty { return "\(marker)\(emptySlot)" }
+        var lifted = ""
+        var allDigits = true
+        for ch in arg {
+            if let mapped = digits[ch] {
+                lifted.append(mapped)
+            } else {
+                allDigits = false
+                break
+            }
+        }
+        if allDigits { return lifted }
+        if arg.count == 1 { return "\(marker)\(arg)" }
+        return "\(marker)(\(arg))"
     }
 
     // Finds `command{ARG}` and replaces with `wrap(ARG)`. ARG cannot contain
