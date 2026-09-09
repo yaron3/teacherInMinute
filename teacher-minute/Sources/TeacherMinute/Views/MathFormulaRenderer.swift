@@ -11,9 +11,13 @@ import SwiftUI
 struct MathFormulaView: View {
     let latex: String
     var displayMode: Bool = true
+    /// Space the renderer keeps to the left and right of the formula. Zero lets
+    /// a caller line the formula up with text of its own that sits above or
+    /// below it, which a list row needs and a chat bubble does not.
+    var horizontalInset: CGFloat = 8
 
     var body: some View {
-        MathFormulaRenderer(latex: latex, displayMode: displayMode)
+        MathFormulaRenderer(latex: latex, displayMode: displayMode, horizontalInset: horizontalInset)
             .environment(\.layoutDirection, .leftToRight)
     }
 }
@@ -24,6 +28,7 @@ import WebKit
 struct MathFormulaRenderer: View {
     let latex: String
     let displayMode: Bool
+    var horizontalInset: CGFloat = 8
     @Environment(\.colorScheme) var colorScheme
 
     private static let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
@@ -32,7 +37,7 @@ struct MathFormulaRenderer: View {
         if Self.isPreview {
             plainTextFallback
         } else {
-            KaTeXWebView(latex: latex, displayMode: displayMode, colorScheme: colorScheme)
+            KaTeXWebView(latex: latex, displayMode: displayMode, colorScheme: colorScheme, horizontalInset: horizontalInset)
         }
     }
 
@@ -43,7 +48,7 @@ struct MathFormulaRenderer: View {
             Text(display.isEmpty ? "Empty equation" : display)
                 .font(.system(size: 16))
                 .foregroundStyle(display.isEmpty ? theme.secondaryText : theme.primaryText)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, horizontalInset)
                 .padding(.vertical, 8)
         }
     }
@@ -53,6 +58,7 @@ struct KaTeXWebView: UIViewRepresentable {
     let latex: String
     let displayMode: Bool
     let colorScheme: ColorScheme
+    var horizontalInset: CGFloat = 8
 
     class Coordinator {
         var loadedKey: String = ""
@@ -98,7 +104,7 @@ struct KaTeXWebView: UIViewRepresentable {
                        font-family:-apple-system,Helvetica,Arial,sans-serif;
                        direction:ltr; text-align:left; unicode-bidi:embed; }
           body { display:flex; align-items:center; justify-content:flex-start;
-                 min-height:0; padding:4px 8px; }
+                 min-height:0; padding:4px \(Int(horizontalInset))px; }
           #host { font-size: 16px; max-width:100%; overflow-x:auto; text-align:left; white-space:nowrap; }
           .katex { color:\(textColor); direction:ltr; }
           .placeholder { color:#9CA3AF; font-style:italic; }
@@ -128,6 +134,7 @@ struct KaTeXWebView: UIViewRepresentable {
 struct MathFormulaRenderer: View {
     let latex: String
     let displayMode: Bool
+    var horizontalInset: CGFloat = 8
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
@@ -137,7 +144,7 @@ struct MathFormulaRenderer: View {
             Text(display.isEmpty ? "Empty equation" : display)
                 .font(.system(size: 16))
                 .foregroundStyle(display.isEmpty ? theme.secondaryText : theme.primaryText)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, horizontalInset)
                 .padding(.vertical, 8)
         }
     }
@@ -194,27 +201,6 @@ enum LatexPlainText {
         s = collapseOneArg(s, command: "_", wrap: { scriptText($0, digits: subscriptDigits, marker: "_") })
 
         return s
-    }
-
-    /// A one-line, plain-text reading of a message that may carry `$$...$$`
-    /// formulas. For the places a formula is named rather than shown — a
-    /// history row, a page title — where drawing it properly would put a web
-    /// view in every row and stretch the row to the height of a fraction.
-    /// `Why is this wrong? $$5\frac{x^{2}}{2}$$` reads `Why is this wrong? 5x²/2`.
-    static func summary(_ text: String) -> String {
-        var s = text
-            .replacingOccurrences(of: "$$", with: " ")
-            .replacingOccurrences(of: "$", with: " ")
-        s = format(s)
-        // Only now that every command has become a symbol is a leftover `\n`
-        // certainly an escaped newline rather than the start of `\neq`.
-        s = s.replacingOccurrences(of: "\\n", with: " ")
-        s = s.replacingOccurrences(of: "\\t", with: " ")
-        s = s.replacingOccurrences(of: "\n", with: " ")
-        while s.contains("  ") {
-            s = s.replacingOccurrences(of: "  ", with: " ")
-        }
-        return s.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Stands in for a slot the student has not filled in yet, so an

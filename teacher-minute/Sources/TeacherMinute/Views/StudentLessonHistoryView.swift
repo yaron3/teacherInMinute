@@ -88,7 +88,10 @@ struct StudentLessonHistoryView: View {
                             .padding(.top, 20)
                     } else {
                         FlatCard(padding: 0, outlined: true) {
-                            VStack(spacing: 0) {
+                            // Lazy: a row draws its question, and a drawn
+                            // formula is a web view. Only the rows on screen
+                            // should be paying for one.
+                            LazyVStack(spacing: 0) {
                                 ForEach(viewModel.filteredLessons) { lesson in
                                     LessonHistoryRow(
                                         lesson: lesson,
@@ -195,11 +198,21 @@ struct LessonHistoryRow: View {
             )
 
             VStack(alignment: .leading, spacing: 3) {
-                // A flat reading, not the drawn formula: this list is built
-                // eagerly, and a rendered formula is a web view per row.
-                Text(LatexPlainText.summary(lesson.title))
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(theme.primaryText)
+                // Drawn, not flattened: a lesson asked as a fraction is
+                // recognised by its shape. Inline-sized and given a fixed
+                // height so every row in the list is the same height, and the
+                // enclosing lists are lazy so only the visible rows build one.
+                FormulaAwareText(
+                    text: lesson.title,
+                    textColor: theme.primaryText,
+                    font: .system(size: 16, weight: .bold),
+                    formulaMinWidth: 120,
+                    formulaMaxWidth: 220,
+                    lineLimit: 1,
+                    displayMode: false,
+                    formulaHeight: 44,
+                    formulaInset: 0
+                )
 
                 Text(isLoading ? LocalizationSupport.localized("Loading session details") : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
                     .font(.system(size: 13))

@@ -63,7 +63,9 @@ struct TeacherLessonHistoryView: View {
                             .padding(.top, 20)
                     } else {
                         FlatCard(padding: 0, outlined: true) {
-                            VStack(spacing: 0) {
+                            // Lazy for the same reason as the student's list:
+                            // the row draws the question's formula.
+                            LazyVStack(spacing: 0) {
                                 ForEach(viewModel.filteredLessons) { lesson in
                                     LessonHistoryRow(
                                         lesson: lesson,
