@@ -266,8 +266,15 @@ final class HistoryModel {
     /// backend-supplied history (see `FunctionsService.teacherEarningsSummary`)
     /// so a lesson is titled the same however it reached the screen.
     static func lessonTitle(questionText: String, photoUrls: [String], topic: String) -> String {
+        // The question can hold a formula the student built with the algebra
+        // keyboard. A row title is one line of plain text, so the LaTeX is read
+        // out compactly — `$$5\frac{x^{2}}{2}$$` becomes `5x²/2` — rather than
+        // printed as markup, which is what a lesson was titled before.
         if !questionText.isEmpty {
-            return questionText
+            let readable = LatexPlainText.summary(questionText)
+            if !readable.isEmpty {
+                return readable
+            }
         }
         if !photoUrls.isEmpty {
             return LocalizationSupport.localized("Image")

@@ -196,6 +196,27 @@ enum LatexPlainText {
         return s
     }
 
+    /// A one-line, plain-text reading of a message that may carry `$$...$$`
+    /// formulas. For the places a formula is named rather than shown — a
+    /// history row, a page title — where drawing it properly would put a web
+    /// view in every row and stretch the row to the height of a fraction.
+    /// `Why is this wrong? $$5\frac{x^{2}}{2}$$` reads `Why is this wrong? 5x²/2`.
+    static func summary(_ text: String) -> String {
+        var s = text
+            .replacingOccurrences(of: "$$", with: " ")
+            .replacingOccurrences(of: "$", with: " ")
+        s = format(s)
+        // Only now that every command has become a symbol is a leftover `\n`
+        // certainly an escaped newline rather than the start of `\neq`.
+        s = s.replacingOccurrences(of: "\\n", with: " ")
+        s = s.replacingOccurrences(of: "\\t", with: " ")
+        s = s.replacingOccurrences(of: "\n", with: " ")
+        while s.contains("  ") {
+            s = s.replacingOccurrences(of: "  ", with: " ")
+        }
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Stands in for a slot the student has not filled in yet, so an
     /// unfinished fraction reads as `3/□` rather than trailing off into `3/`.
     static let emptySlot = "□"
