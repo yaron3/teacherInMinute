@@ -3,7 +3,9 @@
 //  teacher-minute
 //
 //  Cross-platform abstraction for rendering LaTeX. On iOS we host a
-//  WKWebView with KaTeX. On other platforms we fall back to the raw string.
+//  WKWebView running the copy of KaTeX bundled in `KaTeX/` — no network, so a
+//  formula draws at once and keeps drawing offline. On other platforms, and if
+//  that bundle ever goes missing, we fall back to a plain-text reading.
 //
 
 import SwiftUI
@@ -34,7 +36,7 @@ struct MathFormulaRenderer: View {
     private static let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
 
     var body: some View {
-        if Self.isPreview {
+        if Self.isPreview || KaTeXWebView.shellURL == nil {
             plainTextFallback
         } else {
             KaTeXWebView(latex: latex, displayMode: displayMode, colorScheme: colorScheme, horizontalInset: horizontalInset)
@@ -60,74 +62,76 @@ struct KaTeXWebView: UIViewRepresentable {
     let colorScheme: ColorScheme
     var horizontalInset: CGFloat = 8
 
-    class Coordinator {
-        var loadedKey: String = ""
+    /// KaTeX and the page that hosts it ship inside the app, so a formula
+    /// draws immediately and keeps drawing with no network. Fetching them from
+    /// a CDN meant every formula on screen showed as bare LaTeX until the
+    /// script arrived, and stayed that way offline.
+    static let shellURL: URL? = Bundle.module.url(forResource: "index", withExtension: "html", subdirectory: "KaTeX")
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        /// What the page is currently showing, so an unchanged formula is not
+        /// drawn twice.
+        var renderedKey: String = ""
+        var isLoaded = false
+        /// A render asked for before the page finished loading, run on arrival.
+        var pendingScript: String?
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            isLoaded = true
+            if let script = pendingScript {
+                pendingScript = nil
+                webView.evaluateJavaScript(script)
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView(frame: .zero)
+        webView.navigationDelegate = context.coordinator
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
         webView.scrollView.isScrollEnabled = true
         webView.scrollView.showsHorizontalScrollIndicator = false
         webView.scrollView.showsVerticalScrollIndicator = false
+        if let shell = Self.shellURL {
+            webView.loadFileURL(shell, allowingReadAccessTo: shell.deletingLastPathComponent())
+        }
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        let key = "\(colorScheme == .dark ? "d" : "l")|\(displayMode ? "1" : "0")|\(latex)"
-        guard context.coordinator.loadedKey != key else { return }
-        context.coordinator.loadedKey = key
+        let key = "\(colorScheme == .dark ? "d" : "l")|\(displayMode ? "1" : "0")|\(Int(horizontalInset))|\(latex)"
+        guard context.coordinator.renderedKey != key else { return }
+        context.coordinator.renderedKey = key
         webView.overrideUserInterfaceStyle = colorScheme == .dark ? .dark : .light
-        webView.loadHTMLString(html(for: latex), baseURL: URL(string: "https://cdn.jsdelivr.net"))
+
+        // The page stays put and is asked to draw the new formula, rather than
+        // being replaced by a fresh document that has to parse KaTeX again.
+        let script = renderScript()
+        if context.coordinator.isLoaded {
+            webView.evaluateJavaScript(script)
+        } else {
+            context.coordinator.pendingScript = script
+        }
     }
 
-    func html(for latex: String) -> String {
-        let escaped = latex
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-            .replacingOccurrences(of: "</", with: "<\\/")
+    func renderScript() -> String {
         let textColor = colorScheme == .dark ? "#F3F4F6" : "#111827"
-        let bgColor = "transparent"
-        let displayJS = displayMode ? "true" : "false"
-        return """
-        <!doctype html>
-        <html dir="ltr" lang="en"><head><meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
-        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-        <style>
-          html, body { margin:0; padding:0; background:\(bgColor); color:\(textColor);
-                       font-family:-apple-system,Helvetica,Arial,sans-serif;
-                       direction:ltr; text-align:left; unicode-bidi:embed; }
-          body { display:flex; align-items:center; justify-content:flex-start;
-                 min-height:0; padding:4px \(Int(horizontalInset))px; }
-          #host { font-size: 16px; max-width:100%; overflow-x:auto; text-align:left; white-space:nowrap; }
-          .katex { color:\(textColor); direction:ltr; }
-          .placeholder { color:#9CA3AF; font-style:italic; }
-        </style></head>
-        <body dir="ltr">
-        <div id="host" dir="ltr"><span class="placeholder">Empty equation</span></div>
-        <script>
-          window.addEventListener('load', function(){
-            try {
-              var src = `\(escaped)`;
-              if (src && src.trim().length > 0) {
-                katex.render(src, document.getElementById('host'), {
-                  throwOnError: false,
-                  displayMode: \(displayJS)
-                });
-              }
-            } catch (e) {
-              document.getElementById('host').innerText = String(e);
-            }
-          });
-        </script>
-        </body></html>
-        """
+        return "window.renderFormula(\(Self.javaScriptString(latex)), \(displayMode), \(Self.javaScriptString(textColor)), \(Int(horizontalInset)));"
+    }
+
+    /// The formula as a JavaScript string literal. LaTeX is all backslashes and
+    /// braces, so it is quoted by the JSON encoder rather than by hand.
+    static func javaScriptString(_ value: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
+              let json = String(data: data, encoding: .utf8),
+              json.count >= 2 else {
+            return "\"\""
+        }
+        return String(json.dropFirst().dropLast())
     }
 }
 #else
