@@ -93,10 +93,7 @@ struct ChatBubble: View {
   }
 
   static func readableText(_ text: String) -> String {
-    var readable = text
-      .replacingOccurrences(of: "\\n", with: "\n")
-      .replacingOccurrences(of: "\\t", with: "  ")
-      .replacingOccurrences(of: "\r\n", with: "\n")
+    var readable = unescapingOutsideFormulas(text)
       .trimmingCharacters(in: .whitespacesAndNewlines)
 
     while readable.contains("\n\n\n") {
@@ -104,6 +101,44 @@ struct ChatBubble: View {
     }
 
     return readable
+  }
+
+  /// Turns the escape sequences a backend may have serialised into real
+  /// whitespace, but only in the prose between formulas.
+  ///
+  /// `\times` and `\neq` are LaTeX commands, not an escaped tab and an escaped
+  /// newline. Unescaping the whole string ate their first letter and rendered
+  /// `6\times0.5` as `6  imes0.5`, so what is inside `$...$` is left alone.
+  static func unescapingOutsideFormulas(_ text: String) -> String {
+    var out = ""
+    var rest = text[...]
+
+    while let dollar = rest.firstIndex(of: "$") {
+      out += unescaped(String(rest[..<dollar]))
+
+      let isDisplay = rest[rest.index(after: dollar)...].first == "$"
+      let delimiter = isDisplay ? "$$" : "$"
+      let contentStart = rest.index(dollar, offsetBy: delimiter.count)
+      guard let close = rest[contentStart...].range(of: delimiter)?.lowerBound else {
+        // An unclosed delimiter: the rest is not a formula, so it unescapes
+        // like any other prose.
+        out += unescaped(String(rest[dollar...]))
+        return out
+      }
+
+      let end = rest.index(close, offsetBy: delimiter.count)
+      out += String(rest[dollar..<end])
+      rest = rest[end...]
+    }
+
+    return out + unescaped(String(rest))
+  }
+
+  private static func unescaped(_ text: String) -> String {
+    text
+      .replacingOccurrences(of: "\\n", with: "\n")
+      .replacingOccurrences(of: "\\t", with: "  ")
+      .replacingOccurrences(of: "\r\n", with: "\n")
   }
 
   static func containsFormula(_ text: String) -> Bool {
