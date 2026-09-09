@@ -84,7 +84,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
 
     private static let hebrewFallbacks: [String: String] = [
         // Backing out of the first onboarding step, which signs the user out.
-        "Sign out?": "להתנתק?",
+        "Log out?": "להתנתק?",
         "Going back from here returns you to the sign-in screen and signs you out.": "חזרה מכאן תחזיר אותך למסך ההתחברות ותנתק אותך מהחשבון.",
         // Teacher dashboard and lesson history. The Remote Config template has
         // no entries for these yet, so the fallback is what actually renders.

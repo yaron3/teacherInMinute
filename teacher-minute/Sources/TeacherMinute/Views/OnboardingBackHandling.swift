@@ -100,8 +100,15 @@ struct OnboardingBackHandlingModifier: ViewModifier {
                         Button {
                             handleBack()
                         } label: {
+                            // "chevron.left", not "chevron.backward": the
+                            // Android icon table knows the former and falls
+                            // back to a filled dot for the latter. It renders
+                            // the same way round as every other chevron in the
+                            // app — PlatformIcon's right-to-left mirroring does
+                            // not fire on Android, which is app-wide and not
+                            // this screen's to special-case.
                             PlatformIcon(
-                                systemName: "chevron.backward",
+                                systemName: "chevron.left",
                                 size: 17,
                                 weight: .semibold,
                                 color: theme.primaryText
@@ -112,12 +119,12 @@ struct OnboardingBackHandlingModifier: ViewModifier {
                 }
             }
             .appDialog(
-                LocalizationSupport.localized("Sign out?"),
+                LocalizationSupport.localized("Log out?"),
                 isPresented: $isConfirmingSignOut,
                 message: LocalizationSupport.localized("Going back from here returns you to the sign-in screen and signs you out."),
                 actions: [
                     AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel),
-                    AppDialogAction(LocalizationSupport.localized("Sign Out"), kind: .destructive) {
+                    AppDialogAction(LocalizationSupport.localized("Log Out"), kind: .destructive) {
                         signOutAndReturnToSignIn()
                     }
                 ]

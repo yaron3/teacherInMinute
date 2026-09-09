@@ -250,6 +250,16 @@ extension TeacherDashboardViewModeling {
 
   var readinessChecklistHeader: String { LocalizationSupport.localized("Readiness Checklist") }
 
+  // The same three steps the teacher was shown when they picked the role, kept
+  // on the same English keys so they translate identically in both places.
+  var howItWorksTitle: String { LocalizationSupport.localized("How it works") }
+  var howItWorksStep1Title: String { LocalizationSupport.localized("Complete your profile") }
+  var howItWorksStep1Subtitle: String { LocalizationSupport.localized("Add your subjects, bio, and verification documents") }
+  var howItWorksStep2Title: String { LocalizationSupport.localized("A student requests help") }
+  var howItWorksStep2Subtitle: String { LocalizationSupport.localized("Get matched to students who need your subject") }
+  var howItWorksStep3Title: String { LocalizationSupport.localized("Teach live") }
+  var howItWorksStep3Subtitle: String { LocalizationSupport.localized("Chat, whiteboard, voice messages – real time") }
+
   var micChecklistTitle: String {
     hasMicAccess
       ? LocalizationSupport.localized("Microphone Enabled")

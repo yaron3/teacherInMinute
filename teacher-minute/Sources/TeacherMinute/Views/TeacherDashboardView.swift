@@ -121,6 +121,9 @@ struct TeacherDashboardView: View {
 
 			  readinessChecklist
 				.padding(.top, 28)
+
+			  howItWorksSection
+				.padding(.top, 28)
 			}
 		  }
 		  .padding(.horizontal, 20)
@@ -552,6 +555,21 @@ struct TeacherDashboardView: View {
 	  }
 	}
 	.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+  }
+
+  /// The same panel the teacher saw when they chose the role. It answers "what
+  /// happens next" for a teacher who has signed up but not taught yet, which is
+  /// exactly who is looking at this screen.
+  var howItWorksSection: some View {
+	HowItWorksPanel(
+	  title: viewModel.howItWorksTitle,
+	  steps: [
+		HowItWorksStep(number: 1, title: viewModel.howItWorksStep1Title, subtitle: viewModel.howItWorksStep1Subtitle, tint: theme.info),
+		HowItWorksStep(number: 2, title: viewModel.howItWorksStep2Title, subtitle: viewModel.howItWorksStep2Subtitle, tint: theme.warning),
+		HowItWorksStep(number: 3, title: viewModel.howItWorksStep3Title, subtitle: viewModel.howItWorksStep3Subtitle, tint: theme.penGreen),
+	  ],
+	  theme: theme
+	)
   }
 
   var readinessChecklist: some View {

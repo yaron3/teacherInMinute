@@ -22,7 +22,13 @@ struct ChooseRoleView: View {
   }
 
   var body: some View {
+    // The role cards and the teacher's "How it works" panel together outgrow a
+    // short screen, and the panel is the part that explains what the teacher is
+    // signing up for — so the content scrolls and Continue stays pinned below
+    // it rather than being pushed off the bottom.
     VStack(alignment: .leading, spacing: 0) {
+      ScrollView(.vertical, showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 0) {
 
       Text(LocalizationSupport.localized("Choose your role"))
         .font(.system(size: 15))
@@ -74,7 +80,10 @@ struct ChooseRoleView: View {
 		  .padding(.top,12)
 		
 	  }
-      Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 20)
+      }
 
       AuthPrimaryButton(title: LocalizationSupport.localized("Continue")) {
         Task { @MainActor in
