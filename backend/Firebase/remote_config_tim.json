@@ -8655,11 +8655,11 @@
     },
     "get_paid_for": {
       "defaultValue": {
-        "value": "Get paid for the time you taught."
+        "value": "Get paid for the time you taught"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "מקבלים תשלום על הזמן שלימדתם."
+          "value": "מקבלים תשלום על הזמן שלימדתם"
         }
       },
       "valueType": "STRING"

@@ -43,13 +43,15 @@ final class ChooseRoleViewModel {
                 subtitle: LocalizationSupport.localized("Chat, whiteboard, voice messages – real time")
             ),
 			HowItWorksStep(
-			  title: LocalizationSupport.localized("Get paid for the time you taught."),
-			  // The live rate when Remote Config has one, and a rate-free
-			  // reassurance when it does not.
+			  title: LocalizationSupport.localized("Get paid for the time you taught"),
 			  subtitle: LocalizationSupport.localized("Paid once a month")
 			),
         ]
     }
+  
+  var teacherIdentityOnBorading: Bool {
+	RemoteConfigService.shared.getBool("teacher_identity_onboarding")
+  }
 
     func continueFlow() {
         let role = String(describing: selectedRole)

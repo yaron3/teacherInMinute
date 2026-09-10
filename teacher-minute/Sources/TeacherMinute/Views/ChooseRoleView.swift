@@ -127,7 +127,7 @@ struct ChooseRoleView: View {
   }
 
   private func continueWithSelectedRole() {
-    if viewModel.selectedRole == .teacher {
+	if viewModel.selectedRole == .teacher  && viewModel.teacherIdentityOnBorading{
       router.push(.teacherIdentityVerification)
     } else {
       router.push(.completeProfile(role: viewModel.selectedRole))
