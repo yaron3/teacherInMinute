@@ -37,7 +37,7 @@ struct WelcomeView: View {
             .lineSpacing(-4)
             .padding(.top, 12)
           
-          Image("LaunchIcon")
+          Image("sqaure-logo")
             .resizable()
             .scaledToFit()
             .padding(.top, 6)
