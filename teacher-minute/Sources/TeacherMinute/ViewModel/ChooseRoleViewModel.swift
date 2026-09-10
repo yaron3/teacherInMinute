@@ -49,8 +49,8 @@ final class ChooseRoleViewModel {
         ]
     }
   
-  var teacherIdentityOnBorading: Bool {
-	RemoteConfigService.shared.getBool("teacher_identity_Onboarding", default: false)
+  var teacherIdentityOnBoarding: Bool {
+	RemoteConfigService.shared.getBool("teacher_identity_onboarding", default: false)
   }
 
     func continueFlow() {

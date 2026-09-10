@@ -8675,7 +8675,7 @@
       },
       "valueType": "STRING"
     },
-    "teacher_identity_Onboarding": {
+    "teacher_identity_onboarding": {
       "defaultValue": {
         "value": "false"
       },
