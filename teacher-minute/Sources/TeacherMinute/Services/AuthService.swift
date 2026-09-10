@@ -252,10 +252,64 @@ final class AuthService {
   }
 }
 
+#if os(Android)
+/// Recovers a user-visible reason from an Android Firebase Auth failure.
+///
+/// The numeric codes below exist only on iOS. Android's SDK reports failures
+/// as Kotlin exceptions and skip-firebase forwards them untouched for the
+/// email/password calls, so by the time one reaches Swift it is a
+/// `SwiftJNI.ThrowableError` whose `NSError` code is always 1 — which is why
+/// every Android auth failure used to fall through to the generic message.
+///
+/// What does survive is the throwable's `toString()`, which leads with the
+/// exception's fully-qualified class name:
+///
+///     com.google.firebase.auth.FirebaseAuthUserCollisionException: The email
+///     address is already in use by another account.
+///
+/// The class name is what gets matched. The sentence after it is English text
+/// straight from the SDK and is free to change between releases.
+private func androidAuthErrorMessage(_ error: Error) -> String? {
+    let throwable = String(describing: error)
+    func raised(_ exceptionName: String) -> Bool {
+        throwable.contains("com.google.firebase.auth.\(exceptionName)")
+            || throwable.contains("com.google.firebase.\(exceptionName)")
+    }
+
+    // A weak password arrives as a subclass of the invalid-credentials
+    // exception, so it has to be recognised before its parent.
+    if raised("FirebaseAuthWeakPasswordException") {
+        return LocalizationSupport.localized("Password must be at least 6 characters.")
+    }
+    // Covers both a taken address on sign-up and an account that already
+    // exists under a different provider; Firebase does not separate them here.
+    if raised("FirebaseAuthUserCollisionException") {
+        return LocalizationSupport.localized("This email address is already in use.")
+    }
+    // Android folds a malformed address and a wrong password into one
+    // exception, so this says what is true of both.
+    if raised("FirebaseAuthInvalidCredentialsException") || raised("FirebaseAuthInvalidUserException") {
+        return LocalizationSupport.localized("Incorrect email or password.")
+    }
+    if raised("FirebaseTooManyRequestsException") {
+        return LocalizationSupport.localized("Too many failed attempts. Please try again later.")
+    }
+    if raised("FirebaseNetworkException") {
+        return LocalizationSupport.localized("A network error occurred. Please try again.")
+    }
+    return nil
+}
+#endif
+
 /// Maps a Firebase Auth error code to a localized, user-visible message.
 /// Firebase's `localizedDescription` always returns English strings from the SDK;
 /// this function translates the numeric code into a key that LocalizationSupport can look up.
 func localizedAuthErrorMessage(_ error: Error) -> String {
+#if os(Android)
+    if let message = androidAuthErrorMessage(error) {
+        return message
+    }
+#endif
     switch (error as NSError).code {
     case 17007: return LocalizationSupport.localized("This email address is already in use.")
     case 17008: return LocalizationSupport.localized("Please enter a valid email address.")
