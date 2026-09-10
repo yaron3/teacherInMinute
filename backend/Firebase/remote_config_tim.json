@@ -8674,6 +8674,12 @@
         }
       },
       "valueType": "STRING"
+    },
+    "teacher_identity_Onboarding": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN"
     }
   },
   "version": {
