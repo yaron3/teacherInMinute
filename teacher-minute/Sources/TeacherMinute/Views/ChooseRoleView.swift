@@ -63,12 +63,7 @@ struct ChooseRoleView: View {
 	  if viewModel.selectedRole == .teacher {
 		  HowItWorksPanel(
 			title: viewModel.howItWorksTeacherTitle,
-			steps: [
-			  HowItWorksStep(number: 1, title: viewModel.howItWorksTeacherStep1Title, subtitle: viewModel.howItWorksStep1Subtitle, tint: theme.info),
-			  HowItWorksStep(number: 2, title: viewModel.connectTeacherStepTitle, subtitle: viewModel.howItWorksStep2Subtitle, tint: theme.warning),
-			  HowItWorksStep(number: 3, title: viewModel.howItWorksTeacherStep3Title, subtitle: viewModel.howItWorksStep3Subtitle, tint: theme.penGreen),
-
-			],
+			steps: viewModel.howItWorksTeacherSteps,
 			theme: theme
 		  )
 		  .padding(.top,12)

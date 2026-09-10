@@ -563,11 +563,7 @@ struct TeacherDashboardView: View {
   var howItWorksSection: some View {
 	HowItWorksPanel(
 	  title: viewModel.howItWorksTitle,
-	  steps: [
-		HowItWorksStep(number: 1, title: viewModel.howItWorksStep1Title, subtitle: viewModel.howItWorksStep1Subtitle, tint: theme.info),
-		HowItWorksStep(number: 2, title: viewModel.howItWorksStep2Title, subtitle: viewModel.howItWorksStep2Subtitle, tint: theme.warning),
-		HowItWorksStep(number: 3, title: viewModel.howItWorksStep3Title, subtitle: viewModel.howItWorksStep3Subtitle, tint: theme.penGreen),
-	  ],
+	  steps: viewModel.howItWorksSteps,
 	  theme: theme
 	)
   }

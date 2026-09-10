@@ -7,17 +7,17 @@
 
 import SwiftUI
 
-struct HowItWorksStep {
-  let number: Int
-  let title: String
-  let subtitle: String
-  let tint: Color
-}
-
 struct HowItWorksPanel: View {
   let title: String
   let steps: [HowItWorksStep]
   let theme: AppTheme
+
+  /// Accent per position. Every panel walks this same sequence and the
+  /// shorter ones stop early, so the student's four steps and the teacher's
+  /// three stay in step with each other.
+  private var tints: [Color] {
+    [theme.info, theme.warning, theme.penGreen, theme.positive]
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 22) {
@@ -27,8 +27,8 @@ struct HowItWorksPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
 
       VStack(spacing: 24) {
-        ForEach(steps, id: \.number) { step in
-          howItWorksStep(step)
+        ForEach(0..<steps.count, id: \.self) { index in
+          howItWorksStep(steps[index], number: index + 1, tint: tints[index % tints.count])
         }
       }
     }
@@ -37,15 +37,15 @@ struct HowItWorksPanel: View {
     .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
   }
 
-  private func howItWorksStep(_ step: HowItWorksStep) -> some View {
+  private func howItWorksStep(_ step: HowItWorksStep, number: Int, tint: Color) -> some View {
     HStack(alignment: .top, spacing: 16) {
       Circle()
-        .stroke(step.tint, lineWidth: 3)
+        .stroke(tint, lineWidth: 3)
         .frame(width: 46, height: 46)
         .overlay {
-          Text("\(step.number)")
+          Text("\(number)")
             .font(.system(size: 18, weight: .bold))
-            .foregroundStyle(step.tint)
+            .foregroundStyle(tint)
         }
 
       VStack(alignment: .leading, spacing: 6) {

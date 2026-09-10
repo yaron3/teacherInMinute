@@ -261,12 +261,29 @@ extension TeacherDashboardViewModeling {
   // The same three steps the teacher was shown when they picked the role, kept
   // on the same English keys so they translate identically in both places.
   var howItWorksTitle: String { LocalizationSupport.localized("How it works") }
-  var howItWorksStep1Title: String { LocalizationSupport.localized("Complete your profile") }
-  var howItWorksStep1Subtitle: String { LocalizationSupport.localized("Add your subjects, bio, and verification documents") }
-  var howItWorksStep2Title: String { LocalizationSupport.localized("A student requests help") }
-  var howItWorksStep2Subtitle: String { LocalizationSupport.localized("Get matched to students who need your subject") }
-  var howItWorksStep3Title: String { LocalizationSupport.localized("Teach live") }
-  var howItWorksStep3Subtitle: String { LocalizationSupport.localized("Chat, whiteboard, voice messages – real time") }
+  /// The panel's steps in order; the view renders whatever is in the array.
+  var howItWorksSteps: [HowItWorksStep] {
+    [
+      HowItWorksStep(
+        title: LocalizationSupport.localized("Complete your profile"),
+        subtitle: LocalizationSupport.localized("Add your subjects, bio, and verification documents")
+      ),
+      HowItWorksStep(
+        title: LocalizationSupport.localized("A student requests help"),
+        subtitle: LocalizationSupport.localized("Get matched to students who need your subject")
+      ),
+      HowItWorksStep(
+        title: LocalizationSupport.localized("Teach live"),
+        subtitle: LocalizationSupport.localized("Chat, whiteboard, voice messages – real time")
+      ),
+	  HowItWorksStep(
+		title: LocalizationSupport.localized("Get paid for the time you taught."),
+		// The live rate when Remote Config has one, and a rate-free
+		// reassurance when it does not.
+		subtitle: LocalizationSupport.localized("Paid once a month")
+	  ),
+    ]
+  }
 
   var micChecklistTitle: String {
     hasMicAccess

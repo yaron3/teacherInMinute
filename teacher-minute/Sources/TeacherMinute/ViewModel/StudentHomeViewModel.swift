@@ -252,13 +252,32 @@ extension StudentHomeViewModeling {
 
   // MARK: How it works
   var howItWorksTitle: String { LocalizationSupport.localized("How it works") }
-  var howItWorksStep1Title: String { LocalizationSupport.localized("Ask a question") }
-  var howItWorksStep1Subtitle: String { LocalizationSupport.localized("Describe the problem – text, image, or whiteboard drawing") }
-  var howItWorksStep2Subtitle: String { LocalizationSupport.localized("The system finds an available teacher for your subject") }
-  var howItWorksStep3Title: String { LocalizationSupport.localized("Live lesson") }
-  var howItWorksStep3Subtitle: String { LocalizationSupport.localized("Chat, whiteboard, voice messages – real time") }
-  var howItWorksStep4Title: String { LocalizationSupport.localized("Pay only for what you used") }
-  var howItWorksStep4SubtitleFallback: String { LocalizationSupport.localized("Only billed minutes count") }
+  /// The panel's steps in order. The view renders whatever is in the array,
+  /// so a step is added or reworded here rather than in two places.
+  var howItWorksSteps: [HowItWorksStep] {
+    [
+      HowItWorksStep(
+        title: LocalizationSupport.localized("Ask a question"),
+        subtitle: LocalizationSupport.localized("Describe the problem – text, image, or whiteboard drawing")
+      ),
+      HowItWorksStep(
+        title: connectStepTitle,
+        subtitle: LocalizationSupport.localized("The system finds an available teacher for your subject")
+      ),
+      HowItWorksStep(
+        title: LocalizationSupport.localized("Live lesson"),
+        subtitle: LocalizationSupport.localized("Chat, whiteboard, voice messages – real time")
+      ),
+      HowItWorksStep(
+        title: LocalizationSupport.localized("Pay only for what you used"),
+        // The live rate when Remote Config has one, and a rate-free
+        // reassurance when it does not.
+        subtitle: pricePerMinuteText.isEmpty
+          ? LocalizationSupport.localized("Only billed minutes count")
+          : pricePerMinuteText
+      ),
+    ]
+  }
 
   // MARK: Stats strip
   var timeLearnedTitle: String { LocalizationSupport.localized("Time Learned") }

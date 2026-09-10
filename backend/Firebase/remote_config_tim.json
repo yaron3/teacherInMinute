@@ -8652,6 +8652,28 @@
         }
       },
       "valueType": "STRING"
+    },
+    "get_paid_for": {
+      "defaultValue": {
+        "value": "Get paid for the time you taught."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מקבלים תשלום על הזמן שלימדתם."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "paid_once_month": {
+      "defaultValue": {
+        "value": "Paid once a month"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התשלום מועבר אחת לחודש"
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

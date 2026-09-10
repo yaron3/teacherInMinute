@@ -556,12 +556,7 @@ struct StudentHomeView: View {
   var howItWorksPanel: some View {
     HowItWorksPanel(
       title: viewModel.howItWorksTitle,
-      steps: [
-        HowItWorksStep(number: 1, title: viewModel.howItWorksStep1Title, subtitle: viewModel.howItWorksStep1Subtitle, tint: theme.info),
-        HowItWorksStep(number: 2, title: viewModel.connectStepTitle, subtitle: viewModel.howItWorksStep2Subtitle, tint: theme.warning),
-        HowItWorksStep(number: 3, title: viewModel.howItWorksStep3Title, subtitle: viewModel.howItWorksStep3Subtitle, tint: theme.penGreen),
-        HowItWorksStep(number: 4, title: viewModel.howItWorksStep4Title, subtitle: viewModel.pricePerMinuteText.isEmpty ? viewModel.howItWorksStep4SubtitleFallback : viewModel.pricePerMinuteText, tint: theme.positive),
-      ],
+      steps: viewModel.howItWorksSteps,
       theme: theme
     )
   }
