@@ -6,6 +6,14 @@ import SkipBridge
 import FirebaseDatabase
 #endif
 
+/// Is anyone available to take a question right now?
+///
+/// Reads the public `onlineTeachers` projection, not `teachers`. `teachers` is
+/// owner-only under the database rules, so a student asking that node was
+/// always denied — the read failed, the catch assumed availability, and the
+/// check cost a round trip on the ask path without ever answering anything.
+/// The projection holds only teachers who are online, so its emptiness *is*
+/// the answer, and it is a fraction of the size.
 @MainActor
 enum TeacherAvailabilityStore {
   static func hasOnlineTeacher() async -> Bool {
@@ -19,18 +27,10 @@ enum TeacherAvailabilityStore {
       return true
     }
 #else
-    let ref = FirebaseDatabase.Database.database().reference(withPath: "teachers")
+    let ref = FirebaseDatabase.Database.database().reference(withPath: "onlineTeachers")
     return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
       ref.observeSingleEvent(of: .value) { snapshot in
-        for case let child as DataSnapshot in snapshot.children {
-          if let dict = child.value as? [String: Any],
-             let status = dict["status"] as? String,
-             status == "online" {
-            cont.resume(returning: true)
-            return
-          }
-        }
-        cont.resume(returning: false)
+        cont.resume(returning: snapshot.hasChildren())
       } withCancel: { error in
         logger.error("[TeacherAvailability] iOS check failed: \(error); assuming available")
         cont.resume(returning: true)

@@ -6,6 +6,15 @@ import { PayoutMethod } from "./payoutMethod";
 // Per-minute pricing now lives in Remote Config (see pricing.ts); these
 // constants remain only for dispatch sizing and connection-fee fallback.
 
+// A Cloud Functions instance gets CPU in proportion to its memory, and the
+// question path is almost entirely cold-start cost: at the 256MiB default,
+// loading the module graph took ~4.4s before a single line of a handler ran.
+// The extra memory buys ~3.5x the CPU, which is the only lever on cold starts
+// short of paying for warm instances. It is close to free — these handlers
+// finish in well under a second, and billing is memory x duration, so the
+// shorter run largely pays for the bigger box.
+export const HOT_PATH = { memory: "1GiB" as const };
+
 export const WAVE_SIZES = [3, 5, 10] as const;
 export const WAVE_TIMEOUT_SECONDS = 12;
 export const INVITE_EXPIRY_SECONDS = 90;

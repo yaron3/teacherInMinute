@@ -501,6 +501,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #if os(Android)
 		  self?.androidInvitePollingTask?.cancel()
 		  self?.androidInvitePollingTask = nil
+		  AndroidInviteFetcher.stopListening()
 #else
 		  self?.inviteService?.stopListening()
 		  self?.inviteService = nil
@@ -764,28 +765,55 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   }
 
 #if os(Android)
+  /// How often the loop below reads the Kotlin listener's cache. This is a JNI
+  /// call into memory rather than a network round trip, so it can be frequent:
+  /// what it costs is nothing next to the second-plus a question used to spend
+  /// waiting for the next 2s fetch.
+  private static let androidInvitePollInterval: UInt64 = 250_000_000
+
   private func startAndroidInvitePolling(uid: String) {
 	androidInvitePollingTask?.cancel()
+	AndroidInviteFetcher.startListening(teacherId: uid)
 	androidInvitePollingTask = Task { [weak self] in
+	  var lastCount = -1
 	  while !Task.isCancelled {
-		do {
-		  let updated = try await AndroidInviteFetcher.fetchInvites(teacherId: uid)
+		switch AndroidInviteFetcher.liveInvites() {
+		case .ready(let updated):
 		  guard !Task.isCancelled else { return }
 		  self?.setInvites(updated)
-		  // This poll is how a question reaches an Android teacher, so its own
-		  // success and failure are the connection signal here — there is no
-		  // Swift-side database handle on this path to watch instead.
+		  // The listener is how a question reaches an Android teacher, so its
+		  // own health is the connection signal here — there is no Swift-side
+		  // database handle on this path to watch instead.
 		  self?.setServerConnection(true)
-		  logger.info("[VM] Android invite polling fetched count=\(updated.count) uid=\(uid)")
-		} catch {
-		  guard !Task.isCancelled else { return }
-		  self?.setServerConnection(false)
-		  self?.errorMessage = error.localizedDescription
-		  logger.error("[VM] Android invite polling failed — \(error.localizedDescription)")
-		  AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.androidInvitePolling")
+		  if updated.count != lastCount {
+			lastCount = updated.count
+			logger.info("[VM] Android invites changed count=\(updated.count) uid=\(uid)")
+		  }
+
+		case .pending, .failed:
+		  // The listener has not delivered, or was cancelled. Fall back to the
+		  // one-shot fetch so a teacher is never left without their questions
+		  // because a listener failed to attach.
+		  do {
+			let updated = try await AndroidInviteFetcher.fetchInvites(teacherId: uid)
+			guard !Task.isCancelled else { return }
+			self?.setInvites(updated)
+			self?.setServerConnection(true)
+			lastCount = updated.count
+			logger.info("[VM] Android invite fallback fetch count=\(updated.count) uid=\(uid)")
+		  } catch {
+			guard !Task.isCancelled else { return }
+			self?.setServerConnection(false)
+			self?.errorMessage = error.localizedDescription
+			logger.error("[VM] Android invite fallback fetch failed — \(error.localizedDescription)")
+			AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.androidInvitePolling")
+		  }
+		  // A fallback fetch is a round trip; don't hammer it at the cache's rate.
+		  try? await Task.sleep(nanoseconds: 2_000_000_000)
+		  continue
 		}
-		
-		try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+		try? await Task.sleep(nanoseconds: Self.androidInvitePollInterval)
 	  }
 	}
   }

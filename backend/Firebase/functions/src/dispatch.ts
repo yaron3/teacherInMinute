@@ -16,6 +16,7 @@ import {
   WAVE_TIMEOUT_SECONDS,
   INVITE_EXPIRY_SECONDS,
   ConversationType,
+  HOT_PATH,
 } from "./types";
 
 const db = admin.database();
@@ -77,8 +78,19 @@ async function archiveUnanswered(qid: string, alreadyInvited: string[]): Promise
   return true;
 }
 
-async function allTeachers(): Promise<Record<string, TeacherRecord>> {
-  const snap = await db.ref("teachers").once("value");
+/** Only the teachers who could actually take a question right now.
+ *
+ *  Filtered by RTDB rather than here: the node holds every teacher who has ever
+ *  signed up, and pulling all of them down to discard the offline ones cost
+ *  ~700ms on the dispatch path. Needs `.indexOn: ["status"]` on `teachers` in
+ *  database.rules.json — without it RTDB still answers, but scans the node
+ *  server-side and logs a warning. */
+async function onlineTeachers(): Promise<Record<string, TeacherRecord>> {
+  const snap = await db
+    .ref("teachers")
+    .orderByChild("status")
+    .equalTo("online")
+    .once("value");
   return (snap.val() as Record<string, TeacherRecord>) ?? {};
 }
 
@@ -88,21 +100,45 @@ async function sendWave(
   wave: number,
   exclude: Set<string>
 ): Promise<string[]> {
-  const teachers = await allTeachers();
+  const teachers = await onlineTeachers();
   const ranked = rankTeachers(teachers, questionData.topic, exclude);
   const waveSize = WAVE_SIZES[wave - 1];
   const batch = ranked.slice(0, waveSize);
 
   logger.info(
-    `[dispatch] sendWave prepared qid=${qid} wave=${wave} teacherPool=${Object.keys(teachers).length} excluded=${exclude.size} eligible=${ranked.length} selected=${batch.length}`
+    `[dispatch] sendWave prepared qid=${qid} wave=${wave} onlinePool=${Object.keys(teachers).length} excluded=${exclude.size} eligible=${ranked.length} selected=${batch.length}`
   );
 
   if (batch.length === 0) return [];
 
   const now = Timestamp.now();
-  const expiresAt = Timestamp.fromMillis(Date.now() + INVITE_EXPIRY_SECONDS * 1000);
-  const firestoreBatch = firestore.batch();
+  const expiresAtMillis = Date.now() + INVITE_EXPIRY_SECONDS * 1000;
+  const expiresAt = Timestamp.fromMillis(expiresAtMillis);
 
+  // The teacher's dashboard watches teacherInvites/{uid}/{qid}, so that write —
+  // not the Firestore invite doc, and not the push — is the instant the
+  // question lands on their screen. It goes out first, and everything else runs
+  // alongside it instead of in front of it.
+  const invitePayload = {
+    topic: questionData.topic,
+    text: questionData.text.slice(0, 300),
+    photoUrls: questionData.photoUrls ?? [],
+    studentName: questionData.studentName ?? "",
+    studentImageURL: questionData.studentImageURL ?? "",
+    expiresAt: expiresAtMillis,
+    wave,
+    conversationType: questionData.conversationType,
+  };
+
+  const rtdbDelivery = Promise.all(
+    batch.map(({ uid }) => db.ref(`teacherInvites/${uid}/${qid}`).set(invitePayload))
+  );
+
+  // acceptInvite reads this doc, so it has to exist before a teacher can claim
+  // the question — but it is committed in parallel with the RTDB write above
+  // rather than ahead of it. It lands a few hundred milliseconds later, which
+  // is still far ahead of anyone reading the card and tapping Accept.
+  const firestoreBatch = firestore.batch();
   for (const { uid } of batch) {
     const inviteRef = firestore
       .collection("questions")
@@ -121,43 +157,32 @@ async function sendWave(
     };
     firestoreBatch.set(inviteRef, invite);
   }
+  const firestoreCommit = firestoreBatch.commit();
 
-  await firestoreBatch.commit();
-  logger.info(`[dispatch] sendWave firestore invites committed qid=${qid} wave=${wave} count=${batch.length}`);
-
-  // RTDB signals — the app listens to teacherInvites/{uid}/{qid} for real-time invite delivery.
-  // Written in parallel with FCM so the app catches invites even without a push token.
-  const teacherRecords = await allTeachers();
-  await Promise.all(
+  // FCM only matters for a teacher whose app is backgrounded; a teacher looking
+  // at the dashboard already has the invite from RTDB.
+  const pushes = Promise.all(
     batch.map(async ({ uid }) => {
-      await db.ref(`teacherInvites/${uid}/${qid}`).set({
+      const t = teachers[uid];
+      if (!t?.fcmToken) return;
+      await sendInvitePush({
+        fcmToken: t.fcmToken,
+        questionId: qid,
         topic: questionData.topic,
-        text: questionData.text.slice(0, 300),
-        photoUrls: questionData.photoUrls ?? [],
-        studentName: questionData.studentName ?? "",
-        studentImageURL: questionData.studentImageURL ?? "",
-        expiresAt: Date.now() + INVITE_EXPIRY_SECONDS * 1000,
+        studentName: questionData.studentName || questionData.studentUid,
+        questionText: questionData.text,
         wave,
-        conversationType: questionData.conversationType,
+        ttlSeconds: INVITE_EXPIRY_SECONDS,
       });
-
-      // FCM on top of RTDB — best-effort, no-op if no token
-      const t = teacherRecords[uid];
-      if (t?.fcmToken) {
-        await sendInvitePush({
-          fcmToken: t.fcmToken,
-          questionId: qid,
-          topic: questionData.topic,
-          studentName: questionData.studentName || questionData.studentUid,
-          questionText: questionData.text,
-          wave,
-          ttlSeconds: INVITE_EXPIRY_SECONDS,
-        });
-      }
     })
   );
 
-  logger.info(`[dispatch] wave=${wave} qid=${qid} sent to ${batch.length} teachers`);
+  await rtdbDelivery;
+  logger.info(`[dispatch] wave=${wave} qid=${qid} delivered to ${batch.length} teachers`);
+
+  await Promise.all([firestoreCommit, pushes]);
+  logger.info(`[dispatch] wave=${wave} qid=${qid} invites+pushes settled count=${batch.length}`);
+
   return batch.map((t) => t.uid);
 }
 
@@ -169,7 +194,7 @@ async function enqueueWaveEvaluation(qid: string, wave: number): Promise<void> {
   );
 }
 
-async function enqueueQuestionWatchdog(qid: string): Promise<void> {
+export async function enqueueQuestionWatchdog(qid: string): Promise<void> {
   const queue = getFunctions().taskQueue("questionWatchdog");
   await queue.enqueue(
     { questionId: qid },
@@ -344,8 +369,82 @@ export async function backfillPendingQuestionsForTeacher(teacherUid: string): Pr
 // ─── dispatchQuestion — Firestore onCreate trigger ───────────────────────────
 // FR-B-001, FR-B-002, FR-B-003
 
+/**
+ * Fans a brand-new question out to its first wave of teachers.
+ *
+ * Called inline by `createQuestion` — that is the whole point. This used to run
+ * only from the onCreate trigger below, which meant every question paid for
+ * Eventarc delivery (~0.8s) plus a second Cloud Function's cold start (~2.8s)
+ * before the first teacher was told anything. Running it in the function that
+ * already has the question data skips both.
+ *
+ * `dispatchWave` is the claim: the caller flips it 0 → 1 and only the winner
+ * fans out, so the trigger and this path can never double-invite.
+ */
+export async function dispatchFirstWave(qid: string, data: QuestionDoc): Promise<void> {
+  logger.info(`[dispatch] starting dispatch for qid=${qid} topic=${data.topic}`);
+
+  const qRef = firestore.collection("questions").doc(qid);
+  const invited = await sendWave(qid, data, 1, new Set<string>());
+
+  const update: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
+  if (invited.length > 0) {
+    update.alreadyInvited = FieldValue.arrayUnion(...invited);
+  }
+  await qRef.update(update);
+
+  logger.info(`[dispatch] qid=${qid} wave 1 complete invitedNow=${invited.length}`);
+
+  if (invited.length === 0) {
+    // Keep the question searchable until the watchdog expires it. A teacher
+    // can come online after creation and be invited by onTeacherStatusChange.
+    // The scheduled wave evaluation also retries after transient presence
+    // races (mobile clients can write status="online" just before subjects).
+    logger.info(
+      `[dispatch] qid=${qid} no eligible teachers in initial wave; keeping question in RTDB for backfill`
+    );
+  }
+
+  await Promise.all([
+    enqueueWaveEvaluation(qid, 1),
+    enqueueQuestionWatchdog(qid),
+  ]);
+}
+
+/**
+ * Claims wave 1 for a question, returning false if someone already has it.
+ *
+ * `createQuestion` claims by writing `dispatchWave: 1` in the document it
+ * creates, which costs nothing extra; the trigger below claims with this
+ * transaction, which only ever succeeds if that inline path never ran.
+ */
+async function claimFirstWave(qid: string): Promise<QuestionDoc | null> {
+  const qRef = firestore.collection("questions").doc(qid);
+
+  return firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(qRef);
+    if (!snap.exists) return null;
+
+    const current = snap.data() as QuestionDoc;
+    if (current.status !== "searching") return null;
+    if ((current.dispatchWave ?? 0) >= 1) return null;
+
+    tx.update(qRef, { dispatchWave: 1, updatedAt: FieldValue.serverTimestamp() });
+    return current;
+  });
+}
+
+// ─── dispatchQuestion — Firestore onCreate trigger ───────────────────────────
+// FR-B-001, FR-B-002, FR-B-003
+//
+// A safety net, not the fast path. `createQuestion` normally dispatches wave 1
+// itself and marks the question `dispatchWave: 1` as it writes it, so this
+// trigger finds the wave already claimed and returns. It only does real work
+// when that inline dispatch never happened — a createQuestion instance killed
+// between writing the document and fanning it out.
+
 export const dispatchQuestion = onDocumentCreated(
-  "questions/{qid}",
+  { document: "questions/{qid}", ...HOT_PATH },
   async (event) => {
     const qid = event.params.qid;
     const data = event.data?.data() as QuestionDoc | undefined;
@@ -360,39 +459,20 @@ export const dispatchQuestion = onDocumentCreated(
       return;
     }
 
-    logger.info(`[dispatch] starting dispatch for qid=${qid} topic=${data.topic}`);
-    logger.info(
-      `[dispatch] initial status qid=${qid} status=${data.status} alreadyInvited=${(data.alreadyInvited ?? []).length}`
-    );
-
-    const invited = await sendWave(qid, data, 1, new Set<string>());
-
-    const initialDispatchUpdate: Record<string, unknown> = {
-      dispatchWave: 1,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-    if (invited.length > 0) {
-      initialDispatchUpdate.alreadyInvited = FieldValue.arrayUnion(...invited);
+    // Deliberately not short-circuiting on `data.dispatchWave`: the event
+    // payload is the document as it was created, which createQuestion always
+    // stamps with 1, so it cannot show that an inline dispatch later failed and
+    // handed the wave back. Only the transaction sees the current value. This
+    // trigger is off the latency path now, so the extra read costs nothing that
+    // matters.
+    const claimed = await claimFirstWave(qid);
+    if (!claimed) {
+      logger.info(`[dispatch] qid=${qid} wave 1 claimed elsewhere, trigger standing down`);
+      return;
     }
 
-    await firestore.collection("questions").doc(qid).update(initialDispatchUpdate);
-
-    logger.info(`[dispatch] qid=${qid} dispatchWave updated to 1 invitedNow=${invited.length}`);
-
-    if (invited.length === 0) {
-      // Keep the question searchable until the watchdog expires it. A teacher
-      // can come online after creation and be invited by onTeacherStatusChange.
-      // The scheduled wave evaluation also retries after transient presence
-      // races (mobile clients can write status="online" just before subjects).
-      logger.info(
-        `[dispatch] qid=${qid} no eligible teachers in initial wave; keeping question in RTDB for backfill`
-      );
-    }
-
-    await Promise.all([
-      enqueueWaveEvaluation(qid, 1),
-      enqueueQuestionWatchdog(qid),
-    ]);
+    logger.warn(`[dispatch] qid=${qid} inline dispatch did not run — recovering via trigger`);
+    await dispatchFirstWave(qid, claimed);
   }
 );
 
@@ -403,6 +483,7 @@ export const dispatchQuestion = onDocumentCreated(
 
 export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number }>(
   {
+    ...HOT_PATH,
     retryConfig: { maxAttempts: 1 },
     rateLimits: { maxConcurrentDispatches: 50 },
   },

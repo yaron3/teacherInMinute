@@ -3,7 +3,11 @@ package teacher.minute
 import android.util.Log
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -274,6 +278,100 @@ object AndroidChatManager {
             .getReference("questions")
             .child(questionId)
         Tasks.await(ref.updateChildren(values), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    // A student waiting for a teacher used to learn the answer by calling
+    // getQuestionStatus once a second — a Cloud Function round trip per tick,
+    // and up to a second of delay after the teacher actually accepted. This
+    // listener keeps the question's live status in memory so the Swift side can
+    // read it locally and react as soon as RTDB pushes the change.
+    @Volatile private var cachedQuestionStatusJson: String? = null
+    @Volatile private var questionStatusRemoved: Boolean = false
+    @Volatile private var questionStatusError: String? = null
+    private var questionStatusListener: ValueEventListener? = null
+    private var questionStatusRef: DatabaseReference? = null
+    private var questionStatusId: String? = null
+
+    @JvmStatic
+    @Synchronized
+    fun startQuestionStatusListener(questionId: String) {
+        if (questionStatusId == questionId && questionStatusListener != null) return
+        stopQuestionStatusListener()
+
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val status = snapshot.child("status").getValue(String::class.java)
+                if (status.isNullOrBlank()) {
+                    // The backend deletes this node when a question is cancelled
+                    // or archived, so its disappearance is itself the answer.
+                    questionStatusRemoved = !snapshot.exists()
+                    cachedQuestionStatusJson = JSONObject().toString()
+                    return
+                }
+                questionStatusRemoved = false
+                cachedQuestionStatusJson = JSONObject()
+                    .put("status", status)
+                    .put("liveKitRoom", snapshot.child("liveKitRoom").getValue(String::class.java) ?: "")
+                    .put("liveKitToken", snapshot.child("liveKitToken").getValue(String::class.java) ?: "")
+                    .put("questionId", snapshot.firstString("questionId", "questionID", "id"))
+                    .toString()
+                questionStatusError = null
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Question status listener cancelled qid=$questionId", error.toException())
+                questionStatusError = error.message
+            }
+        }
+
+        ref.addValueEventListener(listener)
+        questionStatusListener = listener
+        questionStatusRef = ref
+        questionStatusId = questionId
+        Log.i(TAG, "Question status listener attached qid=$questionId")
+    }
+
+    @JvmStatic
+    @Synchronized
+    fun stopQuestionStatusListener() {
+        val listener = questionStatusListener
+        val ref = questionStatusRef
+        if (listener != null && ref != null) {
+            ref.removeEventListener(listener)
+            Log.i(TAG, "Question status listener detached qid=$questionStatusId")
+        }
+        questionStatusListener = null
+        questionStatusRef = null
+        questionStatusId = null
+        cachedQuestionStatusJson = null
+        questionStatusRemoved = false
+        questionStatusError = null
+    }
+
+    /**
+     * The listener's latest view, as `{"state": ..., "question": {...}}`.
+     *
+     * `state` is "ready" once a snapshot has arrived, "gone" when the question
+     * node has been removed, "error" if the listener was cancelled, and
+     * "pending" before the first delivery.
+     */
+    @JvmStatic
+    fun liveQuestionStatusJson(): String {
+        val cached = cachedQuestionStatusJson
+        val state = when {
+            questionStatusError != null -> "error"
+            cached == null -> "pending"
+            questionStatusRemoved -> "gone"
+            else -> "ready"
+        }
+        return JSONObject()
+            .put("state", state)
+            .put("question", JSONObject(cached ?: "{}"))
+            .toString()
     }
 
     @JvmStatic

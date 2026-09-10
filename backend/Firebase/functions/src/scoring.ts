@@ -40,22 +40,32 @@ export function rankTeachers(
   const candidates: ScoredTeacher[] = [];
   const normalizedTopic = normalizeSubject(topic);
 
+  // Counted rather than logged one line at a time: this runs on the dispatch
+  // path, and a line per rejected teacher meant dozens of Cloud Logging writes
+  // per wave that grow with the roster while saying the same thing.
+  let offline = 0;
+  let topicMismatch = 0;
+
   for (const [uid, t] of Object.entries(teachers)) {
     if (exclude.has(uid)) continue;
     if (t.status !== "online") {
-      logger.info(`[scoring] skip uid=${uid} reason=status status=${t.status}`);
+      offline += 1;
       continue;
     }
     // RTDB can deserialize arrays as {0: "algebra", ...} objects when written by mobile SDKs.
     const subjects: string[] = Array.isArray(t.subjects) ? t.subjects : Object.values(t.subjects ?? {} as Record<string, string>);
     const matches = subjects.some((s) => normalizeSubject(s) === normalizedTopic);
     if (!matches) {
-      logger.info(`[scoring] skip uid=${uid} reason=topic-mismatch subjects=${JSON.stringify(subjects)} topic=${topic}`);
+      topicMismatch += 1;
       continue;
     }
 
     candidates.push({ uid, score: scoreTeacher(t) });
   }
+
+  logger.info(
+    `[scoring] ranked topic=${topic} considered=${Object.keys(teachers).length} excluded=${exclude.size} skippedOffline=${offline} skippedTopic=${topicMismatch} eligible=${candidates.length}`
+  );
 
   return candidates.sort((a, b) => b.score - a.score);
 }

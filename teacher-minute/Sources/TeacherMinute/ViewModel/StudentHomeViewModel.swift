@@ -556,8 +556,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     activeConversationType = conversationType
     searchState = .searching(questionId: "")
 
-    let hasOnlineTeacher = await TeacherAvailabilityStore.hasOnlineTeacher()
-    if !hasOnlineTeacher {
+    // `onlineTeachers` is kept current by a live listener on the same presence
+    // projection this check would read, so when it holds anyone the answer is
+    // already here and the ask goes straight out. Only an empty list — which is
+    // also what a listener that has not fired yet looks like — is worth a round
+    // trip to tell "nobody is online" apart from "we have not heard yet".
+    if onlineTeachers.isEmpty, !(await TeacherAvailabilityStore.hasOnlineTeacher()) {
       logger.info("TeacherMinute askTeacher aborted: no online teachers")
       searchState = .noMatch
       return
@@ -592,6 +596,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     guard case .searching(let qid) = searchState else { return }
     pollingTask?.cancel()
     pollingTask = nil
+    QuestionStatusStore.stopListening()
     if !qid.isEmpty {
       try? await FunctionsService.shared.cancelQuestion(questionId: qid)
     }
@@ -601,6 +606,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   func resetSearch() {
     pollingTask?.cancel()
     pollingTask = nil
+    QuestionStatusStore.stopListening()
     searchState = .idle
   }
 
@@ -1180,24 +1186,78 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   private static let noTeacherTimeoutSeconds: Double = 60
 
+  /// How often the wait loop consults the listener's cache. This is a memory
+  /// read, not a network call, so it can be frequent — what it replaces is a
+  /// Cloud Function round trip every second.
+  private static let questionWatchTickNanos: UInt64 = 200_000_000
+  /// How often to ask the server anyway, as a backstop. RTDB carries the status
+  /// within milliseconds of a teacher accepting, but if that write is lost the
+  /// student would otherwise sit on the searching screen until the timeout.
+  private static let questionStatusBackstopSeconds: Double = 10
+
   private func startPolling(questionId: String) {
     pollingTask?.cancel()
     let startedAt = Date().timeIntervalSince1970
+    QuestionStatusStore.startListening(questionId: questionId)
+
     pollingTask = Task {
+      defer { QuestionStatusStore.stopListening() }
+      var lastBackstopAt = Date().timeIntervalSince1970
+      var lastLoggedStatus = ""
+      // Starts at .pending so simply attaching does not count as a change and
+      // fire a needless call on the first tick.
+      var lastLiveKind = "pending"
+
       while !Task.isCancelled {
-        do {
-          let result = try await currentQuestionStatus(questionId: questionId)
+        var result: QuestionStatusResult?
+        let live = QuestionStatusStore.latest()
+        let now = Date().timeIntervalSince1970
+
+        let liveKind: String
+        switch live {
+        case .ready: liveKind = "ready"
+        case .gone: liveKind = "gone"
+        case .pending: liveKind = "pending"
+        case .failed: liveKind = "failed"
+        }
+
+        if case .ready(let realtime) = live {
+          result = realtime
+        } else if liveKind != lastLiveKind || now - lastBackstopAt >= Self.questionStatusBackstopSeconds {
+          // The node vanished, the listener died, or the backstop came due. Ask
+          // the server — but only on the change itself, never once per tick:
+          // a status the loop takes no action on ("unanswered", say) would
+          // otherwise turn this into a call every 200ms until the timeout.
+          result = try? await currentQuestionStatus(questionId: questionId)
+          lastBackstopAt = now
+        }
+        lastLiveKind = liveKind
+
+        if let result {
           let status = result.status.lowercased()
-          logger.info("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
+          if status != lastLoggedStatus {
+            lastLoggedStatus = status
+            logger.info("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
+          }
 
           if isAcceptedStatus(status) {
-            let room = result.liveKitRoom ?? ""
-            let token = result.liveKitToken ?? ""
+            // The realtime node never carries LiveKit credentials —
+            // `questions/$qid` is readable by any signed-in user — so the token
+            // is minted here, once, now that there is something to mint it for.
+            var room = result.liveKitRoom ?? ""
+            var token = result.liveKitToken ?? ""
+            if room.isEmpty || token.isEmpty,
+               let minted = try? await FunctionsService.shared.getQuestionStatus(questionId: questionId) {
+              room = minted.liveKitRoom ?? room
+              token = minted.liveKitToken ?? token
+            }
+
             if self.requiresMediaConnection(conversationType: self.activeConversationType), (room.isEmpty || token.isEmpty) {
               logger.info("TeacherMinute questionStatus accepted but media credentials missing questionId=\(questionId) roomEmpty=\(room.isEmpty) tokenEmpty=\(token.isEmpty) conversationType=\(self.activeConversationType)")
               try? await Task.sleep(nanoseconds: 1_000_000_000)
               continue
             }
+
             self.questionId = result.questionId
             searchState = .matched(
               questionId: questionId,
@@ -1221,20 +1281,17 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
           default:
             break
           }
-
-          let elapsed = Date().timeIntervalSince1970 - startedAt
-          if elapsed >= Self.noTeacherTimeoutSeconds {
-            logger.info("TeacherMinute questionStatus timed out after \(Int(elapsed))s questionId=\(questionId); transitioning to noMatch")
-            try? await FunctionsService.shared.cancelQuestion(questionId: questionId)
-            searchState = .noMatch
-            return
-          }
-        } catch {
-          guard !Task.isCancelled else { return }
-          logger.error("TeacherMinute questionStatus polling error=\(error)")
         }
 
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        let elapsed = Date().timeIntervalSince1970 - startedAt
+        if elapsed >= Self.noTeacherTimeoutSeconds {
+          logger.info("TeacherMinute questionStatus timed out after \(Int(elapsed))s questionId=\(questionId); transitioning to noMatch")
+          try? await FunctionsService.shared.cancelQuestion(questionId: questionId)
+          searchState = .noMatch
+          return
+        }
+
+        try? await Task.sleep(nanoseconds: Self.questionWatchTickNanos)
       }
     }
   }

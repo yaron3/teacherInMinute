@@ -1,5 +1,19 @@
 import { logger } from "firebase-functions";
-import * as braintree from "braintree";
+// Required at call time rather than module load. index.ts exports every
+// function from one file, so a module-scope import of this ~1MB SDK is parsed
+// on the cold start of every function in the project, almost none of which take
+// a payment. `import type` is erased at compile time, so the types stay free.
+import type * as BraintreeSDK from "braintree";
+
+let braintreeModule: typeof BraintreeSDK | undefined;
+
+function braintree(): typeof BraintreeSDK {
+  if (!braintreeModule) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    braintreeModule = require("braintree") as typeof BraintreeSDK;
+  }
+  return braintreeModule;
+}
 
 // ─── Braintree — native Apple Pay processing ──────────────────────────────
 //
@@ -63,18 +77,18 @@ export function merchantAccountIdFor(currency: string): string | undefined {
   return id.trim() || undefined;
 }
 
-function getGateway(): braintree.BraintreeGateway {
+function getGateway(): BraintreeSDK.BraintreeGateway {
   const merchantId = process.env.BRAINTREE_MERCHANT_ID ?? "";
   const publicKey = process.env.BRAINTREE_PUBLIC_KEY ?? "";
   const privateKey = process.env.BRAINTREE_PRIVATE_KEY ?? "";
   if (!merchantId || !publicKey || !privateKey) {
     throw new BraintreeNotConfiguredError();
   }
-  return new braintree.BraintreeGateway({
+  return new (braintree().BraintreeGateway)({
     environment:
       process.env.BRAINTREE_ENV === "production"
-        ? braintree.Environment.Production
-        : braintree.Environment.Sandbox,
+        ? braintree().Environment.Production
+        : braintree().Environment.Sandbox,
     merchantId,
     publicKey,
     privateKey,
@@ -147,7 +161,7 @@ export async function createBraintreeSale(
 
 /** Ensures a Braintree customer exists for this uid, creating one if needed.
  *  Tolerates a race with another concurrent call for the same uid. */
-async function ensureBraintreeCustomer(gateway: braintree.BraintreeGateway, uid: string): Promise<void> {
+async function ensureBraintreeCustomer(gateway: BraintreeSDK.BraintreeGateway, uid: string): Promise<void> {
   try {
     await gateway.customer.find(uid);
     return;

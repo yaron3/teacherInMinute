@@ -12,9 +12,11 @@ import {
   ConversationType,
   CONVERSATION_TYPES,
   DEFAULT_CONVERSATION_TYPE,
+  HOT_PATH,
 } from "./types";
 import { getConnectionFeeCents } from "./pricing";
 import { recordQuestionConnected } from "./stats";
+import { dispatchFirstWave, enqueueQuestionWatchdog } from "./dispatch";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -62,10 +64,10 @@ async function cleanupRtdb(questionId: string, alreadyInvited: string[]): Promis
 }
 
 // ─── createQuestion ───────────────────────────────────────────────────────────
-// FR-B-010: callable — student initiates the question + dispatch pipeline.
-// Writing the Firestore doc triggers dispatchQuestion automatically.
+// FR-B-010: callable — student initiates the question + dispatch pipeline and
+// fans out wave 1 before returning.
 
-export const createQuestion = onCall(async (req) => {
+export const createQuestion = onCall(HOT_PATH, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
@@ -145,7 +147,10 @@ export const createQuestion = onCall(async (req) => {
     status: "searching",
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
-    dispatchWave: 0,
+    // Born claiming wave 1, because this function dispatches it below rather
+    // than waiting for the onCreate trigger. The trigger sees the 1 and stands
+    // down; if the dispatch throws we reset it to 0 and hand the question back.
+    dispatchWave: 1,
     alreadyInvited: [],
   };
 
@@ -159,19 +164,47 @@ export const createQuestion = onCall(async (req) => {
     photoUrls,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
     conversationType,
-    dispatchWave: 0,
+    dispatchWave: 1,
     createdAt: Date.now(),
   };
 
   await upsertLiveQuestion(qid, liveQuestion, "searching", "createQuestion");
   logger.info(`[questions] createQuestion RTDB-upsert done qid=${qid}`);
 
-  // Writing this doc triggers dispatchQuestion via the Firestore onCreate trigger.
   await firestore.collection("questions").doc(qid).set(question);
 
   logger.info(
     `[questions] createQuestion firestore-set done qid=${qid} status=${question.status} dispatchWave=${question.dispatchWave}`
   );
+
+  // Fan the question out here rather than leaving it to the onCreate trigger.
+  // The trigger still exists as a safety net, but going through it cost every
+  // question an Eventarc delivery plus a second function's cold start before
+  // any teacher was told — several seconds, on the one path where seconds are
+  // the product.
+  try {
+    await dispatchFirstWave(qid, question);
+  } catch (error) {
+    // Give the wave back so the onCreate trigger can pick it up: it only acts
+    // on a question whose dispatchWave is still 0.
+    logger.error(`[questions] inline dispatch failed qid=${qid}, releasing to trigger`, error);
+    await firestore
+      .collection("questions")
+      .doc(qid)
+      .update({ dispatchWave: 0 })
+      .catch((releaseError) => {
+        logger.error(`[questions] failed releasing wave qid=${qid}`, releaseError);
+      });
+
+    // The trigger may already have fired and stood down before that release
+    // landed, which would leave nobody to pick the question up. dispatchFirstWave
+    // arms the watchdog itself, but it never got that far, so arm it here: a
+    // question that no one recovers must still stop searching rather than hang.
+    await enqueueQuestionWatchdog(qid).catch((watchdogError) => {
+      logger.error(`[questions] failed arming watchdog qid=${qid}`, watchdogError);
+    });
+  }
+
   logger.info(`[questions] created qid=${qid} topic=${topic} student=${uid}`);
   return { questionId: qid, connectionFeeCents: await getConnectionFeeCents() };
 });
@@ -180,7 +213,7 @@ export const createQuestion = onCall(async (req) => {
 // FR-B-010: student cancels while still in "searching" state. Free before a
 // teacher has accepted. We do not charge for pilot (no Stripe hold).
 
-export const cancelQuestion = onCall(async (req) => {
+export const cancelQuestion = onCall(HOT_PATH, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
@@ -227,7 +260,7 @@ export const cancelQuestion = onCall(async (req) => {
 // FR-B-004: atomic Firestore transaction guarantees exactly one teacher wins.
 // Returns Agora token for the teacher; pushes token to student via FCM.
 
-export const acceptInvite = onCall(async (req) => {
+export const acceptInvite = onCall(HOT_PATH, async (req) => {
   const teacherUid = req.auth?.uid;
   if (!teacherUid) throw new HttpsError("unauthenticated", "Sign in required");
 
@@ -398,7 +431,7 @@ export const acceptInvite = onCall(async (req) => {
 // Polled by the student app every 3s while in "searching" state.
 // Returns {status} plus LiveKit credentials if the question was accepted.
 
-export const getQuestionStatus = onCall(async (req) => {
+export const getQuestionStatus = onCall(HOT_PATH, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
@@ -426,7 +459,7 @@ export const getQuestionStatus = onCall(async (req) => {
 // FR-B-010: teacher explicitly declines. Updates invite; accept_rate signal
 // is recomputed by a scheduled function (deferred for pilot).
 
-export const declineInvite = onCall(async (req) => {
+export const declineInvite = onCall(HOT_PATH, async (req) => {
   const teacherUid = req.auth?.uid;
   if (!teacherUid) throw new HttpsError("unauthenticated", "Sign in required");
 

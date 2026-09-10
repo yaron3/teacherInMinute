@@ -26,9 +26,38 @@ function normalizeCurrencyCode(value: unknown): string {
   return trimmed.length === 3 ? trimmed : DEFAULT_CURRENCY;
 }
 
+// Every readRcNumber used to pull the whole Remote Config template over the
+// network — a fresh HTTP round trip per key, so resolvePricingForStudent alone
+// fetched it three times and createQuestion paid for one on the ask path. The
+// template changes when someone edits it in the console, which is rare next to
+// how often these run, so an instance holds it briefly and re-reads after that.
+const RC_TEMPLATE_TTL_MS = 60_000;
+let rcTemplateCache: { template: admin.remoteConfig.RemoteConfigTemplate; fetchedAt: number } | undefined;
+let rcTemplateInFlight: Promise<admin.remoteConfig.RemoteConfigTemplate> | undefined;
+
+async function getRcTemplate(): Promise<admin.remoteConfig.RemoteConfigTemplate> {
+  if (rcTemplateCache && Date.now() - rcTemplateCache.fetchedAt < RC_TEMPLATE_TTL_MS) {
+    return rcTemplateCache.template;
+  }
+  // Concurrent callers share one fetch rather than each starting their own.
+  if (!rcTemplateInFlight) {
+    rcTemplateInFlight = admin
+      .remoteConfig()
+      .getTemplate()
+      .then((template) => {
+        rcTemplateCache = { template, fetchedAt: Date.now() };
+        return template;
+      })
+      .finally(() => {
+        rcTemplateInFlight = undefined;
+      });
+  }
+  return rcTemplateInFlight;
+}
+
 async function readRcNumber(key: string): Promise<number | undefined> {
   try {
-    const template = await admin.remoteConfig().getTemplate();
+    const template = await getRcTemplate();
     const param = template.parameters?.[key] as
       | { defaultValue?: { value?: string } }
       | undefined;
