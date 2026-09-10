@@ -260,7 +260,8 @@ struct StudentHomeView: View {
   var studentHero: some View {
     VStack(spacing: 0) {
       HStack(spacing: 12) {
-		PlatformIcon(systemName: "books.vertical.fill", size: 19, weight: .semibold, color: theme.primaryText)
+		Image("LaunchIcon")
+		//PlatformIcon(systemName: "books.vertical.fill", size: 19, weight: .semibold, color: theme.primaryText)
           Text(viewModel.appDisplayName)
             .font(.system(size: 18, weight: .bold))
             .foregroundStyle(theme.primaryText)
