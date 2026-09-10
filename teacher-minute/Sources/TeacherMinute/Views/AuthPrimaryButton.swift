@@ -127,6 +127,7 @@ struct AuthInputField: View {
 
     var inputField: some View {
         TextField(placeholder, text: $text)
+            .textFieldStyle(.plain)
             .font(.system(size: 17))
             .foregroundStyle(theme.primaryText)
             .keyboardType(keyboardType)

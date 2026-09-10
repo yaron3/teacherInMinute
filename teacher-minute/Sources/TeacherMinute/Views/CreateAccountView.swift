@@ -177,6 +177,7 @@ struct CreateAccountView: View {
 			  .textInputAutocapitalization(.never)
 		  }
 		}
+		.textFieldStyle(.plain)
 		.font(.system(size: 16))
 		.foregroundStyle(theme.primaryText)
 		.focused($focusedField, equals: field)

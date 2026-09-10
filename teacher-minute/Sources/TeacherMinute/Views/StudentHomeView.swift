@@ -848,6 +848,7 @@ struct StudentHomeView: View {
 	let isDisabled = trimmedCode.isEmpty || isLoading
 	return HStack(spacing: 10) {
 	  TextField(viewModel.couponPlaceholder, text: couponBinding)
+		.textFieldStyle(.plain)
 		.textInputAutocapitalization(.never)
 		.autocorrectionDisabled(true)
 		.padding(.horizontal, 12)

@@ -169,13 +169,14 @@ struct TeacherSubjectsView: View {
 	  )
 	  
 	  TextField(viewModel.searchPlaceholder, text: $viewModel.searchText)
+		.textFieldStyle(.plain)
 		.font(.system(size: 13))
 		.foregroundStyle(theme.primaryText)
 		.textInputAutocapitalization(.never)
 		.autocorrectionDisabled()
 	}
 	.padding(.horizontal, 16)
-	.frame(height: 44)
+	.frame(height: textFieldContainerHeight(44))
 	.background(theme.cardBackground)
 	.clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 	.overlay {

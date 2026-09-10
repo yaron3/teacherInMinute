@@ -105,6 +105,7 @@ struct LoginView: View {
 		  )
 		  
 		  TextField(viewModel.emailPlaceholder, text: $viewModel.emailOrPhone)
+			.textFieldStyle(.plain)
 			.font(.system(size: 16))
 			.foregroundStyle(theme.primaryText)
 			.keyboardType(.emailAddress)
@@ -145,6 +146,7 @@ struct LoginView: View {
 				.accessibilityIdentifier("password_input")
 			}
 		  }
+		  .textFieldStyle(.plain)
 		  .font(.system(size: 16))
 		  .foregroundStyle(theme.primaryText)
 		  .textInputAutocapitalization(.never)

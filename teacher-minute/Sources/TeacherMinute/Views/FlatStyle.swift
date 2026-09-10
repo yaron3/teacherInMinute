@@ -15,6 +15,22 @@ import SwiftUI
 let flatRadius: CGFloat = 14
 let flatRadiusSmall: CGFloat = 10
 let flatRadiusBadge: CGFloat = 6
+
+/// The height to give a container wrapping a `TextField`.
+///
+/// Skip composes `TextField` as a Material `OutlinedTextField`, which lays
+/// itself out at its own 56dp minimum and lets the parent's clip cut whatever
+/// does not fit. A shorter container therefore crops the descenders off
+/// letters like "j", "g" and "p" — "Search subjects or subtopics" rendered as
+/// "Search subiects or subtopics". iOS has no such floor, so it keeps the
+/// design's height.
+func textFieldContainerHeight(_ designHeight: CGFloat) -> CGFloat {
+#if os(Android)
+    max(designHeight, 56)
+#else
+    designHeight
+#endif
+}
 let flatHairline: CGFloat = 1
 
 // MARK: - Components
@@ -245,13 +261,14 @@ struct FlatSearchField: View {
       PlatformIcon(systemName: "magnifyingglass", size: 17, weight: .medium, color: theme.secondaryText)
 
       TextField(placeholder, text: $text)
+        .textFieldStyle(.plain)
         .font(.system(size: 17))
         .foregroundStyle(theme.primaryText)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
     }
     .padding(.horizontal, 16)
-    .frame(height: 52)
+    .frame(height: textFieldContainerHeight(52))
     .background(theme.cardBackground)
     .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
   }

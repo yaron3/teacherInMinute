@@ -1163,6 +1163,7 @@ struct ProfileInfoRow: View {
 
 	  if isEditing {
 		TextField(parameter.description, text: $parameter.value)
+		  .textFieldStyle(.plain)
 		  .font(.system(size: 15, weight: .semibold))
 		  .foregroundStyle(theme.primaryText)
 		  .lineLimit(1)

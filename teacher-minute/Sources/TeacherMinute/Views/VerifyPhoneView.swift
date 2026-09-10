@@ -142,6 +142,7 @@ struct VerifyPhoneView: View {
                 }
             }
         ))
+        .textFieldStyle(.plain)
         .keyboardType(.numberPad)
         .multilineTextAlignment(.center)
         .font(.system(size: 24, weight: .bold))
