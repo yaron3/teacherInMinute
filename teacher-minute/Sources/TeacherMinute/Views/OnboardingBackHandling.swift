@@ -74,12 +74,16 @@ extension View {
     ///
     /// - Parameter isActive: `false` leaves the screen's back behaviour alone,
     ///   for the steps that double as an editing screen reached from elsewhere.
-    func onboardingBackHandling(isActive: Bool = true) -> some View {
-        modifier(OnboardingBackHandlingModifier(isActive: isActive))
+    func onboardingBackHandling(
+        viewModel: any OnboardingBackViewModeling,
+        isActive: Bool = true
+    ) -> some View {
+        modifier(OnboardingBackHandlingModifier(viewModel: viewModel, isActive: isActive))
     }
 }
 
 struct OnboardingBackHandlingModifier: ViewModifier {
+    let viewModel: any OnboardingBackViewModeling
     let isActive: Bool
     @Environment(\.appRouter) var router
     @Environment(\.colorScheme) var colorScheme
@@ -119,12 +123,12 @@ struct OnboardingBackHandlingModifier: ViewModifier {
                 }
             }
             .appDialog(
-                LocalizationSupport.localized("Log out?"),
+                viewModel.onboardingBackTitle,
                 isPresented: $isConfirmingSignOut,
-                message: LocalizationSupport.localized("Going back from here returns you to the sign-in screen and signs you out."),
+                message: viewModel.onboardingBackMessage,
                 actions: [
-                    AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel),
-                    AppDialogAction(LocalizationSupport.localized("Log Out"), kind: .destructive) {
+                    AppDialogAction(viewModel.onboardingBackCancelLabel, kind: .cancel),
+                    AppDialogAction(viewModel.onboardingBackConfirmLabel, kind: .destructive) {
                         signOutAndReturnToSignIn()
                     }
                 ]

@@ -16,7 +16,7 @@ struct NotificationMessagesView: View {
                     VStack(spacing: 12) {
                         ProgressView()
                             .tint(theme.accent)
-                        Text(LocalizationSupport.localized("Loading messages"))
+                        Text(viewModel.loadingText)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(theme.secondaryText)
                     }
@@ -27,7 +27,8 @@ struct NotificationMessagesView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         LazyVStack(spacing: 12) {
                             ForEach(viewModel.messages) { message in
-                                NotificationMessageRow(message: message) {
+                                NotificationMessageRow(message: message,
+                                                       dateText: viewModel.sentText(message.timestamp)) {
                                     viewModel.delete(message)
                                 }
                             }
@@ -37,11 +38,11 @@ struct NotificationMessagesView: View {
                 }
             }
             .background(Color(.systemBackground))
-            .navigationTitle(LocalizationSupport.localized("Messages"))
+            .navigationTitle(viewModel.screenTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(LocalizationSupport.localized("Done")) { dismiss() }
+                    Button(viewModel.doneLabel) { dismiss() }
                 }
             }
             .task {
@@ -68,11 +69,11 @@ struct NotificationMessagesView: View {
                     )
                 }
 
-            Text(LocalizationSupport.localized("No messages"))
+            Text(viewModel.emptyTitle)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(theme.primaryText)
 
-            Text(LocalizationSupport.localized("New updates and personal messages will appear here."))
+            Text(viewModel.emptySubtitle)
                 .font(.system(size: 13))
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
@@ -84,6 +85,7 @@ struct NotificationMessagesView: View {
 
 struct NotificationMessageRow: View {
     let message: NotificationMessage
+    let dateText: String
     let deleteAction: () -> Void
 
     @Environment(\.colorScheme) var colorScheme
@@ -147,14 +149,6 @@ struct NotificationMessageRow: View {
                 .buttonStyle(.plain)
             }
         }
-    }
-
-    private var dateText: String {
-        guard message.timestamp > .distantPast else { return "" }
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return String(format: LocalizationSupport.localized("Sent %@"), formatter.string(from: message.timestamp))
     }
 }
 

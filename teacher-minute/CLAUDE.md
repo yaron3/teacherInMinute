@@ -33,8 +33,36 @@ Text(viewModel.greetingText)
 Text(viewModel.subjectCountText(for: subject))
 ```
 
-This rule applies to every view that has a `*ViewModeling` protocol:
-- `StudentHomeViewModeling` (done)
-- `TeacherDashboardViewModeling` (done)
-- `ChatSessionViewModeling` (done)
-- `SettingsViewModeling` (done)
+This rule applies to **every** view, not only the ones behind a
+`*ViewModeling` protocol. Which mechanism a screen uses depends on what it has:
+
+| The view has… | Where its copy lives |
+|---|---|
+| A `*ViewModeling` protocol | A protocol extension (`StudentHomeViewModeling`, `TeacherDashboardViewModeling`, `ChatSessionViewModeling`, `SettingsViewModeling`) |
+| A concrete view model | `<Name>ViewModel+LocalizedStrings.swift`, an extension on that class |
+| No view model, but one owner screen | A `viewModel` property passed down from that screen |
+| No view model, and several owner screens | A shared protocol with default implementations — `LessonHistoryViewModeling`, `PhotoSourceViewModeling`, `OnboardingBackViewModeling` |
+| A small presentational component | Plain `String` parameters supplied by the caller |
+
+### Presentational components never translate what they are handed
+
+A component that takes a `title` renders it verbatim. Translating a parameter
+inside the component means the caller cannot pass anything but a raw English
+key, and every caller that already translated its own copy pays for a second,
+pointless lookup. `HistoryMetricCard`, `AboutWebView`, `SubjectChip`,
+`BadgeView` and the grade chips all used to do this.
+
+### Keys must not collide
+
+`LocalizationKey.generatedKey` reduces a source string to three words, so
+distinct strings can land on the same key and one published value ends up
+serving both. When that happens, add an explicit entry to
+`LocalizationKey.exactKeys` under "Collision fixes" — the string that matches
+the value already in the template keeps the original key.
+
+Both invariants — every string reachable from a view model, and no two strings
+sharing a key — are checked by:
+
+```bash
+python3 backend/Firebase/check-localization.py
+```

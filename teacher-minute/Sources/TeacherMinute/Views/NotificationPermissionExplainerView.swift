@@ -10,6 +10,7 @@
 import SwiftUI
 
 struct NotificationPermissionExplainerView: View {
+    let viewModel: any StudentHomeViewModeling
     /// Called after the user makes a choice (enabled or not) so the presenter
     /// can dismiss and record that the explanation was shown.
     let onFinish: () -> Void
@@ -32,12 +33,12 @@ struct NotificationPermissionExplainerView: View {
                 }
                 .shadow(color: theme.accent.opacity(0.12), radius: 24, x: 0, y: 12)
 
-            Text(LocalizationSupport.localized("Stay in the loop"))
+            Text(viewModel.notificationExplainerTitle)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(theme.primaryText)
                 .padding(.top, 28)
 
-            Text(LocalizationSupport.localized("Turn on notifications so we can let you know the moment a teacher accepts your request, replies to a message, or your session is about to start."))
+            Text(viewModel.notificationExplainerText)
                 .font(.system(size: 14))
                 .foregroundStyle(theme.secondaryText)
                 .lineSpacing(6)
@@ -48,7 +49,7 @@ struct NotificationPermissionExplainerView: View {
             Spacer()
 
             AuthPrimaryButton(
-                title: isRequesting ? LocalizationSupport.localized("Enabling...") : LocalizationSupport.localized("Enable Notifications"),
+                title: viewModel.enableNotificationsButtonLabel(isRequesting: isRequesting),
                 systemImage: "bell.fill",
                 isEnabled: !isRequesting
             ) {
@@ -58,7 +59,7 @@ struct NotificationPermissionExplainerView: View {
             Button {
                 onFinish()
             } label: {
-                Text(LocalizationSupport.localized("Not now"))
+                Text(viewModel.notNowLabel)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity)

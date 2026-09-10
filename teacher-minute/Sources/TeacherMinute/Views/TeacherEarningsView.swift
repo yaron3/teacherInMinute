@@ -41,6 +41,7 @@ struct TeacherEarningsView: View {
         }
         .sheet(isPresented: $viewModel.isEditingPayoutMethod) {
             TeacherPayoutMethodSheet(
+                viewModel: viewModel,
                 method: $viewModel.payoutMethodDraft,
                 availableTypes: viewModel.availablePayoutMethodTypes,
                 banks: viewModel.banks,
@@ -55,14 +56,14 @@ struct TeacherEarningsView: View {
             )
         }
         .appDialog(
-            LocalizationSupport.localized("Update your profile?"),
+            viewModel.updateProfileDialogTitle,
             isPresented: $viewModel.isOfferingProfilePhoneUpdate,
-            message: LocalizationSupport.localized("Save this number as your profile phone number too?"),
+            message: viewModel.updateProfileDialogMessage,
             actions: [
-                AppDialogAction(LocalizationSupport.localized("Update"), kind: .primary) {
+                AppDialogAction(viewModel.updateLabel, kind: .primary) {
                     Task { await viewModel.confirmProfilePhoneUpdate() }
                 },
-                AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel) {
+                AppDialogAction(viewModel.notNowLabel, kind: .cancel) {
                     viewModel.declineProfilePhoneUpdate()
                 },
             ]
@@ -136,7 +137,7 @@ struct TeacherEarningsView: View {
     // MARK: - Header
 
     var headerTitle: some View {
-        Text(LocalizationSupport.localized("Income and Payments"))
+        Text(viewModel.earningsScreenTitle)
             .font(.system(size: 26, weight: .bold))
             .foregroundStyle(theme.primaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -223,7 +224,7 @@ struct TeacherEarningsView: View {
     var nextPaymentCard: some View {
         FlatCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text(LocalizationSupport.localized("Next Payment"))
+                Text(viewModel.nextPaymentTitle)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -290,7 +291,7 @@ struct TeacherEarningsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center) {
                     if month.isCurrentMonth {
-                        Text(LocalizationSupport.localized("In progress"))
+                        Text(viewModel.inProgressLabel)
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8)
@@ -309,7 +310,7 @@ struct TeacherEarningsView: View {
                     .foregroundStyle(theme.primaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text("\(month.minutesCount) \(LocalizationSupport.localized("min")) · \(month.lessonCount) \(LocalizationSupport.localized("Lessons"))")
+                Text(viewModel.monthSummaryText(minutes: month.minutesCount, lessons: month.lessonCount))
                     .font(.system(size: 13))
                     .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -317,7 +318,7 @@ struct TeacherEarningsView: View {
                 if !month.weeklyBreakdown.isEmpty {
                     Divider().padding(.vertical, 4)
 
-                    Text(LocalizationSupport.localized("Weekly Breakdown"))
+                    Text(viewModel.weeklyBreakdownTitle)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(theme.primaryText)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -342,7 +343,7 @@ struct TeacherEarningsView: View {
                 Text(LessonFormatting.minutesText(week.minutesCount))
                     .font(.system(size: 13))
                     .foregroundStyle(theme.secondaryText)
-                Text("\(week.lessonCount) \(LocalizationSupport.localized("Lessons"))")
+                Text(viewModel.weekLessonsText(week.lessonCount))
                     .font(.system(size: 12))
                     .foregroundStyle(theme.secondaryText)
             }

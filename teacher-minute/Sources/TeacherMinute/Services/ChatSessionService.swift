@@ -703,6 +703,41 @@ extension ChatSessionViewModeling {
   var connectedAudioText: String { LocalizationSupport.localized("Connected - Audio session") }
   var connectedText: String { LocalizationSupport.localized("Connected") }
 
+  // MARK: Composer
+
+  var messagePlaceholder: String { LocalizationSupport.localized("Message") }
+
+  // MARK: Whiteboard
+
+  var clearBoardTitle: String { LocalizationSupport.localized("Clear board?") }
+  var peerClearedBoardTitle: String { LocalizationSupport.localized("The other side cleared the board") }
+  var saveAsPhotoAndClearLabel: String { LocalizationSupport.localized("Save as photo and clear") }
+  var saveAsPhotoLabel: String { LocalizationSupport.localized("Save as photo") }
+  var clearLabel: String { LocalizationSupport.localized("Clear") }
+  var dismissLabel: String { LocalizationSupport.localized("Dismiss") }
+  var boardHintText: String { LocalizationSupport.localized("Use your finger to write or sketch.") }
+
+  // MARK: Rate the session
+
+  var sessionCompleteTitle: String { LocalizationSupport.localized("Session Complete!") }
+  var rateSessionTitle: String { LocalizationSupport.localized("Rate this session") }
+  var rateCommentPlaceholderTitle: String { LocalizationSupport.localized("Add a comment (optional)") }
+  var rateCommentPrivacyNote: String {
+    LocalizationSupport.localized("Your teacher sees this without your name.")
+  }
+  var sendLabel: String { LocalizationSupport.localized("Send") }
+  var ratingFailedMessage: String {
+    LocalizationSupport.localized("Could not send rating. Please try again next time.")
+  }
+
+  func greatJobText(teacherName: String) -> String {
+    String(format: LocalizationSupport.localized("Great job learning with %@"), teacherName)
+  }
+
+  func rateExperienceText(teacherName: String) -> String {
+    String(format: LocalizationSupport.localized("How was your experience with %@?"), teacherName)
+  }
+
   // MARK: End-session prompt
 
   var endSessionTitleLabel: String { LocalizationSupport.localized("End session?") }

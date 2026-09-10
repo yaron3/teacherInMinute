@@ -10,6 +10,7 @@
 import SwiftUI
 
 struct PaymentMethodSheet: View {
+  let viewModel: any StudentHomeViewModeling
   let methods: [PaymentMethod]
   let theme: AppTheme
   var savedPayPalEmail: String? = nil
@@ -19,7 +20,7 @@ struct PaymentMethodSheet: View {
 
   var body: some View {
     VStack(spacing: 16) {
-      Text(LocalizationSupport.localized("Choose a payment method"))
+      Text(viewModel.choosePaymentMethodTitle)
         .font(.headline)
         .foregroundStyle(theme.primaryText)
         .padding(.top, 20)
@@ -31,7 +32,7 @@ struct PaymentMethodSheet: View {
       }
       .padding(.horizontal, 20)
 
-      Button(LocalizationSupport.localized("Cancel")) {
+      Button(viewModel.cancelLabel) {
         dismiss()
       }
       .foregroundStyle(theme.secondaryText)

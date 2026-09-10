@@ -157,7 +157,7 @@ struct TeacherDashboardView: View {
 	  // After a teacher's first lesson (> 1 min) suggest completing the
 	  // optional verification documents — a one-time, dismissible prompt (bug #24).
 	  .sheet(isPresented: $showsDocumentsSuggestion) {
-		TeacherDocumentsSuggestionView {
+		TeacherDocumentsSuggestionView(viewModel: viewModel) {
 		  TeacherDocumentsPromptStore.markSuggestionShown()
 		  showsDocumentsSuggestion = false
 		  showsDocuments = true

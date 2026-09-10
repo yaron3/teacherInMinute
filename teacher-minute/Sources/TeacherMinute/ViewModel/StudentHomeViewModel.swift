@@ -130,7 +130,7 @@ struct PurchaseSummary {
 // MARK: - ViewModel Protocol
 
 @MainActor
-protocol StudentHomeViewModeling: AnyObject {
+protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   var name: String { get set }
   var searchState: StudentSearchState { get set }
   var activeQuestionText: String { get set }
@@ -190,6 +190,24 @@ protocol StudentHomeViewModeling: AnyObject {
 // MARK: - Default Localized Strings
 
 extension StudentHomeViewModeling {
+
+    // MARK: Payment method sheet
+    var choosePaymentMethodTitle: String { LocalizationSupport.localized("Choose a payment method") }
+
+    // MARK: Notification permission explainer
+    var notificationExplainerTitle: String { LocalizationSupport.localized("Stay in the loop") }
+    var notificationExplainerText: String {
+        LocalizationSupport.localized("Turn on notifications so we can let you know the moment a teacher accepts your request, replies to a message, or your session is about to start.")
+    }
+    var enableNotificationsLabel: String { LocalizationSupport.localized("Enable Notifications") }
+    var enablingLabel: String { LocalizationSupport.localized("Enabling...") }
+    var notNowLabel: String { LocalizationSupport.localized("Not now") }
+
+    /// Label for the enable button, which reports progress while the system
+    /// prompt is up.
+    func enableNotificationsButtonLabel(isRequesting: Bool) -> String {
+        isRequesting ? enablingLabel : enableNotificationsLabel
+    }
 
   // MARK: Dialog & button labels
   var askATeacherSheetTitle: String { LocalizationSupport.localized("Ask a Teacher") }

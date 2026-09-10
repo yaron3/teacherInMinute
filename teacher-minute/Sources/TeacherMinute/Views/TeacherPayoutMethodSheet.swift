@@ -10,6 +10,7 @@
 import SwiftUI
 
 struct TeacherPayoutMethodSheet: View {
+  let viewModel: TeacherEarningsViewModel
   @Binding var method: TeacherPayoutMethod
   /// Which destinations to offer. PayPal is gated behind a Remote Config flag,
   /// so this is not always every `PayoutMethodType`.
@@ -33,13 +34,13 @@ struct TeacherPayoutMethodSheet: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
-        Text(LocalizationSupport.localized("Payment Method"))
+        Text(viewModel.payoutMethodTitle)
           .font(.system(size: 22, weight: .bold))
           .foregroundStyle(theme.primaryText)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.top, 24)
 
-        Text(LocalizationSupport.localized("Choose where we should send your monthly payout."))
+        Text(viewModel.payoutMethodSheetSubtitle)
           .font(.system(size: 14))
           .foregroundStyle(theme.secondaryText)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,9 +57,7 @@ struct TeacherPayoutMethodSheet: View {
         }
 
         AuthPrimaryButton(
-          title: isSaving
-            ? LocalizationSupport.localized("Saving...")
-            : LocalizationSupport.localized("Save Changes"),
+          title: viewModel.payoutSaveButtonLabel,
           systemImage: "checkmark",
           isEnabled: method.isComplete && !isSaving
         ) {
@@ -66,7 +65,7 @@ struct TeacherPayoutMethodSheet: View {
         }
         .padding(.top, 4)
 
-        Button(LocalizationSupport.localized("Cancel")) {
+        Button(viewModel.cancelLabel) {
           onCancel()
         }
         .font(.system(size: 15, weight: .semibold))
@@ -138,22 +137,22 @@ struct TeacherPayoutMethodSheet: View {
     VStack(alignment: .leading, spacing: 18) {
       bankPicker
       AuthInputField(
-        title: LocalizationSupport.localized("Branch Number"),
-        placeholder: LocalizationSupport.localized("e.g. 123"),
+        title: viewModel.branchNumberFieldTitle,
+        placeholder: viewModel.branchNumberPlaceholder,
         systemImage: "number",
         text: $method.branchNumber,
         keyboardType: .numberPad
       )
       AuthInputField(
-        title: LocalizationSupport.localized("Account Number"),
-        placeholder: LocalizationSupport.localized("e.g. 45678901"),
+        title: viewModel.accountNumberFieldTitle,
+        placeholder: viewModel.accountNumberPlaceholder,
         systemImage: "creditcard",
         text: $method.accountNumber,
         keyboardType: .numberPad
       )
       AuthInputField(
-        title: LocalizationSupport.localized("Account Holder Name"),
-        placeholder: LocalizationSupport.localized("Full name as it appears at the bank"),
+        title: viewModel.accountHolderFieldTitle,
+        placeholder: viewModel.accountHolderPlaceholder,
         systemImage: "person",
         text: $method.accountHolderName,
         textContentType: .name,
@@ -166,7 +165,7 @@ struct TeacherPayoutMethodSheet: View {
   /// the backend resolves the name from the code and rejects anything else.
   var bankPicker: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Text(LocalizationSupport.localized("Bank"))
+      Text(viewModel.bankFieldTitle)
         .font(.system(size: 15, weight: .semibold))
         .foregroundStyle(theme.primaryText)
 
@@ -208,14 +207,14 @@ struct TeacherPayoutMethodSheet: View {
   var bitFields: some View {
     VStack(alignment: .leading, spacing: 18) {
       AuthInputField(
-        title: LocalizationSupport.localized("Bit Phone Number"),
-        placeholder: LocalizationSupport.localized("place holder phone number"),
+        title: viewModel.bitPhoneFieldTitle,
+        placeholder: viewModel.bitPhonePlaceholder,
         systemImage: "phone",
         text: $method.phone,
         keyboardType: .phonePad,
         textContentType: .telephoneNumber,
         isValid: !showsPhoneError,
-        errorMessage: LocalizationSupport.localized("Enter a valid phone number.")
+        errorMessage: viewModel.phoneErrorMessage
       )
 
       if !profilePhone.isEmpty, method.phone.trimmingCharacters(in: .whitespacesAndNewlines) != profilePhone {
@@ -224,7 +223,7 @@ struct TeacherPayoutMethodSheet: View {
         } label: {
           HStack(spacing: 8) {
             PlatformIcon(systemName: "arrow.down.doc", size: 14, weight: .semibold, color: theme.info)
-            Text(String(format: LocalizationSupport.localized("Use my profile number (%@)"), profilePhone))
+            Text(viewModel.useProfileNumberText(profilePhone))
               .font(.system(size: 13, weight: .semibold))
               .foregroundStyle(theme.info)
             Spacer()
@@ -236,7 +235,7 @@ struct TeacherPayoutMethodSheet: View {
         .buttonStyle(.plain)
       }
 
-      Text(LocalizationSupport.localized("Use the phone number registered with your Bit account."))
+      Text(viewModel.bitPhoneHint)
         .font(.system(size: 13))
         .foregroundStyle(theme.secondaryText)
     }
@@ -250,14 +249,14 @@ struct TeacherPayoutMethodSheet: View {
   var payPalFields: some View {
     VStack(alignment: .leading, spacing: 18) {
       AuthInputField(
-        title: LocalizationSupport.localized("PayPal Email"),
-        placeholder: LocalizationSupport.localized("name@example.com"),
+        title: viewModel.payPalEmailFieldTitle,
+        placeholder: viewModel.emailPlaceholder,
         systemImage: "envelope",
         text: $method.email,
         keyboardType: .emailAddress,
         textContentType: .emailAddress,
         isValid: !showsPayPalEmailError,
-        errorMessage: LocalizationSupport.localized("Enter a valid PayPal email address.")
+        errorMessage: viewModel.payPalEmailErrorMessage
       )
 
 //      if method.isPayPalVerified, !method.email.isEmpty {

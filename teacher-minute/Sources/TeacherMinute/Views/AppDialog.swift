@@ -20,6 +20,13 @@ import SwiftUI
 
 /// One button in an `appDialog`.
 struct AppDialogAction {
+    /// Shown only when a caller passes no actions at all, so the dialog can
+    /// still be dismissed. No call site relies on it today; it exists so an
+    /// empty array can never trap the user in an undismissable dialog.
+    static var dismissFallback: AppDialogAction {
+        AppDialogAction(LocalizationSupport.localized("OK"), kind: .primary)
+    }
+
     /// Drives the button's appearance, and nothing else — dismissal is handled
     /// by the dialog for every kind, so `handler` only carries side effects.
     enum Kind {
@@ -160,9 +167,7 @@ extension View {
         let dialog = AppDialogView(
             title: title,
             message: message,
-            actions: actions.isEmpty
-                ? [AppDialogAction(LocalizationSupport.localized("OK"), kind: .primary)]
-                : actions,
+            actions: actions.isEmpty ? [AppDialogAction.dismissFallback] : actions,
             onDismiss: { isPresented.wrappedValue = false }
         )
 #if os(Android)

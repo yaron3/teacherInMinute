@@ -113,6 +113,14 @@ protocol TeacherDashboardViewModeling: AnyObject {
 
 extension TeacherDashboardViewModeling {
 
+    // MARK: Verification-documents suggestion
+    var documentsSuggestionTitle: String { LocalizationSupport.localized("Complete your verification") }
+    var documentsSuggestionText: String {
+        LocalizationSupport.localized("Nice work on your first lesson! Uploading the rest of your verification documents helps us confirm you as a teacher faster. It's optional — you can also do it anytime from your Profile.")
+    }
+    var completeNowLabel: String { LocalizationSupport.localized("Complete now") }
+    var maybeLaterLabel: String { LocalizationSupport.localized("Maybe later") }
+
   // MARK: Navigation / overlay titles
 
   var settingUpSessionText: String { LocalizationSupport.localized("Setting up the session") }

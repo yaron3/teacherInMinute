@@ -509,7 +509,7 @@ struct AskTeacherSheet: View {
     @ViewBuilder
     var addPhotoButton: some View {
 #if !os(Android)
-        PhotoSourceButton(onImageData: { data in
+        PhotoSourceButton(viewModel: viewModel, onImageData: { data in
             uploadPhotoData(data)
         }) {
             addPhotoLabel
@@ -542,7 +542,7 @@ struct AskTeacherSheet: View {
     @ViewBuilder
     var largeAddPhotoButton: some View {
 #if !os(Android)
-        PhotoSourceButton(onImageData: { data in
+        PhotoSourceButton(viewModel: viewModel, onImageData: { data in
             uploadPhotoData(data)
         }) {
             largeAddPhotoLabel

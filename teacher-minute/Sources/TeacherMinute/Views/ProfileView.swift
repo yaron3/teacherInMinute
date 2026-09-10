@@ -57,7 +57,7 @@ struct ProfileView: View {
 
           ProfileInfoRow(
             parameter: .constant(Parameter(
-              description: LocalizationSupport.localized("Email"),
+              description: viewModel.emailFieldLabel,
               value: viewModel.email,
               image: "envelope.fill"
             )),
@@ -66,7 +66,7 @@ struct ProfileView: View {
           FlatRule()
           ProfileInfoRow(
             parameter: .constant(Parameter(
-              description: LocalizationSupport.localized("Phone"),
+              description: viewModel.phoneFieldLabel,
               value: viewModel.phoneNumber,
               image: "phone.fill"
             )),
@@ -90,10 +90,10 @@ struct ProfileView: View {
 		FlatCard {
 		  VStack {
 			HStack {
-			  Label(LocalizationSupport.localized("Payment Method"), systemImage: "creditcard")
+			  Label(viewModel.paymentMethodLabel, systemImage: "creditcard")
 			  Spacer()
 			  Button(action: showProfileEditor) {
-				Text(LocalizationSupport.localized("Edit"))
+				Text(viewModel.editLabel)
 				  .font(.system(size: 14, weight: .bold))
 				  .foregroundStyle(theme.primaryText)
 			  }
@@ -131,11 +131,11 @@ struct ProfileView: View {
           .padding(.top, 32)
       }
       if viewModel.shouldShowTeachingDetails {
-        FlatSectionHeader(LocalizationSupport.localized("Teaching Details"))
+        FlatSectionHeader(viewModel.teachingDetailsSectionTitle)
           .padding(.top, 32)
 
         teachingCard(
-          title: LocalizationSupport.localized("Grade Levels Taught"),
+          title: viewModel.gradeLevelsTaughtTitle,
           chips: viewModel.gradeLevelLabels,
           includeAdd: viewModel.gradeLevels.isEmpty,
           editAction: showProfileEditor,
@@ -144,7 +144,7 @@ struct ProfileView: View {
         .padding(.top, 14)
 
         teachingCard(
-          title: LocalizationSupport.localized("Subjects"),
+          title: viewModel.subjectsSectionTitle,
           chips: viewModel.subjectsOrPlaceholder,
           includeAdd: viewModel.subjects.isEmpty,
           editAction: { isShowingSubjectEditor = true },
@@ -156,14 +156,14 @@ struct ProfileView: View {
           .padding(.top, 12)
       }
 
-      FlatSectionHeader(LocalizationSupport.localized("Device Permissions"))
+      FlatSectionHeader(viewModel.devicePermissionsSectionTitle)
         .padding(.top, 32)
 
       FlatCard(padding: 0, outlined: true) {
         VStack(spacing: 0) {
           ProfilePermissionRow(
             icon: "mic.fill",
-            title: LocalizationSupport.localized("Microphone"),
+            title: viewModel.microphoneLabel,
             state: viewModel.microphoneState,
             iconColor: permissionColor(viewModel.microphoneState),
             action: viewModel.requestMicrophonePermission
@@ -173,7 +173,7 @@ struct ProfileView: View {
 
           ProfilePermissionRow(
             icon: "camera.fill",
-            title: LocalizationSupport.localized("Camera"),
+            title: viewModel.cameraLabel,
             state: viewModel.cameraState,
             iconColor: permissionColor(viewModel.cameraState),
             action: viewModel.requestCameraPermission
@@ -183,7 +183,7 @@ struct ProfileView: View {
 
           ProfilePermissionRow(
             icon: "bell.fill",
-            title: LocalizationSupport.localized("Notifications"),
+            title: viewModel.notificationsLabel,
             state: viewModel.notificationsState,
             iconColor: permissionColor(viewModel.notificationsState),
             action: viewModel.manageNotifications
@@ -245,7 +245,7 @@ struct ProfileView: View {
       Button {
         Task { await viewModel.loadProfile() }
       } label: {
-        Text(LocalizationSupport.localized("Retry"))
+        Text(viewModel.retryLabel)
           .font(.system(size: 14, weight: .bold))
           .foregroundStyle(theme.primaryText)
       }
@@ -305,7 +305,7 @@ struct ProfileView: View {
   @ViewBuilder
   var profilePhotoButton: some View {
 #if !os(Android)
-    PhotoSourceButton(onImageData: { data in
+    PhotoSourceButton(viewModel: viewModel, onImageData: { data in
       viewModel.uploadProfileImage(data: data)
     }) {
       profilePhotoContent
@@ -318,17 +318,17 @@ struct ProfileView: View {
     }
     .buttonStyle(.plain)
     .confirmationDialog(
-      LocalizationSupport.localized("Add a photo"),
+      viewModel.addPhotoDialogTitle,
       isPresented: $showAndroidPhotoSourceDialog,
       titleVisibility: .visible
     ) {
-      Button(LocalizationSupport.localized("Take Photo")) {
+      Button(viewModel.takePhotoLabel) {
         pickAndroidProfilePhoto(source: .camera)
       }
-      Button(LocalizationSupport.localized("Choose from Library")) {
+      Button(viewModel.chooseFromLibraryLabel) {
         pickAndroidProfilePhoto(source: .gallery)
       }
-      Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+      Button(viewModel.cancelLabel, role: .cancel) {}
     }
 #endif
   }
@@ -400,7 +400,7 @@ struct ProfileView: View {
 
   var savedPayPalSection: some View {
     VStack(alignment: .leading, spacing: 14) {
-      FlatSectionHeader(LocalizationSupport.localized("Saved PayPal")) {
+      FlatSectionHeader(viewModel.savedPayPalSectionTitle) {
         if viewModel.payPalPayoutEmail == nil, !viewModel.isEditingPayPalEmail {
           Button {
             Task { await viewModel.addPayPalPayoutEmail() }
@@ -408,7 +408,7 @@ struct ProfileView: View {
             if viewModel.isSavingPayPal {
               ProgressView()
             } else {
-              FlatChip(title: LocalizationSupport.localized("+ Add"), outlined: true)
+              FlatChip(title: viewModel.addChipLabel, outlined: true)
             }
           }
           .buttonStyle(.plain)
@@ -424,7 +424,7 @@ struct ProfileView: View {
             FlatIconTile(systemName: "checkmark.circle.fill", tint: theme.positive, background: theme.screenBackground)
 
             VStack(alignment: .leading, spacing: 3) {
-              Text(LocalizationSupport.localized("PayPal"))
+              Text(viewModel.payPalLabel)
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(theme.primaryText)
               Text(email)
@@ -438,14 +438,14 @@ struct ProfileView: View {
             Button {
               viewModel.editPayPalPayoutEmail()
             } label: {
-              Text(LocalizationSupport.localized("Change"))
+              Text(viewModel.changeLabel)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(theme.info)
             }
             .buttonStyle(.plain)
           }
         } else {
-          Text(LocalizationSupport.localized("No saved PayPal account. Tap \"+ Add\" to save one."))
+          Text(viewModel.noSavedPayPalText)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
         }
@@ -460,10 +460,10 @@ struct ProfileView: View {
       HStack(alignment: .top, spacing: 10) {
         PlatformIcon(systemName: "bolt.fill", size: 16, weight: .bold, color: theme.warning)
         VStack(alignment: .leading, spacing: 4) {
-          Text(LocalizationSupport.localized("Where you get paid"))
+          Text(viewModel.whereYouGetPaidTitle)
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(theme.warning)
-          Text(LocalizationSupport.localized("Your monthly payout is sent to this address, so it must be the email on your PayPal account."))
+          Text(viewModel.payoutEmailExplanation)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.secondaryText)
         }
@@ -484,8 +484,8 @@ struct ProfileView: View {
   var payPalEmailEditor: some View {
     VStack(alignment: .leading, spacing: 12) {
       AuthInputField(
-        title: LocalizationSupport.localized("PayPal Email"),
-        placeholder: LocalizationSupport.localized("name@example.com"),
+        title: viewModel.payPalEmailFieldTitle,
+        placeholder: viewModel.emailPlaceholder,
         systemImage: "envelope",
         text: $viewModel.payPalEmailDraft,
         keyboardType: .emailAddress,
@@ -500,7 +500,7 @@ struct ProfileView: View {
             ProgressView()
               .frame(maxWidth: .infinity)
           } else {
-            Text(LocalizationSupport.localized("Save Changes"))
+            Text(viewModel.saveChangesLabel)
               .font(.system(size: 15, weight: .bold))
               .frame(maxWidth: .infinity)
           }
@@ -511,7 +511,7 @@ struct ProfileView: View {
         Button {
           viewModel.cancelPayPalEmailEditing()
         } label: {
-          Text(LocalizationSupport.localized("Cancel"))
+          Text(viewModel.cancelLabel)
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(theme.secondaryText)
         }
@@ -531,14 +531,14 @@ struct ProfileView: View {
 
 		  VStack(alignment: .leading, spacing: 3) {
 			Text(viewModel.hasMissingDocuments
-				 ? LocalizationSupport.localized("Complete Your Documents")
-				 : LocalizationSupport.localized("Documents Uploaded"))
+				 ? viewModel.completeDocumentsTitle
+				 : viewModel.documentsUploadedTitle)
 			  .font(.system(size: 15, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
 
 			Text(viewModel.hasMissingDocuments
-				 ? LocalizationSupport.localized("Upload your remaining verification documents")
-				 : LocalizationSupport.localized("View the verification documents you uploaded"))
+				 ? viewModel.uploadRemainingDocumentsSubtitle
+				 : viewModel.viewUploadedDocumentsSubtitle)
 			  .font(.system(size: 13))
 			  .foregroundStyle(theme.secondaryText)
 		  }
@@ -569,7 +569,7 @@ struct ProfileView: View {
 		  Spacer()
 
 		  Button(action: editAction) {
-			Text(LocalizationSupport.localized("Edit"))
+			Text(viewModel.editLabel)
 			  .font(.system(size: 14, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
 		  }
@@ -583,7 +583,7 @@ struct ProfileView: View {
 
 		  if includeAdd {
 			Button(action: addAction) {
-			  FlatChip(title: LocalizationSupport.localized("+ Add"), outlined: true)
+			  FlatChip(title: viewModel.addChipLabel, outlined: true)
 			}
 			.buttonStyle(.plain)
 		  }
@@ -604,7 +604,7 @@ struct ProfileView: View {
         if source == .camera {
           let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
           guard cameraState.isGranted else {
-            viewModel.errorMessage = LocalizationSupport.localized("Camera access is required to take a photo.")
+            viewModel.errorMessage = viewModel.cameraAccessRequiredMessage
             return
           }
         }
@@ -639,12 +639,12 @@ struct ProfileEditView: View {
   var body: some View {
     ScrollView(.vertical, showsIndicators: false) {
 	  VStack(alignment: .leading, spacing: 0) {
-        Text(LocalizationSupport.localized("Edit Profile"))
+        Text(viewModel.editProfileTitle)
           .font(.system(size: 26, weight: .bold))
           .foregroundStyle(theme.primaryText)
           .padding(.top, 24)
 
-        Text(LocalizationSupport.localized("Update the details students and teachers use to recognize and contact you."))
+        Text(viewModel.editProfileSubtitle)
           .font(.system(size: 13))
           .foregroundStyle(theme.secondaryText)
           .lineSpacing(5)
@@ -653,19 +653,22 @@ struct ProfileEditView: View {
 
         VStack(spacing: 16) {
           ForEach($viewModel.contactRows, id: \.description) { $row in
-            if viewModel.roleType == .student && row.description == LocalizationSupport.localized("Grade") {
+            if viewModel.roleType == .student && row.description == viewModel.gradeFieldLabel {
               ProfileGradePicker(
+                viewModel: viewModel,
                 title: row.description,
                 selectedGrade: $row.value,
                 grades: viewModel.availableStudentGrades
               )
-            } else if viewModel.roleType == .student && row.description == LocalizationSupport.localized("Date of Birth") {
+            } else if viewModel.roleType == .student && row.description == viewModel.dateOfBirthFieldLabel {
               ProfileDateOfBirthPicker(
+                viewModel: viewModel,
                 title: row.description,
                 date: $viewModel.dateOfBirth
               )
             } else {
               ProfileEditInfoRow(
+                viewModel: viewModel,
                 parameter: $row,
                 isValid: viewModel.isRowValid(row),
                 errorMessage: viewModel.rowErrorMessage(for: row),
@@ -676,7 +679,8 @@ struct ProfileEditView: View {
 
           if viewModel.roleType == .teacher {
             ProfileTeachingGradePicker(
-              title: LocalizationSupport.localized("Grade Levels Taught"),
+              viewModel: viewModel,
+              title: viewModel.gradeLevelsTaughtTitle,
               selectedGrades: $viewModel.selectedTeachingGrades
             )
           }
@@ -691,7 +695,7 @@ struct ProfileEditView: View {
         }
 
         AuthPrimaryButton(
-          title: viewModel.isLoading ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save Changes"),
+          title: viewModel.saveButtonLabel,
           systemImage: "checkmark",
           isEnabled: viewModel.canSaveProfileEdits
         ) {
@@ -708,7 +712,7 @@ struct ProfileEditView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
-        Button(LocalizationSupport.localized("Cancel")) {
+        Button(viewModel.cancelLabel) {
           viewModel.cancelProfileEditing()
           dismiss()
         }
@@ -723,6 +727,7 @@ struct ProfileEditView: View {
 }
 
 struct ProfileTeachingGradePicker: View {
+  let viewModel: ProfileViewModel
   let title: String
   @Binding var selectedGrades: Set<String>
   @Environment(\.colorScheme) var colorScheme
@@ -745,7 +750,7 @@ struct ProfileTeachingGradePicker: View {
 
         Spacer()
 
-        Text(selectedGrades.isEmpty ? LocalizationSupport.localized("Choose grades") : String(format: LocalizationSupport.localized("%d selected"), selectedGrades.count))
+        Text(selectedGrades.isEmpty ? viewModel.chooseGradesLabel : viewModel.selectedGradesCountText(selectedGrades.count))
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(theme.secondaryText)
           .padding(.horizontal, 10)
@@ -758,7 +763,7 @@ struct ProfileTeachingGradePicker: View {
 		FlowLayout(spacing: 10) {
 		  ForEach(grades, id: \.self) { grade in
 			ProfileTeachingGradeChip(
-			  title: LocalizationSupport.localizedGradeLabel(grade),
+			  title: viewModel.gradeLabel(for: grade),
 			  isSelected: selectedGrades.contains(grade)
 			) {
 			  toggleGrade(grade)
@@ -780,6 +785,7 @@ struct ProfileTeachingGradePicker: View {
 }
 
 struct ProfileDateOfBirthPicker: View {
+  let viewModel: ProfileViewModel
   let title: String
   @Binding var date: Date?
   @Environment(\.colorScheme) var colorScheme
@@ -816,7 +822,7 @@ struct ProfileDateOfBirthPicker: View {
           Button {
             date = nil
           } label: {
-            Text(LocalizationSupport.localized("Clear"))
+            Text(viewModel.clearLabel)
               .font(.system(size: 13, weight: .semibold))
               .foregroundStyle(theme.accent)
           }
@@ -835,7 +841,7 @@ struct ProfileDateOfBirthPicker: View {
           date = defaultDate
         } label: {
           HStack {
-            Text(LocalizationSupport.localized("Set date of birth"))
+            Text(viewModel.setDateOfBirthLabel)
               .font(.system(size: 17))
               .foregroundStyle(theme.secondaryText)
 
@@ -864,6 +870,7 @@ struct ProfileDateOfBirthPicker: View {
 }
 
 struct ProfileGradePicker: View {
+  let viewModel: ProfileViewModel
   let title: String
   @Binding var selectedGrade: String
   let grades: [String]
@@ -886,7 +893,7 @@ struct ProfileGradePicker: View {
         }
       } label: {
         HStack {
-          Text(selectedGrade.isEmpty ? LocalizationSupport.localized("Select") : selectedGrade)
+          Text(selectedGrade.isEmpty ? viewModel.selectLabel : selectedGrade)
             .font(.system(size: 17))
             .foregroundStyle(selectedGrade.isEmpty ? theme.secondaryText : theme.primaryText)
 
@@ -1003,7 +1010,7 @@ struct ProfileTeachingGradeChip: View {
         PlatformIcon(systemName: "graduationcap")
           .font(.system(size: 12, weight: .semibold))
 
-        Text(LocalizationSupport.localized(title))
+        Text(title)
           .font(.system(size: 13, weight: .medium))
       }
       .foregroundStyle(theme.primaryText)
@@ -1021,6 +1028,7 @@ struct ProfileTeachingGradeChip: View {
 }
 
 struct ProfileEditInfoRow: View {
+  let viewModel: ProfileViewModel
   @Binding var parameter: Parameter
   var isValid = true
   var errorMessage: String?
@@ -1041,9 +1049,9 @@ struct ProfileEditInfoRow: View {
 
   private var keyboardType: UIKeyboardType {
     switch parameter.description {
-    case LocalizationSupport.localized("Email"):
+    case viewModel.emailFieldLabel:
       return .emailAddress
-    case LocalizationSupport.localized("Phone"):
+    case viewModel.phoneFieldLabel:
       return .phonePad
     default:
       return .default
@@ -1052,11 +1060,11 @@ struct ProfileEditInfoRow: View {
 
   private var textContentType: UITextContentType? {
     switch parameter.description {
-    case LocalizationSupport.localized("Full Name"):
+    case viewModel.fullNameFieldLabel:
       return .name
-    case LocalizationSupport.localized("Email"):
+    case viewModel.emailFieldLabel:
       return .emailAddress
-    case LocalizationSupport.localized("Phone"):
+    case viewModel.phoneFieldLabel:
       return .telephoneNumber
     default:
       return nil

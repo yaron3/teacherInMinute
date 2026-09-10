@@ -197,6 +197,7 @@ struct AuthSelectedRoleBackground: View {
 
 struct SubjectChip: View {
     let subject: SubjectOption
+    let title: String
     let isSelected: Bool
     let action: () -> Void
   @Environment(\.colorScheme) var colorScheme
@@ -208,7 +209,7 @@ struct SubjectChip: View {
             HStack(spacing: 7) {
                 PlatformIcon(systemName: subject.systemImage, size: 14, weight: .semibold)
 
-                Text(LocalizationSupport.localized(subject.title))
+                Text(title)
                     .font(.system(size: 15, weight: .medium))
             }
             // Selected chips fill with ink, so the label has to invert.
@@ -227,6 +228,7 @@ struct SubjectChip: View {
 }
 #if os(iOS)
 #Preview {
-  SubjectChip(subject: SubjectOption(title: "test", systemImage: "test"), isSelected: true, action: {})
+  SubjectChip(subject: SubjectOption(title: "test", systemImage: "test"),
+              title: "test", isSelected: true, action: {})
 }
 #endif

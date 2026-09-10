@@ -1,12 +1,13 @@
 import SwiftUI
 
 struct MessageComposer: View {
+  let placeholder: String
   let isFocused: FocusState<Bool>.Binding
   let onSend: (String) -> Void
   @State var draft = ""
 
   var body: some View {
-    ChatInputBar(text: $draft, isFocused: isFocused) {
+    ChatInputBar(placeholder: placeholder, text: $draft, isFocused: isFocused) {
       let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !text.isEmpty else { return }
       draft = ""
@@ -16,6 +17,7 @@ struct MessageComposer: View {
 }
 
 struct ChatInputBar: View {
+  let placeholder: String
   @Binding var text: String
   let isFocused: FocusState<Bool>.Binding
   let send: () -> Void
@@ -38,7 +40,7 @@ struct ChatInputBar: View {
   var body: some View {
 
       HStack(spacing: 10) {
-		TextField(LocalizationSupport.localized("Message"), text: $text)
+		TextField(placeholder, text: $text)
           .focused(isFocused)
           .textFieldStyle(.plain)
           .font(.system(size: 14))

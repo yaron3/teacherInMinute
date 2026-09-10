@@ -22,14 +22,14 @@ struct TeacherSubjectsView: View {
 	ScrollView {
 	  VStack(alignment: .leading, spacing: 0) {
 		if !isEditing {
-		  Text(LocalizationSupport.localized("Step 2 of 2"))
+		  Text(viewModel.stepIndicatorText)
 			.font(.system(size: 13, weight: .medium))
 			.foregroundStyle(theme.secondaryText)
 			.frame(maxWidth: .infinity)
 		}
 		
 		
-		Text(LocalizationSupport.localized("Choose a subject area, then select at least\none subtopic students can request."))
+		Text(viewModel.introText)
 		  .font(.system(size: 13))
 		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(5)
@@ -39,7 +39,7 @@ struct TeacherSubjectsView: View {
 		  .padding(.top, 24)
 		
 		HStack {
-		  Text(LocalizationSupport.localized("Subject Area"))
+		  Text(viewModel.subjectAreaSectionTitle)
 			.font(.system(size: 15, weight: .bold))
 			.foregroundStyle(theme.primaryText)
 		  
@@ -59,6 +59,7 @@ struct TeacherSubjectsView: View {
 		  ForEach(viewModel.visibleAreas) { area in
 			SubjectAreaChip(
 			  area: area,
+			  title: viewModel.areaTitle(area),
 			  isSelected: viewModel.isAreaSelected(area)
 			) {
 			  viewModel.toggleArea(area)
@@ -68,7 +69,7 @@ struct TeacherSubjectsView: View {
 		.padding(.top, 16)
 		
 		if viewModel.shouldShowSubtopicsPrompt {
-		  Text(LocalizationSupport.localized("Choose one or more subjects to see subtopics."))
+		  Text(viewModel.noAreasSelectedText)
 			.font(.system(size: 13))
 			.foregroundStyle(theme.secondaryText)
 			.padding(.top, 24)
@@ -77,7 +78,7 @@ struct TeacherSubjectsView: View {
 			ForEach(viewModel.selectedAreas) { area in
 			  VStack(alignment: .leading, spacing: 12) {
 				HStack {
-				  Text(String(format: LocalizationSupport.localized("%@ subtopics"), LocalizationSupport.localized(area.title)))
+				  Text(viewModel.subtopicsSectionTitle(for: area))
 					.font(.system(size: 15, weight: .bold))
 					.foregroundStyle(theme.primaryText)
 				  Spacer()
@@ -88,6 +89,7 @@ struct TeacherSubjectsView: View {
 				  ForEach(viewModel.visibleSubtopics(for: area)) { subtopic in
 					SubjectChip(
 					  subject: subtopic,
+					  title: viewModel.subtopicTitle(subtopic),
 					  isSelected: viewModel.isSubtopicSelected(subtopic, in: area)
 					) {
 					  viewModel.toggleSubtopic(subtopic, in: area)
@@ -101,7 +103,7 @@ struct TeacherSubjectsView: View {
 		}
 		Spacer()
 		AuthPrimaryButton(
-		  title: isEditing ? LocalizationSupport.localized("Save Changes") : LocalizationSupport.localized("Continue to Onboarding"),
+		  title: viewModel.continueButtonLabel(isEditing: isEditing),
 		  systemImage: isEditing ? "checkmark" : "arrow.right",
 		  isEnabled: viewModel.canContinue
 		) {
@@ -114,8 +116,8 @@ struct TeacherSubjectsView: View {
 	}
 	.background(Color(.systemBackground))
 	.navigationBarTitleDisplayMode(.inline)
-	.onboardingBackHandling(isActive: !isEditing)
-	.navigationTitle(LocalizationSupport.localized("What can you teach?"))
+	.onboardingBackHandling(viewModel: viewModel, isActive: !isEditing)
+	.navigationTitle(viewModel.onboardingTitle)
 	.onAppear {
 	  if isEditing {
 		viewModel.onContinue = { dismiss() }
@@ -125,11 +127,11 @@ struct TeacherSubjectsView: View {
 		viewModel.checkAndAutoAdvance()
 	  }
 	}
-	.navigationTitle(isEditing ? LocalizationSupport.localized("Edit Subjects") : "")
+	.navigationTitle(viewModel.navigationTitle(isEditing: isEditing))
 	.toolbar {
 	  if isEditing {
 		ToolbarItem(placement: .topBarLeading) {
-		  Button(LocalizationSupport.localized("Cancel")) { dismiss() }
+		  Button(viewModel.cancelLabel) { dismiss() }
 		}
 	  }
 	}
@@ -139,7 +141,7 @@ struct TeacherSubjectsView: View {
 		  theme.scrim.opacity(0.25).ignoresSafeArea()
 		  VStack(spacing: 12) {
 			ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.primaryText)
-			Text(LocalizationSupport.localized("Checking your subjects…"))
+			Text(viewModel.checkingText)
 			  .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.primaryText)
 		  }
 		}
@@ -149,11 +151,7 @@ struct TeacherSubjectsView: View {
   
   @ViewBuilder
   func subtopicBadge(for area: TeachingSubjectArea) -> some View {
-	let count = viewModel.selectedSubtopicTitles(for: area).count
-	let label = count == 0
-	? LocalizationSupport.localized("Required")
-	: String(format: LocalizationSupport.localized("selected"), count)
-	Text(label)
+	Text(viewModel.subtopicBadgeLabel(for: area))
 	  .font(.system(size: 11, weight: .semibold))
 	  .foregroundStyle(theme.secondaryText)
 	  .padding(.horizontal, 10)
@@ -170,7 +168,7 @@ struct TeacherSubjectsView: View {
 		color: theme.secondaryText
 	  )
 	  
-	  TextField(LocalizationSupport.localized("Search subjects or subtopics"), text: $viewModel.searchText)
+	  TextField(viewModel.searchPlaceholder, text: $viewModel.searchText)
 		.font(.system(size: 13))
 		.foregroundStyle(theme.primaryText)
 		.textInputAutocapitalization(.never)
@@ -191,6 +189,7 @@ struct TeacherSubjectsView: View {
 @MainActor
 struct SubjectAreaChip: View {
   let area: TeachingSubjectArea
+  let title: String
   let isSelected: Bool
   let action: @MainActor () -> Void
   @Environment(\.colorScheme) var colorScheme
@@ -201,7 +200,7 @@ struct SubjectAreaChip: View {
 	Button(action: action) {
 	  HStack(spacing: 7) {
 		PlatformIcon(systemName: area.systemImage, size: 12, color: isSelected ? theme.onAccentText : theme.primaryText)
-		Text(LocalizationSupport.localized(area.title))
+		Text(title)
 		  .font(.system(size: 13, weight: .medium))
 	  }
 	  .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)

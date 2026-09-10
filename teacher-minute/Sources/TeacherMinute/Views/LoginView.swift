@@ -22,12 +22,12 @@ struct LoginView: View {
 	  
 	  ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 0) {
-//		Text(LocalizationSupport.localized("Welcome Back"))
+//		Text(viewModel.screenTitle)
 //		  .font(.system(size: 32, weight: .bold))
 //		  .foregroundStyle(theme.primaryText)
 //		  .padding(.top, 28)
 		
-		Text(LocalizationSupport.localized("Log in to Teacher in a Minute to continue your journey."))
+		Text(viewModel.subtitleText)
 		  .font(.system(size: 16, weight: .regular))
 		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(6)
@@ -63,7 +63,7 @@ struct LoginView: View {
 			.progressViewStyle(.circular)
 			.scaleEffect(1.8)
 			.tint(theme.primaryText)
-		  Text(LocalizationSupport.localized("Signing in…"))
+		  Text(viewModel.signingInProgressText)
 			.font(.system(size: 15, weight: .medium))
 			.foregroundStyle(theme.primaryText)
 		}
@@ -71,17 +71,17 @@ struct LoginView: View {
 	}
 	.navigationBarTitleDisplayMode(.inline)
 	// Push the resolved destination when login completes
-	.navigationTitle(LocalizationSupport.localized("Welcome Back"))
+	.navigationTitle(viewModel.screenTitle)
 	.onChange(of: viewModel.destination) { _, resume in
 	  guard let resume else { return }
 	  router.resume(resume)
 	  viewModel.destination = nil
 	}
 	.appDialog(
-	  LocalizationSupport.localized("Sign In Error"),
+	  viewModel.signInErrorTitle,
 	  isPresented: $viewModel.showAlert,
-	  message: viewModel.alertMessage ?? LocalizationSupport.localized("An unexpected error occurred."),
-	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	  message: viewModel.alertMessage ?? viewModel.genericErrorMessage,
+	  actions: [AppDialogAction(viewModel.okLabel)]
 	)
   }
   
@@ -93,7 +93,7 @@ struct LoginView: View {
 	VStack(alignment: .leading, spacing: 22) {
 	  // Email field
 	  VStack(alignment: .leading, spacing: 9) {
-		Text(LocalizationSupport.localized("Email"))
+		Text(viewModel.emailFieldTitle)
 		  .font(.system(size: 14, weight: .semibold))
 		  .foregroundStyle(theme.primaryText)
 		
@@ -104,7 +104,7 @@ struct LoginView: View {
 			color: theme.secondaryText
 		  )
 		  
-		  TextField(LocalizationSupport.localized("Enter your email"), text: $viewModel.emailOrPhone)
+		  TextField(viewModel.emailPlaceholder, text: $viewModel.emailOrPhone)
 			.font(.system(size: 16))
 			.foregroundStyle(theme.primaryText)
 			.keyboardType(.emailAddress)
@@ -126,7 +126,7 @@ struct LoginView: View {
 	  
 	  // Password field
 	  VStack(alignment: .leading, spacing: 9) {
-		Text(LocalizationSupport.localized("Password"))
+		Text(viewModel.passwordFieldTitle)
 		  .font(.system(size: 14, weight: .semibold))
 		  .foregroundStyle(theme.primaryText)
 		
@@ -139,9 +139,9 @@ struct LoginView: View {
 		  
 		  Group {
 			if viewModel.isPasswordVisible {
-			  TextField(LocalizationSupport.localized("Enter your password"), text: $viewModel.password)
+			  TextField(viewModel.passwordPlaceholder, text: $viewModel.password)
 			} else {
-			  SecureField(LocalizationSupport.localized("Enter your password"), text: $viewModel.password)
+			  SecureField(viewModel.passwordPlaceholder, text: $viewModel.password)
 				.accessibilityIdentifier("password_input")
 			}
 		  }
@@ -172,7 +172,7 @@ struct LoginView: View {
 	  Button {
 		viewModel.forgotPassword()
 	  } label: {
-		Text(LocalizationSupport.localized("Forgot Password?"))
+		Text(viewModel.forgotPasswordLabel)
 		  .font(.system(size: 14, weight: .medium))
 		  .foregroundStyle(theme.accent)
 		  .frame(maxWidth: .infinity, alignment: .trailing)
@@ -196,7 +196,7 @@ struct LoginView: View {
 		  ProgressView().tint(theme.onAccentText)
 		}
 
-		Text(viewModel.isLoading ? LocalizationSupport.localized("Signing In…") : LocalizationSupport.localized("Log In"))
+		Text(viewModel.logInButtonLabel)
 		  .font(.system(size: 17, weight: .bold))
 	  }
 	  // Disabled state swaps to the raised gray rather than fading ink into the
@@ -217,7 +217,7 @@ struct LoginView: View {
 		.fill(theme.separator)
 		.frame(height: 1)
 	  
-	  Text(LocalizationSupport.localized("Or continue with"))
+	  Text(viewModel.orContinueWithLabel)
 		.font(.system(size: 14, weight: .regular))
 		.foregroundStyle(theme.secondaryText)
 		.lineLimit(1)
@@ -231,9 +231,9 @@ struct LoginView: View {
   
   var socialButtons: some View {
 	HStack(spacing: 16) {
-	  socialButton(title: LocalizationSupport.localized("Google"), systemImage: "google-logo") { viewModel.loginWithGoogle() }
+	  socialButton(title: viewModel.googleLabel, systemImage: "google-logo") { viewModel.loginWithGoogle() }
 	  #if !os(Android)
-		  socialButton(title: LocalizationSupport.localized("Apple"),  systemImage: "apple.logo")    { viewModel.loginWithApple() }
+		  socialButton(title: viewModel.appleLabel,  systemImage: "apple.logo")    { viewModel.loginWithApple() }
 #endif
 	}
   }
@@ -256,13 +256,13 @@ struct LoginView: View {
   
   var bottomSignUp: some View {
 	HStack(spacing: 4) {
-	  Text(LocalizationSupport.localized("Don't have an account?"))
+	  Text(viewModel.noAccountText)
 		.foregroundStyle(theme.secondaryText)
 	  
 	  Button {
 		router.push(.createAccount)
 	  } label: {
-		Text(LocalizationSupport.localized("Sign Up"))
+		Text(viewModel.signUpLabel)
 		  .fontWeight(.semibold)
 		  .foregroundStyle(theme.accent)
 	  }

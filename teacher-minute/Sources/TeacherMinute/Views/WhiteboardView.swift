@@ -67,6 +67,7 @@ struct BoardStrokeKey: Hashable {
 }
 
 struct WhiteboardView: View {
+  let viewModel: any ChatSessionViewModeling
   static let logicalSize = CGSize(width: 2000, height: 2000)
   static let minZoom: CGFloat = 1.0
   static let maxZoom: CGFloat = 6.0
@@ -98,6 +99,7 @@ struct WhiteboardView: View {
   @Environment(\.colorScheme) var colorScheme
   
   init(
+	viewModel: any ChatSessionViewModeling,
 	strokes: [BoardStroke],
 	revision: String,
 	onStrokeFinished: @escaping ([CGPoint]) -> Void,
@@ -107,6 +109,7 @@ struct WhiteboardView: View {
 	isMaximized: Binding<Bool> = .constant(false),
 	role: String = "teacher"
   ) {
+	self.viewModel = viewModel
 	self.strokes = strokes
 	self.revision = revision
 	self.onStrokeFinished = onStrokeFinished
@@ -123,9 +126,9 @@ struct WhiteboardView: View {
   var clearDialogTitle: String {
 	switch clearDialogReason {
 	case .local:
-	  return LocalizationSupport.localized("Clear board?")
+	  return viewModel.clearBoardTitle
 	case .remote:
-	  return LocalizationSupport.localized("The other side cleared the board")
+	  return viewModel.peerClearedBoardTitle
 	}
   }
 
@@ -136,23 +139,23 @@ struct WhiteboardView: View {
 	switch clearDialogReason {
 	case .local:
 	  return [
-		AppDialogAction(LocalizationSupport.localized("Save as photo and clear")) {
+		AppDialogAction(viewModel.saveAsPhotoAndClearLabel) {
 		  saveBoardAsPhoto()
 		  performClear()
 		},
-		AppDialogAction(LocalizationSupport.localized("Clear"), kind: .destructive) {
+		AppDialogAction(viewModel.clearLabel, kind: .destructive) {
 		  performClear()
 		},
-		AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel)
+		AppDialogAction(viewModel.cancelLabel, kind: .cancel)
 	  ]
 	case .remote:
 	  return [
-		AppDialogAction(LocalizationSupport.localized("Save as photo")) {
+		AppDialogAction(viewModel.saveAsPhotoLabel) {
 		  saveBoardAsPhoto(strokesToSave: pendingClearSnapshot)
 		  pendingClearSnapshot = []
 		  localStrokeColors.removeAll()
 		},
-		AppDialogAction(LocalizationSupport.localized("Dismiss"), kind: .cancel) {
+		AppDialogAction(viewModel.dismissLabel, kind: .cancel) {
 		  pendingClearSnapshot = []
 		  localStrokeColors.removeAll()
 		}
@@ -449,7 +452,7 @@ struct WhiteboardView: View {
 	  if strokes.isEmpty && activeStroke.isEmpty {
 		VStack(spacing: 8) {
 		  PlatformIcon(systemName: "pencil", size: 22, weight: .semibold, color: theme.secondaryText)
-		  Text(LocalizationSupport.localized("Use your finger to write or sketch."))
+		  Text(viewModel.boardHintText)
 			.font(.system(size: 12))
 			.foregroundStyle(theme.secondaryText)
 		}

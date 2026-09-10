@@ -20,7 +20,7 @@ struct TeacherLessonHistoryView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     FlatTopHeader(
-                        eyebrow: LocalizationSupport.localized("Teacher"),
+                        eyebrow: viewModel.historyEyebrow,
                         name: viewModel.teacherName,
                         avatarImageURL: viewModel.profileImageURL,
                         avatarSystemImage: "person.crop.circle.fill",
@@ -28,19 +28,19 @@ struct TeacherLessonHistoryView: View {
                     )
                     .padding(.top, 16)
 
-                    FlatPageTitle(title: LocalizationSupport.localized("Past Lessons"))
+                    FlatPageTitle(title: viewModel.pastLessonsTitle)
                         .padding(.top, 24)
 
                     summaryStrip
                         .padding(.top, 20)
 
                     FlatSearchField(
-                        placeholder: LocalizationSupport.localized("Search lessons or students"),
+                        placeholder: viewModel.searchPlaceholder,
                         text: $viewModel.query
                     )
                     .padding(.top, 16)
 
-                    FlatSectionHeader(LocalizationSupport.localized("Past")) {
+                    FlatSectionHeader(viewModel.pastSectionTitle) {
                         FlatChip(title: viewModel.completedCountText)
                     }
                     .padding(.top, 28)
@@ -57,7 +57,7 @@ struct TeacherLessonHistoryView: View {
                         }
                         .padding(.top, 14)
                     } else if viewModel.filteredLessons.isEmpty {
-                        Text(LocalizationSupport.localized("You don't have any recent activity"))
+                        Text(viewModel.emptyHistoryText)
                             .font(.system(size: 17))
                             .foregroundStyle(theme.secondaryText)
                             .padding(.top, 20)
@@ -69,6 +69,7 @@ struct TeacherLessonHistoryView: View {
                                 ForEach(viewModel.filteredLessons) { lesson in
                                     LessonHistoryRow(
                                         lesson: lesson,
+                                        loadingLabel: viewModel.loadingSessionDetailsLabel,
                                         accentColor: theme.primaryText,
                                         iconName: "person.fill.checkmark",
                                         isLoading: viewModel.isLoading(lesson)
@@ -96,8 +97,10 @@ struct TeacherLessonHistoryView: View {
         }
         .sheet(item: $presentingLesson) { lesson in
             LessonDetailView(
+                viewModel: viewModel,
                 lesson: lesson,
-                amountLabel: LocalizationSupport.localized("Earnings"),
+                amountLabel: viewModel.earningsLabel,
+                viewerRole: "teacher",
                 isPlaying: viewModel.isPlaying(lesson),
                 initialDetails: nil,
                 audioAction: { viewModel.toggleAudio(for: lesson) }
@@ -108,14 +111,14 @@ struct TeacherLessonHistoryView: View {
     private var summaryStrip: some View {
         HStack(spacing: 12) {
             HistoryMetricCard(
-                title: LocalizationSupport.localized("Time Taught"),
+                title: viewModel.timeTaughtTitle,
                 value: viewModel.totalTimeTaughtText,
                 systemImage: "clock.fill",
                 tint: theme.primaryText
             )
 
             HistoryMetricCard(
-                title: LocalizationSupport.localized("Earnings"),
+                title: viewModel.earningsLabel,
                 value: viewModel.totalEarningsText,
                 systemImage: LessonFormatting.currencySignIconFilled,
                 tint: theme.primaryText

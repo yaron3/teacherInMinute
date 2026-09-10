@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RateSessionView: View {
+  let viewModel: any ChatSessionViewModeling
   let teacherName: String
   let teacherImageURL: String
   let subject: String
@@ -21,6 +22,7 @@ struct RateSessionView: View {
   }
 
   init(
+    viewModel: any ChatSessionViewModeling,
     teacherName: String,
     teacherImageURL: String,
     subject: String,
@@ -29,6 +31,7 @@ struct RateSessionView: View {
     prepareForRating: @escaping @MainActor () async -> Void = {},
     onFinish: @escaping @MainActor () -> Void
   ) {
+    self.viewModel = viewModel
     self.teacherName = teacherName
     self.teacherImageURL = teacherImageURL
     self.subject = subject
@@ -72,13 +75,10 @@ struct RateSessionView: View {
             .padding(.top, 8)
 
           VStack(spacing: 6) {
-            Text(LocalizationSupport.localized("Session Complete!"))
+            Text(viewModel.sessionCompleteTitle)
               .font(.system(size: 22, weight: .bold))
               .foregroundStyle(theme.primaryText)
-            Text(String(
-              format: LocalizationSupport.localized("Great job learning with %@"),
-              teacherName
-            ))
+            Text(viewModel.greatJobText(teacherName: teacherName))
               .font(.system(size: 14))
               .foregroundStyle(theme.secondaryText)
               .multilineTextAlignment(.center)
@@ -120,13 +120,10 @@ struct RateSessionView: View {
 
           RoundedInfoCard {
             VStack(spacing: 14) {
-              Text(LocalizationSupport.localized("Rate this session"))
+              Text(viewModel.rateSessionTitle)
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(theme.primaryText)
-              Text(String(
-                format: LocalizationSupport.localized("How was your experience with %@?"),
-                teacherName
-              ))
+              Text(viewModel.rateExperienceText(teacherName: teacherName))
                 .font(.system(size: 13))
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
@@ -167,7 +164,7 @@ struct RateSessionView: View {
                     }
                     .overlay(alignment: .topLeading) {
                       if comment.isEmpty {
-                        Text(LocalizationSupport.localized("Add a comment (optional)"))
+                        Text(viewModel.rateCommentPlaceholderTitle)
                           .font(.system(size: 14))
                           .foregroundStyle(theme.secondaryText)
                           .padding(.horizontal, 15)
@@ -176,7 +173,7 @@ struct RateSessionView: View {
                       }
                     }
 
-                  Text(LocalizationSupport.localized("Your teacher sees this without your name."))
+                  Text(viewModel.rateCommentPrivacyNote)
                     .font(.system(size: 11))
                     .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -204,7 +201,7 @@ struct RateSessionView: View {
             ProgressView()
               .tint(theme.onDarkFill)
           } else {
-            Text(LocalizationSupport.localized("Send"))
+            Text(viewModel.sendLabel)
               .font(.system(size: 16, weight: .bold))
               .foregroundStyle(theme.onDarkFill)
           }
@@ -240,7 +237,7 @@ struct RateSessionView: View {
         onFinish()
       } catch {
         isSending = false
-        errorMessage = LocalizationSupport.localized("Could not send rating. Please try again next time.")
+        errorMessage = viewModel.ratingFailedMessage
         logger.error("[RateSession] rateTeacher failed: \(error.localizedDescription)")
       }
     }

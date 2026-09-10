@@ -30,7 +30,7 @@ struct TeacherIdentityVerificationView: View {
 	ZStack {
 	  ScrollView {
 		VStack(alignment: .leading, spacing: 0) {
-		  Text(LocalizationSupport.localized("Step 1 of 2"))
+		  Text(viewModel.stepIndicatorText)
 			.font(.system(size: 13, weight: .medium))
 			.foregroundStyle(theme.secondaryText)
 			.frame(maxWidth: .infinity)
@@ -46,10 +46,10 @@ struct TeacherIdentityVerificationView: View {
 		 // verificationStatus
 		//	.padding(.top, 20)
 		  
-		  sectionTitle(LocalizationSupport.localized("Government ID"))
+		  sectionTitle(viewModel.governmentIDSectionTitle)
 			.padding(.top, 22)
 		  
-		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdGovIdDescription, fallback: LocalizationSupport.localized("Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.")))
+		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdGovIdDescription, fallback: viewModel.governmentIDDescriptionFallback))
 			.font(.system(size: 11))
 			.foregroundStyle(theme.secondaryText)
 			.lineSpacing(4)
@@ -59,14 +59,16 @@ struct TeacherIdentityVerificationView: View {
 #if !os(Android)
 			let hasFront      = viewModel.hasGovernmentIDFront
 			let frontSpinning = viewModel.isUploading(for: .governmentIDFront)
-			PhotoSourceButton(onImageData: { data in
+			PhotoSourceButton(viewModel: viewModel, onImageData: { data in
 			  viewModel.handlePickedImage(data, for: .governmentIDFront)
 			}) {
 			  IDUploadBox(
-				title: LocalizationSupport.localized("Front Side"),
+				title: viewModel.frontSideLabel,
 				isCompleted: hasFront,
 				isUploading: frontSpinning,
 				isMandatory: false,
+				uploadingLabel: viewModel.uploadingLabel,
+				requiredLabel: viewModel.requiredLowercaseLabel,
 				action: {}
 			  )
 			}
@@ -97,16 +99,14 @@ struct TeacherIdentityVerificationView: View {
 		  
 		  // Hint when terms not accepted or front side missing
 		  if !viewModel.canSubmit && viewModel.uploadingTarget == nil {
-			Text(viewModel.hasGovernmentIDFront
-				 ? LocalizationSupport.localized("Accept the terms to continue")
-				 : LocalizationSupport.localized("Upload the front side of your ID to continue"))
+			Text(viewModel.submitBlockedHint)
 			.font(.system(size: 11))
 			.foregroundStyle(theme.primaryText)
 			.padding(.top, 8)
 		  }
 		  
 		  AuthPrimaryButton(
-			title: LocalizationSupport.localized("Submit for Review"),
+			title: viewModel.submitForReviewLabel,
 			systemImage: "arrow.right",
 			isEnabled: viewModel.canSubmit
 		  ) {
@@ -118,7 +118,7 @@ struct TeacherIdentityVerificationView: View {
 		  .padding(.bottom, 24)
 		  
 		  AuthPrimaryButton(
-			title: LocalizationSupport.localized("Continue - upload later"),
+			title: viewModel.continueUploadLaterLabel,
 			systemImage: "arrow.right",
 			isEnabled: true
 		  ) {
@@ -140,32 +140,32 @@ struct TeacherIdentityVerificationView: View {
 			.progressViewStyle(.circular)
 			.scaleEffect(1.8)
 			.tint(theme.primaryText)
-		  Text(LocalizationSupport.localized("Checking…"))
+		  Text(viewModel.checkingLabel)
 			.font(.system(size: 14, weight: .medium))
 			.foregroundStyle(theme.primaryText)
 		}
 	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
-	.onboardingBackHandling()
+	.onboardingBackHandling(viewModel: viewModel)
 	.onAppear {
 	  viewModel.onSubmit = { router.push(.teacherSubjects) }
 	  viewModel.checkAndAutoAdvance()
 	}
-	.navigationTitle(LocalizationSupport.localized("Verify Your Identity"))
+	.navigationTitle(viewModel.screenTitle)
 #if os(Android)
 	.confirmationDialog(
-	  LocalizationSupport.localized("Add a photo"),
+	  viewModel.addPhotoDialogTitle,
 	  isPresented: $showAndroidPhotoSourceDialog,
 	  titleVisibility: .visible
 	) {
-	  Button(LocalizationSupport.localized("Take Photo")) {
+	  Button(viewModel.takePhotoLabel) {
 		pickAndUploadAndroidImage(for: androidPickTarget, source: .camera)
 	  }
-	  Button(LocalizationSupport.localized("Choose from Library")) {
+	  Button(viewModel.chooseFromLibraryLabel) {
 		pickAndUploadAndroidImage(for: androidPickTarget, source: .gallery)
 	  }
-	  Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+	  Button(viewModel.cancelLabel, role: .cancel) {}
 	}
 #endif
 
@@ -174,30 +174,38 @@ struct TeacherIdentityVerificationView: View {
   // MARK: - Picker label helpers (Android / preview)
   var credentialsPickerLabel: some View {
 	UploadLargeBox(
-	  title: LocalizationSupport.localized("Tap to upload document"),
-	  subtitle: LocalizationSupport.localized("PDF, JPG or PNG (Max 5MB)"),
+	  title: viewModel.tapToUploadDocumentLabel,
+	  subtitle: viewModel.uploadFormatsHint,
 	  icon: "icloud.and.arrow.up.fill",
 	  isCompleted: viewModel.hasTeachingCredentials,
 	  isUploading: viewModel.isUploading(for: .teachingCredentials),
+	  uploadingLabel: viewModel.uploadingLabel,
 	  action: {}
 	)
   }
   
   var idFrontPickerLabel: some View {
-	IDUploadBox(title: LocalizationSupport.localized("Front Side"), isCompleted: viewModel.hasGovernmentIDFront,
+	IDUploadBox(title: viewModel.frontSideLabel, isCompleted: viewModel.hasGovernmentIDFront,
 				isUploading: viewModel.isUploading(for: .governmentIDFront),
-				isMandatory: true, action: {})
+				isMandatory: true,
+				uploadingLabel: viewModel.uploadingLabel,
+				requiredLabel: viewModel.requiredLowercaseLabel, action: {})
   }
   
   var idBackPickerLabel: some View {
-	IDUploadBox(title: LocalizationSupport.localized("Back Side"), isCompleted: viewModel.hasGovernmentIDBack,
+	IDUploadBox(title: viewModel.backSideLabel, isCompleted: viewModel.hasGovernmentIDBack,
 				isUploading: viewModel.isUploading(for: .governmentIDBack),
-				isMandatory: false, action: {})
+				isMandatory: false,
+				uploadingLabel: viewModel.uploadingLabel,
+				requiredLabel: viewModel.requiredLowercaseLabel, action: {})
   }
   
   var selfiePickerLabel: some View {
 	SelfieRow(isCompleted: viewModel.hasSelfie,
-			  isUploading: viewModel.isUploading(for: .selfie), action: {})
+			  isUploading: viewModel.isUploading(for: .selfie),
+			  uploadingLabel: viewModel.uploadingSelfieLabel,
+			  takeSelfieLabel: viewModel.takeSelfieLabel,
+			  lightingHint: viewModel.ensureGoodLightingHint, action: {})
   }
   
   // MARK: - Load picked image → upload
@@ -213,7 +221,7 @@ struct TeacherIdentityVerificationView: View {
 		if source == .camera {
 		  let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
 		  guard cameraState.isGranted else {
-			viewModel.uploadError = LocalizationSupport.localized("Camera access is required to take a photo.")
+			viewModel.uploadError = viewModel.cameraAccessRequiredMessage
 			return
 		  }
 		}
@@ -230,7 +238,7 @@ struct TeacherIdentityVerificationView: View {
 		  return
 		}
 		guard let data = Data(base64Encoded: base64) else {
-		  viewModel.uploadError = LocalizationSupport.localized("Could not read selected image")
+		  viewModel.uploadError = viewModel.couldNotReadImageMessage
 		  return
 		}
 		logger.info("TeacherMinute Android image decoded target=\(target) bytes=\(data.count)")
@@ -247,11 +255,11 @@ struct TeacherIdentityVerificationView: View {
   var verificationStatus: some View {
 	VStack(alignment: .leading, spacing: 14) {
 	  HStack {
-		Text(LocalizationSupport.localized("VERIFICATION STATUS"))
+		Text(viewModel.verificationStatusSectionTitle)
 		  .font(.system(size: 11, weight: .bold))
 		  .foregroundStyle(theme.primaryText)
 		Spacer()
-		Text(viewModel.canSubmit ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Incomplete"))
+		Text(viewModel.verificationStatusLabel)
 		  .font(.system(size: 11, weight: .medium))
 		  .foregroundStyle(viewModel.canSubmit ? theme.positive : theme.primaryText)
 		  .padding(.horizontal, 10)
@@ -259,7 +267,11 @@ struct TeacherIdentityVerificationView: View {
 		  .background((viewModel.canSubmit ? theme.positive : theme.controlDisabled).opacity(0.12))
 		  .clipShape(Capsule())
 	  }
-	  StatusRow(title: LocalizationSupport.localized("Government ID – Front"), isDone: viewModel.hasGovernmentIDFront, isMandatory: false)
+	  StatusRow(title: viewModel.governmentIDFrontStatusTitle,
+				isDone: viewModel.hasGovernmentIDFront,
+				isMandatory: false,
+				requirementLabel: viewModel.requirementLabel(isMandatory: false),
+				alertMark: viewModel.alertMark)
 	}
 	.padding(16)
 	.background(theme.cardBackground)
@@ -276,10 +288,10 @@ struct TeacherIdentityVerificationView: View {
 		color: theme.accent
 	  )
 	  VStack(alignment: .leading, spacing: 6) {
-		Text(LocalizationSupport.localized("Your Privacy Matters"))
+		Text(viewModel.privacyTitle)
 		  .font(.system(size: 13, weight: .bold))
 		  .foregroundStyle(theme.primaryText)
-		Text(LocalizationSupport.localized("Your documents are securely encrypted and\nonly used for verification purposes. They will\nnot be shared publicly on your profile."))
+		Text(viewModel.privacyText)
 		  .font(.system(size: 11))
 		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(4)
@@ -299,7 +311,7 @@ struct TeacherIdentityVerificationView: View {
 		PlatformIcon(systemName: viewModel.acceptedTerms ? "checkmark.square.fill" : "square")
 		  .font(.system(size: 18))
 		  .foregroundStyle(viewModel.acceptedTerms ? theme.accent : theme.secondaryText)
-		Text(LocalizationSupport.localized("I confirm that the uploaded documents are authentic and belong to me. I agree to the Verification Terms."))
+		Text(viewModel.confirmDocumentsText)
 		  .font(.system(size: 11))
 		  .foregroundStyle(theme.secondaryText)
 		  .lineSpacing(4)
@@ -323,6 +335,8 @@ struct StatusRow: View {
   let title: String
   let isDone: Bool
   let isMandatory: Bool
+  let requirementLabel: String
+  let alertMark: String
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -343,7 +357,7 @@ struct StatusRow: View {
 		.foregroundStyle(theme.secondaryText)
 	  
 	  if isMandatory && !isDone {
-		Text(isMandatory ? LocalizationSupport.localized("Required") : LocalizationSupport.localized("Optional"))
+		Text(requirementLabel)
 		  .font(.system(size: 9, weight: .semibold))
 		  .foregroundStyle(theme.warning)
 		  .padding(.horizontal, 6)
@@ -359,7 +373,7 @@ struct StatusRow: View {
 		.frame(width: 10, height: 10)
 		.overlay {
 		  if !isDone {
-			Text(LocalizationSupport.localized("!"))
+			Text(alertMark)
 			  .font(.system(size: 7, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
 		  }
@@ -376,10 +390,13 @@ struct UploadLargeBox: View {
   let icon: String
   let isCompleted: Bool
   let isUploading: Bool
+  let uploadingLabel: String
   
   nonisolated init(title: String, subtitle: String, icon: String,
 				   isCompleted: Bool, isUploading: Bool = false,
+				   uploadingLabel: String,
 				   action: @escaping @Sendable () -> Void = {}) {
+	self.uploadingLabel = uploadingLabel
 	self.title = title
 	self.subtitle = subtitle
 	self.icon = icon
@@ -408,7 +425,7 @@ struct UploadLargeBox: View {
 		  }
 		}
 	  
-	  Text(isUploading ? LocalizationSupport.localized("Uploading…") : title)
+	  Text(isUploading ? uploadingLabel : title)
 		.font(.system(size: 13, weight: .semibold))
 		.foregroundStyle(theme.primaryText)
 	  
@@ -435,10 +452,15 @@ struct IDUploadBox: View {
   let isCompleted: Bool
   let isUploading: Bool
   let isMandatory: Bool
+  let uploadingLabel: String
+  let requiredLabel: String
   
   nonisolated init(title: String, isCompleted: Bool,
 				   isUploading: Bool = false, isMandatory: Bool = false,
+				   uploadingLabel: String, requiredLabel: String,
 				   action: @escaping @Sendable () -> Void = {}) {
+	self.uploadingLabel = uploadingLabel
+	self.requiredLabel = requiredLabel
 	self.title = title
 	self.isCompleted = isCompleted
 	self.isUploading = isUploading
@@ -465,12 +487,12 @@ struct IDUploadBox: View {
 		  }
 		}
 	  
-	  Text(isUploading ? LocalizationSupport.localized("Uploading…") : title)
+	  Text(isUploading ? uploadingLabel : title)
 		.font(.system(size: 12, weight: .medium))
 		.foregroundStyle(theme.primaryText)
 	  
 	  if isMandatory && !isCompleted && !isUploading {
-		Text(LocalizationSupport.localized("required"))
+		Text(requiredLabel)
 		  .font(.system(size: 9, weight: .semibold))
 		  .foregroundStyle(theme.warning)
 		  .padding(.horizontal, 5)
@@ -496,9 +518,17 @@ struct IDUploadBox: View {
 struct SelfieRow: View {
   let isCompleted: Bool
   let isUploading: Bool
+  let uploadingLabel: String
+  let takeSelfieLabel: String
+  let lightingHint: String
   
   nonisolated init(isCompleted: Bool, isUploading: Bool = false,
+				   uploadingLabel: String, takeSelfieLabel: String,
+				   lightingHint: String,
 				   action: @escaping @Sendable () -> Void = {}) {
+	self.uploadingLabel = uploadingLabel
+	self.takeSelfieLabel = takeSelfieLabel
+	self.lightingHint = lightingHint
 	self.isCompleted = isCompleted
 	self.isUploading = isUploading
   }
@@ -523,11 +553,11 @@ struct SelfieRow: View {
 		}
 	  
 	  VStack(alignment: .leading, spacing: 4) {
-		Text(isUploading ? LocalizationSupport.localized("Uploading selfie…") : LocalizationSupport.localized("Take Selfie"))
+		Text(isUploading ? uploadingLabel : takeSelfieLabel)
 		  .font(.system(size: 13, weight: .semibold))
 		  .foregroundStyle(theme.primaryText)
 		
-		Text(LocalizationSupport.localized("Ensure good lighting"))
+		Text(lightingHint)
 		  .font(.system(size: 11))
 		  .foregroundStyle(theme.secondaryText)
 	  }

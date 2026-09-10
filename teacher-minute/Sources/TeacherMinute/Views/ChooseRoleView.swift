@@ -30,7 +30,7 @@ struct ChooseRoleView: View {
       ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 0) {
 
-      Text(LocalizationSupport.localized("Choose your role"))
+      Text(viewModel.subtitleText)
         .font(.system(size: 15))
         .foregroundStyle(theme.secondaryText)
         .lineSpacing(5)
@@ -38,13 +38,10 @@ struct ChooseRoleView: View {
 
       VStack(spacing: 12) {
         RoleCard(
-          title: LocalizationSupport.localized("I am a Student"),
+          title: viewModel.studentRoleTitle,
           icon: "graduationcap.fill",
           description: viewModel.studentDescriptionLines,
-          details: [
-            LocalizationSupport.localized("On-demand help"),
-            LocalizationSupport.localized("Per-minute billing")
-          ],
+          details: viewModel.studentRoleBullets,
           isSelected: viewModel.selectedRole == .student,
           accent: theme.accent
         ) {
@@ -52,13 +49,10 @@ struct ChooseRoleView: View {
         }
 
         RoleCard(
-          title: LocalizationSupport.localized("I am a Teacher"),
+          title: viewModel.teacherRoleTitle,
           icon: "person.crop.rectangle",
           description: viewModel.teacherDescriptionLines,
-          details: [
-            LocalizationSupport.localized("Earn while teaching"),
-            LocalizationSupport.localized("Verification required")
-          ],
+          details: viewModel.teacherRoleBullets,
           isSelected: viewModel.selectedRole == .teacher,
           accent: theme.accent
         ) {
@@ -85,7 +79,7 @@ struct ChooseRoleView: View {
         .padding(.bottom, 20)
       }
 
-      AuthPrimaryButton(title: LocalizationSupport.localized("Continue")) {
+      AuthPrimaryButton(title: viewModel.continueLabel) {
         Task { @MainActor in
           continueWithSelectedRole()
         }
@@ -117,23 +111,23 @@ struct ChooseRoleView: View {
     .padding(.horizontal, 20)
     .background(theme.screenBackground)
     .navigationBarTitleDisplayMode(.inline)
-    .onboardingBackHandling()
+    .onboardingBackHandling(viewModel: viewModel)
     .sheet(isPresented: $showingTerms) {
       if let termsURL {
-        NavigationStack { AboutWebView(url: termsURL, title: LocalizationSupport.localized("EULA")) }
+        NavigationStack { AboutWebView(url: termsURL, title: viewModel.eulaTitle) }
       }
     }
-	.navigationTitle(LocalizationSupport.localized("Choose Your Role"))
+	.navigationTitle(viewModel.screenTitle)
     .sheet(isPresented: $showingPrivacy) {
       if let privacyURL {
-        NavigationStack { AboutWebView(url: privacyURL, title: LocalizationSupport.localized("Privacy Policy")) }
+        NavigationStack { AboutWebView(url: privacyURL, title: viewModel.privacyPolicyTitle) }
       }
     }
     .appDialog(
-      LocalizationSupport.localized("Choose Your Role"),
+      viewModel.screenTitle,
       isPresented: $showLegalAlert,
       message: legalAlertMessage,
-      actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+      actions: [AppDialogAction(viewModel.okLabel)]
     )
   }
 
@@ -163,7 +157,7 @@ struct ChooseRoleView: View {
       return
     }
 
-    legalAlertMessage = SettingsError.missingLegalURL(LocalizationSupport.localized("Privacy Policy")).localizedDescription
+    legalAlertMessage = SettingsError.missingLegalURL(viewModel.privacyPolicyTitle).localizedDescription
     showLegalAlert = true
   }
 }

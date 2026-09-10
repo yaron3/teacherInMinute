@@ -19,12 +19,12 @@ struct ResetPasswordView: View {
             AuthIconHeader(systemImage: "key.fill")
                 .padding(.top, 42)
 
-            Text(LocalizationSupport.localized("Reset Password"))
+            Text(viewModel.screenTitle)
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(theme.primaryText)
                 .padding(.top, 26)
 
-            Text(LocalizationSupport.localized("Enter your email or phone number and we'll\nsend you instructions to reset your password."))
+            Text(viewModel.introText)
                 .font(.system(size: 15))
                 .foregroundStyle(theme.secondaryText)
                 .lineSpacing(5)
@@ -33,7 +33,7 @@ struct ResetPasswordView: View {
             formCard
                 .padding(.top, 34)
 
-            AuthPrimaryButton(title: LocalizationSupport.localized("Send Reset Link"), isEnabled: viewModel.canSubmit) {
+            AuthPrimaryButton(title: viewModel.sendResetLinkLabel, isEnabled: viewModel.canSubmit) {
                 viewModel.sendResetLink()
             }
             .padding(.top, 22)
@@ -51,7 +51,7 @@ struct ResetPasswordView: View {
                         color: theme.secondaryText
                     )
 
-                    Text(LocalizationSupport.localized("Back to Log In"))
+                    Text(viewModel.backToLogInLabel)
                         .font(.system(size: 14, weight: .medium))
                 }
                 .foregroundStyle(theme.secondaryText)
@@ -104,7 +104,7 @@ struct ResetPasswordView: View {
                     viewModel.method = .email
                 }
             } label: {
-                Text(LocalizationSupport.localized("Email"))
+                Text(viewModel.emailTabLabel)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                     .frame(maxWidth: .infinity)
@@ -118,7 +118,7 @@ struct ResetPasswordView: View {
                     viewModel.method = .phone
                 }
             } label: {
-                Text(LocalizationSupport.localized("Phone"))
+                Text(viewModel.phoneTabLabel)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity)

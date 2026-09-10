@@ -431,7 +431,7 @@ enum LocalizationKey {
         "I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)": "agree_terms_privacy_markdown",
         "Are you sure you want to end this session?": "are_you_sure_end_session",
         "Audio": "audio_title",
-        "Camera disabled": "camera_disabled",
+        "Camera disabled": "camera_disabled_photo",
         "Camera access is disabled. Open Settings and enable camera access to take a photo.": "camera_access_disabled_settings_photo",
         "Could not send rating. Please try again next time.": "could_not_send_dot_a",
         "Could not send your message.": "could_not_send_dot_b",
@@ -539,7 +539,54 @@ enum LocalizationKey {
 		"Uploading the remaining documents helps us verify you as a teacher faster.": "upload_remaining_documents_hint",
 //		"Not uploaded yet": "not_uploaded_yet",
 		"Upload": "upload_action",
-		"Set date of birth": "set_date_of_birth"
+		"Set date of birth": "set_date_of_birth",
+
+        // MARK: Keys Remote Config would reject
+        //
+        // `generatedKey` drops words of two characters or fewer, so these three
+        // reduce to a key that is empty ("%@ %d") or starts with a digit — and
+        // Firebase only accepts /[A-Za-z_][A-Za-z0-9_]*/. Neither form could
+        // ever resolve, so all three stayed English in Hebrew.
+        "%@ %d": "fmt_month_year",
+        "e.g. 123": "eg_branch_number",
+        "e.g. 45678901": "eg_account_number",
+
+        // MARK: Collision fixes
+        //
+        // Every entry below exists because two distinct source strings reduced
+        // to the same generated key, so one published value was serving both.
+        // The string that matches the value already in the template keeps the
+        // original key; the other one is moved here.
+
+        // `all` holds the "All" subject filter.
+        "all": "all_lower",
+        // `choose_your_role` holds the title-case navigation title.
+        "Choose your role": "choose_your_role_subtitle",
+        // Three different save failures all reduced to `could_not_save`.
+        "Could not save your PayPal account. Please try again.": "could_not_save_paypal_account",
+        "Could not save your PayPal email. Please try again.": "could_not_save_paypal_email",
+        "Could not save your payment method. Please try again.": "could_not_save_payment_method",
+        // `default_session_type` holds the settings row title.
+        "Default session type and currency": "default_session_type_and_currency",
+        // `enter_your_password` holds the login field's placeholder.
+        "Enter your password to confirm account deletion.": "enter_password_confirm_deletion",
+        // `ils` is the currency *symbol* (\u{20AA}); the settings row shows the code.
+        "ILS": "currency_value_ils",
+        // `log_out` holds the button label, not the confirmation question.
+        "Log out?": "log_out_qmark",
+        // `make_sure_your` holds the microphone sentence.
+        "Make sure your camera is enabled so your teacher can see your work.": "make_sure_camera_enabled",
+        // `min` would serve both the rate format and the bare unit label.
+        "%@/min": "fmt_min_rate",
+        "min": "min_short",
+        // `selected` holds the "%d selected" counter.
+        "selected": "selected_lower",
+        // `teacher_available_now` holds the "1 teacher available now" line.
+        "Teacher available now": "teacher_available_now_badge",
+        // `unexpected_error_occurred` holds the shorter sentence.
+        "An unexpected error occurred. Please try again.": "unexpected_error_try_again",
+        // `upload_clear_photo` holds the math-problem prompt.
+        "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.": "upload_clear_photo_gov_id"
     ]
 
     /// Deterministic three-word snake-case slug for any source string that

@@ -23,15 +23,15 @@ struct CompleteProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
 
-                Text(LocalizationSupport.localized("Tell us a bit about yourself to get started with\nTeacher in a Minute."))
+                Text(viewModel.introText)
                     .font(.system(size: 13))
                     .foregroundStyle(theme.secondaryText)
                     .lineSpacing(5)
                     .padding(.top, 10)
 
                 AuthInputField(
-                    title: LocalizationSupport.localized("Full Name"),
-                    placeholder: LocalizationSupport.localized("place holder name"),
+                    title: viewModel.fullNameFieldTitle,
+                    placeholder: viewModel.fullNamePlaceholder,
                     systemImage: "person",
                     text: $viewModel.fullName,
                     textContentType: .name,
@@ -40,10 +40,8 @@ struct CompleteProfileView: View {
                 .padding(.top, 28)
 
                 AuthInputField(
-                    title: viewModel.role == .student
-                    ? LocalizationSupport.localized("Phone Number (Optional)")
-                    : LocalizationSupport.localized("Phone Number"),
-                    placeholder: LocalizationSupport.localized("place holder phone number"),
+                    title: viewModel.phoneFieldTitle(isOptional: viewModel.role == .student),
+                    placeholder: viewModel.phonePlaceholder,
                     systemImage: "phone",
                     text: $viewModel.phoneNumber,
                     keyboardType: .phonePad,
@@ -58,8 +56,8 @@ struct CompleteProfileView: View {
 //                        .padding(.top, 20)
                 } else {
                     AuthInputField(
-                        title: LocalizationSupport.localized("PayPal Email"),
-                        placeholder: LocalizationSupport.localized("Optional"),
+                        title: viewModel.payPalEmailFieldTitle,
+                        placeholder: viewModel.optionalPlaceholder,
                         systemImage: "p.circle.fill",
                         text: $viewModel.paypalEmail,
                         keyboardType: .emailAddress,
@@ -78,7 +76,7 @@ struct CompleteProfileView: View {
                 }
 
                 AuthPrimaryButton(
-                    title: LocalizationSupport.localized("Continue"),
+                    title: viewModel.continueLabel,
                     systemImage: "arrow.right",
                     isEnabled: viewModel.canContinue
                 ) {
@@ -89,7 +87,7 @@ struct CompleteProfileView: View {
             .padding(.horizontal, 18)
             .background(theme.screenBackground)
             .navigationBarTitleDisplayMode(.inline)
-            .onboardingBackHandling()
+            .onboardingBackHandling(viewModel: viewModel)
             .onAppear {
                 viewModel.onContinue = {
                     if viewModel.shouldShowPermissionsOnContinue && PermissionsSetupStore.shouldShowForCurrentUser() {
@@ -103,26 +101,26 @@ struct CompleteProfileView: View {
                 }
                 viewModel.checkAndAutoAdvance()
             }
-            .navigationTitle(LocalizationSupport.localized("Complete your profile"))
+            .navigationTitle(viewModel.screenTitle)
             .overlay {
                 if viewModel.isCheckingCompletion {
                     ZStack {
                         theme.scrim.opacity(0.25).ignoresSafeArea()
                         VStack(spacing: 12) {
                             ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.primaryText)
-                            Text(LocalizationSupport.localized("Loading your profile…"))
+                            Text(viewModel.loadingText)
                                 .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.primaryText)
                         }
                     }
                 }
             }
             .appDialog(
-                LocalizationSupport.localized("Payout Details Missing"),
+                viewModel.payoutMissingDialogTitle,
                 isPresented: $viewModel.showMissingPayoutInfoConfirmation,
-                message: LocalizationSupport.localized("You will not receive money until you provide bank account details or PayPal info."),
+                message: viewModel.payoutMissingDialogMessage,
                 actions: [
-                    AppDialogAction(LocalizationSupport.localized("Add Now"), kind: .cancel),
-                    AppDialogAction(LocalizationSupport.localized("Continue Anyway")) {
+                    AppDialogAction(viewModel.addNowLabel, kind: .cancel),
+                    AppDialogAction(viewModel.continueAnywayLabel) {
                         viewModel.continueWithoutPayoutInfo()
                     }
                 ]
@@ -132,7 +130,7 @@ struct CompleteProfileView: View {
 
     var gradePicker: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(LocalizationSupport.localized("Your Grade"))
+            Text(viewModel.gradeSectionTitle)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(theme.primaryText)
 
@@ -144,7 +142,7 @@ struct CompleteProfileView: View {
                 }
             } label: {
                 HStack {
-                    Text(viewModel.grade.isEmpty ? LocalizationSupport.localized("Select") : viewModel.grade)
+                    Text(viewModel.gradeSelectionLabel)
                         .font(.system(size: 15))
                         .foregroundStyle(viewModel.grade.isEmpty ? theme.secondaryText : theme.primaryText)
 

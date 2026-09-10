@@ -25,6 +25,7 @@ func photoSourceDebug(_ message: String) {
 /// A tappable label that lets the user pick an image from the camera or the
 /// photo library. The chosen image is delivered as JPEG/original `Data`.
 struct PhotoSourceButton<Label: View>: View {
+  let viewModel: any PhotoSourceViewModeling
   let onImageData: (Data) -> Void
   @ViewBuilder var label: () -> Label
 
@@ -44,19 +45,19 @@ struct PhotoSourceButton<Label: View>: View {
     var actions: [AppDialogAction] = []
 #if os(iOS)
     actions.append(
-      AppDialogAction(LocalizationSupport.localized("Take Photo")) {
+      AppDialogAction(viewModel.photoSourceTakePhotoLabel) {
         photoSourceDebug("Take Photo action selected")
         pendingCameraRequest = true
       }
     )
 #endif
     actions.append(
-      AppDialogAction(LocalizationSupport.localized("Choose from Library")) {
+      AppDialogAction(viewModel.photoSourceLibraryLabel) {
         photoSourceDebug("Choose from Library action selected")
         pendingLibraryRequest = true
       }
     )
-    actions.append(AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel))
+    actions.append(AppDialogAction(viewModel.photoSourceCancelLabel, kind: .cancel))
     return actions
   }
 
@@ -79,19 +80,19 @@ struct PhotoSourceButton<Label: View>: View {
     // Attached to the button itself, so this needs the full-screen presentation
     // rather than an overlay bounded by the button's frame.
     .appDialog(
-      LocalizationSupport.localized("Add a photo"),
+      viewModel.photoSourceDialogTitle,
       isPresented: $showSourceDialog,
       actions: photoSourceActions,
       coversScreen: true
     )
     .photosPicker(isPresented: $showLibraryPicker, selection: $pickedItem, matching: .images)
     .appDialog(
-      LocalizationSupport.localized("Camera disabled"),
+      viewModel.cameraDisabledTitle,
       isPresented: $showCameraSettingsDialog,
-      message: LocalizationSupport.localized("Camera access is disabled. Open Settings and enable camera access to take a photo."),
+      message: viewModel.cameraDisabledMessage,
       actions: [
-        AppDialogAction(LocalizationSupport.localized("Cancel"), kind: .cancel),
-        AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+        AppDialogAction(viewModel.photoSourceCancelLabel, kind: .cancel),
+        AppDialogAction(viewModel.openSettingsLabel) {
           PermissionService.shared.openAppSettings()
         }
       ],

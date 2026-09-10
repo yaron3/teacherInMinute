@@ -53,7 +53,7 @@ struct CreateAccountView: View {
 	  }
 	}
 	.navigationBarTitleDisplayMode(.inline)
-	.navigationTitle(LocalizationSupport.localized("Create Account"))
+	.navigationTitle(viewModel.screenTitle)
 	.onChange(of: viewModel.navigateToChooseRole) { _, newValue in
 	  // Replace rather than push so the user cannot navigate back to the
 	  // sign-up form after their account has been created.
@@ -68,27 +68,27 @@ struct CreateAccountView: View {
 	  focusedField = field
 	}
 	.appDialog(
-	  LocalizationSupport.localized("Sign Up"),
+	  viewModel.signUpDialogTitle,
 	  isPresented: $viewModel.showAlert,
 	  message: viewModel.alertMessage ?? "",
-	  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+	  actions: [AppDialogAction(viewModel.okLabel)]
 	)
 	.sheet(isPresented: $viewModel.showingTerms) {
 		  
 		  if let _ = viewModel.termsURL {
-			NavigationStack { AboutWebView(url: viewModel.termsURL!, title: LocalizationSupport.localized("EULA")) }
+			NavigationStack { AboutWebView(url: viewModel.termsURL!, title: viewModel.eulaTitle) }
 		  }
 		}
 		.sheet(isPresented: $viewModel.showingPrivacy) {
 		  if let _ = viewModel.privacyURL {
-			NavigationStack { AboutWebView(url: viewModel.privacyURL!, title: LocalizationSupport.localized("Privacy Policy")) }
+			NavigationStack { AboutWebView(url: viewModel.privacyURL!, title: viewModel.privacyPolicyTitle) }
 		  }
 		}
 		.appDialog(
-		  LocalizationSupport.localized("Sign Up"),
+		  viewModel.signUpDialogTitle,
 		  isPresented: $viewModel.showLegalAlert,
 		  message: viewModel.legalAlertMessage,
-		  actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+		  actions: [AppDialogAction(viewModel.okLabel)]
 		)
   }
   
@@ -100,38 +100,38 @@ struct CreateAccountView: View {
   var inputCard: some View {
 	VStack(alignment: .leading, spacing: 22) {
 	  fieldSection(
-		title: LocalizationSupport.localized("Email"),
+		title: viewModel.emailFieldTitle,
 		icon: "envelope",
-		placeholder: LocalizationSupport.localized("Enter your email"),
+		placeholder: viewModel.emailPlaceholder,
 		text: $viewModel.emailOrPhone,
 		isSecure: false,
 		field: .email,
 		isValid: viewModel.emailOrPhone.isEmpty || viewModel.isEmailValid,
-		errorMessage: LocalizationSupport.localized("Enter a valid email address.")
+		errorMessage: viewModel.emailErrorMessage
 	  )
 	  fieldSection(
-		title: LocalizationSupport.localized("Password"),
+		title: viewModel.passwordFieldTitle,
 		icon: "lock.fill",
-		placeholder: LocalizationSupport.localized("Min. 6 characters"),
+		placeholder: viewModel.passwordPlaceholder,
 		text: $viewModel.password,
 		isSecure: !isPasswordVisible,
 		field: .password,
 		isValid: viewModel.password.isEmpty || viewModel.isPasswordValid,
-		errorMessage: LocalizationSupport.localized("Must be at least 6 characters."),
+		errorMessage: viewModel.passwordErrorMessage,
 		trailingIcon: isPasswordVisible ? "eye" : "eye.slash",
 		trailingAction: { isPasswordVisible.toggle() }
 	  )
 	  fieldSection(
-		title: LocalizationSupport.localized("Confirm Password"),
+		title: viewModel.confirmPasswordFieldTitle,
 		icon: "lock.fill",
-		placeholder: LocalizationSupport.localized("Re-enter your password"),
+		placeholder: viewModel.confirmPasswordPlaceholder,
 		text: $viewModel.confirmPassword,
 		isSecure: !isConfirmPasswordVisible,
 		field: .confirmPassword,
 		// Stays quiet until there is something to compare, so the field does
 		// not shout mismatch at every keystroke of the first character.
 		isValid: viewModel.confirmPassword.isEmpty || viewModel.doPasswordsMatch,
-		errorMessage: LocalizationSupport.localized("Passwords do not match."),
+		errorMessage: viewModel.confirmPasswordErrorMessage,
 		trailingIcon: isConfirmPasswordVisible ? "eye" : "eye.slash",
 		trailingAction: { isConfirmPasswordVisible.toggle() }
 	  )
@@ -213,7 +213,7 @@ struct CreateAccountView: View {
 	VStack(alignment: .leading, spacing: 18) {
 	  checkboxRow(isOn: $viewModel.agreedToTerms, isTermsRow: true)
 	  checkboxRow(isOn: $viewModel.sendUpdates,
-				  text: LocalizationSupport.localized("Send me occasional updates and tips about\nTeacher in a Minute."),
+				  text: viewModel.marketingOptInText,
 				  isTermsRow: false)
 	}
 	.padding(.horizontal, 8)
@@ -255,7 +255,7 @@ struct CreateAccountView: View {
   
 	@ViewBuilder
 	func termsTextView() -> some View {
-	  let markdown = LocalizationSupport.localized("I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)")
+	  let markdown = viewModel.agreementMarkdown
 #if os(Android)
 	  // Skip's `Text` does not parse markdown links, so the tappable link never
 	  // rendered (most visible in Hebrew). Show the agreement as plain text with
@@ -268,12 +268,12 @@ struct CreateAccountView: View {
 
 		HStack(spacing: 16) {
 		  Button { viewModel.openTerms() } label: {
-			Text(LocalizationSupport.localized("Terms of Service"))
+			Text(viewModel.termsOfServiceTitle)
 			  .font(.system(size: 14, weight: .semibold))
 			  .foregroundStyle(theme.accent)
 		  }
 		  Button { viewModel.openPrivacy() } label: {
-			Text(LocalizationSupport.localized("Privacy Policy"))
+			Text(viewModel.privacyPolicyTitle)
 			  .font(.system(size: 14, weight: .semibold))
 			  .foregroundStyle(theme.accent)
 		  }
@@ -333,7 +333,7 @@ struct CreateAccountView: View {
 	  Task { await viewModel.signup() }
 	} label: {
 	  ZStack {
-		Text(LocalizationSupport.localized("Continue to Role Selection"))
+		Text(viewModel.continueToRoleSelectionLabel)
 		  .font(.system(size: 17, weight: .bold))
 		  .foregroundStyle(viewModel.canSubmit ? theme.onAccentText : theme.secondaryText)
 		  .opacity(viewModel.isLoading ? 0 : 1)
@@ -355,7 +355,7 @@ struct CreateAccountView: View {
 	var dividerSection: some View {
 	  HStack(spacing: 16) {
 		Rectangle().fill(theme.separator).frame(height: 1)
-		Text(LocalizationSupport.localized("Or continue with"))
+		Text(viewModel.orContinueWithLabel)
 		  .font(.system(size: 14))
 		  .foregroundStyle(theme.secondaryText)
 		  .lineLimit(1)
@@ -380,7 +380,7 @@ struct CreateAccountView: View {
 	  HStack(spacing: 10) {
 		PlatformIcon(systemName: type == .google ? "google-logo" : "apple.logo")
 		  .font(.system(size: 20, weight: .semibold))
-		Text(type == .google ? LocalizationSupport.localized("Google") : LocalizationSupport.localized("Apple"))
+		Text(type == .google ? viewModel.googleLabel : viewModel.appleLabel)
 		  .font(.system(size: 15, weight: .semibold))
 	  }
 	  .foregroundStyle(theme.primaryText)
@@ -396,9 +396,9 @@ struct CreateAccountView: View {
   
 	var bottomLoginSection: some View {
 	  HStack(spacing: 4) {
-		Text(LocalizationSupport.localized("Already have an account?")).foregroundStyle(theme.secondaryText)
+		Text(viewModel.alreadyHaveAccountText).foregroundStyle(theme.secondaryText)
 		Button { router.push(.login) } label: {
-			Text(LocalizationSupport.localized("Log In")).foregroundStyle(theme.accent)
+			Text(viewModel.logInLabel).foregroundStyle(theme.accent)
 		}
 	}
 	.font(.system(size: 14))

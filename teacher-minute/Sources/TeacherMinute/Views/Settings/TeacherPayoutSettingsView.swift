@@ -25,6 +25,7 @@ struct TeacherPayoutSettingsView: View {
 
     var body: some View {
         TeacherPayoutMethodSheet(
+            viewModel: payoutViewModel,
             method: $payoutViewModel.payoutMethodDraft,
             availableTypes: payoutViewModel.availablePayoutMethodTypes,
             banks: payoutViewModel.banks,

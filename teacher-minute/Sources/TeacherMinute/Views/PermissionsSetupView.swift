@@ -52,12 +52,12 @@ struct PermissionsSetupView: View {
                     .offset(x: 12, y: 8)
             }
 
-            Text(LocalizationSupport.localized("Connect & Learn"))
+            Text(viewModel.screenTitle)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(theme.primaryText)
                 .padding(.top, 34)
 
-            Text(LocalizationSupport.localized("To give you the best math tutoring\nexperience, we need a couple of\npermissions to connect you instantly."))
+            Text(viewModel.introText)
                 .font(.system(size: 14))
                 .foregroundStyle(theme.secondaryText)
                 .lineSpacing(6)
@@ -69,8 +69,8 @@ struct PermissionsSetupView: View {
                     icon: "mic.fill",
                     iconColor: theme.accent,
                     iconBackground: theme.accentBackground,
-                    title: LocalizationSupport.localized("Microphone"),
-                    subtitle: LocalizationSupport.localized("Talk live with\nteachers to solve\nmath problems\ntogether in real-\ntime."),
+                    title: viewModel.microphoneCardTitle,
+                    subtitle: viewModel.microphoneCardSubtitle,
                     isOn: $viewModel.microphoneEnabled
                 )
 
@@ -78,8 +78,8 @@ struct PermissionsSetupView: View {
                     icon: "camera.fill",
                     iconColor: theme.positive,
                     iconBackground: theme.positive.opacity(0.14),
-                    title: LocalizationSupport.localized("Camera"),
-                    subtitle: LocalizationSupport.localized("Use video in live\nlessons and update\nyour profile photo\nwhen needed."),
+                    title: viewModel.cameraCardTitle,
+                    subtitle: viewModel.cameraCardSubtitle,
                     isOn: $viewModel.cameraEnabled
                 )
                 // Notifications are requested after the first lesson (with a
@@ -89,14 +89,14 @@ struct PermissionsSetupView: View {
 
             Spacer()
 
-            AuthPrimaryButton(title: LocalizationSupport.localized("Continue Setup"), systemImage: "arrow.right") {
+            AuthPrimaryButton(title: viewModel.continueSetupLabel, systemImage: "arrow.right") {
                 viewModel.continueSetup()
             }
 
             Button {
                 viewModel.limitedMode()
             } label: {
-                Text(LocalizationSupport.localized("Not now, use limited mode"))
+                Text(viewModel.skipLabel)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity)
@@ -108,7 +108,7 @@ struct PermissionsSetupView: View {
         .padding(.horizontal, 18)
         .background(theme.screenBackground)
         .navigationBarTitleDisplayMode(.inline)
-        .onboardingBackHandling()
+        .onboardingBackHandling(viewModel: viewModel)
         .trackScreen(AnalyticsScreen.permissionsSetup)
         .onAppear {
             viewModel.onContinue = {

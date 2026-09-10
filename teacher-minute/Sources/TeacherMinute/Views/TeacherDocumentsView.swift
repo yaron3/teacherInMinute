@@ -27,7 +27,7 @@ struct TeacherDocumentsView: View {
   var body: some View {
     ScrollView(.vertical, showsIndicators: true) {
       VStack(alignment: .leading, spacing: 16) {
-        Text(LocalizationSupport.localized("These are the verification documents you uploaded."))
+        Text(viewModel.introText)
           .font(.system(size: 13))
           .foregroundStyle(theme.secondaryText)
           .lineSpacing(4)
@@ -55,10 +55,10 @@ struct TeacherDocumentsView: View {
     }
     .background(Color(.systemBackground))
     .navigationBarTitleDisplayMode(.inline)
-    .navigationTitle(LocalizationSupport.localized("Documents Uploaded"))
+    .navigationTitle(viewModel.screenTitle)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
-        Button(LocalizationSupport.localized("Close")) {
+        Button(viewModel.closeLabel) {
           dismiss()
         }
       }
@@ -68,17 +68,17 @@ struct TeacherDocumentsView: View {
     }
 #if os(Android)
     .confirmationDialog(
-      LocalizationSupport.localized("Add a photo"),
+      viewModel.addPhotoDialogTitle,
       isPresented: $showAndroidPhotoSourceDialog,
       titleVisibility: .visible
     ) {
-      Button(LocalizationSupport.localized("Take Photo")) {
+      Button(viewModel.takePhotoLabel) {
         pickAndUploadAndroidImage(for: androidPickTarget, source: .camera)
       }
-      Button(LocalizationSupport.localized("Choose from Library")) {
+      Button(viewModel.chooseFromLibraryLabel) {
         pickAndUploadAndroidImage(for: androidPickTarget, source: .gallery)
       }
-      Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+      Button(viewModel.cancelLabel, role: .cancel) {}
     }
 #endif
   }
@@ -97,7 +97,7 @@ struct TeacherDocumentsView: View {
           if document.url.isEmpty {
             VStack(spacing: 8) {
               PlatformIcon(systemName: "exclamationmark.triangle.fill", size: 22, color: theme.warning)
-              Text(LocalizationSupport.localized("Could not load this document."))
+              Text(viewModel.documentLoadFailedText)
                 .font(.system(size: 12))
                 .foregroundStyle(theme.secondaryText)
             }
@@ -119,12 +119,12 @@ struct TeacherDocumentsView: View {
   @ViewBuilder
   var missingDocumentsSection: some View {
     if !viewModel.missingTargets.isEmpty {
-      Text(LocalizationSupport.localized("Add missing documents"))
+      Text(viewModel.addMissingDocumentsTitle)
         .font(.system(size: 16, weight: .bold))
         .foregroundStyle(theme.primaryText)
         .padding(.top, 12)
 
-      Text(LocalizationSupport.localized("Uploading the remaining documents helps us verify you as a teacher faster."))
+      Text(viewModel.addMissingDocumentsHint)
         .font(.system(size: 12))
         .foregroundStyle(theme.secondaryText)
         .lineSpacing(4)
@@ -147,10 +147,13 @@ struct TeacherDocumentsView: View {
   func uploadPicker(_ target: UploadTarget) -> some View {
     let title = viewModel.title(for: target)
     let uploading = viewModel.isUploading(target)
-    return PhotoSourceButton(onImageData: { data in
+    return PhotoSourceButton(viewModel: viewModel, onImageData: { data in
       viewModel.handlePickedImage(data, for: target)
     }) {
-      MissingDocumentRow(title: title, isUploading: uploading)
+      MissingDocumentRow(title: title,
+                         isUploading: uploading,
+                         statusLabel: uploading ? viewModel.uploadingLabel : viewModel.notUploadedYetLabel,
+                         uploadLabel: viewModel.uploadLabel)
     }
   }
 #else
@@ -166,7 +169,10 @@ struct TeacherDocumentsView: View {
       androidPickTarget = target
       showAndroidPhotoSourceDialog = true
     } label: {
-      MissingDocumentRow(title: title, isUploading: uploading)
+      MissingDocumentRow(title: title,
+                         isUploading: uploading,
+                         statusLabel: uploading ? viewModel.uploadingLabel : viewModel.notUploadedYetLabel,
+                         uploadLabel: viewModel.uploadLabel)
     }
     .buttonStyle(.plain)
   }
@@ -177,7 +183,7 @@ struct TeacherDocumentsView: View {
         if source == .camera {
           let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
           guard cameraState.isGranted else {
-            viewModel.errorMessage = LocalizationSupport.localized("Camera access is required to take a photo.")
+            viewModel.errorMessage = viewModel.cameraAccessRequiredMessage
             return
           }
         }
@@ -202,7 +208,7 @@ struct TeacherDocumentsView: View {
     VStack(spacing: 12) {
       ProgressView()
         .tint(theme.accent)
-      Text(LocalizationSupport.localized("Loading documents..."))
+      Text(viewModel.loadingText)
         .font(.system(size: 13, weight: .semibold))
         .foregroundStyle(theme.secondaryText)
     }
@@ -217,7 +223,7 @@ struct TeacherDocumentsView: View {
       Button {
         Task { await viewModel.load() }
       } label: {
-        Text(LocalizationSupport.localized("Retry"))
+        Text(viewModel.retryLabel)
           .font(.system(size: 13, weight: .semibold))
           .foregroundStyle(theme.accent)
       }
@@ -229,7 +235,7 @@ struct TeacherDocumentsView: View {
   var emptyView: some View {
     VStack(spacing: 12) {
       PlatformIcon(systemName: "doc.text", size: 28, color: theme.secondaryText)
-      Text(LocalizationSupport.localized("No documents uploaded yet."))
+      Text(viewModel.emptyStateText)
         .font(.system(size: 13, weight: .semibold))
         .foregroundStyle(theme.secondaryText)
     }
@@ -242,8 +248,13 @@ struct TeacherDocumentsView: View {
 struct MissingDocumentRow: View {
   let title: String
   let isUploading: Bool
+  let statusLabel: String
+  let uploadLabel: String
 
-  nonisolated init(title: String, isUploading: Bool) {
+  nonisolated init(title: String, isUploading: Bool,
+                   statusLabel: String, uploadLabel: String) {
+    self.statusLabel = statusLabel
+    self.uploadLabel = uploadLabel
     self.title = title
     self.isUploading = isUploading
   }
@@ -274,9 +285,7 @@ struct MissingDocumentRow: View {
         Text(title)
           .font(.system(size: 14, weight: .bold))
           .foregroundStyle(theme.primaryText)
-        Text(isUploading
-             ? LocalizationSupport.localized("Uploading…")
-             : LocalizationSupport.localized("Not uploaded yet"))
+        Text(statusLabel)
           .font(.system(size: 12))
           .foregroundStyle(theme.secondaryText)
       }
@@ -284,7 +293,7 @@ struct MissingDocumentRow: View {
       Spacer()
 
       if !isUploading {
-        Text(LocalizationSupport.localized("Upload"))
+        Text(uploadLabel)
           .font(.system(size: 13, weight: .semibold))
           .foregroundStyle(theme.onAccentText)
           .padding(.horizontal, 14)

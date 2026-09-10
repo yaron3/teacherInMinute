@@ -376,6 +376,7 @@ struct ChatSessionView: View {
 
   var ratingPromptOverlay: some View {
     RateSessionView(
+      viewModel: viewModel,
       teacherName: viewModel.participantName,
       teacherImageURL: viewModel.participantImageURL,
       subject: viewModel.originalQuestion,
@@ -786,6 +787,7 @@ struct ChatSessionView: View {
 
   var whiteboard: some View {
     WhiteboardView(
+      viewModel: viewModel,
       strokes: boardStrokes,
       revision: boardRevision,
       onStrokeFinished: { points in
@@ -1133,7 +1135,8 @@ struct ChatSessionView: View {
         }
         .environment(\.layoutDirection, .leftToRight)
       } else {
-        MessageComposer(isFocused: $isMessageFieldFocused) { text in
+        MessageComposer(placeholder: viewModel.messagePlaceholder,
+                        isFocused: $isMessageFieldFocused) { text in
           sendComposed(text)
         }
       }

@@ -32,12 +32,12 @@ struct VerifyPhoneView: View {
                     )
                 }
 
-            Text(LocalizationSupport.localized("Verify your number"))
+            Text(viewModel.screenTitle)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(theme.primaryText)
                 .padding(.top, 26)
 
-            Text(LocalizationSupport.localized("We've sent a 4-digit security code to"))
+            Text(viewModel.codeSentText)
                 .font(.system(size: 14))
                 .foregroundStyle(theme.secondaryText)
                 .padding(.top, 10)
@@ -58,7 +58,7 @@ struct VerifyPhoneView: View {
                         color: theme.accent
                     )
 
-                    Text(LocalizationSupport.localized("Change contact info"))
+                    Text(viewModel.changeContactInfoLabel)
                         .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundStyle(theme.accent)
@@ -84,7 +84,7 @@ struct VerifyPhoneView: View {
                         color: theme.accent
                     )
 
-                    Text(LocalizationSupport.localized("Resend Code Now"))
+                    Text(viewModel.resendCodeLabel)
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .foregroundStyle(theme.accent)
@@ -104,14 +104,14 @@ struct VerifyPhoneView: View {
                 .padding(.horizontal, 18)
 
             HStack(spacing: 4) {
-                Text(LocalizationSupport.localized("Having trouble?"))
+                Text(viewModel.havingTroubleText)
                     .font(.system(size: 12))
                     .foregroundStyle(theme.secondaryText)
 
                 Button {
                     viewModel.contactSupport()
                 } label: {
-                    Text(LocalizationSupport.localized("Contact Support"))
+                    Text(viewModel.contactSupportLabel)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(theme.primaryText)
                         .underline()

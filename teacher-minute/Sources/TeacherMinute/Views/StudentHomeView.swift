@@ -47,7 +47,7 @@ struct StudentHomeView: View {
 		}
 	}
 	.sheet(isPresented: $showsNotificationExplainer) {
-	  NotificationPermissionExplainerView {
+	  NotificationPermissionExplainerView(viewModel: viewModel) {
 		NotificationPromptStore.markExplanationShown()
 		showsNotificationExplainer = false
 	  }
@@ -61,6 +61,7 @@ struct StudentHomeView: View {
 	.sheet(isPresented: isChoosingPaymentMethod) {
 	  if let option = pendingCheckoutOption {
 		PaymentMethodSheet(
+		  viewModel: viewModel,
 		  methods: PaymentMethod.supported(viewModel.availablePaymentMethods, forCurrency: option.currency),
 		  theme: theme,
 		  savedPayPalEmail: viewModel.savedPayPalEmail
