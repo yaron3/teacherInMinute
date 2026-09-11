@@ -4,7 +4,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { v4 as uuidv4 } from "uuid";
 
-import { mintLiveKitToken } from "./livekit";
+import { lessonRoomName, mintLiveKitToken } from "./livekit";
 import { sendAcceptedPush } from "./fcm";
 import {
   QuestionDoc,
@@ -128,10 +128,29 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
   const studentImageURL = studentData.showProfileImage === false ? "" : studentProfileImage;
 
   const qid = uuidv4();
+  const roomName = lessonRoomName(qid);
 
   logger.info(
     `[questions] createQuestion start qid=${qid} student=${uid} topic=${topic} conversationType=${conversationType}`
   );
+
+  // The student's LiveKit token is minted here, alongside the writes and the
+  // dispatch below, and handed back with the question id. Minting it only once
+  // a teacher accepted put a getQuestionStatus call — on a function that may be
+  // cold — between "a teacher accepted" and the student connecting. The search
+  // gives up within a minute and a lesson is capped at 30, both well inside the
+  // token's 60. getQuestionStatus stays the fallback, so a failed mint costs
+  // that round trip back, never the question.
+  const studentMedia: Promise<{ liveKitRoom: string; liveKitToken: string } | null> =
+    conversationType === "text"
+      ? Promise.resolve(null)
+      : mintLiveKitToken(roomName, uid).then(
+          (minted) => ({ liveKitRoom: roomName, liveKitToken: minted.token }),
+          (error) => {
+            logger.warn(`[questions] createQuestion student token mint failed qid=${qid}`, error);
+            return null;
+          }
+        );
 
   const trimmedText = text?.trim() ?? "";
 
@@ -206,7 +225,11 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
   }
 
   logger.info(`[questions] created qid=${qid} topic=${topic} student=${uid}`);
-  return { questionId: qid, connectionFeeCents: await getConnectionFeeCents() };
+  const [connectionFeeCents, studentMediaCredentials] = await Promise.all([
+    getConnectionFeeCents(),
+    studentMedia,
+  ]);
+  return { questionId: qid, connectionFeeCents, ...(studentMediaCredentials ?? {}) };
 });
 
 // ─── cancelQuestion ───────────────────────────────────────────────────────────
@@ -339,7 +362,7 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
   );
 
   // Mint LiveKit tokens for both parties
-  const channelName = `lesson_${questionId}`;
+  const channelName = lessonRoomName(questionId);
   const [teacherToken, studentToken] = await Promise.all([
     mintLiveKitToken(channelName, teacherUid),
     mintLiveKitToken(channelName, studentUid),
@@ -447,7 +470,7 @@ export const getQuestionStatus = onCall(HOT_PATH, async (req) => {
   logger.info(`[questions] getQuestionStatus qid=${questionId} student=${uid} status=${q.status}`);
 
   if (q.status === "accepted" || q.status === "in_progress") {
-    const roomName = `lesson_${questionId}`;
+    const roomName = lessonRoomName(questionId);
     const token = await mintLiveKitToken(roomName, uid);
     return { status: q.status, liveKitRoom: roomName, liveKitToken: token.token };
   }

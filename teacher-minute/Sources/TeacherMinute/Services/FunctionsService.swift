@@ -58,6 +58,11 @@ struct AcceptInviteResult {
 
 struct CreateQuestionResult {
   let questionId: String
+  /// The student's LiveKit room and token for an audio or video question,
+  /// minted with it so the lesson can connect the moment a teacher accepts.
+  /// Absent for a text question, and from a backend that predates this.
+  let liveKitRoom: String?
+  let liveKitToken: String?
 }
 
 struct QuestionStatusResult {
@@ -210,7 +215,11 @@ final class FunctionsService {
     )
     guard let questionId = result["questionId"] as? String
     else { throw FunctionsError.decodingError() }
-    return CreateQuestionResult(questionId: questionId)
+    return CreateQuestionResult(
+      questionId: questionId,
+      liveKitRoom: result["liveKitRoom"] as? String,
+      liveKitToken: result["liveKitToken"] as? String
+    )
   }
 
   func cancelQuestion(questionId: String) async throws {

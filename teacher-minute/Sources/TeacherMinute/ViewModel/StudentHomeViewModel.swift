@@ -524,6 +524,9 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var purchaseSummary: PurchaseSummary?
 
   private var pollingTask: Task<Void, Never>?
+  /// The question this student last asked, along with the LiveKit credentials
+  /// minted for it, so an accepted lesson does not have to ask for them again.
+  private var createdQuestion: CreateQuestionResult?
   private var onlineTeachersStore: OnlineTeachersStore?
   /// Subject keys (e.g. "math", "physics") enabled via Remote Config
   /// (`enable_<key>`). "math" is the only one on by default; every other
@@ -576,6 +579,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
 	  logger.info("TeacherMinute askTeacher created questionId=\(result.questionId)")
       activeQuestionText = text
+      createdQuestion = result
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
     } catch let err as FunctionsError {
@@ -1242,10 +1246,19 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
           if isAcceptedStatus(status) {
             // The realtime node never carries LiveKit credentials —
-            // `questions/$qid` is readable by any signed-in user — so the token
-            // is minted here, once, now that there is something to mint it for.
+            // `questions/$qid` is readable by any signed-in user — so they came
+            // back with createQuestion instead, and the lesson connects without
+            // another round trip. getQuestionStatus mints them only for a
+            // question that did not get any: an older backend, or a failed mint.
             var room = result.liveKitRoom ?? ""
             var token = result.liveKitToken ?? ""
+            if room.isEmpty || token.isEmpty,
+               let created = createdQuestion, created.questionId == questionId,
+               let createdRoom = created.liveKitRoom, !createdRoom.isEmpty,
+               let createdToken = created.liveKitToken, !createdToken.isEmpty {
+              room = createdRoom
+              token = createdToken
+            }
             if room.isEmpty || token.isEmpty,
                let minted = try? await FunctionsService.shared.getQuestionStatus(questionId: questionId) {
               room = minted.liveKitRoom ?? room

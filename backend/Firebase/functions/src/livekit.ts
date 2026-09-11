@@ -11,6 +11,11 @@ const API_SECRET = process.env.LIVEKIT_API_SECRET ?? "";
 // Lessons hard-cap at 30 min so a token never expires during a lesson.
 const TOKEN_TTL_SECONDS = 3600;
 
+/** The room a lesson's student and teacher meet in, named for its question. */
+export function lessonRoomName(questionId: string): string {
+  return `lesson_${questionId}`;
+}
+
 export async function mintLiveKitToken(roomName: string, participantUid: string): Promise<{
   token: string;
   expiresAt: Date;
