@@ -7,6 +7,11 @@
 
 import Foundation
 
+/// Note there is no `paypalEmail` here, though `UserProfileSummary` still reads
+/// one: the profile-completion step used to write a bare PayPal address, and
+/// asks for the payout *destination* instead now (PayoutMethodPreferenceStore),
+/// with the details going to the teacher's payout method. Saving merges, so
+/// leaving the field out preserves whatever an older build stored.
 struct UserProfile: Codable {
   let uid: String
   let email: String
@@ -16,7 +21,6 @@ struct UserProfile: Codable {
   /// during onboarding, so a brand-new profile has none until the user sets it.
   let dateOfBirth: Date?
   let grade: String
-  let paypalEmail: String
   let role: String   // "student" | "teacher"
   let createdAt: Date
   var currency: String = LessonFormatting.defaultCurrencyCode
@@ -29,7 +33,6 @@ struct UserProfile: Codable {
 	  "fullName":    fullName,
 		  "phoneNumber": phoneNumber,
 		  "grade":       grade,
-		  "paypalEmail": paypalEmail,
 		  "role":        role,
 		  "createdAt":   iso.string(from: createdAt),
 		  "currency":    currency,

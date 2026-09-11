@@ -51,19 +51,6 @@ extension ProfileViewModel {
         LocalizationSupport.localized("Camera access is required to take a photo.")
     }
 
-    // MARK: Saved PayPal
-    var savedPayPalSectionTitle: String { LocalizationSupport.localized("Saved PayPal") }
-    var payPalLabel: String { LocalizationSupport.localized("PayPal") }
-    var noSavedPayPalText: String {
-        LocalizationSupport.localized("No saved PayPal account. Tap \"+ Add\" to save one.")
-    }
-    var whereYouGetPaidTitle: String { LocalizationSupport.localized("Where you get paid") }
-    var payoutEmailExplanation: String {
-        LocalizationSupport.localized("Your monthly payout is sent to this address, so it must be the email on your PayPal account.")
-    }
-    var payPalEmailFieldTitle: String { LocalizationSupport.localized("PayPal Email") }
-    var emailPlaceholder: String { LocalizationSupport.localized("name@example.com") }
-
     // MARK: Verification documents
     var completeDocumentsTitle: String { LocalizationSupport.localized("Complete Your Documents") }
     var documentsUploadedTitle: String { LocalizationSupport.localized("Documents Uploaded") }

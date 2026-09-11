@@ -1142,13 +1142,57 @@
       },
       "valueType": "STRING"
     },
-    "you_will_not": {
+    "add_your_details": {
       "defaultValue": {
-        "value": "You will not receive money until you provide bank account details or PayPal info."
+        "value": "Add your details so we can pay you."
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "לא תקבל כסף עד שתספק פרטי חשבון בנק או פרטי PayPal."
+          "value": "הוסף את הפרטים כדי שנוכל לשלם לך."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "choose_where_your": {
+      "defaultValue": {
+        "value": "Choose where your monthly payout is sent"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בחר לאן יישלח התשלום החודשי שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "how_would_you": {
+      "defaultValue": {
+        "value": "How would you like to get paid?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "איך תרצה לקבל תשלום?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "optional_tap_again": {
+      "defaultValue": {
+        "value": "Optional \u2014 tap again to unpick. You will add the details later, under Earnings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא חובה — הקש שוב כדי לבטל את הבחירה. את הפרטים תוסיף בהמשך, במסך ההכנסות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_will_not": {
+      "defaultValue": {
+        "value": "You will not receive money until you add your payout details."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא תקבל כסף עד שתוסיף את פרטי התשלום שלך."
         }
       },
       "valueType": "STRING"

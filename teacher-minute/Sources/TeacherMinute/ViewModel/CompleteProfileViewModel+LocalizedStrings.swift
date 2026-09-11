@@ -31,14 +31,18 @@ extension CompleteProfileViewModel {
         isOptional ? phoneOptionalFieldTitle : phoneRequiredFieldTitle
     }
 
-    // MARK: PayPal
-    var payPalEmailFieldTitle: String { LocalizationSupport.localized("PayPal Email") }
-    var optionalPlaceholder: String { LocalizationSupport.localized("Optional") }
+    // MARK: Payout method
+    var payoutMethodSectionTitle: String { LocalizationSupport.localized("How would you like to get paid?") }
+    /// Says both that the question can be skipped and that tapping the chosen
+    /// destination again is how it gets un-picked.
+    var payoutMethodSectionHint: String {
+        LocalizationSupport.localized("Optional — tap again to unpick. You will add the details later, under Earnings.")
+    }
 
     // MARK: Missing-payout warning
     var payoutMissingDialogTitle: String { LocalizationSupport.localized("Payout Details Missing") }
     var payoutMissingDialogMessage: String {
-        LocalizationSupport.localized("You will not receive money until you provide bank account details or PayPal info.")
+        LocalizationSupport.localized("You will not receive money until you add your payout details.")
     }
     var addNowLabel: String { LocalizationSupport.localized("Add Now") }
     var continueAnywayLabel: String { LocalizationSupport.localized("Continue Anyway") }

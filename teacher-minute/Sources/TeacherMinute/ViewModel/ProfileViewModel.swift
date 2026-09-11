@@ -63,20 +63,6 @@ final class ProfileViewModel {
     var isSavingPayPal = false
     var payPalVaultErrorMessage: String?
 
-    // MARK: - PayPal payout email (teacher)
-
-    /// Being typed into the address field, kept apart from the saved value so
-    /// abandoning the edit cannot change what the teacher is actually paid to.
-    var payPalEmailDraft = ""
-    var isEditingPayPalEmail = false
-
-    /// The address the teacher's payouts go to, or nil when none is set.
-    var payPalPayoutEmail: String? {
-        guard let payoutMethod, payoutMethod.type == .paypal else { return nil }
-        let email = payoutMethod.email.trimmingCharacters(in: .whitespacesAndNewlines)
-        return email.isEmpty ? nil : email
-    }
-
     var nameInitial: String {
         name.first.map(String.init) ?? ""
     }
@@ -407,81 +393,6 @@ final class ProfileViewModel {
 
     func logout() {
         // Settings owns logout confirmation and routing.
-    }
-
-    // MARK: - PayPal payout email
-
-    /// "+ Add": if the profile already carries a usable address, save that and
-    /// spare the teacher any typing. Otherwise open the field, prefilled with
-    /// whatever we do have, so they only correct it.
-    func addPayPalPayoutEmail() async {
-        payPalVaultErrorMessage = nil
-        let candidate = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        if candidate.isEmail {
-            await savePayPalPayoutEmail(candidate)
-        } else {
-            payPalEmailDraft = candidate
-            isEditingPayPalEmail = true
-        }
-    }
-
-    func editPayPalPayoutEmail() {
-        payPalVaultErrorMessage = nil
-        payPalEmailDraft = payPalPayoutEmail ?? email.trimmingCharacters(in: .whitespacesAndNewlines)
-        isEditingPayPalEmail = true
-    }
-
-    func cancelPayPalEmailEditing() {
-        isEditingPayPalEmail = false
-        payPalVaultErrorMessage = nil
-        payPalEmailDraft = ""
-    }
-
-    /// Saves the address as the teacher's payout method. Shape is checked here
-    /// for an instant answer; the backend then checks the domain actually
-    /// accepts mail and returns a message naming what is wrong, so a plausible
-    /// but undeliverable address (a typo'd domain) is caught before payday.
-    func savePayPalPayoutEmail(_ explicitEmail: String? = nil) async {
-        guard !isSavingPayPal else { return }
-        let email = (explicitEmail ?? payPalEmailDraft).trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard email.isEmail else {
-            payPalVaultErrorMessage = LocalizationSupport.localized("Enter a valid PayPal email address.")
-            payPalEmailDraft = email
-            isEditingPayPalEmail = true
-            return
-        }
-
-        isSavingPayPal = true
-        payPalVaultErrorMessage = nil
-        defer { isSavingPayPal = false }
-
-        var method = payoutMethod ?? TeacherPayoutMethod()
-        method.type = .paypal
-        method.email = email
-
-        do {
-            _ = try await FunctionsService.shared.updateTeacherPayoutMethod(method)
-            payoutMethod = method
-            isEditingPayPalEmail = false
-            payPalEmailDraft = ""
-            logger.info("[Profile] PayPal payout email saved")
-        } catch let error as FunctionsError {
-            if case .serverError(let message, _) = error, !message.isEmpty {
-                payPalVaultErrorMessage = message
-            } else {
-                payPalVaultErrorMessage = LocalizationSupport.localized("Could not save your PayPal email. Please try again.")
-            }
-            payPalEmailDraft = email
-            isEditingPayPalEmail = true
-            logger.error("[Profile] failed saving PayPal payout email: \(error.localizedDescription)")
-        } catch {
-            payPalVaultErrorMessage = LocalizationSupport.localized("Could not save your PayPal email. Please try again.")
-            payPalEmailDraft = email
-            isEditingPayPalEmail = true
-            logger.error("[Profile] failed saving PayPal payout email: \(error.localizedDescription)")
-            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.savePayPalPayoutEmail")
-        }
     }
 
     // MARK: - Saved PayPal

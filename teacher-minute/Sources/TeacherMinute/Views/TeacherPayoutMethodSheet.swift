@@ -81,45 +81,11 @@ struct TeacherPayoutMethodSheet: View {
   // MARK: - Type picker
 
   var typePicker: some View {
-    HStack(spacing: 0) {
-      ForEach(availableTypes) { type in
-        typeTab(type)
-      }
-    }
-    .padding(3)
-    .background(theme.cardBackground)
-    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-  }
-
-  func typeTab(_ type: PayoutMethodType) -> some View {
-    let isSelected = method.type == type
-    // The selected tab sits on the saturated `accent` fill, so its label needs
-    // a colour that stays light in both schemes. `onAccentText` is not it: its
-    // light value is black, which leaves near-unreadable dark text on indigo.
-    let selectedForeground = theme.ctaForeground
-    return Button {
-      method.type = type
-    } label: {
-      HStack(spacing: 6) {
-        PlatformIcon(
-          systemName: type.systemImage,
-          size: 13,
-          weight: .semibold,
-          color: isSelected ? selectedForeground : theme.secondaryText
-        )
-        Text(type.displayName)
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(isSelected ? selectedForeground : theme.secondaryText)
-          .lineLimit(1)
-          .minimumScaleFactor(0.8)
-      }
-      .padding(.vertical, 10)
-      .padding(.horizontal, 8)
-      .frame(maxWidth: .infinity)
-      .background(isSelected ? theme.accent : Color.clear)
-      .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
-    }
-    .buttonStyle(.plain)
+    PayoutMethodTypePicker(
+      types: availableTypes,
+      selected: method.type,
+      onSelect: { method.type = $0 }
+    )
   }
 
   // MARK: - Per-type fields

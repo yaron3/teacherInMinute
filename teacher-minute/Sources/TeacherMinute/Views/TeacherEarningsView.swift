@@ -113,6 +113,27 @@ struct TeacherEarningsView: View {
                         }
                         Spacer()
                     }
+                } else if let pending = viewModel.payoutMethodAwaitingDetails {
+                    // A destination was chosen while completing the profile, so
+                    // the card names it and asks for the details rather than
+                    // telling the teacher they have no method at all.
+                    HStack(spacing: 12) {
+                        FlatIconTile(
+                            systemName: pending.systemImage,
+                            size: 40,
+                            tint: theme.secondaryText,
+                            background: theme.screenBackground
+                        )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(pending.displayName)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(theme.primaryText)
+                            Text(viewModel.completePayoutDetailsText)
+                                .font(.system(size: 13))
+                                .foregroundStyle(theme.secondaryText)
+                        }
+                        Spacer()
+                    }
                 } else {
                     Text(viewModel.noPayoutMethodText)
                         .font(.system(size: 14))

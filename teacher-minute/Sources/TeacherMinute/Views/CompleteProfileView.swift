@@ -55,15 +55,8 @@ struct CompleteProfileView: View {
 //                    gradePicker
 //                        .padding(.top, 20)
                 } else {
-                    AuthInputField(
-                        title: viewModel.payPalEmailFieldTitle,
-                        placeholder: viewModel.optionalPlaceholder,
-                        systemImage: "p.circle.fill",
-                        text: $viewModel.paypalEmail,
-                        keyboardType: .emailAddress,
-                        textContentType: .emailAddress
-                    )
-                    .padding(.top, 20)
+                    payoutMethodSection
+                        .padding(.top, 20)
                 }
 
                 Spacer()
@@ -125,6 +118,27 @@ struct CompleteProfileView: View {
                     }
                 ]
             )
+        }
+    }
+
+    /// Which destination the teacher would like — the choice only, with no
+    /// account details: those are typed later into the payout form, which opens
+    /// on whichever tab is picked here.
+    var payoutMethodSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(viewModel.payoutMethodSectionTitle)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(theme.primaryText)
+
+            PayoutMethodTypePicker(
+                types: viewModel.availablePayoutMethodTypes,
+                selected: viewModel.payoutMethodType,
+                onSelect: { type in viewModel.selectPayoutMethodType(type) }
+            )
+
+            Text(viewModel.payoutMethodSectionHint)
+                .font(.system(size: 12))
+                .foregroundStyle(theme.secondaryText)
         }
     }
 

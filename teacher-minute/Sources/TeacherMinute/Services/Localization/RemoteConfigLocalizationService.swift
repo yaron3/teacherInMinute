@@ -282,9 +282,16 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "No earnings yet. Your first lesson will show up here.": "אין עדיין הכנסות. השיעור הראשון שלך יופיע כאן.",
         "Could not load earnings.": "לא ניתן היה לטעון את ההכנסות.",
         "Left to learn": "נותרו ללימוד",
+        // Payout destination, asked at profile completion
+        "How would you like to get paid?": "איך תרצה לקבל תשלום?",
+        "Optional — tap again to unpick. You will add the details later, under Earnings.": "לא חובה — הקש שוב כדי לבטל את הבחירה. את הפרטים תוסיף בהמשך, במסך ההכנסות.",
+        "Payout Details Missing": "חסרים פרטי תשלום",
+        "You will not receive money until you add your payout details.": "לא תקבל כסף עד שתוסיף את פרטי התשלום שלך.",
+        "Choose where your monthly payout is sent": "בחר לאן יישלח התשלום החודשי שלך",
         // Teacher payout method
         "Payment Method": "אמצעי תשלום",
         "Choose where we should send your monthly payout.": "בחר לאן לשלוח את התשלום החודשי שלך.",
+        "Add your details so we can pay you.": "הוסף את הפרטים כדי שנוכל לשלם לך.",
         "No payment method yet. Add one so we can pay you.": "עדיין אין אמצעי תשלום. הוסף אחד כדי שנוכל לשלם לך.",
         "Bank Account": "חשבון בנק",
         "Bank Name": "שם הבנק",

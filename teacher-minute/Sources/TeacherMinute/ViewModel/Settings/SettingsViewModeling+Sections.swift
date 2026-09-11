@@ -97,7 +97,7 @@ extension SettingsViewModeling {
                 rows: [
                     SettingsRow(
                         title: LocalizationSupport.localized("Teacher Payout Settings"),
-                        subtitle: LocalizationSupport.localized("Update PayPal payout email"),
+                        subtitle: LocalizationSupport.localized("Choose where your monthly payout is sent"),
                         systemImage: "banknote.fill",
                         iconColor: .purple,
                         isDestructive: false,

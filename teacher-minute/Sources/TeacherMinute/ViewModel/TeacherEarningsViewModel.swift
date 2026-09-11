@@ -114,6 +114,11 @@ final class TeacherEarningsViewModel {
         }
     }
 
+    /// The destination the teacher named while completing their profile, kept
+    /// locally (PayoutMethodPreferenceStore) until real details exist. Read
+    /// once per load so the card and the edit form cannot disagree about it.
+    var preferredPayoutMethodType: PayoutMethodType?
+
     /// The phone number already on the teacher's profile, if any.
     var profilePhone: String = ""
     /// Set after saving a Bit number that differs from the profile, to ask
@@ -213,6 +218,20 @@ final class TeacherEarningsViewModel {
         loadedValue(LocalizationSupport.localized("No payment method yet. Add one so we can pay you."))
     }
 
+    /// The destination chosen at profile completion that still has no details
+    /// behind it. `nil` once a method is on file — and while the load is in
+    /// flight, since until then there is no basis for saying either.
+    var payoutMethodAwaitingDetails: PayoutMethodType? {
+        guard payoutMethod == nil, !isLoadingInitialData else { return nil }
+        return preferredPayoutMethodType
+    }
+
+    /// Sits under the chosen destination's name, so the card asks for the one
+    /// thing still missing rather than claiming there is no method at all.
+    var completePayoutDetailsText: String {
+        LocalizationSupport.localized("Add your details so we can pay you.")
+    }
+
     var payoutMethodActionLabel: String {
         hasPayoutMethod
             ? LocalizationSupport.localized("Edit")
@@ -263,6 +282,7 @@ final class TeacherEarningsViewModel {
             return
         }
 
+        preferredPayoutMethodType = PayoutMethodPreferenceStore.preferredTypeForCurrentUser()
         isPayPalPayoutEnabled = await SettingsRemoteConfigService.shared.fetchIsPayPalPayoutEnabled()
 
         do {
@@ -327,10 +347,18 @@ final class TeacherEarningsViewModel {
 
     func editPayoutMethod() {
         var draft = payoutMethod ?? TeacherPayoutMethod()
-        // Starting fresh with a profile number already on file: pre-fill it, so
-        // the common case is one tap rather than retyping.
-        if payoutMethod == nil, !profilePhone.isEmpty {
-            draft.phone = profilePhone
+        if payoutMethod == nil {
+            // No method on file yet, so open on the destination the teacher
+            // named while completing their profile — that answer was collected
+            // precisely so this form does not open on the wrong tab.
+            if let preferred = preferredPayoutMethodType {
+                draft.type = preferred
+            }
+            // A profile number already on file: pre-fill it, so the common case
+            // is one tap rather than retyping.
+            if !profilePhone.isEmpty {
+                draft.phone = profilePhone
+            }
         }
         payoutMethodDraft = draft
         payoutMethodErrorMessage = nil
