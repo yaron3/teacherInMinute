@@ -72,15 +72,26 @@ object AndroidLiveKitManager {
 
             Log.i(TAG, "Connecting room=$roomName video=$enableVideo url=$serverUrl")
             val newRoom = LiveKit.create(appContext)
-            newRoom.connect(
-                url = serverUrl,
-                token = token,
-                options = ConnectOptions(audio = true, video = enableVideo)
-            )
+            try {
+                // The microphone is published as part of the connect. The camera
+                // is not: it is only started by the guarded call below, so one
+                // that will not start cannot fail the whole connect.
+                newRoom.connect(
+                    url = serverUrl,
+                    token = token,
+                    options = ConnectOptions(audio = true, video = false)
+                )
+            } catch (t: Throwable) {
+                // Swift retries a failed connect with a fresh room, so this one
+                // must not keep holding the microphone it may have opened.
+                newRoom.release()
+                throw t
+            }
 
             val audioEnabled = newRoom.localParticipant.setMicrophoneEnabled(true)
             if (!audioEnabled) {
                 newRoom.disconnect()
+                newRoom.release()
                 throw IllegalStateException("LiveKit microphone enable failed")
             }
 

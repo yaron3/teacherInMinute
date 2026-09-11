@@ -66,11 +66,13 @@ final class ChatSessionService {
   private let boardRef: FirebaseDatabase.DatabaseReference
   private let boardViewportsRef: FirebaseDatabase.DatabaseReference
   private let chatPausedRef: FirebaseDatabase.DatabaseReference
+  private let mediaPendingRef: FirebaseDatabase.DatabaseReference
   private var sessionHandle: DatabaseHandle?
   private var messagesHandle: DatabaseHandle?
   private var boardHandle: DatabaseHandle?
   private var boardViewportsHandle: DatabaseHandle?
   private var chatPausedHandle: DatabaseHandle?
+  private var mediaPendingHandle: DatabaseHandle?
 #endif
 
   init(questionId: String, currentUserUid: String? = nil) {
@@ -83,6 +85,7 @@ final class ChatSessionService {
     self.boardRef = questionRef.child("board/strokes")
     self.boardViewportsRef = questionRef.child("board/viewports")
     self.chatPausedRef = questionRef.child("chatPaused")
+    self.mediaPendingRef = questionRef.child("mediaPending")
 #endif
   }
 
@@ -232,6 +235,23 @@ final class ChatSessionService {
 #endif
   }
 
+  func startMediaPendingListening(onUpdate: @escaping ([String: Bool]) -> Void) {
+#if !os(Android)
+    mediaPendingHandle = mediaPendingRef.observe(.value) { snapshot in
+      var states: [String: Bool] = [:]
+      for child in snapshot.children {
+        guard let snap = child as? DataSnapshot else { continue }
+        if let flag = snap.value as? Bool {
+          states[snap.key] = flag
+        } else if let num = snap.value as? NSNumber {
+          states[snap.key] = num.boolValue
+        }
+      }
+      onUpdate(states)
+    }
+#endif
+  }
+
   func stopListening() {
 #if !os(Android)
     if let sessionHandle {
@@ -253,6 +273,10 @@ final class ChatSessionService {
     if let chatPausedHandle {
       chatPausedRef.removeObserver(withHandle: chatPausedHandle)
       self.chatPausedHandle = nil
+    }
+    if let mediaPendingHandle {
+      mediaPendingRef.removeObserver(withHandle: mediaPendingHandle)
+      self.mediaPendingHandle = nil
     }
 #endif
   }
@@ -427,10 +451,51 @@ final class ChatSessionService {
 #endif
   }
 
+  func setMediaPending(_ pending: Bool, role: String) async throws {
+    let trimmedRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let key = trimmedRole.isEmpty ? "participant" : trimmedRole
+
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.setMediaPending(
+        questionId: self.questionId,
+        role: key,
+        pending: pending
+      )
+    }.value
+#else
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      mediaPendingRef.child(key).setValue(pending) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
 #if os(Android)
   func fetchChatPaused() async throws -> [String: Bool] {
     let json = try await Task.detached(priority: .userInitiated) {
       try AndroidChatBridge.fetchChatPaused(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let rows = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return [:]
+    }
+    var states: [String: Bool] = [:]
+    for (key, value) in rows {
+      if let flag = value as? Bool {
+        states[key] = flag
+      } else if let num = value as? NSNumber {
+        states[key] = num.boolValue
+      }
+    }
+    return states
+  }
+
+  func fetchMediaPending() async throws -> [String: Bool] {
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchMediaPending(questionId: self.questionId)
     }.value
     guard let data = json.data(using: .utf8),
           let rows = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -657,6 +722,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var boardStrokes: [BoardStroke] { get set }
   var boardViewports: [String: BoardViewport] { get set }
   var chatPausedStates: [String: Bool] { get set }
+  var mediaPendingStates: [String: Bool] { get set }
   var errorMessage: String? { get set }
   var isConnecting: Bool { get set }
   var participantName: String { get }
@@ -671,6 +737,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)? { get set }
   var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)? { get set }
   var onChatPausedUpdated: (([String: Bool]) -> Void)? { get set }
+  var onMediaPendingUpdated: (([String: Bool]) -> Void)? { get set }
   var onErrorUpdated: ((String?) -> Void)? { get set }
   var onConnectingUpdated: ((Bool) -> Void)? { get set }
   var onSessionDetailsUpdated: (() -> Void)? { get set }
@@ -691,6 +758,8 @@ protocol ChatSessionViewModeling: AnyObject {
   func updateBoardViewport(_ viewport: BoardViewport)
   func setSelfChatPaused(_ paused: Bool)
   func peerChatPaused() -> Bool
+  func setSelfMediaPending(_ pending: Bool)
+  func peerMediaPending() -> Bool
   func endLesson() async
 }
 
@@ -780,6 +849,24 @@ extension ChatSessionViewModeling {
     LocalizationSupport.localized("Reconnecting…")
   }
 
+  /// A lesson that went ahead by chat while its audio carries on connecting.
+  var audioConnectingNotice: String {
+    LocalizationSupport.localized("Audio is still connecting — you can chat meanwhile.")
+  }
+
+  var audioFailedNotice: String {
+    LocalizationSupport.localized("Audio couldn't connect. Tap to try again.")
+  }
+
+  /// The other side is in the lesson without audio, so talking will not reach them.
+  var peerAudioPendingNotice: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    if isStudentRole {
+      return LocalizationSupport.localized("Your teacher's audio isn't connected yet — use the chat.")
+    }
+    return LocalizationSupport.localized("The student's audio isn't connected yet — use the chat.")
+  }
+
   // MARK: Peer-paused panel (role-dependent)
 
   var peerPausedMessage: String {
@@ -828,6 +915,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var boardStrokes: [BoardStroke] = []
   var boardViewports: [String: BoardViewport] = [:]
   var chatPausedStates: [String: Bool] = [:]
+  var mediaPendingStates: [String: Bool] = [:]
   var draft = ""
   var errorMessage: String?
   var isConnecting = true
@@ -874,6 +962,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
   var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
   var onChatPausedUpdated: (([String: Bool]) -> Void)?
+  var onMediaPendingUpdated: (([String: Bool]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
@@ -887,6 +976,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private var hasReportedLessonEnd = false
   private var didObserveActiveSession = false
   private var lastSentChatPaused: Bool?
+  private var lastSentMediaPending: Bool?
 
   init(questionId: String, role: String, initialDetails: ChatSessionDetails? = nil) {
     self.questionId = questionId
@@ -905,7 +995,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         logger.info("[ChatSession] start blocked: session details unavailable questionId=\(self.questionId) role=\(self.role)")
         return
       }
-      try? await Task.sleep(nanoseconds: 1_400_000_000)
       guard !Task.isCancelled else {
         logger.info("[ChatSession] start cancelled before connected questionId=\(self.questionId) role=\(self.role)")
         return
@@ -961,15 +1050,18 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           let strokes = try await service.fetchBoardStrokes()
           let viewports = try await service.fetchBoardViewports()
           let paused = try await service.fetchChatPaused()
+          let mediaPending = try await service.fetchMediaPending()
           guard !Task.isCancelled else { return }
           messages = rows
           boardStrokes = strokes
           boardViewports = viewports
           chatPausedStates = paused
+          mediaPendingStates = mediaPending
           onMessagesUpdated?(rows)
           onBoardStrokesUpdated?(strokes)
           onBoardViewportsUpdated?(viewports)
           onChatPausedUpdated?(paused)
+          onMediaPendingUpdated?(mediaPending)
         } catch {
           errorMessage = error.localizedDescription
           onErrorUpdated?(errorMessage)
@@ -978,6 +1070,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       }
     }
 #else
+    // A retried start must not stack a second set of observers on the first.
+    service.stopListening()
     service.startSessionListening(
       onEnded: { [weak self] in
         Task { @MainActor in
@@ -1005,6 +1099,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     service.startChatPausedListening { [weak self] states in
       self?.chatPausedStates = states
       self?.onChatPausedUpdated?(states)
+    }
+    service.startMediaPendingListening { [weak self] states in
+      self?.mediaPendingStates = states
+      self?.onMediaPendingUpdated?(states)
     }
 #endif
   }
@@ -1188,6 +1286,30 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     return false
   }
 
+  /// Tells the other side this participant is in the lesson without audio —
+  /// still connecting, or started by chat instead — so they type rather than
+  /// talk. Nothing is written until there is something to say.
+  func setSelfMediaPending(_ pending: Bool) {
+    if (lastSentMediaPending ?? false) == pending { return }
+    lastSentMediaPending = pending
+    mediaPendingStates[roleKey(role)] = pending
+    Task {
+      do {
+        try await service.setMediaPending(pending, role: role)
+      } catch {
+        logger.error("[ChatSession] setMediaPending failed pending=\(pending): \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func peerMediaPending() -> Bool {
+    let selfKey = roleKey(role)
+    for (key, value) in mediaPendingStates where key != selfKey && value {
+      return true
+    }
+    return false
+  }
+
   private func roleKey(_ role: String) -> String {
     let trimmed = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     return trimmed.isEmpty ? "participant" : trimmed
@@ -1195,6 +1317,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func endLesson() async {
     setSelfChatPaused(false)
+    setSelfMediaPending(false)
     await reportLessonEnded()
     await LiveKitService.shared.disconnect()
     stop()
@@ -1408,6 +1531,14 @@ private enum AndroidChatBridge {
     name: "fetchChatPausedJson",
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
   )!
+  private static let setMediaPendingMethod = managerClass.getStaticMethodID(
+    name: "setMediaPending",
+    sig: "(Ljava/lang/String;Ljava/lang/String;Z)V"
+  )!
+  private static let fetchMediaPendingMethod = managerClass.getStaticMethodID(
+    name: "fetchMediaPendingJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
   private static let markQuestionAcceptedMethod = managerClass.getStaticMethodID(
     name: "markQuestionAccepted",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
@@ -1539,6 +1670,30 @@ private enum AndroidChatBridge {
     try jniContext {
       try managerClass.callStatic(
         method: fetchChatPausedMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
+  }
+
+  static func setMediaPending(questionId: String, role: String, pending: Bool) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setMediaPendingMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat]),
+          pending.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func fetchMediaPending(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchMediaPendingMethod,
         options: [.kotlincompat],
         args: [questionId.toJavaParameter(options: [.kotlincompat])]
       )

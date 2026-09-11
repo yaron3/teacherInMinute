@@ -3781,6 +3781,105 @@
       },
       "valueType": "STRING"
     },
+    "audio_taking_longer": {
+      "defaultValue": {
+        "value": "Audio is taking longer than usual"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חיבור השמע לוקח יותר זמן מהרגיל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "video_taking_longer": {
+      "defaultValue": {
+        "value": "Video is taking longer than usual"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חיבור הווידאו לוקח יותר זמן מהרגיל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_can_start": {
+      "defaultValue": {
+        "value": "You can start with your teacher by chat now. We'll keep connecting in the background."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אפשר להתחיל עם המורה בצ׳אט כבר עכשיו. נמשיך להתחבר ברקע."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "start_with_chat": {
+      "defaultValue": {
+        "value": "Start with chat"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התחל בצ׳אט"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "keep_waiting": {
+      "defaultValue": {
+        "value": "Keep waiting"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המשך להמתין"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "audio_still_connecting": {
+      "defaultValue": {
+        "value": "Audio is still connecting — you can chat meanwhile."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השמע עדיין מתחבר — אפשר להתכתב בצ׳אט בינתיים."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "audio_couldn_connect": {
+      "defaultValue": {
+        "value": "Audio couldn't connect. Tap to try again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא הצלחנו לחבר את השמע. הקש כדי לנסות שוב."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_teacher_audio": {
+      "defaultValue": {
+        "value": "Your teacher's audio isn't connected yet — use the chat."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השמע של המורה עדיין לא מחובר — אפשר להתכתב בצ׳אט."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_student_audio": {
+      "defaultValue": {
+        "value": "The student's audio isn't connected yet — use the chat."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השמע של התלמיד עדיין לא מחובר — אפשר להתכתב בצ׳אט."
+        }
+      },
+      "valueType": "STRING"
+    },
     "pending_verification": {
       "defaultValue": {
         "value": "Pending Verification"

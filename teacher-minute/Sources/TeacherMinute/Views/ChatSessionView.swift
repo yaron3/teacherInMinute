@@ -53,6 +53,11 @@ struct ChatSessionView: View {
   /// connection that is barely holding — and the header now says so.
   @State var didFallBackToAudioOnly = false
   @State var mediaQuality: SessionMediaQuality = .unknown
+  /// Where this side's own connect stands, and whether the other side is in
+  /// the lesson without audio. Both matter once a student starts by chat and
+  /// audio carries on connecting behind the lesson.
+  @State var mediaPhase: MediaConnectionPhase = .idle
+  @State var peerAwaitingAudio = false
   @State var liveKitRevision = 0
   @State var peerChatPaused = false
   @State var teacherPreviewOffset: CGSize = .zero
@@ -80,7 +85,11 @@ struct ChatSessionView: View {
   var hasAudio: Bool { conversationType == "audio" || conversationType == "video" }
   var hasVideo: Bool { conversationType == "video" }
   var isStudent: Bool { viewModel.role == "student" }
+  /// Audio was asked for but is not up yet: still connecting in the background,
+  /// or given up after its retries.
+  var isAudioPending: Bool { hasAudio && (mediaPhase == .connecting || mediaPhase == .failed) }
   var connectionModeText: String {
+    if isAudioPending { return viewModel.connectedText }
     if hasVideo { return viewModel.connectedVideoText }
     if hasAudio { return viewModel.connectedAudioText }
     return viewModel.connectedText
@@ -156,7 +165,10 @@ struct ChatSessionView: View {
         }
       }
       .onChange(of: isConnecting) { _, newValue in
-        if !newValue { isTransitioningToText = false }
+        if !newValue {
+          isTransitioningToText = false
+          refreshMediaCondition()
+        }
       }
 
       if let endSessionPrompt {
@@ -258,6 +270,12 @@ struct ChatSessionView: View {
         didRequestLessonEnd = true
         Task {
           await viewModel.endLesson()
+        }
+      } else if isConnecting {
+        // Left from the setup screen. The connect it began belongs to
+        // LiveKitService and would otherwise carry on with no lesson to join.
+        Task {
+          await LiveKitService.shared.disconnect()
         }
       }
       viewModel.stop()
@@ -1324,14 +1342,20 @@ struct ChatSessionView: View {
   }
 
   /// A line under the header for a session that is running, but not in the way
-  /// it was asked for. The connection notices come first: a camera that never
-  /// started is a settled fact of the lesson, while a connection this weak is
-  /// the thing about to interrupt it.
+  /// it was asked for. This side's own audio comes first — not connected at all
+  /// outranks connected badly — then the other side's, and a camera that never
+  /// started, a settled fact of the lesson, comes last.
   @ViewBuilder var sessionConditionNotice: some View {
-    if hasAudio, mediaQuality == .lost {
+    if hasAudio, mediaPhase == .failed {
+      audioFailedNoticeButton
+    } else if hasAudio, mediaPhase == .connecting {
+      conditionLine(icon: "mic.fill", text: viewModel.audioConnectingNotice, color: theme.warning)
+    } else if hasAudio, mediaQuality == .lost {
       conditionLine(icon: "exclamationmark.triangle.fill", text: viewModel.lostConnectionNotice, color: theme.danger)
     } else if hasAudio, mediaQuality == .poor {
       conditionLine(icon: "exclamationmark.triangle.fill", text: viewModel.weakConnectionNotice, color: theme.warning)
+    } else if hasAudio, peerAwaitingAudio {
+      conditionLine(icon: "bubble.left.and.bubble.right.fill", text: viewModel.peerAudioPendingNotice, color: theme.warning)
     } else if hasVideo, didFallBackToAudioOnly {
       conditionLine(icon: "video.slash.fill", text: viewModel.cameraUnavailableNotice, color: theme.warning)
     }
@@ -1354,10 +1378,51 @@ struct ChatSessionView: View {
     .background(theme.warningBackground)
   }
 
+  /// Background audio gave up after its retries; tapping the line starts it again.
+  var audioFailedNoticeButton: some View {
+    Button {
+      retryMediaConnection()
+    } label: {
+      conditionLine(icon: "arrow.clockwise", text: viewModel.audioFailedNotice, color: theme.danger)
+    }
+    .buttonStyle(.plain)
+  }
+
   func refreshMediaCondition() {
     guard hasAudio else { return }
     didFallBackToAudioOnly = LiveKitService.shared.didFallBackToAudioOnly
     mediaQuality = LiveKitService.shared.currentMediaQuality()
+    peerAwaitingAudio = viewModel.peerMediaPending()
+
+    let phase = LiveKitService.shared.connectionPhase
+    if phase != mediaPhase {
+      if phase == .connected {
+        applyMediaTogglesOnConnect()
+      }
+      mediaPhase = phase
+    }
+    // Only a running lesson reports it: the setup screen is still waiting on
+    // the answer, and a lesson on its way out has nothing left to say.
+    if !isConnecting, !didRequestLessonEnd {
+      viewModel.setSelfMediaPending(isAudioPending)
+    }
+  }
+
+  func retryMediaConnection() {
+    LiveKitService.shared.startConnecting(roomName: liveKitRoom, token: liveKitToken, enableVideo: hasVideo)
+    mediaPhase = .connecting
+  }
+
+  /// A mic or camera toggled off while audio was still connecting had no room
+  /// to act on, so it is applied once there is one.
+  func applyMediaTogglesOnConnect() {
+    guard isMicMuted || isCameraOff else { return }
+    let muteMic = isMicMuted
+    let cameraOff = isCameraOff
+    Task {
+      if muteMic { await LiveKitService.shared.setMicrophoneEnabled(false) }
+      if cameraOff { await LiveKitService.shared.setCameraEnabled(false) }
+    }
   }
 
   var sessionStats: some View {

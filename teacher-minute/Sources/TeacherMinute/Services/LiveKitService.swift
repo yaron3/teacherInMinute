@@ -25,6 +25,16 @@ enum SessionMediaQuality: String {
   case lost
 }
 
+/// Where the room's connection stands. The connect is owned by
+/// `LiveKitService` rather than by the screen that asked for it, so a student
+/// who starts a lesson by chat leaves it running in the background.
+enum MediaConnectionPhase: String {
+  case idle
+  case connecting
+  case connected
+  case failed
+}
+
 enum LiveKitError: Error, LocalizedError {
   case missingCredentials
 
@@ -69,9 +79,76 @@ final class LiveKitService {
   /// later is not the same thing.
   private(set) var didFallBackToAudioOnly = false
 
+  /// How many times one connect is tried before it is reported failed. A first
+  /// attempt lost to a flaky network usually succeeds on the next, which beats
+  /// sending the user to the timeout screen.
+  static let maxConnectAttempts = 3
+
+  private(set) var connectionPhase: MediaConnectionPhase = .idle
+  private var connectTask: Task<Bool, Never>?
+  /// Bumped by every new connect and by every disconnect, so an attempt that
+  /// was overtaken can tell, once it finally returns, that its room is unwanted.
+  private var connectGeneration = 0
+  private var connectingRoomName = ""
+
   private init() {}
 
-  func connect(roomName: String, token: String, enableVideo: Bool) async throws {
+  /// Starts connecting in a task this service owns, so the connection carries
+  /// on after the screen that asked for it goes away. Asking again for a room
+  /// that is already connecting or connected joins that attempt.
+  func startConnecting(roomName: String, token: String, enableVideo: Bool) {
+    if roomName == connectingRoomName, connectionPhase == .connecting || connectionPhase == .connected {
+      return
+    }
+
+    connectGeneration += 1
+    let generation = connectGeneration
+    let previous = connectTask
+    previous?.cancel()
+    connectingRoomName = roomName
+    connectionPhase = .connecting
+    connectTask = Task { [weak self] in
+      // An overtaken attempt unwinds first: Android cannot interrupt one, and
+      // two connects at once would fight over the same room.
+      _ = await previous?.value
+      guard let self else { return false }
+      return await self.connectWithRetries(
+        roomName: roomName,
+        token: token,
+        enableVideo: enableVideo,
+        generation: generation
+      )
+    }
+  }
+
+  /// Waits for the current connect to settle; true once the room is connected.
+  func waitUntilConnected() async -> Bool {
+    guard let connectTask else { return connectionPhase == .connected }
+    return await connectTask.value
+  }
+
+  private func connectWithRetries(roomName: String, token: String, enableVideo: Bool, generation: Int) async -> Bool {
+    for attempt in 1...Self.maxConnectAttempts {
+      guard generation == connectGeneration, !Task.isCancelled else { return false }
+      if attempt > 1 {
+        try? await Task.sleep(nanoseconds: UInt64(attempt - 1) * 1_000_000_000)
+        guard generation == connectGeneration, !Task.isCancelled else { return false }
+      }
+      do {
+        try await connectOnce(roomName: roomName, token: token, enableVideo: enableVideo, generation: generation)
+        guard generation == connectGeneration else { return false }
+        connectionPhase = .connected
+        return true
+      } catch {
+        logger.error("[LiveKit] connect attempt \(attempt)/\(Self.maxConnectAttempts) failed room=\(roomName) error=\(error.localizedDescription)")
+      }
+    }
+    guard generation == connectGeneration else { return false }
+    connectionPhase = .failed
+    return false
+  }
+
+  private func connectOnce(roomName: String, token: String, enableVideo: Bool, generation: Int) async throws {
     guard !roomName.isEmpty, !token.isEmpty else {
       throw LiveKitError.missingCredentials
     }
@@ -79,7 +156,7 @@ final class LiveKitService {
     didFallBackToAudioOnly = false
 
 #if !os(Android)
-    await disconnect()
+    await tearDownRoom()
 
     let newRoom = Room()
     let adapter = RoomDelegateAdapter { [weak self] in
@@ -88,22 +165,25 @@ final class LiveKitService {
     newRoom.add(delegate: adapter)
 
     logger.info("[LiveKit] connecting room=\(roomName) video=\(enableVideo) url=\(Self.serverUrl)")
-    try await newRoom.connect(url: Self.serverUrl, token: token)
-    logger.info("[LiveKit] room.connect returned state=\(String(describing: newRoom.connectionState)) localIdentity=\(String(describing: newRoom.localParticipant.identity)) remoteCount=\(newRoom.remoteParticipants.count)")
+    // The microphone is started while the room connects rather than published
+    // after it, which saves the round trip a separate publish costs. A mic that
+    // will not publish still fails the connect, as it did before.
+    try await newRoom.connect(
+      url: Self.serverUrl,
+      token: token,
+      connectOptions: ConnectOptions(enableMicrophone: true)
+    )
+    logger.info("[LiveKit] room.connect returned state=\(String(describing: newRoom.connectionState)) localIdentity=\(String(describing: newRoom.localParticipant.identity)) remoteCount=\(newRoom.remoteParticipants.count) localTracks=\(newRoom.localParticipant.trackPublications.count)")
 
-    // Adopt the room before publishing so a publish failure still leaves a
-    // room we can tear down instead of a connected orphan.
+    // A disconnect that landed while this attempt was in flight wants no room.
+    guard generation == connectGeneration else {
+      newRoom.remove(delegate: adapter)
+      await newRoom.disconnect()
+      throw CancellationError()
+    }
+
     room = newRoom
     roomDelegateAdapter = adapter
-
-    do {
-      _ = try await newRoom.localParticipant.setMicrophone(enabled: true)
-      logger.info("[LiveKit] microphone enabled tracks=\(newRoom.localParticipant.trackPublications.count)")
-    } catch {
-      logger.error("[LiveKit] microphone publish failed room=\(roomName) error=\(error.localizedDescription)")
-      await disconnect()
-      throw error
-    }
 
     if enableVideo {
       // A camera that will not start (simulator, hardware in use, capture
@@ -130,6 +210,14 @@ final class LiveKitService {
         enableVideo: enableVideo
       )
     }.value
+    // A disconnect that landed while the blocking connect ran wants no room.
+    // The next attempt waits for this one, so this cannot take down a newer room.
+    guard generation == connectGeneration else {
+      try? await Task.detached(priority: .userInitiated) {
+        try AndroidLiveKitBridge.disconnect()
+      }.value
+      throw CancellationError()
+    }
     if enableVideo {
       // The Kotlin side takes the same "publish what we can" line, so ask it
       // whether a camera actually went out.
@@ -160,7 +248,16 @@ final class LiveKitService {
 #endif
   }
 
+  /// Ends the lesson's media: stops a connect still in flight and leaves the room.
   func disconnect() async {
+    connectGeneration += 1
+    connectTask?.cancel()
+    connectingRoomName = ""
+    connectionPhase = .idle
+    await tearDownRoom()
+  }
+
+  private func tearDownRoom() async {
     didFallBackToAudioOnly = false
 #if !os(Android)
     diagnosticsTask?.cancel()

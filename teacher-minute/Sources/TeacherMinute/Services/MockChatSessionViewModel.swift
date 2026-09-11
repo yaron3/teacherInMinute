@@ -19,6 +19,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var boardStrokes: [BoardStroke]
   var boardViewports: [String: BoardViewport] = [:]
   var chatPausedStates: [String: Bool] = [:]
+  var mediaPendingStates: [String: Bool] = [:]
   var errorMessage: String?
   var isConnecting: Bool
   let participantName: String
@@ -36,6 +37,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
   var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
   var onChatPausedUpdated: (([String: Bool]) -> Void)?
+  var onMediaPendingUpdated: (([String: Bool]) -> Void)?
   var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
@@ -179,6 +181,20 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func peerChatPaused() -> Bool {
     let selfKey = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     for (key, value) in chatPausedStates where key != selfKey && value {
+      return true
+    }
+    return false
+  }
+
+  func setSelfMediaPending(_ pending: Bool) {
+    let key = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    mediaPendingStates[key.isEmpty ? "participant" : key] = pending
+    onMediaPendingUpdated?(mediaPendingStates)
+  }
+
+  func peerMediaPending() -> Bool {
+    let selfKey = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    for (key, value) in mediaPendingStates where key != selfKey && value {
       return true
     }
     return false

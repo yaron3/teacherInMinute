@@ -46,6 +46,8 @@ struct ConnectionSetupView: View {
 
       if viewModel.hasTimedOut {
         timeoutOverlay
+      } else if viewModel.showsChatOffer {
+        chatOfferOverlay
       }
     }
     .task(id: viewModel.sessionStartKey) {
@@ -53,6 +55,9 @@ struct ConnectionSetupView: View {
     }
     .task(id: viewModel.timerKey) {
       await viewModel.startTimeoutTimer()
+    }
+    .task(id: viewModel.chatOfferTimerKey) {
+      await viewModel.startChatOfferTimer()
     }
     .task {
       await viewModel.loadParticipantRating()
@@ -179,6 +184,74 @@ struct ConnectionSetupView: View {
       .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
       .shadow(color: theme.cardShadow.opacity(0.18), radius: 24, x: 0, y: 14)
       .padding(.horizontal, 24)
+    }
+  }
+
+  /// Put to the student alone, once audio has been connecting for a few
+  /// seconds: start with the teacher by chat now, and let audio join when it
+  /// is ready. The teacher is never asked; they follow the student's choice.
+  var chatOfferOverlay: some View {
+    ZStack {
+      theme.scrim.opacity(0.45)
+        .ignoresSafeArea()
+
+      VStack(spacing: 18) {
+        PlatformIcon(
+          systemName: "bubble.left.and.bubble.right.fill",
+          size: 26,
+          weight: .semibold,
+          color: theme.accent
+        )
+        .frame(width: 56, height: 56)
+        .background(theme.accentBackground)
+        .clipShape(Circle())
+
+        Text(viewModel.chatOfferTitle)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(theme.primaryText)
+          .multilineTextAlignment(.center)
+
+        Text(viewModel.chatOfferMessage)
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(theme.secondaryText)
+          .multilineTextAlignment(.center)
+
+        chatOfferButtons
+      }
+      .padding(24)
+      .frame(maxWidth: 320)
+      .background(theme.cardBackground)
+      .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+      .shadow(color: theme.cardShadow.opacity(0.18), radius: 24, x: 0, y: 14)
+      .padding(.horizontal, 24)
+    }
+  }
+
+  var chatOfferButtons: some View {
+    VStack(spacing: 10) {
+      Button {
+        viewModel.startWithChat()
+      } label: {
+        Text(viewModel.startWithChatLabel)
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(theme.onAccentText)
+          .frame(maxWidth: .infinity)
+          .frame(height: 44)
+          .background(theme.accent)
+          .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+      }
+      .buttonStyle(.plain)
+
+      Button {
+        viewModel.keepWaitingForMedia()
+      } label: {
+        Text(viewModel.keepWaitingLabel)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.secondaryText)
+          .frame(maxWidth: .infinity)
+          .frame(height: 38)
+      }
+      .buttonStyle(.plain)
     }
   }
 

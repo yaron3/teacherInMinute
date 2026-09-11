@@ -263,6 +263,44 @@ object AndroidChatManager {
         return rows.toString()
     }
 
+    /**
+     * Raised by a participant who is in the lesson without their audio yet —
+     * still connecting, or started by chat instead — so the other side knows
+     * to type rather than talk. It is also what lets a teacher still waiting on
+     * their own audio join a student who has already started by chat.
+     */
+    @JvmStatic
+    fun setMediaPending(questionId: String, role: String, pending: Boolean) {
+        val key = role.trim().lowercase().ifBlank { "participant" }
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+            .child("mediaPending")
+            .child(key)
+        Tasks.await(ref.setValue(pending), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    @JvmStatic
+    fun fetchMediaPendingJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance(DATABASE_URL)
+                .getReference("questions")
+                .child(questionId)
+                .child("mediaPending")
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+
+        val rows = JSONObject()
+        for (child in snapshot.children) {
+            val key = child.key ?: continue
+            val value = child.getValue(Boolean::class.java) ?: continue
+            rows.put(key, value)
+        }
+        return rows.toString()
+    }
+
     @JvmStatic
     fun markQuestionAccepted(questionId: String, teacherId: String) {
         val values = mutableMapOf<String, Any>(

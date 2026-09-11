@@ -90,6 +90,17 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // no entries for these yet, so the fallback is what actually renders.
         "Go Online": "עבור למצב מקוון",
         "Go Offline": "עבור למצב לא מקוון",
+        // Starting a lesson by chat while its audio connects. Remote Config
+        // carries these too; the fallback covers the time before it deploys.
+        "Audio is taking longer than usual": "חיבור השמע לוקח יותר זמן מהרגיל",
+        "Video is taking longer than usual": "חיבור הווידאו לוקח יותר זמן מהרגיל",
+        "You can start with your teacher by chat now. We'll keep connecting in the background.": "אפשר להתחיל עם המורה בצ׳אט כבר עכשיו. נמשיך להתחבר ברקע.",
+        "Start with chat": "התחל בצ׳אט",
+        "Keep waiting": "המשך להמתין",
+        "Audio is still connecting — you can chat meanwhile.": "השמע עדיין מתחבר — אפשר להתכתב בצ׳אט בינתיים.",
+        "Audio couldn't connect. Tap to try again.": "לא הצלחנו לחבר את השמע. הקש כדי לנסות שוב.",
+        "Your teacher's audio isn't connected yet — use the chat.": "השמע של המורה עדיין לא מחובר — אפשר להתכתב בצ׳אט.",
+        "The student's audio isn't connected yet — use the chat.": "השמע של התלמיד עדיין לא מחובר — אפשר להתכתב בצ׳אט.",
         "ONLINE": "מחובר",
         "OFFLINE": "לא מחובר",
         "Teaching History": "היסטוריית הוראה",
