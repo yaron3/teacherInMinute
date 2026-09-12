@@ -139,6 +139,60 @@ async function creditCompletedCheckout(params: {
   });
 }
 
+/**
+ * Marks a checkout cancelled — unless it has already completed.
+ *
+ * Every cancel path is a failure that happened *around* a payment: a provider
+ * call that threw, a buyer who backed out of the approval page, a webhook
+ * reporting a declined capture. None of them can see whether some other path
+ * captured the money in the meantime, and they used to write the status
+ * blindly, so a paid checkout could be recorded as cancelled — minutes still
+ * credited, but the payment record saying the purchase never happened, which is
+ * what a refund or chargeback is later judged against.
+ *
+ * `expectedOrderId` binds the cancel to one PayPal order, for the redirect
+ * endpoint where the order id arrives in the query string.
+ *
+ * Returns whether the status was actually changed.
+ */
+async function markCheckoutCancelled(
+  checkoutRef: FirebaseFirestore.DocumentReference,
+  reason: string,
+  expectedOrderId?: string
+): Promise<boolean> {
+  return firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(checkoutRef);
+    if (!snap.exists) {
+      logger.warn(
+        `[payments] cancel skipped, checkout not found checkoutId=${checkoutRef.id} reason=${reason}`
+      );
+      return false;
+    }
+
+    const checkout = snap.data() as PaymentCheckoutDoc;
+
+    if (checkout.status === "completed") {
+      logger.warn(
+        `[payments] refused to cancel a completed checkout checkoutId=${checkoutRef.id} reason=${reason}`
+      );
+      return false;
+    }
+
+    if (checkout.status === "cancelled") return false;
+
+    if (expectedOrderId && checkout.paypalOrderId && checkout.paypalOrderId !== expectedOrderId) {
+      logger.warn(
+        `[payments] cancel skipped, order mismatch checkoutId=${checkoutRef.id} stored=${checkout.paypalOrderId} supplied=${expectedOrderId}`
+      );
+      return false;
+    }
+
+    tx.update(checkoutRef, { status: "cancelled", updatedAt: Timestamp.now() });
+    logger.info(`[payments] checkout cancelled checkoutId=${checkoutRef.id} reason=${reason}`);
+    return true;
+  });
+}
+
 // ─── createCheckoutSession ────────────────────────────────────────────────────
 
 export const createCheckoutSession = onCall(async (req) => {
@@ -214,7 +268,7 @@ export const createCheckoutSession = onCall(async (req) => {
         cancelUrl,
       });
     } catch (err) {
-      await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+      await markCheckoutCancelled(checkoutRef, "bit-create-order-failed");
       if (err instanceof BitNotConfiguredError) {
         logger.warn(`[payments] Bit checkout requested but no provider is configured checkoutId=${checkoutId}`);
         throw new HttpsError(
@@ -247,7 +301,7 @@ export const createCheckoutSession = onCall(async (req) => {
     });
   } catch (err) {
     logger.error(`[payments] PayPal createOrder failed checkoutId=${checkoutId}`, err);
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    await markCheckoutCancelled(checkoutRef, "paypal-create-order-failed");
     throw new HttpsError("internal", "Failed to create PayPal order");
   }
 
@@ -353,7 +407,7 @@ async function startWalletCheckout(params: {
     // declared for this currency — see merchantAccountIdFor.
     clientToken = await generateBraintreeClientToken(pkg.currency);
   } catch (err) {
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    await markCheckoutCancelled(checkoutRef, "wallet-client-token-failed");
     if (err instanceof BraintreeNotConfiguredError) {
       logger.warn(
         `[payments] ${params.walletLabel} checkout requested but Braintree is not configured checkoutId=${checkoutId}`
@@ -412,7 +466,7 @@ async function confirmWalletPayment(params: {
     });
   } catch (err) {
     logger.error(`[payments] Braintree sale failed checkoutId=${params.checkoutId}`, err);
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    await markCheckoutCancelled(checkoutRef, "wallet-sale-threw");
     throw new HttpsError("internal", `${params.walletLabel} payment failed`);
   }
 
@@ -420,7 +474,7 @@ async function confirmWalletPayment(params: {
     logger.warn(
       `[payments] Braintree sale declined checkoutId=${params.checkoutId} message=${sale.message}`
     );
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    await markCheckoutCancelled(checkoutRef, "wallet-sale-declined");
     throw new HttpsError("aborted", sale.message ?? `${params.walletLabel} payment was declined`);
   }
 
@@ -636,7 +690,7 @@ export const chargeSavedPayPal = onCall(async (req) => {
     });
   } catch (err) {
     logger.error(`[payments] chargeSavedPayPal sale failed checkoutId=${checkoutId}`, err);
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    await markCheckoutCancelled(checkoutRef, "saved-paypal-sale-threw");
     if (err instanceof BraintreeCurrencyNotSupportedError) {
       throw new HttpsError(
         "failed-precondition",
@@ -650,7 +704,7 @@ export const chargeSavedPayPal = onCall(async (req) => {
     logger.warn(
       `[payments] chargeSavedPayPal declined checkoutId=${checkoutId} message=${sale.message}`
     );
-    await checkoutRef.update({ status: "cancelled", updatedAt: Timestamp.now() });
+    await markCheckoutCancelled(checkoutRef, "saved-paypal-declined");
     throw new HttpsError("aborted", sale.message ?? "Saved PayPal payment was declined");
   }
 
@@ -927,13 +981,17 @@ export const paypalCancel = onRequest(async (req, res) => {
   logger.info(`[payments] paypalCancel checkoutId=${checkoutId} token=${token}`);
 
   if (checkoutId) {
-    firestore
-      .collection("paymentCheckouts")
-      .doc(checkoutId)
-      .update({ status: "cancelled", updatedAt: Timestamp.now() })
-      .catch((err) =>
-        logger.warn(`[payments] paypalCancel update failed checkoutId=${checkoutId}`, err)
-      );
+    // Reachable by anyone holding a checkout id, and PayPal sends a buyer here
+    // after they back out — including, on a browser Back, after they already
+    // paid. The guard keeps a completed purchase completed, and the order id
+    // has to match the one this checkout was created with.
+    await markCheckoutCancelled(
+      firestore.collection("paymentCheckouts").doc(checkoutId),
+      "buyer-cancelled",
+      token
+    ).catch((err) =>
+      logger.warn(`[payments] paypalCancel update failed checkoutId=${checkoutId}`, err)
+    );
   }
 
   const deepLink = `teacherminute://payment-return?status=cancelled&checkout_id=${checkoutId ?? "unknown"}`;
@@ -1092,16 +1150,15 @@ async function handleWebhookEvent(
         );
         break;
       }
-      await firestore
-        .collection("paymentCheckouts")
-        .doc(invoiceId)
-        .update({ status: "cancelled", updatedAt: Timestamp.now() })
-        .catch((err) =>
-          logger.warn(
-            `[payments] webhook CAPTURE.DENIED update failed checkoutId=${invoiceId}`,
-            err
-          )
-        );
+      await markCheckoutCancelled(
+        firestore.collection("paymentCheckouts").doc(invoiceId),
+        "capture-denied"
+      ).catch((err) =>
+        logger.warn(
+          `[payments] webhook CAPTURE.DENIED update failed checkoutId=${invoiceId}`,
+          err
+        )
+      );
       logger.info(
         `[payments] webhook capture denied checkoutId=${invoiceId} captureId=${captureId}`
       );
