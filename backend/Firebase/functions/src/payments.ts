@@ -18,6 +18,7 @@ import {
   createSaleWithVaultedPaymentMethod,
 } from "./braintree";
 import { PricingDoc, PaymentCheckoutDoc, PurchaseDoc } from "./types";
+import { extendLessonMinutes } from "./lessons";
 
 const firestore = admin.firestore();
 
@@ -137,6 +138,18 @@ async function creditCompletedCheckout(params: {
       { merge: true }
     );
   });
+
+  // A student whose minutes run out mid-lesson is held rather than cut off, so
+  // minutes bought during a lesson have to reach that lesson and lift the hold,
+  // not merely land in the balance. Best-effort: the purchase is already paid
+  // for and credited, and the student can still spend it on the next question.
+  await extendLessonMinutes(params.checkout.uid, toSafeMinutes(params.checkout.minutes)).catch(
+    (err) =>
+      logger.warn(
+        `[payments] could not extend a running lesson uid=${params.checkout.uid}`,
+        err
+      )
+  );
 }
 
 /**

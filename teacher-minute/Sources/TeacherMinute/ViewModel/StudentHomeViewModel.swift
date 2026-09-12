@@ -193,6 +193,7 @@ extension StudentHomeViewModeling {
 
     // MARK: Payment method sheet
     var choosePaymentMethodTitle: String { LocalizationSupport.localized("Choose a payment method") }
+    var choosePackageTitle: String { LocalizationSupport.localized("Choose a package") }
 
     // MARK: Notification permission explainer
     var notificationExplainerTitle: String { LocalizationSupport.localized("Stay in the loop") }

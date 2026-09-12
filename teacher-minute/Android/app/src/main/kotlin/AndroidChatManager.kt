@@ -51,7 +51,7 @@ object AndroidChatManager {
     }
 
     @JvmStatic
-    fun sendText(questionId: String, text: String, senderRole: String) {
+    fun sendText(questionId: String, text: String, senderRole: String, kind: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
             ?: throw IllegalStateException("Not signed in")
         val ref = FirebaseDatabase.getInstance(DATABASE_URL)
@@ -65,10 +65,10 @@ object AndroidChatManager {
             "senderUid" to uid,
             "senderRole" to senderRole,
             "createdAt" to System.currentTimeMillis().toDouble(),
-            "kind" to "text"
+            "kind" to kind
         )
 
-        Log.i(TAG, "Sending message questionId=$questionId role=$senderRole")
+        Log.i(TAG, "Sending message questionId=$questionId role=$senderRole kind=$kind")
         Tasks.await(ref.setValue(payload), TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 

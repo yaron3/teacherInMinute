@@ -185,7 +185,7 @@ jest.mock("../dispatch", () => ({
   backfillPendingQuestionsForTeacher: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { endAbandonedLesson, endLesson, startLesson } from "../lessons";
+import { endAbandonedLesson, endLesson, extendLessonMinutes, startLesson } from "../lessons";
 
 type TaskHandler = (req: { data: { questionId: string } }) => Promise<void>;
 type CallableHandler = (request: {
@@ -316,6 +316,103 @@ describe("startLesson", () => {
     await expect(
       callStartLesson({ auth: { uid: "stranger" }, data: { questionId: "q-1" } })
     ).rejects.toThrow("Not a participant in this lesson");
+  });
+});
+
+describe("the student's minute allowance", () => {
+  /** Timestamp.now() is pinned in the fakes, so the billing clock is fixed. */
+  const NOW_MS = 1_700_000_000_000;
+
+  test("startLesson publishes what the student can afford", async () => {
+    seedQuestion();
+    store.set("users/student-1", { remainingMinutes: 20 });
+
+    await callStartLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } });
+
+    const saved = question();
+    expect(saved.minutesAvailable).toBe(20);
+    expect(saved.heldSeconds).toBe(0);
+    const deadline = (saved.minutesDeadlineAt as { __timestamp: number }).__timestamp;
+    expect(deadline - Date.now()).toBeGreaterThan(19 * 60_000);
+    expect(deadline - Date.now()).toBeLessThanOrEqual(20 * 60_000);
+
+    // The apps count down against the live node.
+    expect(rtdb.get(QUESTION_PATH)).toMatchObject({ minutesAvailable: 20 });
+  });
+
+  test("a student with nothing left starts already held", async () => {
+    seedQuestion();
+    store.set("users/student-1", { remainingMinutes: 0 });
+
+    await callStartLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } });
+
+    const deadline = (question().minutesDeadlineAt as { __timestamp: number }).__timestamp;
+    expect(question().minutesAvailable).toBe(0);
+    expect(deadline).toBeLessThanOrEqual(Date.now());
+  });
+
+  // The clock is pinned rather than allowed a tolerance: held seconds are
+  // computed from two separate reads of the clock, so a loaded machine turns an
+  // exact expectation into a flake and a loose one into a test that proves
+  // little.
+  test("buying more lifts the hold and banks the wait", async () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(NOW_MS);
+    try {
+      seedQuestion({
+        status: "in_progress",
+        minutesAvailable: 10,
+        heldSeconds: 0,
+        minutesDeadlineAt: { toMillis: () => NOW_MS - 120_000 },
+      });
+
+      await expect(extendLessonMinutes("student-1", 10)).resolves.toBe(true);
+
+      const saved = question();
+      expect(saved.minutesAvailable).toBe(20);
+      // The two minutes spent deciding to buy are not billed...
+      expect(saved.heldSeconds).toBe(120);
+      // ...and the ten just bought start from now, not from the old deadline,
+      // so they are not eaten by the time spent buying them.
+      expect((saved.minutesDeadlineAt as { __timestamp: number }).__timestamp).toBe(
+        NOW_MS + 10 * 60_000
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  test.each([
+    ["a student with no lesson running", "student-2", 10],
+    ["a nonsense number of minutes", "student-1", 0],
+  ])("does nothing for %s", async (_label, uid, minutes) => {
+    seedQuestion({ status: "in_progress", minutesAvailable: 10 });
+
+    await expect(extendLessonMinutes(uid as string, minutes as number)).resolves.toBe(false);
+    expect(question().minutesAvailable).toBe(10);
+  });
+
+  test("held time is not billed", async () => {
+    // Ten minutes on the clock, the last two of them held for want of minutes.
+    seedQuestion({ status: "in_progress", lessonId: "lesson-1" });
+    rtdb.set(QUESTION_PATH, {
+      studentUid: "student-1",
+      teacherUid: "teacher-1",
+      acceptedAt: NOW_MS - 660_000,
+      startedAt: NOW_MS - 600_000,
+      minutesDeadlineAt: NOW_MS - 120_000,
+    });
+
+    await callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } });
+
+    const saved = question();
+    expect(saved.heldSeconds).toBe(120);
+    // 8 billable minutes at 2 a minute, not the 10 on the wall clock.
+    expect(saved.durationSeconds).toBe(480);
+    expect(saved.cost).toBe(16);
+    expect(saved.teacherEarnings).toBe(12);
+    expect(store.get("users/student-1")).toMatchObject({
+      remainingMinutes: { __increment: -8 },
+    });
   });
 });
 

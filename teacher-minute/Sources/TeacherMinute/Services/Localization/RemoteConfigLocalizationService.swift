@@ -414,6 +414,11 @@ enum LocalizationKey {
         "%d minutes": "fmt_minutes",
         "%d sec": "fmt_sec",
         "Your question is too long. Please shorten it to %d characters.": "fmt_question_too_long",
+        // Would generate `buy_more_minutes`, which the button of that name owns.
+        "Buy more minutes to carry on, or end the call with a short note for your teacher.":
+          "out_of_minutes_message",
+        // `your_teacher_will` already belongs to "Your teacher will join shortly".
+        "Your teacher will see this before the call ends.": "farewell_prompt_message",
         "When AI gets stuck, a human teacher connects in %@": "fmt_ai_stuck_connects",
         "When AI gets stuck, a human teacher connects in moments": "ai_stuck_connects_moments",
         "%@ Teacher": "fmt_subject_teacher",

@@ -1734,6 +1734,13 @@ struct StudentLiveSessionScreen: View {
   /// Called when the first lesson finishes, so home can offer notifications.
   let onLessonEnded: @MainActor () -> Void
   @Environment(\.dismiss) var dismiss
+  @Environment(\.colorScheme) var colorScheme
+  /// The package being paid for, when the student tops up mid-lesson, and
+  /// whether that purchase is on screen at all. Held here rather than on
+  /// `StudentHomeView` so the sheet comes up over the session instead of
+  /// behind it. Nil while the student is still choosing which package.
+  @State var pendingCheckoutOption: PricingOption?
+  @State var isBuyingMinutesInSession = false
 
   var body: some View {
 	ChatSessionView(
@@ -1743,7 +1750,8 @@ struct StudentLiveSessionScreen: View {
 	  conversationType: viewModel.activeConversationType,
 	  liveKitRoom: liveKitRoom,
 	  liveKitToken: liveKitToken,
-	  initialDetails: viewModel.chatInitialDetails(questionId: questionId)
+	  initialDetails: viewModel.chatInitialDetails(questionId: questionId),
+	  onBuyMinutes: { beginInSessionCheckout() }
 	) {
 	  dismiss()
 	  Task {
@@ -1773,6 +1781,65 @@ struct StudentLiveSessionScreen: View {
 	  AndroidBackNavigationBridge.setSessionBackBlocked(false)
 #endif
 	}
+	// One sheet for both steps of the purchase. Picking a package swaps the
+	// content rather than dismissing and presenting again, which SwiftUI drops
+	// on the floor often enough to matter.
+	.sheet(isPresented: isBuyingMinutes) {
+	  if let option = pendingCheckoutOption {
+		PaymentMethodSheet(
+		  viewModel: viewModel,
+		  methods: PaymentMethod.supported(viewModel.availablePaymentMethods, forCurrency: option.currency),
+		  theme: AppTheme(colorScheme: colorScheme),
+		  savedPayPalEmail: viewModel.savedPayPalEmail
+		) { method in
+		  isBuyingMinutesInSession = false
+		  pendingCheckoutOption = nil
+		  // On success the backend adds the minutes to this very lesson and
+		  // republishes the deadline, so the hold lifts on its own — there is
+		  // nothing for this screen to do afterwards.
+		  Task { await viewModel.checkout(option, method: method) }
+		}
+	  } else {
+		MinutesPackageSheet(
+		  viewModel: viewModel,
+		  options: viewModel.pricingOptions,
+		  theme: AppTheme(colorScheme: colorScheme)
+		) { option in
+		  pendingCheckoutOption = option
+		}
+	  }
+	}
+  }
+
+  /// Buying without leaving the lesson. The teacher is waiting in the room, so
+  /// the picker opens over the session rather than sending the student home —
+  /// and the options are settled first, exactly as on the home screen, so the
+  /// sheet arrives complete instead of filling in a row at a time.
+  func beginInSessionCheckout() {
+	guard !viewModel.isPreparingCheckout else { return }
+	Task { @MainActor in
+	  await viewModel.preparePaymentOptions()
+	  let options = viewModel.pricingOptions
+	  // A single package is not a choice, so that case goes straight to paying
+	  // for it; anything else opens the chooser first.
+	  pendingCheckoutOption = options.count == 1 ? options.first : nil
+	  isBuyingMinutesInSession = !options.isEmpty
+	  viewModel.isPreparingCheckout = false
+	}
+  }
+
+  var isBuyingMinutes: Binding<Bool> {
+	Binding(
+	  get: { isBuyingMinutesInSession },
+	  set: { isPresented in
+		isBuyingMinutesInSession = isPresented
+		// Closing the sheet abandons the whole purchase, including a package
+		// chosen a moment ago.
+		if !isPresented {
+		  pendingCheckoutOption = nil
+		}
+	  }
+	)
   }
 }
 

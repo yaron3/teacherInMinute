@@ -16,6 +16,17 @@ enum ChatComposerMode {
 
 enum EndSessionPrompt {
   case confirmEnd, saveBoard
+  /// The student's minutes ran out: the session holds here until they buy more
+  /// or end the call.
+  case outOfMinutes
+  /// Composing the short note that goes to the teacher as the call ends.
+  case farewell
+  /// The teacher's side of the same hold: wait for the student to buy more, or
+  /// end the call.
+  case studentOutOfMinutes
+  /// The other side closed the lesson and left a note. Shown until it is
+  /// acknowledged, so it is not swept away with the session.
+  case peerFarewell
 }
 
 struct ChatSessionView: View {
@@ -65,6 +76,12 @@ struct ChatSessionView: View {
   @State var conversationType: String
   @State var isRatingPromptVisible = false
   @State var endSessionPrompt: EndSessionPrompt?
+  @State var farewellText = ""
+  /// The teacher chose to wait, so the notice stays down until the hold lifts
+  /// and the student runs out again.
+  @State var teacherIsWaitingForMinutes = false
+  /// The note the other side left as they closed the lesson.
+  @State var peerFarewellText = ""
   @State var isEndingSession = false
   @State var didRequestLessonEnd = false
   @State var saveBoardIsRemoteInitiated = false
@@ -80,6 +97,10 @@ struct ChatSessionView: View {
   let title: String
   let liveKitRoom: String
   let liveKitToken: String
+  /// Opens the minutes picker without leaving the session. Absent for the
+  /// teacher, and for any caller that cannot present it — the hold panel then
+  /// offers only ending the call, rather than a button that does nothing.
+  let onBuyMinutes: (@MainActor @Sendable () -> Void)?
   let onClose: @MainActor @Sendable () -> Void
 
   var hasAudio: Bool { conversationType == "audio" || conversationType == "video" }
@@ -108,6 +129,7 @@ struct ChatSessionView: View {
     liveKitRoom: String = "",
     liveKitToken: String = "",
     initialDetails: ChatSessionDetails? = nil,
+    onBuyMinutes: (@MainActor @Sendable () -> Void)? = nil,
     onClose: @escaping @MainActor @Sendable () -> Void
   ) {
     let viewModel = ChatSessionViewModel(questionId: questionId, role: role, initialDetails: initialDetails)
@@ -118,10 +140,11 @@ struct ChatSessionView: View {
     self.title = title
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
+    self.onBuyMinutes = onBuyMinutes
     self.onClose = onClose
   }
 
-  init(viewModel: any ChatSessionViewModeling, title: String, conversationType: String = "text", liveKitRoom: String = "", liveKitToken: String = "", onClose: @escaping @MainActor @Sendable () -> Void) {
+  init(viewModel: any ChatSessionViewModeling, title: String, conversationType: String = "text", liveKitRoom: String = "", liveKitToken: String = "", onBuyMinutes: (@MainActor @Sendable () -> Void)? = nil, onClose: @escaping @MainActor @Sendable () -> Void) {
     self._viewModel = State(initialValue: viewModel)
     self._isConnecting = State(initialValue: viewModel.isConnecting)
     self._conversationType = State(initialValue: conversationType)
@@ -129,6 +152,7 @@ struct ChatSessionView: View {
     self.title = title
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
+    self.onBuyMinutes = onBuyMinutes
     self.onClose = onClose
   }
 
@@ -169,6 +193,14 @@ struct ChatSessionView: View {
           isTransitioningToText = false
           refreshMediaCondition()
         }
+      }
+
+      if isStudent, viewModel.minutesHoldState(at: displayDate) == .warning {
+        holdBanner(viewModel.minutesRunningOutNotice)
+      } else if !isStudent, viewModel.minutesHoldState(at: displayDate) == .held {
+        // Stays up for a teacher who chose to wait, so the paused session
+        // explains itself rather than just going quiet.
+        holdBanner(viewModel.studentOutOfMinutesTitle)
       }
 
       if let endSessionPrompt {
@@ -236,7 +268,14 @@ struct ChatSessionView: View {
       }
       viewModel.onSessionEnded = {
         if sessionFrozenDate == nil { sessionFrozenDate = Date() }
-        if !boardStrokes.isEmpty && !didRequestLessonEnd && !isEndingSession {
+        if let note = viewModel.peerFarewellNote, !note.isEmpty,
+           !didRequestLessonEnd, !isEndingSession {
+          // They left a note on their way out. Hold the screen open until it
+          // has been read — the chat it also lives in is going away with the
+          // session, and closing straight away would take the note with it.
+          peerFarewellText = note
+          endSessionPrompt = .peerFarewell
+        } else if !boardStrokes.isEmpty && !didRequestLessonEnd && !isEndingSession {
           saveBoardIsRemoteInitiated = true
           endSessionPrompt = .saveBoard
         } else {
@@ -262,6 +301,7 @@ struct ChatSessionView: View {
       while !Task.isCancelled {
         displayDate = Date()
         refreshMediaCondition()
+        refreshMinutesHold()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
       }
     }
@@ -298,6 +338,34 @@ struct ChatSessionView: View {
           .font(.system(size: 13))
           .foregroundStyle(theme.secondaryText)
           .multilineTextAlignment(.center)
+
+        if prompt == .farewell {
+          VStack(alignment: .leading, spacing: 6) {
+            TextField(viewModel.farewellPlaceholder, text: $farewellText)
+              .font(.system(size: 14))
+              .foregroundStyle(theme.primaryText)
+              .padding(10)
+              .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                  .stroke(theme.secondaryText.opacity(0.3), lineWidth: 1)
+              )
+              .onChange(of: farewellText) { _, newValue in
+                // Hard-capped rather than validated on send: the student should
+                // not compose a note they are then told to shorten.
+                if newValue.count > viewModel.farewellMessageMaxLength {
+                  farewellText = String(newValue.prefix(viewModel.farewellMessageMaxLength))
+                }
+              }
+
+            Text(
+              viewModel.farewellCharactersLeftText(
+                max(0, viewModel.farewellMessageMaxLength - farewellText.count)
+              )
+            )
+            .font(.system(size: 11))
+            .foregroundStyle(theme.secondaryText)
+          }
+        }
 
         VStack(spacing: 10) {
           Button {
@@ -348,6 +416,51 @@ struct ChatSessionView: View {
               finalizeEndSession()
             } label: {
               Text(viewModel.dontSaveLabel)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.secondaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+            }
+            .buttonStyle(.plain)
+            .disabled(isEndingSession)
+          } else if prompt == .studentOutOfMinutes {
+            Button {
+              endSessionPrompt = nil
+              requestEndSession()
+            } label: {
+              Text(viewModel.endTheCallLabel)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.secondaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+            }
+            .buttonStyle(.plain)
+            .disabled(isEndingSession)
+          } else if prompt == .outOfMinutes {
+            // Deliberately no way to dismiss this one: the session is held
+            // until the student either buys more minutes or ends the call.
+            // Where buying is the primary action, ending is offered here.
+            if onBuyMinutes != nil {
+              Button {
+                endSessionPrompt = .farewell
+              } label: {
+                Text(viewModel.endTheCallLabel)
+                  .font(.system(size: 14, weight: .semibold))
+                  .foregroundStyle(theme.secondaryText)
+                  .frame(maxWidth: .infinity)
+                  .frame(height: 38)
+              }
+              .buttonStyle(.plain)
+              .disabled(isEndingSession)
+            }
+          } else if prompt == .peerFarewell {
+            // Nothing but OK: there is no decision here, only a note to read.
+            EmptyView()
+          } else if prompt == .farewell {
+            Button {
+              endSessionPrompt = .outOfMinutes
+            } label: {
+              Text(viewModel.cancelLabel)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity)
@@ -443,6 +556,14 @@ struct ChatSessionView: View {
       return viewModel.endSessionTitleLabel
     case .saveBoard:
       return viewModel.saveBoardTitleLabel
+    case .outOfMinutes:
+      return viewModel.outOfMinutesTitle
+    case .farewell:
+      return viewModel.endTheCallLabel
+    case .studentOutOfMinutes:
+      return viewModel.studentOutOfMinutesTitle
+    case .peerFarewell:
+      return viewModel.peerEndedLessonTitle
     }
   }
 
@@ -455,6 +576,15 @@ struct ChatSessionView: View {
         return viewModel.saveBoardRemoteMessage
       }
       return viewModel.saveBoardLocalMessage
+    case .outOfMinutes:
+      return viewModel.outOfMinutesMessage
+    case .farewell:
+      return viewModel.farewellPromptMessage
+    case .studentOutOfMinutes:
+      return viewModel.studentOutOfMinutesMessage
+    case .peerFarewell:
+      // Their own words, not copy of ours.
+      return peerFarewellText
     }
   }
 
@@ -464,6 +594,18 @@ struct ChatSessionView: View {
       return viewModel.endSessionActionLabel
     case .saveBoard:
       return viewModel.saveToGalleryLabel
+    case .outOfMinutes:
+      // Buying is the offer worth leading with; where this caller cannot
+      // present the picker, ending the call is the only thing left to do.
+      return onBuyMinutes != nil
+        ? viewModel.buyMoreMinutesLabel
+        : viewModel.endTheCallLabel
+    case .farewell:
+      return viewModel.sendAndEndLabel
+    case .studentOutOfMinutes:
+      return viewModel.waitForStudentLabel
+    case .peerFarewell:
+      return viewModel.okLabel
     }
   }
 
@@ -481,6 +623,87 @@ struct ChatSessionView: View {
       }
     case .saveBoard:
       endSessionAfterSnapshot(saveToChat: !saveBoardIsRemoteInitiated, saveToGallery: true)
+    case .outOfMinutes:
+      if let onBuyMinutes {
+        onBuyMinutes()
+      } else {
+        endSessionPrompt = .farewell
+      }
+    case .farewell:
+      sendFarewellAndEnd()
+    case .studentOutOfMinutes:
+      // Waiting: the notice comes down and stays down until the student runs
+      // out again. The session is paused for both sides until minutes arrive.
+      teacherIsWaitingForMinutes = true
+      endSessionPrompt = nil
+    case .peerFarewell:
+      // Read. Carry on with the ordinary close, board prompt included.
+      endSessionPrompt = nil
+      if !boardStrokes.isEmpty && !isEndingSession {
+        saveBoardIsRemoteInitiated = true
+        endSessionPrompt = .saveBoard
+      } else {
+        closeWithOptionalRating()
+      }
+    }
+  }
+
+  /// Raises the hold the moment the student's credit runs out. Driven by the
+  /// same once-a-second tick that moves the session timer, so it costs nothing
+  /// extra, and it never replaces a prompt the student is already dealing with.
+  func refreshMinutesHold() {
+    guard !isEndingSession else { return }
+
+    guard viewModel.minutesHoldState(at: displayDate) == .held else {
+      // Minutes arrived. Take the hold panels down — but never a farewell the
+      // student is in the middle of writing — and let the notice appear again
+      // if they run out a second time.
+      if endSessionPrompt == .outOfMinutes || endSessionPrompt == .studentOutOfMinutes {
+        endSessionPrompt = nil
+      }
+      teacherIsWaitingForMinutes = false
+      return
+    }
+
+    guard endSessionPrompt == nil else { return }
+
+    if isStudent {
+      dismissChatInput()
+      endSessionPrompt = .outOfMinutes
+    } else if !teacherIsWaitingForMinutes {
+      dismissChatInput()
+      endSessionPrompt = .studentOutOfMinutes
+    }
+  }
+
+  func holdBanner(_ text: String) -> some View {
+    VStack {
+      Text(text)
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(theme.onAccentText)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(theme.accent)
+        .clipShape(Capsule())
+        .padding(.top, 8)
+      Spacer()
+    }
+    .allowsHitTesting(false)
+    .zIndex(20)
+  }
+
+  /// Sends the parting note and closes the call. Mirrors finalizeEndSession,
+  /// which the ordinary End button uses.
+  func sendFarewellAndEnd() {
+    guard !isEndingSession else { return }
+    let note = farewellText
+    endSessionPrompt = nil
+    isEndingSession = true
+    didRequestLessonEnd = true
+    if sessionFrozenDate == nil { sessionFrozenDate = Date() }
+    Task {
+      await viewModel.endLessonWithFarewell(note)
+      closeWithOptionalRating()
     }
   }
 

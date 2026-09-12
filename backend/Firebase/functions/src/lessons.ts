@@ -200,6 +200,13 @@ async function resolveQuestionContext(questionId: string): Promise<{
   teacherUid: string;
   acceptedAtMs: number;
   startedAtMs: number | undefined;
+  /** Seconds already banked as unbillable — the lesson was held for want of
+   *  minutes and the student later bought more. See extendLessonMinutes. */
+  heldSeconds: number;
+  /** When the student's minutes run out. A lesson running past it is held, and
+   *  everything after it is unbillable. Undefined for a lesson that started
+   *  before allowances were recorded. */
+  minutesDeadlineMs: number | undefined;
 }> {
   const questionRef = db.ref(`questions/${questionId}`);
   const questionSnap = await questionRef.once("value");
@@ -253,6 +260,10 @@ async function resolveQuestionContext(questionId: string): Promise<{
     throw new HttpsError("failed-precondition", "Question is missing acceptedAt");
   }
 
+  const heldSecondsValue = Number(
+    fsQuestion.heldSeconds ?? (rtdbQuestion.heldSeconds as number | undefined) ?? 0
+  );
+
   return {
     questionRef,
     rtdbQuestion,
@@ -260,22 +271,33 @@ async function resolveQuestionContext(questionId: string): Promise<{
     teacherUid,
     acceptedAtMs,
     startedAtMs,
+    heldSeconds: Number.isFinite(heldSecondsValue) && heldSecondsValue > 0 ? heldSecondsValue : 0,
+    minutesDeadlineMs: firstNumber(
+      toMillis(fsQuestion.minutesDeadlineAt),
+      toMillis(rtdbQuestion.minutesDeadlineAt)
+    ),
   };
 }
+
+/** Everything `resolveQuestionContext` establishes about a lesson being ended.
+ *  Derived from that function so the two cannot drift apart. */
+type QuestionContext = Awaited<ReturnType<typeof resolveQuestionContext>>;
 
 async function migrateQuestionToFirestore(
   questionId: string,
   endedBy: LessonDoc["endedBy"],
-  context: {
-    questionRef: admin.database.Reference;
-    rtdbQuestion: Record<string, unknown>;
-    studentUid: string;
-    teacherUid: string;
-    acceptedAtMs: number;
-    startedAtMs: number | undefined;
-  }
+  context: QuestionContext
 ): Promise<void> {
-  const { questionRef, rtdbQuestion, studentUid, teacherUid, acceptedAtMs, startedAtMs } = context;
+  const {
+    questionRef,
+    rtdbQuestion,
+    studentUid,
+    teacherUid,
+    acceptedAtMs,
+    startedAtMs,
+    heldSeconds: bankedHeldSeconds,
+    minutesDeadlineMs,
+  } = context;
   logger.info(
     `[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`
   );
@@ -292,6 +314,18 @@ async function migrateQuestionToFirestore(
   // than billing from an unknown point.
   const billingStartMs = billingStartMillis(startedAtMs, acceptedAtMs) ?? endedAtMs;
 
+  // Time the lesson spent held for want of minutes is not billed: the student
+  // had already used everything they bought, and nothing was taught while the
+  // two of them waited. `heldSeconds` is what earlier holds banked when the
+  // student topped up; the final term is a hold still open at the end, which
+  // is the ordinary case — the student chose not to buy and closed the lesson.
+  const openHoldSeconds =
+    minutesDeadlineMs === undefined
+      ? 0
+      : Math.max(0, Math.floor((endedAtMs - minutesDeadlineMs) / 1000));
+  const heldSeconds = Math.max(0, Math.round(bankedHeldSeconds)) + openHoldSeconds;
+  const billableEndedAtMs = Math.max(billingStartMs, endedAtMs - heldSeconds * 1000);
+
   const {
     rawSeconds,
     roundedSeconds,
@@ -299,14 +333,14 @@ async function migrateQuestionToFirestore(
     minutesToCharge: roundedMinutesToCharge,
     cost,
     teacherEarnings,
-  } = calculateBilling(billingStartMs, endedAtMs, pricePerMinute, teacherShare);
+  } = calculateBilling(billingStartMs, billableEndedAtMs, pricePerMinute, teacherShare);
   const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
   logger.info(
     `[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`
   );
 
   logger.info(
-    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} teacherEarnings=${teacherEarnings}`
+    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} heldSeconds=${heldSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} teacherEarnings=${teacherEarnings}`
   );
 
   const batch = firestore.batch();
@@ -322,6 +356,7 @@ async function migrateQuestionToFirestore(
       teacherId: teacherUid,
       participants: [studentUid, teacherUid],
       durationSeconds: roundedSeconds,
+      heldSeconds,
       currencyCode,
       pricePerMinute,
       exchangeRateToUsd,
@@ -466,6 +501,80 @@ async function questionAlreadyEnded(questionId: string): Promise<boolean> {
   return status === "completed" || status === "cancelled";
 }
 
+/**
+ * Adds minutes to a lesson the student is in right now, and lifts the hold.
+ *
+ * Called when a purchase lands (see ./payments). A student whose minutes ran
+ * out mid-lesson is held rather than cut off, so buying more has to reach the
+ * lesson already running, not just their balance.
+ *
+ * The wait itself is banked as `heldSeconds` and subtracted when the lesson is
+ * billed: the new deadline runs from now rather than from the old one, so the
+ * minutes just bought are not eaten by the time spent deciding to buy them.
+ *
+ * Returns whether a lesson was found and extended.
+ */
+export async function extendLessonMinutes(
+  studentUid: string,
+  addedMinutes: number
+): Promise<boolean> {
+  const minutes = Math.floor(Number(addedMinutes));
+  if (!studentUid || !Number.isFinite(minutes) || minutes <= 0) return false;
+
+  const snap = await firestore
+    .collection("questions")
+    .where("studentUid", "==", studentUid)
+    .where("status", "==", "in_progress")
+    .limit(1)
+    .get();
+
+  if (snap.empty) return false;
+  const qRef = snap.docs[0].ref;
+
+  const extended = await firestore.runTransaction(async (tx) => {
+    const fresh = await tx.get(qRef);
+    if (!fresh.exists) return undefined;
+
+    const data = fresh.data() as QuestionDoc & {
+      minutesAvailable?: number;
+      minutesDeadlineAt?: unknown;
+      heldSeconds?: number;
+    };
+    if (data.status !== "in_progress") return undefined;
+
+    const now = Date.now();
+    const deadlineMs = toMillis(data.minutesDeadlineAt) ?? now;
+    const bankedHeld = Math.max(0, Math.round(Number(data.heldSeconds) || 0));
+    const heldSeconds = bankedHeld + Math.max(0, Math.floor((now - deadlineMs) / 1000));
+    const nextDeadlineMs = Math.max(now, deadlineMs) + minutes * 60_000;
+    const minutesAvailable = Math.max(0, Math.round(Number(data.minutesAvailable) || 0)) + minutes;
+
+    tx.update(qRef, {
+      minutesAvailable,
+      minutesDeadlineAt: Timestamp.fromMillis(nextDeadlineMs),
+      heldSeconds,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return { questionId: fresh.id, nextDeadlineMs, minutesAvailable, heldSeconds };
+  });
+
+  if (!extended) return false;
+
+  // The apps watch the live node, so this is what lifts the hold on screen.
+  await db.ref(`questions/${extended.questionId}`).update({
+    minutesAvailable: extended.minutesAvailable,
+    minutesDeadlineAt: extended.nextDeadlineMs,
+    heldSeconds: extended.heldSeconds,
+    updatedAt: Date.now(),
+  });
+
+  logger.info(
+    `[lessons] extended lesson qid=${extended.questionId} student=${studentUid} addedMinutes=${minutes} minutesAvailable=${extended.minutesAvailable} heldSeconds=${extended.heldSeconds}`
+  );
+  return true;
+}
+
 /** Arms the grace period that ends a lesson the student never joined. Called
  *  when a teacher accepts, since that is when the teacher starts waiting. */
 export async function enqueueAbandonedLessonCheck(questionId: string): Promise<void> {
@@ -534,11 +643,21 @@ export const startLesson = onCall(async (req) => {
   // Lock pricing at the moment the lesson starts so RC changes mid-lesson
   // do not retroactively shift the price. Currency is resolved from the
   // student's profile (/users/{uid}.currency).
-  const [pricing, connectionFeeCents] = await Promise.all([
+  const [pricing, connectionFeeCents, studentSnap] = await Promise.all([
     resolvePricingForStudent(q.studentUid),
     getConnectionFeeCents(),
+    firestore.collection("users").doc(q.studentUid).get(),
   ]);
   const pricePerMinuteCents = Math.round(pricing.pricePerMinute * 100);
+
+  // What the student can afford, turned into a moment both apps can count down
+  // to. They hold the session there — the student is offered more minutes, the
+  // teacher is told why — and nothing past it is billed.
+  const minutesAvailable = Math.max(
+    0,
+    Math.floor(Number((studentSnap.data() ?? {}).remainingMinutes) || 0)
+  );
+  const minutesDeadlineMs = now.getTime() + minutesAvailable * 60_000;
 
   const lesson: LessonDoc = {
     questionId,
@@ -563,6 +682,9 @@ export const startLesson = onCall(async (req) => {
     status: "in_progress",
     startedAt: Timestamp.fromDate(now),
     lessonId,
+    minutesAvailable,
+    minutesDeadlineAt: Timestamp.fromMillis(minutesDeadlineMs),
+    heldSeconds: 0,
     currencyCode: pricing.currency,
     pricePerMinute: pricing.pricePerMinute,
     teacherShare: pricing.teacherShare,
@@ -590,6 +712,9 @@ export const startLesson = onCall(async (req) => {
     teacherId: q.acceptedByTeacher,
     startedAt: Date.now(),
     updatedAt: Date.now(),
+    minutesAvailable,
+    minutesDeadlineAt: minutesDeadlineMs,
+    heldSeconds: 0,
     currencyCode: pricing.currency,
     pricePerMinute: pricing.pricePerMinute,
     pricePerMinuteCents,

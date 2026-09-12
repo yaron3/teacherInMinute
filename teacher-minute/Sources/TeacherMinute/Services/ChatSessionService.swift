@@ -11,12 +11,19 @@ import SkipFirebaseAuth
 #endif
 
 struct ChatMessage: Identifiable, Equatable {
+  /// The note a student leaves as they close a session their minutes ran out
+  /// on. An ordinary message otherwise.
+  static let farewellKind = "farewell"
+
   let id: String
   let text: String
   let senderUid: String
   let senderRole: String
   let createdAt: Double
   let isMine: Bool
+  /// `farewellKind` for a parting note, "text" for everything else. Defaulted
+  /// so the places that build a message locally keep compiling.
+  var kind: String = "text"
 }
 
 struct BoardPoint: Equatable {
@@ -54,6 +61,25 @@ struct ChatSessionDetails: Equatable {
   let pricePerMinuteCents: Int
   let teacherSharePercent: Double
   let currencyCode: String
+  /// When the student's purchased minutes run out, in epoch milliseconds, as
+  /// published by `startLesson` and kept current when they buy more. Zero when
+  /// the backend has not said — a lesson from before allowances were recorded
+  /// runs exactly as it used to, with no countdown and no hold.
+  ///
+  /// Defaulted so the several places that rebuild these details keep compiling;
+  /// each of them passes the current value through deliberately.
+  var minutesDeadlineAt: Double = 0
+}
+
+/// What the student's remaining credit means for the session right now.
+enum MinutesHoldState: Equatable {
+  /// Time left, or no deadline published at all.
+  case none
+  /// Under a minute to go, so the student can top up before being interrupted.
+  case warning
+  /// Nothing left. The session holds here until the student buys more minutes
+  /// or ends the call; nothing past this point is billed.
+  case held
 }
 
 @MainActor
@@ -281,14 +307,19 @@ final class ChatSessionService {
 #endif
   }
 
-  func sendText(_ text: String, senderRole: String) async throws {
+  func sendText(_ text: String, senderRole: String, kind: String = "text") async throws {
     guard let uid = Auth.auth().currentUser?.uid else { throw FunctionsError.notSignedIn }
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
 
 #if os(Android)
     try await Task.detached(priority: .userInitiated) {
-      try AndroidChatBridge.sendText(questionId: self.questionId, text: trimmed, senderRole: senderRole)
+      try AndroidChatBridge.sendText(
+        questionId: self.questionId,
+        text: trimmed,
+        senderRole: senderRole,
+        kind: kind
+      )
     }.value
 #else
     let payload: [String: Any] = [
@@ -296,7 +327,7 @@ final class ChatSessionService {
       "senderUid": uid,
       "senderRole": senderRole,
       "createdAt": Date().timeIntervalSince1970 * 1000.0,
-      "kind": "text"
+      "kind": kind
     ]
     try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
       messagesRef.childByAutoId().setValue(payload) { error, _ in
@@ -576,7 +607,8 @@ final class ChatSessionService {
       senderUid: senderUid,
       senderRole: senderRole,
       createdAt: createdAt,
-      isMine: senderUid == currentUserUid
+      isMine: senderUid == currentUserUid,
+      kind: dict["kind"] as? String ?? "text"
     )
   }
 
@@ -668,7 +700,8 @@ final class ChatSessionService {
         ?? intValue(dict["costPerMinuteCents"])
         ?? 0,
       teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75,
-      currencyCode: currencyCode(from: dict)
+      currencyCode: currencyCode(from: dict),
+      minutesDeadlineAt: normalizedMilliseconds(doubleValue(dict["minutesDeadlineAt"]) ?? 0)
     )
   }
 
@@ -761,10 +794,67 @@ protocol ChatSessionViewModeling: AnyObject {
   func setSelfMediaPending(_ pending: Bool)
   func peerMediaPending() -> Bool
   func endLesson() async
+
+  /// What the student's remaining credit means at `date`. Read from the
+  /// deadline the backend publishes, so both apps reach the same answer at the
+  /// same moment without either of them polling.
+  func minutesHoldState(at date: Date) -> MinutesHoldState
+  /// Sends a parting note, then ends the lesson. An empty note just ends it.
+  func endLessonWithFarewell(_ message: String) async
+  /// The other side's parting note, when they left one.
+  var peerFarewellNote: String? { get }
+}
+
+// MARK: - ChatSessionViewModeling defaults
+
+extension ChatSessionViewModeling {
+
+  /// Longest parting note a student can send as they close a held session.
+  var farewellMessageMaxLength: Int { 128 }
+
+  func minutesHoldState(at date: Date) -> MinutesHoldState { .none }
+
+  func endLessonWithFarewell(_ message: String) async { await endLesson() }
+
+  var peerFarewellNote: String? { nil }
 }
 
 // MARK: - ChatSessionViewModeling UI Strings
 extension ChatSessionViewModeling {
+
+  // MARK: Out of minutes
+
+  var outOfMinutesTitle: String { LocalizationSupport.localized("No more minutes left.") }
+  var outOfMinutesMessage: String {
+    LocalizationSupport.localized("Buy more minutes to carry on, or end the call with a short note for your teacher.")
+  }
+  var buyMoreMinutesLabel: String { LocalizationSupport.localized("Buy more minutes") }
+  var endTheCallLabel: String { LocalizationSupport.localized("End the call") }
+  var minutesRunningOutNotice: String {
+    LocalizationSupport.localized("Less than a minute of credit left.")
+  }
+  var farewellPromptMessage: String {
+    LocalizationSupport.localized("Your teacher will see this before the call ends.")
+  }
+  var farewellPlaceholder: String { LocalizationSupport.localized("Message to your teacher") }
+  var sendAndEndLabel: String { LocalizationSupport.localized("Send and end the call") }
+
+  // MARK: Out of minutes — the teacher's side
+
+  var studentOutOfMinutesTitle: String {
+    LocalizationSupport.localized("The student is out of minutes.")
+  }
+  var studentOutOfMinutesMessage: String {
+    LocalizationSupport.localized("They can buy more to carry on. You can wait, or end the call.")
+  }
+  var waitForStudentLabel: String { LocalizationSupport.localized("Wait") }
+  var peerEndedLessonTitle: String {
+    LocalizationSupport.localized("The student ended the lesson.")
+  }
+  var okLabel: String { LocalizationSupport.localized("OK") }
+  func farewellCharactersLeftText(_ remaining: Int) -> String {
+    String(format: LocalizationSupport.localized("%d characters left"), remaining)
+  }
 
   // MARK: Header / connection
 
@@ -1082,6 +1172,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           let mediaPending = try await service.fetchMediaPending()
           guard !Task.isCancelled else { return }
           messages = rows
+          noteFarewell(in: rows)
           boardStrokes = strokes
           boardViewports = viewports
           chatPausedStates = paused
@@ -1115,6 +1206,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     )
     service.startListening { [weak self] rows in
       self?.messages = rows
+      self?.noteFarewell(in: rows)
       self?.onMessagesUpdated?(rows)
     }
     service.startBoardListening { [weak self] strokes in
@@ -1210,6 +1302,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   func send(_ messageText: String) {
     let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
+    // A held session is paused for both sides: nothing past the deadline is
+    // billed, so nothing past it is taught either. The parting note goes out
+    // through endLessonWithFarewell, which does not come through here.
+    guard minutesHoldState(at: Date()) != .held else { return }
     errorMessage = nil
 #if os(Android)
 #endif
@@ -1352,6 +1448,56 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     stop()
   }
 
+  /// Warn a minute before the student's credit runs out, so they can top up
+  /// before the session is interrupted at all.
+  private static let minutesWarningSeconds: Double = 60
+
+  func minutesHoldState(at date: Date) -> MinutesHoldState {
+    // Zero means the backend published no allowance — a lesson that started
+    // before this existed runs as it always did.
+    guard let deadlineMs = details?.minutesDeadlineAt, deadlineMs > 0 else { return .none }
+
+    let secondsLeft = deadlineMs / 1000.0 - date.timeIntervalSince1970
+    if secondsLeft <= 0 { return .held }
+    return secondsLeft <= Self.minutesWarningSeconds ? .warning : .none
+  }
+
+  /// The other side's parting note, once it has arrived. Read when the session
+  /// ends: the note is shown to them before the screen closes, rather than
+  /// flashing past in a chat that is about to disappear.
+  private(set) var peerFarewellNote: String?
+
+  /// Remembers a parting note the moment it lands, because it arrives just
+  /// ahead of the session ending and the chat is torn down with it.
+  private func noteFarewell(in rows: [ChatMessage]) {
+    guard let note = rows.last(where: { $0.kind == ChatMessage.farewellKind && !$0.isMine }) else {
+      return
+    }
+    peerFarewellNote = note.text
+  }
+
+  func endLessonWithFarewell(_ message: String) async {
+    let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty {
+      do {
+        try await service.sendText(
+          String(trimmed.prefix(farewellMessageMaxLength)),
+          senderRole: role,
+          // Flagged so the other side can show it rather than let it scroll
+          // past: it lands in both chats either way.
+          kind: ChatMessage.farewellKind
+        )
+      } catch {
+        // The call is ending either way; a note that failed to send must not
+        // strand the student in a session they have already left.
+        logger.error(
+          "[ChatSession] farewell failed questionId=\(self.questionId): \(error.localizedDescription)"
+        )
+      }
+    }
+    await endLesson()
+  }
+
   private func handleRemoteSessionEnded() async {
 	logger.info("[ChatSession] handleRemoteSessionEnded")
     guard didObserveActiveSession || details != nil else { return }
@@ -1437,7 +1583,12 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       acceptedAt: updated.acceptedAt > 0 ? updated.acceptedAt : current.acceptedAt,
       pricePerMinuteCents: updated.pricePerMinuteCents > 0 ? updated.pricePerMinuteCents : current.pricePerMinuteCents,
       teacherSharePercent: updated.teacherSharePercent > 0 ? updated.teacherSharePercent : current.teacherSharePercent,
-      currencyCode: nonEmpty(updated.currencyCode) ?? current.currencyCode
+      currencyCode: nonEmpty(updated.currencyCode) ?? current.currencyCode,
+      // A later snapshot that omits the deadline must not clear a known one:
+      // the hold would lift itself and the student would keep talking for free.
+      minutesDeadlineAt: updated.minutesDeadlineAt > 0
+        ? updated.minutesDeadlineAt
+        : current.minutesDeadlineAt
     )
   }
 
@@ -1459,7 +1610,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       acceptedAt: current.acceptedAt,
       pricePerMinuteCents: current.pricePerMinuteCents,
       teacherSharePercent: current.teacherSharePercent,
-      currencyCode: current.currencyCode
+      currencyCode: current.currencyCode,
+      minutesDeadlineAt: current.minutesDeadlineAt
     )
     onSessionDetailsUpdated?()
   }
@@ -1510,7 +1662,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       acceptedAt: current.acceptedAt,
       pricePerMinuteCents: current.pricePerMinuteCents,
       teacherSharePercent: current.teacherSharePercent,
-      currencyCode: current.currencyCode
+      currencyCode: current.currencyCode,
+      minutesDeadlineAt: current.minutesDeadlineAt
     )
   }
 }
@@ -1526,7 +1679,7 @@ private enum AndroidChatBridge {
   )!
   private static let sendMethod = managerClass.getStaticMethodID(
     name: "sendText",
-    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
+    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
   )!
   private static let appendQuestionTextMethod = managerClass.getStaticMethodID(
     name: "appendQuestionText",
@@ -1587,7 +1740,7 @@ private enum AndroidChatBridge {
     } as String
   }
 
-  static func sendText(questionId: String, text: String, senderRole: String) throws {
+  static func sendText(questionId: String, text: String, senderRole: String, kind: String) throws {
     try jniContext {
       try managerClass.callStatic(
         method: sendMethod,
@@ -1595,7 +1748,8 @@ private enum AndroidChatBridge {
         args: [
           questionId.toJavaParameter(options: [.kotlincompat]),
           text.toJavaParameter(options: [.kotlincompat]),
-          senderRole.toJavaParameter(options: [.kotlincompat])
+          senderRole.toJavaParameter(options: [.kotlincompat]),
+          kind.toJavaParameter(options: [.kotlincompat])
         ]
       )
     }

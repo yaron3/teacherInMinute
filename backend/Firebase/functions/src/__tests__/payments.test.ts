@@ -36,7 +36,18 @@ function docRef(path: string) {
 type FakeDocRef = ReturnType<typeof docRef>;
 
 function collectionRef(path: string) {
-  return { doc: (id: string) => docRef(`${path}/${id}`) };
+  // `where`/`limit` exist for the lesson lookup a credited purchase makes; no
+  // test here runs a lesson, so an empty result is the right answer.
+  const emptyQuery = {
+    where: () => emptyQuery,
+    limit: () => emptyQuery,
+    get: async () => ({ empty: true, size: 0, docs: [] }),
+  };
+  return {
+    doc: (id: string) => docRef(`${path}/${id}`),
+    where: () => emptyQuery,
+    limit: () => emptyQuery,
+  };
 }
 
 const fakeFirestore = {
@@ -61,6 +72,16 @@ const fakeFirestore = {
 
 jest.mock("firebase-admin", () => ({
   firestore: () => fakeFirestore,
+  // payments.ts reaches the lesson a purchase may be extending, and that module
+  // graph takes a realtime handle at import. Nothing here exercises it.
+  database: () => ({
+    ref: () => ({
+      once: async () => ({ exists: () => false, val: () => null }),
+      update: async () => undefined,
+      remove: async () => undefined,
+      set: async () => undefined,
+    }),
+  }),
 }));
 
 jest.mock("firebase-admin/firestore", () => ({

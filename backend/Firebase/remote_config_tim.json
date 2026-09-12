@@ -5767,6 +5767,160 @@
       },
       "valueType": "STRING"
     },
+    "more_minutes_left": {
+      "defaultValue": {
+        "value": "No more minutes left."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא נותרו לך דקות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "out_of_minutes_message": {
+      "defaultValue": {
+        "value": "Buy more minutes to carry on, or end the call with a short note for your teacher."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אפשר לקנות עוד דקות ולהמשיך, או לסיים את השיחה עם הודעה קצרה למורה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "buy_more_minutes": {
+      "defaultValue": {
+        "value": "Buy more minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "קניית דקות נוספות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "end_the_call": {
+      "defaultValue": {
+        "value": "End the call"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סיום השיחה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "less_than_minute": {
+      "defaultValue": {
+        "value": "Less than a minute of credit left."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נותרה פחות מדקה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "farewell_prompt_message": {
+      "defaultValue": {
+        "value": "Your teacher will see this before the call ends."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה יראה את ההודעה לפני שהשיחה תסתיים."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "message_your_teacher": {
+      "defaultValue": {
+        "value": "Message to your teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הודעה למורה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "send_and_end": {
+      "defaultValue": {
+        "value": "Send and end the call"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שליחה וסיום השיחה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "choose_package": {
+      "defaultValue": {
+        "value": "Choose a package"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בחירת חבילה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_student_ended": {
+      "defaultValue": {
+        "value": "The student ended the lesson."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד סיים את השיעור."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_student_out": {
+      "defaultValue": {
+        "value": "The student is out of minutes."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לתלמיד נגמרו הדקות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "they_can_buy": {
+      "defaultValue": {
+        "value": "They can buy more to carry on. You can wait, or end the call."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוא יכול לקנות עוד דקות כדי להמשיך. אפשר להמתין או לסיים את השיחה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "wait": {
+      "defaultValue": {
+        "value": "Wait"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המתנה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "characters_left": {
+      "defaultValue": {
+        "value": "%d characters left"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נותרו %d תווים"
+        }
+      },
+      "valueType": "STRING"
+    },
     "the_purchase_did": {
       "defaultValue": {
         "value": "The purchase did not complete. If you were charged, your account will update after payment confirmation."
