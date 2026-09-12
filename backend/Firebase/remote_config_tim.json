@@ -5739,6 +5739,34 @@
       },
       "valueType": "NUMBER"
     },
+    "question_max_length": {
+      "defaultValue": {
+        "value": "1024"
+      },
+      "valueType": "NUMBER"
+    },
+    "fmt_question_too_long": {
+      "defaultValue": {
+        "value": "Your question is too long. Please shorten it to %d characters."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השאלה ארוכה מדי. קצרו אותה ל-%d תווים."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_question_too": {
+      "defaultValue": {
+        "value": "Your question is too long. Please shorten it."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השאלה ארוכה מדי. קצרו אותה."
+        }
+      },
+      "valueType": "STRING"
+    },
     "the_purchase_did": {
       "defaultValue": {
         "value": "The purchase did not complete. If you were charged, your account will update after payment confirmation."

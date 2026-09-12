@@ -4,6 +4,7 @@ const mockQuestionSet = jest.fn().mockResolvedValue(undefined);
 const mockQuestionUpdate = jest.fn().mockResolvedValue(undefined);
 const mockMint = jest.fn();
 const mockDispatchFirstWave = jest.fn();
+const mockQuestionMaxLength = jest.fn();
 
 jest.mock("firebase-admin", () => ({
   database: jest.fn(() => ({
@@ -36,7 +37,7 @@ jest.mock("firebase-functions", () => ({
 jest.mock("firebase-functions/v2/https", () => ({
   onCall: jest.fn((_options: unknown, handler: unknown) => handler),
   HttpsError: class HttpsError extends Error {
-    constructor(public code: string, message: string) {
+    constructor(public code: string, message: string, public details?: unknown) {
       super(message);
     }
   },
@@ -56,6 +57,10 @@ jest.mock("../pricing", () => ({
 }));
 
 jest.mock("../stats", () => ({ recordQuestionConnected: jest.fn() }));
+
+jest.mock("../questionLimits", () => ({
+  getQuestionMaxLength: () => mockQuestionMaxLength(),
+}));
 
 jest.mock("../dispatch", () => ({
   dispatchFirstWave: (...args: unknown[]) => mockDispatchFirstWave(...args),
@@ -78,12 +83,134 @@ function ask(conversationType: string) {
   });
 }
 
+function askWithText(text: string) {
+  return createQuestionHandler({
+    auth: { uid: "student-1" },
+    data: { topic: "algebra", text, conversationType: "text" },
+  });
+}
+
+function askWithPhotos(photoUrls: unknown) {
+  return createQuestionHandler({
+    auth: { uid: "student-1" },
+    data: {
+      topic: "algebra",
+      text: "How do I solve 2x + 3 = 11?",
+      photoUrls,
+      conversationType: "text",
+    },
+  });
+}
+
+/** What StorageService.uploadQuestionImage returns for this student. */
+function ownPhotoUrl(uid = "student-1"): string {
+  return (
+    "https://firebasestorage.googleapis.com/v0/b/teacher-in-a-moment.firebasestorage.app/o/" +
+    `${encodeURIComponent(`questionImages/${uid}/1757000000000.jpg`)}?alt=media&token=t`
+  );
+}
+
 describe("createQuestion", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUserGet.mockResolvedValue({ data: () => ({ remainingMinutes: 20, fullName: "Sam" }) });
     mockDispatchFirstWave.mockResolvedValue(undefined);
     mockMint.mockResolvedValue({ token: "student-token", expiresAt: new Date() });
+    mockQuestionMaxLength.mockResolvedValue(1024);
+  });
+
+  describe("question photos", () => {
+    const originalProject = process.env.GCLOUD_PROJECT;
+
+    beforeEach(() => {
+      process.env.GCLOUD_PROJECT = "teacher-in-a-moment";
+    });
+
+    afterAll(() => {
+      if (originalProject === undefined) delete process.env.GCLOUD_PROJECT;
+      else process.env.GCLOUD_PROJECT = originalProject;
+    });
+
+    test("accepts and stores a photo the student uploaded", async () => {
+      await expect(askWithPhotos([ownPhotoUrl()])).resolves.toEqual({
+        questionId: "q-1",
+        connectionFeeCents: 50,
+      });
+      expect(mockQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({ photoUrls: [ownPhotoUrl()] })
+      );
+    });
+
+    test.each([
+      ["a link to somewhere else entirely", "https://evil.test/tracker.jpg"],
+      ["another student's upload", ownPhotoUrl("student-2")],
+    ])("rejects %s, before writing anything", async (_label, url) => {
+      await expect(askWithPhotos([url])).rejects.toMatchObject({
+        code: "invalid-argument",
+        details: { reason: "photo_url_rejected" },
+      });
+      expect(mockQuestionSet).not.toHaveBeenCalled();
+      expect(mockRtdbUpdate).not.toHaveBeenCalled();
+      expect(mockDispatchFirstWave).not.toHaveBeenCalled();
+    });
+
+    test("rejects a question whose photos are partly foreign", async () => {
+      await expect(
+        askWithPhotos([ownPhotoUrl(), "https://evil.test/tracker.jpg"])
+      ).rejects.toMatchObject({ details: { reason: "photo_url_rejected" } });
+    });
+
+    test("stores an array even when the client sends something else", async () => {
+      await expect(askWithPhotos([42, null])).resolves.toEqual({
+        questionId: "q-1",
+        connectionFeeCents: 50,
+      });
+      expect(mockQuestionSet).toHaveBeenCalledWith(expect.objectContaining({ photoUrls: [] }));
+    });
+  });
+
+  describe("question length", () => {
+    // The app shows its own localized sentence for this, so the reason and the
+    // limit have to survive the trip — not just the English message.
+    test("rejects text longer than the limit, before writing anything", async () => {
+      await expect(askWithText("x".repeat(1025))).rejects.toMatchObject({
+        code: "invalid-argument",
+        message: "Question text must be at most 1024 characters",
+        details: { reason: "question_too_long", limit: 1024 },
+      });
+      expect(mockQuestionSet).not.toHaveBeenCalled();
+      expect(mockRtdbUpdate).not.toHaveBeenCalled();
+      expect(mockDispatchFirstWave).not.toHaveBeenCalled();
+    });
+
+    test("accepts text exactly at the limit", async () => {
+      await expect(askWithText("x".repeat(1024))).resolves.toEqual({
+        questionId: "q-1",
+        connectionFeeCents: 50,
+      });
+    });
+
+    // Trailing whitespace is not part of what gets stored, so it must not be
+    // what pushes a question over the limit.
+    test("measures the limit after trimming", async () => {
+      await expect(askWithText(`   ${"x".repeat(1024)}   `)).resolves.toEqual({
+        questionId: "q-1",
+        connectionFeeCents: 50,
+      });
+    });
+
+    test("follows the limit Remote Config publishes", async () => {
+      mockQuestionMaxLength.mockResolvedValue(20);
+
+      await expect(askWithText("x".repeat(21))).rejects.toMatchObject({
+        message: "Question text must be at most 20 characters",
+        details: { reason: "question_too_long", limit: 20 },
+      });
+      await expect(askWithText("x".repeat(20))).resolves.toEqual({
+        questionId: "q-1",
+        connectionFeeCents: 50,
+      });
+    });
   });
 
   test.each(["audio", "video"])(

@@ -413,6 +413,7 @@ enum LocalizationKey {
         "%d seconds": "fmt_seconds",
         "%d minutes": "fmt_minutes",
         "%d sec": "fmt_sec",
+        "Your question is too long. Please shorten it to %d characters.": "fmt_question_too_long",
         "When AI gets stuck, a human teacher connects in %@": "fmt_ai_stuck_connects",
         "When AI gets stuck, a human teacher connects in moments": "ai_stuck_connects_moments",
         "%@ Teacher": "fmt_subject_teacher",

@@ -264,7 +264,7 @@ struct RateSessionView: View {
 private extension Error {
   var isLessonFinalizingError: Bool {
     guard let functionError = self as? FunctionsError else { return false }
-    if case .serverError(let message, let status) = functionError {
+    if case .serverError(let message, let status, _) = functionError {
       return status == "FAILED_PRECONDITION"
         && message.localizedCaseInsensitiveContains("finaliz")
     }

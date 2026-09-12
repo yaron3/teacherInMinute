@@ -394,7 +394,7 @@ final class TeacherEarningsViewModel {
         } catch let error as FunctionsError {
             // The backend names the field that failed validation, so surface its
             // message rather than a generic one.
-            if case .serverError(let message, let status) = error, status == "INVALID_ARGUMENT" {
+            if case .serverError(let message, let status, _) = error, status == "INVALID_ARGUMENT" {
                 payoutMethodErrorMessage = message
             } else {
                 payoutMethodErrorMessage = LocalizationSupport.localized("Could not save your payment method. Please try again.")
@@ -467,7 +467,7 @@ final class TeacherEarningsViewModel {
                 payoutMethodErrorMessage = error.localizedDescription
             }
         } catch let error as FunctionsError {
-            if case .serverError(let message, _) = error {
+            if case .serverError(let message, _, _) = error {
                 payoutMethodErrorMessage = message
             } else {
                 payoutMethodErrorMessage = LocalizationSupport.localized("Could not confirm your PayPal account. Please try again.")

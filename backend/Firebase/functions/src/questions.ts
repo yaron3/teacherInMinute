@@ -15,6 +15,8 @@ import {
   HOT_PATH,
 } from "./types";
 import { getConnectionFeeCents } from "./pricing";
+import { getQuestionMaxLength } from "./questionLimits";
+import { isOwnQuestionImageUrl } from "./storageUrls";
 import { recordQuestionConnected } from "./stats";
 import { dispatchFirstWave, enqueueQuestionWatchdog } from "./dispatch";
 
@@ -90,8 +92,14 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
       ? (rawConversationType as ConversationType)
       : DEFAULT_CONVERSATION_TYPE;
 
+  // Anything that is not a string cannot be a photo URL, and the stored value
+  // has to be an array whatever the client sent.
+  const photos: string[] = Array.isArray(photoUrls)
+    ? photoUrls.filter((url): url is string => typeof url === "string")
+    : [];
+
   const hasText = !!text?.trim();
-  const hasPhoto = Array.isArray(photoUrls) && photoUrls.length > 0;
+  const hasPhoto = photos.length > 0;
 
   if (!topic) {
     throw new HttpsError("invalid-argument", "topic is required");
@@ -109,7 +117,41 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     throw new HttpsError("invalid-argument", "Question text must be at least 10 characters");
   }
 
-  const studentSnap = await firestore.collection("users").doc(uid).get();
+  // Every photo has to be one this student uploaded into our own bucket. These
+  // URLs are handed to invited teachers and fetched by their devices, so an
+  // arbitrary link would let a question aim teachers' apps at a server the
+  // student controls, or at another user's files.
+  if (photos.some((url) => !isOwnQuestionImageUrl(url, uid))) {
+    logger.warn(`[questions] createQuestion rejected foreign photo url student=${uid}`);
+    throw new HttpsError(
+      "invalid-argument",
+      "Question photos must be uploaded through the app",
+      { reason: "photo_url_rejected" }
+    );
+  }
+
+  // The length limit and the student's balance are independent reads, so they
+  // overlap rather than queueing up on the ask path.
+  const [studentSnap, maxQuestionLength] = await Promise.all([
+    firestore.collection("users").doc(uid).get(),
+    getQuestionMaxLength(),
+  ]);
+
+  // Measured after trimming, so the limit counts what is stored rather than
+  // whitespace the student cannot see.
+  const trimmedText = text?.trim() ?? "";
+  if (trimmedText.length > maxQuestionLength) {
+    // `details` carries the machine-readable half: the message above is English
+    // and written for a log, while the app switches on `reason` to show its own
+    // localized sentence, with `limit` filled in from whatever is published
+    // rather than a number the client hardcodes.
+    throw new HttpsError(
+      "invalid-argument",
+      `Question text must be at most ${maxQuestionLength} characters`,
+      { reason: "question_too_long", limit: maxQuestionLength }
+    );
+  }
+
   const studentData = studentSnap.data() ?? {};
   const remainingMinutes: number = (studentData.remainingMinutes as number | undefined) ?? 0;
   if (remainingMinutes < 2) {
@@ -152,15 +194,13 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
           }
         );
 
-  const trimmedText = text?.trim() ?? "";
-
   const question: QuestionDoc = {
     studentUid: uid,
     studentName,
     studentImageURL,
     topic,
     text: trimmedText,
-    photoUrls,
+    photoUrls: photos,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
     conversationType,
     status: "searching",
@@ -180,7 +220,7 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     studentImageURL,
     topic,
     text: trimmedText,
-    photoUrls,
+    photoUrls: photos,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
     conversationType,
     dispatchWave: 1,

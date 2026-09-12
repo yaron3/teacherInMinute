@@ -230,6 +230,22 @@ extension StudentHomeViewModeling {
     LocalizationSupport.localized("Build the formula, then add it to your question.")
   }
 
+  // MARK: Ask errors
+  /// Shown when the backend refuses a question for exceeding the published
+  /// character limit. The limit arrives with the error rather than being
+  /// repeated here, so changing it in Remote Config changes this sentence too.
+  func questionTooLongMessage(maxLength: Int) -> String {
+    String(
+      format: LocalizationSupport.localized("Your question is too long. Please shorten it to %d characters."),
+      maxLength
+    )
+  }
+
+  /// The same refusal from a backend that did not say what the limit is.
+  var questionTooLongFallbackMessage: String {
+    LocalizationSupport.localized("Your question is too long. Please shorten it.")
+  }
+
   // MARK: Section headers & captions
   var availableSubjectsTitle: String { LocalizationSupport.localized("Available Subjects") }
   var teachersOnlineNowTitle: String { LocalizationSupport.localized("Teachers online now") }
@@ -583,9 +599,19 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
     } catch let err as FunctionsError {
-      if case .serverError(_, let status) = err, status == "RESOURCE_EXHAUSTED" {
+      if case .serverError(_, let status, _) = err, status == "RESOURCE_EXHAUSTED" {
         logger.info("TeacherMinute askTeacher blocked: insufficient minutes")
         searchState = .error(LocalizationSupport.localized("Not enough time left. Please purchase more minutes."))
+      } else if case .serverError(_, _, let details) = err,
+                details?.reason == ServerErrorDetails.questionTooLong {
+        // Told apart from every other invalid-argument by the reason, so the
+        // student reads a sentence about their question's length rather than
+        // the backend's English log line.
+        logger.info("TeacherMinute askTeacher blocked: question too long limit=\(details?.limit ?? 0)")
+        searchState = .error(
+          details?.limit.map { questionTooLongMessage(maxLength: $0) }
+            ?? questionTooLongFallbackMessage
+        )
       } else {
         logger.error("TeacherMinute askTeacher failed error=\(err)")
         searchState = .error(err.localizedDescription)
@@ -892,7 +918,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       }
       logger.info("[Coupon] redeemed minutesAdded=\(result.minutesAdded)")
     } catch let err as FunctionsError {
-      if case .serverError(let message, let status) = err {
+      if case .serverError(let message, let status, _) = err {
         switch status {
         case "NOT_FOUND":
           couponState = .invalid

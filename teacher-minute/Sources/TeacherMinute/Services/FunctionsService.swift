@@ -25,10 +25,44 @@ import SkipFirebaseAuth
 
 // MARK: - Errors
 
+/// The machine-readable half of a callable's error, from `error.details`.
+///
+/// The `message` a function throws is English and written for a log; anything
+/// the app has to *act* on — show its own localized copy for, fill a number
+/// into — travels here instead, where it can be switched on safely.
+struct ServerErrorDetails: Sendable, Equatable {
+  /// Stable identifier for why the call was refused, e.g. `question_too_long`.
+  let reason: String
+  /// The limit `reason` refers to, when it names one. Sent by the backend so
+  /// the app never has to keep its own copy of a number Remote Config owns.
+  let limit: Int?
+
+  init?(_ raw: [String: Any]?) {
+    guard let reason = raw?["reason"] as? String, !reason.isEmpty else { return nil }
+    self.reason = reason
+    self.limit = Self.intValue(raw?["limit"])
+  }
+
+  /// JSON numbers arrive as `Int` or `Double` depending on the platform's
+  /// deserializer, and as a string from a backend that quoted them.
+  private static func intValue(_ value: Any?) -> Int? {
+    if let int = value as? Int { return int }
+    if let double = value as? Double { return Int(double) }
+    if let string = value as? String { return Int(string) }
+    return nil
+  }
+}
+
+extension ServerErrorDetails {
+  /// `createQuestion` refused the text for exceeding the published length
+  /// limit; `limit` carries that limit.
+  static let questionTooLong = "question_too_long"
+}
+
 enum FunctionsError: Error {
   case notSignedIn
   case httpError(statusCode: Int)
-  case serverError(message: String, status: String)
+  case serverError(message: String, status: String, details: ServerErrorDetails? = nil)
   case decodingError(function: String? = nil, response: String? = nil)
 }
 
@@ -39,7 +73,7 @@ extension FunctionsError: LocalizedError {
       "Not signed in"
     case .httpError(let statusCode):
       "HTTP error \(statusCode)"
-    case .serverError(let message, let status):
+    case .serverError(let message, let status, _):
       "\(status): \(message)"
     case .decodingError(let function, let response):
       "Could not decode \(function ?? "function") response. \(response ?? "")"
@@ -631,8 +665,9 @@ final class FunctionsService {
        let error = json["error"] as? [String: Any] {
       let message = error["message"] as? String ?? "Unknown error"
       let status  = error["status"]  as? String ?? "UNKNOWN"
-      logger.error("[FunctionsService] \(name) server error status=\(status) message=\(message)")
-      throw FunctionsError.serverError(message: message, status: status)
+      let details = ServerErrorDetails(error["details"] as? [String: Any])
+      logger.error("[FunctionsService] \(name) server error status=\(status) message=\(message) reason=\(details?.reason ?? "none")")
+      throw FunctionsError.serverError(message: message, status: status, details: details)
     }
 
     if let statusCode, statusCode != 200 {
