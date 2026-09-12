@@ -19,6 +19,15 @@ export const WAVE_SIZES = [3, 5, 10] as const;
 export const WAVE_TIMEOUT_SECONDS = 12;
 export const INVITE_EXPIRY_SECONDS = 90;
 export const HARD_CAP_MINUTES = 30;
+
+// How long a teacher who accepted waits for the student to actually turn up
+// before the lesson is written off. A student's app joins within seconds of
+// seeing the acceptance, so this is generous; what it bounds is the case where
+// the student is not there at all — their app was killed while searching, or
+// they gave up before a teacher with a still-valid invite claimed the question.
+// Nobody is charged for such a lesson, and clearing it is what ends the
+// teacher's session, since the apps end when the live question node disappears.
+export const ABANDONED_LESSON_GRACE_SECONDS = 120;
 export const CONNECTION_FEE_CENTS = 50;
 export const MIN_BILLABLE_SECONDS = 30;
 export const ROUND_UP_SECONDS = 30;

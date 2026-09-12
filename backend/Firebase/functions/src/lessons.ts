@@ -10,6 +10,7 @@ import {
   QuestionDoc,
   LessonDoc,
   HARD_CAP_MINUTES,
+  ABANDONED_LESSON_GRACE_SECONDS,
   PurchaseDoc,
 } from "./types";
 import { calculateBilling, billingStartMillis } from "./billing";
@@ -456,6 +457,25 @@ async function migrateQuestionToFirestore(
   logger.info(`[lessons] migrateQuestionToFirestore RTDB question removed qid=${questionId}`);
 }
 
+/** Whether the question has already reached a state no further ending can
+ *  change. Read from Firestore, which outlives the live RTDB node. */
+async function questionAlreadyEnded(questionId: string): Promise<boolean> {
+  const snap = await firestore.collection("questions").doc(questionId).get();
+  if (!snap.exists) return false;
+  const status = (snap.data() as QuestionDoc).status;
+  return status === "completed" || status === "cancelled";
+}
+
+/** Arms the grace period that ends a lesson the student never joined. Called
+ *  when a teacher accepts, since that is when the teacher starts waiting. */
+export async function enqueueAbandonedLessonCheck(questionId: string): Promise<void> {
+  const queue = getFunctions().taskQueue("endAbandonedLesson");
+  await queue.enqueue(
+    { questionId },
+    { scheduleDelaySeconds: ABANDONED_LESSON_GRACE_SECONDS }
+  );
+}
+
 // ─── startLesson ──────────────────────────────────────────────────────────────
 // FR-B-006, FR-B-010
 // Called by either client once the Agora audio channel is connected.
@@ -479,17 +499,22 @@ export const startLesson = onCall(async (req) => {
     throw new HttpsError("permission-denied", "Not a participant in this lesson");
   }
 
-  if (q.status !== "accepted") {
-    throw new HttpsError("failed-precondition", `Cannot start lesson in status: ${q.status}`);
-  }
-
   logger.info(
     `[lessons] startLesson authorized qid=${questionId} uid=${uid} questionStatus=${q.status} acceptedByTeacher=${q.acceptedByTeacher ?? "none"}`
   );
 
-  // Idempotent: if lesson already exists return it
+  // Both apps call this as they connect, so arriving second is normal rather
+  // than an error: record the arrival and hand back the lesson already running.
+  // This is also the only record of who actually turned up — endAbandonedLesson
+  // writes off a lesson the student never joined, and it reads this.
+  await qRef.update({ joinedParticipants: FieldValue.arrayUnion(uid) });
+
   if (q.lessonId) {
     return { lessonId: q.lessonId };
+  }
+
+  if (q.status !== "accepted") {
+    throw new HttpsError("failed-precondition", `Cannot start lesson in status: ${q.status}`);
   }
 
   const lessonId = uuidv4();
@@ -603,7 +628,21 @@ export const endLesson = onCall(async (req) => {
     debugContext.stage = "validated-input";
     logger.info(`[lessons] endLesson start qid=${questionId} uid=${uid}`);
 
-    const context = await resolveQuestionContext(questionId);
+    let context: Awaited<ReturnType<typeof resolveQuestionContext>>;
+    try {
+      context = await resolveQuestionContext(questionId);
+    } catch (error) {
+      // The live question node is removed as a lesson is settled, so its
+      // absence is usually not a failure: it means the other side ended the
+      // lesson first, or the grace-period task wrote it off. Both apps call
+      // this — the one that did not press End reaches here — and a lesson that
+      // is already over is a success for the caller, not an error to show them.
+      if (await questionAlreadyEnded(questionId)) {
+        logger.info(`[lessons] endLesson already ended qid=${questionId} uid=${uid}`);
+        return { success: true, questionId, alreadyEnded: true };
+      }
+      throw error;
+    }
     debugContext.stage = "loaded-rtdb-question";
 
     const rtdbKeys = Object.keys(context.rtdbQuestion).sort();
@@ -821,6 +860,96 @@ export const rateTeacher = onCall(async (req) => {
 
   return { success: true };
 });
+
+// ─── endAbandonedLesson — Cloud Tasks handler ────────────────────────────────
+// Armed when a teacher accepts, and fires once the grace period is up.
+//
+// A teacher can legitimately claim a question its student has already given up
+// on: the student's app stops waiting after a minute, while an invite stays
+// valid for ninety seconds, and a student whose app was killed never tells
+// anyone it left at all. The teacher was then left sitting in a room nobody
+// joins, with the billing clock running from the moment they accepted and
+// nothing on the server to stop it — the 30-minute cap is armed by startLesson,
+// which never runs when there is no lesson to start.
+//
+// Writing the question off costs the student nothing, pays nothing, and removes
+// the live node, which is what ends the teacher's session: both apps stop when
+// that node disappears.
+
+export const endAbandonedLesson = onTaskDispatched<{ questionId: string }>(
+  {
+    retryConfig: { maxAttempts: 2 },
+    rateLimits: { maxConcurrentDispatches: 20 },
+  },
+  async (req) => {
+    const { questionId } = req.data;
+    if (!questionId) {
+      logger.warn("[lessons] endAbandonedLesson missing questionId payload");
+      return;
+    }
+
+    const qRef = firestore.collection("questions").doc(questionId);
+
+    const abandoned = await firestore.runTransaction(async (tx) => {
+      const snap = await tx.get(qRef);
+      if (!snap.exists) return false;
+
+      const question = snap.data() as QuestionDoc & { joinedParticipants?: string[] };
+
+      // Anything already settled — ended by a participant, cancelled, or never
+      // claimed in the first place — is none of this task's business.
+      if (question.status !== "accepted" && question.status !== "in_progress") return false;
+
+      const joined = Array.isArray(question.joinedParticipants)
+        ? question.joinedParticipants
+        : [];
+      if (joined.includes(question.studentUid)) return false;
+
+      tx.update(qRef, {
+        status: "cancelled",
+        endedBy: "system",
+        endedReason: "student_never_joined",
+        endedAt: FieldValue.serverTimestamp(),
+        billedSeconds: 0,
+        durationSeconds: 0,
+        totalCents: 0,
+        cost: 0,
+        teacherEarnings: 0,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return true;
+    });
+
+    if (!abandoned) {
+      logger.info(`[lessons] endAbandonedLesson skipped qid=${questionId}`);
+      return;
+    }
+
+    await db.ref(`questions/${questionId}`).remove();
+
+    // A lesson document exists only if someone called startLesson — the
+    // teacher, in this case, since the student never arrived.
+    const lessonRecord = await loadLessonDocByQuestionId(questionId);
+    if (lessonRecord) {
+      await lessonRecord.ref.set(
+        {
+          status: "completed",
+          endedBy: "system",
+          endedAt: FieldValue.serverTimestamp(),
+          billedSeconds: 0,
+          cost: 0,
+          teacherEarnings: 0,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    logger.warn(
+      `[lessons] endAbandonedLesson wrote off qid=${questionId} — the student never joined`
+    );
+  }
+);
 
 // ─── forceEndLesson — Cloud Tasks handler ────────────────────────────────────
 // FR-B-006: fires at hardCapAt (30 min after lesson start).

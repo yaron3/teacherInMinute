@@ -974,6 +974,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private let service: ChatSessionService
   private var pollingTask: Task<Void, Never>?
   private var hasReportedLessonEnd = false
+  private var hasReportedLessonStart = false
   private var didObserveActiveSession = false
   private var lastSentChatPaused: Bool?
   private var lastSentMediaPending: Bool?
@@ -1003,6 +1004,34 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       onConnectingUpdated?(false)
       logger.info("[ChatSession] connected questionId=\(self.questionId) role=\(self.role)")
       beginListening()
+      await reportLessonStarted()
+    }
+  }
+
+  /// Tells the backend this participant is in the session.
+  ///
+  /// Nothing used to call `startLesson`, which left the lesson document
+  /// uncreated, the 30-minute hard cap unarmed — it is scheduled by that call —
+  /// and the billing clock running from the moment the teacher accepted rather
+  /// than from when the two of them were actually together. It is also how the
+  /// backend learns the student turned up at all: a lesson they never joined is
+  /// written off after a grace period and charged to nobody.
+  ///
+  /// Both sides call it as they connect, and the backend treats the second
+  /// arrival as ordinary. Best-effort: failing here must not throw anyone out
+  /// of a session they are already connected to.
+  private func reportLessonStarted() async {
+    guard !hasReportedLessonStart else { return }
+    guard let questionId = nonEmpty(self.questionId) else { return }
+    hasReportedLessonStart = true
+
+    do {
+      let lessonId = try await FunctionsService.shared.startLesson(questionId: questionId)
+      logger.info("[ChatSession] startLesson reported questionId=\(questionId) lessonId=\(lessonId)")
+    } catch {
+      logger.error(
+        "[ChatSession] startLesson failed questionId=\(questionId): \(error.localizedDescription)"
+      )
     }
   }
 

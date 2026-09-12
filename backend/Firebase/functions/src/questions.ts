@@ -19,6 +19,7 @@ import { getQuestionMaxLength } from "./questionLimits";
 import { isOwnQuestionImageUrl } from "./storageUrls";
 import { recordQuestionConnected } from "./stats";
 import { dispatchFirstWave, enqueueQuestionWatchdog } from "./dispatch";
+import { enqueueAbandonedLessonCheck } from "./lessons";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -479,6 +480,13 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
   // the accept.
   await recordQuestionConnected(questionId, questionCreatedAtMillis, Date.now()).catch((error) => {
     logger.warn(`[questions] failed recording connect stat qid=${questionId}`, error);
+  });
+
+  // The teacher starts waiting the moment they claim the question, so the grace
+  // period starts here: if the student never turns up, the lesson is written
+  // off rather than left running with nothing to stop it.
+  await enqueueAbandonedLessonCheck(questionId).catch((error) => {
+    logger.error(`[questions] failed arming abandoned-lesson check qid=${questionId}`, error);
   });
 
   logger.info(`[questions] accepted qid=${questionId} teacher=${teacherUid}`);

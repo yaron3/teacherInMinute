@@ -11,7 +11,13 @@ export { dispatchQuestion, evaluateWave, questionWatchdog, onTeacherStatusChange
 export { createQuestion, cancelQuestion, acceptInvite, declineInvite, getQuestionStatus } from "./questions";
 
 // Lesson lifecycle (all callable — FR-B-010)
-export { startLesson, endLesson, forceEndLesson, rateTeacher } from "./lessons";
+export {
+  startLesson,
+  endLesson,
+  forceEndLesson,
+  endAbandonedLesson,
+  rateTeacher,
+} from "./lessons";
 
 // Public online-teacher projection students can read
 export {
