@@ -39,6 +39,38 @@ function database() {
  * Reads rather than trusts the triggering event, so concurrent status and
  * subject writes converge on the same answer whichever order they land in.
  */
+/**
+ * Copies the teacher's real rating into the record the dispatcher ranks on.
+ *
+ * Ranking reads RTDB, but the rating is earned in Firestore — `rateTeacher`
+ * maintains `averageRate` and `ratingCount` on `teachers/{uid}`. The app used
+ * to fill the RTDB copy in itself, defaulting to five stars, which is both
+ * unverifiable and flattering to whoever wrote it. The backend owns it now:
+ * stamped here when a teacher comes online, and again by `rateTeacher` as each
+ * new rating lands, so a rating changes who gets the next question.
+ *
+ * A teacher nobody has rated keeps no rating at all — the keys are removed
+ * rather than set to a number nobody gave them. ./scoring reads that absence
+ * as unrated and ranks them on the rest of the signals.
+ */
+export async function stampAuthoritativeRating(uid: string): Promise<void> {
+  const snap = await firestore.collection("teachers").doc(uid).get();
+  const data = snap.data() ?? {};
+
+  const average = Number(data.averageRate);
+  const count = Number(data.ratingCount);
+  const rated = Number.isFinite(average) && average > 0;
+
+  await database().ref(`teachers/${uid}`).update({
+    ratingAvg: rated ? average : null,
+    ratingCount: Number.isFinite(count) && count > 0 ? Math.round(count) : null,
+  });
+
+  logger.info(
+    `[presence] stamped rating uid=${uid} ratingAvg=${rated ? average : "none"}`
+  );
+}
+
 export async function republishTeacherPresence(uid: string): Promise<boolean> {
   const teacherSnap = await database().ref(`teachers/${uid}`).get();
   const status = teacherSnap.child("status").val();
@@ -49,6 +81,14 @@ export async function republishTeacherPresence(uid: string): Promise<boolean> {
     logger.info(`[presence] cleared online entry uid=${uid}`);
     return false;
   }
+
+  // Done before the projection so a teacher who just came online is ranked on
+  // their real rating from their very first wave. Best-effort: presence must
+  // still publish if this fails, or a failed read would take them out of the
+  // pool entirely.
+  await stampAuthoritativeRating(uid).catch((error) => {
+    logger.warn(`[presence] failed stamping rating uid=${uid}`, error);
+  });
 
   const rawSubjects = teacherSnap.child("subjects").val();
   const subjects = Array.isArray(rawSubjects)

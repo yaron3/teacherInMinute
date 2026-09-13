@@ -15,6 +15,7 @@ import {
 } from "./types";
 import { calculateBilling, billingStartMillis } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
+import { stampAuthoritativeRating } from "./presence";
 import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
 
 const firestore = admin.firestore();
@@ -981,6 +982,14 @@ export const rateTeacher = onCall(async (req) => {
     // Mirror the score onto the question so the student who gave it can show it
     // in their own lesson history — they cannot read the teacher's ratings.
     tx.update(questionRef, { studentRating: rating, ratedAt: Timestamp.now() });
+  });
+
+  // The dispatcher ranks on the RTDB copy, so a rating that only reached
+  // Firestore would never affect who gets the next question. Best-effort: the
+  // rating itself is already recorded, and presence stamps it again the next
+  // time this teacher comes online.
+  await stampAuthoritativeRating(teacherId).catch((error) => {
+    logger.warn(`[lessons] failed mirroring rating teacher=${teacherId}`, error);
   });
 
   return { success: true };

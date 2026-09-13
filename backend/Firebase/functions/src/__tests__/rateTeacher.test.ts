@@ -7,9 +7,15 @@ const adminFirestore = jest.fn();
 const adminDatabase = jest.fn();
 const dbRef = jest.fn();
 const dbOnce = jest.fn();
+const dbUpdate = jest.fn();
+const teacherGet = jest.fn();
 
 let questionRef: { path: string };
-let teacherRef: { path: string; collection: (name: string) => { path: string; doc: (id: string) => { path: string } } };
+let teacherRef: {
+  path: string;
+  get: typeof teacherGet;
+  collection: (name: string) => { path: string; doc: (id: string) => { path: string } };
+};
 let ratingsCollectionRef: { path: string; doc: (id: string) => { path: string } };
 let ratingRef: { path: string };
 let lessonRef: { path: string };
@@ -71,6 +77,9 @@ describe("rateTeacher", () => {
     };
     teacherRef = {
       path: "teachers/teacher-1",
+      // Read back after the transaction commits, to mirror the new average into
+      // RTDB — so this returns the aggregate as it stands once the rating landed.
+      get: teacherGet,
       collection: (name: string) => {
         if (name !== "ratings") throw new Error(`Unexpected collection: ${name}`);
         return ratingsCollectionRef;
@@ -100,8 +109,13 @@ describe("rateTeacher", () => {
     dbOnce.mockResolvedValue({
       exists: () => false,
     });
+    dbUpdate.mockResolvedValue(undefined);
     dbRef.mockReturnValue({
       once: dbOnce,
+      update: dbUpdate,
+    });
+    teacherGet.mockResolvedValue({
+      data: () => ({ averageRate: 4.333333333333333, ratingCount: 3 }),
     });
     adminDatabase.mockReturnValue({
       ref: dbRef,
@@ -199,6 +213,38 @@ describe("rateTeacher", () => {
       expect.objectContaining({ path: questionRef.path }),
       expect.objectContaining({ studentRating: 5 })
     );
+  });
+
+  // Ranking is decided on the RTDB copy, so a rating that reached only
+  // Firestore would never change who gets the next question.
+  test("mirrors the new average into the record the dispatcher ranks on", async () => {
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: { questionId: "question-1", teacherId: "teacher-1", rating: 5 },
+    });
+
+    expect(dbRef).toHaveBeenCalledWith("teachers/teacher-1");
+    expect(dbUpdate).toHaveBeenCalledWith({
+      ratingAvg: 4.333333333333333,
+      ratingCount: 3,
+    });
+  });
+
+  test("leaves an unrated teacher with no rating at all", async () => {
+    teacherGet.mockResolvedValue({ data: () => ({}) });
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: { questionId: "question-1", teacherId: "teacher-1", rating: 5 },
+    });
+
+    // Null removes the key: absent means unrated, which is what scoring reads.
+    expect(dbUpdate).toHaveBeenCalledWith({ ratingAvg: null, ratingCount: null });
   });
 
   test("stores a trimmed student comment when one is written", async () => {

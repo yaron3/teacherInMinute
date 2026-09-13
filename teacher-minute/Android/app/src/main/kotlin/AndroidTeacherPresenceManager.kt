@@ -130,8 +130,11 @@ object AndroidTeacherPresenceManager {
                 values["uid"] = uid
                 values["displayName"] = document.getString("fullName") ?: "Teacher"
                 values["subjects"] = subjects
-                values["ratingAvg"] = document.getDouble("ratingAvg") ?: 5.0
-                values["acceptRate"] = document.getDouble("acceptRate") ?: 1.0
+                // Deliberately not writing ratingAvg or acceptRate. Ranking is
+                // decided on those, so the app being ranked cannot be the one
+                // supplying them — this used to default to five stars for
+                // everybody. The backend stamps the earned rating when
+                // presence is published, and again whenever a student rates.
                 values["lastActiveAt"] = System.currentTimeMillis()
 
                 updateTeacherRecord(uid, status, values)

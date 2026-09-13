@@ -3,16 +3,63 @@ import { TeacherRecord } from "./types";
 
 // FR-B-002: score = 0.6·(ratingAvg/5) + 0.25·acceptRate + 0.15·recencyFactor
 // recencyFactor = exp(-hoursAgo / 24)  →  1.0 when just active, decays to ~0 after 72h
+//
+// Every term has to survive its value being absent, and each absence means
+// something different. A teacher who has never been rated has no `ratingAvg` at
+// all — the backend writes one only once a student has given one — and reading
+// that as zero would bury every new teacher behind anyone with a single star.
+// Reading it as five would do the opposite and let an unrated teacher outrank a
+// good one. So the missing value is scored as a prior, and nothing is stored:
+// the database still says "no rating".
+//
+// This used to fall out as NaN rather than anything considered. iOS writes only
+// status and subjects, so `ratingAvg`, `acceptRate` and `lastActiveAt` were all
+// undefined, the arithmetic produced NaN, and `sort` with a comparator that
+// returns NaN leaves the order unspecified — the ranking was not wrong so much
+// as absent.
 
-function recencyFactor(lastActiveAt: number): number {
-  const hoursAgo = (Date.now() - lastActiveAt) / 3_600_000;
+/** What an unrated teacher's rating counts as. Mid-scale: they have not earned
+ *  a good average, and have not earned a bad one either. */
+const UNRATED_PRIOR = 3.0;
+
+/** No invitations refused on record yet, so nothing is held against them. */
+const UNKNOWN_ACCEPT_RATE = 1.0;
+
+/** Only teachers who are online are ranked at all, so an absent `lastActiveAt`
+ *  means the app does not write one (iOS), not that the teacher is stale. It is
+ *  read as "active now" rather than penalising a whole platform. */
+const UNKNOWN_RECENCY = 1.0;
+
+function finite(value: unknown): number | undefined {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** 0–5, or the prior when this teacher has no ratings yet. */
+function ratingOf(teacher: TeacherRecord): number {
+  const rating = finite(teacher.ratingAvg);
+  if (rating === undefined || rating <= 0) return UNRATED_PRIOR;
+  return Math.min(5, rating);
+}
+
+function acceptRateOf(teacher: TeacherRecord): number {
+  const rate = finite(teacher.acceptRate);
+  if (rate === undefined || rate < 0) return UNKNOWN_ACCEPT_RATE;
+  return Math.min(1, rate);
+}
+
+function recencyFactor(lastActiveAt: unknown): number {
+  const activeAt = finite(lastActiveAt);
+  if (activeAt === undefined || activeAt <= 0) return UNKNOWN_RECENCY;
+  const hoursAgo = (Date.now() - activeAt) / 3_600_000;
+  if (hoursAgo <= 0) return 1;
   return Math.exp(-hoursAgo / 24);
 }
 
 export function scoreTeacher(teacher: TeacherRecord): number {
   return (
-    0.6 * (teacher.ratingAvg / 5) +
-    0.25 * teacher.acceptRate +
+    0.6 * (ratingOf(teacher) / 5) +
+    0.25 * acceptRateOf(teacher) +
     0.15 * recencyFactor(teacher.lastActiveAt)
   );
 }
@@ -37,7 +84,7 @@ export function rankTeachers(
   topic: string,
   exclude: Set<string>
 ): ScoredTeacher[] {
-  const candidates: ScoredTeacher[] = [];
+  const candidates: Array<ScoredTeacher & { lastActiveAt: number }> = [];
   const normalizedTopic = normalizeSubject(topic);
 
   // Counted rather than logged one line at a time: this runs on the dispatch
@@ -60,12 +107,26 @@ export function rankTeachers(
       continue;
     }
 
-    candidates.push({ uid, score: scoreTeacher(t) });
+    candidates.push({
+      uid,
+      score: scoreTeacher(t),
+      lastActiveAt: finite(t.lastActiveAt) ?? 0,
+    });
   }
 
   logger.info(
     `[scoring] ranked topic=${topic} considered=${Object.keys(teachers).length} excluded=${exclude.size} skippedOffline=${offline} skippedTopic=${topicMismatch} eligible=${candidates.length}`
   );
 
-  return candidates.sort((a, b) => b.score - a.score);
+  // Unrated teachers all score alike, so ties are ordinary rather than rare.
+  // Breaking them on recency and then on uid keeps the order defined — left to
+  // the sort's own stability it would follow whatever order the keys arrived
+  // in, and the same teachers would take wave 1 every time.
+  return candidates
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.lastActiveAt !== a.lastActiveAt) return b.lastActiveAt - a.lastActiveAt;
+      return a.uid.localeCompare(b.uid);
+    })
+    .map(({ uid, score }) => ({ uid, score }));
 }

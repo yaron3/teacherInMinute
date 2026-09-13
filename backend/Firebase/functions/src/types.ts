@@ -39,10 +39,23 @@ export const ROUND_UP_SECONDS = 30;
 
 export interface TeacherRecord {
   status: "online" | "offline";
+  /** What the teacher asked for, as opposed to whether the app is connected.
+   *  Written only when they work the availability toggle. */
+  availability?: "available" | "dnd";
   subjects: string[];       // ["algebra", "geometry", ...]
-  ratingAvg: number;        // 0–5,  default 3.0 for new teachers
-  acceptRate: number;       // 0–1,  default 1.0 for new teachers
-  lastActiveAt: number;     // Unix ms
+  /** 0–5, and absent until a student has actually rated them. Written by the
+   *  backend alone — `rateTeacher` mirrors it here and presence stamps it when
+   *  a teacher comes online — so it cannot be set by the app that benefits
+   *  from it. Absent means unrated, which ./scoring reads as a prior rather
+   *  than as zero. */
+  ratingAvg?: number;
+  /** How many ratings `ratingAvg` is the mean of. */
+  ratingCount?: number;
+  /** 0–1. Absent until there is anything to measure. */
+  acceptRate?: number;
+  /** Unix ms. Android writes it; iOS does not, so absence means "unknown",
+   *  not "idle". */
+  lastActiveAt?: number;
   fcmToken?: string;        // registered by the app on login
   displayName: string;
   photoUrl?: string;
