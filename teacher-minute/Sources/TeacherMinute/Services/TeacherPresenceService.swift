@@ -99,6 +99,12 @@ final class TeacherPresenceService {
 	  injectedStatusWriter(status)
 	  return
 	}
+	// Two separate facts. `availability` is what the teacher asked for and only
+	// this method writes it; `status` is whether the app is actually connected,
+	// and the dead man's switch below writes that alone. So a teacher whose app
+	// was killed with the toggle on stays "available" and is told apart from one
+	// who turned the toggle off — the first is worth reaching, the second is not.
+	teacherRef?.child("availability").setValue(status == "online" ? "available" : "dnd")
 	teacherRef?.child("status").setValue(status)
 	if status == "online" {
 	  teacherRef?.child("subjects").setValue(subjects)

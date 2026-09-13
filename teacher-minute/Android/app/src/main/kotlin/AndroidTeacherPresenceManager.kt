@@ -99,6 +99,11 @@ object AndroidTeacherPresenceManager {
     @JvmStatic
     fun setTeacherStatus(uid: String, status: String) {
         val baseValues = mutableMapOf<String, Any>(
+            // What the teacher asked for, as opposed to whether the app is
+            // connected. Only this path writes it — the onDisconnect handler
+            // below writes `status` alone — so an app killed with the toggle on
+            // stays "available", while a toggle turned off reads "dnd".
+            "availability" to if (status == "online") "available" else "dnd",
             "status" to status,
             "isOnline" to (status == "online"),
             "updatedAt" to ServerValue.TIMESTAMP
