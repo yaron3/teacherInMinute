@@ -1762,9 +1762,15 @@ struct StudentLiveSessionScreen: View {
 	  onBuyMinutes: { beginInSessionCheckout() }
 	) {
 	  dismiss()
+	  // Cleared here rather than after the refresh below. That refresh waits up
+	  // to seven seconds for the balance debit to land — and a lesson billed at
+	  // zero minutes never changes the balance, so it always waits the full
+	  // time. A student who asked again inside that window had the new search
+	  // cancelled by this reset: the question went out, the app stopped
+	  // watching it, and the teacher who accepted sat in an empty room.
+	  viewModel.resetSearch()
 	  Task {
 		await viewModel.refreshAfterLessonEnded()
-		viewModel.resetSearch()
 		// After the student's first lesson, offer notifications behind a
 		// custom explanation (the system prompt only appears if they opt in).
 		if await NotificationPromptStore.shouldPresentExplanation() {
