@@ -166,6 +166,11 @@ protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   var purchaseSummary: PurchaseSummary? { get set }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
+  /// Starts an ask that outlives the screen that asked for it. The ask sheet
+  /// dismisses itself as it submits, and work owned by that screen dies with
+  /// it — on Android the task is scoped to the composable, so the question was
+  /// simply never sent and nothing appeared to say so.
+  func submitQuestion(topic: String, text: String, photoUrls: [String], conversationType: String)
   func cancelSearch() async
   func resetSearch()
   func selectTier(_ option: PricingOption)
@@ -245,6 +250,25 @@ extension StudentHomeViewModeling {
   /// The same refusal from a backend that did not say what the limit is.
   var questionTooLongFallbackMessage: String {
     LocalizationSupport.localized("Your question is too long. Please shorten it.")
+  }
+
+  /// Asked again too soon. The wait comes from the backend rather than from a
+  /// copy of the allowance here, so changing the published limit changes this
+  /// sentence with it.
+  func askingTooQuicklyMessage(retryAfterSeconds: Int) -> String {
+    String(
+      format: LocalizationSupport.localized("You're asking too quickly. Try again in %d seconds."),
+      max(1, retryAfterSeconds)
+    )
+  }
+
+  /// The hourly allowance, where seconds would read as a strange way to say
+  /// "in a while".
+  func hourlyAskLimitMessage(retryAfterMinutes: Int) -> String {
+    String(
+      format: LocalizationSupport.localized("You've asked a lot of questions this hour. Try again in %d minutes."),
+      max(1, retryAfterMinutes)
+    )
   }
 
   // MARK: Section headers & captions
@@ -541,6 +565,9 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var purchaseSummary: PurchaseSummary?
 
   private var pollingTask: Task<Void, Never>?
+  /// Held by the view model rather than the ask sheet, so dismissing the sheet
+  /// cannot cancel the question it just sent.
+  private var askTask: Task<Void, Never>?
   /// The question this student last asked, along with the LiveKit credentials
   /// minted for it, so an accepted lesson does not have to ask for them again.
   private var createdQuestion: CreateQuestionResult?
@@ -570,8 +597,32 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   // MARK: - Actions
 
+  func submitQuestion(topic: String, text: String, photoUrls: [String], conversationType: String) {
+    askTask?.cancel()
+    askTask = Task { [weak self] in
+      await self?.askTeacher(
+        topic: topic,
+        text: text,
+        photoUrls: photoUrls,
+        conversationType: conversationType
+      )
+    }
+  }
+
   func askTeacher(topic: String, text: String, photoUrls: [String] = [], conversationType: String = "text") async {
-    guard case .idle = searchState else { return }
+    // A finished state is not a reason to refuse the next question. The ask
+    // sheet dismisses itself before calling this, so returning here dropped the
+    // question with nothing on screen to say why — the student saw their
+    // question vanish. Only a question actually in flight blocks another.
+    switch searchState {
+    case .idle:
+      break
+    case .error, .noMatch:
+      searchState = .idle
+    case .searching, .matched:
+      logger.info("TeacherMinute askTeacher ignored: a question is already in flight")
+      return
+    }
 	logger.info("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
     activeConversationType = conversationType
     searchState = .searching(questionId: "")
@@ -600,7 +651,20 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
     } catch let err as FunctionsError {
-      if case .serverError(_, let status, _) = err, status == "RESOURCE_EXHAUSTED" {
+      if case .serverError(_, _, let details) = err,
+         details?.reason == ServerErrorDetails.rateLimited {
+        // Checked before the balance branch below: both refusals arrive as
+        // RESOURCE_EXHAUSTED, and only the reason tells them apart.
+        let waitSeconds = details?.retryAfterSeconds ?? 60
+        logger.info(
+          "TeacherMinute askTeacher blocked: rate limited scope=\(details?.scope ?? "none") retryAfter=\(waitSeconds)s"
+        )
+        searchState = .error(
+          details?.scope == ServerErrorDetails.hourScope
+            ? hourlyAskLimitMessage(retryAfterMinutes: Int((Double(waitSeconds) / 60.0).rounded(.up)))
+            : askingTooQuicklyMessage(retryAfterSeconds: waitSeconds)
+        )
+      } else if case .serverError(_, let status, _) = err, status == "RESOURCE_EXHAUSTED" {
         logger.info("TeacherMinute askTeacher blocked: insufficient minutes")
         searchState = .error(LocalizationSupport.localized("Not enough time left. Please purchase more minutes."))
       } else if case .serverError(_, _, let details) = err,
@@ -1467,6 +1531,17 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.lessonCount = recentLessons.count
     self.hasUnreadMessages = true
     self.profileImageURL = ""
+  }
+
+  func submitQuestion(topic: String, text: String, photoUrls: [String], conversationType: String) {
+    Task {
+      await askTeacher(
+        topic: topic,
+        text: text,
+        photoUrls: photoUrls,
+        conversationType: conversationType
+      )
+    }
   }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {

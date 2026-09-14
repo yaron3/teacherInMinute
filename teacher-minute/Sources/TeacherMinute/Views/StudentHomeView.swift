@@ -1522,7 +1522,11 @@ struct NoMatchOverlay: View {
 		.buttonStyle(.plain)
 		.padding(.horizontal, 32)
 	  }
-	  .padding(32)
+	  .padding(28)
+	  .frame(maxWidth: 340)
+	  .background(theme.cardBackground)
+	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+	  .padding(.horizontal, 24)
 	}
   }
 }
@@ -1538,7 +1542,7 @@ struct ErrorOverlay: View {
   }
   var body: some View {
 	ZStack {
-	  theme.cardBackground.opacity(0.9).ignoresSafeArea()
+	  theme.scrim.opacity(0.6).ignoresSafeArea()
 	  
 	  VStack(spacing: 20) {
 		Circle()
@@ -1573,7 +1577,11 @@ struct ErrorOverlay: View {
 		.buttonStyle(.plain)
 		.padding(.horizontal, 32)
 	  }
-	  .padding(32)
+	  .padding(28)
+	  .frame(maxWidth: 340)
+	  .background(theme.cardBackground)
+	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+	  .padding(.horizontal, 24)
 	}
   }
 }

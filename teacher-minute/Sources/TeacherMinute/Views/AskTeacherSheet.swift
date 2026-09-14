@@ -464,13 +464,15 @@ struct AskTeacherSheet: View {
             }
         }
 
-        closeAskTeacher()
-        await viewModel.askTeacher(
+        // Submitted before the sheet closes, and owned by the view model rather
+        // than by this screen: dismissing used to cancel the send outright.
+        viewModel.submitQuestion(
             topic: selectedTopic.lowercased(),
             text: composedQuestionText,
             photoUrls: uploadedPhotoUrls,
             conversationType: conversationType
         )
+        closeAskTeacher()
     }
 
     var photoAttachmentSection: some View {

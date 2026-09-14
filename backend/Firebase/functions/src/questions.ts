@@ -15,7 +15,8 @@ import {
   HOT_PATH,
 } from "./types";
 import { getConnectionFeeCents } from "./pricing";
-import { getQuestionMaxLength } from "./questionLimits";
+import { getQuestionMaxLength, getQuestionRateLimits } from "./questionLimits";
+import { checkQuestionAllowance, recordSessionStart } from "./rateLimit";
 import { isOwnQuestionImageUrl } from "./storageUrls";
 import { recordQuestionConnected } from "./stats";
 import { dispatchFirstWave, enqueueQuestionWatchdog } from "./dispatch";
@@ -131,11 +132,13 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     );
   }
 
-  // The length limit and the student's balance are independent reads, so they
-  // overlap rather than queueing up on the ask path.
-  const [studentSnap, maxQuestionLength] = await Promise.all([
+  // The limits and the student's balance are independent reads, so they
+  // overlap rather than queueing up on the ask path. Both limits come from one
+  // cached Remote Config template, so this is a single fetch, usually cached.
+  const [studentSnap, maxQuestionLength, rateLimits] = await Promise.all([
     firestore.collection("users").doc(uid).get(),
     getQuestionMaxLength(),
+    getQuestionRateLimits(),
   ]);
 
   // Measured after trimming, so the limit counts what is stored rather than
@@ -157,6 +160,32 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
   const remainingMinutes: number = (studentData.remainingMinutes as number | undefined) ?? 0;
   if (remainingMinutes < 2) {
     throw new HttpsError("resource-exhausted", "Not enough time left");
+  }
+
+  // A read, not a spend: the allowance is spent when a teacher accepts (see
+  // acceptInvite below), so a question nobody answers costs the student
+  // nothing. What this refuses is a student who has already *started* more
+  // lessons than the allowance permits.
+  const allowance = await checkQuestionAllowance(
+    uid,
+    rateLimits.perMinute,
+    rateLimits.perHour
+  );
+  if (!allowance.allowed) {
+    logger.info(
+      `[questions] createQuestion rate limited student=${uid} scope=${allowance.scope} retryAfter=${allowance.retryAfterSeconds}s`
+    );
+    // Shares the `resource-exhausted` code with an empty balance, so the app
+    // tells them apart by `reason` — see StudentHomeViewModel.askTeacher.
+    throw new HttpsError(
+      "resource-exhausted",
+      `Too many questions — try again in ${allowance.retryAfterSeconds}s`,
+      {
+        reason: "rate_limited",
+        scope: allowance.scope,
+        retryAfterSeconds: allowance.retryAfterSeconds,
+      }
+    );
   }
 
   // Snapshot the student's name + (privacy-respecting) profile image so invited
@@ -480,6 +509,15 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
   // the accept.
   await recordQuestionConnected(questionId, questionCreatedAtMillis, Date.now()).catch((error) => {
     logger.warn(`[questions] failed recording connect stat qid=${questionId}`, error);
+  });
+
+  // The allowance is spent here rather than at creation: a question becomes a
+  // session only now. Stamped with when it was sent, so a question that waited
+  // for a teacher does not push the student's next ask further out. Best-effort
+  // — the lesson is already claimed, and losing one entry is not worth failing
+  // it over.
+  await recordSessionStart(studentUid, questionCreatedAtMillis ?? Date.now()).catch((error) => {
+    logger.warn(`[questions] failed recording the session allowance qid=${questionId}`, error);
   });
 
   // The teacher starts waiting the moment they claim the question, so the grace

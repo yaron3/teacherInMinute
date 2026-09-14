@@ -9005,6 +9005,40 @@
         "value": "false"
       },
       "valueType": "BOOLEAN"
+    },
+    "questions_per_minute": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "valueType": "NUMBER"
+    },
+    "questions_per_hour": {
+      "defaultValue": {
+        "value": "5"
+      },
+      "valueType": "NUMBER"
+    },
+    "fmt_asking_too_quickly": {
+      "defaultValue": {
+        "value": "You're asking too quickly. Try again in %d seconds."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שליחת השאלות מהירה מדי. נסו שוב בעוד %d שניות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_hourly_ask_limit": {
+      "defaultValue": {
+        "value": "You've asked a lot of questions this hour. Try again in %d minutes."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שאלתם הרבה שאלות בשעה האחרונה. נסו שוב בעוד %d דקות."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

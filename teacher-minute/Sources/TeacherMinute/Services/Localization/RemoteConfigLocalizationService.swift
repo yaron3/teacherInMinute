@@ -419,6 +419,9 @@ enum LocalizationKey {
           "out_of_minutes_message",
         // `your_teacher_will` already belongs to "Your teacher will join shortly".
         "Your teacher will see this before the call ends.": "farewell_prompt_message",
+        "You're asking too quickly. Try again in %d seconds.": "fmt_asking_too_quickly",
+        "You've asked a lot of questions this hour. Try again in %d minutes.":
+          "fmt_hourly_ask_limit",
         "When AI gets stuck, a human teacher connects in %@": "fmt_ai_stuck_connects",
         "When AI gets stuck, a human teacher connects in moments": "ai_stuck_connects_moments",
         "%@ Teacher": "fmt_subject_teacher",

@@ -5,6 +5,8 @@ const mockQuestionUpdate = jest.fn().mockResolvedValue(undefined);
 const mockMint = jest.fn();
 const mockDispatchFirstWave = jest.fn();
 const mockQuestionMaxLength = jest.fn();
+const mockRateLimits = jest.fn();
+const mockCheckAllowance = jest.fn();
 
 jest.mock("firebase-admin", () => ({
   database: jest.fn(() => ({
@@ -60,6 +62,12 @@ jest.mock("../stats", () => ({ recordQuestionConnected: jest.fn() }));
 
 jest.mock("../questionLimits", () => ({
   getQuestionMaxLength: () => mockQuestionMaxLength(),
+  getQuestionRateLimits: () => mockRateLimits(),
+}));
+
+jest.mock("../rateLimit", () => ({
+  checkQuestionAllowance: (...args: unknown[]) => mockCheckAllowance(...args),
+  recordSessionStart: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../dispatch", () => ({
@@ -117,6 +125,8 @@ describe("createQuestion", () => {
     mockDispatchFirstWave.mockResolvedValue(undefined);
     mockMint.mockResolvedValue({ token: "student-token", expiresAt: new Date() });
     mockQuestionMaxLength.mockResolvedValue(1024);
+    mockRateLimits.mockResolvedValue({ perMinute: 2, perHour: 5 });
+    mockCheckAllowance.mockResolvedValue({ allowed: true, kept: [] });
   });
 
   describe("question photos", () => {
@@ -166,6 +176,48 @@ describe("createQuestion", () => {
         connectionFeeCents: 50,
       });
       expect(mockQuestionSet).toHaveBeenCalledWith(expect.objectContaining({ photoUrls: [] }));
+    });
+  });
+
+  describe("how often a student may start a lesson", () => {
+    test("refuses once the allowance is spent, and writes nothing", async () => {
+      mockCheckAllowance.mockResolvedValue({
+        allowed: false,
+        scope: "minute",
+        retryAfterSeconds: 20,
+        kept: [],
+      });
+
+      await expect(ask("text")).rejects.toMatchObject({
+        code: "resource-exhausted",
+        details: { reason: "rate_limited", scope: "minute", retryAfterSeconds: 20 },
+      });
+
+      expect(mockQuestionSet).not.toHaveBeenCalled();
+      expect(mockRtdbUpdate).not.toHaveBeenCalled();
+      expect(mockDispatchFirstWave).not.toHaveBeenCalled();
+    });
+
+    test("passes the published allowances through", async () => {
+      mockRateLimits.mockResolvedValue({ perMinute: 7, perHour: 9 });
+
+      await ask("text");
+
+      expect(mockCheckAllowance).toHaveBeenCalledWith("student-1", 7, 9);
+    });
+
+    // An allowance is for questions that would otherwise have gone out; a
+    // malformed one must not cost the student anything.
+    test("does not even check a question that was refused for another reason", async () => {
+      await expect(askWithText("too short")).rejects.toThrow();
+      expect(mockCheckAllowance).not.toHaveBeenCalled();
+    });
+
+    test("does not check when the student has no minutes", async () => {
+      mockUserGet.mockResolvedValue({ data: () => ({ remainingMinutes: 0 }) });
+
+      await expect(ask("text")).rejects.toMatchObject({ code: "resource-exhausted" });
+      expect(mockCheckAllowance).not.toHaveBeenCalled();
     });
   });
 

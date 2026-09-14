@@ -7,6 +7,18 @@ import { TeacherRecord } from "../types";
 
 const NOW = Date.now();
 
+// Scores are read off the clock: a recency term that moves between two calls
+// makes an exact comparison fail whenever a millisecond happens to tick, which
+// is a flake rather than a finding. Pinning it makes every score here a
+// function of its inputs alone.
+let clock: jest.SpyInstance;
+beforeEach(() => {
+  clock = jest.spyOn(Date, "now").mockReturnValue(NOW);
+});
+afterEach(() => {
+  clock.mockRestore();
+});
+
 function teacher(overrides: Partial<TeacherRecord> = {}): TeacherRecord {
   return {
     status: "online",

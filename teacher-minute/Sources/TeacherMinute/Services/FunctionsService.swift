@@ -36,11 +36,18 @@ struct ServerErrorDetails: Sendable, Equatable {
   /// The limit `reason` refers to, when it names one. Sent by the backend so
   /// the app never has to keep its own copy of a number Remote Config owns.
   let limit: Int?
+  /// Which allowance ran out — "minute" or "hour" — for a refusal that names
+  /// one.
+  let scope: String?
+  /// How long until the same call is worth making again.
+  let retryAfterSeconds: Int?
 
   init?(_ raw: [String: Any]?) {
     guard let reason = raw?["reason"] as? String, !reason.isEmpty else { return nil }
     self.reason = reason
     self.limit = Self.intValue(raw?["limit"])
+    self.scope = raw?["scope"] as? String
+    self.retryAfterSeconds = Self.intValue(raw?["retryAfterSeconds"])
   }
 
   /// JSON numbers arrive as `Int` or `Double` depending on the platform's
@@ -57,6 +64,13 @@ extension ServerErrorDetails {
   /// `createQuestion` refused the text for exceeding the published length
   /// limit; `limit` carries that limit.
   static let questionTooLong = "question_too_long"
+
+  /// `createQuestion` refused because the student has asked too often;
+  /// `scope` names the allowance and `retryAfterSeconds` says how long.
+  static let rateLimited = "rate_limited"
+
+  /// The value `scope` carries when it is the hourly allowance.
+  static let hourScope = "hour"
 }
 
 enum FunctionsError: Error {
