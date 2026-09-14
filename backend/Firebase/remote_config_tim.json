@@ -9008,13 +9008,13 @@
     },
     "questions_per_minute": {
       "defaultValue": {
-        "value": "2"
+        "value": "0"
       },
       "valueType": "NUMBER"
     },
     "questions_per_hour": {
       "defaultValue": {
-        "value": "5"
+        "value": "0"
       },
       "valueType": "NUMBER"
     },
