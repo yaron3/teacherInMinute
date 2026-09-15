@@ -41,3 +41,4 @@ DerivedData/
 teacher-minute/TeacherMinute App */
 # Integration-test run output
 backend/Firebase/functions/scripts/lesson-result-*.json
+.derivedData/
