@@ -1472,11 +1472,25 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
           case "unanswered", "waiting", "pending":
             break
           case "cancelled", "canceled", "expired":
+            let responseTime = Date().timeIntervalSince1970 - startedAt
+            AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherNoMatch, parameters: [
+              "question_id": questionId,
+              "response_time_seconds": Int(responseTime),
+              "reason": "teacher_declined",
+              "conversation_type": activeConversationType
+            ])
             searchState = .noMatch
             return
           case "completed":
             // Completed without an AI answer means the question was force-ended
             // or cancelled server-side before a teacher connected.
+            let responseTime = Date().timeIntervalSince1970 - startedAt
+            AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherNoMatch, parameters: [
+              "question_id": questionId,
+              "response_time_seconds": Int(responseTime),
+              "reason": "completed_no_teacher",
+              "conversation_type": activeConversationType
+            ])
             searchState = .noMatch
             return
           default:
@@ -1487,6 +1501,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
         let elapsed = Date().timeIntervalSince1970 - startedAt
         if elapsed >= Self.noTeacherTimeoutSeconds {
           logger.info("TeacherMinute questionStatus timed out after \(Int(elapsed))s questionId=\(questionId); transitioning to noMatch")
+          AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherNoMatch, parameters: [
+            "question_id": questionId,
+            "response_time_seconds": Int(elapsed),
+            "reason": "timeout",
+            "conversation_type": activeConversationType
+          ])
           try? await FunctionsService.shared.cancelQuestion(questionId: questionId)
           searchState = .noMatch
           return
