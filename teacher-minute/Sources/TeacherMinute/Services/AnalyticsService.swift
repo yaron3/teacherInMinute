@@ -45,6 +45,8 @@ enum AnalyticsEvent {
     static let askTeacherNoMatch   = "ask_teacher_no_match"
     static let askTeacherFailed    = "ask_teacher_failed"
     static let lessonTapped        = "lesson_tapped"
+    static let lessonTappedWithDetails = "lesson_tapped_with_details"
+    static let permissionStateOnAskTeacher = "permission_state_on_ask_teacher"
 
     // Teacher flow
     static let teacherAcceptingToggled = "teacher_accepting_toggled"
@@ -52,6 +54,8 @@ enum AnalyticsEvent {
     static let teacherInviteDeclined   = "teacher_invite_declined"
     static let teacherCallAnswered     = "teacher_call_answered"
     static let teacherCallDenied       = "teacher_call_denied"
+    static let studentQuestionResponseTime = "student_question_response_time"
+    static let teacherCallResponseTime = "teacher_call_response_time"
 
     // Chat / session
     static let chatMessageSent  = "chat_message_sent"
@@ -110,6 +114,12 @@ enum AnalyticsScreen {
     static let about                 = "about_web"
     static let connectionSetup       = "connection_setup"
     static let whiteboard            = "whiteboard"
+    static let teacherDocuments      = "teacher_documents"
+    static let teacherEarnings       = "teacher_earnings"
+    static let teacherPayoutMethod   = "teacher_payout_method"
+    static let launchSplash          = "launch_splash"
+    static let minutesPackage        = "minutes_package"
+    static let rateSession           = "rate_session"
 }
 
 @MainActor

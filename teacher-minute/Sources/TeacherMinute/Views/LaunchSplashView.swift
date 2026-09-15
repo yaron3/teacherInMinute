@@ -18,6 +18,7 @@ struct LaunchSplashView: View {
           .scaleEffect(1.2)
       }
     }
+    .trackScreen(AnalyticsScreen.launchSplash)
   }
 }
 

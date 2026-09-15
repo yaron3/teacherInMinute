@@ -23,6 +23,7 @@ struct WelcomeView: View {
 
 	  welcomeContent
 	}
+	.trackScreen(AnalyticsScreen.welcome)
   }
 
   private var welcomeContent: some View {

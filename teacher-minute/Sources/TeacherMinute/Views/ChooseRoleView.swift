@@ -124,6 +124,7 @@ struct ChooseRoleView: View {
       message: legalAlertMessage,
       actions: [AppDialogAction(viewModel.okLabel)]
     )
+    .trackScreen(AnalyticsScreen.chooseRole)
   }
 
   private func continueWithSelectedRole() {

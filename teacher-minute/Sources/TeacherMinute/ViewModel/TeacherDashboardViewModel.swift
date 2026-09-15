@@ -31,6 +31,7 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var inviteTopics: [String: String] { get set }
   var inviteTexts: [String: String] { get set }
   var inviteExpiresAt: [String: Double] { get set }
+  var inviteCreatedAt: [String: Double] { get set }
   var inviteWaves: [String: Int] { get set }
   var invitePhotoUrls: [String: [String]] { get set }
   var inviteHasVoiceMessage: [String: Bool] { get set }
@@ -356,6 +357,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var inviteTopics: [String: String] = [:]
   var inviteTexts: [String: String] = [:]
   var inviteExpiresAt: [String: Double] = [:]
+  var inviteCreatedAt: [String: Double] = [:]
   var inviteWaves: [String: Int] = [:]
   var invitePhotoUrls: [String: [String]] = [:]
   var inviteHasVoiceMessage: [String: Bool] = [:]
@@ -828,6 +830,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	var topics: [String: String] = [:]
 	var texts: [String: String] = [:]
 	var expiresAtByID: [String: Double] = [:]
+	var createdAtByID: [String: Double] = [:]
 	var waves: [String: Int] = [:]
 	var photoUrlsByID: [String: [String]] = [:]
 	var hasVoiceByID: [String: Bool] = [:]
@@ -837,14 +840,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	var studentIds: [String: String] = [:]
 	var pricesPerMinute: [String: Int] = [:]
 	var conversationTypes: [String: String] = [:]
-	
+
 	for row in rows {
 	  guard let id = row["id"] as? String,
 			let topic = row["topic"] as? String,
 			let text = row["text"] as? String else {
 		continue
 	  }
-	  
+
 	  let expiresAt: Double
 	  if let value = row["expiresAt"] as? Double {
 		expiresAt = value
@@ -852,6 +855,15 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		expiresAt = value.doubleValue
 	  } else {
 		expiresAt = Date().timeIntervalSince1970 * 1000.0 + 12_000.0
+	  }
+
+	  let createdAt: Double
+	  if let value = row["createdAt"] as? Double {
+		createdAt = value
+	  } else if let value = row["createdAt"] as? NSNumber {
+		createdAt = value.doubleValue
+	  } else {
+		createdAt = Date().timeIntervalSince1970 * 1000.0
 	  }
 	  
 	  let wave: Int
@@ -867,6 +879,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  topics[id] = topic
 	  texts[id] = text
 	  expiresAtByID[id] = expiresAt
+	  createdAtByID[id] = createdAt
 	  waves[id] = wave
 	  photoUrlsByID[id] = row["photoUrls"] as? [String] ?? []
 	  hasVoiceByID[id] = row["hasVoiceMessage"] as? Bool ?? false
@@ -896,6 +909,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	inviteTopics = topics
 	inviteTexts = texts
 	inviteExpiresAt = expiresAtByID
+	inviteCreatedAt = createdAtByID
 	inviteWaves = waves
 	invitePhotoUrls = photoUrlsByID
 	inviteHasVoiceMessage = hasVoiceByID
@@ -1246,20 +1260,24 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   }
 
   func logTeacherCallAnswered(questionId: String, topic: String, wave: Int, conversationType: String) {
+	let responseTimeSecs = Int((Date().timeIntervalSince1970 * 1000 - (inviteCreatedAt[questionId] ?? Date().timeIntervalSince1970 * 1000)) / 1000)
 	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherCallAnswered, parameters: [
 	  "question_id": questionId,
 	  "topic": topic,
 	  "wave": wave,
-	  "conversation_type": conversationType
+	  "conversation_type": conversationType,
+	  "response_time_seconds": responseTimeSecs
 	])
   }
 
   func logTeacherCallDenied(questionId: String, topic: String, wave: Int, conversationType: String) {
+	let responseTimeSecs = Int((Date().timeIntervalSince1970 * 1000 - (inviteCreatedAt[questionId] ?? Date().timeIntervalSince1970 * 1000)) / 1000)
 	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherCallDenied, parameters: [
 	  "question_id": questionId,
 	  "topic": topic,
 	  "wave": wave,
-	  "conversation_type": conversationType
+	  "conversation_type": conversationType,
+	  "response_time_seconds": responseTimeSecs
 	])
   }
 
@@ -1291,6 +1309,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var inviteTopics: [String: String] = [:]
   var inviteTexts: [String: String] = [:]
   var inviteExpiresAt: [String: Double] = [:]
+  var inviteCreatedAt: [String: Double] = [:]
   var inviteWaves: [String: Int] = [:]
   var invitePhotoUrls: [String: [String]] = [:]
   var inviteHasVoiceMessage: [String: Bool] = [:]

@@ -90,6 +90,7 @@ struct CreateAccountView: View {
 		  message: viewModel.legalAlertMessage,
 		  actions: [AppDialogAction(viewModel.okLabel)]
 		)
+		.trackScreen(AnalyticsScreen.createAccount)
   }
   
   // MARK: - Sections
