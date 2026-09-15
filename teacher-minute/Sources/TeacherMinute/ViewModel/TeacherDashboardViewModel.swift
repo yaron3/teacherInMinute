@@ -109,6 +109,8 @@ protocol TeacherDashboardViewModeling: AnyObject {
   func requestCameraAccess()
   func logTeacherCallAnswered(questionId: String, topic: String, wave: Int, conversationType: String)
   func logTeacherCallDenied(questionId: String, topic: String, wave: Int, conversationType: String)
+  func checkDocumentsSuggestion() async -> Bool
+  func markDocumentsSuggestionShown()
 }
 
 // MARK: - Protocol default strings
@@ -1261,6 +1263,15 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	])
   }
 
+  func checkDocumentsSuggestion() async -> Bool {
+	guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return false }
+	return await TeacherDocumentsPromptStore.shouldPresentSuggestion()
+  }
+
+  func markDocumentsSuggestionShown() {
+	TeacherDocumentsPromptStore.markSuggestionShown()
+  }
+
   private static func formatCents(_ cents: Int, currency: String = LessonFormatting.defaultCurrencyCode) -> String {
 	LessonFormatting.currencyText(cents: cents, currencyCode: currency)
   }
@@ -1433,5 +1444,12 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   }
 
   func logTeacherCallDenied(questionId: String, topic: String, wave: Int, conversationType: String) {
+  }
+
+  func checkDocumentsSuggestion() async -> Bool {
+	false
+  }
+
+  func markDocumentsSuggestionShown() {
   }
 }

@@ -158,11 +158,11 @@ struct TeacherDashboardView: View {
 	  // optional verification documents — a one-time, dismissible prompt (bug #24).
 	  .sheet(isPresented: $showsDocumentsSuggestion) {
 		TeacherDocumentsSuggestionView(viewModel: viewModel) {
-		  TeacherDocumentsPromptStore.markSuggestionShown()
+		  viewModel.markDocumentsSuggestionShown()
 		  showsDocumentsSuggestion = false
 		  showsDocuments = true
 		} onDismiss: {
-		  TeacherDocumentsPromptStore.markSuggestionShown()
+		  viewModel.markDocumentsSuggestionShown()
 		  showsDocumentsSuggestion = false
 		}
 		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
@@ -181,9 +181,8 @@ struct TeacherDashboardView: View {
 		// Seeded without animation: a banner that is already true on the first
 		// frame should be there, not slide in.
 		warningMessage = viewModel.errorMessageGeneral
-		guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
 		Task {
-		  if await TeacherDocumentsPromptStore.shouldPresentSuggestion() {
+		  if await viewModel.checkDocumentsSuggestion() {
 			showsDocumentsSuggestion = true
 		  }
 		}
