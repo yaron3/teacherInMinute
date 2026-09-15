@@ -212,6 +212,7 @@ struct WhiteboardView: View {
 		}
 	  }
 	}
+	.trackScreen(AnalyticsScreen.whiteboard)
   }
 
   var header: some View {
@@ -598,7 +599,6 @@ struct WhiteboardView: View {
 		  }
 	  )
 #endif
-    .trackScreen(AnalyticsScreen.whiteboard)
   }
   
   // MARK: - Coordinate conversion
