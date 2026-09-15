@@ -784,9 +784,7 @@ struct ChatSessionView: View {
     if saveToChat {
       do {
         logger.info("[BoardSnapshot] uploading to chat bytes=\(data.count) qid=\(questionId)")
-        let url = try await StorageService.shared.uploadBoardSnapshot(data: data, questionId: questionId)
-        let service = ChatSessionService(questionId: questionId)
-        try await service.sendImage(downloadURL: url, senderRole: senderRole)
+        try await viewModel.sendBoardSnapshot(data, senderRole: senderRole)
       } catch {
         logger.error("Board snapshot save failed: \(error.localizedDescription)")
       }

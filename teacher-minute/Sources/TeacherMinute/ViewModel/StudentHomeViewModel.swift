@@ -214,6 +214,7 @@ protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   func consumePaymentResult()
   func shouldShowPaymentReturnResult() -> Bool
   func redeemCouponFromHome() async
+  func requestAndroidCameraPermission() async -> PermissionState
 }
 
 // MARK: - Default Localized Strings
@@ -1633,6 +1634,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     if case .success = result.status { return false }
     return true
   }
+
+  func requestAndroidCameraPermission() async -> PermissionState {
+    await PermissionService.shared.requestCapturePermission(for: .camera)
+  }
 }
 
 @Observable
@@ -1864,5 +1869,9 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   func shouldShowPaymentReturnResult() -> Bool {
     false
+  }
+
+  func requestAndroidCameraPermission() async -> PermissionState {
+    .denied
   }
 }

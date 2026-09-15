@@ -804,6 +804,7 @@ protocol ChatSessionViewModeling: AnyObject {
   /// The other side's parting note, when they left one.
   var peerFarewellNote: String? { get }
   func logSessionStarted(conversationType: String)
+  func sendBoardSnapshot(_ snapshotData: Data, senderRole: String) async throws
 }
 
 // MARK: - ChatSessionViewModeling defaults
@@ -820,6 +821,9 @@ extension ChatSessionViewModeling {
   var peerFarewellNote: String? { nil }
 
   func logSessionStarted(conversationType: String) {
+  }
+
+  func sendBoardSnapshot(_ snapshotData: Data, senderRole: String) async throws {
   }
 }
 
@@ -1678,6 +1682,14 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       "conversation_type": conversationType
     ])
   }
+
+#if !os(Android)
+  func sendBoardSnapshot(_ snapshotData: Data, senderRole: String) async throws {
+    let url = try await StorageService.shared.uploadBoardSnapshot(data: snapshotData, questionId: questionId)
+    let service = ChatSessionService(questionId: questionId)
+    try await service.sendImage(downloadURL: url, senderRole: senderRole)
+  }
+#endif
 }
 
 

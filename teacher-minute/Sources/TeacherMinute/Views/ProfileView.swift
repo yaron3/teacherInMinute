@@ -474,7 +474,8 @@ struct ProfileView: View {
     Task {
       do {
         if source == .camera {
-          let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+          let cameraState = await PermissionService.shared.resolveCapturePermission(for: .camera)
+          viewModel.cameraState = cameraState
           guard cameraState.isGranted else {
             viewModel.errorMessage = viewModel.cameraAccessRequiredMessage
             return

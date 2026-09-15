@@ -655,7 +655,7 @@ struct AskTeacherSheet: View {
     func pickAndroidPhoto(source: AndroidPhotoSource) {
         Task {
             if source == .camera {
-                let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+                let cameraState = await viewModel.requestAndroidCameraPermission()
                 guard cameraState.isGranted else {
                     photoUploadError = viewModel.cameraRequiredForPhotoError
                     return

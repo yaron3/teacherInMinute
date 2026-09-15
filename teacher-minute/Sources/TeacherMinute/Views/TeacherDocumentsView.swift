@@ -181,7 +181,7 @@ struct TeacherDocumentsView: View {
     Task {
       do {
         if source == .camera {
-          let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+          let cameraState = await PermissionService.shared.resolveCapturePermission(for: .camera)
           guard cameraState.isGranted else {
             viewModel.errorMessage = viewModel.cameraAccessRequiredMessage
             return
