@@ -118,6 +118,7 @@ struct CompleteProfileView: View {
                     }
                 ]
             )
+            .trackScreen(AnalyticsScreen.completeProfile)
         }
     }
 

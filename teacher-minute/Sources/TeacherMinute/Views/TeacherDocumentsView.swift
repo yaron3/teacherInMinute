@@ -81,6 +81,7 @@ struct TeacherDocumentsView: View {
       Button(viewModel.cancelLabel, role: .cancel) {}
     }
 #endif
+    .trackScreen(AnalyticsScreen.teacherDocuments)
   }
 
   func documentTile(_ document: TeacherDocument) -> some View {

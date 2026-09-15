@@ -168,7 +168,7 @@ struct TeacherIdentityVerificationView: View {
 	  Button(viewModel.cancelLabel, role: .cancel) {}
 	}
 #endif
-
+	.trackScreen(AnalyticsScreen.teacherIdentity)
   }
   
   // MARK: - Picker label helpers (Android / preview)
