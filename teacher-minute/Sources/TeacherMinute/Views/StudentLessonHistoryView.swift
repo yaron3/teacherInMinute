@@ -23,6 +23,7 @@ struct StudentLessonHistoryView: View {
             }
             .background(theme.screenBackground)
         }
+        .trackScreen(AnalyticsScreen.studentLessonHistory)
         .task {
             await viewModel.loadProfile()
             isLoading = false
@@ -104,6 +105,7 @@ struct StudentLessonHistoryView: View {
                                         showsAmount: false
                                     ) {
                                         presentingLesson = lesson
+                                        viewModel.view(lesson)
                                     }
 
                                     if lesson.id != viewModel.filteredLessons.last?.id {

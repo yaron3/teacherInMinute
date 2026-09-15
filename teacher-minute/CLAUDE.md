@@ -2,6 +2,59 @@
 
 ## Architecture
 
+### Views must be minimal and clean (MVVM principle)
+
+Views are for rendering UI only. All business logic, state management, permissions, networking, analytics, and side effects belong in ViewModels.
+
+**What stays in the View:**
+- UI state (text fields, toggles, focus, loading spinners tied to `isLoading` from ViewModel)
+- Layout and styling
+- User interaction handlers that immediately call ViewModel methods
+- Environment values and derived UI computed properties
+
+**What moves to ViewModel:**
+- Permissions (requesting, checking, handling denial)
+- Analytics logging (all service calls)
+- Networking and data fetching
+- Business logic and validation
+- State that affects behavior (not just rendering)
+- Localized strings
+
+**Pattern:**
+```swift
+// ✗ Bad: View handling permission
+func findTeacherTapped() async {
+  let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+  if !micState.isGranted {
+    permissionAlertMessage = "Mic required"
+  }
+  AnalyticsService.shared.logEvent(...) // Also bad
+  submitQuestion(...)
+}
+
+// ✓ Good: ViewModel handling permission and analytics
+func findTeacherTapped() async {
+  let error = await viewModel.submitQuestionWithPermissions(...)
+  if let error = error {
+    permissionAlertMessage = error
+  }
+}
+
+// In ViewModel:
+func submitQuestionWithPermissions(...) async -> String? {
+  let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+  if !micState.isGranted {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, ...)
+    return "Microphone access is required"
+  }
+  AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherSubmitted, ...)
+  submitQuestion(...)
+  return nil
+}
+```
+
+**Why:** Keeps Views testable without mocking services, makes analytics and permission logic auditable in one place, and makes Views easy to read at a glance.
+
 ### No `LocalizationSupport.localized` in views
 
 Views must never call `LocalizationSupport.localized(...)` directly. All localized strings must be requested from the view model.

@@ -37,7 +37,6 @@ struct AskTeacherSheet: View {
     @State  var questionText = ""
     @State  var conversationType: String
     @State  var permissionAlertMessage: String? = nil
-    @State  var isRequestingPermission = false
     @State  var uploadedPhotoUrls: [String] = []
     @State  var isUploadingPhoto = false
     @State  var photoUploadError: String? = nil
@@ -254,21 +253,20 @@ struct AskTeacherSheet: View {
 
                         Spacer(minLength: 0)
 
-                        let isSendDisabled = !canSubmit || isRequestingPermission
                         Button {
                             Task { await findTeacherTapped() }
                         } label: {
                             Text(viewModel.sendLabel)
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(isSendDisabled ? theme.secondaryText : theme.onAccentText)
+                                .foregroundStyle(canSubmit ? theme.onAccentText : theme.secondaryText)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 8)
-                                .background(isSendDisabled ? theme.cardBackground : theme.accent)
+                                .background(canSubmit ? theme.accent : theme.cardBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                                .opacity(isSendDisabled ? 0.6 : 1.0)
+                                .opacity(canSubmit ? 1.0 : 0.6)
                         }
                         .buttonStyle(.plain)
-                        .disabled(isSendDisabled)
+                        .disabled(!canSubmit)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -278,21 +276,20 @@ struct AskTeacherSheet: View {
 
                 infoCard
 
-                let isFindDisabled = !canSubmit || isRequestingPermission
                 Button {
                     Task { await findTeacherTapped() }
                 } label: {
                     Text(viewModel.findTeacherNowLabel)
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(isFindDisabled ? theme.secondaryText : theme.onAccentText)
+                        .foregroundStyle(canSubmit ? theme.onAccentText : theme.secondaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: findButtonHeight)
-                        .background(isFindDisabled ? theme.cardBackground : theme.accent)
+                        .background(canSubmit ? theme.accent : theme.cardBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .opacity(isFindDisabled ? 0.6 : 1.0)
+                        .opacity(canSubmit ? 1.0 : 0.6)
                 }
                 .buttonStyle(.plain)
-                .disabled(isFindDisabled)
+                .disabled(!canSubmit)
 
                 footerText
             }
@@ -442,37 +439,18 @@ struct AskTeacherSheet: View {
     }
 
     func findTeacherTapped() async {
-        guard !isRequestingPermission else { return }
-        isRequestingPermission = true
-        defer { isRequestingPermission = false }
-
-        if conversationType == "audio" || conversationType == "video" {
-            let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
-            if !micState.isGranted {
-                permissionAlertMessage = conversationType == "video"
-                    ? viewModel.videoPermissionRequiredMessage
-                    : viewModel.audioPermissionRequiredMessage
-                return
-            }
-        }
-
-        if conversationType == "video" {
-            let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
-            if !cameraState.isGranted {
-                permissionAlertMessage = viewModel.videoPermissionRequiredMessage
-                return
-            }
-        }
-
-        // Submitted before the sheet closes, and owned by the view model rather
-        // than by this screen: dismissing used to cancel the send outright.
-        viewModel.submitQuestion(
+        let error = await viewModel.submitQuestionWithPermissions(
             topic: selectedTopic.lowercased(),
             text: composedQuestionText,
             photoUrls: uploadedPhotoUrls,
             conversationType: conversationType
         )
-        closeAskTeacher()
+
+        if let error = error {
+            permissionAlertMessage = error
+        } else {
+            closeAskTeacher()
+        }
     }
 
     var photoAttachmentSection: some View {

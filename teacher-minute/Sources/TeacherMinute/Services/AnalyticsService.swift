@@ -44,16 +44,21 @@ enum AnalyticsEvent {
     static let askTeacherMatched   = "ask_teacher_matched"
     static let askTeacherNoMatch   = "ask_teacher_no_match"
     static let askTeacherFailed    = "ask_teacher_failed"
+    static let lessonTapped        = "lesson_tapped"
 
     // Teacher flow
     static let teacherAcceptingToggled = "teacher_accepting_toggled"
     static let teacherInviteAccepted   = "teacher_invite_accepted"
     static let teacherInviteDeclined   = "teacher_invite_declined"
+    static let teacherCallAnswered     = "teacher_call_answered"
+    static let teacherCallDenied       = "teacher_call_denied"
 
     // Chat / session
     static let chatMessageSent  = "chat_message_sent"
     static let chatPhotoSent    = "chat_photo_sent"
     static let chatSessionEnded = "chat_session_ended"
+    static let studentChatStarted = "student_chat_started"
+    static let studentChatResponseTime = "student_chat_response_time"
 
     // Purchase
     static let beginCheckout          = "begin_checkout"  // also a GA4 standard event
@@ -145,6 +150,7 @@ final class AnalyticsService {
     // MARK: - Events
 
     func logEvent(_ name: String, parameters: [String: Any]? = nil) {
+        guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
         let sanitized = AnalyticsService.sanitize(parameters)
         Analytics.logEvent(name, parameters: sanitized)
         let breadcrumb = sanitized?.isEmpty == false ? "\(name) \(sanitized!)" : name
@@ -152,6 +158,7 @@ final class AnalyticsService {
     }
 
     func logScreen(_ screen: String, screenClass: String? = nil) {
+        guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
         var params: [String: Any] = [
             AnalyticsParameterScreenName: screen
         ]

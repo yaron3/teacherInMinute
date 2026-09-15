@@ -176,6 +176,7 @@ struct ChatSessionView: View {
               onCancel: onClose,
               onSessionStarted: { @MainActor @Sendable in
                 logger.info("[ChatSessionView] setup complete qid=\(viewModel.questionId) role=\(viewModel.role) conversationType=\(conversationType)")
+                viewModel.logSessionStarted(conversationType: conversationType)
                 isConnecting = false
               },
               onContinueAsText: isStudent && hasAudio ? { @MainActor @Sendable in

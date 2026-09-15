@@ -47,6 +47,14 @@ final class TeacherLessonHistoryViewModel {
     func view(_ lesson: LessonHistoryItem) {
         selectedLessonDetails = nil
         selectedLesson = lesson
+        AnalyticsService.shared.logEvent(AnalyticsEvent.lessonTapped, parameters: [
+            "lesson_id": lesson.questionId,
+            "lesson_title": lesson.title,
+            "other_participant": lesson.otherParticipant,
+            "duration": lesson.duration,
+            "completed_at": lesson.completedAt,
+            "role": "teacher"
+        ])
     }
     
     func toggleAudio(for lesson: LessonHistoryItem) {

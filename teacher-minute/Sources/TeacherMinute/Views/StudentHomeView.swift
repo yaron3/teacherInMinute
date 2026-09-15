@@ -9,7 +9,6 @@ import SwiftUI
 
 struct StudentHomeView: View {
   @State var viewModel: any StudentHomeViewModeling
-  @State var paymentReturnStore = PaymentReturnStore.shared
   @State var showingLowBalanceAlert = false
   @State var showingCouponAlert = false
   @State var showingPurchaseSummaryAlert = false
@@ -46,6 +45,7 @@ struct StudentHomeView: View {
 		  liveSessionScreen
 		}
 	}
+	.trackScreen(AnalyticsScreen.studentHome)
 	.sheet(isPresented: $showsNotificationExplainer) {
 	  NotificationPermissionExplainerView(viewModel: viewModel) {
 		NotificationPromptStore.markExplanationShown()
@@ -62,7 +62,7 @@ struct StudentHomeView: View {
 	  if let option = pendingCheckoutOption {
 		PaymentMethodSheet(
 		  viewModel: viewModel,
-		  methods: PaymentMethod.supported(viewModel.availablePaymentMethods, forCurrency: option.currency),
+		  methods: viewModel.supportedPaymentMethods(for: option),
 		  theme: theme,
 		  savedPayPalEmail: viewModel.savedPayPalEmail
 		) { method in
@@ -92,8 +92,7 @@ struct StudentHomeView: View {
   var isInLiveSession: Binding<Bool> {
 	Binding(
 	  get: {
-		if case .matched = viewModel.searchState { return true }
-		return false
+		viewModel.isInLiveSession
 	  },
 	  set: { _ in }
 	)
@@ -101,12 +100,12 @@ struct StudentHomeView: View {
 
   @ViewBuilder
   var liveSessionScreen: some View {
-	if case .matched(let questionId, let liveKitRoom, let liveKitToken) = viewModel.searchState {
+	if let destination = viewModel.liveSessionDestination {
 	  StudentLiveSessionScreen(
 		viewModel: viewModel,
-		questionId: questionId,
-		liveKitRoom: liveKitRoom,
-		liveKitToken: liveKitToken,
+		questionId: destination.questionId,
+		liveKitRoom: destination.liveKitRoom,
+		liveKitToken: destination.liveKitToken,
 		onLessonEnded: { showsNotificationExplainer = true }
 	  )
 	}
@@ -125,18 +124,15 @@ struct StudentHomeView: View {
 	  viewModel.checkoutDidOpen()
 	  viewModel.consumeCheckoutURL()
 	}
-	.onChange(of: paymentReturnStore.resultVersion) { _, _ in
-	  guard let result = paymentReturnStore.latestResult else { return }
-	  logger.info("[PaymentReturn] StudentHome observed resultVersion=\(paymentReturnStore.resultVersion) rawURL=\(result.rawURL.absoluteString)")
-	  Task { await viewModel.handlePaymentReturn(result) }
+	.onChange(of: viewModel.paymentReturnVersion) { _, _ in
+	  Task { await viewModel.handlePaymentReturnVersionChange() }
 	}
 	.onChange(of: scenePhase) { _, phase in
-	  logger.info("[PaymentReturn] StudentHome scenePhase changed active=\(phase == .active) awaiting=\(viewModel.isAwaitingPaymentReturn) resultVersion=\(paymentReturnStore.resultVersion)")
 	  guard phase == .active else { return }
-	  handleActiveAfterExternalCheckout()
+	  Task { await viewModel.handleAppActiveAfterCheckout() }
 	}
-	.onChange(of: couponStateKey) { _, _ in
-	  handleCouponStateChange()
+	.onChange(of: viewModel.couponStateKey) { _, _ in
+	  showingCouponAlert = viewModel.handleCouponStateChange()
 	}
 	.onChange(of: viewModel.purchaseSummary?.id) { _, id in
 	  showingPurchaseSummaryAlert = id != nil
@@ -153,7 +149,7 @@ struct StudentHomeView: View {
 		.zIndex(5)
 
 #if os(Android)
-	  if let result = paymentReturnStore.latestResult {
+	  if let result = viewModel.paymentReturnResult {
 		paymentReturnOverlay(result)
 		  .frame(maxWidth: .infinity, maxHeight: .infinity)
 		  .zIndex(10)
@@ -172,10 +168,7 @@ struct StudentHomeView: View {
 	  message: viewModel.purchaseSummaryMessage,
 	  actions: [
 		AppDialogAction(viewModel.okLabel) {
-		  viewModel.consumePurchaseSummary()
-		  // The redirect flows also leave a success result behind; clear it so a
-		  // stale one cannot resurface.
-		  paymentReturnStore.consumeLatestResult()
+		  viewModel.consumePurchaseSummaryAndPaymentResult()
 		}
 	  ]
 	)
@@ -191,12 +184,12 @@ struct StudentHomeView: View {
 	)
 #if !os(Android)
 	.appDialog(
-	  paymentReturnStore.latestResult?.title ?? viewModel.paymentFallbackTitle,
+	  viewModel.paymentReturnTitle,
 	  isPresented: isShowingPaymentReturnResult,
-	  message: paymentReturnStore.latestResult?.message ?? "",
+	  message: viewModel.paymentReturnMessage,
 	  actions: [
 		AppDialogAction(viewModel.okLabel) {
-		  paymentReturnStore.consumeLatestResult()
+		  viewModel.consumePaymentResult()
 		}
 	  ]
 	)
@@ -349,7 +342,7 @@ struct StudentHomeView: View {
 
   @ViewBuilder
   var heroAskTeacherButton: some View {
-    if viewModel.remainingMinutes >= 2 {
+    if viewModel.canAskTeacher {
       Button {
         showsAskTeacher = true
       } label: {
@@ -865,10 +858,7 @@ struct StudentHomeView: View {
 
 	  Button {
 		Task {
-		  await viewModel.redeemCoupon()
-		  if case .alreadyActivated = viewModel.couponState {
-			viewModel.couponCode = ""
-		  }
+		  await viewModel.redeemCouponFromHome()
 		}
 	  } label: {
 		if isLoading {
@@ -882,27 +872,6 @@ struct StudentHomeView: View {
 	}
 	.frame(maxWidth: .infinity)
   }
-
-  var couponStateKey: String {
-	switch viewModel.couponState {
-	case .idle: return "idle"
-	case .loading: return "loading"
-	case .success(let minutes): return "success-\(minutes)"
-	case .alreadyActivated(let date): return "already-\(date)"
-	case .invalid: return "invalid"
-	case .error(let msg): return "error-\(msg)"
-	}
-  }
-
-  func handleCouponStateChange() {
-	switch viewModel.couponState {
-	case .success, .alreadyActivated, .invalid, .error:
-	  showingCouponAlert = true
-	default:
-	  break
-	}
-  }
-
 
 #if os(Android)
   func paymentReturnOverlay(_ result: PaymentReturnResult) -> some View {
@@ -920,9 +889,9 @@ struct StudentHomeView: View {
 		  .font(.system(size: 14))
 		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
-		
+
 		Button {
-		  paymentReturnStore.consumeLatestResult()
+		  viewModel.consumePaymentResult()
 		} label: {
 		  Text(viewModel.okLabel)
 			.font(.system(size: 15, weight: .bold))
@@ -947,16 +916,11 @@ struct StudentHomeView: View {
   var isShowingPaymentReturnResult: Binding<Bool> {
 	Binding(
 	  get: {
-		guard let result = paymentReturnStore.latestResult else { return false }
-		// Successful payments are announced by the purchase-summary alert,
-		// which also names the package and the amount charged; showing this
-		// generic one too would stack two alerts on the same event.
-		if case .success = result.status { return false }
-		return true
+		viewModel.shouldShowPaymentReturnResult()
 	  },
 	  set: { isPresented in
 		if !isPresented {
-		  paymentReturnStore.consumeLatestResult()
+		  viewModel.consumePaymentResult()
 		}
 	  }
 	)
@@ -968,11 +932,9 @@ struct StudentHomeView: View {
   /// PassKit's first-button cost) behind the spinner, so the sheet arrives
   /// complete instead of filling in a row at a time.
   private func beginCheckout(_ option: PricingOption) {
-	guard !viewModel.isPreparingCheckout else { return }
-	Task { @MainActor in
-	  await viewModel.preparePaymentOptions()
+	Task {
+	  await viewModel.beginCheckout(option)
 	  pendingCheckoutOption = option
-	  viewModel.isPreparingCheckout = false
 	}
   }
 
@@ -985,41 +947,6 @@ struct StudentHomeView: View {
 		}
 	  }
 	)
-  }
-  
-  private func handleActiveAfterExternalCheckout() {
-	guard viewModel.isAwaitingPaymentReturn else { return }
-	// Back from the browser with the outcome still unresolved — put the spinner
-	// back up so the wait for the deep link (or the balance check below) is not
-	// a blank home screen.
-	viewModel.resumeCheckoutSpinner()
-	let resultVersionBeforeWait = paymentReturnStore.resultVersion
-	logger.info("[PaymentReturn] app active after checkout; waiting for deep link resultVersion=\(resultVersionBeforeWait)")
-	Task { @MainActor in
-	  // PayPal's return redirect fires while the app is coming back, so the deep
-	  // link — cancel or success — lands within a moment of this point. Checking
-	  // in short slices lets a cancel surface as soon as it arrives, instead of
-	  // sitting behind a fixed wait long enough that the buyer notices it.
-	  for _ in 0..<12 {
-		try? await Task.sleep(nanoseconds: 100_000_000)
-		guard viewModel.isAwaitingPaymentReturn else {
-		  logger.info("[PaymentReturn] fallback skipped; no longer awaiting return")
-		  return
-		}
-		guard paymentReturnStore.resultVersion == resultVersionBeforeWait, paymentReturnStore.latestResult == nil else {
-		  logger.info("[PaymentReturn] fallback skipped; payment result arrived resultVersion=\(paymentReturnStore.resultVersion)")
-		  return
-		}
-	  }
-	  logger.info("[PaymentReturn] no payment return URL arrived after wait; refreshing balance before fallback")
-	  let confirmedByBalance = await viewModel.handleCheckoutReturnWithoutResult()
-	  if confirmedByBalance {
-		paymentReturnStore.handleConfirmedWithoutReturnURL()
-	  } else {
-		logger.info("[PaymentReturn] balance did not update after checkout return; showing pending confirmation")
-		paymentReturnStore.handleMissingReturn()
-	  }
-	}
   }
   
   // MARK: - State overlay
@@ -1109,7 +1036,7 @@ struct StudentHomeView: View {
   
   @ViewBuilder
   var askTeacherCard: some View {
-	if viewModel.remainingMinutes >= 2 {
+	if viewModel.canAskTeacher {
 	  Button {
 		showsAskTeacher = true
 	  } label: {
@@ -1802,7 +1729,7 @@ struct StudentLiveSessionScreen: View {
 	  if let option = pendingCheckoutOption {
 		PaymentMethodSheet(
 		  viewModel: viewModel,
-		  methods: PaymentMethod.supported(viewModel.availablePaymentMethods, forCurrency: option.currency),
+		  methods: viewModel.supportedPaymentMethods(for: option),
 		  theme: AppTheme(colorScheme: colorScheme),
 		  savedPayPalEmail: viewModel.savedPayPalEmail
 		) { method in

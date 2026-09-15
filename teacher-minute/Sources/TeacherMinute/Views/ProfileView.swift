@@ -225,7 +225,8 @@ struct ProfileView: View {
               .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
               .id(languagePreference)
             }
-	  }
+	  .trackScreen(AnalyticsScreen.profile)
+  }
 	  
   /// Shown above the profile when a load failed, rather than in place of it.
   /// A failure leaves the fields at their placeholder values, which is still a

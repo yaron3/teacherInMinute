@@ -93,6 +93,7 @@ struct SettingsView: View {
             openURL(url)
             viewModel.consumeExternalURL()
         }
+        .trackScreen(AnalyticsScreen.settings)
     }
 
     @ViewBuilder

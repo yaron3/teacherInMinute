@@ -75,6 +75,7 @@ struct TeacherLessonHistoryView: View {
                                         isLoading: viewModel.isLoading(lesson)
                                     ) {
                                         presentingLesson = lesson
+                                        viewModel.view(lesson)
                                     }
 
                                     if lesson.id != viewModel.filteredLessons.last?.id {
@@ -91,6 +92,7 @@ struct TeacherLessonHistoryView: View {
             }
             .background(theme.screenBackground)
         }
+        .trackScreen(AnalyticsScreen.teacherLessonHistory)
         .task {
             await viewModel.loadProfile()
             isLoading = false

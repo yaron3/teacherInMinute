@@ -26,6 +26,12 @@ enum StudentSearchState {
   case error(String)
 }
 
+struct StudentLiveSessionDestination {
+  let questionId: String
+  let liveKitRoom: String
+  let liveKitToken: String
+}
+
 // MARK: - Supporting Models
 
 /// Pricing tier type. Firestore stores the raw string in the `type` field.
@@ -164,6 +170,14 @@ protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   var couponCode: String { get set }
   var couponState: CouponRedemptionState { get set }
   var purchaseSummary: PurchaseSummary? { get set }
+  var paymentReturnVersion: Int { get }
+  var paymentReturnResult: PaymentReturnResult? { get }
+  var liveSessionDestination: StudentLiveSessionDestination? { get }
+  var isInLiveSession: Bool { get }
+  var canAskTeacher: Bool { get }
+  var couponStateKey: String { get }
+  var paymentReturnTitle: String { get }
+  var paymentReturnMessage: String { get }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
   /// Starts an ask that outlives the screen that asked for it. The ask sheet
@@ -190,11 +204,81 @@ protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   func redeemCoupon() async
   func resetCouponState()
   func consumePurchaseSummary()
+  func consumePurchaseSummaryAndPaymentResult()
+  func submitQuestionWithPermissions(topic: String, text: String, photoUrls: [String], conversationType: String) async -> String?
+  func handleCouponStateChange() -> Bool
+  func beginCheckout(_ option: PricingOption) async
+  func supportedPaymentMethods(for option: PricingOption) -> [PaymentMethod]
+  func handlePaymentReturnVersionChange() async
+  func handleAppActiveAfterCheckout() async
+  func consumePaymentResult()
+  func shouldShowPaymentReturnResult() -> Bool
+  func redeemCouponFromHome() async
 }
 
 // MARK: - Default Localized Strings
 
 extension StudentHomeViewModeling {
+
+  var liveSessionDestination: StudentLiveSessionDestination? {
+    if case .matched(let questionId, let liveKitRoom, let liveKitToken) = searchState {
+      return StudentLiveSessionDestination(
+        questionId: questionId,
+        liveKitRoom: liveKitRoom,
+        liveKitToken: liveKitToken
+      )
+    }
+    return nil
+  }
+
+  var isInLiveSession: Bool {
+    liveSessionDestination != nil
+  }
+
+  var canAskTeacher: Bool {
+    remainingMinutes >= 2
+  }
+
+  var couponStateKey: String {
+    switch couponState {
+    case .idle: return "idle"
+    case .loading: return "loading"
+    case .success(let minutes): return "success-\(minutes)"
+    case .alreadyActivated(let date): return "already-\(date)"
+    case .invalid: return "invalid"
+    case .error(let message): return "error-\(message)"
+    }
+  }
+
+  var paymentReturnTitle: String {
+    paymentReturnResult?.title ?? paymentFallbackTitle
+  }
+
+  var paymentReturnMessage: String {
+    paymentReturnResult?.message ?? ""
+  }
+
+  func consumePurchaseSummaryAndPaymentResult() {
+    consumePurchaseSummary()
+    consumePaymentResult()
+  }
+
+  func supportedPaymentMethods(for option: PricingOption) -> [PaymentMethod] {
+    PaymentMethod.supported(availablePaymentMethods, forCurrency: option.currency)
+  }
+
+  func handlePaymentReturnVersionChange() async {
+    guard let result = paymentReturnResult else { return }
+    logger.info("[PaymentReturn] StudentHome observed resultVersion=\(self.paymentReturnVersion) rawURL=\(result.rawURL.absoluteString)")
+    await handlePaymentReturn(result)
+  }
+
+  func redeemCouponFromHome() async {
+    await redeemCoupon()
+    if case .alreadyActivated = couponState {
+      couponCode = ""
+    }
+  }
 
     // MARK: Payment method sheet
     var choosePaymentMethodTitle: String { LocalizationSupport.localized("Choose a payment method") }
@@ -563,6 +647,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var couponCode = ""
   var couponState: CouponRedemptionState = .idle
   var purchaseSummary: PurchaseSummary?
+  var paymentReturnVersion: Int {
+    PaymentReturnStore.shared.resultVersion
+  }
+  var paymentReturnResult: PaymentReturnResult? {
+    PaymentReturnStore.shared.latestResult
+  }
 
   private var pollingTask: Task<Void, Never>?
   /// Held by the view model rather than the ask sheet, so dismissing the sheet
@@ -1363,6 +1453,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
             }
 
             self.questionId = result.questionId
+            let responseTime = Date().timeIntervalSince1970 - startedAt
+            AnalyticsService.shared.logEvent(AnalyticsEvent.studentChatResponseTime, parameters: [
+              "question_id": questionId,
+              "response_time_seconds": Int(responseTime),
+              "conversation_type": activeConversationType
+            ])
             searchState = .matched(
               questionId: questionId,
               liveKitRoom: room,
@@ -1440,6 +1536,103 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       rating: lesson.studentRating
     )
   }
+
+  func submitQuestionWithPermissions(topic: String, text: String, photoUrls: [String], conversationType: String) async -> String? {
+    var micPermissionGranted = true
+    var cameraPermissionGranted = true
+
+    if conversationType == "audio" || conversationType == "video" {
+      let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+      micPermissionGranted = micState.isGranted
+      if !micState.isGranted {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, parameters: [
+          "permission_type": "microphone",
+          "conversation_type": conversationType
+        ])
+        return conversationType == "video"
+          ? LocalizationSupport.localized("Video and audio access are required for a video session.")
+          : LocalizationSupport.localized("Microphone access is required for an audio session.")
+      }
+    }
+
+    if conversationType == "video" {
+      let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+      cameraPermissionGranted = cameraState.isGranted
+      if !cameraState.isGranted {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, parameters: [
+          "permission_type": "camera",
+          "conversation_type": conversationType
+        ])
+        return LocalizationSupport.localized("Video and audio access are required for a video session.")
+      }
+    }
+
+    AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherSubmitted, parameters: [
+      "topic": topic,
+      "text_length": text.count,
+      "photo_count": photoUrls.count,
+      "conversation_type": conversationType,
+      "microphone_permission": micPermissionGranted ? 1 : 0,
+      "camera_permission": cameraPermissionGranted ? 1 : 0
+    ])
+
+    submitQuestion(topic: topic, text: text, photoUrls: photoUrls, conversationType: conversationType)
+    return nil
+  }
+
+  func handleCouponStateChange() -> Bool {
+    switch couponState {
+    case .success, .alreadyActivated, .invalid, .error:
+      return true
+    default:
+      return false
+    }
+  }
+
+  func beginCheckout(_ option: PricingOption) async {
+    guard !isPreparingCheckout else { return }
+    isPreparingCheckout = true
+    await preparePaymentOptions()
+    selectTier(option)
+    isPreparingCheckout = false
+  }
+
+  func handleAppActiveAfterCheckout() async {
+    guard isAwaitingPaymentReturn else { return }
+    resumeCheckoutSpinner()
+    let resultVersionBeforeWait = PaymentReturnStore.shared.resultVersion
+    logger.info("[PaymentReturn] app active after checkout; waiting for deep link resultVersion=\(resultVersionBeforeWait)")
+
+    for _ in 0..<12 {
+      try? await Task.sleep(nanoseconds: 100_000_000)
+      guard isAwaitingPaymentReturn else {
+        logger.info("[PaymentReturn] fallback skipped; no longer awaiting return")
+        return
+      }
+      guard PaymentReturnStore.shared.resultVersion == resultVersionBeforeWait, PaymentReturnStore.shared.latestResult == nil else {
+        logger.info("[PaymentReturn] fallback skipped; payment result arrived resultVersion=\(PaymentReturnStore.shared.resultVersion)")
+        return
+      }
+    }
+    logger.info("[PaymentReturn] no payment return URL arrived after wait; refreshing balance before fallback")
+    let confirmedByBalance = await handleCheckoutReturnWithoutResult()
+    if confirmedByBalance {
+      PaymentReturnStore.shared.handleConfirmedWithoutReturnURL()
+    } else {
+      logger.info("[PaymentReturn] balance did not update after checkout return; showing pending confirmation")
+      PaymentReturnStore.shared.handleMissingReturn()
+    }
+  }
+
+  func consumePaymentResult() {
+    PaymentReturnStore.shared.consumeLatestResult()
+  }
+
+  func shouldShowPaymentReturnResult() -> Bool {
+    guard let result = PaymentReturnStore.shared.latestResult else { return false }
+    if case .success = result.status { return false }
+    return true
+  }
 }
 
 @Observable
@@ -1480,6 +1673,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var couponCode = ""
   var couponState: CouponRedemptionState = .idle
   var purchaseSummary: PurchaseSummary?
+  var paymentReturnVersion = 0
+  var paymentReturnResult: PaymentReturnResult? = nil
 
   init(
     name: String = "Sarah Jenkins",
@@ -1648,5 +1843,26 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       teacherSharePercent: 75,
       currencyCode: pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode
     )
+  }
+
+  func submitQuestionWithPermissions(topic: String, text: String, photoUrls: [String], conversationType: String) async -> String? {
+    return nil
+  }
+
+  func handleCouponStateChange() -> Bool {
+    return false
+  }
+
+  func beginCheckout(_ option: PricingOption) async {
+  }
+
+  func handleAppActiveAfterCheckout() async {
+  }
+
+  func consumePaymentResult() {
+  }
+
+  func shouldShowPaymentReturnResult() -> Bool {
+    false
   }
 }

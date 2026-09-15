@@ -803,6 +803,7 @@ protocol ChatSessionViewModeling: AnyObject {
   func endLessonWithFarewell(_ message: String) async
   /// The other side's parting note, when they left one.
   var peerFarewellNote: String? { get }
+  func logSessionStarted(conversationType: String)
 }
 
 // MARK: - ChatSessionViewModeling defaults
@@ -817,6 +818,9 @@ extension ChatSessionViewModeling {
   func endLessonWithFarewell(_ message: String) async { await endLesson() }
 
   var peerFarewellNote: String? { nil }
+
+  func logSessionStarted(conversationType: String) {
+  }
 }
 
 // MARK: - ChatSessionViewModeling UI Strings
@@ -1665,6 +1669,14 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       currencyCode: current.currencyCode,
       minutesDeadlineAt: current.minutesDeadlineAt
     )
+  }
+
+  func logSessionStarted(conversationType: String) {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.studentChatStarted, parameters: [
+      "question_id": questionId,
+      "role": role,
+      "conversation_type": conversationType
+    ])
   }
 }
 

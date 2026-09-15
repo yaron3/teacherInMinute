@@ -107,6 +107,8 @@ protocol TeacherDashboardViewModeling: AnyObject {
   func refreshPermissions()
   func requestMicrophoneAccess()
   func requestCameraAccess()
+  func logTeacherCallAnswered(questionId: String, topic: String, wave: Int, conversationType: String)
+  func logTeacherCallDenied(questionId: String, topic: String, wave: Int, conversationType: String)
 }
 
 // MARK: - Protocol default strings
@@ -1240,7 +1242,25 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  cameraPermissionState = await PermissionService.shared.resolveCapturePermission(for: .camera)
 	}
   }
-  
+
+  func logTeacherCallAnswered(questionId: String, topic: String, wave: Int, conversationType: String) {
+	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherCallAnswered, parameters: [
+	  "question_id": questionId,
+	  "topic": topic,
+	  "wave": wave,
+	  "conversation_type": conversationType
+	])
+  }
+
+  func logTeacherCallDenied(questionId: String, topic: String, wave: Int, conversationType: String) {
+	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherCallDenied, parameters: [
+	  "question_id": questionId,
+	  "topic": topic,
+	  "wave": wave,
+	  "conversation_type": conversationType
+	])
+  }
+
   private static func formatCents(_ cents: Int, currency: String = LessonFormatting.defaultCurrencyCode) -> String {
 	LessonFormatting.currencyText(cents: cents, currencyCode: currency)
   }
@@ -1407,5 +1427,11 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
       teacherSharePercent: 75,
       currencyCode: LessonFormatting.defaultCurrencyCode
     )
+  }
+
+  func logTeacherCallAnswered(questionId: String, topic: String, wave: Int, conversationType: String) {
+  }
+
+  func logTeacherCallDenied(questionId: String, topic: String, wave: Int, conversationType: String) {
   }
 }

@@ -200,7 +200,7 @@ struct TeacherDashboardView: View {
 		  viewModel.enforceNotificationRequirement()
 		}
 	  }
-
+	  .trackScreen(AnalyticsScreen.teacherDashboard)
 	}
   }
 
@@ -501,8 +501,20 @@ struct TeacherDashboardView: View {
 			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
 			  viewModel: viewModel
 		) {
+		  viewModel.logTeacherCallAnswered(
+			questionId: inviteID,
+			topic: viewModel.inviteTopics[inviteID] ?? "",
+			wave: viewModel.inviteWaves[inviteID] ?? 1,
+			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+		  )
 		  viewModel.acceptInvite(questionId: inviteID)
 		} decline: {
+		  viewModel.logTeacherCallDenied(
+			questionId: inviteID,
+			topic: viewModel.inviteTopics[inviteID] ?? "",
+			wave: viewModel.inviteWaves[inviteID] ?? 1,
+			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+		  )
 		  viewModel.declineInvite(questionId: inviteID)
 		}
 	  }
@@ -529,8 +541,20 @@ struct TeacherDashboardView: View {
 			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
 			  viewModel: viewModel
 		  ) {
+			viewModel.logTeacherCallAnswered(
+			  questionId: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  wave: viewModel.inviteWaves[inviteID] ?? 1,
+			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			)
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {
+			viewModel.logTeacherCallDenied(
+			  questionId: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  wave: viewModel.inviteWaves[inviteID] ?? 1,
+			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			)
 			viewModel.declineInvite(questionId: inviteID)
 		  }
 		  .padding(.horizontal, 20)
@@ -961,8 +985,20 @@ struct TeacherIncomingQuestionOverlay: View {
 			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
 			  viewModel: viewModel
 		  ) {
+			viewModel.logTeacherCallAnswered(
+			  questionId: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  wave: viewModel.inviteWaves[inviteID] ?? 1,
+			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			)
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {
+			viewModel.logTeacherCallDenied(
+			  questionId: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  wave: viewModel.inviteWaves[inviteID] ?? 1,
+			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			)
 			viewModel.declineInvite(questionId: inviteID)
 		  }
 		  .padding(.horizontal, 20)
