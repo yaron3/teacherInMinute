@@ -22,6 +22,7 @@ struct TeacherDashboardView: View {
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
   @State var showsMessages = false
+  @State var emailReward = EmailRewardViewModel()
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? "en" : SettingsLanguageChoice.system.rawValue
   //@AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
@@ -90,6 +91,8 @@ struct TeacherDashboardView: View {
 			)
 			.padding(.top, 16)
 
+			EmailRewardBanner(viewModel: emailReward, topPadding: 20)
+
 			statusToggleCard
 			  .padding(.top, 20)
 
@@ -144,6 +147,7 @@ struct TeacherDashboardView: View {
 			}
 		}
 	  }
+	  .emailRewardDialogs(emailReward)
 	  .sheet(isPresented: $showsMessages) {
 		NotificationMessagesView()
 	  }

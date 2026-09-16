@@ -40,6 +40,13 @@ export async function provenEmails(uid: string): Promise<Set<string>> {
     return proven;
   }
 
+  return provenEmailsFor(user);
+}
+
+/** Same as `provenEmails`, for a caller that already holds the auth record. */
+export function provenEmailsFor(user: admin.auth.UserRecord): Set<string> {
+  const proven = new Set<string>();
+
   if (user.emailVerified && user.email) {
     proven.add(normalizeEmail(user.email));
   }

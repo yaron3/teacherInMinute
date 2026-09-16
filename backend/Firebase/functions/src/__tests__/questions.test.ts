@@ -142,7 +142,7 @@ describe("createQuestion", () => {
     });
 
     test("accepts and stores a photo the student uploaded", async () => {
-      await expect(askWithPhotos([ownPhotoUrl()])).resolves.toEqual({
+      await expect(askWithPhotos([ownPhotoUrl()])).resolves.toMatchObject({
         questionId: "q-1",
         connectionFeeCents: 50,
       });
@@ -171,7 +171,7 @@ describe("createQuestion", () => {
     });
 
     test("stores an array even when the client sends something else", async () => {
-      await expect(askWithPhotos([42, null])).resolves.toEqual({
+      await expect(askWithPhotos([42, null])).resolves.toMatchObject({
         questionId: "q-1",
         connectionFeeCents: 50,
       });
@@ -236,7 +236,7 @@ describe("createQuestion", () => {
     });
 
     test("accepts text exactly at the limit", async () => {
-      await expect(askWithText("x".repeat(1024))).resolves.toEqual({
+      await expect(askWithText("x".repeat(1024))).resolves.toMatchObject({
         questionId: "q-1",
         connectionFeeCents: 50,
       });
@@ -245,7 +245,7 @@ describe("createQuestion", () => {
     // Trailing whitespace is not part of what gets stored, so it must not be
     // what pushes a question over the limit.
     test("measures the limit after trimming", async () => {
-      await expect(askWithText(`   ${"x".repeat(1024)}   `)).resolves.toEqual({
+      await expect(askWithText(`   ${"x".repeat(1024)}   `)).resolves.toMatchObject({
         questionId: "q-1",
         connectionFeeCents: 50,
       });
@@ -258,14 +258,16 @@ describe("createQuestion", () => {
         message: "Question text must be at most 20 characters",
         details: { reason: "question_too_long", limit: 20 },
       });
-      await expect(askWithText("x".repeat(20))).resolves.toEqual({
+      await expect(askWithText("x".repeat(20))).resolves.toMatchObject({
         questionId: "q-1",
         connectionFeeCents: 50,
       });
     });
   });
 
-  test.each(["audio", "video"])(
+  // A text question gets them too: the lesson may switch to audio or video
+  // once it is running.
+  test.each(["text", "audio", "video"])(
     "hands a %s question's student their LiveKit credentials",
     async (conversationType) => {
       // Minted alongside the dispatch rather than after it, so the question
@@ -285,11 +287,6 @@ describe("createQuestion", () => {
       expect(mintedBeforeDispatch).toBe(true);
     }
   );
-
-  test("mints nothing for a text question", async () => {
-    await expect(ask("text")).resolves.toEqual({ questionId: "q-1", connectionFeeCents: 50 });
-    expect(mockMint).not.toHaveBeenCalled();
-  });
 
   test("still creates the question when the token cannot be minted", async () => {
     mockMint.mockRejectedValue(new Error("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set"));

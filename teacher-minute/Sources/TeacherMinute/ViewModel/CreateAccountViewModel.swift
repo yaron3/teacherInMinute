@@ -159,6 +159,7 @@ final class CreateAccountViewModel {
 		AnalyticsService.shared.setUser(uid: uid)
 	  }
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpSuccess, parameters: ["method": "email"])
+	  sendVerificationEmail()
 	  navigateToChooseRole = true
 	} catch {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": error.localizedDescription])
@@ -168,6 +169,19 @@ final class CreateAccountViewModel {
 	}
   }
   
+  /// Fired off without waiting: signup is already done, and a failed send can
+  /// be retried from the home screen's verify-email banner.
+  func sendVerificationEmail() {
+	Task { @MainActor in
+	  do {
+		try await authService.sendEmailVerification()
+		AnalyticsService.shared.logEvent(AnalyticsEvent.emailVerificationSent, parameters: ["source": "signup"])
+	  } catch {
+		AnalyticsService.shared.recordError(error, context: "signup_email_verification")
+	  }
+	}
+  }
+
   // MARK: - Social
   
   func signupWithGoogle() {

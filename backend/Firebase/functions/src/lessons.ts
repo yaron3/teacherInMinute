@@ -13,10 +13,11 @@ import {
   ABANDONED_LESSON_GRACE_SECONDS,
   PurchaseDoc,
 } from "./types";
-import { calculateBilling, billingStartMillis } from "./billing";
+import { calculateBilling, billingStartMillis, applyTeacherBonus } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
 import { stampAuthoritativeRating } from "./presence";
 import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
+import { readTeacherBonus } from "./emailRewards";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -333,15 +334,27 @@ async function migrateQuestionToFirestore(
     roundedMinutes,
     minutesToCharge: roundedMinutesToCharge,
     cost,
-    teacherEarnings,
   } = calculateBilling(billingStartMs, billableEndedAtMs, pricePerMinute, teacherShare);
+
+  // A teacher's welcome bonus (./emailRewards) raises their share on its first
+  // minutes. It is read now rather than stamped at start, so a lesson only
+  // draws on what is actually left when it is settled.
+  const teacherRef = firestore.collection("users").doc(teacherUid);
+  const teacherBonus = readTeacherBonus((await teacherRef.get()).data()?.teacherBonus);
+  const { teacherEarnings, bonusMinutesUsed, effectiveShare } = applyTeacherBonus(
+    cost,
+    roundedMinutes,
+    teacherShare,
+    teacherBonus?.share ?? teacherShare,
+    teacherBonus?.minutesRemaining ?? 0
+  );
   const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
   logger.info(
     `[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`
   );
 
   logger.info(
-    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} heldSeconds=${heldSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} teacherEarnings=${teacherEarnings}`
+    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} heldSeconds=${heldSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} bonusMinutesUsed=${bonusMinutesUsed} effectiveShare=${effectiveShare} teacherEarnings=${teacherEarnings}`
   );
 
   const batch = firestore.batch();
@@ -362,6 +375,8 @@ async function migrateQuestionToFirestore(
       pricePerMinute,
       exchangeRateToUsd,
       teacherShare,
+      teacherBonusMinutesUsed: bonusMinutesUsed,
+      effectiveTeacherShare: effectiveShare,
       cost,
       teacherEarnings,
       // Legacy aliases for clients still reading the old field names.
@@ -381,6 +396,8 @@ async function migrateQuestionToFirestore(
         currencyCode,
         pricePerMinute,
         teacherShare,
+        teacherBonusMinutesUsed: bonusMinutesUsed,
+        effectiveTeacherShare: effectiveShare,
         exchangeRateToUsd,
         cost,
         teacherEarnings,
@@ -395,7 +412,6 @@ async function migrateQuestionToFirestore(
   }
 
   const studentRef = firestore.collection("users").doc(studentUid);
-  const teacherRef = firestore.collection("users").doc(teacherUid);
   batch.set(
     studentRef,
     {
@@ -413,6 +429,9 @@ async function migrateQuestionToFirestore(
       totalEarnings: FieldValue.increment(teacherEarnings),
       earnings: FieldValue.increment(teacherEarnings),
       totalRevenueGenerated: FieldValue.increment(cost),
+      ...(bonusMinutesUsed > 0
+        ? { teacherBonus: { minutesRemaining: FieldValue.increment(-bonusMinutesUsed) } }
+        : {}),
     },
     { merge: true }
   );
@@ -644,10 +663,11 @@ export const startLesson = onCall(async (req) => {
   // Lock pricing at the moment the lesson starts so RC changes mid-lesson
   // do not retroactively shift the price. Currency is resolved from the
   // student's profile (/users/{uid}.currency).
-  const [pricing, connectionFeeCents, studentSnap] = await Promise.all([
+  const [pricing, connectionFeeCents, studentSnap, teacherSnap] = await Promise.all([
     resolvePricingForStudent(q.studentUid),
     getConnectionFeeCents(),
     firestore.collection("users").doc(q.studentUid).get(),
+    firestore.collection("users").doc(q.acceptedByTeacher!).get(),
   ]);
   const pricePerMinuteCents = Math.round(pricing.pricePerMinute * 100);
 
@@ -700,7 +720,11 @@ export const startLesson = onCall(async (req) => {
   // Keep RTDB question state aligned for real-time clients.
   // Mirror the pricing snapshot so the in-progress UI can render live
   // earnings / cost without re-querying Firestore mid-call.
-  const teacherSharePercent = Math.round(pricing.teacherShare * 100);
+  // The live figure shows the welcome-bonus share while the teacher has bonus
+  // minutes left. Settlement splits a lesson that outlasts them, so this is an
+  // estimate at the edge; `teacherShare` itself stays the base rate.
+  const teacherBonus = readTeacherBonus((teacherSnap.data() ?? {}).teacherBonus);
+  const teacherSharePercent = Math.round((teacherBonus?.share ?? pricing.teacherShare) * 100);
   logger.info(
     `[lessons] startLesson syncing RTDB question qid=${questionId} status=in_progress teacherId=${q.acceptedByTeacher ?? "none"}`
   );
@@ -721,6 +745,7 @@ export const startLesson = onCall(async (req) => {
     pricePerMinuteCents,
     teacherShare: pricing.teacherShare,
     teacherSharePercent,
+    teacherBonusMinutesAvailable: teacherBonus?.minutesRemaining ?? 0,
     exchangeRateToUsd: pricing.exchangeRateToUsd,
     connectionFeeCents,
   });

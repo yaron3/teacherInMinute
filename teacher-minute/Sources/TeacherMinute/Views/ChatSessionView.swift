@@ -87,6 +87,21 @@ struct ChatSessionView: View {
   @State var saveBoardIsRemoteInitiated = false
   @State var sessionFrozenDate: Date?
   @State var isTransitioningToText = false
+  /// The strip that lets either side switch the lesson between text, audio
+  /// and video while it runs.
+  @State var isSessionTypePickerVisible = false
+  @State var isChangingSessionType = false
+  /// Why the last switch did not happen, shown under the header until tapped.
+  @State var sessionTypeNotice: String?
+  /// The shared medium this side has already acted on. Only a change to it is
+  /// followed: a student who went on by chat while the lesson was asked as
+  /// audio has not been switched by anyone, and must not be pulled back.
+  @State var lastSeenSharedConversationType = ""
+  /// The other side moved the lesson up to audio or video, waiting on this
+  /// side's yes — a camera or microphone is never turned on without it.
+  @State var pendingPeerConversationType: String?
+  @State var liveKitRoom: String
+  @State var liveKitToken: String
   @State var inputBarHeight: CGFloat = 0
   /// Whether the scrolling chat layout still has its tab strip on screen.
   /// The strip scrolls away with the rest of the chrome, and a badge that
@@ -95,8 +110,6 @@ struct ChatSessionView: View {
   @State var isSessionTabStripVisible = true
   @FocusState var isMessageFieldFocused: Bool
   let title: String
-  let liveKitRoom: String
-  let liveKitToken: String
   /// Opens the minutes picker without leaving the session. Absent for the
   /// teacher, and for any caller that cannot present it — the hold panel then
   /// offers only ending the call, rather than a button that does nothing.
@@ -138,8 +151,8 @@ struct ChatSessionView: View {
     self._conversationType = State(initialValue: conversationType)
 	self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
     self.title = title
-    self.liveKitRoom = liveKitRoom
-    self.liveKitToken = liveKitToken
+    self._liveKitRoom = State(initialValue: liveKitRoom)
+    self._liveKitToken = State(initialValue: liveKitToken)
     self.onBuyMinutes = onBuyMinutes
     self.onClose = onClose
   }
@@ -150,8 +163,8 @@ struct ChatSessionView: View {
     self._conversationType = State(initialValue: conversationType)
     self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
     self.title = title
-    self.liveKitRoom = liveKitRoom
-    self.liveKitToken = liveKitToken
+    self._liveKitRoom = State(initialValue: liveKitRoom)
+    self._liveKitToken = State(initialValue: liveKitToken)
     self.onBuyMinutes = onBuyMinutes
     self.onClose = onClose
   }
@@ -193,6 +206,7 @@ struct ChatSessionView: View {
         if !newValue {
           isTransitioningToText = false
           refreshMediaCondition()
+          followSharedConversationType()
         }
       }
 
@@ -266,6 +280,7 @@ struct ChatSessionView: View {
       viewModel.onSessionDetailsUpdated = {
         sessionDetailsRevision += 1
         displayDate = Date()
+        followSharedConversationType()
       }
       viewModel.onSessionEnded = {
         if sessionFrozenDate == nil { sessionFrozenDate = Date() }
@@ -322,6 +337,29 @@ struct ChatSessionView: View {
       viewModel.stop()
     }
     .trackScreen(AnalyticsScreen.chatSession)
+    .appDialog(
+      viewModel.peerUpgradeTitle(for: pendingPeerConversationType ?? ""),
+      isPresented: Binding(
+        get: { pendingPeerConversationType != nil },
+        set: { if !$0 { pendingPeerConversationType = nil } }
+      ),
+      message: viewModel.peerUpgradeMessage(for: pendingPeerConversationType ?? ""),
+      actions: peerUpgradeActions
+    )
+  }
+
+  /// The dialog clears `pendingPeerConversationType` before it runs a
+  /// handler, so the type is captured here, as the buttons are built.
+  var peerUpgradeActions: [AppDialogAction] {
+    let type = pendingPeerConversationType ?? ""
+    return [
+      AppDialogAction(viewModel.switchSessionTypeLabel) {
+        acceptPeerConversationType(type)
+      },
+      AppDialogAction(viewModel.notNowLabel, kind: .cancel) {
+        declinePeerConversationType()
+      }
+    ]
   }
 
   func endSessionPromptOverlay(_ prompt: EndSessionPrompt) -> some View {
@@ -872,6 +910,8 @@ struct ChatSessionView: View {
 
             header
 
+            sessionTypePicker
+
             sessionConditionNotice
 
             sessionStats
@@ -966,6 +1006,8 @@ struct ChatSessionView: View {
     VStack(spacing: 0) {
       if !isBoardMaximized {
         header
+
+        sessionTypePicker
 
         sessionConditionNotice
 
@@ -1506,9 +1548,20 @@ struct ChatSessionView: View {
         Text(participantName)
           .font(.system(size: 15, weight: .bold))
           .foregroundStyle(theme.primaryText)
-        Text(connectionModeText)
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(hasVideo ? theme.info : theme.positive)
+        Button {
+          isSessionTypePickerVisible.toggle()
+        } label: {
+          HStack(spacing: 6) {
+            Text(connectionModeText)
+              .font(.system(size: 11, weight: .medium))
+              .foregroundStyle(hasVideo ? theme.info : theme.positive)
+            Text(viewModel.changeSessionTypeLabel)
+              .font(.system(size: 11, weight: .bold))
+              .foregroundStyle(theme.accent)
+          }
+        }
+        .buttonStyle(.plain)
+        .disabled(isEndingSession)
       }
 
       Spacer()
@@ -1568,7 +1621,14 @@ struct ChatSessionView: View {
   /// outranks connected badly — then the other side's, and a camera that never
   /// started, a settled fact of the lesson, comes last.
   @ViewBuilder var sessionConditionNotice: some View {
-    if hasAudio, mediaPhase == .failed {
+    if let sessionTypeNotice {
+      Button {
+        self.sessionTypeNotice = nil
+      } label: {
+        conditionLine(icon: "exclamationmark.triangle.fill", text: sessionTypeNotice, color: theme.danger)
+      }
+      .buttonStyle(.plain)
+    } else if hasAudio, mediaPhase == .failed {
       audioFailedNoticeButton
     } else if hasAudio, mediaPhase == .connecting {
       conditionLine(icon: "mic.fill", text: viewModel.audioConnectingNotice, color: theme.warning)
@@ -1627,6 +1687,198 @@ struct ChatSessionView: View {
     // the answer, and a lesson on its way out has nothing left to say.
     if !isConnecting, !didRequestLessonEnd {
       viewModel.setSelfMediaPending(isAudioPending)
+    }
+  }
+
+  // MARK: Session type
+
+  /// Text, audio and video, for either side to move the running lesson between.
+  @ViewBuilder var sessionTypePicker: some View {
+    if isSessionTypePickerVisible {
+      VStack(alignment: .leading, spacing: 8) {
+        Text(viewModel.sessionTypeTitle)
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(theme.primaryText)
+
+        HStack(spacing: 10) {
+          ConversationTypeChip(
+            title: viewModel.textSessionTypeLabel,
+            isSelected: conversationType == ConversationType.text.rawValue,
+            systemIcons: ["bubble.left.fill"],
+            accent: .teal
+          ) {
+            requestConversationType(ConversationType.text.rawValue)
+          }
+          ConversationTypeChip(
+            title: viewModel.audioSessionTypeLabel,
+            isSelected: conversationType == ConversationType.audio.rawValue,
+            systemIcons: ["mic.fill"],
+            accent: .teal
+          ) {
+            requestConversationType(ConversationType.audio.rawValue)
+          }
+          ConversationTypeChip(
+            title: viewModel.videoSessionTypeLabel,
+            isSelected: conversationType == ConversationType.video.rawValue,
+            systemIcons: ["video.fill"],
+            accent: .teal
+          ) {
+            requestConversationType(ConversationType.video.rawValue)
+          }
+        }
+        .disabled(isChangingSessionType)
+        .opacity(isChangingSessionType ? 0.5 : 1)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 10)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(theme.cardBackground)
+      .overlay(alignment: .bottom) {
+        Rectangle().fill(theme.controlBorder).frame(height: 1)
+      }
+    }
+  }
+
+  /// This side picked a new medium: make sure the device allows it, tell the
+  /// other side, then switch.
+  func requestConversationType(_ type: String) {
+    guard type != conversationType, !isChangingSessionType else {
+      isSessionTypePickerVisible = false
+      return
+    }
+    isChangingSessionType = true
+    sessionTypeNotice = nil
+    Task {
+      defer { isChangingSessionType = false }
+      if let error = await viewModel.prepareMedia(for: type) {
+        sessionTypeNotice = error
+        return
+      }
+      // Marked as seen before the write: the node echoes it straight back, and
+      // that echo is this side's own switch, not one to follow.
+      let previouslySeen = lastSeenSharedConversationType
+      lastSeenSharedConversationType = type
+      if let error = await viewModel.publishConversationType(type) {
+        lastSeenSharedConversationType = previouslySeen
+        sessionTypeNotice = error
+        return
+      }
+      isSessionTypePickerVisible = false
+      await applyConversationType(type)
+    }
+  }
+
+  /// Follows a switch the other side made. Dropping media happens straight
+  /// away; picking it up waits for this side to agree.
+  func followSharedConversationType() {
+    let shared = viewModel.sharedConversationType
+    guard ConversationType(rawValue: shared) != nil else { return }
+    // The first reading is the medium the lesson was asked as, which this
+    // side has already set itself up for.
+    guard !lastSeenSharedConversationType.isEmpty else {
+      lastSeenSharedConversationType = shared
+      return
+    }
+    guard !isConnecting, !didRequestLessonEnd, shared != lastSeenSharedConversationType else { return }
+    lastSeenSharedConversationType = shared
+    pendingPeerConversationType = nil
+    guard shared != conversationType else { return }
+    logger.info("[ChatSessionView] other side switched qid=\(viewModel.questionId) role=\(viewModel.role) from=\(conversationType) to=\(shared)")
+
+    if Self.mediaRank(shared) > Self.mediaRank(conversationType) {
+      pendingPeerConversationType = shared
+    } else {
+      Task { await applyConversationType(shared) }
+    }
+  }
+
+  func acceptPeerConversationType(_ type: String) {
+    pendingPeerConversationType = nil
+    Task {
+      if let error = await viewModel.prepareMedia(for: type) {
+        sessionTypeNotice = error
+        declinePeerConversationType()
+        return
+      }
+      await applyConversationType(type)
+    }
+  }
+
+  /// Stays on the current medium. Without audio of its own, this side says so,
+  /// and the other side is told to use the chat.
+  func declinePeerConversationType() {
+    pendingPeerConversationType = nil
+    if !hasAudio {
+      viewModel.setSelfMediaPending(true)
+    }
+  }
+
+  static func mediaRank(_ type: String) -> Int {
+    switch ConversationType(rawValue: type) {
+    case .video?: return 2
+    case .audio?: return 1
+    default: return 0
+    }
+  }
+
+  /// Moves this side's media to `type`: joins the room, turns the camera on or
+  /// off, or leaves the room for a text-only lesson.
+  func applyConversationType(_ type: String) async {
+    guard let target = ConversationType(rawValue: type), type != conversationType else { return }
+
+    if target.requiresMic,
+       liveKitRoom.isEmpty || liveKitToken.isEmpty {
+      guard let credentials = await viewModel.mediaCredentials() else {
+        sessionTypeNotice = viewModel.mediaCredentialsFailedNotice
+        viewModel.setSelfMediaPending(true)
+        return
+      }
+      liveKitRoom = credentials.room
+      liveKitToken = credentials.token
+    }
+    guard !didRequestLessonEnd else { return }
+
+    logger.info("[ChatSessionView] applying conversation type qid=\(viewModel.questionId) role=\(viewModel.role) from=\(conversationType) to=\(type)")
+    conversationType = type
+    isMicMuted = false
+    isCameraOff = false
+
+    guard target.requiresMic else {
+      mediaPhase = .idle
+      mediaQuality = .unknown
+      didFallBackToAudioOnly = false
+      peerAwaitingAudio = false
+      viewModel.setSelfMediaPending(false)
+      if selectedTab == .VIDEO {
+        selectSessionTab(.CHAT)
+      } else {
+        applyVideoPauseState()
+      }
+      await LiveKitService.shared.disconnect()
+      return
+    }
+
+    let phase = LiveKitService.shared.connectionPhase
+    if phase == .connecting || phase == .connected {
+      // Already in the room, or on the way: only the camera changes, once the
+      // room is there to change it in.
+      let wantsVideo = target.requiresCamera
+      Task {
+        guard await LiveKitService.shared.waitUntilConnected() else { return }
+        await LiveKitService.shared.setMicrophoneEnabled(true)
+        await LiveKitService.shared.setCameraEnabled(wantsVideo)
+      }
+    } else {
+      LiveKitService.shared.startConnecting(roomName: liveKitRoom, token: liveKitToken, enableVideo: target.requiresCamera)
+      mediaPhase = .connecting
+    }
+
+    if target.requiresCamera {
+      selectSessionTab(.VIDEO)
+    } else if selectedTab == .VIDEO {
+      selectSessionTab(.CHAT)
+    } else {
+      applyVideoPauseState()
     }
   }
 

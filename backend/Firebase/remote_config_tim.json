@@ -9073,6 +9073,302 @@
         }
       },
       "valueType": "STRING"
+    },
+    "email_reward_student_minutes": {
+      "defaultValue": {
+        "value": "30"
+      },
+      "description": "Free minutes a student gets once for verifying their email (0 turns it off).",
+      "valueType": "NUMBER"
+    },
+    "email_reward_teacher_share": {
+      "defaultValue": {
+        "value": "1"
+      },
+      "description": "Share a teacher keeps during their verified-email bonus (0-1).",
+      "valueType": "NUMBER"
+    },
+    "email_reward_teacher_minutes": {
+      "defaultValue": {
+        "value": "300"
+      },
+      "description": "Taught minutes the verified-email teacher bonus covers (0 turns it off).",
+      "valueType": "NUMBER"
+    },
+    "verify_your_email": {
+      "defaultValue": {
+        "value": "Verify your email"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אמת את כתובת המייל שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_email_reward_student_offer": {
+      "defaultValue": {
+        "value": "Verify your email address and get %d free minutes."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אמת את כתובת המייל שלך וקבל %d דקות חינם."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_email_reward_teacher_offer": {
+      "defaultValue": {
+        "value": "Verify your email address and keep %d%% of your earnings for your first %d minutes of teaching."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אמת את כתובת המייל שלך וקבל %d%% מההכנסות על %d דקות ההוראה הראשונות שלך."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_keep_your": {
+      "defaultValue": {
+        "value": "You keep %d%% of your earnings for your next %d minutes of teaching."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אתה מקבל %d%% מההכנסות על %d דקות ההוראה הבאות שלך."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "email_reward_already_claimed": {
+      "defaultValue": {
+        "value": "This email address has already received its welcome reward."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כתובת המייל הזו כבר קיבלה את מתנת ההצטרפות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "email_reward_i_verified": {
+      "defaultValue": {
+        "value": "I've verified"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אימתתי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "resend_email": {
+      "defaultValue": {
+        "value": "Resend email"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שלח שוב"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "email_sent": {
+      "defaultValue": {
+        "value": "Email sent"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המייל נשלח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "sent_link_open": {
+      "defaultValue": {
+        "value": "We sent a link to %@. Open it, then come back and tap “I've verified”."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שלחנו קישור אל %@. פתח אותו, ואז חזור לכאן והקש על „אימתתי”."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "couldn_send_the": {
+      "defaultValue": {
+        "value": "Couldn't send the email. Please try again later."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא הצלחנו לשלוח את המייל. נסה שוב מאוחר יותר."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "couldn_check_your": {
+      "defaultValue": {
+        "value": "Couldn't check your email right now. Please try again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא הצלחנו לבדוק את המייל כרגע. נסה שוב."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "not_verified_yet": {
+      "defaultValue": {
+        "value": "Not verified yet"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המייל עדיין לא אומת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "open_the_link": {
+      "defaultValue": {
+        "value": "Open the link we emailed you, then tap “I've verified” again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "פתח את הקישור ששלחנו אליך במייל, ואז הקש שוב על „אימתתי”."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "welcome_bonus_unlocked": {
+      "defaultValue": {
+        "value": "Welcome bonus unlocked"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בונוס ההצטרפות הופעל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "welcome_bonus": {
+      "defaultValue": {
+        "value": "Welcome bonus"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בונוס הצטרפות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "free_minutes_added": {
+      "defaultValue": {
+        "value": "%d free minutes added"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נוספו %d דקות חינם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "thanks_for_verifying": {
+      "defaultValue": {
+        "value": "Thanks for verifying your email. Enjoy your first lessons!"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תודה שאימתת את המייל. תהנה מהשיעורים הראשונים!"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "switch": {
+      "defaultValue": {
+        "value": "Switch"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "החלפה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "switch_video_session": {
+      "defaultValue": {
+        "value": "Switch to a video session?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לעבור לשיעור וידאו?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "switch_audio_session": {
+      "defaultValue": {
+        "value": "Switch to an audio session?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לעבור לשיעור קולי?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_session_type": {
+      "defaultValue": {
+        "value": "The session type could not be changed. Tap to dismiss."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא ניתן היה לשנות את סוג השיעור. יש להקיש כדי לסגור."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "session_type_switched_teacher_audio": {
+      "defaultValue": {
+        "value": "Your teacher switched the session to audio."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה העביר/ה את השיעור לשיחה קולית."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "session_type_switched_teacher_video": {
+      "defaultValue": {
+        "value": "Your teacher switched the session to video."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה העביר/ה את השיעור לווידאו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "session_type_switched_student_audio": {
+      "defaultValue": {
+        "value": "The student switched the session to audio."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד/ה העביר/ה את השיעור לשיחה קולית."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "session_type_switched_student_video": {
+      "defaultValue": {
+        "value": "The student switched the session to video."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד/ה העביר/ה את השיעור לווידאו."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

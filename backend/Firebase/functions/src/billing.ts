@@ -60,3 +60,46 @@ export function billingStartMillis(
   if (candidates.length === 0) return undefined;
   return Math.max(...candidates);
 }
+
+export interface TeacherBonusSplit {
+  /** What the teacher is paid for the lesson, in major units. */
+  teacherEarnings: number;
+  /** Bonus minutes this lesson used up. */
+  bonusMinutesUsed: number;
+  /** `teacherEarnings / cost`, for display; the base share when cost is 0. */
+  effectiveShare: number;
+}
+
+/**
+ * Teacher earnings when part of the lesson falls inside a welcome bonus (see
+ * ./emailRewards). The first `bonusMinutesAvailable` billed minutes earn
+ * `bonusShare`; any minutes past that earn `baseShare`. Cost is split by
+ * minutes, so a lesson wholly inside the bonus pays `cost × bonusShare` and one
+ * with no bonus matches `calculateBilling` exactly.
+ */
+export function applyTeacherBonus(
+  cost: number,
+  billedMinutes: number,
+  baseShare: number,
+  bonusShare: number,
+  bonusMinutesAvailable: number
+): TeacherBonusSplit {
+  const minutes = Math.max(0, Math.floor(billedMinutes));
+  const bonusMinutesUsed = Math.min(minutes, Math.max(0, Math.floor(bonusMinutesAvailable)));
+  // A lesson that cost nothing earns nothing either way, so it keeps the bonus.
+  if (bonusMinutesUsed === 0 || cost <= 0) {
+    return {
+      teacherEarnings: Math.round(Math.max(0, cost) * baseShare * 100) / 100,
+      bonusMinutesUsed: 0,
+      effectiveShare: baseShare,
+    };
+  }
+  const bonusCost = (cost * bonusMinutesUsed) / minutes;
+  const earnings = bonusCost * bonusShare + (cost - bonusCost) * baseShare;
+  const teacherEarnings = Math.round(earnings * 100) / 100;
+  return {
+    teacherEarnings,
+    bonusMinutesUsed,
+    effectiveShare: Math.round((teacherEarnings / cost) * 10_000) / 10_000,
+  };
+}

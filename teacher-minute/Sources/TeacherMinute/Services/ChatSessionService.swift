@@ -69,6 +69,16 @@ struct ChatSessionDetails: Equatable {
   /// Defaulted so the several places that rebuild these details keep compiling;
   /// each of them passes the current value through deliberately.
   var minutesDeadlineAt: Double = 0
+  /// The lesson's current medium, as last written to the question node —
+  /// `ConversationType` raw values. Empty when the node has not said. Either
+  /// side may change it while the lesson runs, and the other follows.
+  var conversationType: String = ""
+}
+
+/// The room and token one participant joins the lesson's media with.
+struct MediaCredentials: Equatable {
+  let room: String
+  let token: String
 }
 
 /// What the student's remaining credit means for the session right now.
@@ -504,6 +514,25 @@ final class ChatSessionService {
 #endif
   }
 
+  /// Switches the lesson's medium for both participants.
+  func setConversationType(_ conversationType: String) async throws {
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.setConversationType(
+        questionId: self.questionId,
+        conversationType: conversationType
+      )
+    }.value
+#else
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      questionRef.child("conversationType").setValue(conversationType) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
 #if os(Android)
   func fetchChatPaused() async throws -> [String: Bool] {
     let json = try await Task.detached(priority: .userInitiated) {
@@ -701,7 +730,8 @@ final class ChatSessionService {
         ?? 0,
       teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75,
       currencyCode: currencyCode(from: dict),
-      minutesDeadlineAt: normalizedMilliseconds(doubleValue(dict["minutesDeadlineAt"]) ?? 0)
+      minutesDeadlineAt: normalizedMilliseconds(doubleValue(dict["minutesDeadlineAt"]) ?? 0),
+      conversationType: firstString(in: dict, keys: ["conversationType"])
     )
   }
 
@@ -805,11 +835,32 @@ protocol ChatSessionViewModeling: AnyObject {
   var peerFarewellNote: String? { get }
   func logSessionStarted(conversationType: String)
   func sendBoardSnapshot(_ snapshotData: Data, senderRole: String) async throws
+
+  /// The lesson's medium as both participants currently see it — a
+  /// `ConversationType` raw value, or empty until the session node has said.
+  var sharedConversationType: String { get }
+  /// Asks for whatever `conversationType` needs from this device. Nil once it
+  /// is all granted, otherwise the sentence to show.
+  func prepareMedia(for conversationType: String) async -> String?
+  /// Switches the lesson to `conversationType` for both sides. Nil on success,
+  /// otherwise the sentence to show.
+  func publishConversationType(_ conversationType: String) async -> String?
+  /// Fresh credentials for the lesson's room, for a lesson that started
+  /// without them and has just switched to audio or video.
+  func mediaCredentials() async -> MediaCredentials?
 }
 
 // MARK: - ChatSessionViewModeling defaults
 
 extension ChatSessionViewModeling {
+
+  var sharedConversationType: String { "" }
+
+  func prepareMedia(for conversationType: String) async -> String? { nil }
+
+  func publishConversationType(_ conversationType: String) async -> String? { nil }
+
+  func mediaCredentials() async -> MediaCredentials? { nil }
 
   /// Longest parting note a student can send as they close a held session.
   var farewellMessageMaxLength: Int { 128 }
@@ -1002,6 +1053,44 @@ extension ChatSessionViewModeling {
   var boardTabTitle: String { LocalizationSupport.localized("Board") }
   var videoTabTitle: String { LocalizationSupport.localized("Video") }
   var imagesTabTitle: String { LocalizationSupport.localized("Images") }
+
+  // MARK: Session type
+
+  var sessionTypeTitle: String { LocalizationSupport.localized("Session type") }
+  var changeSessionTypeLabel: String { LocalizationSupport.localized("Change") }
+  var textSessionTypeLabel: String { LocalizationSupport.localized("Text") }
+  var audioSessionTypeLabel: String { LocalizationSupport.localized("Audio") }
+  var videoSessionTypeLabel: String { LocalizationSupport.localized("Video") }
+  var switchSessionTypeLabel: String { LocalizationSupport.localized("Switch") }
+  var notNowLabel: String { LocalizationSupport.localized("Not now") }
+  var sessionTypeChangeFailedNotice: String {
+    LocalizationSupport.localized("The session type could not be changed. Tap to dismiss.")
+  }
+  var mediaCredentialsFailedNotice: String {
+    LocalizationSupport.localized("Could not start the audio/video connection. Please try again.")
+  }
+
+  /// Asks this side to follow the other one up to `conversationType`.
+  func peerUpgradeTitle(for conversationType: String) -> String {
+    conversationType == ConversationType.video.rawValue
+      ? LocalizationSupport.localized("Switch to a video session?")
+      : LocalizationSupport.localized("Switch to an audio session?")
+  }
+
+  func peerUpgradeMessage(for conversationType: String) -> String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    let isVideo = conversationType == ConversationType.video.rawValue
+    switch (isStudentRole, isVideo) {
+    case (true, true):
+      return LocalizationSupport.localized("Your teacher switched the session to video.")
+    case (true, false):
+      return LocalizationSupport.localized("Your teacher switched the session to audio.")
+    case (false, true):
+      return LocalizationSupport.localized("The student switched the session to video.")
+    case (false, false):
+      return LocalizationSupport.localized("The student switched the session to audio.")
+    }
+  }
 }
 
 @Observable
@@ -1576,6 +1665,11 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   private func mergedDetails(current: ChatSessionDetails?, updated: ChatSessionDetails) -> ChatSessionDetails {
+    if let published = publishedConversationType,
+       updated.conversationType == published
+        || Date().timeIntervalSince(publishedConversationTypeAt) > Self.publishedConversationTypeGraceSeconds {
+      publishedConversationType = nil
+    }
     guard let current else { return updated }
     return ChatSessionDetails(
       questionId: nonEmpty(updated.questionId) ?? current.questionId,
@@ -1596,7 +1690,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       // the hold would lift itself and the student would keep talking for free.
       minutesDeadlineAt: updated.minutesDeadlineAt > 0
         ? updated.minutesDeadlineAt
-        : current.minutesDeadlineAt
+        : current.minutesDeadlineAt,
+      conversationType: nonEmpty(updated.conversationType) ?? current.conversationType
     )
   }
 
@@ -1619,7 +1714,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       pricePerMinuteCents: current.pricePerMinuteCents,
       teacherSharePercent: current.teacherSharePercent,
       currencyCode: current.currencyCode,
-      minutesDeadlineAt: current.minutesDeadlineAt
+      minutesDeadlineAt: current.minutesDeadlineAt,
+      conversationType: current.conversationType
     )
     onSessionDetailsUpdated?()
   }
@@ -1671,8 +1767,88 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       pricePerMinuteCents: current.pricePerMinuteCents,
       teacherSharePercent: current.teacherSharePercent,
       currencyCode: current.currencyCode,
-      minutesDeadlineAt: current.minutesDeadlineAt
+      minutesDeadlineAt: current.minutesDeadlineAt,
+      conversationType: current.conversationType
     )
+  }
+
+  /// A switch this side wrote, reported as the shared medium until a read of
+  /// the node agrees. On Android a poll that set off before the write can
+  /// still come back with the old medium, which would otherwise look like the
+  /// other side switching straight back.
+  private var publishedConversationType: String?
+  private var publishedConversationTypeAt = Date.distantPast
+  private static let publishedConversationTypeGraceSeconds: TimeInterval = 5
+
+  var sharedConversationType: String {
+    publishedConversationType ?? details?.conversationType ?? ""
+  }
+
+  func prepareMedia(for conversationType: String) async -> String? {
+    guard let type = ConversationType(rawValue: conversationType) else { return nil }
+
+    if type.requiresMic {
+      let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+      if !micState.isGranted {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, parameters: [
+          "permission_type": "microphone",
+          "conversation_type": conversationType
+        ])
+        return type == .video
+          ? LocalizationSupport.localized("Microphone and camera access are required for this video session.")
+          : LocalizationSupport.localized("Microphone access is required for this audio session.")
+      }
+    }
+
+    if type.requiresCamera {
+      let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+      if !cameraState.isGranted {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, parameters: [
+          "permission_type": "camera",
+          "conversation_type": conversationType
+        ])
+        return LocalizationSupport.localized("Microphone and camera access are required for this video session.")
+      }
+    }
+
+    return nil
+  }
+
+  func publishConversationType(_ conversationType: String) async -> String? {
+    guard ConversationType(rawValue: conversationType) != nil else { return nil }
+    let previous = sharedConversationType
+    publishedConversationType = conversationType
+    publishedConversationTypeAt = Date()
+    do {
+      try await service.setConversationType(conversationType)
+      publishedConversationTypeAt = Date()
+      AnalyticsService.shared.logEvent(AnalyticsEvent.sessionTypeChanged, parameters: [
+        "question_id": questionId,
+        "role": role,
+        "from_conversation_type": previous,
+        "conversation_type": conversationType
+      ])
+      logger.info("[ChatSession] conversation type changed questionId=\(self.questionId) role=\(self.role) from=\(previous) to=\(conversationType)")
+      return nil
+    } catch {
+      publishedConversationType = nil
+      logger.error("[ChatSession] conversation type change failed questionId=\(self.questionId) to=\(conversationType): \(error.localizedDescription)")
+      return sessionTypeChangeFailedNotice
+    }
+  }
+
+  func mediaCredentials() async -> MediaCredentials? {
+    do {
+      let result = try await FunctionsService.shared.getQuestionStatus(questionId: questionId)
+      guard let room = nonEmpty(result.liveKitRoom), let token = nonEmpty(result.liveKitToken) else {
+        logger.error("[ChatSession] media credentials missing questionId=\(self.questionId) status=\(result.status)")
+        return nil
+      }
+      return MediaCredentials(room: room, token: token)
+    } catch {
+      logger.error("[ChatSession] media credentials failed questionId=\(self.questionId): \(error.localizedDescription)")
+      return nil
+    }
   }
 
   func logSessionStarted(conversationType: String) {
@@ -1740,6 +1916,10 @@ private enum AndroidChatBridge {
   private static let setMediaPendingMethod = managerClass.getStaticMethodID(
     name: "setMediaPending",
     sig: "(Ljava/lang/String;Ljava/lang/String;Z)V"
+  )!
+  private static let setConversationTypeMethod = managerClass.getStaticMethodID(
+    name: "setConversationType",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)V"
   )!
   private static let fetchMediaPendingMethod = managerClass.getStaticMethodID(
     name: "fetchMediaPendingJson",
@@ -1892,6 +2072,19 @@ private enum AndroidChatBridge {
           questionId.toJavaParameter(options: [.kotlincompat]),
           role.toJavaParameter(options: [.kotlincompat]),
           pending.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func setConversationType(questionId: String, conversationType: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setConversationTypeMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          conversationType.toJavaParameter(options: [.kotlincompat])
         ]
       )
     }

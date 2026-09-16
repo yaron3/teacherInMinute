@@ -72,6 +72,20 @@ final class AuthService {
   func sendPasswordReset(email: String) async throws {
     try await Auth.auth().sendPasswordReset(withEmail: email)
   }
+
+  /// Emails Firebase's "verify your address" link to the signed-in account.
+  /// Following it is what earns the welcome reward (see `claimEmailReward`).
+  func sendEmailVerification() async throws {
+    guard let user = Auth.auth().currentUser else {
+      throw SettingsError.missingUser
+    }
+#if !os(Android)
+    // skip-firebase does not expose the language setting, so Android gets the
+    // project's default template language.
+    Auth.auth().languageCode = LocalizationSupport.currentLanguageCode
+#endif
+    try await user.sendEmailVerification()
+  }
   
   
 //  func signInWithGoogle()  async throws -> Bool{

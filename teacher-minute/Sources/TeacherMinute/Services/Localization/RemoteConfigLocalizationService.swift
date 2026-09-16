@@ -591,6 +591,22 @@ enum LocalizationKey {
         // The string that matches the value already in the template keeps the
         // original key; the other one is moved here.
 
+        // Verify-email reward banner. `verify_your_email` stays with the title,
+        // `this_email_address` with "…already in use", and `verified` with the
+        // plain "Verified" status label.
+        "Verify your email address and get %d free minutes.": "fmt_email_reward_student_offer",
+        "Verify your email address and keep %d%% of your earnings for your first %d minutes of teaching.":
+          "fmt_email_reward_teacher_offer",
+
+        // Mid-session type switch. The four sentences differ only in who and
+        // which medium, so each gets its own key.
+        "Your teacher switched the session to audio.": "session_type_switched_teacher_audio",
+        "Your teacher switched the session to video.": "session_type_switched_teacher_video",
+        "The student switched the session to audio.": "session_type_switched_student_audio",
+        "The student switched the session to video.": "session_type_switched_student_video",
+        "This email address has already received its welcome reward.": "email_reward_already_claimed",
+        "I've verified": "email_reward_i_verified",
+
         // `all` holds the "All" subject filter.
         "all": "all_lower",
         // `choose_your_role` holds the title-case navigation title.

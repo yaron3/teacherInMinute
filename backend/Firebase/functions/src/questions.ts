@@ -212,17 +212,16 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
   // cold — between "a teacher accepted" and the student connecting. The search
   // gives up within a minute and a lesson is capped at 30, both well inside the
   // token's 60. getQuestionStatus stays the fallback, so a failed mint costs
-  // that round trip back, never the question.
+  // that round trip back, never the question. A text question gets one too:
+  // either side may switch the lesson to audio or video once it is running.
   const studentMedia: Promise<{ liveKitRoom: string; liveKitToken: string } | null> =
-    conversationType === "text"
-      ? Promise.resolve(null)
-      : mintLiveKitToken(roomName, uid).then(
-          (minted) => ({ liveKitRoom: roomName, liveKitToken: minted.token }),
-          (error) => {
-            logger.warn(`[questions] createQuestion student token mint failed qid=${qid}`, error);
-            return null;
-          }
-        );
+    mintLiveKitToken(roomName, uid).then(
+      (minted) => ({ liveKitRoom: roomName, liveKitToken: minted.token }),
+      (error) => {
+        logger.warn(`[questions] createQuestion student token mint failed qid=${qid}`, error);
+        return null;
+      }
+    );
 
   const question: QuestionDoc = {
     studentUid: uid,
@@ -539,6 +538,8 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
 // ─── getQuestionStatus ────────────────────────────────────────────────────────
 // Polled by the student app every 3s while in "searching" state.
 // Returns {status} plus LiveKit credentials if the question was accepted.
+// The accepted teacher may call it too, to fetch credentials again when a
+// lesson switches to audio or video after it started.
 
 export const getQuestionStatus = onCall(HOT_PATH, async (req) => {
   const uid = req.auth?.uid;
@@ -551,9 +552,11 @@ export const getQuestionStatus = onCall(HOT_PATH, async (req) => {
   if (!qSnap.exists) throw new HttpsError("not-found", "Question not found");
 
   const q = qSnap.data() as QuestionDoc;
-  if (q.studentUid !== uid) throw new HttpsError("permission-denied", "Not your question");
+  if (q.studentUid !== uid && q.acceptedByTeacher !== uid) {
+    throw new HttpsError("permission-denied", "Not your question");
+  }
 
-  logger.info(`[questions] getQuestionStatus qid=${questionId} student=${uid} status=${q.status}`);
+  logger.info(`[questions] getQuestionStatus qid=${questionId} caller=${uid} status=${q.status}`);
 
   if (q.status === "accepted" || q.status === "in_progress") {
     const roomName = lessonRoomName(questionId);
