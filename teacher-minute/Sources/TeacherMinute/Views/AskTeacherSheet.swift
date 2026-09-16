@@ -710,6 +710,9 @@ struct AskTeacherSheet: View {
                 isQuestionFocused = true
                 scrollForKeyboardMode(.regular, proxy: scrollProxy)
             }
+            // "Algebra" is also one of the topic chips higher up this screen,
+            // so the pills carry identifiers to tell the two apart.
+            .accessibilityIdentifier("keyboard_mode_regular")
             keyboardModePill(title: viewModel.algebraKeyboardLabel, isSelected: keyboardMode == .algebra) {
                 keyboardMode = .algebra
                 // The math keys are the keyboard in this mode, so the system
@@ -721,6 +724,7 @@ struct AskTeacherSheet: View {
                 SoftKeyboard.dismiss()
                 scrollForKeyboardMode(.algebra, proxy: scrollProxy)
             }
+            .accessibilityIdentifier("keyboard_mode_algebra")
         }
     }
 

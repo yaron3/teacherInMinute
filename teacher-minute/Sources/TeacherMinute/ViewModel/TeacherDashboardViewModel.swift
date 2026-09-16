@@ -1283,6 +1283,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 
   func checkDocumentsSuggestion() async -> Bool {
 	guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return false }
+	// The nudge after a first lesson is a third way into identity
+	// verification, alongside sign-up and launch, and it carries its own flag
+	// for the same reason those two do: it reaches a different moment and a
+	// different teacher, so it is turned on and off on its own. With every
+	// one of them off the screen cannot be reached at all.
+	guard RemoteConfigService.shared.getBool("teacher_identity_suggestion", default: false) else {
+	  return false
+	}
 	return await TeacherDocumentsPromptStore.shouldPresentSuggestion()
   }
 

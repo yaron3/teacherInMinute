@@ -148,7 +148,18 @@ final class UserService {
 	  let subjectSelections = data["subjectSelections"] as? [String: [String]] ?? [:]
 	  let hasSubjects = subjectSelections.values.contains { !$0.isEmpty }
 
-	  if !hasIdentityDocs { return .teacherIdentityVerification }
+	  // Whether a teacher who is already signed in, but never uploaded an ID,
+	  // is sent to verification on launch.
+	  //
+	  // Its own flag rather than the `teacher_identity_onboarding` one the
+	  // sign-up path reads: the two catch different people — that one only
+	  // ever sees a teacher creating an account, this one every teacher who
+	  // signed up while it was off — so turning the step on for new teachers
+	  // should not, on its own, round up the existing ones at next launch.
+	  let verifiesIdentityOnLaunch = RemoteConfigService.shared.getBool(
+		"teacher_identity_on_launch", default: false
+	  )
+	  if verifiesIdentityOnLaunch, !hasIdentityDocs { return .teacherIdentityVerification }
 	  if !hasSubjects      { return .teacherSubjects }
 			  if !(hasName && hasPhone) { return .completeProfile(role: .teacher) }
 		  return .home(role: .teacher)

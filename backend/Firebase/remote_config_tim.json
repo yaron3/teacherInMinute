@@ -9006,6 +9006,18 @@
       },
       "valueType": "BOOLEAN"
     },
+    "teacher_identity_on_launch": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN"
+    },
+    "teacher_identity_suggestion": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN"
+    },
     "questions_per_minute": {
       "defaultValue": {
         "value": "0"
@@ -9036,6 +9048,28 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "שאלתם הרבה שאלות בשעה האחרונה. נסו שוב בעוד %d דקות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "checking_your_balance": {
+      "defaultValue": {
+        "value": "Checking your balance"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בודקים את היתרה שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_minutes_are": {
+      "defaultValue": {
+        "value": "Your minutes are still loading. This takes a moment the first time you open the app."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הדקות שלך עדיין נטענות. זה לוקח רגע בפעם הראשונה שפותחים את האפליקציה."
         }
       },
       "valueType": "STRING"

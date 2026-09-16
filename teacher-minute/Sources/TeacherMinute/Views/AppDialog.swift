@@ -129,6 +129,12 @@ struct AppDialogView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
+        // A dialog draws as an overlay on the screen that raised it, so its
+        // buttons share the accessibility tree with the rows behind them — and
+        // a confirmation reuses the wording of the row that opened it, which
+        // leaves a UI test two identical "Log Out" buttons to choose between.
+        // The identifier says which one belongs to the dialog.
+        .accessibilityIdentifier(action.kind == .cancel ? "dialog_cancel_button" : "dialog_confirm_button")
     }
 
     func foreground(for kind: AppDialogAction.Kind) -> Color {

@@ -10,6 +10,9 @@ import SwiftUI
 struct StudentHomeView: View {
   @State var viewModel: any StudentHomeViewModeling
   @State var showingLowBalanceAlert = false
+  /// Raised when the ask button is tapped before the profile — and with
+  /// it the balance — has arrived.
+  @State var showingBalanceLoadingAlert = false
   @State var showingCouponAlert = false
   @State var showingPurchaseSummaryAlert = false
   @State var showsAskTeacher = false
@@ -160,6 +163,12 @@ struct StudentHomeView: View {
 	  viewModel.lowBalanceAlertTitle,
 	  isPresented: $showingLowBalanceAlert,
 	  message: viewModel.lowBalanceMessage,
+	  actions: [AppDialogAction(viewModel.okLabel)]
+	)
+	.appDialog(
+	  viewModel.balanceLoadingTitle,
+	  isPresented: $showingBalanceLoadingAlert,
+	  message: viewModel.balanceLoadingMessage,
 	  actions: [AppDialogAction(viewModel.okLabel)]
 	)
 	.appDialog(
@@ -319,12 +328,18 @@ struct StudentHomeView: View {
         .stroke(theme.warning, lineWidth: 2.5)
         .frame(width: 54, height: 54)
         .overlay {
-          Text("\(viewModel.remainingMinutes)")
-            .font(.system(size: 22, weight: .bold))
+          // "Loading..." needs far more room than a two or three digit
+          // balance, so the ring gives it a smaller type size rather than
+          // wrapping it across the circle.
+          Text(viewModel.balanceCountText)
+            .font(.system(size: viewModel.isProfileLoaded ? 22 : 11, weight: .bold))
             .foregroundStyle(theme.warning)
-			.lineLimit(2)
-			.minimumScaleFactor(0.8)
-			.frame(maxWidth: .infinity, alignment: .center)
+			.lineLimit(viewModel.isProfileLoaded ? 2 : 1)
+			.minimumScaleFactor(0.6)
+			// Held inside the 54pt ring rather than left to run over its
+			// stroke. An unbounded width gives `minimumScaleFactor` nothing to
+			// shrink against, so "Loading..." would overflow instead of fitting.
+			.frame(width: 46, alignment: .center)
         }
       Text(viewModel.minutesLabel)
         .font(.system(size: 13, weight: .bold))
@@ -342,20 +357,28 @@ struct StudentHomeView: View {
 
   @ViewBuilder
   var heroAskTeacherButton: some View {
-    if viewModel.canAskTeacher {
-      Button {
-        showsAskTeacher = true
-      } label: {
-        heroAskTeacherButtonContent
-      }
-      .buttonStyle(.plain)
+    Button {
+      askTeacherTapped()
+    } label: {
+      heroAskTeacherButtonContent
+    }
+    .buttonStyle(.plain)
+  }
+
+  /// One place decides what tapping "ask" does, so the hero button and the
+  /// card below it cannot drift apart.
+  ///
+  /// The loading case is its own branch rather than falling in with the low
+  /// balance: until the profile arrives `remainingMinutes` is zero for
+  /// everyone, and telling a student with minutes to go and buy more is worse
+  /// than asking them to wait a moment.
+  func askTeacherTapped() {
+    if !viewModel.isProfileLoaded {
+      showingBalanceLoadingAlert = true
+    } else if viewModel.canAskTeacher {
+      showsAskTeacher = true
     } else {
-      Button {
-        showingLowBalanceAlert = true
-      } label: {
-        heroAskTeacherButtonContent
-      }
-      .buttonStyle(.plain)
+      showingLowBalanceAlert = true
     }
   }
 
@@ -414,7 +437,7 @@ struct StudentHomeView: View {
 
       dashboardInfoCard(
         title: viewModel.yourBalanceTitle,
-        value: LessonFormatting.minutesText(viewModel.remainingMinutes),
+        value: viewModel.balanceMinutesText,
         detail: viewModel.leftToLearnDetail,
         systemImage: "creditcard.fill",
         actionTitle: viewModel.buyMoreLabel,
@@ -1034,23 +1057,13 @@ struct StudentHomeView: View {
   
   // MARK: - Ask card
   
-  @ViewBuilder
   var askTeacherCard: some View {
-	if viewModel.canAskTeacher {
-	  Button {
-		showsAskTeacher = true
-	  } label: {
-		askTeacherCardContent
-	  }
-	  .buttonStyle(.plain)
-	} else {
-	  Button {
-		showingLowBalanceAlert = true
-	  } label: {
-		askTeacherCardContent
-	  }
-	  .buttonStyle(.plain)
-  }
+	Button {
+	  askTeacherTapped()
+	} label: {
+	  askTeacherCardContent
+	}
+	.buttonStyle(.plain)
   }
 
   // Solid ink panel instead of the pink/purple gradient: one strong CTA, the

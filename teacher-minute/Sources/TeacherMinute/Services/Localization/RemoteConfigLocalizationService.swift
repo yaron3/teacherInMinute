@@ -83,6 +83,12 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
     } 
 
     private static let hebrewFallbacks: [String: String] = [
+        // Shown when the ask button is tapped before the balance has loaded.
+        // Remote Config carries these too; the fallback covers the time
+        // before it deploys.
+        "Checking your balance": "בודקים את היתרה שלך",
+        "Your minutes are still loading. This takes a moment the first time you open the app.":
+          "הדקות שלך עדיין נטענות. זה לוקח רגע בפעם הראשונה שפותחים את האפליקציה.",
         // Backing out of the first onboarding step, which signs the user out.
         "Log out?": "להתנתק?",
         "Going back from here returns you to the sign-in screen and signs you out.": "חזרה מכאן תחזיר אותך למסך ההתחברות ותנתק אותך מהחשבון.",

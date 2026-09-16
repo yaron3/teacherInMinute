@@ -162,6 +162,9 @@ protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   var hasUnreadMessages: Bool { get set }
   var profileImageURL: String { get set }
   var remainingMinutes: Int { get set }
+  /// Whether `remainingMinutes` has been read from the profile yet. Until it
+  /// has, the balance is unknown rather than zero — see `canAskTeacher`.
+  var isProfileLoaded: Bool { get }
   var checkoutURL: URL? { get set }
   var isStartingCheckout: Bool { get set }
   var isPreparingCheckout: Bool { get set }
@@ -236,8 +239,16 @@ extension StudentHomeViewModeling {
     liveSessionDestination != nil
   }
 
+  /// Whether the student can be sent to the ask screen right now.
+  ///
+  /// False while the profile is still loading as well as when the balance is
+  /// genuinely short, because `remainingMinutes` starts at zero and only the
+  /// profile can say otherwise. Callers must therefore check
+  /// `isProfileLoaded` before treating a false here as "out of minutes" —
+  /// offering to sell minutes to someone who already has them is worse than
+  /// making them wait a moment.
   var canAskTeacher: Bool {
-    remainingMinutes >= 2
+    isProfileLoaded && remainingMinutes >= 2
   }
 
   var couponStateKey: String {
@@ -303,6 +314,10 @@ extension StudentHomeViewModeling {
   // MARK: Dialog & button labels
   var askATeacherSheetTitle: String { LocalizationSupport.localized("Ask a Teacher") }
   var lowBalanceAlertTitle: String { LocalizationSupport.localized("Low Balance") }
+  var balanceLoadingTitle: String { LocalizationSupport.localized("Checking your balance") }
+  var balanceLoadingMessage: String {
+    LocalizationSupport.localized("Your minutes are still loading. This takes a moment the first time you open the app.")
+  }
   var okLabel: String { LocalizationSupport.localized("OK") }
   var purchaseCompleteTitle: String { LocalizationSupport.localized("Purchase complete") }
   var openingCheckoutText: String { LocalizationSupport.localized("Opening secure checkout\u{2026}") }
@@ -439,8 +454,25 @@ extension StudentHomeViewModeling {
     return String(format: LocalizationSupport.localized("%d teachers available now"), onlineTeachers.count)
   }
 
+  /// Stand-in shown wherever the balance would otherwise be quoted before it
+  /// has been read. `remainingMinutes` is zero until the profile arrives, and
+  /// a zero the app never read is one the student acts on — see
+  /// `canAskTeacher`.
+  var loadingText: String { LocalizationSupport.localized("Loading...") }
+
+  /// The bare number in the header ring.
+  var balanceCountText: String {
+    isProfileLoaded ? "\(remainingMinutes)" : loadingText
+  }
+
+  /// The balance on the overview card, in minutes.
+  var balanceMinutesText: String {
+    isProfileLoaded ? LessonFormatting.minutesText(remainingMinutes) : loadingText
+  }
+
   var remainingMinutesText: String {
-    String(format: LocalizationSupport.localized("%d min remaining"), remainingMinutes)
+    guard isProfileLoaded else { return loadingText }
+    return String(format: LocalizationSupport.localized("%d min remaining"), remainingMinutes)
   }
 
   var lowBalanceMessage: String {
@@ -636,6 +668,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     set { UserPhotoStore.shared.profileImageURL = newValue }
   }
   var remainingMinutes = 0
+  /// Set once the profile summary has actually been read. `didLoadProfile`
+  /// cannot stand in for it: that one is raised before the fetch to keep the
+  /// load from running twice, so it is true while the balance is still zero.
+  var isProfileLoaded = false
   var checkoutURL: URL?
   var isStartingCheckout = false
   /// True from the moment checkout starts until the buyer is handed off to
@@ -1114,6 +1150,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       profileImageURL = profile.profileImageURL
       remainingMinutes = profile.remainingMinutes
       currencyCode = profile.currency
+      isProfileLoaded = true
+    } else {
+      // The balance is still unknown, so let the next appearance try again
+      // rather than leave the screen quoting a zero it never read.
+      didLoadProfile = false
     }
     // After the profile, so the fee is quoted in the student's own currency.
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
@@ -1218,6 +1259,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       profileImageURL = profile.profileImageURL
       remainingMinutes = profile.remainingMinutes
       currencyCode = profile.currency
+      isProfileLoaded = true
+      didLoadProfile = true
     }
     // Pull-to-refresh: re-read the measured connect time rather than reuse the
     // one cached when the screen first appeared.
@@ -1686,6 +1729,8 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var hasUnreadMessages: Bool
   var profileImageURL: String
   var remainingMinutes: Int
+  /// Previews and tests stand in for a screen whose profile has arrived.
+  var isProfileLoaded = true
   var checkoutURL: URL?
   var isStartingCheckout = false
   /// True from the moment checkout starts until the buyer is handed off to
