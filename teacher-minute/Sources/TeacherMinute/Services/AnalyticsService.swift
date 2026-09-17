@@ -173,13 +173,17 @@ final class AnalyticsService {
 
     func logScreen(_ screen: String, screenClass: String? = nil) {
         guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
-        var params: [String: Any] = [
-            AnalyticsParameterScreenName: screen
+        // Without an explicit class Firebase fills `screen_class` with the
+        // native container (`MainActivity`, `_TtGC7SwiftUI19UIHosting…`),
+        // which is what the console's "screen class" reports group by.
+        let params: [String: Any] = [
+            AnalyticsParameterScreenName: screen,
+            AnalyticsParameterScreenClass: screenClass ?? AnalyticsService.screenTitle(for: screen)
         ]
-        if let screenClass {
-            params[AnalyticsParameterScreenClass] = screenClass
-        }
         Analytics.logEvent(AnalyticsEventScreenView, parameters: params)
+        // The Events list shows every screen_view as one row; a per-screen
+        // event (`screen_student_home`) makes each screen its own row there.
+        Analytics.logEvent("screen_\(screen)", parameters: nil)
         Crashlytics.crashlytics().log("screen_view \(screen)")
     }
 
@@ -284,6 +288,11 @@ final class AnalyticsService {
     #endif
 
     // MARK: - Helpers
+
+    /// `student_home` → `Student Home`.
+    static func screenTitle(for screen: String) -> String {
+        screen.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 
     /// Firebase Analytics on iOS only accepts `NSNumber` / `NSString` /
     /// boxed Swift primitives in the parameters dict. We do a defensive

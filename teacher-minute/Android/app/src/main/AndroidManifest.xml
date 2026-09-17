@@ -51,6 +51,13 @@
         <meta-data
             android:name="com.google.android.gms.wallet.api.enabled"
             android:value="true" />
+        <!--
+            Screens are logged by hand (AnalyticsService.logScreen). Automatic
+            reporting would add screen_views named after the single MainActivity.
+        -->
+        <meta-data
+            android:name="google_analytics_automatic_screen_reporting_enabled"
+            android:value="false" />
 
         <service
         android:name=".TeacherMinuteFirebaseMessagingService"
