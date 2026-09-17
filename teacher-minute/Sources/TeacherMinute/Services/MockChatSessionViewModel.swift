@@ -8,6 +8,9 @@
 import Foundation
 import Observation
 import SkipFuse
+#if !os(Android)
+import LiveKit
+#endif
 
 @Observable
 @MainActor
@@ -22,6 +25,12 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var mediaPendingStates: [String: Bool] = [:]
   var errorMessage: String?
   var isConnecting: Bool
+  private(set) var isInSetup: Bool
+  let hasUnreadChat = false
+  let hasUnreadBoard = false
+  let incomingFormulaCount = 0
+  var isMicMuted = false
+  var isCameraOff = false
   let participantName: String
   let participantImageURL: String
   let currentUserImageURL: String
@@ -33,17 +42,28 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   let sessionStartedAt: Double
   let pricePerMinuteCents: Int
   let teacherSharePercent: Double
-  var onMessagesUpdated: (([ChatMessage]) -> Void)?
-  var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
-  var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
   var onChatPausedUpdated: (([String: Bool]) -> Void)?
   var onMediaPendingUpdated: (([String: Bool]) -> Void)?
-  var onErrorUpdated: ((String?) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
-  var onSessionDetailsUpdated: (() -> Void)?
+  /// Announced as soon as a screen listens, the way the real session reports
+  /// its first reading of the question node.
+  var onSessionDetailsUpdated: (() -> Void)? {
+    didSet {
+      guard onSessionDetailsUpdated != nil else { return }
+      Task { @MainActor in self.onSessionDetailsUpdated?() }
+    }
+  }
   var onSessionEnded: (() -> Void)?
 
   private let currentUid = "mock-current-user"
+
+  /// The medium both sides see. Switched by this side through
+  /// `publishConversationType`, and by the pretend other side through
+  /// `simulatePeerConversationType`.
+  private(set) var sharedConversationType: String
+  var liveKitRoom = ""
+  var liveKitToken = ""
+  var lastSeenSharedConversationType = ""
 
   init(
     questionId: String = "mock-question",
@@ -60,7 +80,8 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     sessionNoticeText: String = "Session started - Billing active",
     sessionStartedAt: Double = Date().timeIntervalSince1970 * 1000.0 - 83_000.0,
     pricePerMinuteCents: Int = 60,
-    teacherSharePercent: Double = 75
+    teacherSharePercent: Double = 75,
+    conversationType: String = "text"
   ) {
     self.questionId = questionId
     self.role = role
@@ -68,6 +89,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.messages = messages.isEmpty ? Self.defaultMessages(currentRole: role) : messages
     self.boardStrokes = boardStrokes
     self.isConnecting = isConnecting
+    self.isInSetup = isConnecting
     self.participantName = participantName
     self.participantImageURL = participantImageURL
     self.currentUserImageURL = currentUserImageURL
@@ -80,6 +102,62 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.sessionStartedAt = sessionStartedAt
     self.pricePerMinuteCents = pricePerMinuteCents
     self.teacherSharePercent = teacherSharePercent
+    self.sharedConversationType = conversationType
+  }
+
+  func publishConversationType(_ conversationType: String) async -> String? {
+    sharedConversationType = conversationType
+    onSessionDetailsUpdated?()
+    return nil
+  }
+
+  func finishSetup() {
+    isInSetup = false
+  }
+
+  func sessionTabChanged(showsChat: Bool, showsBoard: Bool) {}
+
+  /// A room that is never reached: the mock has no backend to mint one.
+  func fetchMediaCredentials() async -> MediaCredentials? {
+    MediaCredentials(room: "mock-room", token: "mock-token")
+  }
+
+  // MARK: Media
+  //
+  // No room: a connect succeeds at once and nothing is published, so a preview
+  // or a UI test never reaches the LiveKit server.
+
+  private(set) var mediaConnectionPhase: MediaConnectionPhase = .idle
+  let mediaDidFallBackToAudioOnly = false
+  var onMediaTracksUpdated: (@MainActor @Sendable () -> Void)?
+
+  func mediaQuality() -> SessionMediaQuality { .good }
+
+  func connectMedia(enableVideo: Bool) {
+    mediaConnectionPhase = .connected
+  }
+
+  func waitUntilMediaConnected() async -> Bool {
+    mediaConnectionPhase == .connected
+  }
+
+  func disconnectMedia() async {
+    mediaConnectionPhase = .idle
+  }
+
+  func setMicrophoneEnabled(_ enabled: Bool) async {}
+
+  func setCameraEnabled(_ enabled: Bool) async {}
+
+#if !os(Android)
+  var localCameraVideoTrack: VideoTrack? { nil }
+  var remoteCameraVideoTrack: VideoTrack? { nil }
+#endif
+
+  /// Plays the other participant switching the lesson.
+  func simulatePeerConversationType(_ conversationType: String) {
+    sharedConversationType = conversationType
+    onSessionDetailsUpdated?()
   }
 
   func start() {
@@ -90,10 +168,6 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
         isConnecting = false
         onConnectingUpdated?(false)
       }
-      onMessagesUpdated?(messages)
-      onBoardStrokesUpdated?(boardStrokes)
-      onBoardViewportsUpdated?(boardViewports)
-      onErrorUpdated?(errorMessage)
     }
   }
 
@@ -148,7 +222,6 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     guard !text.isEmpty else { return }
     let message = localMessage(text: text)
     messages.append(message)
-    onMessagesUpdated?(messages)
   }
 
   func sendQuestionFormula(_ formulaText: String) {
@@ -159,17 +232,14 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     guard !points.isEmpty else { return }
     let stroke = localStroke(points: points)
     boardStrokes.append(stroke)
-    onBoardStrokesUpdated?(boardStrokes)
   }
 
   func clearBoard() {
     boardStrokes.removeAll()
-    onBoardStrokesUpdated?([])
   }
 
   func updateBoardViewport(_ viewport: BoardViewport) {
     boardViewports[role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] = viewport
-    onBoardViewportsUpdated?(boardViewports)
   }
 
   func setSelfChatPaused(_ paused: Bool) {

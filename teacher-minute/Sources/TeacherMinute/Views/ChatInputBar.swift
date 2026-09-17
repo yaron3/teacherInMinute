@@ -49,6 +49,7 @@ struct ChatInputBar: View {
           .frame(height: textFieldHeight)
           .background(theme.fieldBackground)
           .clipShape(Capsule())
+          .accessibilityIdentifier("chat_message_field")
 
         Button {
           send()
@@ -67,6 +68,7 @@ struct ChatInputBar: View {
         }
         .buttonStyle(.plain)
         .disabled(!canSend)
+        .accessibilityIdentifier("chat_send_button")
       }
     }
 }

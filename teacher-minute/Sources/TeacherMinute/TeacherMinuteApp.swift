@@ -87,6 +87,12 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				  LaunchSplashView()
 					.transition(.opacity)
 				}
+
+#if DEBUG && !os(Android)
+				if SessionTypeUITestHarness.isRequested {
+				  SessionTypeUITestHarness()
+				}
+#endif
 				}
 				// The welcome branch owns a NavigationStack bound to the router's
 				// path, and after a login that stack is displaying a pushed

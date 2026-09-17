@@ -17,6 +17,16 @@ enum ConversationType: String, CaseIterable {
     var requiresMic: Bool { self == .audio || self == .video }
     var requiresCamera: Bool { self == .video }
 
+    /// How much media the type carries. A switch to a higher rank turns
+    /// something on; to a lower one, only off.
+    var mediaRank: Int {
+        switch self {
+        case .text: return 0
+        case .audio: return 1
+        case .video: return 2
+        }
+    }
+
     /// Localized label shown to students when picking a session medium.
     var displayName: String {
         switch self {

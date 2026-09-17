@@ -42,24 +42,11 @@ struct ChatSessionView: View {
   }
   @State var viewModel: any ChatSessionViewModeling
   @State var composerMode: ChatComposerMode = .regular
-  @State var messages: [ChatMessage] = []
-  @State var boardStrokes: [BoardStroke] = []
-  @State var boardViewports: [String: BoardViewport] = [:]
-  @State var lastSentBoardViewport: BoardViewport?
-  @State var errorMessage: String?
-  @State var isConnecting: Bool
   @State var selectedTab:TAB_TYPE = .CHAT
-  @State var hasUnreadChat = false
-  @State var hasUnreadBoard = false
-  @State var didPrimeMessages = false
-  @State var didPrimeBoard = false
   @State var displayDate = Date()
-  @State var sessionDetailsRevision = 0
   @State var isBoardMaximized = false
-  @State var isMicMuted = false
-  @State var isCameraOff = false
   /// What the media session is currently able to do, polled from
-  /// `LiveKitService` once a second. Both of these are conditions the lesson
+  /// the view model once a second. Both of these are conditions the lesson
   /// silently carried on through before — a camera that never published, a
   /// connection that is barely holding — and the header now says so.
   @State var didFallBackToAudioOnly = false
@@ -93,15 +80,9 @@ struct ChatSessionView: View {
   @State var isChangingSessionType = false
   /// Why the last switch did not happen, shown under the header until tapped.
   @State var sessionTypeNotice: String?
-  /// The shared medium this side has already acted on. Only a change to it is
-  /// followed: a student who went on by chat while the lesson was asked as
-  /// audio has not been switched by anyone, and must not be pulled back.
-  @State var lastSeenSharedConversationType = ""
   /// The other side moved the lesson up to audio or video, waiting on this
   /// side's yes — a camera or microphone is never turned on without it.
   @State var pendingPeerConversationType: String?
-  @State var liveKitRoom: String
-  @State var liveKitToken: String
   @State var inputBarHeight: CGFloat = 0
   /// Whether the scrolling chat layout still has its tab strip on screen.
   /// The strip scrolls away with the rest of the chrome, and a badge that
@@ -145,26 +126,30 @@ struct ChatSessionView: View {
     onBuyMinutes: (@MainActor @Sendable () -> Void)? = nil,
     onClose: @escaping @MainActor @Sendable () -> Void
   ) {
-    let viewModel = ChatSessionViewModel(questionId: questionId, role: role, initialDetails: initialDetails)
+    let viewModel = ChatSessionViewModel(
+      questionId: questionId,
+      role: role,
+      initialDetails: initialDetails,
+      liveKitRoom: liveKitRoom,
+      liveKitToken: liveKitToken
+    )
     self._viewModel = State(initialValue: viewModel)
-    self._isConnecting = State(initialValue: viewModel.isConnecting)
     self._conversationType = State(initialValue: conversationType)
 	self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
     self.title = title
-    self._liveKitRoom = State(initialValue: liveKitRoom)
-    self._liveKitToken = State(initialValue: liveKitToken)
     self.onBuyMinutes = onBuyMinutes
     self.onClose = onClose
   }
 
   init(viewModel: any ChatSessionViewModeling, title: String, conversationType: String = "text", liveKitRoom: String = "", liveKitToken: String = "", onBuyMinutes: (@MainActor @Sendable () -> Void)? = nil, onClose: @escaping @MainActor @Sendable () -> Void) {
     self._viewModel = State(initialValue: viewModel)
-    self._isConnecting = State(initialValue: viewModel.isConnecting)
     self._conversationType = State(initialValue: conversationType)
     self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
+    if !liveKitRoom.isEmpty, !liveKitToken.isEmpty {
+      viewModel.liveKitRoom = liveKitRoom
+      viewModel.liveKitToken = liveKitToken
+    }
     self.title = title
-    self._liveKitRoom = State(initialValue: liveKitRoom)
-    self._liveKitToken = State(initialValue: liveKitToken)
     self.onBuyMinutes = onBuyMinutes
     self.onClose = onClose
   }
@@ -173,7 +158,7 @@ struct ChatSessionView: View {
 	
     ZStack {
       Group {
-        if isConnecting {
+        if viewModel.isInSetup {
           if isTransitioningToText {
             textTransitionOverlay
           } else {
@@ -184,13 +169,13 @@ struct ChatSessionView: View {
               participantTeacherId: isStudent ? viewModel.teacherId : "",
               conversationType: conversationType,
               viewModel: viewModel,
-              liveKitRoom: liveKitRoom,
-              liveKitToken: liveKitToken,
+              liveKitRoom: viewModel.liveKitRoom,
+              liveKitToken: viewModel.liveKitToken,
               onCancel: onClose,
               onSessionStarted: { @MainActor @Sendable in
                 logger.info("[ChatSessionView] setup complete qid=\(viewModel.questionId) role=\(viewModel.role) conversationType=\(conversationType)")
                 viewModel.logSessionStarted(conversationType: conversationType)
-                isConnecting = false
+                viewModel.finishSetup()
               },
               onContinueAsText: isStudent && hasAudio ? { @MainActor @Sendable in
                 isTransitioningToText = true
@@ -202,8 +187,8 @@ struct ChatSessionView: View {
           sessionBody
         }
       }
-      .onChange(of: isConnecting) { _, newValue in
-        if !newValue {
+      .onChange(of: viewModel.isInSetup) { _, isInSetup in
+        if !isInSetup {
           isTransitioningToText = false
           refreshMediaCondition()
           followSharedConversationType()
@@ -228,45 +213,6 @@ struct ChatSessionView: View {
     }
     .background(Color(.systemBackground))
     .task {
-      viewModel.onMessagesUpdated = { rows in
-        let oldCount = messages.count
-        let previousMessageIDs = Set(messages.map(\.id))
-        let newIncomingMessages = didPrimeMessages
-          ? rows.filter { !$0.isMine && !previousMessageIDs.contains($0.id) }
-          : []
-        if didPrimeMessages,
-		   selectedTab != .CHAT,
-           rows.count > oldCount,
-           rows.suffix(rows.count - oldCount).contains(where: { !$0.isMine }) {
-          hasUnreadChat = true
-        }
-        for message in newIncomingMessages {
-          LocalNotificationService.shared.scheduleChatMessage(
-            questionId: viewModel.questionId,
-            message: message,
-            currentRole: viewModel.role
-          )
-        }
-        if newIncomingMessages.contains(where: { ChatBubble.containsFormula($0.text) }) {
-          dismissChatInput()
-        }
-        messages = rows
-        didPrimeMessages = true
-      }
-      viewModel.onBoardStrokesUpdated = { strokes in
-        let oldCount = boardStrokes.count
-        if didPrimeBoard,
-		   selectedTab != .BOARD,
-           strokes.count > oldCount,
-           strokes.suffix(strokes.count - oldCount).contains(where: { !$0.isMine }) {
-          hasUnreadBoard = true
-        }
-        boardStrokes = strokes
-        didPrimeBoard = true
-      }
-      viewModel.onBoardViewportsUpdated = { viewports in
-        boardViewports = viewports
-      }
       viewModel.onChatPausedUpdated = { _ in
         let newValue = viewModel.peerChatPaused()
         if peerChatPaused != newValue {
@@ -274,11 +220,7 @@ struct ChatSessionView: View {
           applyVideoPauseState()
         }
       }
-      viewModel.onErrorUpdated = { error in
-        errorMessage = error
-      }
       viewModel.onSessionDetailsUpdated = {
-        sessionDetailsRevision += 1
         displayDate = Date()
         followSharedConversationType()
       }
@@ -291,7 +233,7 @@ struct ChatSessionView: View {
           // session, and closing straight away would take the note with it.
           peerFarewellText = note
           endSessionPrompt = .peerFarewell
-        } else if !boardStrokes.isEmpty && !didRequestLessonEnd && !isEndingSession {
+        } else if !viewModel.boardStrokes.isEmpty && !didRequestLessonEnd && !isEndingSession {
           saveBoardIsRemoteInitiated = true
           endSessionPrompt = .saveBoard
         } else {
@@ -299,17 +241,11 @@ struct ChatSessionView: View {
         }
       }
 #if !os(Android)
-      LiveKitService.shared.onTracksUpdated = { @MainActor @Sendable in
+      viewModel.onMediaTracksUpdated = { @MainActor @Sendable in
         liveKitRevision &+= 1
       }
 #endif
-      messages = viewModel.messages
-      boardStrokes = viewModel.boardStrokes
-      boardViewports = viewModel.boardViewports
-      didPrimeMessages = true
-      didPrimeBoard = true
-      errorMessage = viewModel.errorMessage
-      isConnecting = viewModel.isConnecting
+      viewModel.sessionTabChanged(showsChat: selectedTab == .CHAT, showsBoard: selectedTab == .BOARD)
       isMessageFieldFocused = selectedTab == .CHAT && composerMode == .regular
     }
     .task {
@@ -321,17 +257,21 @@ struct ChatSessionView: View {
         try? await Task.sleep(nanoseconds: 1_000_000_000)
       }
     }
+    .onChange(of: viewModel.incomingFormulaCount) { _, _ in
+      // A formula from the other side needs the room the keyboard takes.
+      dismissChatInput()
+    }
     .onDisappear {
-      if !didRequestLessonEnd, !isConnecting {
+      if !didRequestLessonEnd, !viewModel.isInSetup {
         didRequestLessonEnd = true
         Task {
           await viewModel.endLesson()
         }
-      } else if isConnecting {
+      } else if viewModel.isInSetup {
         // Left from the setup screen. The connect it began belongs to
         // LiveKitService and would otherwise carry on with no lesson to join.
         Task {
-          await LiveKitService.shared.disconnect()
+          await viewModel.disconnectMedia()
         }
       }
       viewModel.stop()
@@ -654,7 +594,7 @@ struct ChatSessionView: View {
       // The user confirmed "Are you sure?" — end immediately: freeze the timer
       // now so time stops counting right away, even if a save-board prompt follows.
       if sessionFrozenDate == nil { sessionFrozenDate = Date() }
-      if boardStrokes.isEmpty {
+      if viewModel.boardStrokes.isEmpty {
         finalizeEndSession()
       } else {
         saveBoardIsRemoteInitiated = false
@@ -678,7 +618,7 @@ struct ChatSessionView: View {
     case .peerFarewell:
       // Read. Carry on with the ordinary close, board prompt included.
       endSessionPrompt = nil
-      if !boardStrokes.isEmpty && !isEndingSession {
+      if !viewModel.boardStrokes.isEmpty && !isEndingSession {
         saveBoardIsRemoteInitiated = true
         endSessionPrompt = .saveBoard
       } else {
@@ -780,7 +720,7 @@ struct ChatSessionView: View {
 
   @MainActor
   func saveBoardSnapshotAndShare(saveToChat: Bool, saveToGallery: Bool) async {
-    let strokesSnapshot = boardStrokes
+    let strokesSnapshot = viewModel.boardStrokes
     guard !strokesSnapshot.isEmpty else { return }
 
     let questionId = viewModel.questionId
@@ -922,7 +862,7 @@ struct ChatSessionView: View {
               .onAppear { isSessionTabStripVisible = true }
               .onDisappear { isSessionTabStripVisible = false }
 
-            if let errorMessage {
+            if let errorMessage = viewModel.errorMessage {
               Text(errorMessage)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(theme.accentBackground)
@@ -931,13 +871,13 @@ struct ChatSessionView: View {
                 .padding(.top, 6)
             }
 
-            if messages.count == 0 {
+            if viewModel.messages.count == 0 {
               sessionNotice
 
               ChatThreadEmptyNotice(viewModel: viewModel)
             }
 
-            ForEach(messages) { message in
+            ForEach(viewModel.messages) { message in
               ChatThreadRow(message: message, now: displayDate, viewModel: viewModel)
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
@@ -970,8 +910,8 @@ struct ChatSessionView: View {
         // Claims the space the composer does not take, so the composer is
         // never the thing that overflows.
         .frame(maxHeight: .infinity)
-        .onChange(of: messages.count) { _, _ in
-          if let last = messages.last {
+        .onChange(of: viewModel.messages.count) { _, _ in
+          if let last = viewModel.messages.last {
             withAnimation(.easeOut(duration: 0.2)) {
               proxy.scrollTo(last.id, anchor: .bottom)
             }
@@ -1017,7 +957,7 @@ struct ChatSessionView: View {
 
         sessionTabs
 
-        if let errorMessage {
+        if let errorMessage = viewModel.errorMessage {
           Text(errorMessage)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(theme.accentBackground)
@@ -1034,10 +974,10 @@ struct ChatSessionView: View {
           compactVideoSessionLayout
 		} else if selectedTab == .CHAT {
           VStack(spacing: 0) {
-			if messages.count == 0 {
+			if viewModel.messages.count == 0 {
 			  sessionNotice
 			}
-            ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
+            ChatThreadView(messages: viewModel.messages, now: displayDate, viewModel: viewModel)
           }
 		} else if selectedTab == .VIDEO {
           videoFeed
@@ -1070,15 +1010,13 @@ struct ChatSessionView: View {
   var whiteboard: some View {
     WhiteboardView(
       viewModel: viewModel,
-      strokes: boardStrokes,
+      strokes: viewModel.boardStrokes,
       revision: boardRevision,
       onStrokeFinished: { points in
         let boardPoints = points.map { BoardPoint(x: Double($0.x), y: Double($0.y)) }
-        boardStrokes = boardStrokes + [viewModel.localStroke(points: boardPoints)]
         viewModel.sendStroke(boardPoints)
       },
       onClear: {
-        boardStrokes = []
         viewModel.clearBoard()
       },
       onViewportChanged: { rect in
@@ -1092,8 +1030,6 @@ struct ChatSessionView: View {
           height: Double(rect.height),
           updatedAt: Date().timeIntervalSince1970 * 1000.0
         )
-        guard shouldSendBoardViewport(viewport) else { return }
-        lastSentBoardViewport = viewport
         viewModel.updateBoardViewport(viewport)
       },
       peerViewport: peerBoardViewport,
@@ -1135,8 +1071,8 @@ struct ChatSessionView: View {
 
   var videoFeed: some View {
 #if !os(Android)
-    let remoteTrack = LiveKitService.shared.remoteCameraVideoTrack
-    let localTrack = LiveKitService.shared.localCameraVideoTrack
+    let remoteTrack = viewModel.remoteCameraVideoTrack
+    let localTrack = viewModel.localCameraVideoTrack
     return RoundedRectangle(cornerRadius: 18, style: .continuous)
       .fill(theme.videoBackground)
       .overlay {
@@ -1168,7 +1104,7 @@ struct ChatSessionView: View {
 #else
     return AndroidVideoFeed(
       isStudent: isStudent,
-      isCameraOff: isCameraOff,
+      isCameraOff: viewModel.isCameraOff,
       theme: theme,
       waitingForVideoText: viewModel.waitingForVideoText
     )
@@ -1181,10 +1117,10 @@ struct ChatSessionView: View {
     if selectedTab == .CHAT {
       ZStack(alignment: .bottomTrailing) {
         VStack(spacing: 0) {
-          if messages.count == 0 {
+          if viewModel.messages.count == 0 {
             sessionNotice
           }
-          ChatThreadView(messages: messages, now: displayDate, viewModel: viewModel)
+          ChatThreadView(messages: viewModel.messages, now: displayDate, viewModel: viewModel)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -1210,8 +1146,8 @@ struct ChatSessionView: View {
   @ViewBuilder
   var compactBottomVideoStrip: some View {
 #if !os(Android)
-    let remoteTrack = LiveKitService.shared.remoteCameraVideoTrack
-    let localTrack = LiveKitService.shared.localCameraVideoTrack
+    let remoteTrack = viewModel.remoteCameraVideoTrack
+    let localTrack = viewModel.localCameraVideoTrack
     ZStack(alignment: .bottomTrailing) {
       VStack(spacing: 0) {
         Spacer(minLength: 0)
@@ -1246,7 +1182,7 @@ struct ChatSessionView: View {
     } else {
       AndroidVideoFeed(
         isStudent: isStudent,
-        isCameraOff: isCameraOff,
+        isCameraOff: viewModel.isCameraOff,
         theme: theme,
         waitingForVideoText: viewModel.waitingForVideoText
       )
@@ -1284,7 +1220,7 @@ struct ChatSessionView: View {
   @ViewBuilder
   var draggableSelfPreview: some View {
 #if !os(Android)
-    let localTrack = LiveKitService.shared.localCameraVideoTrack
+    let localTrack = viewModel.localCameraVideoTrack
     localPreview(localTrack: localTrack)
       .offset(teacherPreviewOffset)
       .gesture(
@@ -1303,7 +1239,7 @@ struct ChatSessionView: View {
 #else
     // Your own camera, not the whole feed: the feed carries the remote
     // participant, and shrinking it to preview size put them in the window.
-    AndroidSelfVideoPreview(isCameraOff: isCameraOff, theme: theme)
+    AndroidSelfVideoPreview(isCameraOff: viewModel.isCameraOff, theme: theme)
       .offset(teacherPreviewOffset)
       .gesture(
         DragGesture()
@@ -1338,7 +1274,7 @@ struct ChatSessionView: View {
   @ViewBuilder
   func localPreview(localTrack: VideoTrack?) -> some View {
     Group {
-      if let localTrack, !isCameraOff {
+      if let localTrack, !viewModel.isCameraOff {
         SwiftUIVideoView(localTrack, layoutMode: .fill, mirrorMode: .mirror)
           .id(ObjectIdentifier(localTrack))
       } else {
@@ -1346,7 +1282,7 @@ struct ChatSessionView: View {
           .fill(theme.videoBackground.opacity(0.6))
           .overlay {
             PlatformIcon(
-              systemName: isCameraOff ? "video.slash.fill" : "video.fill",
+              systemName: viewModel.isCameraOff ? "video.slash.fill" : "video.fill",
               size: 18,
               weight: .semibold,
               color: theme.onDarkFill
@@ -1362,22 +1298,6 @@ struct ChatSessionView: View {
     }
   }
 #endif
-
-  func toggleMicrophone() {
-    let newValue = !isMicMuted
-    isMicMuted = newValue
-    Task {
-      await LiveKitService.shared.setMicrophoneEnabled(!newValue)
-    }
-  }
-
-  func toggleCamera() {
-    let newValue = !isCameraOff
-    isCameraOff = newValue
-    Task {
-      await LiveKitService.shared.setCameraEnabled(!newValue)
-    }
-  }
 
   func headerToggle(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
     Button(action: action) {
@@ -1469,7 +1389,7 @@ struct ChatSessionView: View {
 
   func scrollChatForKeyboardMode(_ mode: ChatComposerMode, proxy: ScrollViewProxy) {
 #if os(Android)
-    let target = messages.last?.id ?? Self.chatInitialScrollID
+    let target = viewModel.messages.last?.id ?? Self.chatInitialScrollID
     let anchor: UnitPoint = .top
 #else
     let target = mode == .algebra ? Self.chatComposerScrollID : Self.chatBottomScrollID
@@ -1486,7 +1406,6 @@ struct ChatSessionView: View {
   func sendComposed(_ text: String) {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
-    messages = messages + [viewModel.localMessage(text: trimmed)]
     viewModel.send(trimmed)
   }
 
@@ -1494,17 +1413,16 @@ struct ChatSessionView: View {
     let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
     let formulaText = "$$\(trimmed)$$"
-    messages = messages + [viewModel.localMessage(text: formulaText)]
     viewModel.sendQuestionFormula(formulaText)
   }
 
   var boardRevision: String {
-    boardStrokes.map { "\($0.id):\($0.points.count)" }.joined(separator: "|")
+    viewModel.boardStrokes.map { "\($0.id):\($0.points.count)" }.joined(separator: "|")
   }
 
   var peerBoardViewport: CGRect? {
     let localRole = viewModel.role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    guard let viewport = boardViewports
+    guard let viewport = viewModel.boardViewports
       .filter({ $0.key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() != localRole })
       .map(\.value)
       .sorted(by: { $0.updatedAt > $1.updatedAt })
@@ -1512,13 +1430,6 @@ struct ChatSessionView: View {
       return nil
     }
     return CGRect(x: viewport.x, y: viewport.y, width: viewport.width, height: viewport.height)
-  }
-
-  func shouldSendBoardViewport(_ viewport: BoardViewport) -> Bool {
-    guard let previous = lastSentBoardViewport else { return true }
-    let positionDelta = abs(previous.x - viewport.x) + abs(previous.y - viewport.y)
-    let sizeDelta = abs(previous.width - viewport.width) + abs(previous.height - viewport.height)
-    return positionDelta > 2 || sizeDelta > 2
   }
 
   var participantName: String {
@@ -1562,6 +1473,7 @@ struct ChatSessionView: View {
         }
         .buttonStyle(.plain)
         .disabled(isEndingSession)
+        .accessibilityIdentifier("session_type_change")
       }
 
       Spacer()
@@ -1569,27 +1481,30 @@ struct ChatSessionView: View {
       if hasVideo {
         if isStudent {
           headerToggle(
-            systemName: isMicMuted ? "mic.slash.fill" : "mic.fill",
-            isActive: isMicMuted
+            systemName: viewModel.isMicMuted ? "mic.slash.fill" : "mic.fill",
+            isActive: viewModel.isMicMuted
           ) {
-            toggleMicrophone()
+            viewModel.toggleMicrophone()
           }
+          .accessibilityIdentifier("session_mic_toggle")
           headerToggle(
-            systemName: isCameraOff ? "video.slash.fill" : "video.fill",
-            isActive: isCameraOff
+            systemName: viewModel.isCameraOff ? "video.slash.fill" : "video.fill",
+            isActive: viewModel.isCameraOff
           ) {
-            toggleCamera()
+            viewModel.toggleCamera()
           }
+          .accessibilityIdentifier("session_camera_toggle")
         } else {
           videoBadge
         }
       } else if hasAudio {
         headerToggle(
-          systemName: isMicMuted ? "mic.slash.fill" : "mic.fill",
-          isActive: isMicMuted
+          systemName: viewModel.isMicMuted ? "mic.slash.fill" : "mic.fill",
+          isActive: viewModel.isMicMuted
         ) {
-          toggleMicrophone()
+          viewModel.toggleMicrophone()
         }
+        .accessibilityIdentifier("session_mic_toggle")
       }
 
       Button {
@@ -1672,20 +1587,20 @@ struct ChatSessionView: View {
 
   func refreshMediaCondition() {
     guard hasAudio else { return }
-    didFallBackToAudioOnly = LiveKitService.shared.didFallBackToAudioOnly
-    mediaQuality = LiveKitService.shared.currentMediaQuality()
+    didFallBackToAudioOnly = viewModel.mediaDidFallBackToAudioOnly
+    mediaQuality = viewModel.mediaQuality()
     peerAwaitingAudio = viewModel.peerMediaPending()
 
-    let phase = LiveKitService.shared.connectionPhase
+    let phase = viewModel.mediaConnectionPhase
     if phase != mediaPhase {
       if phase == .connected {
-        applyMediaTogglesOnConnect()
+        viewModel.applyMediaTogglesOnConnect()
       }
       mediaPhase = phase
     }
     // Only a running lesson reports it: the setup screen is still waiting on
     // the answer, and a lesson on its way out has nothing left to say.
-    if !isConnecting, !didRequestLessonEnd {
+    if !viewModel.isInSetup, !didRequestLessonEnd {
       viewModel.setSelfMediaPending(isAudioPending)
     }
   }
@@ -1709,6 +1624,8 @@ struct ChatSessionView: View {
           ) {
             requestConversationType(ConversationType.text.rawValue)
           }
+          .accessibilitySelected(conversationType == ConversationType.text.rawValue)
+          .accessibilityIdentifier("session_type_text")
           ConversationTypeChip(
             title: viewModel.audioSessionTypeLabel,
             isSelected: conversationType == ConversationType.audio.rawValue,
@@ -1717,6 +1634,8 @@ struct ChatSessionView: View {
           ) {
             requestConversationType(ConversationType.audio.rawValue)
           }
+          .accessibilitySelected(conversationType == ConversationType.audio.rawValue)
+          .accessibilityIdentifier("session_type_audio")
           ConversationTypeChip(
             title: viewModel.videoSessionTypeLabel,
             isSelected: conversationType == ConversationType.video.rawValue,
@@ -1725,6 +1644,8 @@ struct ChatSessionView: View {
           ) {
             requestConversationType(ConversationType.video.rawValue)
           }
+          .accessibilitySelected(conversationType == ConversationType.video.rawValue)
+          .accessibilityIdentifier("session_type_video")
         }
         .disabled(isChangingSessionType)
         .opacity(isChangingSessionType ? 0.5 : 1)
@@ -1750,16 +1671,7 @@ struct ChatSessionView: View {
     sessionTypeNotice = nil
     Task {
       defer { isChangingSessionType = false }
-      if let error = await viewModel.prepareMedia(for: type) {
-        sessionTypeNotice = error
-        return
-      }
-      // Marked as seen before the write: the node echoes it straight back, and
-      // that echo is this side's own switch, not one to follow.
-      let previouslySeen = lastSeenSharedConversationType
-      lastSeenSharedConversationType = type
-      if let error = await viewModel.publishConversationType(type) {
-        lastSeenSharedConversationType = previouslySeen
+      if let error = await viewModel.requestConversationType(type) {
         sessionTypeNotice = error
         return
       }
@@ -1771,24 +1683,18 @@ struct ChatSessionView: View {
   /// Follows a switch the other side made. Dropping media happens straight
   /// away; picking it up waits for this side to agree.
   func followSharedConversationType() {
-    let shared = viewModel.sharedConversationType
-    guard ConversationType(rawValue: shared) != nil else { return }
-    // The first reading is the medium the lesson was asked as, which this
-    // side has already set itself up for.
-    guard !lastSeenSharedConversationType.isEmpty else {
-      lastSeenSharedConversationType = shared
-      return
-    }
-    guard !isConnecting, !didRequestLessonEnd, shared != lastSeenSharedConversationType else { return }
-    lastSeenSharedConversationType = shared
-    pendingPeerConversationType = nil
-    guard shared != conversationType else { return }
-    logger.info("[ChatSessionView] other side switched qid=\(viewModel.questionId) role=\(viewModel.role) from=\(conversationType) to=\(shared)")
-
-    if Self.mediaRank(shared) > Self.mediaRank(conversationType) {
-      pendingPeerConversationType = shared
-    } else {
-      Task { await applyConversationType(shared) }
+    let change = viewModel.sharedConversationTypeChange(
+      current: conversationType,
+      canFollow: !viewModel.isInSetup && !didRequestLessonEnd
+    )
+    switch change {
+    case .none:
+      break
+    case .apply(let type):
+      pendingPeerConversationType = nil
+      Task { await applyConversationType(type) }
+    case .askToFollow(let type):
+      pendingPeerConversationType = type
     }
   }
 
@@ -1813,35 +1719,21 @@ struct ChatSessionView: View {
     }
   }
 
-  static func mediaRank(_ type: String) -> Int {
-    switch ConversationType(rawValue: type) {
-    case .video?: return 2
-    case .audio?: return 1
-    default: return 0
-    }
-  }
-
   /// Moves this side's media to `type`: joins the room, turns the camera on or
   /// off, or leaves the room for a text-only lesson.
   func applyConversationType(_ type: String) async {
     guard let target = ConversationType(rawValue: type), type != conversationType else { return }
 
-    if target.requiresMic,
-       liveKitRoom.isEmpty || liveKitToken.isEmpty {
-      guard let credentials = await viewModel.mediaCredentials() else {
-        sessionTypeNotice = viewModel.mediaCredentialsFailedNotice
-        viewModel.setSelfMediaPending(true)
-        return
-      }
-      liveKitRoom = credentials.room
-      liveKitToken = credentials.token
+    if target.requiresMic, !(await viewModel.ensureMediaCredentials()) {
+      sessionTypeNotice = viewModel.mediaCredentialsFailedNotice
+      viewModel.setSelfMediaPending(true)
+      return
     }
     guard !didRequestLessonEnd else { return }
 
     logger.info("[ChatSessionView] applying conversation type qid=\(viewModel.questionId) role=\(viewModel.role) from=\(conversationType) to=\(type)")
     conversationType = type
-    isMicMuted = false
-    isCameraOff = false
+    viewModel.resetMediaToggles()
 
     guard target.requiresMic else {
       mediaPhase = .idle
@@ -1854,22 +1746,13 @@ struct ChatSessionView: View {
       } else {
         applyVideoPauseState()
       }
-      await LiveKitService.shared.disconnect()
+      await viewModel.switchMedia(to: target)
       return
     }
 
-    let phase = LiveKitService.shared.connectionPhase
-    if phase == .connecting || phase == .connected {
-      // Already in the room, or on the way: only the camera changes, once the
-      // room is there to change it in.
-      let wantsVideo = target.requiresCamera
-      Task {
-        guard await LiveKitService.shared.waitUntilConnected() else { return }
-        await LiveKitService.shared.setMicrophoneEnabled(true)
-        await LiveKitService.shared.setCameraEnabled(wantsVideo)
-      }
-    } else {
-      LiveKitService.shared.startConnecting(roomName: liveKitRoom, token: liveKitToken, enableVideo: target.requiresCamera)
+    let wasJoining = viewModel.mediaConnectionPhase == .connecting || viewModel.mediaConnectionPhase == .connected
+    Task { await viewModel.switchMedia(to: target) }
+    if !wasJoining {
       mediaPhase = .connecting
     }
 
@@ -1883,20 +1766,8 @@ struct ChatSessionView: View {
   }
 
   func retryMediaConnection() {
-    LiveKitService.shared.startConnecting(roomName: liveKitRoom, token: liveKitToken, enableVideo: hasVideo)
+    viewModel.connectMedia(enableVideo: hasVideo)
     mediaPhase = .connecting
-  }
-
-  /// A mic or camera toggled off while audio was still connecting had no room
-  /// to act on, so it is applied once there is one.
-  func applyMediaTogglesOnConnect() {
-    guard isMicMuted || isCameraOff else { return }
-    let muteMic = isMicMuted
-    let cameraOff = isCameraOff
-    Task {
-      if muteMic { await LiveKitService.shared.setMicrophoneEnabled(false) }
-      if cameraOff { await LiveKitService.shared.setCameraEnabled(false) }
-    }
   }
 
   var sessionStats: some View {
@@ -1972,13 +1843,12 @@ struct ChatSessionView: View {
 
   func selectSessionTab(_ tab: TAB_TYPE) {
     selectedTab = tab
+    viewModel.sessionTabChanged(showsChat: tab == .CHAT, showsBoard: tab == .BOARD)
 
     switch tab {
     case .CHAT:
-      hasUnreadChat = false
       isMessageFieldFocused = composerMode == .regular
     case .BOARD:
-      hasUnreadBoard = false
       dismissChatInput()
     case .VIDEO:
       dismissChatInput()
@@ -2000,14 +1870,7 @@ struct ChatSessionView: View {
     }
     viewModel.setSelfChatPaused(selfChatPaused)
 
-    let shouldCameraBeOff = selfChatPaused && peerChatPaused
-
-    if shouldCameraBeOff != isCameraOff {
-      isCameraOff = shouldCameraBeOff
-      Task {
-        await LiveKitService.shared.setCameraEnabled(!shouldCameraBeOff)
-      }
-    }
+    viewModel.setCameraPaused(selfChatPaused && peerChatPaused)
   }
 
   func dismissChatInput() {
@@ -2030,8 +1893,8 @@ struct ChatSessionView: View {
 
   func sessionTabHasUnread(_ id: TAB_TYPE) -> Bool {
     switch id {
-    case .CHAT: return hasUnreadChat
-    case .BOARD: return hasUnreadBoard
+    case .CHAT: return viewModel.hasUnreadChat
+    case .BOARD: return viewModel.hasUnreadBoard
     case .VIDEO, .IMAGES: return false
     }
   }
@@ -2056,9 +1919,9 @@ struct ChatSessionView: View {
 
   var sessionTabs: some View {
     HStack(spacing: 0) {
-	  tabButton(id: .CHAT, title: viewModel.chatTabTitle, icon: "bubble.left.fill", showsBadge: hasUnreadChat)
+	  tabButton(id: .CHAT, title: viewModel.chatTabTitle, icon: "bubble.left.fill", showsBadge: viewModel.hasUnreadChat)
 		.background(selectedTab == .CHAT ? theme.accentBackground : Color.clear)
-	  tabButton(id: .BOARD, title: viewModel.boardTabTitle, icon: "pencil.and.list.clipboard", showsBadge: hasUnreadBoard)
+	  tabButton(id: .BOARD, title: viewModel.boardTabTitle, icon: "pencil.and.list.clipboard", showsBadge: viewModel.hasUnreadBoard)
 		.background(selectedTab == .BOARD ? theme.accentBackground : Color.clear)
       if hasVideo {
 		tabButton(id: .VIDEO, title: viewModel.videoTabTitle, icon: "video.fill", showsBadge: false)
@@ -2118,6 +1981,7 @@ struct ChatSessionView: View {
     }
 	
     .buttonStyle(.plain)
+    .accessibilityIdentifier("session_tab_\(id.rawValue.lowercased())")
     .frame(maxWidth: .infinity)
 	
   }
