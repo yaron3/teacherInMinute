@@ -29,6 +29,9 @@ enum AnalyticsEvent {
     static let loginFailure      = "login_failure"
     static let logout            = "logout"
     static let passwordResetSent = "password_reset_sent"
+    static let emailVerificationSent = "email_verification_sent"
+    static let emailRewardGranted    = "email_reward_granted"
+    static let emailRewardRejected   = "email_reward_rejected"
     static let phoneVerifySent   = "phone_verify_sent"
     static let phoneVerified     = "phone_verified"
 
@@ -62,6 +65,7 @@ enum AnalyticsEvent {
     static let chatPhotoSent    = "chat_photo_sent"
     static let chatSessionEnded = "chat_session_ended"
     static let studentChatStarted = "student_chat_started"
+    static let sessionTypeChanged = "session_type_changed"
     static let studentChatResponseTime = "student_chat_response_time"
 
     // Purchase

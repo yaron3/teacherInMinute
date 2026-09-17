@@ -41,6 +41,9 @@ export {
   verifyPayPalPayoutAccount,
 } from "./earnings";
 
+// Welcome reward for a verified email, once per real mailbox
+export { claimEmailReward } from "./emailRewards";
+
 // Shared email checking — used by the payout form and available to signup
 export { validateEmailAddress } from "./emailValidation";
 

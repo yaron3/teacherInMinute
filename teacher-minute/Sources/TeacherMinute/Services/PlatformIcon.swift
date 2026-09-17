@@ -97,6 +97,8 @@ struct PlatformIcon: View {
 	  // listed explicitly or they fall through to the "missing" dot below.
 	  case "bell":                              return "🔔"
 	  case "bell.badge.fill":                   return "🔔"
+	  case "envelope.badge.fill":               return "✉️"
+	  case "gift.fill":                         return "🎁"
 	  case "doc.text":                          return "📄"
 	  case "graduationcap":                     return "🎓"
 	  case "photo":                             return "▧"

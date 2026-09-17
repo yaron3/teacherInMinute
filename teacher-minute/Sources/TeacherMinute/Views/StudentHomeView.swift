@@ -18,6 +18,7 @@ struct StudentHomeView: View {
   @State var showsAskTeacher = false
   @State var showsNotificationExplainer = false
   @State var pendingCheckoutOption: PricingOption?
+  @State var emailReward = EmailRewardViewModel()
   @Binding var hidesTabBar: Bool
   @Environment(\.openURL) var openURL
   @Environment(\.scenePhase) var scenePhase
@@ -165,6 +166,7 @@ struct StudentHomeView: View {
 	  message: viewModel.lowBalanceMessage,
 	  actions: [AppDialogAction(viewModel.okLabel)]
 	)
+	.emailRewardDialogs(emailReward)
 	.appDialog(
 	  viewModel.balanceLoadingTitle,
 	  isPresented: $showingBalanceLoadingAlert,
@@ -218,6 +220,10 @@ struct StudentHomeView: View {
   var homeSections: some View {
     VStack(alignment: .leading, spacing: 0) {
       studentHero
+
+      EmailRewardBanner(viewModel: emailReward, onGranted: {
+        Task { await viewModel.refresh() }
+      }, topPadding: 20)
 
       studentSectionHeader(
         title: viewModel.availableSubjectsTitle,

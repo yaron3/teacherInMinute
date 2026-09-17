@@ -158,7 +158,15 @@ final class LiveKitService {
 #if !os(Android)
     await tearDownRoom()
 
-    let newRoom = Room()
+    // Built off the main actor. The first Room starts WebRTC — SSL, the peer
+    // connection factory, the audio device module — synchronously in its
+    // init, and on the main actor that froze the app for seconds (23 s under
+    // the debugger on an iPhone XS Max). `Room` is Sendable and hops to the
+    // main actor itself for the parts that need it.
+    let roomStartedAt = Date()
+    let newRoom = await Task.detached(priority: .userInitiated) { Room() }.value
+    logger.info("[LiveKit] room created in \(Int(Date().timeIntervalSince(roomStartedAt) * 1000))ms")
+    guard generation == connectGeneration else { throw CancellationError() }
     let adapter = RoomDelegateAdapter { [weak self] in
       self?.onTracksUpdated?()
     }

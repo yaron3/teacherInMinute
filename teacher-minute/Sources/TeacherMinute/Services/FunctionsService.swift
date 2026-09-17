@@ -167,6 +167,27 @@ struct RedeemCouponResult {
   let minutesAdded: Int
 }
 
+/// What `claimEmailReward` reports. The offer amounts come back on every
+/// status, so the app can describe the reward before it is earned.
+struct EmailRewardStatus {
+  enum Status: String {
+    case granted
+    case alreadyGranted = "already_granted"
+    case notVerified = "not_verified"
+    case claimedByOtherAccount = "claimed_by_other_account"
+    case notEligible = "not_eligible"
+    case unavailable
+  }
+
+  let status: Status
+  /// "student" or "teacher"; nil before a role is chosen.
+  let role: String?
+  let studentMinutes: Int
+  let teacherSharePercent: Int
+  let teacherBonusMinutes: Int
+  let teacherBonusMinutesRemaining: Int
+}
+
 // MARK: - Teacher earnings
 
 /// One 7-day span within a month, as aggregated by the `teacherEarningsSummary`
@@ -309,6 +330,24 @@ final class FunctionsService {
       throw FunctionsError.decodingError(function: "redeemCoupon")
     }
     return RedeemCouponResult(minutesAdded: minutes)
+  }
+
+  /// Claims the verified-email welcome reward for the caller's role. Safe to
+  /// call repeatedly: once granted it just reports `alreadyGranted`.
+  func claimEmailReward() async throws -> EmailRewardStatus {
+    let result = try await call(function: "claimEmailReward", data: [:])
+    guard let raw = result["status"] as? String,
+          let status = EmailRewardStatus.Status(rawValue: raw) else {
+      throw FunctionsError.decodingError(function: "claimEmailReward")
+    }
+    return EmailRewardStatus(
+      status: status,
+      role: result["role"] as? String,
+      studentMinutes: Self.intValue(result["studentMinutes"]) ?? 0,
+      teacherSharePercent: Int(((Self.doubleValue(result["teacherShare"]) ?? 0) * 100).rounded()),
+      teacherBonusMinutes: Self.intValue(result["teacherBonusMinutes"]) ?? 0,
+      teacherBonusMinutesRemaining: Self.intValue(result["teacherBonusMinutesRemaining"]) ?? 0
+    )
   }
 
   func createCheckoutSession(pricingOptionID: String, paymentMethod: PaymentMethod = .paypal) async throws -> CheckoutSessionResult {

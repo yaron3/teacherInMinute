@@ -280,6 +280,19 @@ object AndroidChatManager {
         Tasks.await(ref.setValue(pending), TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
+    /**
+     * Switches the lesson's medium — text, audio or video — for both
+     * participants. The other side follows it from the session details.
+     */
+    @JvmStatic
+    fun setConversationType(questionId: String, conversationType: String) {
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+            .child("conversationType")
+        Tasks.await(ref.setValue(conversationType), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
     @JvmStatic
     fun fetchMediaPendingJson(questionId: String): String {
         val snapshot = Tasks.await(
@@ -476,6 +489,7 @@ object AndroidChatManager {
                     ?: snapshot.child("teacherShare").value.asDoubleOrNull()
                     ?: 75.0
             )
+            .put("conversationType", snapshot.firstString("conversationType"))
             .toString()
     }
 
