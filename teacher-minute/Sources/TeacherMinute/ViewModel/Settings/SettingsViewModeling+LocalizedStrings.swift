@@ -33,6 +33,7 @@ extension SettingsViewModeling {
     var contactSupportIntroText: String {
         LocalizationSupport.localized("Send a message to support. You will preview the data before it is sent.")
     }
+    var helpSupportTitle: String { LocalizationSupport.localized("Help & Support") }
     var contactSupportTitleSectionTitle: String { LocalizationSupport.localized("Title") }
     var contactSupportTitlePlaceholder: String { LocalizationSupport.localized("What can we help with?") }
     var contactSupportDescriptionSectionTitle: String { LocalizationSupport.localized("Description") }
