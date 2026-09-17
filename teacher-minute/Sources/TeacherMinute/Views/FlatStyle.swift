@@ -365,6 +365,8 @@ struct FlatTopHeader: View {
 
   var body: some View {
     HStack(spacing: 12) {
+      SideMenuButton()
+
       ProfileAvatarView(
         imageURL: avatarImageURL,
         size: 40,

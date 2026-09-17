@@ -57,9 +57,6 @@ final class AskQuestionFlowUITests: XCTestCase {
 
     private let authLabels = ["Welcome Back", "Log In", "ברוך השב", "התחבר"]
     private let logInLabels = ["Log In", "התחבר"]
-    private let settingsLabels = ["Settings", "הגדרות"]
-    private let accountSecurityLabels = ["Account & Security", "חשבון ואבטחה"]
-    private let logOutLabels = ["Log Out", "התנתק"]
     private let studentHomeLabels = ["Ask a question now", "שאל שאלה עכשיו"]
     private let questionSectionLabels = ["Your question", "השאלה שלך"]
     /// The two dialogs the app raises instead of opening the ask screen. The
@@ -115,10 +112,11 @@ final class AskQuestionFlowUITests: XCTestCase {
         //
         // Which it is cannot be read off the first screen: the app shows the
         // welcome screen while it restores a saved session, so a check made at
-        // launch calls every signed-in device signed out. The tab bar is the
-        // tell — both roles draw one, and the auth screens do not — so the
-        // wait is for that, and only its absence means nobody is signed in.
-        if waitForAny(settingsLabels, timeout: sessionRestoreTimeout) {
+        // launch calls every signed-in device signed out. The side-menu button
+        // is the tell — both roles' home screens draw one, and the auth
+        // screens do not — so the wait is for that, and only its absence means
+        // nobody is signed in.
+        if menuButton.waitForExistence(timeout: sessionRestoreTimeout) {
             // Sign out, so the test covers the sign-in it claims to cover and
             // runs the rest of the flow as its own account.
             signOut()
@@ -166,13 +164,54 @@ final class AskQuestionFlowUITests: XCTestCase {
         assertVisible(["Available Subjects", "מקצועות זמינים"], "the subjects section")
         assertVisible(["How it works", "איך זה עובד"], "the how-it-works panel")
 
-        // The tab bar, which is also where a missing icon shows up first.
-        for tab in [["Home", "בית"], ["Lessons", "שיעורים"], ["Profile", "פרופיל"], settingsLabels] {
-            XCTAssertNotNil(
-                element(anyOf: tab, in: app.buttons) ?? element(anyOf: tab, in: app.staticTexts),
-                "the \(tab[0]) tab is missing from the tab bar"
+        // The side menu, which replaced the tab bar. A student's has no
+        // Earnings section.
+        openSideMenu()
+        for section in ["home", "lessons", "profile", "settings", "help"] {
+            XCTAssertTrue(
+                app.buttons["side_menu_item_\(section)"].exists,
+                "the \(section) section is missing from the side menu"
             )
         }
+        XCTAssertFalse(
+            app.buttons["side_menu_item_earnings"].exists,
+            "a student's side menu offers Earnings"
+        )
+        XCTAssertTrue(
+            tapWhenHittable(app.buttons["side_menu_close"], "the side menu's close button"),
+            "the side menu's close button was never tappable"
+        )
+        XCTAssertTrue(
+            waitForDisappearance(app.buttons["side_menu_item_home"]),
+            "the side menu did not close"
+        )
+    }
+
+    // MARK: - Side menu
+
+    private var menuButton: XCUIElement {
+        app.buttons["side_menu_button"]
+    }
+
+    @MainActor
+    private func openSideMenu() {
+        XCTAssertTrue(
+            tapWhenHittable(menuButton, "the side-menu button"),
+            "the side-menu button was never tappable"
+        )
+        XCTAssertTrue(
+            app.buttons["side_menu_log_out"].waitForExistence(timeout: 10),
+            "the side menu did not open"
+        )
+    }
+
+    @MainActor
+    private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while element.exists && Date() < deadline {
+            pause()
+        }
+        return !element.exists
     }
 
     @MainActor
@@ -274,20 +313,12 @@ final class AskQuestionFlowUITests: XCTestCase {
 
     @MainActor
     private func signOut() {
-        // Log Out is not on the Settings root: it lives one level down, under
-        // Account & Security, next to Delete Account — so each step is waited
-        // for rather than tapped blind.
-        tapElement(anyOf: settingsLabels, "the Settings tab")
-
-        // ACCOUNT is the last section of a scrolling settings list, and
-        // SwiftUI builds a List's rows lazily: a row below the fold is absent
-        // from the tree rather than merely off-screen, so waiting for one
-        // without scrolling never ends.
-        scrollUntilVisible(accountSecurityLabels, "the Account & Security row")
-        tapElement(anyOf: accountSecurityLabels, "the Account & Security row")
-
-        scrollUntilVisible(logOutLabels, "the Log Out row")
-        tapElement(anyOf: logOutLabels, "the Log Out row")
+        // Log Out sits at the bottom of the side menu.
+        openSideMenu()
+        XCTAssertTrue(
+            tapWhenHittable(app.buttons["side_menu_log_out"], "the menu's Log Out row"),
+            "the menu's Log Out row was never tappable"
+        )
 
         // The confirmation reuses the row's wording, so it is taken by
         // identifier — by label there is no telling the two apart.
@@ -414,19 +445,6 @@ final class AskQuestionFlowUITests: XCTestCase {
             pause()
         }
         return false
-    }
-
-    /// Scrolls until one of these labels is on screen, for a row a lazy List
-    /// has not built yet.
-    @MainActor
-    private func scrollUntilVisible(_ labels: [String], _ described: String, swipes: Int = 8) {
-        // Let the screen arrive before deciding that it needs scrolling.
-        if waitForAny(labels, timeout: 5) { return }
-        for _ in 0..<swipes {
-            app.swipeUp()
-            if isOnScreen(labels) { return }
-        }
-        XCTFail("\(described) never came into view")
     }
 
     /// One second of doing nothing, for the polling loops above.

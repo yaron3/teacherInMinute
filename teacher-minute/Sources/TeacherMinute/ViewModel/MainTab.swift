@@ -16,7 +16,8 @@ enum MainTab: Hashable, CaseIterable {
   case earnings
   case profile
   case settings
-  
+  case help
+
   var title: String {
 	switch self {
 	  case .home: LocalizationSupport.localized("Home")
@@ -24,6 +25,7 @@ enum MainTab: Hashable, CaseIterable {
 	  case .earnings: LocalizationSupport.localized("Earnings")
 	  case .profile: LocalizationSupport.localized("Profile")
 	  case .settings: LocalizationSupport.localized("Settings")
+	  case .help: LocalizationSupport.localized("Help & Support")
 	}
   }
   
@@ -34,6 +36,7 @@ enum MainTab: Hashable, CaseIterable {
 	  case .earnings: Self.earningsSymbol
 	  case .profile: "person"
 	  case .settings: "gearshape"
+	  case .help: "questionmark.circle"
 	}
   }
 
@@ -44,6 +47,7 @@ enum MainTab: Hashable, CaseIterable {
 	  case .earnings: "\(Self.earningsSymbol).fill"
 	  case .profile: "person.fill"
 	  case .settings: "gearshape.fill"
+	  case .help: "questionmark.circle.fill"
 	}
   }
 
@@ -53,6 +57,18 @@ enum MainTab: Hashable, CaseIterable {
   
   func systemImage(isSelected: Bool) -> String {
 	isSelected ? selectedSystemImage : systemImage
+  }
+
+  /// Stable, untranslated name for accessibility identifiers.
+  var identifier: String {
+	switch self {
+	  case .home: "home"
+	  case .lessons: "lessons"
+	  case .earnings: "earnings"
+	  case .profile: "profile"
+	  case .settings: "settings"
+	  case .help: "help"
+	}
   }
 }
 
@@ -73,6 +89,7 @@ enum AppUserMode {
 }
 
 @Observable
+@MainActor
 final class MainTabViewModel {
   var selectedTab: MainTab = .home
   var userMode: AppUserMode
@@ -84,17 +101,21 @@ final class MainTabViewModel {
 	userMode == .teacher && hasUnseenLessons
   }
 
-  /// The tabs to show, in order. Earnings is teacher-only.
-  ///
-  /// The view builds its tab bar from this list rather than wrapping a tab in
-  /// an `if`: on iOS a false branch inside `TabView` omits the tab, but under
-  /// SkipUI it still contributes an empty slot, which showed up on Android as
-  /// a blank tab between Lessons and Profile.
-  var visibleTabs: [MainTab] {
+  /// Whether the side menu — the app's navigation — is open.
+  var isSideMenuOpen = false
+  var isConfirmingLogOut = false
+
+  /// The menu's main sections, in order. Earnings is teacher-only.
+  var primaryMenuTabs: [MainTab] {
 	if userMode == .teacher {
-	  return [.home, .lessons, .earnings, .profile, .settings]
+	  return [.home, .lessons, .earnings, .profile]
 	}
-	return [.home, .lessons, .profile, .settings]
+	return [.home, .lessons, .profile]
+  }
+
+  /// Listed below the divider, apart from the main sections.
+  var secondaryMenuTabs: [MainTab] {
+	[.settings, .help]
   }
 
   /// Badge count for `tab` — only Lessons ever carries one; 0 means no badge.
@@ -133,5 +154,42 @@ final class MainTabViewModel {
   func markLessonsTabEntered() {
 	LessonsBadgeStore.markSeen(count: lessonCount)
 	hasUnseenLessons = false
+  }
+
+  // MARK: - Side menu
+
+  func openSideMenu() {
+	isSideMenuOpen = true
+  }
+
+  func closeSideMenu() {
+	isSideMenuOpen = false
+  }
+
+  /// A section was picked from the menu: show it and close the menu.
+  func select(_ tab: MainTab) {
+	selectedTab = tab
+	isSideMenuOpen = false
+	if tab == .lessons {
+	  markLessonsTabEntered()
+	}
+  }
+
+  /// Log Out was tapped in the menu. It asks first, as Settings does.
+  func logOutTapped() {
+	isSideMenuOpen = false
+	isConfirmingLogOut = true
+  }
+
+  /// Signs out. The caller routes back to sign-in whatever the outcome, the
+  /// same as leaving onboarding does: a failed Firebase sign-out still must
+  /// not leave the user on a signed-in screen.
+  func logOut() {
+	isConfirmingLogOut = false
+	do {
+	  try AuthService().signOut()
+	} catch {
+	  logger.error("[SideMenu] sign out failed: \(error)")
+	}
   }
 }

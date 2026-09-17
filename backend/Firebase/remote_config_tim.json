@@ -1177,7 +1177,7 @@
     },
     "optional_tap_again": {
       "defaultValue": {
-        "value": "Optional \u2014 tap again to unpick. You will add the details later, under Earnings."
+        "value": "Optional — tap again to unpick. You will add the details later, under Earnings."
       },
       "conditionalValues": {
         "Hebrew": {
@@ -9369,11 +9369,44 @@
         }
       },
       "valueType": "STRING"
+    },
+    "open_menu": {
+      "defaultValue": {
+        "value": "Open menu"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "פתיחת תפריט"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "close_menu": {
+      "defaultValue": {
+        "value": "Close menu"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סגירת תפריט"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "help_support": {
+      "defaultValue": {
+        "value": "Help & Support"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עזרה ותמיכה"
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {
-    "versionNumber": "97",
-    "updateTime": "2026-09-16T08:55:54.261538Z",
+    "versionNumber": "98",
+    "updateTime": "2026-09-17T15:33:49.614862Z",
     "updateUser": {
       "email": "yaronj3@gmail.com"
     },

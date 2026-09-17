@@ -61,6 +61,12 @@ extension ProfileViewModel {
         LocalizationSupport.localized("View the verification documents you uploaded")
     }
 
+    // MARK: Screen
+    var profileScreenTitle: String { LocalizationSupport.localized("Profile") }
+    /// The name for the side menu's header — blank until the profile loads, so
+    /// the placeholder `name` never flashes there.
+    var menuDisplayName: String { isProfileLoaded ? name : "" }
+
     // MARK: Edit profile
     var editProfileTitle: String { LocalizationSupport.localized("Edit Profile") }
     var editProfileSubtitle: String {

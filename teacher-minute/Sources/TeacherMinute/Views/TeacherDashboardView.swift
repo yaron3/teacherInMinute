@@ -11,7 +11,6 @@ import SwiftUI
 @MainActor
 struct TeacherDashboardView: View {
   @State var viewModel: any TeacherDashboardViewModeling
-  @Binding var hidesTabBar: Bool
   let showsSessionOverlay: Bool
   let showsIncomingOverlay: Bool
   /// The warning the header is currently showing. Mirrors the view model, but
@@ -32,12 +31,10 @@ struct TeacherDashboardView: View {
   }
   init(
 	viewModel: any TeacherDashboardViewModeling = TeacherDashboardViewModel(),
-	hidesTabBar: Binding<Bool> = .constant(false),
 	showsSessionOverlay: Bool = true,
 	showsIncomingOverlay: Bool = true
   ) {
 	self._viewModel = State(initialValue: viewModel)
-	self._hidesTabBar = hidesTabBar
 	self.showsSessionOverlay = showsSessionOverlay
 	self.showsIncomingOverlay = showsIncomingOverlay
   }
@@ -52,12 +49,6 @@ struct TeacherDashboardView: View {
 		  viewModel.cancelAcceptingInvite()
 		}
 	  )
-	  .onAppear {
-		hidesTabBar = true
-	  }
-	  .onDisappear {
-		hidesTabBar = false
-	  }
 	} else if showsSessionOverlay, let questionId = viewModel.activeQuestionId {
 	  ChatSessionView(
 		questionId: questionId,
@@ -69,12 +60,6 @@ struct TeacherDashboardView: View {
 		initialDetails: viewModel.activeChatInitialDetails()
 	  ) {
 		viewModel.endCall()
-	  }
-	  .onAppear {
-		hidesTabBar = true
-	  }
-	  .onDisappear {
-		hidesTabBar = false
 	  }
 	} else {
 	  VStack(spacing: 0) {
@@ -139,12 +124,6 @@ struct TeacherDashboardView: View {
 	  .overlay {
 		if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
 		  TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
-			.onAppear {
-			  hidesTabBar = true
-			}
-			.onDisappear {
-			  hidesTabBar = false
-			}
 		}
 	  }
 	  .emailRewardDialogs(emailReward)

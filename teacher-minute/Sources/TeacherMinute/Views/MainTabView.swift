@@ -15,7 +15,11 @@ struct MainTabView: View {
   /// mutates need not be the one the view observes — on Android that showed up
   /// as the profile only appearing after switching tabs and back.
   @State var profileViewModel: ProfileViewModel
-  @State var hidesTabBar = false
+  /// Held here for the same reason: the home screen is rebuilt whenever the
+  /// user comes back to it from the menu, and must not lose a search or a
+  /// checkout that is under way.
+  @State var studentHomeViewModel: StudentHomeViewModel?
+  @Environment(\.appRouter) var router
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -27,19 +31,41 @@ struct MainTabView: View {
 	self._profileViewModel = State(
 	  wrappedValue: ProfileViewModel(roleType: userMode == .teacher ? .teacher : .student)
 	)
+	self._studentHomeViewModel = State(wrappedValue: userMode == .student ? StudentHomeViewModel() : nil)
   }
   
   var body: some View {
 	// The stack exists for the teacher's live session, which is pushed rather
-	// than laid over the tabs. Its own bar stays hidden: every screen here
-	// draws its own header.
-	NavigationStack {
-	  tabLayers
-		.toolbar(.hidden, for: .navigationBar)
-		.navigationDestination(isPresented: isTeacherInLiveSession) {
-		  teacherSessionScreen
-		}
+	// than laid over the sections. Its bar stays hidden for the sections that
+	// draw their own header. Settings and Help have none: their own stacks sit
+	// directly inside this one, so their titles and menu buttons come through
+	// this bar.
+	ZStack {
+	  NavigationStack {
+		tabLayers
+		  .toolbar(showsNavigationBar ? .visible : .hidden, for: .navigationBar)
+		  .navigationDestination(isPresented: isTeacherInLiveSession) {
+			teacherSessionScreen
+		  }
+	  }
+
+	  // Outside the stack so it covers the navigation bar Settings shows.
+	  SideMenuView(viewModel: viewModel, profile: profileViewModel) {
+		viewModel.logOutTapped()
+	  }
 	}
+	.appDialog(
+	  viewModel.logOutLabel,
+	  isPresented: $viewModel.isConfirmingLogOut,
+	  message: viewModel.logOutConfirmMessage,
+	  actions: [
+		AppDialogAction(viewModel.cancelLabel, kind: .cancel),
+		AppDialogAction(viewModel.logOutConfirmLabel, kind: .destructive) {
+		  viewModel.logOut()
+		  router.signOut()
+		}
+	  ]
+	)
   }
 
   /// Drives the push off `activeQuestionId` alone. As on the student side the
@@ -59,50 +85,37 @@ struct MainTabView: View {
 	}
   }
 
+  /// Only the selected section is on screen; the side menu switches between
+  /// them. Each section places `SideMenuButton` in its own header, and the
+  /// button finds its action through the environment.
   var tabLayers: some View {
 	ZStack {
-	  // Driven by `visibleTabs` rather than an `if` around the teacher-only
-	  // Earnings tab: a false branch inside TabView still contributes an empty
-	  // slot under SkipUI, which rendered as a blank tab on Android.
-	  TabView(selection: $viewModel.selectedTab) {
-		ForEach(viewModel.visibleTabs, id: \.self) { tab in
-		  tabContent(tab)
-			.tabItem {
-			  Label {
-				Text(tab.title)
-			  } icon: {
-				tabIcon(tab)
-			  }
-			}
-			.tag(tab)
-			.badge(viewModel.badgeCount(for: tab))
-		}
-	  }
-	  .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
-	  // Accent selection instead of the system blue.
-	  //.tint(theme.accent)
-	  
+	  tabContent(viewModel.selectedTab)
+		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+		.environment(\.sideMenuAction, sideMenuAction)
+
 	  teacherGlobalOverlay
-	}
-	.onChange(of: viewModel.selectedTab) { _, newTab in
-	  if !isTeacherGlobalOverlayVisible {
-		hidesTabBar = false
-	  }
-	  if newTab == .lessons {
-		viewModel.markLessonsTabEntered()
-	  }
 	}
 	.onChange(of: teacherDashboardViewModel?.lessonCount ?? 0) { _, newCount in
 	  viewModel.updateLessonCount(newCount)
 	}
+	.onChange(of: isTeacherGlobalOverlayVisible) { _, isVisible in
+	  // An arriving question or a starting lesson takes the whole screen.
+	  if isVisible { viewModel.closeSideMenu() }
+	}
 	.background(Color(.systemBackground))
 	.navigationBarBackButtonHidden(true)
-	.navigationBarHidden(true)
 	.task {
 	  print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
 	  PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
 	  if let count = teacherDashboardViewModel?.lessonCount {
 		viewModel.updateLessonCount(count)
+	  }
+	}
+	.task {
+	  // The menu's header shows the user's name, email and photo.
+	  if !profileViewModel.hasDisplayableProfileData {
+		await profileViewModel.loadProfile()
 	  }
 	}
 	.onAppear {
@@ -116,45 +129,29 @@ struct MainTabView: View {
 #endif
 	}
   }
-  
-  /// Tab bar icon for `tab`, filled while it is the selected tab.
-  @ViewBuilder
-  func tabIcon(_ tab: MainTab) -> some View {
-	let name = tab.systemImage(isSelected: viewModel.selectedTab == tab)
-	if tab == .lessons || tab == .profile {
-	  // Bundled asset, not an SF Symbol.
-	  Image(name, bundle: .module)
-		.renderingMode(.template)
-		.resizable()
-		.aspectRatio(contentMode: .fit)
-		.frame(width: 40, height: 40)
-	} else {
-#if os(iOS)
-	  // iOS forces the .fill variant on every tab bar symbol, so "house" and
-	  // "house.fill" render identically. Opting out lets the name decide.
-	  Image(systemName: name)
-		.environment(\.symbolVariants, .none)
-#else
-	  // SkipUI maps only a subset of SF Symbols and draws a warning triangle
-	  // for the rest — which is what "dollarsign.circle" was rendering as. Go
-	  // through PlatformIcon so Android uses the app's own icon table, the
-	  // same as every other icon in the app.
-	  PlatformIcon(systemName: name, size: 22)
-#endif
-	}
+
+  var showsNavigationBar: Bool {
+	viewModel.selectedTab == .settings || viewModel.selectedTab == .help
+  }
+
+  var sideMenuAction: SideMenuAction {
+	SideMenuAction(
+	  accessibilityLabel: viewModel.openMenuLabel,
+	  showsBadge: viewModel.shouldShowLessonsBadge,
+	  open: { viewModel.openSideMenu() }
+	)
   }
 
   @ViewBuilder
   func tabContent(_ tab: MainTab) -> some View {
 	switch tab {
 	  case .home:
-		if viewModel.userMode == .student {
-		  StudentHomeView(hidesTabBar: $hidesTabBar)
+		if viewModel.userMode == .student, let studentHomeViewModel {
+		  StudentHomeView(viewModel: studentHomeViewModel)
 			.trackScreen(AnalyticsScreen.studentHome)
 		} else if let teacherDashboardViewModel {
 		  TeacherDashboardView(
 			viewModel: teacherDashboardViewModel,
-			hidesTabBar: $hidesTabBar,
 			showsSessionOverlay: false,
 			showsIncomingOverlay: false
 		  )
@@ -180,6 +177,9 @@ struct MainTabView: View {
 	  case .settings:
 		SettingsView(role: viewModel.userMode, viewModel: nil)
 		  .trackScreen(AnalyticsScreen.settings)
+
+	  case .help:
+		HelpSupportView(role: viewModel.userMode)
 	}
   }
   
@@ -196,12 +196,6 @@ struct MainTabView: View {
 		}
 		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
 		.zIndex(20)
-		.onAppear {
-		  hidesTabBar = true
-		}
-		.onDisappear {
-		  hidesTabBar = false
-		}
 	  } else if teacherDashboardViewModel.activeQuestionId != nil {
 		// Pushed instead — see `teacherSessionScreen`. The branch stays so a
 		// running lesson still outranks a queued invite.
@@ -210,12 +204,6 @@ struct MainTabView: View {
 		TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: teacherDashboardViewModel)
 		  .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
 		  .zIndex(20)
-		  .onAppear {
-			hidesTabBar = true
-		  }
-		  .onDisappear {
-			hidesTabBar = false
-		  }
 	  }
 	}
   }
@@ -253,7 +241,6 @@ struct TeacherLiveSessionScreen: View {
 	}
 	// The session draws its own header and end control, and must not be
 	// escapable by a back tap or edge swipe while it is running.
-	.toolbar(.hidden, for: .tabBar)
 	.toolbar(.hidden, for: .navigationBar)
 	.navigationBarBackButtonHidden(true)
 	// Covers the ends this view does not drive itself — a lesson closed out
