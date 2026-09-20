@@ -124,6 +124,8 @@ struct SettingsView: View {
             ChangePasswordSettingsView(viewModel: viewModel)
         case .notifications:
             NotificationPreferencesSettingsView(viewModel: viewModel)
+        case .mediaPermissions:
+            MediaPermissionsSettingsView(viewModel: viewModel)
         case .privacyControls:
             PrivacyControlsSettingsView(viewModel: viewModel)
         }

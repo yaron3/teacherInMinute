@@ -32,6 +32,7 @@ struct PhotoSourceButton<Label: View>: View {
   @State private var showSourceDialog = false
   @State private var showLibraryPicker = false
   @State private var pickedItem: PhotosPickerItem?
+  @State private var showCameraPermissionDenied = false
 #if os(iOS)
   @State private var showCamera = false
   @State private var pendingCameraRequest = false
@@ -127,6 +128,18 @@ struct PhotoSourceButton<Label: View>: View {
       .ignoresSafeArea()
     }
 #endif
+    .appDialog(
+      LocalizationSupport.localized("Camera access required"),
+      isPresented: $showCameraPermissionDenied,
+      message: LocalizationSupport.localized("Enable camera access in Settings to take photos."),
+      actions: [
+        AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+          PermissionService.shared.openAppSettings()
+        },
+        AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
+      ],
+      coversScreen: true
+    )
   }
 
   func presentPendingSource() {

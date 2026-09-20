@@ -71,6 +71,17 @@ extension SettingsViewModeling {
     var enableNotificationsLabel: String { LocalizationSupport.localized("Enable Notifications") }
     var openSystemSettingsLabel: String { LocalizationSupport.localized("Open System Settings") }
 
+    // MARK: Media permissions
+    var mediaPermissionsSectionTitle: String { LocalizationSupport.localized("System Permissions") }
+    var microphonePermissionLabel: String { LocalizationSupport.localized("Microphone") }
+    var microphonePermissionCaption: String {
+        LocalizationSupport.localized("Required for audio and video sessions")
+    }
+    var cameraPermissionLabel: String { LocalizationSupport.localized("Camera") }
+    var cameraPermissionCaption: String {
+        LocalizationSupport.localized("Required for video sessions and taking photos")
+    }
+
     // MARK: App preferences
     var defaultSessionTypeSectionTitle: String { LocalizationSupport.localized("Default Session Type") }
     var defaultSessionTypeFooterText: String {

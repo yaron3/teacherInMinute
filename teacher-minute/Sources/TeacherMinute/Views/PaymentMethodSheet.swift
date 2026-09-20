@@ -131,7 +131,7 @@ struct PaymentMethodSheet: View {
   }
 
   // PayPal brand palette (fixed in both colour schemes).
-  private static let payPalGold = Color(red: 255 / 255, green: 196 / 255, blue: 57 / 255)
+  private static let payPalGold = Color(red: 249 / 255, green: 184 / 255, blue: 35 / 255)
   private static let payPalNavy = Color(red: 37 / 255, green: 59 / 255, blue: 128 / 255)
   private static let payPalBlue = Color(red: 23 / 255, green: 155 / 255, blue: 215 / 255)
   private static let payPalInk = Color(red: 28 / 255, green: 28 / 255, blue: 28 / 255)

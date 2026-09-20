@@ -21,6 +21,8 @@ struct TeacherDashboardView: View {
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
   @State var showsMessages = false
+  @State var showsQuestionSimulator = false
+  @State  var isDemoEnabled = DemoStudentService.isEnabled
   @State var emailReward = EmailRewardViewModel()
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? "en" : SettingsLanguageChoice.system.rawValue
   //@AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
@@ -113,6 +115,11 @@ struct TeacherDashboardView: View {
 			  howItWorksSection
 				.padding(.top, 28)
 			}
+
+			if isDemoEnabled {
+			  simulateQuestionCard
+				.padding(.top, 28)
+			}
 		  }
 		  .padding(.horizontal, 20)
 		  .padding(.bottom, 40)
@@ -160,23 +167,69 @@ struct TeacherDashboardView: View {
 		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
 		.id(languagePreference)
 	  }
+	  // Demo tool — sends this teacher a simulated question written by the
+	  // local AI model behind the demo-student service.
+	  .sheet(isPresented: $showsQuestionSimulator) {
+		SimulateStudentQuestionView { simulation in
+		  viewModel.startDemoSimulation(simulation)
+		} onClose: {
+		  showsQuestionSimulator = false
+		}
+		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		.id(languagePreference)
+	  }
 	  .onAppear {
 		// Seeded without animation: a banner that is already true on the first
 		// frame should be there, not slide in.
 		warningMessage = viewModel.errorMessageGeneral
+		// The readiness rows report switches the OS owns, and the user can have
+		// changed one on the permissions screen without the app ever leaving the
+		// front — which is the one case `scenePhase` below does not catch. Asked
+		// here rather than on a navigation callback so it survives however the
+		// dashboard is reached; the side menu replaced the tab bar that used to
+		// carry it.
+		viewModel.refreshPermissions()
 		Task {
 		  if await viewModel.checkDocumentsSuggestion() {
 			showsDocumentsSuggestion = true
 		  }
 		}
 	  }
+	  .task {
+		await RemoteConfigService.shared.ready()
+		isDemoEnabled = DemoStudentService.isEnabled
+	  }
+	  .appDialog(
+		LocalizationSupport.localized("Permission required"),
+		isPresented: Binding(
+		  get: { viewModel.permissionAlertMessage != nil },
+		  set: { if !$0 {
+			viewModel.permissionAlertMessage = nil
+			viewModel.permissionAlertQuestionId = nil
+		  } }
+		),
+		message: viewModel.permissionAlertMessage ?? "",
+		actions: [
+		  AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+			PermissionService.shared.openAppSettings()
+		  },
+		  AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel) {
+			if let qid = viewModel.permissionAlertQuestionId {
+			  viewModel.declineInvite(questionId: qid)
+			}
+		  }
+		]
+	  )
 	  .onChange(of: viewModel.errorMessageGeneral) { _, message in
 		withAnimation(.easeInOut(duration: 0.25)) {
 		  warningMessage = message
 		}
 	  }
 	  .onChange(of: scenePhase) { _, phase in
-		if phase == .background {
+		if phase == .active {
+		  viewModel.refreshPermissions()
+		} else if phase == .background {
 		  // If notifications are disabled, an online teacher cannot be reached
 		  // in the background, so take them offline immediately.
 		  viewModel.enforceNotificationRequirement()
@@ -319,6 +372,59 @@ struct TeacherDashboardView: View {
 			  .foregroundStyle(theme.primaryText)
 			Spacer()
 		  }
+		}
+	  }
+	}
+  }
+  
+  /// Demo-only entry point: sends this teacher a simulated student question,
+  /// written by a local AI model. Hidden in release builds unless the
+  /// `demo_student_enabled` Remote Config flag is on.
+  var simulateQuestionCard: some View {
+	FlatCard(outlined: true) {
+	  VStack(alignment: .leading, spacing: 14) {
+		HStack(alignment: .top, spacing: 12) {
+		  FlatIconTile(
+			systemName: "wand.and.stars",
+			size: 44,
+			tint: theme.accent,
+			background: theme.accentBackground
+		  )
+
+		  VStack(alignment: .leading, spacing: 3) {
+			Text(LocalizationSupport.localized("Demo Mode"))
+			  .font(.system(size: 15, weight: .bold))
+			  .foregroundStyle(theme.primaryText)
+
+			Text(LocalizationSupport.localized("Send yourself a question from a simulated student."))
+			  .font(.system(size: 13))
+			  .foregroundStyle(theme.secondaryText)
+			  .frame(maxWidth: .infinity, alignment: .leading)
+		  }
+		}
+
+		FlatSecondaryButton(
+		  title: LocalizationSupport.localized("Simulate a Student Question"),
+		  systemImage: "paperplane.fill"
+		) {
+		  showsQuestionSimulator = true
+		}
+
+		if let demoStatusMessage = viewModel.demoStatusMessage {
+		  HStack(spacing: 8) {
+			ProgressView()
+			Text(demoStatusMessage)
+			  .font(.system(size: 13))
+			  .foregroundStyle(theme.secondaryText)
+		  }
+		}
+
+		if let demoErrorMessage = viewModel.demoErrorMessage {
+		  Text(demoErrorMessage)
+			.font(.system(size: 13, weight: .semibold))
+			.foregroundStyle(theme.danger)
+			.lineSpacing(3)
+			.frame(maxWidth: .infinity, alignment: .leading)
 		}
 	  }
 	}
@@ -991,6 +1097,20 @@ struct TeacherIncomingQuestionOverlay: View {
 	  }
 	}
 	.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+	.appDialog(
+	  LocalizationSupport.localized("Permission required"),
+	  isPresented: Binding(
+		get: { viewModel.permissionAlertMessage != nil },
+		set: { if !$0 { viewModel.permissionAlertMessage = nil } }
+	  ),
+	  message: viewModel.permissionAlertMessage ?? "",
+	  actions: [
+		AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+		  PermissionService.shared.openAppSettings()
+		},
+		AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
+	  ]
+	)
   }
 }
 

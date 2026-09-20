@@ -383,7 +383,93 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Ask a Teacher sheet: the keyboard switch above the question field.
         // "Regular" and "Algebra" are already published; only these are new.
         "Keyboard": "מקלדת",
-        "Build the formula, then add it to your question.": "בנו את הנוסחה ואז הוסיפו אותה לשאלה."
+        "Build the formula, then add it to your question.": "בנו את הנוסחה ואז הוסיפו אותה לשאלה.",
+        // Demo-student and simulator copy carried over from this branch.
+        // Settings, chat status, notification and payment-history copy that had
+        // no template entry. Translated alongside the Remote Config additions.
+        "%@/min": "%@ לדקה",
+        // Ask-a-Teacher composer copy added with the redesigned sheet. No
+        // Remote Config entries yet, so these fallbacks are what renders.
+        "Tell us what you're stuck on. A teacher usually joins within a minute.": "ספרו לנו במה נתקעתם. מורה בדרך כלל מצטרף תוך כדקה.",
+        "For example: I got stuck on question 3 right after opening the parentheses.": "לדוגמה: נתקעתי בשאלה 3 מיד אחרי פתיחת הסוגריים.",
+        "Math keyboard": "מקלדת נוסחאות",
+        "Ready to send": "אפשר לשלוח",
+        "Debug builds only": "גרסאות פיתוח בלבד",
+        "Enabling...": "מפעיל...",
+        "Image": "תמונה",
+        "Images": "תמונות",
+        "Loading...": "טוען...",
+        "No payments yet": "אין עדיין תשלומים",
+        "No subjects selected": "לא נבחרו מקצועות",
+        "Payment History": "היסטוריית תשלומים",
+        "Please sign out and sign in again before deleting your account.": "התנתקו והתחברו מחדש לפני מחיקת החשבון.",
+        "Stay in the loop": "הישארו מעודכנים",
+        "Student is reading chat — video paused": "התלמיד קורא את הצ׳אט — הווידאו מושהה",
+        "Switching to text chat…": "עובר לצ׳אט טקסט…",
+        "Teacher is reading chat — video paused": "המורה קורא את הצ׳אט — הווידאו מושהה",
+        "Test Crashlytics Crash": "בדיקת קריסה ב־Crashlytics",
+        "Refresh Remote Config": "רענון Remote Config",
+        "Remote Config refreshed — %d keys loaded.": "‏Remote Config רוענן — נטענו %d מפתחות.",
+        "Remote Config refresh returned no keys. Check the connection and that a template is published.": "רענון Remote Config לא החזיר מפתחות. בדקו את החיבור ושפורסמה תבנית.",
+        "This session type is preselected when you ask a teacher a question. You can still change it for each question.": "סוג שיעור זה נבחר מראש כששואלים מורה שאלה. עדיין אפשר לשנות אותו בכל שאלה.",
+        "Turn on notifications so we can let you know the moment a teacher accepts your request, replies to a message, or your session is about to start.": "הפעילו התראות כדי שנוכל לעדכן אתכם ברגע שמורה מקבל את הבקשה, משיב להודעה, או כשהשיעור עומד להתחיל.",
+        "View your lesson payment history": "צפייה בהיסטוריית תשלומי השיעורים",
+        "When turned off, your profile photo won't be shared with the other participant during a session.": "כאשר האפשרות כבויה, תמונת הפרופיל שלכם לא תשותף עם המשתתף השני במהלך השיעור.",
+        "You don't have any recent activity": "אין לכם פעילות אחרונה",
+        "You need to be signed in to attach a photo.": "יש להתחבר כדי לצרף תמונה.",
+        "Your currency is set to Israeli Shekel (ILS) and cannot be changed for now.": "המטבע שלכם מוגדר לשקל חדש (₪) ולא ניתן לשנותו כרגע.",
+        "Your lesson payments will appear here.": "תשלומי השיעורים שלכם יופיעו כאן.",
+        "Default Session Type": "סוג שיעור ברירת מחדל",
+        "Default session type and currency": "סוג שיעור ומטבע ברירת מחדל",
+        "Enter your password to confirm account deletion.": "הזינו את הסיסמה שלכם כדי לאשר את מחיקת החשבון.",
+        // Demo tooling (simulate a student question) and the teacher
+        // verification prompts. Not in the published Remote Config template
+        // yet, so these fallbacks are what actually render in Hebrew.
+        "Demo Mode": "מצב הדגמה",
+        "Send yourself a question from a simulated student.": "שלחו לעצמכם שאלה מתלמיד מדומה.",
+        "Simulate a Student Question": "הדמיית שאלת תלמיד",
+        "A demo student writes the question with a local AI model and sends it to you, so you can practise the whole flow without a real student.": "תלמיד הדגמה מנסח את השאלה בעזרת מודל AI מקומי ושולח אותה אליכם, כדי שתוכלו להתאמן על התהליך המלא בלי תלמיד אמיתי.",
+        "Difficulty": "רמת קושי",
+        "What should it be about? (optional)": "במה תעסוק השאלה? (רשות)",
+        "e.g. solving quadratic equations": "לדוגמה: פתרון משוואות ריבועיות",
+        "Send Simulated Question": "שליחת שאלה מדומה",
+        "The question takes a few seconds to write. You will get it on your dashboard like any other request.": "כתיבת השאלה אורכת כמה שניות. היא תגיע ללוח הבקרה שלכם כמו כל בקשה אחרת.",
+        "Writing a question with the local AI model...": "כותב שאלה בעזרת מודל ה־AI המקומי...",
+        "Question sent — it should appear in your queue now.": "השאלה נשלחה — היא אמורה להופיע בתור שלכם עכשיו.",
+        "Question sent — the local AI model was unreachable, so a sample question was used.": "השאלה נשלחה — מודל ה־AI המקומי לא היה זמין, ולכן נעשה שימוש בשאלה לדוגמה.",
+        "The local AI is offline — sent a standard demo question instead.": "ה־AI המקומי אינו פעיל — נשלחה במקומו שאלת הדגמה סטנדרטית.",
+        "The demo question feature is currently turned off.": "תכונת שאלת ההדגמה כבויה כרגע.",
+        "Sign in as a teacher to simulate a question.": "התחברו כמורה כדי להדמות שאלה.",
+        "The demo student service did not respond. Make sure it is running on your machine.": "שירות תלמיד ההדגמה לא הגיב. ודאו שהוא פועל במחשב שלכם.",
+        "The demo student service could not create the question.": "שירות תלמיד ההדגמה לא הצליח ליצור את השאלה.",
+        "Camera access is required to take a photo.": "נדרשת גישה למצלמה כדי לצלם תמונה.",
+        // Permission-denied dialog title and per-context messages with Settings deep-link.
+        "Permission required": "נדרשת הרשאה",
+        "Microphone access is required for an audio session. Enable it in Settings.": "נדרשת גישה למיקרופון לשיחת שמע. הפעילו אותה בהגדרות.",
+        "Microphone access is required for a video session. Enable it in Settings.": "נדרשת גישה למיקרופון לשיחת וידאו. הפעילו אותה בהגדרות.",
+        "Microphone and camera access are required for a video session. Enable them in Settings.": "נדרשת גישה למיקרופון ולמצלמה לשיחת וידאו. הפעילו אותן בהגדרות.",
+        // Teacher incoming-question permission prompts.
+        "The student is requesting an audio call. Enable microphone access to accept.": "התלמיד מבקש שיחת שמע. הפעילו גישה למיקרופון כדי לקבל.",
+        "The student is requesting a video call. Enable microphone access to accept.": "התלמיד מבקש שיחת וידאו. הפעילו גישה למיקרופון כדי לקבל.",
+        "The student is requesting a video call. Enable camera access to accept.": "התלמיד מבקש שיחת וידאו. הפעילו גישה למצלמה כדי לקבל.",
+        // App Permissions screen — notification row.
+        "Notifications": "התראות",
+        "Alerts when a teacher accepts your request or replies": "התראות כשמורה מקבל את בקשתך או עונה",
+        // Contextual permission prompts (replacing the removed onboarding permissions screen).
+        "App Permissions": "הרשאות אפליקציה",
+        "Microphone and camera": "מיקרופון ומצלמה",
+        "System Permissions": "הרשאות מערכת",
+        "Required for audio and video sessions": "נדרש לשיעורי שמע וסרטון",
+        "Required for video sessions and taking photos": "נדרש לשיעורי סרטון ולצילום תמונות",
+        "Camera access required": "נדרשת גישה למצלמה",
+        "Enable camera access in Settings to take photos.": "אפשרו גישה למצלמה בהגדרות כדי לצלם תמונות.",
+        "Complete now": "להשלים עכשיו",
+        "Complete your verification": "השלימו את האימות שלכם",
+        "Continue - upload later": "המשך - העלאה מאוחר יותר",
+        "Maybe later": "אולי מאוחר יותר",
+        "Nice work on your first lesson! Uploading the rest of your verification documents helps us confirm you as a teacher faster. It's optional — you can also do it anytime from your Profile.": "כל הכבוד על השיעור הראשון! העלאת שאר מסמכי האימות עוזרת לנו לאשר אתכם כמורים מהר יותר. ההעלאה אינה חובה — תוכלו לבצע אותה בכל עת מהפרופיל שלכם.",
+        "Upload your remaining verification documents": "העלו את מסמכי האימות שנותרו",
+        "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.": "העלו תמונה ברורה של דרכון, רישיון נהיגה\nאו תעודת זהות. נדרשת תעודה מזהה ממשלתית תקפה\nכדי להפוך למורה מאומת.",
     ]
 
     #if os(Android)
@@ -467,6 +553,13 @@ enum LocalizationKey {
         "Camera disabled": "camera_disabled_photo",
         "Camera access is disabled. Open Settings and enable camera access to take a photo.": "camera_access_disabled_settings_photo",
         "Could not send rating. Please try again next time.": "could_not_send_dot_a",
+        // Shared `enter_your_password` with the login field, so the delete-account
+        // confirmation was showing the login prompt's translation.
+        // Shared `default_session_type` with the settings section title.
+        // Both demo-service errors generate `the_demo_student`, which would make
+        // one translation serve two different failures.
+        "The demo student service did not respond. Make sure it is running on your machine.": "demo_service_no_response",
+        "The demo student service could not create the question.": "demo_service_create_failed",
         "Could not send your message.": "could_not_send_dot_b",
         "Could not start the audio/video connection. Please try again.": "could_not_start_audio_video",
         "Enter your email address first.": "enter_your_email_dot_a",
@@ -508,6 +601,18 @@ enum LocalizationKey {
         "Microphone access is required to accept an audio session.": "microphone_access_accept_audio",
         "Microphone and camera access are required for a video session.": "microphone_camera_video_session",
         "Microphone and camera access are required to accept a video session.": "microphone_camera_accept_video",
+        // Permission-denied prompts with Settings deep-link (replacing the older strings above).
+        "Permission required": "permission_required",
+        "Microphone access is required for an audio session. Enable it in Settings.": "mic_denied_audio_enable",
+        "Microphone access is required for a video session. Enable it in Settings.": "mic_denied_video_enable",
+        "Microphone and camera access are required for a video session. Enable them in Settings.": "mic_camera_denied_video_enable",
+        // Incoming-question teacher prompts — all share the same auto-generated prefix.
+        "The student is requesting an audio call. Enable microphone access to accept.": "student_requesting_audio_mic",
+        "The student is requesting a video call. Enable microphone access to accept.": "student_requesting_video_mic",
+        "The student is requesting a video call. Enable camera access to accept.": "student_requesting_video_camera",
+        // App Permissions screen — notification row.
+        "Notifications": "notifications_title",
+        "Alerts when a teacher accepts your request or replies": "alerts_when_teacher_accepts",
         "No messages": "messages_b",
         "OFF": "off_caps",
         // Every word in "OK" is two letters, and `generatedKey` drops words of
@@ -546,6 +651,10 @@ enum LocalizationKey {
         "Teacher": "teacher_b",
 //        "Terms of Service": "terms_of_service",
         "Upload a clear photo of your passport, driver's license,\nor national ID.": "upload_clear_photo_dot",
+        // The longer variant generated `upload_clear_photo` — the same key as
+        // the student's "photo of your math problem" tip, so the ID screen was
+        // showing the math-problem translation in Hebrew.
+        "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.": "upload_clear_photo_id",
         "Use the device language": "use_the_device_language",
         "WAITING": "waiting_caps",
         "algebra": "algebra_b",
@@ -635,7 +744,6 @@ enum LocalizationKey {
         // `unexpected_error_occurred` holds the shorter sentence.
         "An unexpected error occurred. Please try again.": "unexpected_error_try_again",
         // `upload_clear_photo` holds the math-problem prompt.
-        "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.": "upload_clear_photo_gov_id"
     ]
 
     /// Deterministic three-word snake-case slug for any source string that

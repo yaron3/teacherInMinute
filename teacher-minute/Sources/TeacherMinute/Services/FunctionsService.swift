@@ -167,6 +167,19 @@ struct RedeemCouponResult {
   let minutesAdded: Int
 }
 
+/// Outcome of a demo simulation request.
+/// `mode` is "local" when the laptop service will write the question with the
+/// local AI model, "fallback" when the backend already created one from the
+/// Remote Config message.
+struct SimulateDemoQuestionResult {
+  let mode: String
+  let requestId: String
+  let questionId: String
+  let questionText: String
+
+  var usedLocalAI: Bool { mode == "local" }
+}
+
 /// What `claimEmailReward` reports. The offer amounts come back on every
 /// status, so the app can describe the reward before it is earned.
 struct EmailRewardStatus {
@@ -288,6 +301,36 @@ final class FunctionsService {
       questionId: questionId,
       liveKitRoom: result["liveKitRoom"] as? String,
       liveKitToken: result["liveKitToken"] as? String
+    )
+  }
+
+  /// Asks the backend for a simulated student question. The backend decides who
+  /// answers: the local AI service when it is running, canned Remote Config
+  /// messages when it is not.
+  func simulateDemoQuestion(
+    topic: String,
+    difficulty: String,
+    conversationType: String,
+    language: String,
+    hint: String,
+    teacherName: String
+  ) async throws -> SimulateDemoQuestionResult {
+    let result = try await call(
+      function: "simulateDemoQuestion",
+      data: [
+        "topic": topic,
+        "difficulty": difficulty,
+        "conversationType": conversationType,
+        "language": language,
+        "hint": hint,
+        "teacherName": teacherName
+      ]
+    )
+    return SimulateDemoQuestionResult(
+      mode: (result["mode"] as? String) ?? "local",
+      requestId: (result["requestId"] as? String) ?? "",
+      questionId: (result["questionId"] as? String) ?? "",
+      questionText: (result["questionText"] as? String) ?? ""
     )
   }
 

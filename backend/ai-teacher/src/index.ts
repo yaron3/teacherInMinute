@@ -102,6 +102,12 @@ db.ref("questions").on("child_added", (snap) => {
 
   // Only text questions in searching state need an AI response.
   if (status !== "searching") return;
+  if (q.isDemo === true && !config.answerDemoQuestions) {
+    // A teacher is simulating an incoming question (demo-student service) and
+    // wants to answer it themselves — don't race them for it.
+    console.log(`[ai-teacher] Skip demo qid=${qid}`);
+    return;
+  }
   if (conversationType === "audio" || conversationType === "video") {
     console.log(`[ai-teacher] Skip non-text qid=${qid} type=${conversationType}`);
     return;
@@ -128,6 +134,7 @@ db.ref("questions").on("child_changed", (snap) => {
 
   if (status !== "unanswered") return;
   if (conversationType === "audio" || conversationType === "video") return;
+  if (q.isDemo === true && !config.answerDemoQuestions) return;
 
   scheduleResponse(qid, q);
 });

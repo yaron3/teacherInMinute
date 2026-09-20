@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# A second push to the same branch makes the first run pointless; the iOS job
+# is the slow one, so cancel rather than queue.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - backend/Firebase/functions
+          - backend/demo-student
+          - backend/ai-teacher
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+
+      - run: npm ci
+        working-directory: ${{ matrix.package }}
+
+      - name: Typecheck
+        run: npm run build
+        working-directory: ${{ matrix.package }}
+
+      # Only the functions package has a suite; the other two would fail on a
+      # missing script, so ask package.json before running it.
+      - name: Test
+        working-directory: ${{ matrix.package }}
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
+            npm test
+          else
+            echo "no test script — skipping"
+          fi
+
+  config:
+    name: Config files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Duplicate keys are the failure mode these files actually have: merging
+      # two branches that both appended parameters leaves JSON that still parses
+      # but silently keeps only the last of each pair. json.load hides that, so
+      # reject it explicitly.
+      - name: Parse, and reject duplicate keys
+        run: |
+          python3 - <<'PY'
+          import json, sys, pathlib
+
+          def no_dupes(pairs):
+              seen = {}
+              for key, value in pairs:
+                  if key in seen:
+                      raise ValueError(f"duplicate key: {key!r}")
+                  seen[key] = value
+              return seen
+
+          targets = [
+              "backend/Firebase/remote_config_tim.json",
+              "backend/Firebase/database.rules.json",
+              "backend/Firebase/firestore.indexes.json",
+              "teacher-minute/Sources/TeacherMinute/Resources/Localizable.xcstrings",
+              "teacher-minute/Darwin/InfoPlist.xcstrings",
+          ]
+
+          failed = False
+          for name in targets:
+              path = pathlib.Path(name)
+              if not path.exists():
+                  print(f"-- {name} (absent, skipped)")
+                  continue
+              try:
+                  json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=no_dupes)
+              except ValueError as error:
+                  print(f"FAIL {name}: {error}")
+                  failed = True
+              else:
+                  print(f"ok   {name}")
+          sys.exit(1 if failed else 0)
+          PY
+
+  ios:
+    name: iOS build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app is written against Swift 6.2: AuthService declares an isolated
+      # `@MainActor deinit`, which older compilers reject as an experimental
+      # feature. Take the newest Xcode the image carries rather than its
+      # default, and print what that turned out to be — if it is still too old
+      # the versions below say so directly, instead of surfacing as puzzling
+      # errors in code that compiles fine on a developer's machine.
+      - name: Select the newest Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+          swift --version
+
+      # The SwiftPM target runs Skip's `skipstone` plugin, which shells out to
+      # the `skip` tool. Without it the plugin fails before any Swift compiles.
+      - name: Install Skip
+        run: brew install skiptools/skip/skip
+
+      - name: Cache SwiftPM checkouts
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('teacher-minute/Package.swift') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # A simulator destination so nothing needs a signing identity. `generic`
+      # avoids naming a device that a given runner image may not have.
+      # -skipPackagePluginValidation accepts skipstone non-interactively, which
+      # a headless runner cannot be prompted for.
+      #
+      # SKIP_ZERO stops the app target's "Run skip gradle" phase, which
+      # transpiles to Kotlin and builds the Android app — the phase reads that
+      # variable itself and exits 0. This job checks that the iOS app compiles
+      # and links; the Android half needs a JDK and Android SDK of its own and
+      # belongs in its own job. Without it the phase fails applying Android
+      # Gradle Plugin 8.13.2, long after every Swift file has already built.
+      - name: Build
+        run: |
+          set -o pipefail
+          build() {
+            xcodebuild build \
+              -workspace teacher-minute/Project.xcworkspace \
+              -scheme "TeacherMinute App" \
+              -destination 'generic/platform=iOS Simulator' \
+              -configuration Debug \
+              -skipPackagePluginValidation \
+              -skipMacroValidation \
+              CODE_SIGNING_ALLOWED=NO \
+              SKIP_ZERO=1
+          }
+          # xcbeautify ships with the runner image, but don't fail the build if
+          # a future image drops it — raw xcodebuild output is ugly, not broken.
+          if command -v xcbeautify >/dev/null; then
+            build | xcbeautify --renderer github-actions
+          else
+            build
+          fi

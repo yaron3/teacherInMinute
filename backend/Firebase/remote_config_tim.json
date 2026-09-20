@@ -9370,6 +9370,479 @@
       },
       "valueType": "STRING"
     },
+    "upload_remaining_verification_documents": {
+      "defaultValue": {
+        "value": "Upload your remaining verification documents"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "העלה את מסמכי האימות הנותרים שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "top_minutes": {
+      "defaultValue": {
+        "value": "Top up minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רכוש עוד דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "demo_student_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Master switch for the teacher-facing demo question feature. Off hides the 'Simulate a Student Question' card in the app and makes the simulateDemoQuestion function refuse. Unset counts as on for the backend and for DEBUG builds, off for release builds.",
+      "valueType": "BOOLEAN"
+    },
+    "demo_student_offline_message": {
+      "defaultValue": {
+        "value": "This is an automatic message from Demo #{count}"
+      },
+      "description": "Canned demo-student message used when the local AI service is offline. {count} is replaced by the message number within the demo (the question is #1).",
+      "valueType": "STRING"
+    },
+    "demo_student_offline_message_he": {
+      "defaultValue": {
+        "value": "זוהי הודעה אוטומטית מדמו #{count}"
+      },
+      "description": "Hebrew variant of demo_student_offline_message.",
+      "valueType": "STRING"
+    },
+    "demo_mode": {
+      "defaultValue": {
+        "value": "Demo Mode"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מצב הדגמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "send_yourself_question": {
+      "defaultValue": {
+        "value": "Send yourself a question from a simulated student."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שלחו לעצמכם שאלה מתלמיד מדומה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "simulate_student_question": {
+      "defaultValue": {
+        "value": "Simulate a Student Question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הדמיית שאלת תלמיד"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "demo_student_writes": {
+      "defaultValue": {
+        "value": "A demo student writes the question with a local AI model and sends it to you, so you can practise the whole flow without a real student."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תלמיד הדגמה מנסח את השאלה בעזרת מודל AI מקומי ושולח אותה אליכם, כדי שתוכלו להתאמן על התהליך המלא בלי תלמיד אמיתי."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "difficulty": {
+      "defaultValue": {
+        "value": "Difficulty"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רמת קושי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "what_should_about": {
+      "defaultValue": {
+        "value": "What should it be about? (optional)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "במה תעסוק השאלה? (רשות)"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "solving_quadratic_equations": {
+      "defaultValue": {
+        "value": "e.g. solving quadratic equations"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לדוגמה: פתרון משוואות ריבועיות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "send_simulated_question": {
+      "defaultValue": {
+        "value": "Send Simulated Question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שליחת שאלה מדומה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_question_takes": {
+      "defaultValue": {
+        "value": "The question takes a few seconds to write. You will get it on your dashboard like any other request."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כתיבת השאלה אורכת כמה שניות. היא תגיע ללוח הבקרה שלכם כמו כל בקשה אחרת."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "writing_question_with": {
+      "defaultValue": {
+        "value": "Writing a question with the local AI model..."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כותב שאלה בעזרת מודל ה־AI המקומי..."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "question_sent_should": {
+      "defaultValue": {
+        "value": "Question sent — it should appear in your queue now."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השאלה נשלחה — היא אמורה להופיע בתור שלכם עכשיו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "question_sent_the": {
+      "defaultValue": {
+        "value": "Question sent — the local AI model was unreachable, so a sample question was used."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השאלה נשלחה — מודל ה־AI המקומי לא היה זמין, ולכן נעשה שימוש בשאלה לדוגמה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_local_offline": {
+      "defaultValue": {
+        "value": "The local AI is offline — sent a standard demo question instead."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ה־AI המקומי אינו פעיל — נשלחה במקומו שאלת הדגמה סטנדרטית."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_demo_question": {
+      "defaultValue": {
+        "value": "The demo question feature is currently turned off."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תכונת שאלת ההדגמה כבויה כרגע."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "sign_teacher_simulate": {
+      "defaultValue": {
+        "value": "Sign in as a teacher to simulate a question."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התחברו כמורה כדי להדמות שאלה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "demo_service_no_response": {
+      "defaultValue": {
+        "value": "The demo student service did not respond. Make sure it is running on your machine."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שירות תלמיד ההדגמה לא הגיב. ודאו שהוא פועל במחשב שלכם."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "demo_service_create_failed": {
+      "defaultValue": {
+        "value": "The demo student service could not create the question."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שירות תלמיד ההדגמה לא הצליח ליצור את השאלה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "upload_clear_photo_id": {
+      "defaultValue": {
+        "value": "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "העלו תמונה ברורה של דרכון, רישיון נהיגה\nאו תעודת זהות. נדרשת תעודה מזהה ממשלתית תקפה\nכדי להפוך למורה מאומת."
+        }
+      },
+      "description": "Government-ID upload instruction on the teacher verification screen. Split from upload_clear_photo, which is the student's math-problem photo tip.",
+      "valueType": "STRING"
+    },
+    "go_offline": {
+      "defaultValue": {
+        "value": "Go Offline"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עבור למצב לא מקוון"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "go_online": {
+      "defaultValue": {
+        "value": "Go Online"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עבור למצב מקוון"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "offline_caps": {
+      "defaultValue": {
+        "value": "OFFLINE"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא מחובר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "online_caps": {
+      "defaultValue": {
+        "value": "ONLINE"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מחובר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pay_with": {
+      "defaultValue": {
+        "value": "Pay with"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום באמצעות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teaching_history": {
+      "defaultValue": {
+        "value": "Teaching History"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "היסטוריית הוראה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "terms_of_service": {
+      "defaultValue": {
+        "value": "Terms of Service"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תנאי השירות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "min": {
+      "defaultValue": {
+        "value": "%@/min"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%@ לדקה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "default_session_type_currency": {
+      "defaultValue": {
+        "value": "Default session type and currency"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סוג שיעור ומטבע ברירת מחדל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "enter_password_delete_account": {
+      "defaultValue": {
+        "value": "Enter your password to confirm account deletion."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הזינו את הסיסמה שלכם כדי לאשר את מחיקת החשבון."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "refresh_remote_config": {
+      "defaultValue": {
+        "value": "Refresh Remote Config"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רענון Remote Config"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "remote_config_refreshed": {
+      "defaultValue": {
+        "value": "Remote Config refreshed — %d keys loaded."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "‏Remote Config רוענן — נטענו %d מפתחות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "remote_config_refresh": {
+      "defaultValue": {
+        "value": "Remote Config refresh returned no keys. Check the connection and that a template is published."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רענון Remote Config לא החזיר מפתחות. בדקו את החיבור ושפורסמה תבנית."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "mic_denied_audio_enable": {
+      "defaultValue": {
+        "value": "Microphone access is required for an audio session. Enable it in Settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת גישה למיקרופון לשיחת שמע. הפעילו אותה בהגדרות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "mic_denied_video_enable": {
+      "defaultValue": {
+        "value": "Microphone access is required for a video session. Enable it in Settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת גישה למיקרופון לשיחת וידאו. הפעילו אותה בהגדרות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "mic_camera_denied_video_enable": {
+      "defaultValue": {
+        "value": "Microphone and camera access are required for a video session. Enable them in Settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נדרשת גישה למיקרופון ולמצלמה לשיחת וידאו. הפעילו אותן בהגדרות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_requesting_audio_mic": {
+      "defaultValue": {
+        "value": "The student is requesting an audio call. Enable microphone access to accept."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד מבקש שיחת שמע. הפעילו גישה למיקרופון כדי לקבל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_requesting_video_mic": {
+      "defaultValue": {
+        "value": "The student is requesting a video call. Enable microphone access to accept."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד מבקש שיחת וידאו. הפעילו גישה למיקרופון כדי לקבל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_requesting_video_camera": {
+      "defaultValue": {
+        "value": "The student is requesting a video call. Enable camera access to accept."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד מבקש שיחת וידאו. הפעילו גישה למצלמה כדי לקבל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "notifications_title": {
+      "defaultValue": {
+        "value": "Notifications"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התראות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "alerts_when_teacher_accepts": {
+      "defaultValue": {
+        "value": "Alerts when a teacher accepts your request or replies"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התראות כשמורה מקבל את בקשתך או עונה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "open_menu": {
       "defaultValue": {
         "value": "Open menu"

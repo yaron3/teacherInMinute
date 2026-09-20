@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teacher in a Minute</title>
+</head>
+<body>
+  <p>Redirecting to the app store...</p>
+  <p>If nothing happens, <a id="store-link" href="https://apps.apple.com/us/app/teacher-in-a-minute/id6771022216">tap here</a>.</p>
+
+  <script>
+    const appStoreUrl = 'https://apps.apple.com/us/app/teacher-in-a-minute/id6771022216';
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.yaronj.tim';
+
+    function getStoreUrl() {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+
+      if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+        return appStoreUrl;
+      }
+
+      if (/android/i.test(userAgent)) {
+        return playStoreUrl;
+      }
+
+      return appStoreUrl;
+    }
+
+    const storeUrl = getStoreUrl();
+    document.getElementById('store-link').href = storeUrl;
+    window.location.replace(storeUrl);
+  </script>
+</body>
+</html>

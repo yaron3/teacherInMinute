@@ -170,6 +170,39 @@ describe("dispatchQuestion", () => {
     expect(mockQuestionUpdate).not.toHaveBeenCalled();
   });
 
+  // A demo question is written straight to Firestore by the demo-student
+  // service, already marked dispatchWave: 1 with its single invite in place,
+  // so it must never be fanned out to real teachers. It still needs the
+  // watchdog armed here: it never goes through createQuestion, and the claim
+  // below would stand down without arming one, leaving the demo question
+  // searching forever.
+  test("skips the waves for a demo question but still arms the watchdog", async () => {
+    questionForClaim = searchingQuestion({ dispatchWave: 1, isDemo: true });
+    const handler = dispatchQuestion as unknown as TriggerHandler;
+
+    await handler({
+      params: { qid: "question-1" },
+      data: {
+        data: () =>
+          searchingQuestion({
+            dispatchWave: 1,
+            isDemo: true,
+            demoTeacherUid: "teacher-1",
+            alreadyInvited: ["teacher-1"],
+          }),
+      },
+    });
+
+    expect(mockQueueEnqueue).toHaveBeenCalledTimes(1);
+    expect(mockQueueEnqueue).toHaveBeenCalledWith(
+      "questionWatchdog",
+      { questionId: "question-1" },
+      { scheduleDelaySeconds: 90 }
+    );
+    // No wave claimed, so no real teacher was paged.
+    expect(mockRunTransaction).not.toHaveBeenCalled();
+  });
+
   // The mirror image: the event says wave 1 was claimed, but the inline
   // dispatch failed and handed it back, so the stored document says 0. The
   // trigger must recover the question rather than trust the stale payload.

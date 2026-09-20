@@ -11,6 +11,7 @@ export interface Config {
   llmTimeoutMs: number;
   answerDelayMs: number;
   maxConcurrent: number;
+  answerDemoQuestions: boolean;
 }
 
 function requireEnv(name: string): string {
@@ -47,5 +48,8 @@ export function loadConfig(): Config {
     llmTimeoutMs: parseInt(process.env.LLM_TIMEOUT_SECONDS ?? "60", 10) * 1000,
     answerDelayMs: Math.max(0, parseInt(process.env.ANSWER_DELAY_MS ?? "1000", 10)),
     maxConcurrent: Math.max(1, parseInt(process.env.MAX_CONCURRENT ?? "2", 10)),
+    answerDemoQuestions: ["1", "true", "yes", "on"].includes(
+      (process.env.ANSWER_DEMO_QUESTIONS ?? "false").trim().toLowerCase(),
+    ),
   };
 }

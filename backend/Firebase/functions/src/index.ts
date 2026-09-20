@@ -28,6 +28,10 @@ export {
 // Platform statistics
 export { onUserRoleChange } from "./stats";
 
+// Demo tooling — simulated student questions (local AI service, or canned
+// Remote Config messages when it is not running)
+export { simulateDemoQuestion, demoStudentAutoReply } from "./demoStudent";
+
 // Coupons
 export { redeemCoupon } from "./coupons";
 

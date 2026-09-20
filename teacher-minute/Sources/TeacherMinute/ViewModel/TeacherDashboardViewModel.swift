@@ -112,6 +112,15 @@ protocol TeacherDashboardViewModeling: AnyObject {
   func logTeacherCallDenied(questionId: String, topic: String, wave: Int, conversationType: String)
   func checkDocumentsSuggestion() async -> Bool
   func markDocumentsSuggestionShown()
+
+  /// Demo tooling. The dashboard drives the simulator sheet and reports its
+  /// progress, so these belong on the protocol like every other thing the view
+  /// asks of its model — the view holds `any TeacherDashboardViewModeling`.
+  var permissionAlertMessage: String? { get set }
+  var permissionAlertQuestionId: String? { get set }
+  var demoStatusMessage: String? { get set }
+  var demoErrorMessage: String? { get set }
+  func startDemoSimulation(_ simulation: DemoStudentSimulation)
 }
 
 // MARK: - Protocol default strings
@@ -382,6 +391,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
+  var permissionAlertMessage: String? = nil
+  var permissionAlertQuestionId: String? = nil
   var errorMessageGeneral: String? = nil
   var isAcceptingCalls = false
   var isVerified = false
@@ -404,6 +415,11 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var micPermissionState: PermissionState = .notDetermined
   var cameraPermissionState: PermissionState = .notDetermined
   var showsSubjectEditor = false
+  /// Demo tool progress. Tracked here, not in the sheet, so the sheet can close
+  /// straight away and the teacher waits for the simulated question on the
+  /// dashboard — where the invite actually shows up.
+  var demoStatusMessage: String? = nil
+  var demoErrorMessage: String? = nil
   /// Cleared once — after the first profile/rating/earnings load. Later
   /// refreshes (`refreshEarnings`) leave it alone, so finishing a lesson
   /// updates the figures in place instead of blanking them out again.
@@ -477,6 +493,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #endif
   private var authListenerHandle: Any?
   private var acceptingTask: Task<Void, Never>?
+  private var demoSimulationTask: Task<Void, Never>?
   private var didLoadProfile = false
   private var didApplyLaunchPresence = false
 #if !os(Android)
@@ -933,21 +950,37 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  guard let self else { return }
 	  
 	  if conversationType == "audio" || conversationType == "video" {
-		let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
-		if !micState.isGranted {
-		  errorMessage = conversationType == "video"
-		  ? LocalizationSupport.localized("Microphone and camera access are required to accept a video session.")
-		  : LocalizationSupport.localized("Microphone access is required to accept an audio session.")
+		var micState = PermissionService.shared.captureStatus(for: .microphone)
+		if micState == .denied {
+		  permissionAlertQuestionId = questionId
+		  permissionAlertMessage = conversationType == "video"
+			? LocalizationSupport.localized("The student is requesting a video call. Enable microphone access to accept.")
+			: LocalizationSupport.localized("The student is requesting an audio call. Enable microphone access to accept.")
 		  logger.info("[VM] acceptInvite blocked — mic permission denied qid=\(questionId)")
 		  return
 		}
+		if micState == .notDetermined {
+		  micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+		  if !micState.isGranted {
+			logger.info("[VM] acceptInvite — mic permission refused by user qid=\(questionId)")
+			return
+		  }
+		}
 	  }
 	  if conversationType == "video" {
-		let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
-		if !cameraState.isGranted {
-		  errorMessage = LocalizationSupport.localized("Microphone and camera access are required to accept a video session.")
+		var cameraState = PermissionService.shared.captureStatus(for: .camera)
+		if cameraState == .denied {
+		  permissionAlertQuestionId = questionId
+		  permissionAlertMessage = LocalizationSupport.localized("The student is requesting a video call. Enable camera access to accept.")
 		  logger.info("[VM] acceptInvite blocked — camera permission denied qid=\(questionId)")
 		  return
+		}
+		if cameraState == .notDetermined {
+		  cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+		  if !cameraState.isGranted {
+			logger.info("[VM] acceptInvite — camera permission refused by user qid=\(questionId)")
+			return
+		  }
 		}
 	  }
 	  
@@ -1066,6 +1099,66 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   }
   
+  // MARK: - Demo Simulation
+
+  /// Kicks off a simulated student question and returns immediately. The work
+  /// outlives the sheet on purpose: the teacher goes back to the dashboard and
+  /// the invite arrives there, the same way a real question would.
+  func startDemoSimulation(_ simulation: DemoStudentSimulation) {
+	demoErrorMessage = nil
+	demoStatusMessage = LocalizationSupport.localized("Writing a question with the local AI model...")
+	logger.info("[Simulate] requested topic=\(simulation.topic) difficulty=\(simulation.difficulty) type=\(simulation.conversationType)")
+
+	demoSimulationTask?.cancel()
+	demoSimulationTask = Task { [weak self] in
+	  guard let self else { return }
+	  do {
+		// The backend decides who answers: it checks whether the local AI
+		// service is up, and falls back to canned Remote Config messages if not.
+		let result = try await DemoStudentService.simulate(simulation, teacherName: teacherName)
+		try Task.checkCancellation()
+
+		var source = result.mode
+		if result.usedLocalAI {
+		  let status = try await DemoStudentService.awaitDispatch(requestId: result.requestId)
+		  try Task.checkCancellation()
+		  source = status.source
+		  demoStatusMessage = status.source == "fallback"
+			? LocalizationSupport.localized("Question sent — the local AI model was unreachable, so a sample question was used.")
+			: LocalizationSupport.localized("Question sent — it should appear in your queue now.")
+		  logger.info("[Simulate] dispatched qid=\(status.questionId) source=\(status.source)")
+		} else {
+		  demoStatusMessage = LocalizationSupport.localized("The local AI is offline — sent a standard demo question instead.")
+		  logger.info("[Simulate] fallback question qid=\(result.questionId)")
+		}
+
+		AnalyticsService.shared.logEvent(AnalyticsEvent.teacherDemoQuestionSimulated, parameters: [
+		  "topic": simulation.topic,
+		  "difficulty": simulation.difficulty,
+		  "conversation_type": simulation.conversationType,
+		  "source": source
+		])
+
+		// The invite card takes over from here — clear the note after a beat.
+		try? await Task.sleep(nanoseconds: 6_000_000_000)
+		if !Task.isCancelled { demoStatusMessage = nil }
+	  } catch is CancellationError {
+		demoStatusMessage = nil
+	  } catch {
+		demoStatusMessage = nil
+		// The backend reads the same demo_student_enabled flag, and the app's
+		// copy of Remote Config can be up to an hour stale, so the button may
+		// still be there after the feature was switched off.
+		if case FunctionsError.serverError(_, let status, _) = error, status == "FAILED_PRECONDITION" {
+		  demoErrorMessage = LocalizationSupport.localized("The demo question feature is currently turned off.")
+		} else {
+		  demoErrorMessage = error.localizedDescription
+		}
+		logger.error("[Simulate] failed — \(error.localizedDescription)")
+	  }
+	}
+  }
+
   func editSubjects() {
 	showsSubjectEditor = true
   }
@@ -1309,6 +1402,11 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 @MainActor
 final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var errorMessageGeneral: String?
+  var permissionAlertMessage: String? = nil
+  var permissionAlertQuestionId: String? = nil
+  var demoStatusMessage: String? = nil
+  var demoErrorMessage: String? = nil
+  func startDemoSimulation(_ simulation: DemoStudentSimulation) {}
   
   var teacherName: String
   var teacherImageURL: String = ""

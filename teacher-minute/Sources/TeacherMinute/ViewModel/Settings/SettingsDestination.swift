@@ -14,6 +14,7 @@ enum SettingsDestination: Hashable {
     case teacherPayouts
     case studentPayments
     case notifications
+    case mediaPermissions
     case privacyControls
     case language
     case about
@@ -28,6 +29,7 @@ enum SettingsDestination: Hashable {
         case .teacherPayouts: LocalizationSupport.localized("Teacher Payout Settings")
         case .studentPayments: LocalizationSupport.localized("Payment History")
         case .notifications: LocalizationSupport.localized("Notification Preferences")
+        case .mediaPermissions: LocalizationSupport.localized("App Permissions")
         case .privacyControls: LocalizationSupport.localized("Privacy Controls")
         case .language: LocalizationSupport.localized("Language")
         case .about: LocalizationSupport.localized("About")
@@ -48,7 +50,7 @@ enum SettingsDestination: Hashable {
             LocalizationSupport.localized("Notification preferences will be available here.")
         case .privacyControls:
             LocalizationSupport.localized("Privacy controls will be available here.")
-        case .accountSecurity, .appPreferences, .language, .about, .contactUs, .webPage:
+        case .accountSecurity, .appPreferences, .mediaPermissions, .language, .about, .contactUs, .webPage:
             ""
         }
     }

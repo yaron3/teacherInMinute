@@ -135,7 +135,8 @@ final class InviteService {
   }
 
   func startListening() {
-    handle = ref.observe(.value) { [weak self] snapshot in
+    let teacherId = self.teacherId
+    handle = ref.observe(.value, with: { [weak self] snapshot in
       guard let self else { return }
       var invites: [IncomingInvite] = []
       for child in snapshot.children {
@@ -186,7 +187,9 @@ final class InviteService {
       }
       invites.sort { $0.expiresAt < $1.expiresAt }
       self.onInvitesUpdated(invites)
-    }
+    }, withCancel: { error in
+      logger.info("[InviteService] listener cancelled uid=\(teacherId) error=\(error.localizedDescription)")
+    })
 	logger.info("[InviteService] startListening uid=\(self.teacherId)")
   }
 

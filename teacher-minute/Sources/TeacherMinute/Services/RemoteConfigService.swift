@@ -180,6 +180,17 @@ final class RemoteConfigService {
         }
     }
 
+    /// Force-fetches and activates, then reports how many keys the server
+    /// returned. `refresh()` already bypasses `minimumFetchInterval`; the count
+    /// is what lets debug tooling confirm a freshly published template actually
+    /// reached the device.
+    func refreshAndCountKeys() async -> Int {
+        await refresh()
+        let keys = RemoteConfig.remoteConfig().allKeys(from: .remote)
+        logger.info("[RemoteConfig] manual refresh complete; remoteKeyCount=\(keys.count)")
+        return keys.count
+    }
+
     private func configureRemoteConfig() {
         let remoteConfig = RemoteConfig.remoteConfig()
         let settings = RemoteConfigSettings()
@@ -305,6 +316,14 @@ final class RemoteConfigService {
         let value = RemoteConfig.remoteConfig().configValue(forKey: key)
         guard value.source != .static else { return defaultValue }
         return value.boolValue
+    }
+
+    /// Like `getBool(_:)` but distinguishes "not published" from "published as
+    /// false": an absent key yields `fallback` rather than `false`. Use it for
+    /// switches that should stay on until someone deliberately turns them off.
+    func getBool(_ key: String, fallback: Bool) -> Bool {
+        let value = RemoteConfig.remoteConfig().configValue(forKey: key)
+        return value.source == .static ? fallback : value.boolValue
     }
 
     func getURL(_ key: String) -> URL? {

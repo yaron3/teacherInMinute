@@ -55,6 +55,7 @@ enum AnalyticsEvent {
     static let teacherAcceptingToggled = "teacher_accepting_toggled"
     static let teacherInviteAccepted   = "teacher_invite_accepted"
     static let teacherInviteDeclined   = "teacher_invite_declined"
+    static let teacherDemoQuestionSimulated = "teacher_demo_question_simulated"
     static let teacherCallAnswered     = "teacher_call_answered"
     static let teacherCallDenied       = "teacher_call_denied"
     static let studentQuestionResponseTime = "student_question_response_time"

@@ -42,7 +42,7 @@
     <application
 		android:icon="@mipmap/ic_launcher"
 		android:roundIcon="@mipmap/ic_launcher"
-        android:label="${PRODUCT_NAME}"
+        android:label="@string/app_name"
         android:name=".AndroidAppMain"
         android:supportsRtl="true"
         android:allowBackup="true"

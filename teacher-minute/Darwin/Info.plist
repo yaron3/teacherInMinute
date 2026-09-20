@@ -42,5 +42,14 @@
 			</array>
 		</dict>
 	</array>
+	<key>FirebaseCrashlyticsCollectionEnabled</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIImageName</key>
+		<string>LaunchIcon</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
