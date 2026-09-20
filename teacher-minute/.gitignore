@@ -62,7 +62,12 @@ playground.xcworkspace
 # Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
 Packages/
 Package.pins
-Package.resolved
+# Package.resolved is deliberately NOT ignored. The stock template ignores it
+# because it is written for libraries, which should resolve against whatever a
+# consumer already has. This is an app: it wants every build — a new machine, a
+# release, CI — to resolve the same dependency versions. Leaving it out let CI
+# pick a nanopb newer than LiveKit's generated headers expect, and the build
+# died in CLiveKitProto with no error of ours anywhere in it.
 #*.xcodeproj
 
 Carthage/Build/
