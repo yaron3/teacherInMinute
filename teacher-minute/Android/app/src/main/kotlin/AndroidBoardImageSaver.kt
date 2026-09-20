@@ -98,6 +98,8 @@ object AndroidBoardImageSaver {
         val canvas = Canvas(bitmap)
         canvas.drawColor(backgroundColorArgb)
 
+        // `strokeColorArgb` is the fallback: each stroke carries its author's
+        // ink so the saved image reads like the live board did.
         val paint = Paint().apply {
             color = strokeColorArgb
             strokeWidth = 3f
@@ -121,6 +123,8 @@ object AndroidBoardImageSaver {
             val stroke = strokes.optJSONObject(i) ?: continue
             val points = stroke.optJSONArray("points") ?: continue
             if (points.length() == 0) continue
+
+            paint.color = stroke.optInt("color", strokeColorArgb)
 
             val path = Path()
             var moved = false

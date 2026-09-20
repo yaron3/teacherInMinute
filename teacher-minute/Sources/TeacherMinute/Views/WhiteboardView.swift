@@ -21,48 +21,36 @@ enum ClearDialogReason {
   case local, remote
 }
 
-enum BoardColor: CaseIterable, Hashable {
-  case `default`, pink, purple, green, orange, teal, red, yellow
+/// Who drew a stroke decides its color, so both sides read the same board at a
+/// glance: the teacher writes in blue, the student in ink (black on light,
+/// white on dark).
+///
+/// Nothing about the color travels over the wire. A stroke is either `isMine`
+/// or the peer's, and each side already knows its own role, so the two devices
+/// derive the same answer from what they each already have.
+enum BoardAuthor: Equatable {
+  case teacher, student
 
   func color(theme: AppTheme) -> Color {
 	switch self {
-	case .default: return theme.penInk
-	case .pink: return theme.penPink
-	case .purple: return theme.penPurple
-	case .green: return theme.penGreen
-	case .orange: return theme.penOrange
-	case .teal: return theme.penTeal
-	case .red: return theme.penRed
-	case .yellow: return theme.penYellow
+	case .teacher: return theme.penTeacher
+	case .student: return theme.penStudent
 	}
   }
 
-  static func initial(forRole role: String) -> BoardColor {
-	role.lowercased() == "student" ? .pink : .default
-  }
-}
-
-struct BoardStrokeKey: Hashable {
-  let firstX: Double
-  let firstY: Double
-  let lastX: Double
-  let lastY: Double
-  let count: Int
-
-  init(points: [BoardPoint]) {
-	self.firstX = points.first?.x ?? 0
-	self.firstY = points.first?.y ?? 0
-	self.lastX = points.last?.x ?? 0
-	self.lastY = points.last?.y ?? 0
-	self.count = points.count
+  /// A session has exactly two seats, so anyone who is not the student is the
+  /// teacher. Reading an unknown role as teacher keeps a board usable if one
+  /// ever arrives empty.
+  static func own(role: String) -> BoardAuthor {
+	role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student" ? .student : .teacher
   }
 
-  init(cgPoints: [CGPoint]) {
-	self.firstX = Double(cgPoints.first?.x ?? 0)
-	self.firstY = Double(cgPoints.first?.y ?? 0)
-	self.lastX = Double(cgPoints.last?.x ?? 0)
-	self.lastY = Double(cgPoints.last?.y ?? 0)
-	self.count = cgPoints.count
+  /// The other seat.
+  var peer: BoardAuthor {
+	switch self {
+	case .teacher: return .student
+	case .student: return .teacher
+	}
   }
 }
 
@@ -78,6 +66,7 @@ struct WhiteboardView: View {
   let onClear: () -> Void
   let onViewportChanged: (CGRect) -> Void
   let peerViewport: CGRect?
+  let role: String
   @Binding var isMaximized: Bool
   
   @State var activeStroke: [CGPoint] = []
@@ -87,13 +76,10 @@ struct WhiteboardView: View {
   @State var isMoveMode = false
   @State var lastMoveDragTranslation: CGSize = .zero
   @State var selectedTool: DrawingTool = .pen
-  @State var selectedColor: BoardColor
-  @State var showColorPicker = false
   @State var isClearDialogPresented = false
   @State var clearDialogReason: ClearDialogReason = .local
   @State var localClearInitiated = false
   @State var pendingClearSnapshot: [BoardStroke] = []
-  @State var localStrokeColors: [BoardStrokeKey: BoardColor] = [:]
   
   @Environment(\.horizontalSizeClass) var hSizeClass
   @Environment(\.colorScheme) var colorScheme
@@ -117,11 +103,20 @@ struct WhiteboardView: View {
 	self.onViewportChanged = onViewportChanged
 	self.peerViewport = peerViewport
 	self._isMaximized = isMaximized
-	self._selectedColor = State(initialValue: BoardColor.initial(forRole: role))
+	self.role = role
   }
   
   var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
   var isCompact: Bool { hSizeClass != .regular }
+
+  var myAuthor: BoardAuthor { .own(role: role) }
+  var peerAuthor: BoardAuthor { myAuthor.peer }
+  var isTeacher: Bool { myAuthor == .teacher }
+
+  /// Wiping shared work is the teacher's call: a student who clears mid-lesson
+  /// destroys the explanation they asked for, and the other side only finds out
+  /// afterwards.
+  var canClearBoard: Bool { isTeacher }
 
   var clearDialogTitle: String {
 	switch clearDialogReason {
@@ -153,11 +148,9 @@ struct WhiteboardView: View {
 		AppDialogAction(viewModel.saveAsPhotoLabel) {
 		  saveBoardAsPhoto(strokesToSave: pendingClearSnapshot)
 		  pendingClearSnapshot = []
-		  localStrokeColors.removeAll()
 		},
 		AppDialogAction(viewModel.dismissLabel, kind: .cancel) {
 		  pendingClearSnapshot = []
-		  localStrokeColors.removeAll()
 		}
 	  ]
 	}
@@ -174,14 +167,74 @@ struct WhiteboardView: View {
 	guard let peerViewport else { return base }
 	return base.union(peerViewport)
   }
+
+  // MARK: - Following the peer
+
+  /// Padding around a bare stroke, in logical units. A straight line has zero
+  /// height, so without it the box below would have no area to compare.
+  static let peerFocusPadding: CGFloat = 60
+
+  /// Where the peer is working: the box around the last stroke they drew, or,
+  /// until they have drawn anything, the part of the board they are looking at.
+  var peerFocusRect: CGRect? {
+	if let stroke = strokes.last(where: { !$0.isMine }),
+	   let box = Self.boundingBox(of: stroke.points) {
+	  return box.insetBy(dx: -Self.peerFocusPadding, dy: -Self.peerFocusPadding)
+	}
+	return peerViewport
+  }
+
+  /// True once the peer's work has drifted far enough out of the visible window
+  /// that hunting for it by hand is the slow part of following a lesson.
+  ///
+  /// The overlap is measured against whichever rect is smaller, so a peer on
+  /// iPad — whose viewport is the whole board — counts as on-screen while this
+  /// side is anywhere inside it.
+  var isPeerOffscreen: Bool {
+	guard let focus = peerFocusRect, viewport.width > 0, viewport.height > 0 else { return false }
+	let shared = focus.intersection(viewport)
+	guard !shared.isNull else { return true }
+	let smaller = min(focus.width * focus.height, viewport.width * viewport.height)
+	guard smaller > 0 else { return true }
+	return (shared.width * shared.height) / smaller < 0.5
+  }
+
+  /// Rotation for an up-pointing arrow so that it aims at the peer's work.
+  var peerDirectionAngle: Double {
+	guard let focus = peerFocusRect else { return 0 }
+	let dx = focus.midX - viewport.midX
+	let dy = focus.midY - viewport.midY
+	return atan2(Double(dy), Double(dx)) + .pi / 2
+  }
+
+  /// Re-centres on the peer without changing zoom: the point is to arrive where
+  /// they are writing, still reading the board at the size you chose.
+  func jumpToPeer() {
+	guard let focus = peerFocusRect else { return }
+	viewport = clampedViewport(CGRect(
+	  x: focus.midX - viewport.width / 2,
+	  y: focus.midY - viewport.height / 2,
+	  width: viewport.width,
+	  height: viewport.height
+	))
+	onViewportChanged(viewport)
+  }
+
+  static func boundingBox(of points: [BoardPoint]) -> CGRect? {
+	guard let first = points.first else { return nil }
+	var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
+	for point in points.dropFirst() {
+	  minX = min(minX, point.x)
+	  maxX = max(maxX, point.x)
+	  minY = min(minY, point.y)
+	  maxY = max(maxY, point.y)
+	}
+	return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+  }
   
   var body: some View {
 	VStack(alignment: .leading, spacing: 6) {
 	  header
-
-	  if showColorPicker {
-		colorPalettePanel
-	  }
 
 	  GeometryReader { proxy in
 		canvas(viewSize: proxy.size)
@@ -204,7 +257,6 @@ struct WhiteboardView: View {
 	  if !oldStrokes.isEmpty && newStrokes.isEmpty {
 		if localClearInitiated {
 		  localClearInitiated = false
-		  localStrokeColors.removeAll()
 		} else {
 		  pendingClearSnapshot = oldStrokes
 		  clearDialogReason = .remote
@@ -220,9 +272,6 @@ struct WhiteboardView: View {
 	  ForEach(DrawingTool.allCases, id: \.self) { tool in
 		toolButton(tool)
 	  }
-
-	  colorPickerButton
-		.padding(.leading, 6)
 
 	  Spacer()
 
@@ -259,67 +308,52 @@ struct WhiteboardView: View {
 		.buttonStyle(.plain)
 	  }
 
-	  Button {
-		clearDialogReason = .local
-		isClearDialogPresented = true
-	  } label: {
-		PlatformIcon(
-		  systemName: "trash",
-		  size: 14,
-		  weight: .semibold,
-		  color: theme.accent
-		)
-		.frame(width: 28, height: 28)
-	  }
-	  .buttonStyle(.plain)
-	}
-	.padding(.horizontal, 12)
-  }
-
-  var colorPickerButton: some View {
-	Button {
-	  showColorPicker.toggle()
-	} label: {
-	  Circle()
-		.fill(selectedColor.color(theme: theme))
-		.frame(width: 24, height: 24)
-		.overlay(
-		  Circle().stroke(theme.controlBorder, lineWidth: 1.5)
-		)
-	}
-	.buttonStyle(.plain)
-  }
-
-  var colorPalettePanel: some View {
-	HStack(spacing: 10) {
-	  ForEach(BoardColor.allCases, id: \.self) { color in
+	  if canClearBoard {
 		Button {
-		  selectedColor = color
-		  showColorPicker = false
+		  clearDialogReason = .local
+		  isClearDialogPresented = true
 		} label: {
-		  Circle()
-			.fill(color.color(theme: theme))
-			.frame(width: 28, height: 28)
-			.overlay(
-			  Circle().stroke(
-				selectedColor == color ? theme.accent : theme.controlBorder,
-				lineWidth: selectedColor == color ? 2.5 : 1
-			  )
-			)
+		  PlatformIcon(
+			systemName: "trash",
+			size: 14,
+			weight: .semibold,
+			color: theme.accent
+		  )
+		  .frame(width: 28, height: 28)
 		}
 		.buttonStyle(.plain)
 	  }
-	  Spacer()
 	}
 	.padding(.horizontal, 12)
-	.padding(.vertical, 6)
-	.background(theme.cardBackground)
-	.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-	.overlay(
-	  RoundedRectangle(cornerRadius: 10, style: .continuous)
-		.stroke(theme.controlBorder, lineWidth: 0.5)
-	)
-	.padding(.horizontal, 12)
+  }
+
+  /// Only worth offering where the board can actually pan — on a regular size
+  /// class the whole board is already on screen.
+  @ViewBuilder
+  func jumpToPeerButton(viewSize: CGSize) -> some View {
+	if usesScrollableViewport(viewSize: viewSize), isPeerOffscreen {
+	  Button(action: jumpToPeer) {
+		HStack(spacing: 6) {
+		  PlatformIcon(
+			systemName: "arrow.up",
+			size: 12,
+			weight: .bold,
+			color: theme.onAccentText
+		  )
+		  .rotationEffect(.radians(peerDirectionAngle))
+
+		  Text(viewModel.seeOtherSideLabel)
+			.font(.system(size: 12, weight: .semibold))
+			.foregroundStyle(theme.onAccentText)
+		}
+		.padding(.horizontal, 12)
+		.padding(.vertical, 8)
+		.background(theme.accent)
+		.clipShape(Capsule())
+	  }
+	  .buttonStyle(.plain)
+	  .padding(12)
+	}
   }
 
   func toolButton(_ tool: DrawingTool) -> some View {
@@ -349,40 +383,33 @@ struct WhiteboardView: View {
   func performClear() {
 	activeStroke.removeAll()
 	shapeStartLogical = nil
-	localStrokeColors.removeAll()
 	localClearInitiated = true
 	onClear()
   }
 
-  func colorForStroke(_ stroke: BoardStroke) -> Color {
-	let key = BoardStrokeKey(points: stroke.points)
-	if let bc = localStrokeColors[key] {
-	  return bc.color(theme: theme)
-	}
-	return theme.primaryText
+  func author(of stroke: BoardStroke) -> BoardAuthor {
+	stroke.isMine ? myAuthor : peerAuthor
   }
 
-  func recordLocalColor(for points: [CGPoint]) {
-	let key = BoardStrokeKey(cgPoints: points)
-	localStrokeColors[key] = selectedColor
+  func colorForStroke(_ stroke: BoardStroke) -> Color {
+	author(of: stroke).color(theme: theme)
   }
 
   func saveBoardAsPhoto(strokesToSave: [BoardStroke]? = nil) {
 #if canImport(UIKit) && !os(Android)
 	let renderSize = CGSize(width: 1080, height: 1080)
-	let defaultColor = theme.primaryText
 	let background = theme.cardBackground
 	let logical = Self.logicalSize
 	let strokesSnapshot = strokesToSave ?? strokes
-	let colorMap = localStrokeColors
 	let currentTheme = theme
+	let mine = myAuthor
+	let theirs = peerAuthor
 
 	let snapshot = ZStack {
 	  background
 	  ForEach(strokesSnapshot.indices, id: \.self) { idx in
 		let stroke = strokesSnapshot[idx]
-		let key = BoardStrokeKey(points: stroke.points)
-		let strokeColor = colorMap[key]?.color(theme: currentTheme) ?? defaultColor
+		let strokeColor = (stroke.isMine ? mine : theirs).color(theme: currentTheme)
 		Path { path in
 		  let pts = stroke.points.map { p in
 			CGPoint(
@@ -482,7 +509,7 @@ struct WhiteboardView: View {
 			path.addLine(to: point)
 		  }
 		}
-		.stroke(selectedColor.color(theme: theme), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+		.stroke(myAuthor.color(theme: theme), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
 	  }
 
       if let peerViewport, !isCompact {
@@ -504,6 +531,9 @@ struct WhiteboardView: View {
 	  }
 	}
 	.overlay(gestureLayer(viewSize: viewSize))
+	.overlay(alignment: .bottomTrailing) {
+	  jumpToPeerButton(viewSize: viewSize)
+	}
   }
   
   @ViewBuilder
@@ -534,7 +564,6 @@ struct WhiteboardView: View {
 		activeStroke.removeAll()
 		shapeStartLogical = nil
 		guard completed.count > 1 else { return }
-		recordLocalColor(for: completed)
 		onStrokeFinished(completed)
 	  },
 	  onDrawCancelled: {
@@ -594,7 +623,6 @@ struct WhiteboardView: View {
 			activeStroke.removeAll()
 			shapeStartLogical = nil
 			guard completed.count > 1 else { return }
-			recordLocalColor(for: completed)
 			onStrokeFinished(completed)
 		  }
 	  )
