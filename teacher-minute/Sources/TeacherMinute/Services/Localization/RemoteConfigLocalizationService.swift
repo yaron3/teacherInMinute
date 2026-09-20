@@ -383,7 +383,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Ask a Teacher sheet: the keyboard switch above the question field.
         // "Regular" and "Algebra" are already published; only these are new.
         "Keyboard": "מקלדת",
-        "Build the formula, then add it to your question.": "בנו את הנוסחה ואז הוסיפו אותה לשאלה."
+        "Build the formula, then add it to your question.": "בנו את הנוסחה ואז הוסיפו אותה לשאלה.",
         // Demo-student and simulator copy carried over from this branch.
         // Settings, chat status, notification and payment-history copy that had
         // no template entry. Translated alongside the Remote Config additions.
@@ -555,9 +555,7 @@ enum LocalizationKey {
         "Could not send rating. Please try again next time.": "could_not_send_dot_a",
         // Shared `enter_your_password` with the login field, so the delete-account
         // confirmation was showing the login prompt's translation.
-        "Enter your password to confirm account deletion.": "enter_password_delete_account",
         // Shared `default_session_type` with the settings section title.
-        "Default session type and currency": "default_session_type_currency",
         // Both demo-service errors generate `the_demo_student`, which would make
         // one translation serve two different failures.
         "The demo student service did not respond. Make sure it is running on your machine.": "demo_service_no_response",
@@ -746,7 +744,6 @@ enum LocalizationKey {
         // `unexpected_error_occurred` holds the shorter sentence.
         "An unexpected error occurred. Please try again.": "unexpected_error_try_again",
         // `upload_clear_photo` holds the math-problem prompt.
-        "Upload a clear photo of your passport, driver's license,\nor national ID. A valid government ID is required to\nbecome a verified teacher.": "upload_clear_photo_gov_id"
     ]
 
     /// Deterministic three-word snake-case slug for any source string that
