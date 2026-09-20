@@ -159,3 +159,65 @@ jobs:
           else
             build
           fi
+
+  android:
+    name: Android build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Skip transpiles Swift to Kotlin, so this needs the Swift toolchain as
+      # much as the iOS job does — Android/settings.gradle.kts shells out to
+      # `skip plugin --prebuild` while Gradle is still configuring.
+      - name: Select the newest Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Install Skip
+        run: brew install skiptools/skip/skip
+
+      # Android Gradle Plugin 8.13 wants JDK 17+. The runner's default JDK is
+      # newer than AGP supports, which is what "Failed to create service
+      # ...AndroidProblemReporterProvider" meant when this ran inside the iOS
+      # job. Pin it, and print what we got so a future mismatch says so plainly.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: java -version
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('teacher-minute/Android/**/*.gradle.kts', 'teacher-minute/Android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # The app target's build phase runs `skip gradle -p ../Android
+      # ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}`, so the default task is
+      # launchDebug — which wants an emulator to launch onto. assemble gives
+      # assembleDebug: build the APK, start nothing.
+      - name: Build
+        run: |
+          set -o pipefail
+          build() {
+            xcodebuild build \
+              -workspace teacher-minute/Project.xcworkspace \
+              -scheme "TeacherMinute App" \
+              -destination 'generic/platform=iOS Simulator' \
+              -configuration Debug \
+              -skipPackagePluginValidation \
+              -skipMacroValidation \
+              CODE_SIGNING_ALLOWED=NO \
+              SKIP_ACTION=assemble
+          }
+          if command -v xcbeautify >/dev/null; then
+            build | xcbeautify --renderer github-actions
+          else
+            build
+          fi
