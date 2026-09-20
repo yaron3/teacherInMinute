@@ -13,6 +13,10 @@
 
 import SwiftUI
 
+// `PermissionService` is @MainActor, and this screen reaches it from a plain
+// synchronous helper rather than only from an async `task` the way the
+// notification screen does, so the view is isolated to match.
+@MainActor
 struct MediaPermissionsSettingsView: View {
     let viewModel: any SettingsViewModeling
     @State var micState: PermissionState = .notDetermined
