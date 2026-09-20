@@ -6,7 +6,8 @@
     "deploy": "firebase deploy --only functions",
     "test": "jest",
     "test:integration:presence": "node scripts/test-teacher-presence.js",
-    "test:integration:lesson": "node scripts/test-full-lesson.js"
+    "test:integration:lesson": "node scripts/test-full-lesson.js",
+    "test:rules": "firebase emulators:exec --config ../firebase.json --only database --project demo-teacher-in-a-moment \"jest --config jest.emulator.config.js\""
   },
   "engines": {
     "node": "22"
@@ -20,8 +21,11 @@
     "uuid": "^11.1.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/braintree": "^3.4.4",
     "@types/jest": "^30.0.0",
+    "firebase": "^12.19.0",
+    "firebase-tools": "^15.30.2",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.11",
     "typescript": "^5.4.0"

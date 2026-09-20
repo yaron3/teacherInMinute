@@ -49,6 +49,41 @@ jobs:
             echo "no test script — skipping"
           fi
 
+  rules:
+    name: Database rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/Firebase/functions/package-lock.json
+
+      # The Realtime Database emulator is a Java jar. The image already carries
+      # a JDK, but pin one so the job does not depend on which.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # emulators:exec fetches the jar on a cold run; keep it between runs.
+      - name: Cache the emulator jar
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - run: npm ci
+        working-directory: backend/Firebase/functions
+
+      # Runs database.rules.json against the real rules engine: that a student
+      # cannot wipe the board, and that every path the apps write still works.
+      - name: Rules tests
+        run: npm run test:rules
+        working-directory: backend/Firebase/functions
+
   config:
     name: Config files
     runs-on: ubuntu-latest
