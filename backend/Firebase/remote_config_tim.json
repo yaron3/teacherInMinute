@@ -916,6 +916,17 @@
       },
       "valueType": "STRING"
     },
+    "see_the_other": {
+      "defaultValue": {
+        "value": "See the other side"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הצג את הצד השני"
+        }
+      },
+      "valueType": "STRING"
+    },
     "use_your_finger": {
       "defaultValue": {
         "value": "Use your finger to write or sketch."

@@ -345,6 +345,23 @@ struct AppTheme {
     // The one place where a color name *is* the purpose: these are the swatches
     // the user picks between when drawing, so they are tuned to stay apart from
     // each other rather than to match any UI role.
+    //
+    // `penTeacher` and `penStudent` are the exception: during a session the
+    // author of a stroke picks its color, so that either side can tell at a
+    // glance who wrote what. They are aliases so the pair stays a single
+    // decision rather than two call sites that drift apart.
+
+    /// The teacher's ink during a session. Blue in both appearances, and kept
+    /// clear of `accent` so a stroke never reads as a tappable control.
+    var penTeacher: Color {
+        adaptive(
+            light: (37, 99, 235),
+            dark: (96, 165, 250)
+        )
+    }
+
+    /// The student's ink during a session: black on light, white on dark.
+    var penStudent: Color { penInk }
 
     var penInk: Color {
         adaptive(
@@ -500,6 +517,8 @@ private struct AppThemePreviewView: View {
                 ])
 
                 section("Whiteboard pens", swatches: [
+                    ("penTeacher", theme.penTeacher),
+                    ("penStudent", theme.penStudent),
                     ("penInk", theme.penInk),
                     ("penPink", theme.penPink),
                     ("penPurple", theme.penPurple),

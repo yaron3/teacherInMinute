@@ -729,12 +729,15 @@ struct ChatSessionView: View {
 #if canImport(UIKit) && !os(Android)
     let renderSize = CGSize(width: 500, height: 500)
     let logical = WhiteboardView.logicalSize
-    let strokeColor = theme.primaryText
     let background = theme.cardBackground
+    let snapshotTheme = theme
+    let mine = boardAuthor(isMine: true)
+    let theirs = boardAuthor(isMine: false)
 
     let snapshot = ZStack {
       background
       ForEach(strokesSnapshot.indices, id: \.self) { index in
+        let strokeColor = (strokesSnapshot[index].isMine ? mine : theirs).color(theme: snapshotTheme)
         Path { path in
           let points = strokesSnapshot[index].points.map { point in
             CGPoint(
@@ -780,7 +783,11 @@ struct ChatSessionView: View {
       }
     }
 #elseif os(Android)
-    let strokesJson = Self.boardStrokesJson(strokesSnapshot)
+    let strokesJson = Self.boardStrokesJson(
+      strokesSnapshot,
+      myAuthor: boardAuthor(isMine: true),
+      peerAuthor: boardAuthor(isMine: false)
+    )
     let logical = WhiteboardView.logicalSize
     let logicalWidth = Double(logical.width)
     let logicalHeight = Double(logical.height)
@@ -809,9 +816,32 @@ struct ChatSessionView: View {
 #endif
   }
 
-  static func boardStrokesJson(_ strokes: [BoardStroke]) -> String {
+  /// The author of a stroke, seen from this device: the board only ever holds
+  /// two people, so "mine or not" plus this side's own role names both.
+  func boardAuthor(isMine: Bool) -> BoardAuthor {
+    let mine = BoardAuthor.own(role: viewModel.role)
+    return isMine ? mine : mine.peer
+  }
+
+  /// The Android renderer draws on a fixed white sheet, so the saved image uses
+  /// the light-appearance inks whatever the phone is set to.
+  static func snapshotArgb(for author: BoardAuthor) -> Int {
+    switch author {
+    case .teacher: return Int(Int32(bitPattern: 0xFF2563EB as UInt32))
+    case .student: return Int(Int32(bitPattern: 0xFF111827 as UInt32))
+    }
+  }
+
+  static func boardStrokesJson(
+    _ strokes: [BoardStroke],
+    myAuthor: BoardAuthor,
+    peerAuthor: BoardAuthor
+  ) -> String {
     let rows: [[String: Any]] = strokes.map { stroke in
-      ["points": stroke.points.map { ["x": $0.x, "y": $0.y] }]
+      [
+        "points": stroke.points.map { ["x": $0.x, "y": $0.y] },
+        "color": snapshotArgb(for: stroke.isMine ? myAuthor : peerAuthor)
+      ]
     }
     guard let data = try? JSONSerialization.data(withJSONObject: rows),
           let json = String(data: data, encoding: .utf8) else { return "[]" }

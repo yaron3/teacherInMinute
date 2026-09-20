@@ -1100,6 +1100,7 @@ extension ChatSessionViewModeling {
   var clearLabel: String { LocalizationSupport.localized("Clear") }
   var dismissLabel: String { LocalizationSupport.localized("Dismiss") }
   var boardHintText: String { LocalizationSupport.localized("Use your finger to write or sketch.") }
+  var seeOtherSideLabel: String { LocalizationSupport.localized("See the other side") }
 
   // MARK: Rate the session
 
