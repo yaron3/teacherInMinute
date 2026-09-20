@@ -32,4 +32,7 @@ final class PermissionsSetupViewModel {
         }
     }
 
+    func limitedMode() {
+        onContinue?()
+    }
 }

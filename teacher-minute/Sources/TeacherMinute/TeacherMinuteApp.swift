@@ -68,6 +68,9 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 						  case .completeProfile(let role):
 							CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
 							  .trackScreen(AnalyticsScreen.completeProfile)
+						  case .permissionsSetup(let role):
+							PermissionsSetupView(role: role)
+							  .trackScreen(AnalyticsScreen.permissionsSetup)
 						  case .studentHome:
 							StudentHomeView()
 							  .trackScreen(AnalyticsScreen.studentHome)
