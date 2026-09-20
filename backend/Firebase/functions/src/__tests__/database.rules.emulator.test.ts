@@ -24,7 +24,7 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { Database, ref, remove, set } from "firebase/database";
+import { ref, remove, set } from "firebase/database";
 
 const TEACHER = "teacher-uid";
 const STUDENT = "student-uid";
@@ -71,7 +71,7 @@ afterAll(async () => {
   await testEnv?.cleanup();
 });
 
-function db(uid: string): Database {
+function db(uid: string) {
   return testEnv.authenticatedContext(uid).database();
 }
 

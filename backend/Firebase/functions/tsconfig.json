@@ -9,5 +9,9 @@
     "target": "es2017"
   },
   "compileOnSave": true,
-  "include": ["src"]
+  "include": ["src"],
+  // Tests are not part of the deployed bundle, and the emulator suite
+  // pulls in the Firebase client SDK, whose types the functions build
+  // has no reason to check.
+  "exclude": ["src/__tests__"]
 }
