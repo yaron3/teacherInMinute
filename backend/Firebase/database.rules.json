@@ -21,9 +21,9 @@
             ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid)"
           },
           "strokes": {
-            ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid) && (newData.exists() || (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid))",
+            ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid)",
             "$strokeId": {
-              ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid) && (newData.exists() || (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid))"
+              ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid) && newData.exists() && !data.exists()"
             }
           }
         },
