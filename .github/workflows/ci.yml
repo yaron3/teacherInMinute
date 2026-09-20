@@ -131,6 +131,13 @@ jobs:
       # avoids naming a device that a given runner image may not have.
       # -skipPackagePluginValidation accepts skipstone non-interactively, which
       # a headless runner cannot be prompted for.
+      #
+      # SKIP_ZERO stops the app target's "Run skip gradle" phase, which
+      # transpiles to Kotlin and builds the Android app — the phase reads that
+      # variable itself and exits 0. This job checks that the iOS app compiles
+      # and links; the Android half needs a JDK and Android SDK of its own and
+      # belongs in its own job. Without it the phase fails applying Android
+      # Gradle Plugin 8.13.2, long after every Swift file has already built.
       - name: Build
         run: |
           set -o pipefail
@@ -142,7 +149,8 @@ jobs:
               -configuration Debug \
               -skipPackagePluginValidation \
               -skipMacroValidation \
-              CODE_SIGNING_ALLOWED=NO
+              CODE_SIGNING_ALLOWED=NO \
+              SKIP_ZERO=1
           }
           # xcbeautify ships with the runner image, but don't fail the build if
           # a future image drops it — raw xcodebuild output is ugly, not broken.
