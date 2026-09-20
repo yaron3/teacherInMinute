@@ -19,7 +19,6 @@ struct StudentHomeView: View {
   @State var showsNotificationExplainer = false
   @State var pendingCheckoutOption: PricingOption?
   @State var emailReward = EmailRewardViewModel()
-  @Binding var hidesTabBar: Bool
   @Environment(\.openURL) var openURL
   @Environment(\.scenePhase) var scenePhase
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
@@ -27,12 +26,8 @@ struct StudentHomeView: View {
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
-  init(
-	viewModel: any StudentHomeViewModeling = StudentHomeViewModel(),
-	hidesTabBar: Binding<Bool> = .constant(false)
-  ) {
+  init(viewModel: any StudentHomeViewModeling = StudentHomeViewModel()) {
 	self._viewModel = State(initialValue: viewModel)
-	self._hidesTabBar = hidesTabBar
   }
 
   var body: some View {
@@ -82,11 +77,6 @@ struct StudentHomeView: View {
 	  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
 	  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
 	  .id(languagePreference)
-	  // Pushing keeps the tab bar on screen, which the full-screen cover
-	  // covered. The modifier belongs on the pushed view rather than on
-	  // `hidesTabBar`, which drives the TabView itself and so does not
-	  // apply to a screen pushed inside one of its tabs.
-	  .toolbar(.hidden, for: .tabBar)
   }
 
   /// Drives the lesson push off `searchState` alone. The setter is inert on
@@ -268,6 +258,8 @@ struct StudentHomeView: View {
   var studentHero: some View {
     VStack(spacing: 0) {
       HStack(spacing: 12) {
+		SideMenuButton(size: 40)
+
 		Image("sqaure-logo", bundle: .module)
 		  .resizable()
 		  .scaledToFit()
@@ -1726,7 +1718,6 @@ struct StudentLiveSessionScreen: View {
 	}
 	// The session draws its own header and end control, and must not be
 	// escapable by a back tap or edge swipe while it is running.
-	.toolbar(.hidden, for: .tabBar)
 	.toolbar(.hidden, for: .navigationBar)
 	.navigationBarBackButtonHidden(true)
 	// Compose Navigation would otherwise pop a running lesson on a system

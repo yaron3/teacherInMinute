@@ -11,7 +11,6 @@ import SwiftUI
 @MainActor
 struct TeacherDashboardView: View {
   @State var viewModel: any TeacherDashboardViewModeling
-  @Binding var hidesTabBar: Bool
   let showsSessionOverlay: Bool
   let showsIncomingOverlay: Bool
   /// The warning the header is currently showing. Mirrors the view model, but
@@ -34,12 +33,10 @@ struct TeacherDashboardView: View {
   }
   init(
 	viewModel: any TeacherDashboardViewModeling = TeacherDashboardViewModel(),
-	hidesTabBar: Binding<Bool> = .constant(false),
 	showsSessionOverlay: Bool = true,
 	showsIncomingOverlay: Bool = true
   ) {
 	self._viewModel = State(initialValue: viewModel)
-	self._hidesTabBar = hidesTabBar
 	self.showsSessionOverlay = showsSessionOverlay
 	self.showsIncomingOverlay = showsIncomingOverlay
   }
@@ -54,12 +51,6 @@ struct TeacherDashboardView: View {
 		  viewModel.cancelAcceptingInvite()
 		}
 	  )
-	  .onAppear {
-		hidesTabBar = true
-	  }
-	  .onDisappear {
-		hidesTabBar = false
-	  }
 	} else if showsSessionOverlay, let questionId = viewModel.activeQuestionId {
 	  ChatSessionView(
 		questionId: questionId,
@@ -71,12 +62,6 @@ struct TeacherDashboardView: View {
 		initialDetails: viewModel.activeChatInitialDetails()
 	  ) {
 		viewModel.endCall()
-	  }
-	  .onAppear {
-		hidesTabBar = true
-	  }
-	  .onDisappear {
-		hidesTabBar = false
 	  }
 	} else {
 	  VStack(spacing: 0) {
@@ -146,12 +131,6 @@ struct TeacherDashboardView: View {
 	  .overlay {
 		if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
 		  TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
-			.onAppear {
-			  hidesTabBar = true
-			}
-			.onDisappear {
-			  hidesTabBar = false
-			}
 		}
 	  }
 	  .emailRewardDialogs(emailReward)
@@ -204,6 +183,13 @@ struct TeacherDashboardView: View {
 		// Seeded without animation: a banner that is already true on the first
 		// frame should be there, not slide in.
 		warningMessage = viewModel.errorMessageGeneral
+		// The readiness rows report switches the OS owns, and the user can have
+		// changed one on the permissions screen without the app ever leaving the
+		// front — which is the one case `scenePhase` below does not catch. Asked
+		// here rather than on a navigation callback so it survives however the
+		// dashboard is reached; the side menu replaced the tab bar that used to
+		// carry it.
+		viewModel.refreshPermissions()
 		Task {
 		  if await viewModel.checkDocumentsSuggestion() {
 			showsDocumentsSuggestion = true

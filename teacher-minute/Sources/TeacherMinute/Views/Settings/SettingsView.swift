@@ -50,6 +50,11 @@ struct SettingsView: View {
                 loadingOverlay
             }
             .navigationTitle(viewModel.settingsTitle)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SideMenuButton(size: 36)
+                }
+            }
             .navigationDestination(for: SettingsDestination.self) { destination in
                 destinationView(destination)
                     .navigationTitle(destination.title)

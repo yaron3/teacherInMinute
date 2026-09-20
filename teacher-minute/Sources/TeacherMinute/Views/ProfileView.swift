@@ -45,6 +45,15 @@ struct ProfileView: View {
       // screen sat on "Loading profile..." indefinitely. Rendering one tree and
       // letting the individual fields update removes the branch entirely.
     VStack(alignment: .leading, spacing: 0) {
+      HStack(spacing: 12) {
+        SideMenuButton()
+        Text(viewModel.profileScreenTitle)
+          .font(.system(size: 26, weight: .bold))
+          .foregroundStyle(theme.primaryText)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .padding(.top, 16)
+
       if let error = viewModel.errorMessage {
         profileLoadError(error)
       }

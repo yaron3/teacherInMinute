@@ -86,6 +86,7 @@ struct PlatformIcon: View {
 	  case "link":                              return "🔗"
 	  case "checkmark.circle.fill":             return "✓"
 	  case "questionmark.circle":               return "?"
+	  case "questionmark.circle.fill":          return "?"
 	  case "photo.fill":                        return "▧"
 	  case "mic.fill":                          return "🎤"
 	  case "speaker.wave.2.fill":               return "🔊"
@@ -122,6 +123,7 @@ struct PlatformIcon: View {
 	  case "waveform.path.ecg":                 return "〰"
 	  case "chevron.left.forwardslash.chevron.right": return "</>"
 	  case "list.bullet":                       return "☰"
+	  case "line.3.horizontal":                 return "☰"
 	  // Form fields, settings rows and payout details — all of which render
 	  // their icon via AuthInputField / FlatIconTile, and so land here too.
 	  case "number":                            return "#"

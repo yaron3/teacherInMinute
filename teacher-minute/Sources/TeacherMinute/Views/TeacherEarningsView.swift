@@ -158,10 +158,13 @@ struct TeacherEarningsView: View {
     // MARK: - Header
 
     var headerTitle: some View {
-        Text(viewModel.earningsScreenTitle)
-            .font(.system(size: 26, weight: .bold))
-            .foregroundStyle(theme.primaryText)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 12) {
+            SideMenuButton()
+            Text(viewModel.earningsScreenTitle)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(theme.primaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     // MARK: - Segment Picker
