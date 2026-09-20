@@ -16,6 +16,7 @@ enum SettingsAction: Equatable {
     case teacherPayouts
     case studentPayments
     case notifications
+    case mediaPermissions
     case privacyControls
     case language
     case about
@@ -37,6 +38,7 @@ enum SettingsAction: Equatable {
         case .teacherPayouts: "teacherPayouts"
         case .studentPayments: "studentPayments"
         case .notifications: "notifications"
+        case .mediaPermissions: "mediaPermissions"
         case .privacyControls: "privacyControls"
         case .language: "language"
         case .about: "about"

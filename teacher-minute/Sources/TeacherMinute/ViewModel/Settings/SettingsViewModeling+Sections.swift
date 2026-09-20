@@ -55,6 +55,14 @@ extension SettingsViewModeling {
                 action: .notifications
             ),
             SettingsRow(
+                title: LocalizationSupport.localized("App Permissions"),
+                subtitle: nil,
+                systemImage: "mic.fill",
+                iconColor: .primary,
+                isDestructive: false,
+                action: .mediaPermissions
+            ),
+            SettingsRow(
                 title: LocalizationSupport.localized("Privacy Controls"),
                 subtitle: nil,
                 systemImage: "shield.lefthalf.filled",
@@ -230,6 +238,8 @@ extension SettingsViewModeling {
             navigationPath.append(.studentPayments)
         case .notifications:
             navigationPath.append(.notifications)
+        case .mediaPermissions:
+            navigationPath.append(.mediaPermissions)
         case .privacyControls:
             navigationPath.append(.privacyControls)
         case .language:

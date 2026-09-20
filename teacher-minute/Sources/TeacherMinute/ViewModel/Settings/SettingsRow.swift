@@ -41,6 +41,7 @@ struct SettingsRow: Identifiable {
         case .teacherPayouts:  self.destination = .teacherPayouts
         case .studentPayments: self.destination = .studentPayments
         case .notifications:   self.destination = .notifications
+        case .mediaPermissions: self.destination = .mediaPermissions
         case .privacyControls: self.destination = .privacyControls
         case .language:        self.destination = .language
         case .about:           self.destination = .about
