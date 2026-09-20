@@ -1,0 +1,14 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "teacher.minute",
+      "sha256_cert_fingerprints": [
+        "05:78:36:F2:5F:08:F2:26:18:D8:39:61:51:63:9A:E5:1A:ED:D0:47:00:C9:13:64:2E:BC:1F:FF:8B:F1:6D:DE",
+        "97:06:CD:AE:95:A9:AB:FB:8E:A1:A9:8F:45:1A:99:FA:E2:5A:2C:7E:6D:8A:DF:A0:86:D5:91:8E:C2:67:A5:99",
+        "95:79:43:ED:FF:E8:37:80:AC:EB:E0:FE:75:B0:79:AF:FE:72:8A:20:D7:46:DA:4C:B9:24:68:BC:56:D4:84:C0"
+      ]
+    }
+  }
+]

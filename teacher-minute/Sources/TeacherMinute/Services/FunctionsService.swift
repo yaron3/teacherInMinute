@@ -25,10 +25,58 @@ import SkipFirebaseAuth
 
 // MARK: - Errors
 
+/// The machine-readable half of a callable's error, from `error.details`.
+///
+/// The `message` a function throws is English and written for a log; anything
+/// the app has to *act* on — show its own localized copy for, fill a number
+/// into — travels here instead, where it can be switched on safely.
+struct ServerErrorDetails: Sendable, Equatable {
+  /// Stable identifier for why the call was refused, e.g. `question_too_long`.
+  let reason: String
+  /// The limit `reason` refers to, when it names one. Sent by the backend so
+  /// the app never has to keep its own copy of a number Remote Config owns.
+  let limit: Int?
+  /// Which allowance ran out — "minute" or "hour" — for a refusal that names
+  /// one.
+  let scope: String?
+  /// How long until the same call is worth making again.
+  let retryAfterSeconds: Int?
+
+  init?(_ raw: [String: Any]?) {
+    guard let reason = raw?["reason"] as? String, !reason.isEmpty else { return nil }
+    self.reason = reason
+    self.limit = Self.intValue(raw?["limit"])
+    self.scope = raw?["scope"] as? String
+    self.retryAfterSeconds = Self.intValue(raw?["retryAfterSeconds"])
+  }
+
+  /// JSON numbers arrive as `Int` or `Double` depending on the platform's
+  /// deserializer, and as a string from a backend that quoted them.
+  private static func intValue(_ value: Any?) -> Int? {
+    if let int = value as? Int { return int }
+    if let double = value as? Double { return Int(double) }
+    if let string = value as? String { return Int(string) }
+    return nil
+  }
+}
+
+extension ServerErrorDetails {
+  /// `createQuestion` refused the text for exceeding the published length
+  /// limit; `limit` carries that limit.
+  static let questionTooLong = "question_too_long"
+
+  /// `createQuestion` refused because the student has asked too often;
+  /// `scope` names the allowance and `retryAfterSeconds` says how long.
+  static let rateLimited = "rate_limited"
+
+  /// The value `scope` carries when it is the hourly allowance.
+  static let hourScope = "hour"
+}
+
 enum FunctionsError: Error {
   case notSignedIn
   case httpError(statusCode: Int)
-  case serverError(message: String, status: String)
+  case serverError(message: String, status: String, details: ServerErrorDetails? = nil)
   case decodingError(function: String? = nil, response: String? = nil)
 }
 
@@ -39,7 +87,7 @@ extension FunctionsError: LocalizedError {
       "Not signed in"
     case .httpError(let statusCode):
       "HTTP error \(statusCode)"
-    case .serverError(let message, let status):
+    case .serverError(let message, let status, _):
       "\(status): \(message)"
     case .decodingError(let function, let response):
       "Could not decode \(function ?? "function") response. \(response ?? "")"
@@ -58,7 +106,11 @@ struct AcceptInviteResult {
 
 struct CreateQuestionResult {
   let questionId: String
-  let connectionFeeCents: Int
+  /// The student's LiveKit room and token for an audio or video question,
+  /// minted with it so the lesson can connect the moment a teacher accepts.
+  /// Absent for a text question, and from a backend that predates this.
+  let liveKitRoom: String?
+  let liveKitToken: String?
 }
 
 struct QuestionStatusResult {
@@ -95,8 +147,20 @@ struct GooglePayCheckoutSession {
   let countryCode: String
 }
 
+struct EmailValidationResult {
+  /// Trimmed and lowercased by the backend — store this, not what was typed.
+  let email: String
+  let isValid: Bool
+  /// Why it was rejected, ready to show. Nil when the address is usable.
+  let message: String?
+}
+
 struct PaymentSettingsSessionResult {
   let settingsURL: URL
+}
+
+struct PayPalVaultClientTokenResult {
+  let clientToken: String
 }
 
 struct RedeemCouponResult {
@@ -116,6 +180,104 @@ struct SimulateDemoQuestionResult {
   var usedLocalAI: Bool { mode == "local" }
 }
 
+/// What `claimEmailReward` reports. The offer amounts come back on every
+/// status, so the app can describe the reward before it is earned.
+struct EmailRewardStatus {
+  enum Status: String {
+    case granted
+    case alreadyGranted = "already_granted"
+    case notVerified = "not_verified"
+    case claimedByOtherAccount = "claimed_by_other_account"
+    case notEligible = "not_eligible"
+    case unavailable
+  }
+
+  let status: Status
+  /// "student" or "teacher"; nil before a role is chosen.
+  let role: String?
+  let studentMinutes: Int
+  let teacherSharePercent: Int
+  let teacherBonusMinutes: Int
+  let teacherBonusMinutesRemaining: Int
+}
+
+// MARK: - Teacher earnings
+
+/// One 7-day span within a month, as aggregated by the `teacherEarningsSummary`
+/// backend service. Labels are built client-side so they follow the app language.
+struct EarningsWeek {
+  let index: Int
+  let startDay: Int
+  let endDay: Int
+  let earningsCents: Int
+  let minutesCount: Int
+  let lessonCount: Int
+}
+
+struct EarningsMonth {
+  let id: String   // "yyyy-MM"
+  let year: Int
+  let month: Int   // 1-12
+  let earningsCents: Int
+  let minutesCount: Int
+  let lessonCount: Int
+  let isCurrentMonth: Bool
+  let weeks: [EarningsWeek]
+}
+
+/// The pending payout: a month's earnings, paid on the 9th of the month after
+/// it (March is paid on 9 April) — see functions/src/payoutSchedule.ts.
+struct EarningsNextPayment {
+  let amountCents: Int
+  /// Payout day as "yyyy-MM-dd"; formatted for display by the view model.
+  let payoutDate: String
+  /// "yyyy-MM" of the earnings period this payout covers.
+  let periodMonthId: String
+}
+
+struct TeacherEarningsSummaryResult {
+  let currency: String
+  let totalEarningsCents: Int
+  let months: [EarningsMonth]
+  /// Exactly the lessons the totals above were computed from, newest first.
+  /// The teacher's history list renders these rather than assembling its own
+  /// set from the `questions` array on the user document — that array is
+  /// maintained by a separate write and drifts, which is how the two screens
+  /// came to show different totals for the same teacher.
+  let lessons: [HistoryLesson]
+  /// When the oldest counted lesson ended, so the running total can say what
+  /// period it covers. `nil` when there are no lessons yet.
+  let firstLessonAt: Date?
+  let nextPayment: EarningsNextPayment?
+  /// Where the payout is sent, or `nil` if the teacher has not set one up.
+  let payoutMethod: TeacherPayoutMethod?
+  /// Short, non-sensitive description of the destination — a bank account is
+  /// already masked to its last 4 digits by the backend.
+  let payoutMethodSummary: String
+  /// The banks the backend accepts, for the payout form's picker.
+  let banks: [PayoutBank]
+  /// The teacher's profile phone, offered as the Bit number so they don't have
+  /// to retype a number the app already holds.
+  let profilePhone: String
+}
+
+// MARK: - Teacher ratings
+
+/// A teacher's public reputation, as aggregated by the `teacherRatingSummary`
+/// backend service. `ratingCount == 0` means nobody has rated this teacher yet,
+/// which the screens render as "no rating" rather than as zero stars.
+struct TeacherRatingSummary {
+  let teacherId: String
+  let averageRating: Double
+  let ratingCount: Int
+
+  var hasRating: Bool { ratingCount > 0 }
+
+  static func empty(teacherId: String) -> TeacherRatingSummary {
+    TeacherRatingSummary(teacherId: teacherId, averageRating: 0, ratingCount: 0)
+  }
+}
+
 // MARK: - Service
 
 @MainActor
@@ -133,11 +295,13 @@ final class FunctionsService {
       function: "createQuestion",
       data: ["topic": topic, "text": text, "photoUrls": photoUrls, "conversationType": conversationType]
     )
-    guard
-      let questionId = result["questionId"] as? String,
-      let feeCents   = result["connectionFeeCents"] as? Int
+    guard let questionId = result["questionId"] as? String
     else { throw FunctionsError.decodingError() }
-    return CreateQuestionResult(questionId: questionId, connectionFeeCents: feeCents)
+    return CreateQuestionResult(
+      questionId: questionId,
+      liveKitRoom: result["liveKitRoom"] as? String,
+      liveKitToken: result["liveKitToken"] as? String
+    )
   }
 
   /// Asks the backend for a simulated student question. The backend decides who
@@ -174,15 +338,20 @@ final class FunctionsService {
     _ = try await call(function: "cancelQuestion", data: ["questionId": questionId])
   }
 
-  func rateTeacher(questionId: String, teacherId: String, rating: Int) async throws {
-    _ = try await call(
-      function: "rateTeacher",
-      data: [
-        "questionId": questionId,
-        "teacherId": teacherId,
-        "rating": rating
-      ]
-    )
+  /// `comment` is the student's optional written feedback. The backend trims it
+  /// and stores it on the rating; the teacher later reads it without the
+  /// student's identity attached.
+  func rateTeacher(questionId: String, teacherId: String, rating: Int, comment: String = "") async throws {
+    var data: [String: Any] = [
+      "questionId": questionId,
+      "teacherId": teacherId,
+      "rating": rating
+    ]
+    let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty {
+      data["comment"] = trimmed
+    }
+    _ = try await call(function: "rateTeacher", data: data)
   }
 
   func getQuestionStatus(questionId: String) async throws -> QuestionStatusResult {
@@ -204,6 +373,24 @@ final class FunctionsService {
       throw FunctionsError.decodingError(function: "redeemCoupon")
     }
     return RedeemCouponResult(minutesAdded: minutes)
+  }
+
+  /// Claims the verified-email welcome reward for the caller's role. Safe to
+  /// call repeatedly: once granted it just reports `alreadyGranted`.
+  func claimEmailReward() async throws -> EmailRewardStatus {
+    let result = try await call(function: "claimEmailReward", data: [:])
+    guard let raw = result["status"] as? String,
+          let status = EmailRewardStatus.Status(rawValue: raw) else {
+      throw FunctionsError.decodingError(function: "claimEmailReward")
+    }
+    return EmailRewardStatus(
+      status: status,
+      role: result["role"] as? String,
+      studentMinutes: Self.intValue(result["studentMinutes"]) ?? 0,
+      teacherSharePercent: Int(((Self.doubleValue(result["teacherShare"]) ?? 0) * 100).rounded()),
+      teacherBonusMinutes: Self.intValue(result["teacherBonusMinutes"]) ?? 0,
+      teacherBonusMinutesRemaining: Self.intValue(result["teacherBonusMinutesRemaining"]) ?? 0
+    )
   }
 
   func createCheckoutSession(pricingOptionID: String, paymentMethod: PaymentMethod = .paypal) async throws -> CheckoutSessionResult {
@@ -289,6 +476,218 @@ final class FunctionsService {
     return PaymentSettingsSessionResult(settingsURL: settingsURL)
   }
 
+  // MARK: - Saved PayPal (Braintree vault)
+
+  func createPayPalVaultClientToken() async throws -> PayPalVaultClientTokenResult {
+    let result = try await call(function: "createPayPalVaultClientToken", data: [:])
+    guard let clientToken = result["clientToken"] as? String else {
+      throw FunctionsError.decodingError(function: "createPayPalVaultClientToken", response: "\(result)")
+    }
+    return PayPalVaultClientTokenResult(clientToken: clientToken)
+  }
+
+  /// Vaults the PayPal account behind `nonce` and returns its (masked) email
+  /// for display.
+  func savePayPalVault(nonce: String) async throws -> String {
+    let result = try await call(function: "savePayPalVault", data: ["nonce": nonce])
+    return result["email"] as? String ?? ""
+  }
+
+  func removeSavedPayPal() async throws {
+    _ = try await call(function: "removeSavedPayPal", data: [:])
+  }
+
+  /// Charges the student's previously saved PayPal account directly — no
+  /// PayPal login, no checkout URL.
+  func chargeSavedPayPal(pricingOptionID: String) async throws {
+    _ = try await call(function: "chargeSavedPayPal", data: ["pricingOptionId": pricingOptionID])
+  }
+
+  // MARK: - Teacher ratings
+
+  /// Star average and review count for the given teachers. Teacher documents
+  /// are not readable cross-user, so this is the only way a student can see a
+  /// teacher's rating.
+  func teacherRatingSummaries(teacherIds: [String]) async throws -> [TeacherRatingSummary] {
+    var data: [String: Any] = [:]
+    if !teacherIds.isEmpty {
+      data["teacherIds"] = teacherIds
+    }
+    let result = try await call(function: "teacherRatingSummary", data: data)
+    let rows = result["ratings"] as? [[String: Any]] ?? []
+    return rows.compactMap { row in
+      guard let teacherId = row["teacherId"] as? String else { return nil }
+      return TeacherRatingSummary(
+        teacherId: teacherId,
+        averageRating: Self.doubleValue(row["averageRating"]) ?? 0,
+        ratingCount: Self.intValue(row["ratingCount"]) ?? 0
+      )
+    }
+  }
+
+  /// One teacher's rating, or the signed-in teacher's own when `teacherId` is
+  /// `nil`. Returns an empty summary rather than throwing when nobody has rated
+  /// them yet.
+  func teacherRatingSummary(teacherId: String? = nil) async throws -> TeacherRatingSummary {
+    let requested = teacherId.map { [$0] } ?? []
+    let summaries = try await teacherRatingSummaries(teacherIds: requested)
+    if let teacherId {
+      return summaries.first(where: { $0.teacherId == teacherId }) ?? .empty(teacherId: teacherId)
+    }
+    return summaries.first ?? .empty(teacherId: "")
+  }
+
+  // MARK: - Teacher earnings
+
+  /// Server-side aggregation of the teacher's completed lessons into monthly
+  /// and weekly earnings, plus the pending payout. Replaces the client-side
+  /// per-question fetch, which could not see months beyond its page limit.
+  func teacherEarningsSummary() async throws -> TeacherEarningsSummaryResult {
+    let result = try await call(function: "teacherEarningsSummary", data: [:])
+
+    let monthRows = result["months"] as? [[String: Any]] ?? []
+    let months: [EarningsMonth] = monthRows.compactMap { row in
+      guard
+        let id = row["id"] as? String,
+        let year = Self.intValue(row["year"]),
+        let month = Self.intValue(row["month"])
+      else { return nil }
+
+      let weekRows = row["weeks"] as? [[String: Any]] ?? []
+      let weeks: [EarningsWeek] = weekRows.compactMap { weekRow in
+        guard
+          let index = Self.intValue(weekRow["index"]),
+          let startDay = Self.intValue(weekRow["startDay"]),
+          let endDay = Self.intValue(weekRow["endDay"])
+        else { return nil }
+        return EarningsWeek(
+          index: index,
+          startDay: startDay,
+          endDay: endDay,
+          earningsCents: Self.intValue(weekRow["earningsCents"]) ?? 0,
+          minutesCount: Self.intValue(weekRow["minutesCount"]) ?? 0,
+          lessonCount: Self.intValue(weekRow["lessonCount"]) ?? 0
+        )
+      }
+
+      return EarningsMonth(
+        id: id,
+        year: year,
+        month: month,
+        earningsCents: Self.intValue(row["earningsCents"]) ?? 0,
+        minutesCount: Self.intValue(row["minutesCount"]) ?? 0,
+        lessonCount: Self.intValue(row["lessonCount"]) ?? 0,
+        isCurrentMonth: row["isCurrentMonth"] as? Bool ?? false,
+        weeks: weeks
+      )
+    }
+
+    var nextPayment: EarningsNextPayment?
+    if let payment = result["nextPayment"] as? [String: Any],
+       let payoutDate = payment["payoutDate"] as? String {
+      nextPayment = EarningsNextPayment(
+        amountCents: Self.intValue(payment["amountCents"]) ?? 0,
+        payoutDate: payoutDate,
+        periodMonthId: payment["periodMonthId"] as? String ?? ""
+      )
+    }
+
+    var payoutMethod: TeacherPayoutMethod?
+    if let methodRow = result["payoutMethod"] as? [String: Any] {
+      payoutMethod = TeacherPayoutMethod(data: methodRow)
+    }
+
+    let bankRows = result["banks"] as? [[String: Any]] ?? []
+    let banks: [PayoutBank] = bankRows.compactMap { row in
+      guard let code = row["code"] as? String, let name = row["name"] as? String else { return nil }
+      return PayoutBank(code: code, name: name, nameHe: row["nameHe"] as? String ?? name)
+    }
+
+    let summaryCurrency = result["currency"] as? String ?? LessonFormatting.defaultCurrencyCode
+    let lessonRows = result["lessons"] as? [[String: Any]] ?? []
+    let lessons: [HistoryLesson] = lessonRows.compactMap { row in
+      guard let questionId = row["questionId"] as? String, !questionId.isEmpty else { return nil }
+      let text = row["text"] as? String ?? ""
+      let photoUrls = row["photoUrls"] as? [String] ?? []
+      let studentName = row["studentName"] as? String ?? ""
+      return HistoryLesson(
+        id: questionId,
+        questionId: questionId,
+        title: HistoryModel.lessonTitle(
+          questionText: text,
+          photoUrls: photoUrls,
+          topic: row["topic"] as? String ?? ""
+        ),
+        otherParticipantName: studentName.isEmpty ? LocalizationSupport.localized("Student") : studentName,
+        otherParticipantImageURL: row["studentImageURL"] as? String ?? "",
+        questionText: text,
+        questionPhotoUrls: photoUrls,
+        acceptedAt: Self.isoDate(row["acceptedAt"]) ?? Self.isoDate(row["endedAt"]) ?? Date.distantPast,
+        durationSeconds: Self.intValue(row["durationSeconds"]) ?? 0,
+        costCents: Self.intValue(row["costCents"]) ?? 0,
+        teacherEarningsCents: Self.intValue(row["earningsCents"]) ?? 0,
+        // Older lessons predate the per-lesson currency field; the summary's
+        // own currency is the same money, so it stands in rather than letting
+        // the row fall back to a different default than the totals used.
+        currencyCode: (row["currency"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? summaryCurrency,
+        studentRating: Self.intValue(row["studentRating"]) ?? 0
+      )
+    }
+
+    return TeacherEarningsSummaryResult(
+      currency: summaryCurrency,
+      totalEarningsCents: Self.intValue(result["totalEarningsCents"]) ?? 0,
+      months: months,
+      lessons: lessons,
+      firstLessonAt: Self.isoDate(result["firstLessonAt"]),
+      nextPayment: nextPayment,
+      payoutMethod: payoutMethod,
+      payoutMethodSummary: result["payoutMethodSummary"] as? String ?? "",
+      banks: banks,
+      profilePhone: result["profilePhone"] as? String ?? ""
+    )
+  }
+
+  /// Confirms a PayPal payout account from a nonce produced by the teacher
+  /// completing a PayPal login, and saves it. Returns the confirmed email and
+  /// its masked summary — PayPal has no address-lookup API, so completing the
+  /// login is the only way to know the account exists.
+  func verifyPayPalPayoutAccount(nonce: String) async throws -> (email: String, summary: String) {
+    let result = try await call(function: "verifyPayPalPayoutAccount", data: ["nonce": nonce])
+    let method = result["payoutMethod"] as? [String: Any] ?? [:]
+    return (
+      email: method["email"] as? String ?? "",
+      summary: result["payoutMethodSummary"] as? String ?? ""
+    )
+  }
+
+  /// Saves where the teacher's payout is sent. The backend validates the fields
+  /// the chosen type requires and throws `invalid-argument` with a message the
+  /// teacher can act on. Returns the masked destination summary.
+  /// Checks an address before it is submitted anywhere — the payout form
+  /// today, email signup next. Stores nothing and needs no sign-in.
+  ///
+  /// `valid == false` carries a `message` explaining which check failed
+  /// (malformed, or a domain that accepts no mail). Mailbox existence is only
+  /// reported when the backend has a verification provider configured; when it
+  /// does not, a well-formed address on a real mail domain reads as valid.
+  func validateEmailAddress(_ email: String) async throws -> EmailValidationResult {
+    let result = try await call(function: "validateEmailAddress", data: ["email": email])
+    return EmailValidationResult(
+      email: result["email"] as? String ?? email,
+      isValid: result["valid"] as? Bool ?? false,
+      message: result["message"] as? String
+    )
+  }
+
+  func updateTeacherPayoutMethod(_ method: TeacherPayoutMethod) async throws -> String {
+    let result = try await call(
+      function: "updateTeacherPayoutMethod",
+      data: ["payoutMethod": method.requestPayload]
+    )
+    return result["payoutMethodSummary"] as? String ?? ""
+  }
+
   // MARK: - Teacher callables
 
   func acceptInvite(questionId: String) async throws -> AcceptInviteResult {
@@ -362,8 +761,9 @@ final class FunctionsService {
        let error = json["error"] as? [String: Any] {
       let message = error["message"] as? String ?? "Unknown error"
       let status  = error["status"]  as? String ?? "UNKNOWN"
-      logger.error("[FunctionsService] \(name) server error status=\(status) message=\(message)")
-      throw FunctionsError.serverError(message: message, status: status)
+      let details = ServerErrorDetails(error["details"] as? [String: Any])
+      logger.error("[FunctionsService] \(name) server error status=\(status) message=\(message) reason=\(details?.reason ?? "none")")
+      throw FunctionsError.serverError(message: message, status: status, details: details)
     }
 
     if let statusCode, statusCode != 200 {
@@ -396,6 +796,35 @@ final class FunctionsService {
 #else
     "ios"
 #endif
+  }
+
+  /// JSON numbers arrive as `Int`, `Double` or `NSNumber` depending on platform
+  /// and magnitude, so every numeric field is read through this.
+  private static func intValue(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? Double { return Int(value) }
+    if let value = value as? String { return Int(value) }
+    return nil
+  }
+
+  /// Same story as `intValue`, for fields that carry a fraction (a star
+  /// average, for instance).
+  private static func doubleValue(_ value: Any?) -> Double? {
+    if let value = value as? Double { return value }
+    if let value = value as? Int { return Double(value) }
+    if let value = value as? String { return Double(value) }
+    return nil
+  }
+
+  /// Callable results carry dates as ISO-8601 strings — the transport has no
+  /// Timestamp — and the backend writes them with fractional seconds, which
+  /// the plain formatter does not accept.
+  private static func isoDate(_ value: Any?) -> Date? {
+    guard let text = value as? String, !text.isEmpty else { return nil }
+    let withFraction = ISO8601DateFormatter()
+    withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = withFraction.date(from: text) { return date }
+    return ISO8601DateFormatter().date(from: text)
   }
 
   private static func firstString(in dict: [String: Any], keys: [String]) -> String? {

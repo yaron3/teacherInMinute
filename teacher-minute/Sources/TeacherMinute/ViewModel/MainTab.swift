@@ -8,10 +8,12 @@
 
 import SwiftUI
 import Observation
+import SkipFuse
 
 enum MainTab: Hashable, CaseIterable {
   case home
   case lessons
+  case earnings
   case profile
   case settings
   
@@ -19,6 +21,7 @@ enum MainTab: Hashable, CaseIterable {
 	switch self {
 	  case .home: LocalizationSupport.localized("Home")
 	  case .lessons: LocalizationSupport.localized("Lessons")
+	  case .earnings: LocalizationSupport.localized("Earnings")
 	  case .profile: LocalizationSupport.localized("Profile")
 	  case .settings: LocalizationSupport.localized("Settings")
 	}
@@ -28,19 +31,25 @@ enum MainTab: Hashable, CaseIterable {
 	switch self {
 	  case .home: "house"
 	  case .lessons: "teaching_tab_icon"
+	  case .earnings: Self.earningsSymbol
 	  case .profile: "person"
 	  case .settings: "gearshape"
 	}
   }
-  
+
   var selectedSystemImage: String {
 	switch self {
 	  case .home: "house.fill"
 	  case .lessons: "teaching_tab_icon.fill"
+	  case .earnings: "\(Self.earningsSymbol).fill"
 	  case .profile: "person.fill"
 	  case .settings: "gearshape.fill"
 	}
   }
+
+  /// The Earnings tab wears the currency the money is actually in, rather than
+  /// a fixed dollar sign — everything the tab leads to is priced in shekels.
+  static var earningsSymbol: String { LessonFormatting.currencySignIcon }
   
   func systemImage(isSelected: Bool) -> String {
 	isSelected ? selectedSystemImage : systemImage
@@ -73,6 +82,24 @@ final class MainTabViewModel {
 
   var shouldShowLessonsBadge: Bool {
 	userMode == .teacher && hasUnseenLessons
+  }
+
+  /// The tabs to show, in order. Earnings is teacher-only.
+  ///
+  /// The view builds its tab bar from this list rather than wrapping a tab in
+  /// an `if`: on iOS a false branch inside `TabView` omits the tab, but under
+  /// SkipUI it still contributes an empty slot, which showed up on Android as
+  /// a blank tab between Lessons and Profile.
+  var visibleTabs: [MainTab] {
+	if userMode == .teacher {
+	  return [.home, .lessons, .earnings, .profile, .settings]
+	}
+	return [.home, .lessons, .profile, .settings]
+  }
+
+  /// Badge count for `tab` — only Lessons ever carries one; 0 means no badge.
+  func badgeCount(for tab: MainTab) -> Int {
+	tab == .lessons && shouldShowLessonsBadge ? 1 : 0
   }
 
   init(userMode: AppUserMode = .teacher) {

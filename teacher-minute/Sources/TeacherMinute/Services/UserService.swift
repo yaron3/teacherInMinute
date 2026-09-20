@@ -52,6 +52,17 @@ final class UserService {
 			return UserProfileSummary(uid: uid, data: data)
   }
 
+  /// The email of the student's vaulted PayPal account (see FunctionsService's
+  /// savePayPalVault/chargeSavedPayPal), or `nil` if none is saved.
+  func fetchSavedPayPalEmail(uid: String) async throws -> String? {
+    guard let data = try await fetchRaw(uid: uid),
+          let savedPayPal = data["savedPayPal"] as? [String: Any],
+          let email = savedPayPal["email"] as? String,
+          !email.isEmpty
+    else { return nil }
+    return email
+  }
+
   func isTeacherVerified(uid: String) async throws -> Bool {
     let db = Firestore.firestore()
     let snap = try await db.collection("teachers").document(uid).getDocument()
@@ -137,7 +148,18 @@ final class UserService {
 	  let subjectSelections = data["subjectSelections"] as? [String: [String]] ?? [:]
 	  let hasSubjects = subjectSelections.values.contains { !$0.isEmpty }
 
-	  if !hasIdentityDocs { return .teacherIdentityVerification }
+	  // Whether a teacher who is already signed in, but never uploaded an ID,
+	  // is sent to verification on launch.
+	  //
+	  // Its own flag rather than the `teacher_identity_onboarding` one the
+	  // sign-up path reads: the two catch different people — that one only
+	  // ever sees a teacher creating an account, this one every teacher who
+	  // signed up while it was off — so turning the step on for new teachers
+	  // should not, on its own, round up the existing ones at next launch.
+	  let verifiesIdentityOnLaunch = RemoteConfigService.shared.getBool(
+		"teacher_identity_on_launch", default: false
+	  )
+	  if verifiesIdentityOnLaunch, !hasIdentityDocs { return .teacherIdentityVerification }
 	  if !hasSubjects      { return .teacherSubjects }
 			  if !(hasName && hasPhone) { return .completeProfile(role: .teacher) }
 		  return .home(role: .teacher)

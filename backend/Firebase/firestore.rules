@@ -10,6 +10,23 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
+    // Fields on users/{uid} that only the backend may write: balances,
+    // earnings and welcome rewards. The app never writes them, and letting it
+    // would let any user grant themselves minutes or a better teacher share.
+    function serverOwnedUserFields() {
+      return [
+        'remainingMinutes',
+        'totalMinutes',
+        'totalMinutesUsed',
+        'purchaseMinutesConsumed',
+        'earnings',
+        'totalEarnings',
+        'totalRevenueGenerated',
+        'emailRewards',
+        'teacherBonus'
+      ];
+    }
+
     function authUidInThreadId(threadId) {
       return isAuth()
         && threadId.matches('^(' + request.auth.uid + '_[^_]+|[^_]+_' + request.auth.uid + ')$');
@@ -47,7 +64,11 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, create, update, delete: if isUser(uid);
+      allow read, delete: if isUser(uid);
+      allow create: if isUser(uid)
+        && !request.resource.data.keys().hasAny(serverOwnedUserFields());
+      allow update: if isUser(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(serverOwnedUserFields());
 
       match /profile/{profileId} {
         allow read, create, update, delete: if isUser(uid);
@@ -90,6 +111,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Aggregate, non-identifying platform counters (e.g. the average time it
+    // takes a question to reach a teacher). Written server-side only; any
+    // signed-in user may read them so the app can show real numbers instead of
+    // baked-in copy.
+    match /stats/{statsDocId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
     match /pricing/{pricingOptionId} {
       allow read: if true;
       allow write: if false;
@@ -103,6 +133,12 @@ service cloud.firestore {
         && resource.data.uid == request.auth.uid;
 
       allow update, delete: if false;
+    }
+
+    // One welcome-reward claim per canonical mailbox (functions/src/emailRewards.ts).
+    // Backend only; no client reads it.
+    match /emailRewardClaims/{claimId} {
+      allow read, write: if false;
     }
 
     match /processedWebhooks/{eventId} {

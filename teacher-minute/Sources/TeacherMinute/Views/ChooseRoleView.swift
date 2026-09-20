@@ -22,22 +22,26 @@ struct ChooseRoleView: View {
   }
 
   var body: some View {
+    // The role cards and the teacher's "How it works" panel together outgrow a
+    // short screen, and the panel is the part that explains what the teacher is
+    // signing up for — so the content scrolls and Continue stays pinned below
+    // it rather than being pushed off the bottom.
     VStack(alignment: .leading, spacing: 0) {
+      ScrollView(.vertical, showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 0) {
 
-      Text(LocalizationSupport.localized("How do you want to use Teacher in a Minute? You\ncan change this later in settings."))
+      Text(viewModel.subtitleText)
         .font(.system(size: 15))
         .foregroundStyle(theme.secondaryText)
         .lineSpacing(5)
         .padding(.top, 8)
 
-      VStack(spacing: 22) {
+      VStack(spacing: 12) {
         RoleCard(
-          title: LocalizationSupport.localized("I am a Student"),
+          title: viewModel.studentRoleTitle,
           icon: "graduationcap.fill",
-          details: [
-            LocalizationSupport.localized("On-demand help"),
-            LocalizationSupport.localized("Per-minute billing")
-          ],
+          description: viewModel.studentDescriptionLines,
+          details: viewModel.studentRoleBullets,
           isSelected: viewModel.selectedRole == .student,
           accent: theme.accent
         ) {
@@ -45,12 +49,10 @@ struct ChooseRoleView: View {
         }
 
         RoleCard(
-          title: LocalizationSupport.localized("I am a Teacher"),
+          title: viewModel.teacherRoleTitle,
           icon: "person.crop.rectangle",
-          details: [
-            LocalizationSupport.localized("Earn while teaching"),
-            LocalizationSupport.localized("Verification required")
-          ],
+          description: viewModel.teacherDescriptionLines,
+          details: viewModel.teacherRoleBullets,
           isSelected: viewModel.selectedRole == .teacher,
           accent: theme.accent
         ) {
@@ -58,10 +60,21 @@ struct ChooseRoleView: View {
         }
       }
       .padding(.top, 34)
+	  if viewModel.selectedRole == .teacher {
+		  HowItWorksPanel(
+			title: viewModel.howItWorksTeacherTitle,
+			steps: viewModel.howItWorksTeacherSteps,
+			theme: theme
+		  )
+		  .padding(.top,12)
+		
+	  }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 20)
+      }
 
-      Spacer()
-
-      AuthPrimaryButton(title: LocalizationSupport.localized("Continue")) {
+      AuthPrimaryButton(title: viewModel.continueLabel) {
         Task { @MainActor in
           continueWithSelectedRole()
         }
@@ -93,27 +106,29 @@ struct ChooseRoleView: View {
     .padding(.horizontal, 20)
     .background(theme.screenBackground)
     .navigationBarTitleDisplayMode(.inline)
+    .onboardingBackHandling(viewModel: viewModel)
     .sheet(isPresented: $showingTerms) {
       if let termsURL {
-        NavigationStack { AboutWebView(url: termsURL, title: LocalizationSupport.localized("EULA")) }
+        NavigationStack { AboutWebView(url: termsURL, title: viewModel.eulaTitle) }
       }
     }
-	.navigationTitle(LocalizationSupport.localized("Choose Your Role"))
+	.navigationTitle(viewModel.screenTitle)
     .sheet(isPresented: $showingPrivacy) {
       if let privacyURL {
-        NavigationStack { AboutWebView(url: privacyURL, title: LocalizationSupport.localized("Privacy Policy")) }
+        NavigationStack { AboutWebView(url: privacyURL, title: viewModel.privacyPolicyTitle) }
       }
     }
     .appDialog(
-      LocalizationSupport.localized("Choose Your Role"),
+      viewModel.screenTitle,
       isPresented: $showLegalAlert,
       message: legalAlertMessage,
-      actions: [AppDialogAction(LocalizationSupport.localized("OK"))]
+      actions: [AppDialogAction(viewModel.okLabel)]
     )
+    .trackScreen(AnalyticsScreen.chooseRole)
   }
 
   private func continueWithSelectedRole() {
-    if viewModel.selectedRole == .teacher {
+	if viewModel.selectedRole == .teacher  && viewModel.teacherIdentityOnBoarding{
       router.push(.teacherIdentityVerification)
     } else {
       router.push(.completeProfile(role: viewModel.selectedRole))
@@ -138,7 +153,7 @@ struct ChooseRoleView: View {
       return
     }
 
-    legalAlertMessage = SettingsError.missingLegalURL(LocalizationSupport.localized("Privacy Policy")).localizedDescription
+    legalAlertMessage = SettingsError.missingLegalURL(viewModel.privacyPolicyTitle).localizedDescription
     showLegalAlert = true
   }
 }
@@ -146,6 +161,7 @@ struct ChooseRoleView: View {
 struct RoleCard: View {
   let title: String
   let icon: String
+  let description: [String]
   let details: [String]
   let isSelected: Bool
   let accent: Color
@@ -167,7 +183,13 @@ struct RoleCard: View {
                 .font(.system(size: 21, weight: .semibold))
                 .foregroundStyle(accent)
             }
-
+		  VStack {
+			ForEach (description, id: \.self) { detail in
+			  Text(detail)
+				.font(.system(size: 14, weight: .semibold))
+				.foregroundStyle(theme.primaryText)
+			}
+		  }
           Spacer()
 
           if isSelected {

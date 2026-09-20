@@ -23,14 +23,17 @@ struct StudentLessonHistoryView: View {
             }
             .background(theme.screenBackground)
         }
+        .trackScreen(AnalyticsScreen.studentLessonHistory)
         .task {
             await viewModel.loadProfile()
             isLoading = false
         }
         .sheet(item: $presentingLesson) { lesson in
             LessonDetailView(
+                viewModel: viewModel,
                 lesson: lesson,
-                amountLabel: "Cost",
+                amountLabel: viewModel.costLabel,
+                viewerRole: "student",
                 isPlaying: viewModel.isPlaying(lesson),
                 initialDetails: nil,
                 showsAmount: false,
@@ -45,7 +48,7 @@ struct StudentLessonHistoryView: View {
     private var lessonSections: some View {
                 VStack(alignment: .leading, spacing: 0) {
                     FlatTopHeader(
-                        eyebrow: LocalizationSupport.localized("Lesson History"),
+                        eyebrow: viewModel.historyEyebrow,
                         name: viewModel.studentName,
                         avatarImageURL: viewModel.profileImageURL,
                         avatarSystemImage: "person.crop.circle.fill",
@@ -53,19 +56,19 @@ struct StudentLessonHistoryView: View {
                     )
                     .padding(.top, 16)
 
-                    FlatPageTitle(title: LocalizationSupport.localized("Past Lessons"))
+                    FlatPageTitle(title: viewModel.pastLessonsTitle)
                         .padding(.top, 24)
 
                     summaryStrip
                         .padding(.top, 20)
 
                     FlatSearchField(
-                        placeholder: LocalizationSupport.localized("Search lessons or teachers"),
+                        placeholder: viewModel.searchPlaceholder,
                         text: $viewModel.query
                     )
                     .padding(.top, 16)
 
-                    FlatSectionHeader(LocalizationSupport.localized("Past")) {
+                    FlatSectionHeader(viewModel.pastSectionTitle) {
                         FlatChip(title: viewModel.completedCountText)
                     }
                     .padding(.top, 28)
@@ -82,22 +85,27 @@ struct StudentLessonHistoryView: View {
                         }
                         .padding(.top, 14)
                     } else if viewModel.filteredLessons.isEmpty {
-                        Text(LocalizationSupport.localized("You don't have any recent activity"))
+                        Text(viewModel.emptyHistoryText)
                             .font(.system(size: 17))
                             .foregroundStyle(theme.secondaryText)
                             .padding(.top, 20)
                     } else {
                         FlatCard(padding: 0, outlined: true) {
-                            VStack(spacing: 0) {
+                            // Lazy: a row draws its question, and a drawn
+                            // formula is a web view. Only the rows on screen
+                            // should be paying for one.
+                            LazyVStack(spacing: 0) {
                                 ForEach(viewModel.filteredLessons) { lesson in
                                     LessonHistoryRow(
                                         lesson: lesson,
+                                        loadingLabel: viewModel.loadingSessionDetailsLabel,
                                         accentColor: theme.primaryText,
                                         iconName: "function",
                                         isLoading: viewModel.isLoading(lesson),
                                         showsAmount: false
                                     ) {
                                         presentingLesson = lesson
+                                        viewModel.view(lesson)
                                     }
 
                                     if lesson.id != viewModel.filteredLessons.last?.id {
@@ -118,7 +126,7 @@ struct StudentLessonHistoryView: View {
         // omitted here.
         HStack(spacing: 12) {
             HistoryMetricCard(
-                title: "Time Learned",
+                title: viewModel.timeLearnedTitle,
                 value: viewModel.totalTimeLearnedText,
                 systemImage: "clock.fill",
                 tint: theme.primaryText
@@ -142,7 +150,7 @@ struct HistoryMetricCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 FlatIconTile(systemName: systemImage, size: 40, background: theme.screenBackground)
 
-                Text(LocalizationSupport.localized(title))
+                Text(title)
                     .font(.system(size: 13))
                     .foregroundStyle(theme.secondaryText)
 
@@ -162,6 +170,7 @@ struct HistoryMetricCard: View {
 
 struct LessonHistoryRow: View {
     let lesson: LessonHistoryItem
+    let loadingLabel: String
     let accentColor: Color
     let iconName: String
     var isLoading = false
@@ -195,11 +204,23 @@ struct LessonHistoryRow: View {
             )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(lesson.title)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(theme.primaryText)
+                // Drawn, not flattened: a lesson asked as a fraction is
+                // recognised by its shape. Inline-sized and given a fixed
+                // height so every row in the list is the same height, and the
+                // enclosing lists are lazy so only the visible rows build one.
+                FormulaAwareText(
+                    text: lesson.title,
+                    textColor: theme.primaryText,
+                    font: .system(size: 16, weight: .bold),
+                    formulaMinWidth: 120,
+                    formulaMaxWidth: 220,
+                    lineLimit: 1,
+                    displayMode: false,
+                    formulaHeight: 44,
+                    formulaInset: 0
+                )
 
-                Text(isLoading ? LocalizationSupport.localized("Loading session details") : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
+                Text(isLoading ? loadingLabel : "\(lesson.otherParticipant) \u{2022} \(lesson.completedAt)")
                     .font(.system(size: 13))
                     .foregroundStyle(theme.secondaryText)
             }
@@ -270,8 +291,14 @@ struct LessonActionButton: View {
 // MARK: - Shared Lesson Detail
 
 struct LessonDetailView: View {
+    let viewModel: any LessonHistoryViewModeling
     let lesson: LessonHistoryItem
     let amountLabel: String
+    /// Which side of the lesson is looking at it, so the chat bubbles
+    /// know which messages are the viewer's own. This used to be inferred
+    /// by comparing `amountLabel` against the literal "Earnings", which
+    /// stopped matching the moment that label was translated.
+    let viewerRole: String
     let isPlaying: Bool
     let initialDetails: LessonDetails?
     /// Whether to show the monetary amount card. Hidden for students, who only
@@ -288,15 +315,19 @@ struct LessonDetailView: View {
     @State var isLoading: Bool
 
     init(
+        viewModel: any LessonHistoryViewModeling,
         lesson: LessonHistoryItem,
         amountLabel: String,
+        viewerRole: String,
         isPlaying: Bool,
         initialDetails: LessonDetails?,
         showsAmount: Bool = true,
         audioAction: @escaping () -> Void
     ) {
+        self.viewModel = viewModel
         self.lesson = lesson
         self.amountLabel = amountLabel
+        self.viewerRole = viewerRole
         self.isPlaying = isPlaying
         self.initialDetails = initialDetails
         self.showsAmount = showsAmount
@@ -307,18 +338,23 @@ struct LessonDetailView: View {
         _isLoading = State(initialValue: initialDetails == nil)
     }
 
-     var viewerRole: String {
-        amountLabel == "Earnings" ? "teacher" : "student"
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(lesson.title)
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(theme.primaryText)
+                        // The title is the question's opening line, which is
+                        // usually the formula itself — so it is drawn the same
+                        // way as the Original Question card below rather than
+                        // flattened to `5(x²)/2` in the one place there is room
+                        // to show it properly.
+                        FormulaAwareText(
+                            text: lesson.title,
+                            textColor: theme.primaryText,
+                            font: .system(size: 24, weight: .bold),
+                            formulaMinWidth: 200,
+                            formulaMaxWidth: 320
+                        )
 
                         Text("\(lesson.otherParticipant) \u{2022} \(lesson.completedAt) \u{2022} \(lesson.duration)")
                             .font(.system(size: 13))
@@ -336,7 +372,7 @@ struct LessonDetailView: View {
                         }
 
                         HistoryMetricCard(
-                            title: "Duration",
+                            title: viewModel.durationTitle,
                             value: lesson.duration,
                             systemImage: "clock.fill",
                             tint: theme.accent
@@ -344,7 +380,7 @@ struct LessonDetailView: View {
                     }
 
                     LessonActionButton(
-                        title: isPlaying ? "Pause Audio" : "Listen to Lesson",
+                        title: viewModel.audioActionLabel(isPlaying: isPlaying),
                         systemImage: isPlaying ? "pause.fill" : "play.fill",
                         foreground: lesson.hasAudio ? theme.cardBackground : theme.secondaryText,
                         background: lesson.hasAudio ? theme.accent : theme.cardBackground,
@@ -357,15 +393,19 @@ struct LessonDetailView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 6) {
                                     PlatformIcon(systemName: "pin.fill", size: 12, weight: .semibold, color: theme.warning)
-                                    Text(LocalizationSupport.localized("Original Question"))
+                                    Text(viewModel.originalQuestionTitle)
                                         .font(.system(size: 13, weight: .bold))
                                         .foregroundStyle(theme.warning)
                                 }
                                 if !questionText.isEmpty {
-                                    Text(questionText)
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(theme.primaryText)
-                                        .lineSpacing(4)
+                                    // The question can carry equations built
+                                    // with the algebra keyboard, so it is drawn
+                                    // by the same renderer the chat bubbles and
+                                    // the teacher's preview use.
+                                    FormulaAwareText(
+                                        text: questionText,
+                                        textColor: theme.primaryText
+                                    )
                                 }
                                 ForEach(questionPhotoUrls, id: \.self) { url in
                                     CachedRemoteImage(url: url, contentMode: .fit)
@@ -379,7 +419,7 @@ struct LessonDetailView: View {
                     if !lesson.summary.isEmpty {
                         RoundedInfoCard {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text(LocalizationSupport.localized("Summary"))
+                                Text(viewModel.summaryTitle)
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle(theme.primaryText)
 
@@ -393,7 +433,7 @@ struct LessonDetailView: View {
 
                     if !messages.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(LocalizationSupport.localized("Chat Messages"))
+                            Text(viewModel.chatMessagesTitle)
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundStyle(theme.primaryText)
 
@@ -401,6 +441,8 @@ struct LessonDetailView: View {
                                 ForEach(messages) { message in
                                     LessonMessageBubble(
                                         message: message,
+                                        audioMessageLabel: viewModel.audioMessageLabel,
+                                        videoMessageLabel: viewModel.videoMessageLabel,
                                         isMine: message.senderRole == viewerRole,
                                         avatarImageURL: message.senderRole == viewerRole ? lesson.currentUserImageURL : lesson.otherParticipantImageURL
                                     )
@@ -415,7 +457,7 @@ struct LessonDetailView: View {
                     if !lesson.transcriptPreview.isEmpty {
                         RoundedInfoCard {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text(LocalizationSupport.localized("Transcript Preview"))
+                                Text(viewModel.transcriptPreviewTitle)
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle(theme.primaryText)
 
@@ -439,7 +481,7 @@ struct LessonDetailView: View {
                 .padding(18)
             }
             .background(Color(.systemBackground))
-            .navigationTitle(LocalizationSupport.localized("Lesson"))
+            .navigationTitle(viewModel.lessonDetailTitle)
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 if initialDetails == nil {
@@ -464,6 +506,8 @@ struct LessonDetailView: View {
 
 struct LessonMessageBubble: View {
     let message: LessonMessage
+    let audioMessageLabel: String
+    let videoMessageLabel: String
     let isMine: Bool
     let avatarImageURL: String
     @Environment(\.colorScheme) var colorScheme
@@ -500,7 +544,7 @@ struct LessonMessageBubble: View {
         case "audio":
             HStack(spacing: 6) {
                 PlatformIcon(systemName: "waveform", size: 14, weight: .semibold, color: isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
-                Text(LocalizationSupport.localized("Audio message"))
+                Text(audioMessageLabel)
                     .font(.system(size: 14))
                     .foregroundStyle(isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
             }
@@ -512,7 +556,7 @@ struct LessonMessageBubble: View {
         case "video":
             HStack(spacing: 6) {
                 PlatformIcon(systemName: "video.fill", size: 14, weight: .semibold, color: isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
-                Text(LocalizationSupport.localized("Video message"))
+                Text(videoMessageLabel)
                     .font(.system(size: 14))
                     .foregroundStyle(isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
             }
@@ -522,10 +566,14 @@ struct LessonMessageBubble: View {
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
         default:
-            Text(message.text)
-                .font(.system(size: 14))
-                .foregroundStyle(isMine ? theme.outgoingBubbleText : theme.incomingBubbleText)
-                .lineSpacing(3)
+            // Formulas sent during the lesson are stored as the LaTeX between
+            // `$$` markers, so the replay uses the same renderer the live chat
+            // does rather than printing the markup back at the student.
+            FormulaAwareText(
+                text: message.text,
+                textColor: isMine ? theme.outgoingBubbleText : theme.incomingBubbleText,
+                lineSpacing: 3
+            )
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
 				.background(isMine ? theme.outgoingBubbleBackground : theme.incomingBubbleBackground)

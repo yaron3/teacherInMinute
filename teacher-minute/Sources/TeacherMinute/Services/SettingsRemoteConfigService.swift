@@ -25,6 +25,7 @@ final class SettingsRemoteConfigService {
         static let teacherShare = "teacher_share"
         static let pricePerMinutePrefix = "price_per_minute"
         static let costPerMinute = "cost_per_minute"
+        static let payPalPayoutEnabled = "enable_paypal_payout"
         static let contactSupportTitleMaxLength = "contact_support_title_max_length"
         static let contactSupportDescriptionMaxLength = "contact_support_description_max_length"
     }
@@ -98,6 +99,17 @@ final class SettingsRemoteConfigService {
             amount = defaultPricePerMinuteByCurrency[normalizedCode] ?? 0
         }
         return Int((amount * 100.0).rounded())
+    }
+
+    /// Whether PayPal is offered as a teacher payout destination.
+    ///
+    /// Defaults to `false`: PayPal payouts need a linked PayPal account on the
+    /// Braintree gateway, so the option stays hidden until Remote Config turns
+    /// it on rather than letting a teacher pick a destination that cannot be
+    /// confirmed. Source: Remote Config `enable_paypal_payout`.
+    func fetchIsPayPalPayoutEnabled() async -> Bool {
+        await RemoteConfigService.shared.ready()
+        return RemoteConfigService.shared.getBool(Key.payPalPayoutEnabled, default: false)
     }
 
     func fetchContactSupportTitleMaxLength() async -> Int {

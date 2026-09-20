@@ -1,0 +1,40 @@
+<!doctype html>
+<html dir="ltr" lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<link rel="stylesheet" href="katex.min.css" />
+<script src="katex.min.js"></script>
+<style>
+  html, body { margin:0; padding:0; background:transparent;
+               font-family:-apple-system,Helvetica,Arial,sans-serif;
+               direction:ltr; text-align:left; unicode-bidi:embed; }
+  body { display:flex; align-items:center; justify-content:flex-start;
+         min-height:0; padding:4px 8px; }
+  #host { font-size:16px; max-width:100%; overflow-x:auto; text-align:left; white-space:nowrap; }
+  .katex { direction:ltr; }
+  .placeholder { color:#9CA3AF; font-style:italic; }
+</style>
+</head>
+<body dir="ltr">
+<div id="host" dir="ltr"><span class="placeholder">Empty equation</span></div>
+<script>
+  // The page is loaded once and kept; each formula arrives as a call to this
+  // from the native side rather than as a whole new document.
+  window.renderFormula = function (src, displayMode, color, inset) {
+    document.body.style.color = color;
+    document.body.style.padding = '4px ' + inset + 'px';
+    var host = document.getElementById('host');
+    if (!src || src.trim().length === 0) {
+      host.innerHTML = '<span class="placeholder">Empty equation</span>';
+      return;
+    }
+    try {
+      katex.render(src, host, { throwOnError: false, displayMode: displayMode });
+    } catch (e) {
+      host.textContent = String(e);
+    }
+  };
+</script>
+</body>
+</html>

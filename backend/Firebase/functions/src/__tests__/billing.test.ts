@@ -15,7 +15,7 @@
  * 30 seconds rounds up; exactly 30 seconds rounds down.
  */
 
-import { calculateBilling } from "../billing";
+import { calculateBilling, billingStartMillis } from "../billing";
 
 const COST_PER_MINUTE = 1.0;   // $1.00 per minute
 const COMMISSION_RATE = 0.75;  // teacher keeps 75 %
@@ -164,5 +164,51 @@ describe("Edge cases", () => {
     expect(billing.rawSeconds).toBe(0);
     expect(billing.minutesToCharge).toBe(0);
     expect(billing.cost).toBe(0);
+  });
+});
+
+/**
+ * Which timestamp billing starts from.
+ *
+ * Regression cover: `startedAt` alone used to be consulted, so a lesson where
+ * `startLesson` was never called billed from `endedAt` — zero duration, zero
+ * charge, and `endLesson` still reported success.
+ */
+describe("billingStartMillis", () => {
+  const accepted = 1_700_000_000_000;
+  const started = accepted + 30_000; // connected 30s after accept
+
+  it("uses startedAt when it is the later of the two", () => {
+    expect(billingStartMillis(started, accepted)).toBe(started);
+  });
+
+  it("falls back to acceptedAt when startLesson never ran", () => {
+    expect(billingStartMillis(undefined, accepted)).toBe(accepted);
+  });
+
+  it("uses acceptedAt when it is somehow the later of the two", () => {
+    const lateAccept = started + 5_000;
+    expect(billingStartMillis(started, lateAccept)).toBe(lateAccept);
+  });
+
+  it("uses startedAt when there is no acceptedAt", () => {
+    expect(billingStartMillis(started, undefined)).toBe(started);
+  });
+
+  it.each([
+    ["both missing", undefined, undefined],
+    ["both zero", 0, 0],
+    ["not finite", NaN, undefined],
+  ])("returns undefined when there is nothing usable (%s)", (_label, a, b) => {
+    expect(billingStartMillis(a as number | undefined, b as number | undefined)).toBeUndefined();
+  });
+
+  it("bills a real 2 minute lesson rather than nothing", () => {
+    // The reported failure: a 2 minute session that left the balance untouched.
+    const endedAt = accepted + 120_000;
+    const start = billingStartMillis(undefined, accepted)!;
+    const billing = calculateBilling(start, endedAt, COST_PER_MINUTE, COMMISSION_RATE);
+    expect(billing.minutesToCharge).toBe(2);
+    expect(billing.cost).toBeCloseTo(2 * COST_PER_MINUTE, 5);
   });
 });

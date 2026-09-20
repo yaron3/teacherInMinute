@@ -1,4 +1,5 @@
 import SwiftUI
+import SkipFuse
 #if !os(Android)
 import FirebaseAnalytics
 #else
@@ -36,7 +37,7 @@ final class LocalizationManager {
 
     /// Public lookup used by views/view-models for active-language strings.
     /// Backed by Remote Config; falls back to the English source.
-    let service: any LocalizationServiceProtocol = RemoteConfigLocalizationService()
+  let service: any LocalizationServiceProtocol = RemoteConfigLocalizationService.shared
 
     let languages: [String: String] = [
         "": "System",

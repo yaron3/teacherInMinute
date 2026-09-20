@@ -4,16 +4,23 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { v4 as uuidv4 } from "uuid";
 
-import { mintLiveKitToken } from "./livekit";
+import { lessonRoomName, mintLiveKitToken } from "./livekit";
 import { sendAcceptedPush } from "./fcm";
 import {
   QuestionDoc,
   DispatchInviteDoc,
-  CONNECTION_FEE_CENTS,
   ConversationType,
   CONVERSATION_TYPES,
   DEFAULT_CONVERSATION_TYPE,
+  HOT_PATH,
 } from "./types";
+import { getConnectionFeeCents } from "./pricing";
+import { getQuestionMaxLength, getQuestionRateLimits } from "./questionLimits";
+import { checkQuestionAllowance, recordSessionStart } from "./rateLimit";
+import { isOwnQuestionImageUrl } from "./storageUrls";
+import { recordQuestionConnected } from "./stats";
+import { dispatchFirstWave, enqueueQuestionWatchdog } from "./dispatch";
+import { enqueueAbandonedLessonCheck } from "./lessons";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -61,10 +68,10 @@ async function cleanupRtdb(questionId: string, alreadyInvited: string[]): Promis
 }
 
 // ─── createQuestion ───────────────────────────────────────────────────────────
-// FR-B-010: callable — student initiates the question + dispatch pipeline.
-// Writing the Firestore doc triggers dispatchQuestion automatically.
+// FR-B-010: callable — student initiates the question + dispatch pipeline and
+// fans out wave 1 before returning.
 
-export const createQuestion = onCall(async (req) => {
+export const createQuestion = onCall(HOT_PATH, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
@@ -87,8 +94,14 @@ export const createQuestion = onCall(async (req) => {
       ? (rawConversationType as ConversationType)
       : DEFAULT_CONVERSATION_TYPE;
 
+  // Anything that is not a string cannot be a photo URL, and the stored value
+  // has to be an array whatever the client sent.
+  const photos: string[] = Array.isArray(photoUrls)
+    ? photoUrls.filter((url): url is string => typeof url === "string")
+    : [];
+
   const hasText = !!text?.trim();
-  const hasPhoto = Array.isArray(photoUrls) && photoUrls.length > 0;
+  const hasPhoto = photos.length > 0;
 
   if (!topic) {
     throw new HttpsError("invalid-argument", "topic is required");
@@ -106,11 +119,73 @@ export const createQuestion = onCall(async (req) => {
     throw new HttpsError("invalid-argument", "Question text must be at least 10 characters");
   }
 
-  const studentSnap = await firestore.collection("users").doc(uid).get();
+  // Every photo has to be one this student uploaded into our own bucket. These
+  // URLs are handed to invited teachers and fetched by their devices, so an
+  // arbitrary link would let a question aim teachers' apps at a server the
+  // student controls, or at another user's files.
+  if (photos.some((url) => !isOwnQuestionImageUrl(url, uid))) {
+    logger.warn(`[questions] createQuestion rejected foreign photo url student=${uid}`);
+    throw new HttpsError(
+      "invalid-argument",
+      "Question photos must be uploaded through the app",
+      { reason: "photo_url_rejected" }
+    );
+  }
+
+  // The limits and the student's balance are independent reads, so they
+  // overlap rather than queueing up on the ask path. Both limits come from one
+  // cached Remote Config template, so this is a single fetch, usually cached.
+  const [studentSnap, maxQuestionLength, rateLimits] = await Promise.all([
+    firestore.collection("users").doc(uid).get(),
+    getQuestionMaxLength(),
+    getQuestionRateLimits(),
+  ]);
+
+  // Measured after trimming, so the limit counts what is stored rather than
+  // whitespace the student cannot see.
+  const trimmedText = text?.trim() ?? "";
+  if (trimmedText.length > maxQuestionLength) {
+    // `details` carries the machine-readable half: the message above is English
+    // and written for a log, while the app switches on `reason` to show its own
+    // localized sentence, with `limit` filled in from whatever is published
+    // rather than a number the client hardcodes.
+    throw new HttpsError(
+      "invalid-argument",
+      `Question text must be at most ${maxQuestionLength} characters`,
+      { reason: "question_too_long", limit: maxQuestionLength }
+    );
+  }
+
   const studentData = studentSnap.data() ?? {};
   const remainingMinutes: number = (studentData.remainingMinutes as number | undefined) ?? 0;
   if (remainingMinutes < 2) {
     throw new HttpsError("resource-exhausted", "Not enough time left");
+  }
+
+  // A read, not a spend: the allowance is spent when a teacher accepts (see
+  // acceptInvite below), so a question nobody answers costs the student
+  // nothing. What this refuses is a student who has already *started* more
+  // lessons than the allowance permits.
+  const allowance = await checkQuestionAllowance(
+    uid,
+    rateLimits.perMinute,
+    rateLimits.perHour
+  );
+  if (!allowance.allowed) {
+    logger.info(
+      `[questions] createQuestion rate limited student=${uid} scope=${allowance.scope} retryAfter=${allowance.retryAfterSeconds}s`
+    );
+    // Shares the `resource-exhausted` code with an empty balance, so the app
+    // tells them apart by `reason` — see StudentHomeViewModel.askTeacher.
+    throw new HttpsError(
+      "resource-exhausted",
+      `Too many questions — try again in ${allowance.retryAfterSeconds}s`,
+      {
+        reason: "rate_limited",
+        scope: allowance.scope,
+        retryAfterSeconds: allowance.retryAfterSeconds,
+      }
+    );
   }
 
   // Snapshot the student's name + (privacy-respecting) profile image so invited
@@ -125,12 +200,28 @@ export const createQuestion = onCall(async (req) => {
   const studentImageURL = studentData.showProfileImage === false ? "" : studentProfileImage;
 
   const qid = uuidv4();
+  const roomName = lessonRoomName(qid);
 
   logger.info(
     `[questions] createQuestion start qid=${qid} student=${uid} topic=${topic} conversationType=${conversationType}`
   );
 
-  const trimmedText = text?.trim() ?? "";
+  // The student's LiveKit token is minted here, alongside the writes and the
+  // dispatch below, and handed back with the question id. Minting it only once
+  // a teacher accepted put a getQuestionStatus call — on a function that may be
+  // cold — between "a teacher accepted" and the student connecting. The search
+  // gives up within a minute and a lesson is capped at 30, both well inside the
+  // token's 60. getQuestionStatus stays the fallback, so a failed mint costs
+  // that round trip back, never the question. A text question gets one too:
+  // either side may switch the lesson to audio or video once it is running.
+  const studentMedia: Promise<{ liveKitRoom: string; liveKitToken: string } | null> =
+    mintLiveKitToken(roomName, uid).then(
+      (minted) => ({ liveKitRoom: roomName, liveKitToken: minted.token }),
+      (error) => {
+        logger.warn(`[questions] createQuestion student token mint failed qid=${qid}`, error);
+        return null;
+      }
+    );
 
   const question: QuestionDoc = {
     studentUid: uid,
@@ -138,13 +229,16 @@ export const createQuestion = onCall(async (req) => {
     studentImageURL,
     topic,
     text: trimmedText,
-    photoUrls,
+    photoUrls: photos,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
     conversationType,
     status: "searching",
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
-    dispatchWave: 0,
+    // Born claiming wave 1, because this function dispatches it below rather
+    // than waiting for the onCreate trigger. The trigger sees the 1 and stands
+    // down; if the dispatch throws we reset it to 0 and hand the question back.
+    dispatchWave: 1,
     alreadyInvited: [],
   };
 
@@ -155,31 +249,63 @@ export const createQuestion = onCall(async (req) => {
     studentImageURL,
     topic,
     text: trimmedText,
-    photoUrls,
+    photoUrls: photos,
     ...(voiceMemoUrl ? { voiceMemoUrl } : {}),
     conversationType,
-    dispatchWave: 0,
+    dispatchWave: 1,
     createdAt: Date.now(),
   };
 
   await upsertLiveQuestion(qid, liveQuestion, "searching", "createQuestion");
   logger.info(`[questions] createQuestion RTDB-upsert done qid=${qid}`);
 
-  // Writing this doc triggers dispatchQuestion via the Firestore onCreate trigger.
   await firestore.collection("questions").doc(qid).set(question);
 
   logger.info(
     `[questions] createQuestion firestore-set done qid=${qid} status=${question.status} dispatchWave=${question.dispatchWave}`
   );
+
+  // Fan the question out here rather than leaving it to the onCreate trigger.
+  // The trigger still exists as a safety net, but going through it cost every
+  // question an Eventarc delivery plus a second function's cold start before
+  // any teacher was told — several seconds, on the one path where seconds are
+  // the product.
+  try {
+    await dispatchFirstWave(qid, question);
+  } catch (error) {
+    // Give the wave back so the onCreate trigger can pick it up: it only acts
+    // on a question whose dispatchWave is still 0.
+    logger.error(`[questions] inline dispatch failed qid=${qid}, releasing to trigger`, error);
+    await firestore
+      .collection("questions")
+      .doc(qid)
+      .update({ dispatchWave: 0 })
+      .catch((releaseError) => {
+        logger.error(`[questions] failed releasing wave qid=${qid}`, releaseError);
+      });
+
+    // The trigger may already have fired and stood down before that release
+    // landed, which would leave nobody to pick the question up. dispatchFirstWave
+    // arms the watchdog itself, but it never got that far, so arm it here: a
+    // question that no one recovers must still stop searching rather than hang.
+    await enqueueQuestionWatchdog(qid).catch((watchdogError) => {
+      logger.error(`[questions] failed arming watchdog qid=${qid}`, watchdogError);
+    });
+  }
+
   logger.info(`[questions] created qid=${qid} topic=${topic} student=${uid}`);
-  return { questionId: qid, connectionFeeCents: CONNECTION_FEE_CENTS };
+  const [connectionFeeCents, studentMediaCredentials] = await Promise.all([
+    getConnectionFeeCents(),
+    studentMedia,
+  ]);
+  return { questionId: qid, connectionFeeCents, ...(studentMediaCredentials ?? {}) };
 });
 
 // ─── cancelQuestion ───────────────────────────────────────────────────────────
 // FR-B-010: student cancels while still in "searching" state. Free before a
 // teacher has accepted. We do not charge for pilot (no Stripe hold).
 
-export const cancelQuestion = onCall(async (req) => {
+export const cancelQuestion = onCall(HOT_PATH, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
@@ -226,7 +352,7 @@ export const cancelQuestion = onCall(async (req) => {
 // FR-B-004: atomic Firestore transaction guarantees exactly one teacher wins.
 // Returns Agora token for the teacher; pushes token to student via FCM.
 
-export const acceptInvite = onCall(async (req) => {
+export const acceptInvite = onCall(HOT_PATH, async (req) => {
   const teacherUid = req.auth?.uid;
   if (!teacherUid) throw new HttpsError("unauthenticated", "Sign in required");
 
@@ -239,6 +365,7 @@ export const acceptInvite = onCall(async (req) => {
   const inviteRef = qRef.collection("invites").doc(teacherUid);
 
   let studentUid = "";
+  let questionCreatedAtMillis: number | undefined;
 
   // Atomic claim — only one teacher can win
   await firestore.runTransaction(async (tx) => {
@@ -278,6 +405,7 @@ export const acceptInvite = onCall(async (req) => {
     }
 
     studentUid = q.studentUid;
+    questionCreatedAtMillis = q.createdAt?.toMillis?.();
 
     tx.update(qRef, {
       status: "accepted",
@@ -303,7 +431,7 @@ export const acceptInvite = onCall(async (req) => {
   );
 
   // Mint LiveKit tokens for both parties
-  const channelName = `lesson_${questionId}`;
+  const channelName = lessonRoomName(questionId);
   const [teacherToken, studentToken] = await Promise.all([
     mintLiveKitToken(channelName, teacherUid),
     mintLiveKitToken(channelName, studentUid),
@@ -375,6 +503,29 @@ export const acceptInvite = onCall(async (req) => {
     alreadyInvited.map((uid) => db.ref(`teacherInvites/${uid}/${questionId}`).remove())
   );
 
+  // Feeds the "avg time to connect" the student home shows. Best-effort: the
+  // teacher has already claimed the question, so a stats failure must not fail
+  // the accept.
+  await recordQuestionConnected(questionId, questionCreatedAtMillis, Date.now()).catch((error) => {
+    logger.warn(`[questions] failed recording connect stat qid=${questionId}`, error);
+  });
+
+  // The allowance is spent here rather than at creation: a question becomes a
+  // session only now. Stamped with when it was sent, so a question that waited
+  // for a teacher does not push the student's next ask further out. Best-effort
+  // — the lesson is already claimed, and losing one entry is not worth failing
+  // it over.
+  await recordSessionStart(studentUid, questionCreatedAtMillis ?? Date.now()).catch((error) => {
+    logger.warn(`[questions] failed recording the session allowance qid=${questionId}`, error);
+  });
+
+  // The teacher starts waiting the moment they claim the question, so the grace
+  // period starts here: if the student never turns up, the lesson is written
+  // off rather than left running with nothing to stop it.
+  await enqueueAbandonedLessonCheck(questionId).catch((error) => {
+    logger.error(`[questions] failed arming abandoned-lesson check qid=${questionId}`, error);
+  });
+
   logger.info(`[questions] accepted qid=${questionId} teacher=${teacherUid}`);
 
   return {
@@ -387,8 +538,10 @@ export const acceptInvite = onCall(async (req) => {
 // ─── getQuestionStatus ────────────────────────────────────────────────────────
 // Polled by the student app every 3s while in "searching" state.
 // Returns {status} plus LiveKit credentials if the question was accepted.
+// The accepted teacher may call it too, to fetch credentials again when a
+// lesson switches to audio or video after it started.
 
-export const getQuestionStatus = onCall(async (req) => {
+export const getQuestionStatus = onCall(HOT_PATH, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
 
@@ -399,12 +552,14 @@ export const getQuestionStatus = onCall(async (req) => {
   if (!qSnap.exists) throw new HttpsError("not-found", "Question not found");
 
   const q = qSnap.data() as QuestionDoc;
-  if (q.studentUid !== uid) throw new HttpsError("permission-denied", "Not your question");
+  if (q.studentUid !== uid && q.acceptedByTeacher !== uid) {
+    throw new HttpsError("permission-denied", "Not your question");
+  }
 
-  logger.info(`[questions] getQuestionStatus qid=${questionId} student=${uid} status=${q.status}`);
+  logger.info(`[questions] getQuestionStatus qid=${questionId} caller=${uid} status=${q.status}`);
 
   if (q.status === "accepted" || q.status === "in_progress") {
-    const roomName = `lesson_${questionId}`;
+    const roomName = lessonRoomName(questionId);
     const token = await mintLiveKitToken(roomName, uid);
     return { status: q.status, liveKitRoom: roomName, liveKitToken: token.token };
   }
@@ -416,7 +571,7 @@ export const getQuestionStatus = onCall(async (req) => {
 // FR-B-010: teacher explicitly declines. Updates invite; accept_rate signal
 // is recomputed by a scheduled function (deferred for pilot).
 
-export const declineInvite = onCall(async (req) => {
+export const declineInvite = onCall(HOT_PATH, async (req) => {
   const teacherUid = req.auth?.uid;
   if (!teacherUid) throw new HttpsError("unauthenticated", "Sign in required");
 

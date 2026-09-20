@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -44,15 +45,35 @@ object AndroidPermissionManager {
 
     @JvmStatic
     fun hasPermission(permission: String): Boolean {
-        if (permission == Manifest.permission.POST_NOTIFICATIONS && Build.VERSION.SDK_INT < 33) {
-            return true
-        }
         val activity = MainActivity.currentActivity ?: return false
+        if (permission == Manifest.permission.POST_NOTIFICATIONS) {
+            val appNotificationsEnabled = NotificationManagerCompat.from(activity).areNotificationsEnabled()
+            if (Build.VERSION.SDK_INT < 33) {
+                return appNotificationsEnabled
+            }
+            return appNotificationsEnabled &&
+                ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
+        }
         return ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Whether the system would still put its dialog up for this permission.
+     * False both before the first ask and after the user has denied it for
+     * good, so it only separates the two once a request has been made.
+     */
+    @JvmStatic
+    fun shouldShowRationale(permission: String): Boolean {
+        val activity = MainActivity.currentActivity ?: return false
+        return ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
     }
 
     @JvmStatic
     fun requestPermission(permission: String): Boolean {
+        if (permission == Manifest.permission.POST_NOTIFICATIONS && Build.VERSION.SDK_INT < 33) {
+            return hasPermission(permission)
+        }
+
         if (hasPermission(permission)) {
             return true
         }
@@ -78,7 +99,11 @@ object AndroidPermissionManager {
             throw IllegalStateException("Timed out waiting for permission response")
         }
 
-        return request.granted
+        return if (permission == Manifest.permission.POST_NOTIFICATIONS) {
+            request.granted && hasPermission(permission)
+        } else {
+            request.granted
+        }
     }
 
     fun handleRequestPermissionsResult(

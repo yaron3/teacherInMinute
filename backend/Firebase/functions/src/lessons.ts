@@ -10,12 +10,14 @@ import {
   QuestionDoc,
   LessonDoc,
   HARD_CAP_MINUTES,
-  CONNECTION_FEE_CENTS,
+  ABANDONED_LESSON_GRACE_SECONDS,
   PurchaseDoc,
 } from "./types";
-import { calculateBilling } from "./billing";
+import { calculateBilling, billingStartMillis, applyTeacherBonus } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
-import { resolvePricingForStudent } from "./pricing";
+import { stampAuthoritativeRating } from "./presence";
+import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
+import { readTeacherBonus } from "./emailRewards";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -25,10 +27,32 @@ interface TeacherRatingDoc {
   endedAt: Timestamp;
   studentId: string;
   studentRate: number;
+  /** Optional free text the student wrote about the lesson. Shown back to the
+   *  teacher without `studentId` (see ./ratings.ts `teacherReviews`), so it is
+   *  the only part of a rating a teacher ever reads. */
+  studentComment?: string;
+}
+
+/** Long enough for a paragraph of feedback, short enough that one rating stays
+ *  a small document. Anything longer is truncated rather than rejected — the
+ *  student has already finished the lesson and should not lose the rating to a
+ *  validation error. */
+const MAX_RATING_COMMENT_LENGTH = 500;
+
+/** The comment as it should be stored: trimmed, capped, and `undefined` when
+ *  the student left the box empty. */
+function normalizedComment(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return undefined;
+  return trimmed.slice(0, MAX_RATING_COMMENT_LENGTH);
 }
 
 interface TeacherAggregateDoc {
   averageRate?: number;
+  /** Denormalised size of the `ratings` subcollection, so reading a teacher's
+   *  review count (see ./ratings.ts) is a single document get. */
+  ratingCount?: number;
 }
 
 function toTimestamp(value: unknown): Timestamp | undefined {
@@ -178,6 +202,13 @@ async function resolveQuestionContext(questionId: string): Promise<{
   teacherUid: string;
   acceptedAtMs: number;
   startedAtMs: number | undefined;
+  /** Seconds already banked as unbillable — the lesson was held for want of
+   *  minutes and the student later bought more. See extendLessonMinutes. */
+  heldSeconds: number;
+  /** When the student's minutes run out. A lesson running past it is held, and
+   *  everything after it is unbillable. Undefined for a lesson that started
+   *  before allowances were recorded. */
+  minutesDeadlineMs: number | undefined;
 }> {
   const questionRef = db.ref(`questions/${questionId}`);
   const questionSnap = await questionRef.once("value");
@@ -231,6 +262,10 @@ async function resolveQuestionContext(questionId: string): Promise<{
     throw new HttpsError("failed-precondition", "Question is missing acceptedAt");
   }
 
+  const heldSecondsValue = Number(
+    fsQuestion.heldSeconds ?? (rtdbQuestion.heldSeconds as number | undefined) ?? 0
+  );
+
   return {
     questionRef,
     rtdbQuestion,
@@ -238,22 +273,33 @@ async function resolveQuestionContext(questionId: string): Promise<{
     teacherUid,
     acceptedAtMs,
     startedAtMs,
+    heldSeconds: Number.isFinite(heldSecondsValue) && heldSecondsValue > 0 ? heldSecondsValue : 0,
+    minutesDeadlineMs: firstNumber(
+      toMillis(fsQuestion.minutesDeadlineAt),
+      toMillis(rtdbQuestion.minutesDeadlineAt)
+    ),
   };
 }
+
+/** Everything `resolveQuestionContext` establishes about a lesson being ended.
+ *  Derived from that function so the two cannot drift apart. */
+type QuestionContext = Awaited<ReturnType<typeof resolveQuestionContext>>;
 
 async function migrateQuestionToFirestore(
   questionId: string,
   endedBy: LessonDoc["endedBy"],
-  context: {
-    questionRef: admin.database.Reference;
-    rtdbQuestion: Record<string, unknown>;
-    studentUid: string;
-    teacherUid: string;
-    acceptedAtMs: number;
-    startedAtMs: number | undefined;
-  }
+  context: QuestionContext
 ): Promise<void> {
-  const { questionRef, rtdbQuestion, studentUid, teacherUid, startedAtMs } = context;
+  const {
+    questionRef,
+    rtdbQuestion,
+    studentUid,
+    teacherUid,
+    acceptedAtMs,
+    startedAtMs,
+    heldSeconds: bankedHeldSeconds,
+    minutesDeadlineMs,
+  } = context;
   logger.info(
     `[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`
   );
@@ -264,9 +310,23 @@ async function migrateQuestionToFirestore(
   const pricing = await resolveLessonPricing(studentUid, lessonRecord?.data);
   const { currencyCode, pricePerMinute, teacherShare, exchangeRateToUsd } = pricing;
 
-  // Bill from the moment both parties were fully connected (startedAt).
-  // If startLesson was never called the lesson never properly began — charge 0.
-  const billingStartMs = startedAtMs ?? endedAtMs;
+  // Bill from the later of startedAt (both parties connected) and acceptedAt
+  // (teacher accepted) — see billingStartMillis. Falling back to endedAtMs only
+  // when neither exists means a lesson with no usable start bills zero rather
+  // than billing from an unknown point.
+  const billingStartMs = billingStartMillis(startedAtMs, acceptedAtMs) ?? endedAtMs;
+
+  // Time the lesson spent held for want of minutes is not billed: the student
+  // had already used everything they bought, and nothing was taught while the
+  // two of them waited. `heldSeconds` is what earlier holds banked when the
+  // student topped up; the final term is a hold still open at the end, which
+  // is the ordinary case — the student chose not to buy and closed the lesson.
+  const openHoldSeconds =
+    minutesDeadlineMs === undefined
+      ? 0
+      : Math.max(0, Math.floor((endedAtMs - minutesDeadlineMs) / 1000));
+  const heldSeconds = Math.max(0, Math.round(bankedHeldSeconds)) + openHoldSeconds;
+  const billableEndedAtMs = Math.max(billingStartMs, endedAtMs - heldSeconds * 1000);
 
   const {
     rawSeconds,
@@ -274,15 +334,27 @@ async function migrateQuestionToFirestore(
     roundedMinutes,
     minutesToCharge: roundedMinutesToCharge,
     cost,
-    teacherEarnings,
-  } = calculateBilling(billingStartMs, endedAtMs, pricePerMinute, teacherShare);
+  } = calculateBilling(billingStartMs, billableEndedAtMs, pricePerMinute, teacherShare);
+
+  // A teacher's welcome bonus (./emailRewards) raises their share on its first
+  // minutes. It is read now rather than stamped at start, so a lesson only
+  // draws on what is actually left when it is settled.
+  const teacherRef = firestore.collection("users").doc(teacherUid);
+  const teacherBonus = readTeacherBonus((await teacherRef.get()).data()?.teacherBonus);
+  const { teacherEarnings, bonusMinutesUsed, effectiveShare } = applyTeacherBonus(
+    cost,
+    roundedMinutes,
+    teacherShare,
+    teacherBonus?.share ?? teacherShare,
+    teacherBonus?.minutesRemaining ?? 0
+  );
   const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
   logger.info(
     `[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`
   );
 
   logger.info(
-    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} teacherEarnings=${teacherEarnings}`
+    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} heldSeconds=${heldSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} bonusMinutesUsed=${bonusMinutesUsed} effectiveShare=${effectiveShare} teacherEarnings=${teacherEarnings}`
   );
 
   const batch = firestore.batch();
@@ -298,10 +370,13 @@ async function migrateQuestionToFirestore(
       teacherId: teacherUid,
       participants: [studentUid, teacherUid],
       durationSeconds: roundedSeconds,
+      heldSeconds,
       currencyCode,
       pricePerMinute,
       exchangeRateToUsd,
       teacherShare,
+      teacherBonusMinutesUsed: bonusMinutesUsed,
+      effectiveTeacherShare: effectiveShare,
       cost,
       teacherEarnings,
       // Legacy aliases for clients still reading the old field names.
@@ -321,6 +396,8 @@ async function migrateQuestionToFirestore(
         currencyCode,
         pricePerMinute,
         teacherShare,
+        teacherBonusMinutesUsed: bonusMinutesUsed,
+        effectiveTeacherShare: effectiveShare,
         exchangeRateToUsd,
         cost,
         teacherEarnings,
@@ -335,7 +412,6 @@ async function migrateQuestionToFirestore(
   }
 
   const studentRef = firestore.collection("users").doc(studentUid);
-  const teacherRef = firestore.collection("users").doc(teacherUid);
   batch.set(
     studentRef,
     {
@@ -353,6 +429,9 @@ async function migrateQuestionToFirestore(
       totalEarnings: FieldValue.increment(teacherEarnings),
       earnings: FieldValue.increment(teacherEarnings),
       totalRevenueGenerated: FieldValue.increment(cost),
+      ...(bonusMinutesUsed > 0
+        ? { teacherBonus: { minutesRemaining: FieldValue.increment(-bonusMinutesUsed) } }
+        : {}),
     },
     { merge: true }
   );
@@ -433,6 +512,99 @@ async function migrateQuestionToFirestore(
   logger.info(`[lessons] migrateQuestionToFirestore RTDB question removed qid=${questionId}`);
 }
 
+/** Whether the question has already reached a state no further ending can
+ *  change. Read from Firestore, which outlives the live RTDB node. */
+async function questionAlreadyEnded(questionId: string): Promise<boolean> {
+  const snap = await firestore.collection("questions").doc(questionId).get();
+  if (!snap.exists) return false;
+  const status = (snap.data() as QuestionDoc).status;
+  return status === "completed" || status === "cancelled";
+}
+
+/**
+ * Adds minutes to a lesson the student is in right now, and lifts the hold.
+ *
+ * Called when a purchase lands (see ./payments). A student whose minutes ran
+ * out mid-lesson is held rather than cut off, so buying more has to reach the
+ * lesson already running, not just their balance.
+ *
+ * The wait itself is banked as `heldSeconds` and subtracted when the lesson is
+ * billed: the new deadline runs from now rather than from the old one, so the
+ * minutes just bought are not eaten by the time spent deciding to buy them.
+ *
+ * Returns whether a lesson was found and extended.
+ */
+export async function extendLessonMinutes(
+  studentUid: string,
+  addedMinutes: number
+): Promise<boolean> {
+  const minutes = Math.floor(Number(addedMinutes));
+  if (!studentUid || !Number.isFinite(minutes) || minutes <= 0) return false;
+
+  const snap = await firestore
+    .collection("questions")
+    .where("studentUid", "==", studentUid)
+    .where("status", "==", "in_progress")
+    .limit(1)
+    .get();
+
+  if (snap.empty) return false;
+  const qRef = snap.docs[0].ref;
+
+  const extended = await firestore.runTransaction(async (tx) => {
+    const fresh = await tx.get(qRef);
+    if (!fresh.exists) return undefined;
+
+    const data = fresh.data() as QuestionDoc & {
+      minutesAvailable?: number;
+      minutesDeadlineAt?: unknown;
+      heldSeconds?: number;
+    };
+    if (data.status !== "in_progress") return undefined;
+
+    const now = Date.now();
+    const deadlineMs = toMillis(data.minutesDeadlineAt) ?? now;
+    const bankedHeld = Math.max(0, Math.round(Number(data.heldSeconds) || 0));
+    const heldSeconds = bankedHeld + Math.max(0, Math.floor((now - deadlineMs) / 1000));
+    const nextDeadlineMs = Math.max(now, deadlineMs) + minutes * 60_000;
+    const minutesAvailable = Math.max(0, Math.round(Number(data.minutesAvailable) || 0)) + minutes;
+
+    tx.update(qRef, {
+      minutesAvailable,
+      minutesDeadlineAt: Timestamp.fromMillis(nextDeadlineMs),
+      heldSeconds,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return { questionId: fresh.id, nextDeadlineMs, minutesAvailable, heldSeconds };
+  });
+
+  if (!extended) return false;
+
+  // The apps watch the live node, so this is what lifts the hold on screen.
+  await db.ref(`questions/${extended.questionId}`).update({
+    minutesAvailable: extended.minutesAvailable,
+    minutesDeadlineAt: extended.nextDeadlineMs,
+    heldSeconds: extended.heldSeconds,
+    updatedAt: Date.now(),
+  });
+
+  logger.info(
+    `[lessons] extended lesson qid=${extended.questionId} student=${studentUid} addedMinutes=${minutes} minutesAvailable=${extended.minutesAvailable} heldSeconds=${extended.heldSeconds}`
+  );
+  return true;
+}
+
+/** Arms the grace period that ends a lesson the student never joined. Called
+ *  when a teacher accepts, since that is when the teacher starts waiting. */
+export async function enqueueAbandonedLessonCheck(questionId: string): Promise<void> {
+  const queue = getFunctions().taskQueue("endAbandonedLesson");
+  await queue.enqueue(
+    { questionId },
+    { scheduleDelaySeconds: ABANDONED_LESSON_GRACE_SECONDS }
+  );
+}
+
 // ─── startLesson ──────────────────────────────────────────────────────────────
 // FR-B-006, FR-B-010
 // Called by either client once the Agora audio channel is connected.
@@ -456,17 +628,22 @@ export const startLesson = onCall(async (req) => {
     throw new HttpsError("permission-denied", "Not a participant in this lesson");
   }
 
-  if (q.status !== "accepted") {
-    throw new HttpsError("failed-precondition", `Cannot start lesson in status: ${q.status}`);
-  }
-
   logger.info(
     `[lessons] startLesson authorized qid=${questionId} uid=${uid} questionStatus=${q.status} acceptedByTeacher=${q.acceptedByTeacher ?? "none"}`
   );
 
-  // Idempotent: if lesson already exists return it
+  // Both apps call this as they connect, so arriving second is normal rather
+  // than an error: record the arrival and hand back the lesson already running.
+  // This is also the only record of who actually turned up — endAbandonedLesson
+  // writes off a lesson the student never joined, and it reads this.
+  await qRef.update({ joinedParticipants: FieldValue.arrayUnion(uid) });
+
   if (q.lessonId) {
     return { lessonId: q.lessonId };
+  }
+
+  if (q.status !== "accepted") {
+    throw new HttpsError("failed-precondition", `Cannot start lesson in status: ${q.status}`);
   }
 
   const lessonId = uuidv4();
@@ -486,8 +663,22 @@ export const startLesson = onCall(async (req) => {
   // Lock pricing at the moment the lesson starts so RC changes mid-lesson
   // do not retroactively shift the price. Currency is resolved from the
   // student's profile (/users/{uid}.currency).
-  const pricing = await resolvePricingForStudent(q.studentUid);
+  const [pricing, connectionFeeCents, studentSnap, teacherSnap] = await Promise.all([
+    resolvePricingForStudent(q.studentUid),
+    getConnectionFeeCents(),
+    firestore.collection("users").doc(q.studentUid).get(),
+    firestore.collection("users").doc(q.acceptedByTeacher!).get(),
+  ]);
   const pricePerMinuteCents = Math.round(pricing.pricePerMinute * 100);
+
+  // What the student can afford, turned into a moment both apps can count down
+  // to. They hold the session there — the student is offered more minutes, the
+  // teacher is told why — and nothing past it is billed.
+  const minutesAvailable = Math.max(
+    0,
+    Math.floor(Number((studentSnap.data() ?? {}).remainingMinutes) || 0)
+  );
+  const minutesDeadlineMs = now.getTime() + minutesAvailable * 60_000;
 
   const lesson: LessonDoc = {
     questionId,
@@ -496,7 +687,7 @@ export const startLesson = onCall(async (req) => {
     startedAt: Timestamp.fromDate(now),
     hardCapAt: Timestamp.fromDate(hardCapAt),
     baseRatePerMinCents: pricePerMinuteCents,
-    connectionFeeCents: CONNECTION_FEE_CENTS,
+    connectionFeeCents,
     currencyCode: pricing.currency,
     pricePerMinute: pricing.pricePerMinute,
     teacherShare: pricing.teacherShare,
@@ -514,6 +705,9 @@ export const startLesson = onCall(async (req) => {
     status: "in_progress",
     startedAt: Timestamp.fromDate(now),
     lessonId,
+    minutesAvailable,
+    minutesDeadlineAt: Timestamp.fromMillis(minutesDeadlineMs),
+    heldSeconds: 0,
     currencyCode: pricing.currency,
     pricePerMinute: pricing.pricePerMinute,
     teacherShare: pricing.teacherShare,
@@ -528,7 +722,11 @@ export const startLesson = onCall(async (req) => {
   // Keep RTDB question state aligned for real-time clients.
   // Mirror the pricing snapshot so the in-progress UI can render live
   // earnings / cost without re-querying Firestore mid-call.
-  const teacherSharePercent = Math.round(pricing.teacherShare * 100);
+  // The live figure shows the welcome-bonus share while the teacher has bonus
+  // minutes left. Settlement splits a lesson that outlasts them, so this is an
+  // estimate at the edge; `teacherShare` itself stays the base rate.
+  const teacherBonus = readTeacherBonus((teacherSnap.data() ?? {}).teacherBonus);
+  const teacherSharePercent = Math.round((teacherBonus?.share ?? pricing.teacherShare) * 100);
   logger.info(
     `[lessons] startLesson syncing RTDB question qid=${questionId} status=in_progress teacherId=${q.acceptedByTeacher ?? "none"}`
   );
@@ -541,13 +739,17 @@ export const startLesson = onCall(async (req) => {
     teacherId: q.acceptedByTeacher,
     startedAt: Date.now(),
     updatedAt: Date.now(),
+    minutesAvailable,
+    minutesDeadlineAt: minutesDeadlineMs,
+    heldSeconds: 0,
     currencyCode: pricing.currency,
     pricePerMinute: pricing.pricePerMinute,
     pricePerMinuteCents,
     teacherShare: pricing.teacherShare,
     teacherSharePercent,
+    teacherBonusMinutesAvailable: teacherBonus?.minutesRemaining ?? 0,
     exchangeRateToUsd: pricing.exchangeRateToUsd,
-    connectionFeeCents: CONNECTION_FEE_CENTS,
+    connectionFeeCents,
   });
   logger.info(`[lessons] startLesson RTDB sync complete qid=${questionId}`);
 
@@ -579,7 +781,21 @@ export const endLesson = onCall(async (req) => {
     debugContext.stage = "validated-input";
     logger.info(`[lessons] endLesson start qid=${questionId} uid=${uid}`);
 
-    const context = await resolveQuestionContext(questionId);
+    let context: Awaited<ReturnType<typeof resolveQuestionContext>>;
+    try {
+      context = await resolveQuestionContext(questionId);
+    } catch (error) {
+      // The live question node is removed as a lesson is settled, so its
+      // absence is usually not a failure: it means the other side ended the
+      // lesson first, or the grace-period task wrote it off. Both apps call
+      // this — the one that did not press End reaches here — and a lesson that
+      // is already over is a success for the caller, not an error to show them.
+      if (await questionAlreadyEnded(questionId)) {
+        logger.info(`[lessons] endLesson already ended qid=${questionId} uid=${uid}`);
+        return { success: true, questionId, alreadyEnded: true };
+      }
+      throw error;
+    }
     debugContext.stage = "loaded-rtdb-question";
 
     const rtdbKeys = Object.keys(context.rtdbQuestion).sort();
@@ -668,11 +884,13 @@ export const rateTeacher = onCall(async (req) => {
     questionId?: string;
     teacherId?: string;
     rating?: number;
+    comment?: string;
   };
 
   const questionId = data.questionId;
   const teacherId = data.teacherId;
   const rating = Number(data.rating);
+  const comment = normalizedComment(data.comment);
 
   if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
   if (!teacherId) throw new HttpsError("invalid-argument", "teacherId required");
@@ -683,6 +901,21 @@ export const rateTeacher = onCall(async (req) => {
   const questionRef = firestore.collection("questions").doc(questionId);
   const teacherRef = firestore.collection("teachers").doc(teacherId);
   const ratingRef = teacherRef.collection("ratings").doc(questionId);
+
+  // The live RTDB question is removed only after migrateQuestionToFirestore has
+  // committed `status: "completed"` and `endedAt`, so its presence means the
+  // lesson has not been finalized yet. Rejecting here — rather than letting the
+  // transaction below fail on "Lesson must be completed" — is what lets the app
+  // tell a race apart from a genuine refusal: RateSessionView retries only on a
+  // failed-precondition whose message mentions finalizing.
+  const liveQuestionSnap = await db.ref(`questions/${questionId}`).once("value");
+  if (liveQuestionSnap.exists()) {
+    logger.info(`[lessons] rateTeacher deferred, lesson still finalizing qid=${questionId}`);
+    throw new HttpsError(
+      "failed-precondition",
+      "Lesson is still being finalized. Try rating again in a few seconds"
+    );
+  }
 
   await firestore.runTransaction(async (tx) => {
     const [questionSnap, teacherSnap, existingRatingSnap] = await Promise.all([
@@ -767,13 +1000,117 @@ export const rateTeacher = onCall(async (req) => {
       studentId: uid,
       studentRate: rating,
     };
+    if (comment) {
+      ratingDoc.studentComment = comment;
+    }
 
     tx.set(ratingRef, ratingDoc);
-    tx.set(teacherRef, { averageRate: nextAverage }, { merge: true });
+    tx.set(teacherRef, { averageRate: nextAverage, ratingCount: ratingCount + 1 }, { merge: true });
+    // Mirror the score onto the question so the student who gave it can show it
+    // in their own lesson history — they cannot read the teacher's ratings.
+    tx.update(questionRef, { studentRating: rating, ratedAt: Timestamp.now() });
+  });
+
+  // The dispatcher ranks on the RTDB copy, so a rating that only reached
+  // Firestore would never affect who gets the next question. Best-effort: the
+  // rating itself is already recorded, and presence stamps it again the next
+  // time this teacher comes online.
+  await stampAuthoritativeRating(teacherId).catch((error) => {
+    logger.warn(`[lessons] failed mirroring rating teacher=${teacherId}`, error);
   });
 
   return { success: true };
 });
+
+// ─── endAbandonedLesson — Cloud Tasks handler ────────────────────────────────
+// Armed when a teacher accepts, and fires once the grace period is up.
+//
+// A teacher can legitimately claim a question its student has already given up
+// on: the student's app stops waiting after a minute, while an invite stays
+// valid for ninety seconds, and a student whose app was killed never tells
+// anyone it left at all. The teacher was then left sitting in a room nobody
+// joins, with the billing clock running from the moment they accepted and
+// nothing on the server to stop it — the 30-minute cap is armed by startLesson,
+// which never runs when there is no lesson to start.
+//
+// Writing the question off costs the student nothing, pays nothing, and removes
+// the live node, which is what ends the teacher's session: both apps stop when
+// that node disappears.
+
+export const endAbandonedLesson = onTaskDispatched<{ questionId: string }>(
+  {
+    retryConfig: { maxAttempts: 2 },
+    rateLimits: { maxConcurrentDispatches: 20 },
+  },
+  async (req) => {
+    const { questionId } = req.data;
+    if (!questionId) {
+      logger.warn("[lessons] endAbandonedLesson missing questionId payload");
+      return;
+    }
+
+    const qRef = firestore.collection("questions").doc(questionId);
+
+    const abandoned = await firestore.runTransaction(async (tx) => {
+      const snap = await tx.get(qRef);
+      if (!snap.exists) return false;
+
+      const question = snap.data() as QuestionDoc & { joinedParticipants?: string[] };
+
+      // Anything already settled — ended by a participant, cancelled, or never
+      // claimed in the first place — is none of this task's business.
+      if (question.status !== "accepted" && question.status !== "in_progress") return false;
+
+      const joined = Array.isArray(question.joinedParticipants)
+        ? question.joinedParticipants
+        : [];
+      if (joined.includes(question.studentUid)) return false;
+
+      tx.update(qRef, {
+        status: "cancelled",
+        endedBy: "system",
+        endedReason: "student_never_joined",
+        endedAt: FieldValue.serverTimestamp(),
+        billedSeconds: 0,
+        durationSeconds: 0,
+        totalCents: 0,
+        cost: 0,
+        teacherEarnings: 0,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return true;
+    });
+
+    if (!abandoned) {
+      logger.info(`[lessons] endAbandonedLesson skipped qid=${questionId}`);
+      return;
+    }
+
+    await db.ref(`questions/${questionId}`).remove();
+
+    // A lesson document exists only if someone called startLesson — the
+    // teacher, in this case, since the student never arrived.
+    const lessonRecord = await loadLessonDocByQuestionId(questionId);
+    if (lessonRecord) {
+      await lessonRecord.ref.set(
+        {
+          status: "completed",
+          endedBy: "system",
+          endedAt: FieldValue.serverTimestamp(),
+          billedSeconds: 0,
+          cost: 0,
+          teacherEarnings: 0,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    logger.warn(
+      `[lessons] endAbandonedLesson wrote off qid=${questionId} — the student never joined`
+    );
+  }
+);
 
 // ─── forceEndLesson — Cloud Tasks handler ────────────────────────────────────
 // FR-B-006: fires at hardCapAt (30 min after lesson start).

@@ -11,9 +11,3 @@ protocol LocalizationServiceProtocol {
     func localized(_ english: String) -> String
 }
 
-/// Static fallback used by previews, tests, and any code path that needs the
-/// protocol but shouldn't hit Remote Config. Returns the English source
-/// unchanged.
-struct StaticLocalizationService: LocalizationServiceProtocol {
-    func localized(_ english: String) -> String { english }
-}

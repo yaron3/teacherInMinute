@@ -13,8 +13,9 @@ struct ConnectionSetupView: View {
 
   init(
     participantName: String,
+    participantTeacherId: String = "",
     conversationType: String,
-    footerText: String = LocalizationSupport.localized("Your teacher will join shortly"),
+    footerText: String? = nil,
     viewModel sessionViewModel: (any ChatSessionViewModeling)? = nil,
     liveKitRoom: String = "",
     liveKitToken: String = "",
@@ -25,6 +26,7 @@ struct ConnectionSetupView: View {
     self._viewModel = State(
       initialValue: ConnectionSetupViewModel(
         participantName: participantName,
+        participantTeacherId: participantTeacherId,
         conversationType: conversationType,
         footerText: footerText,
         sessionViewModel: sessionViewModel,
@@ -44,6 +46,8 @@ struct ConnectionSetupView: View {
 
       if viewModel.hasTimedOut {
         timeoutOverlay
+      } else if viewModel.showsChatOffer {
+        chatOfferOverlay
       }
     }
     .task(id: viewModel.sessionStartKey) {
@@ -51,6 +55,12 @@ struct ConnectionSetupView: View {
     }
     .task(id: viewModel.timerKey) {
       await viewModel.startTimeoutTimer()
+    }
+    .task(id: viewModel.chatOfferTimerKey) {
+      await viewModel.startChatOfferTimer()
+    }
+    .task {
+      await viewModel.loadParticipantRating()
     }
     .trackScreen(AnalyticsScreen.connectionSetup)
   }
@@ -84,7 +94,7 @@ struct ConnectionSetupView: View {
         .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
 
       Button(action: onCancel) {
-        Text(LocalizationSupport.localized("Cancel Session"))
+        Text(viewModel.cancelSessionLabel)
           .font(.system(size: 12, weight: .semibold))
           .foregroundStyle(theme.accent)
           .frame(height: 36)
@@ -118,16 +128,12 @@ struct ConnectionSetupView: View {
         .background(theme.accentBackground)
         .clipShape(Circle())
 
-        Text(LocalizationSupport.localized("Connection is taking longer than usual"))
+        Text(viewModel.connectionSlowTitle)
           .font(.system(size: 16, weight: .bold))
           .foregroundStyle(theme.primaryText)
           .multilineTextAlignment(.center)
 
-        Text(
-          viewModel.hasVideo
-            ? LocalizationSupport.localized("We couldn't establish a video connection. Retry, continue with text only, or cancel.")
-            : LocalizationSupport.localized("We couldn't establish an audio connection. Retry, continue with text only, or cancel.")
-        )
+        Text(viewModel.connectionSlowMessage)
         .font(.system(size: 12, weight: .medium))
         .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
         .multilineTextAlignment(.center)
@@ -136,7 +142,7 @@ struct ConnectionSetupView: View {
           Button {
             viewModel.retry()
           } label: {
-            Text(LocalizationSupport.localized("Retry"))
+            Text(viewModel.retryLabel)
               .font(.system(size: 14, weight: .bold))
               .foregroundStyle(theme.onAccentText)
               .frame(maxWidth: .infinity)
@@ -151,7 +157,7 @@ struct ConnectionSetupView: View {
               viewModel.continueAsText()
               onContinueAsText()
             } label: {
-              Text(LocalizationSupport.localized("Continue with text only"))
+              Text(viewModel.continueWithTextOnlyLabel)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(theme.primaryText)
                 .frame(maxWidth: .infinity)
@@ -163,7 +169,7 @@ struct ConnectionSetupView: View {
           }
 
           Button(action: onCancel) {
-            Text(LocalizationSupport.localized("Cancel"))
+            Text(viewModel.cancelLabel)
               .font(.system(size: 13, weight: .semibold))
               .foregroundStyle(theme.secondaryText)
               .frame(maxWidth: .infinity)
@@ -178,6 +184,74 @@ struct ConnectionSetupView: View {
       .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
       .shadow(color: theme.cardShadow.opacity(0.18), radius: 24, x: 0, y: 14)
       .padding(.horizontal, 24)
+    }
+  }
+
+  /// Put to the student alone, once audio has been connecting for a few
+  /// seconds: start with the teacher by chat now, and let audio join when it
+  /// is ready. The teacher is never asked; they follow the student's choice.
+  var chatOfferOverlay: some View {
+    ZStack {
+      theme.scrim.opacity(0.45)
+        .ignoresSafeArea()
+
+      VStack(spacing: 18) {
+        PlatformIcon(
+          systemName: "bubble.left.and.bubble.right.fill",
+          size: 26,
+          weight: .semibold,
+          color: theme.accent
+        )
+        .frame(width: 56, height: 56)
+        .background(theme.accentBackground)
+        .clipShape(Circle())
+
+        Text(viewModel.chatOfferTitle)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(theme.primaryText)
+          .multilineTextAlignment(.center)
+
+        Text(viewModel.chatOfferMessage)
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(theme.secondaryText)
+          .multilineTextAlignment(.center)
+
+        chatOfferButtons
+      }
+      .padding(24)
+      .frame(maxWidth: 320)
+      .background(theme.cardBackground)
+      .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+      .shadow(color: theme.cardShadow.opacity(0.18), radius: 24, x: 0, y: 14)
+      .padding(.horizontal, 24)
+    }
+  }
+
+  var chatOfferButtons: some View {
+    VStack(spacing: 10) {
+      Button {
+        viewModel.startWithChat()
+      } label: {
+        Text(viewModel.startWithChatLabel)
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(theme.onAccentText)
+          .frame(maxWidth: .infinity)
+          .frame(height: 44)
+          .background(theme.accent)
+          .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+      }
+      .buttonStyle(.plain)
+
+      Button {
+        viewModel.keepWaitingForMedia()
+      } label: {
+        Text(viewModel.keepWaitingLabel)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(theme.secondaryText)
+          .frame(maxWidth: .infinity)
+          .frame(height: 38)
+      }
+      .buttonStyle(.plain)
     }
   }
 
@@ -198,16 +272,13 @@ struct ConnectionSetupView: View {
         .font(.system(size: 20, weight: .bold))
         .foregroundStyle(theme.primaryText)
 
-      HStack(spacing: 4) {
-        ForEach(0..<5, id: \.self) { _ in
-          PlatformIcon(systemName: "star.fill", size: 11, weight: .bold, color: theme.ratingStar)
-        }
-        Text(LocalizationSupport.localized("4.9"))
-          .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(theme.primaryText)
-        Text(LocalizationSupport.localized("(127 reviews)"))
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(theme.secondaryText)
+      // Only shown once the teacher has actually been rated — the student is
+      // told who is joining, not sold a score nobody gave.
+      if viewModel.showsRating {
+        RatingSummaryView(
+          rating: viewModel.participantRating,
+          reviewCount: viewModel.participantReviewCount
+        )
       }
     }
   }
@@ -225,7 +296,7 @@ struct ConnectionSetupView: View {
         .frame(width: 62, height: 104)
         .rotationEffect(.degrees(capsuleRotation))
         .overlay {
-          PlatformIcon(systemName: "wifi", size: 20, weight: .bold, color: theme.onAccentText)
+          PlatformIcon(systemName: "wifi", size: 20, weight: .bold, color: theme.onDarkFill)
         }
         .task {
           withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
@@ -285,8 +356,8 @@ struct ConnectionSetupView: View {
   var microphonePermissionCard: some View {
     permissionCard(
       icon: "mic.fill",
-      title: LocalizationSupport.localized("Microphone Permission"),
-      message: LocalizationSupport.localized("Make sure your microphone is enabled for the best learning experience."),
+      title: viewModel.microphonePermissionTitle,
+      message: viewModel.microphonePermissionMessage,
       buttonTitle: viewModel.microphoneButtonTitle,
       buttonIcon: viewModel.microphoneState.isGranted ? "checkmark" : "mic.fill"
     ) {
@@ -297,8 +368,8 @@ struct ConnectionSetupView: View {
   var cameraPermissionCard: some View {
     permissionCard(
       icon: "video.fill",
-      title: "Camera Permission",
-      message: "Make sure your camera is enabled so your teacher can see your work.",
+      title: viewModel.cameraPermissionTitle,
+      message: viewModel.cameraPermissionMessage,
       buttonTitle: viewModel.cameraButtonTitle,
       buttonIcon: viewModel.cameraState.isGranted ? "checkmark" : "video.fill"
     ) {
@@ -317,10 +388,10 @@ struct ConnectionSetupView: View {
           }
 
         VStack(alignment: .leading, spacing: 6) {
-          Text(LocalizationSupport.localized(title))
+          Text(title)
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(theme.primaryText)
-          Text(LocalizationSupport.localized(message))
+          Text(message)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(theme.secondaryText)
             .lineSpacing(3)
@@ -329,7 +400,7 @@ struct ConnectionSetupView: View {
 
       Button(action: action) {
         HStack(spacing: 8) {
-          PlatformIcon(systemName: buttonIcon, size: 11, weight: .bold, color: theme.onAccentText)
+          PlatformIcon(systemName: buttonIcon, size: 11, weight: .bold, color: theme.onBrightFill)
           Text(buttonTitle)
             .font(.system(size: 13, weight: .bold))
         }

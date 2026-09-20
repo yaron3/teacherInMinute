@@ -11,6 +11,7 @@
 import SwiftUI
 
 struct TeacherDocumentsSuggestionView: View {
+    let viewModel: any TeacherDashboardViewModeling
     /// Called when the teacher chooses to complete the documents now.
     let onComplete: () -> Void
     /// Called when the teacher dismisses the suggestion for later.
@@ -33,13 +34,13 @@ struct TeacherDocumentsSuggestionView: View {
                 }
                 .shadow(color: theme.accent.opacity(0.12), radius: 24, x: 0, y: 12)
 
-            Text(LocalizationSupport.localized("Complete your verification"))
+            Text(viewModel.documentsSuggestionTitle)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(theme.primaryText)
                 .multilineTextAlignment(.center)
                 .padding(.top, 28)
 
-            Text(LocalizationSupport.localized("Nice work on your first lesson! Uploading the rest of your verification documents helps us confirm you as a teacher faster. It's optional — you can also do it anytime from your Profile."))
+            Text(viewModel.documentsSuggestionText)
                 .font(.system(size: 14))
                 .foregroundStyle(theme.secondaryText)
                 .lineSpacing(6)
@@ -50,7 +51,7 @@ struct TeacherDocumentsSuggestionView: View {
             Spacer()
 
             AuthPrimaryButton(
-                title: LocalizationSupport.localized("Complete now"),
+                title: viewModel.completeNowLabel,
                 systemImage: "arrow.right",
                 isEnabled: true
             ) {
@@ -60,7 +61,7 @@ struct TeacherDocumentsSuggestionView: View {
             Button {
                 onDismiss()
             } label: {
-                Text(LocalizationSupport.localized("Maybe later"))
+                Text(viewModel.maybeLaterLabel)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.secondaryText)
                     .frame(maxWidth: .infinity)

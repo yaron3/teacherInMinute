@@ -1,21 +1,30 @@
 import Foundation
 import Observation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
 import FirebaseDatabase
+import LiveKit
 #else
 import SkipBridge
 import SkipFirebaseAuth
 #endif
 
 struct ChatMessage: Identifiable, Equatable {
+  /// The note a student leaves as they close a session their minutes ran out
+  /// on. An ordinary message otherwise.
+  static let farewellKind = "farewell"
+
   let id: String
   let text: String
   let senderUid: String
   let senderRole: String
   let createdAt: Double
   let isMine: Bool
+  /// `farewellKind` for a parting note, "text" for everything else. Defaulted
+  /// so the places that build a message locally keep compiling.
+  var kind: String = "text"
 }
 
 struct BoardPoint: Equatable {
@@ -50,10 +59,48 @@ struct ChatSessionDetails: Equatable {
   let questionPhotoUrls: [String]
   let createdAt: Double
   let acceptedAt: Double
-  let connectionFeeCents: Int
   let pricePerMinuteCents: Int
   let teacherSharePercent: Double
   let currencyCode: String
+  /// When the student's purchased minutes run out, in epoch milliseconds, as
+  /// published by `startLesson` and kept current when they buy more. Zero when
+  /// the backend has not said — a lesson from before allowances were recorded
+  /// runs exactly as it used to, with no countdown and no hold.
+  ///
+  /// Defaulted so the several places that rebuild these details keep compiling;
+  /// each of them passes the current value through deliberately.
+  var minutesDeadlineAt: Double = 0
+  /// The lesson's current medium, as last written to the question node —
+  /// `ConversationType` raw values. Empty when the node has not said. Either
+  /// side may change it while the lesson runs, and the other follows.
+  var conversationType: String = ""
+}
+
+/// The room and token one participant joins the lesson's media with.
+struct MediaCredentials: Equatable {
+  let room: String
+  let token: String
+}
+
+/// What this side should do about the lesson's shared medium.
+enum ConversationTypeChange: Equatable {
+  /// Nothing new, or nothing this side has to act on.
+  case none
+  /// Follow straight away: the other side dropped media.
+  case apply(String)
+  /// The other side added media. Ask before turning any of it on here.
+  case askToFollow(String)
+}
+
+/// What the student's remaining credit means for the session right now.
+enum MinutesHoldState: Equatable {
+  /// Time left, or no deadline published at all.
+  case none
+  /// Under a minute to go, so the student can top up before being interrupted.
+  case warning
+  /// Nothing left. The session holds here until the student buys more minutes
+  /// or ends the call; nothing past this point is billed.
+  case held
 }
 
 @MainActor
@@ -66,11 +113,13 @@ final class ChatSessionService {
   private let boardRef: FirebaseDatabase.DatabaseReference
   private let boardViewportsRef: FirebaseDatabase.DatabaseReference
   private let chatPausedRef: FirebaseDatabase.DatabaseReference
+  private let mediaPendingRef: FirebaseDatabase.DatabaseReference
   private var sessionHandle: DatabaseHandle?
   private var messagesHandle: DatabaseHandle?
   private var boardHandle: DatabaseHandle?
   private var boardViewportsHandle: DatabaseHandle?
   private var chatPausedHandle: DatabaseHandle?
+  private var mediaPendingHandle: DatabaseHandle?
 #endif
 
   init(questionId: String, currentUserUid: String? = nil) {
@@ -83,6 +132,7 @@ final class ChatSessionService {
     self.boardRef = questionRef.child("board/strokes")
     self.boardViewportsRef = questionRef.child("board/viewports")
     self.chatPausedRef = questionRef.child("chatPaused")
+    self.mediaPendingRef = questionRef.child("mediaPending")
 #endif
   }
 
@@ -137,7 +187,7 @@ final class ChatSessionService {
 #endif
   }
 
-  func startSessionListening(onEnded: @escaping () -> Void) {
+  func startSessionListening(onEnded: @escaping () -> Void, onUpdate: @escaping (ChatSessionDetails) -> Void = { _ in }) {
 #if !os(Android)
     sessionHandle = questionRef.observe(.value) { snapshot in
       if !snapshot.exists() {
@@ -147,6 +197,10 @@ final class ChatSessionService {
       if let dict = snapshot.value as? [String: Any],
          Self.isTerminalStatus(dict["status"]) {
         onEnded()
+        return
+      }
+      if let dict = snapshot.value as? [String: Any] {
+        onUpdate(Self.details(from: dict))
       }
     }
 #endif
@@ -228,6 +282,23 @@ final class ChatSessionService {
 #endif
   }
 
+  func startMediaPendingListening(onUpdate: @escaping ([String: Bool]) -> Void) {
+#if !os(Android)
+    mediaPendingHandle = mediaPendingRef.observe(.value) { snapshot in
+      var states: [String: Bool] = [:]
+      for child in snapshot.children {
+        guard let snap = child as? DataSnapshot else { continue }
+        if let flag = snap.value as? Bool {
+          states[snap.key] = flag
+        } else if let num = snap.value as? NSNumber {
+          states[snap.key] = num.boolValue
+        }
+      }
+      onUpdate(states)
+    }
+#endif
+  }
+
   func stopListening() {
 #if !os(Android)
     if let sessionHandle {
@@ -250,17 +321,26 @@ final class ChatSessionService {
       chatPausedRef.removeObserver(withHandle: chatPausedHandle)
       self.chatPausedHandle = nil
     }
+    if let mediaPendingHandle {
+      mediaPendingRef.removeObserver(withHandle: mediaPendingHandle)
+      self.mediaPendingHandle = nil
+    }
 #endif
   }
 
-  func sendText(_ text: String, senderRole: String) async throws {
+  func sendText(_ text: String, senderRole: String, kind: String = "text") async throws {
     guard let uid = Auth.auth().currentUser?.uid else { throw FunctionsError.notSignedIn }
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
 
 #if os(Android)
     try await Task.detached(priority: .userInitiated) {
-      try AndroidChatBridge.sendText(questionId: self.questionId, text: trimmed, senderRole: senderRole)
+      try AndroidChatBridge.sendText(
+        questionId: self.questionId,
+        text: trimmed,
+        senderRole: senderRole,
+        kind: kind
+      )
     }.value
 #else
     let payload: [String: Any] = [
@@ -268,12 +348,42 @@ final class ChatSessionService {
       "senderUid": uid,
       "senderRole": senderRole,
       "createdAt": Date().timeIntervalSince1970 * 1000.0,
-      "kind": "text"
+      "kind": kind
     ]
     try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
       messagesRef.childByAutoId().setValue(payload) { error, _ in
         if let error { cont.resume(throwing: error); return }
         cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
+  func appendQuestionText(_ addition: String) async throws -> String {
+    let trimmed = addition.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return "" }
+
+#if os(Android)
+    return try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.appendQuestionText(questionId: self.questionId, addition: trimmed)
+    }.value
+#else
+    return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<String, Error>) in
+      questionRef.observeSingleEvent(of: .value) { snapshot in
+        let current = Self.questionText(from: snapshot.value as? [String: Any])
+        let next = Self.appendingQuestionText(addition: trimmed, to: current)
+        self.questionRef.updateChildValues([
+          "text": next,
+          "questionText": next
+        ]) { error, _ in
+          if let error {
+            cont.resume(throwing: error)
+            return
+          }
+          cont.resume(returning: next)
+        }
+      } withCancel: { error in
+        cont.resume(throwing: error)
       }
     }
 #endif
@@ -393,10 +503,70 @@ final class ChatSessionService {
 #endif
   }
 
+  func setMediaPending(_ pending: Bool, role: String) async throws {
+    let trimmedRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let key = trimmedRole.isEmpty ? "participant" : trimmedRole
+
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.setMediaPending(
+        questionId: self.questionId,
+        role: key,
+        pending: pending
+      )
+    }.value
+#else
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      mediaPendingRef.child(key).setValue(pending) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
+  /// Switches the lesson's medium for both participants.
+  func setConversationType(_ conversationType: String) async throws {
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.setConversationType(
+        questionId: self.questionId,
+        conversationType: conversationType
+      )
+    }.value
+#else
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      questionRef.child("conversationType").setValue(conversationType) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
 #if os(Android)
   func fetchChatPaused() async throws -> [String: Bool] {
     let json = try await Task.detached(priority: .userInitiated) {
       try AndroidChatBridge.fetchChatPaused(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let rows = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return [:]
+    }
+    var states: [String: Bool] = [:]
+    for (key, value) in rows {
+      if let flag = value as? Bool {
+        states[key] = flag
+      } else if let num = value as? NSNumber {
+        states[key] = num.boolValue
+      }
+    }
+    return states
+  }
+
+  func fetchMediaPending() async throws -> [String: Bool] {
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchMediaPending(questionId: self.questionId)
     }.value
     guard let data = json.data(using: .utf8),
           let rows = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -477,7 +647,8 @@ final class ChatSessionService {
       senderUid: senderUid,
       senderRole: senderRole,
       createdAt: createdAt,
-      isMine: senderUid == currentUserUid
+      isMine: senderUid == currentUserUid,
+      kind: dict["kind"] as? String ?? "text"
     )
   }
 
@@ -521,6 +692,20 @@ final class ChatSessionService {
     return nil
   }
 
+  private static func questionText(from dict: [String: Any]?) -> String {
+    guard let dict else { return "" }
+    return firstString(in: dict, keys: ["text", "questionText", "originalQuestion", "message", "topic"])
+  }
+
+  static func appendingQuestionText(addition: String, to current: String) -> String {
+    let trimmedCurrent = current.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedAddition = addition.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedAddition.isEmpty else { return trimmedCurrent }
+    guard !trimmedCurrent.isEmpty else { return trimmedAddition }
+    if trimmedCurrent.contains(trimmedAddition) { return trimmedCurrent }
+    return trimmedCurrent + "\n" + trimmedAddition
+  }
+
   private static func pointsJson(_ points: [BoardPoint]) -> String {
     let rows = points.map { ["x": $0.x, "y": $0.y] }
     guard let data = try? JSONSerialization.data(withJSONObject: rows),
@@ -550,13 +735,14 @@ final class ChatSessionService {
           ?? doubleValue(dict["startedAt"])
           ?? 0
       ),
-      connectionFeeCents: intValue(dict["connectionFeeCents"]) ?? intValue(dict["connectionFee"]) ?? 0,
       pricePerMinuteCents: intValue(dict["pricePerMinuteCents"])
         ?? intValue(dict["ratePerMinuteCents"])
         ?? intValue(dict["costPerMinuteCents"])
         ?? 0,
       teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75,
-      currencyCode: currencyCode(from: dict)
+      currencyCode: currencyCode(from: dict),
+      minutesDeadlineAt: normalizedMilliseconds(doubleValue(dict["minutesDeadlineAt"]) ?? 0),
+      conversationType: firstString(in: dict, keys: ["conversationType"])
     )
   }
 
@@ -610,6 +796,7 @@ protocol ChatSessionViewModeling: AnyObject {
   var boardStrokes: [BoardStroke] { get set }
   var boardViewports: [String: BoardViewport] { get set }
   var chatPausedStates: [String: Bool] { get set }
+  var mediaPendingStates: [String: Bool] { get set }
   var errorMessage: String? { get set }
   var isConnecting: Bool { get set }
   var participantName: String { get }
@@ -620,12 +807,23 @@ protocol ChatSessionViewModeling: AnyObject {
   var primaryAmountTitle: String { get }
   var primaryAmountSubtitle: String { get }
   var sessionNoticeText: String { get }
-  var onMessagesUpdated: (([ChatMessage]) -> Void)? { get set }
-  var onBoardStrokesUpdated: (([BoardStroke]) -> Void)? { get set }
-  var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)? { get set }
   var onChatPausedUpdated: (([String: Bool]) -> Void)? { get set }
-  var onErrorUpdated: ((String?) -> Void)? { get set }
+  var onMediaPendingUpdated: (([String: Bool]) -> Void)? { get set }
   var onConnectingUpdated: ((Bool) -> Void)? { get set }
+
+  /// True until the setup screen has both chat and, where asked for, media
+  /// ready. Unlike `isConnecting`, which clears once chat alone is up.
+  var isInSetup: Bool { get }
+  func finishSetup()
+
+  /// New activity from the other side on a tab this side is not looking at.
+  var hasUnreadChat: Bool { get }
+  var hasUnreadBoard: Bool { get }
+  /// Tells the session which tab is on screen, which also marks it read.
+  func sessionTabChanged(showsChat: Bool, showsBoard: Bool)
+  /// Bumped whenever the other side sends a formula, so the screen can put its
+  /// keyboard away and let it be read.
+  var incomingFormulaCount: Int { get }
   var onSessionDetailsUpdated: (() -> Void)? { get set }
   var onSessionEnded: (() -> Void)? { get set }
 
@@ -638,12 +836,427 @@ protocol ChatSessionViewModeling: AnyObject {
   func localMessage(text: String) -> ChatMessage
   func localStroke(points: [BoardPoint]) -> BoardStroke
   func send(_ messageText: String)
+  func sendQuestionFormula(_ formulaText: String)
   func sendStroke(_ points: [BoardPoint])
   func clearBoard()
   func updateBoardViewport(_ viewport: BoardViewport)
   func setSelfChatPaused(_ paused: Bool)
   func peerChatPaused() -> Bool
+  func setSelfMediaPending(_ pending: Bool)
+  func peerMediaPending() -> Bool
   func endLesson() async
+
+  /// What the student's remaining credit means at `date`. Read from the
+  /// deadline the backend publishes, so both apps reach the same answer at the
+  /// same moment without either of them polling.
+  func minutesHoldState(at date: Date) -> MinutesHoldState
+  /// Sends a parting note, then ends the lesson. An empty note just ends it.
+  func endLessonWithFarewell(_ message: String) async
+  /// The other side's parting note, when they left one.
+  var peerFarewellNote: String? { get }
+  func logSessionStarted(conversationType: String)
+  func sendBoardSnapshot(_ snapshotData: Data, senderRole: String) async throws
+
+  /// The lesson's medium as both participants currently see it — a
+  /// `ConversationType` raw value, or empty until the session node has said.
+  var sharedConversationType: String { get }
+  /// Asks for whatever `conversationType` needs from this device. Nil once it
+  /// is all granted, otherwise the sentence to show.
+  func prepareMedia(for conversationType: String) async -> String?
+  /// Switches the lesson to `conversationType` for both sides. Nil on success,
+  /// otherwise the sentence to show.
+  func publishConversationType(_ conversationType: String) async -> String?
+  /// Fresh credentials for the lesson's room, for a lesson that started
+  /// without them and has just switched to audio or video.
+  func fetchMediaCredentials() async -> MediaCredentials?
+
+  /// The lesson's LiveKit room and this participant's token. Empty until
+  /// known — a text lesson may start without them.
+  var liveKitRoom: String { get set }
+  var liveKitToken: String { get set }
+  /// The shared medium this side has already acted on. Only a change to it is
+  /// followed: a student who went on by chat while the lesson was asked as
+  /// audio has not been switched by anyone, and must not be pulled back.
+  var lastSeenSharedConversationType: String { get set }
+
+  // MARK: Media
+
+  /// This side's own microphone and camera, as the user left them.
+  var isMicMuted: Bool { get set }
+  var isCameraOff: Bool { get set }
+  //
+  // The lesson's audio and video. The connection itself belongs to
+  // `LiveKitService`, so it outlives the screen that asked for it.
+
+  var mediaConnectionPhase: MediaConnectionPhase { get }
+  /// True when a video lesson connected without its camera.
+  var mediaDidFallBackToAudioOnly: Bool { get }
+  func mediaQuality() -> SessionMediaQuality
+  /// Starts joining the lesson's room with the stored credentials.
+  func connectMedia(enableVideo: Bool)
+  /// Waits for a connect in flight to settle; true once the room is joined.
+  func waitUntilMediaConnected() async -> Bool
+  func disconnectMedia() async
+  func setMicrophoneEnabled(_ enabled: Bool) async
+  func setCameraEnabled(_ enabled: Bool) async
+  /// Called on the main actor whenever local or remote tracks change.
+  var onMediaTracksUpdated: (@MainActor @Sendable () -> Void)? { get set }
+#if !os(Android)
+  var localCameraVideoTrack: VideoTrack? { get }
+  var remoteCameraVideoTrack: VideoTrack? { get }
+#endif
+}
+
+// MARK: - ChatSessionViewModeling defaults
+
+extension ChatSessionViewModeling {
+
+  var sharedConversationType: String { "" }
+
+  func prepareMedia(for conversationType: String) async -> String? { nil }
+
+  func publishConversationType(_ conversationType: String) async -> String? { nil }
+
+  func fetchMediaCredentials() async -> MediaCredentials? { nil }
+
+  var hasMediaCredentials: Bool { !liveKitRoom.isEmpty && !liveKitToken.isEmpty }
+
+  func toggleMicrophone() {
+    isMicMuted.toggle()
+    let enabled = !isMicMuted
+    Task { await setMicrophoneEnabled(enabled) }
+  }
+
+  func toggleCamera() {
+    isCameraOff.toggle()
+    let enabled = !isCameraOff
+    Task { await setCameraEnabled(enabled) }
+  }
+
+  /// Turns the camera off while both sides are reading the chat of a video
+  /// lesson, and back on when either returns to the video.
+  func setCameraPaused(_ paused: Bool) {
+    guard paused != isCameraOff else { return }
+    isCameraOff = paused
+    Task { await setCameraEnabled(!paused) }
+  }
+
+  /// A new medium starts with the microphone and camera on.
+  func resetMediaToggles() {
+    isMicMuted = false
+    isCameraOff = false
+  }
+
+  /// A mic or camera turned off while the room was still connecting had
+  /// nothing to act on, so it is applied once the room is there.
+  func applyMediaTogglesOnConnect() {
+    guard isMicMuted || isCameraOff else { return }
+    let muteMic = isMicMuted
+    let cameraOff = isCameraOff
+    Task {
+      if muteMic { await setMicrophoneEnabled(false) }
+      if cameraOff { await setCameraEnabled(false) }
+    }
+  }
+
+  /// Moves this side's media to `target`: leaves the room for a text lesson,
+  /// changes only the camera in a room already joined or being joined, and
+  /// otherwise starts joining.
+  func switchMedia(to target: ConversationType) async {
+    guard target.requiresMic else {
+      await disconnectMedia()
+      return
+    }
+    let phase = mediaConnectionPhase
+    guard phase == .connecting || phase == .connected else {
+      connectMedia(enableVideo: target.requiresCamera)
+      return
+    }
+    guard await waitUntilMediaConnected() else { return }
+    await setMicrophoneEnabled(true)
+    await setCameraEnabled(target.requiresCamera)
+  }
+
+  /// Makes sure there is a room to join, fetching credentials if the lesson
+  /// started without them.
+  func ensureMediaCredentials() async -> Bool {
+    if hasMediaCredentials { return true }
+    guard let credentials = await fetchMediaCredentials() else { return false }
+    liveKitRoom = credentials.room
+    liveKitToken = credentials.token
+    return true
+  }
+
+  /// This side picked a new medium: checks the device allows it, then tells
+  /// the other side. Nil once the switch is published, otherwise the sentence
+  /// to show.
+  func requestConversationType(_ conversationType: String) async -> String? {
+    if let error = await prepareMedia(for: conversationType) {
+      return error
+    }
+    // Marked as seen before the write: the node echoes it straight back, and
+    // that echo is this side's own switch, not one to follow.
+    let previouslySeen = lastSeenSharedConversationType
+    lastSeenSharedConversationType = conversationType
+    if let error = await publishConversationType(conversationType) {
+      lastSeenSharedConversationType = previouslySeen
+      return error
+    }
+    return nil
+  }
+
+  /// Reads the shared medium and says what, if anything, this side should do
+  /// about it, given the medium it is on now. `canFollow` is false while the
+  /// lesson is still connecting or already ending; a change seen then is left
+  /// for a later reading.
+  func sharedConversationTypeChange(current: String, canFollow: Bool) -> ConversationTypeChange {
+    let shared = sharedConversationType
+    guard let sharedType = ConversationType(rawValue: shared) else { return .none }
+    // The first reading is the medium the lesson was asked as, which this
+    // side has already set itself up for.
+    guard !lastSeenSharedConversationType.isEmpty else {
+      lastSeenSharedConversationType = shared
+      return .none
+    }
+    guard canFollow, shared != lastSeenSharedConversationType else { return .none }
+    lastSeenSharedConversationType = shared
+    logger.info("[ChatSession] other side switched qid=\(self.questionId) role=\(self.role) from=\(current) to=\(shared)")
+
+    // Back to the medium this side is already on still counts as a change: it
+    // answers any question still open about the one before.
+    let currentRank = ConversationType(rawValue: current)?.mediaRank ?? 0
+    return sharedType.mediaRank > currentRank ? .askToFollow(shared) : .apply(shared)
+  }
+
+  /// Longest parting note a student can send as they close a held session.
+  var farewellMessageMaxLength: Int { 128 }
+
+  func minutesHoldState(at date: Date) -> MinutesHoldState { .none }
+
+  func endLessonWithFarewell(_ message: String) async { await endLesson() }
+
+  var peerFarewellNote: String? { nil }
+
+  func logSessionStarted(conversationType: String) {
+  }
+
+  func sendBoardSnapshot(_ snapshotData: Data, senderRole: String) async throws {
+  }
+}
+
+// MARK: - ChatSessionViewModeling UI Strings
+extension ChatSessionViewModeling {
+
+  // MARK: Out of minutes
+
+  var outOfMinutesTitle: String { LocalizationSupport.localized("No more minutes left.") }
+  var outOfMinutesMessage: String {
+    LocalizationSupport.localized("Buy more minutes to carry on, or end the call with a short note for your teacher.")
+  }
+  var buyMoreMinutesLabel: String { LocalizationSupport.localized("Buy more minutes") }
+  var endTheCallLabel: String { LocalizationSupport.localized("End the call") }
+  var minutesRunningOutNotice: String {
+    LocalizationSupport.localized("Less than a minute of credit left.")
+  }
+  var farewellPromptMessage: String {
+    LocalizationSupport.localized("Your teacher will see this before the call ends.")
+  }
+  var farewellPlaceholder: String { LocalizationSupport.localized("Message to your teacher") }
+  var sendAndEndLabel: String { LocalizationSupport.localized("Send and end the call") }
+
+  // MARK: Out of minutes — the teacher's side
+
+  var studentOutOfMinutesTitle: String {
+    LocalizationSupport.localized("The student is out of minutes.")
+  }
+  var studentOutOfMinutesMessage: String {
+    LocalizationSupport.localized("They can buy more to carry on. You can wait, or end the call.")
+  }
+  var waitForStudentLabel: String { LocalizationSupport.localized("Wait") }
+  var peerEndedLessonTitle: String {
+    LocalizationSupport.localized("The student ended the lesson.")
+  }
+  var okLabel: String { LocalizationSupport.localized("OK") }
+  func farewellCharactersLeftText(_ remaining: Int) -> String {
+    String(format: LocalizationSupport.localized("%d characters left"), remaining)
+  }
+
+  // MARK: Header / connection
+
+  var connectedVideoText: String { LocalizationSupport.localized("Connected - Video session") }
+  var connectedAudioText: String { LocalizationSupport.localized("Connected - Audio session") }
+  var connectedText: String { LocalizationSupport.localized("Connected") }
+
+  // MARK: Composer
+
+  var messagePlaceholder: String { LocalizationSupport.localized("Message") }
+
+  // MARK: Whiteboard
+
+  var clearBoardTitle: String { LocalizationSupport.localized("Clear board?") }
+  var peerClearedBoardTitle: String { LocalizationSupport.localized("The other side cleared the board") }
+  var saveAsPhotoAndClearLabel: String { LocalizationSupport.localized("Save as photo and clear") }
+  var saveAsPhotoLabel: String { LocalizationSupport.localized("Save as photo") }
+  var clearLabel: String { LocalizationSupport.localized("Clear") }
+  var dismissLabel: String { LocalizationSupport.localized("Dismiss") }
+  var boardHintText: String { LocalizationSupport.localized("Use your finger to write or sketch.") }
+
+  // MARK: Rate the session
+
+  var sessionCompleteTitle: String { LocalizationSupport.localized("Session Complete!") }
+  var rateSessionTitle: String { LocalizationSupport.localized("Rate this session") }
+  var rateCommentPlaceholderTitle: String { LocalizationSupport.localized("Add a comment (optional)") }
+  var rateCommentPrivacyNote: String {
+    LocalizationSupport.localized("Your teacher sees this without your name.")
+  }
+  var sendLabel: String { LocalizationSupport.localized("Send") }
+  var ratingFailedMessage: String {
+    LocalizationSupport.localized("Could not send rating. Please try again next time.")
+  }
+
+  func greatJobText(teacherName: String) -> String {
+    String(format: LocalizationSupport.localized("Great job learning with %@"), teacherName)
+  }
+
+  func rateExperienceText(teacherName: String) -> String {
+    String(format: LocalizationSupport.localized("How was your experience with %@?"), teacherName)
+  }
+
+  // MARK: End-session prompt
+
+  var endSessionTitleLabel: String { LocalizationSupport.localized("End session?") }
+  var saveBoardTitleLabel: String { LocalizationSupport.localized("Save board to gallery?") }
+  var endSessionConfirmMessage: String { LocalizationSupport.localized("Are you sure you want to end this session?") }
+  var saveBoardRemoteMessage: String { LocalizationSupport.localized("The session ended. Do you want to save the board image to your device gallery?") }
+  var saveBoardLocalMessage: String { LocalizationSupport.localized("The board will be saved to the chat. Do you also want to save it to your device gallery?") }
+  var endSessionActionLabel: String { LocalizationSupport.localized("End session") }
+  var saveToGalleryLabel: String { LocalizationSupport.localized("Save to gallery") }
+  var saveToChatOnlyLabel: String { LocalizationSupport.localized("Save to chat only") }
+  var dontSaveLabel: String { LocalizationSupport.localized("Don't save") }
+  var cancelLabel: String { LocalizationSupport.localized("Cancel") }
+
+  // MARK: End-session button (header)
+
+  var endLabel: String { LocalizationSupport.localized("End") }
+  var endingLabel: String { LocalizationSupport.localized("Ending...") }
+
+  // MARK: Text-transition overlay
+
+  var switchingToTextChatText: String { LocalizationSupport.localized("Switching to text chat…") }
+
+  // MARK: Video placeholders
+
+  var waitingForVideoText: String { LocalizationSupport.localized("Waiting for video…") }
+
+  // MARK: Session condition notice (header)
+
+  /// Said when a video lesson had to start without a camera. The session is
+  /// otherwise fine, so this explains the missing picture rather than warning.
+  var cameraUnavailableNotice: String {
+    LocalizationSupport.localized("Camera unavailable — this lesson is audio only.")
+  }
+
+  var weakConnectionNotice: String {
+    LocalizationSupport.localized("Weak connection — audio and video may stutter.")
+  }
+
+  var lostConnectionNotice: String {
+    LocalizationSupport.localized("Reconnecting…")
+  }
+
+  /// A lesson that went ahead by chat while its audio carries on connecting.
+  var audioConnectingNotice: String {
+    LocalizationSupport.localized("Audio is still connecting — you can chat meanwhile.")
+  }
+
+  var audioFailedNotice: String {
+    LocalizationSupport.localized("Audio couldn't connect. Tap to try again.")
+  }
+
+  /// The other side is in the lesson without audio, so talking will not reach them.
+  var peerAudioPendingNotice: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    if isStudentRole {
+      return LocalizationSupport.localized("Your teacher's audio isn't connected yet — use the chat.")
+    }
+    return LocalizationSupport.localized("The student's audio isn't connected yet — use the chat.")
+  }
+
+  // MARK: Peer-paused panel (role-dependent)
+
+  var peerPausedMessage: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    if isStudentRole {
+      return LocalizationSupport.localized("Teacher is reading chat — video paused")
+    }
+    return LocalizationSupport.localized("Student is reading chat — video paused")
+  }
+
+  // MARK: Video badge
+
+  var videoLabel: String { LocalizationSupport.localized("Video") }
+
+  // MARK: Composer mode pills
+
+  var regularModeLabel: String { LocalizationSupport.localized("Regular") }
+  var algebraModeLabel: String { LocalizationSupport.localized("Algebra") }
+
+  // MARK: Session stats
+
+  var originalQuestionLabel: String { LocalizationSupport.localized("ORIGINAL QUESTION") }
+  var sessionTimeLabel: String { LocalizationSupport.localized("Session Time") }
+  var minutesLabel: String { LocalizationSupport.localized("minutes") }
+
+  // MARK: Empty thread
+
+  var emptyThreadHintText: String {
+    LocalizationSupport.localized("Start with a text explanation, then use the board below for the math work.")
+  }
+
+  // MARK: Tab bar
+
+  var chatTabTitle: String { LocalizationSupport.localized("Chat") }
+  var boardTabTitle: String { LocalizationSupport.localized("Board") }
+  var videoTabTitle: String { LocalizationSupport.localized("Video") }
+  var imagesTabTitle: String { LocalizationSupport.localized("Images") }
+
+  // MARK: Session type
+
+  var sessionTypeTitle: String { LocalizationSupport.localized("Session type") }
+  var changeSessionTypeLabel: String { LocalizationSupport.localized("Change") }
+  var textSessionTypeLabel: String { LocalizationSupport.localized("Text") }
+  var audioSessionTypeLabel: String { LocalizationSupport.localized("Audio") }
+  var videoSessionTypeLabel: String { LocalizationSupport.localized("Video") }
+  var switchSessionTypeLabel: String { LocalizationSupport.localized("Switch") }
+  var notNowLabel: String { LocalizationSupport.localized("Not now") }
+  var sessionTypeChangeFailedNotice: String {
+    LocalizationSupport.localized("The session type could not be changed. Tap to dismiss.")
+  }
+  var mediaCredentialsFailedNotice: String {
+    LocalizationSupport.localized("Could not start the audio/video connection. Please try again.")
+  }
+
+  /// Asks this side to follow the other one up to `conversationType`.
+  func peerUpgradeTitle(for conversationType: String) -> String {
+    conversationType == ConversationType.video.rawValue
+      ? LocalizationSupport.localized("Switch to a video session?")
+      : LocalizationSupport.localized("Switch to an audio session?")
+  }
+
+  func peerUpgradeMessage(for conversationType: String) -> String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    let isVideo = conversationType == ConversationType.video.rawValue
+    switch (isStudentRole, isVideo) {
+    case (true, true):
+      return LocalizationSupport.localized("Your teacher switched the session to video.")
+    case (true, false):
+      return LocalizationSupport.localized("Your teacher switched the session to audio.")
+    case (false, true):
+      return LocalizationSupport.localized("The student switched the session to video.")
+    case (false, false):
+      return LocalizationSupport.localized("The student switched the session to audio.")
+    }
+  }
 }
 
 @Observable
@@ -655,10 +1268,20 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var boardStrokes: [BoardStroke] = []
   var boardViewports: [String: BoardViewport] = [:]
   var chatPausedStates: [String: Bool] = [:]
+  var mediaPendingStates: [String: Bool] = [:]
   var draft = ""
   var errorMessage: String?
   var isConnecting = true
   var details: ChatSessionDetails?
+  var liveKitRoom: String
+  var liveKitToken: String
+  var lastSeenSharedConversationType = ""
+  private(set) var isInSetup = true
+  private(set) var hasUnreadChat = false
+  private(set) var hasUnreadBoard = false
+  private(set) var incomingFormulaCount = 0
+  var isMicMuted = false
+  var isCameraOff = false
   var participantName: String {
     if isTeacherRole {
 	  return nonEmpty(details?.studentName) ?? LocalizationSupport.localized("Student")
@@ -697,11 +1320,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     return LocalizationSupport.localized("Total so far")
   }
   let sessionNoticeText = LocalizationSupport.localized("Session started - Billing active")
-  var onMessagesUpdated: (([ChatMessage]) -> Void)?
-  var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
-  var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
   var onChatPausedUpdated: (([String: Bool]) -> Void)?
-  var onErrorUpdated: ((String?) -> Void)?
+  var onMediaPendingUpdated: (([String: Bool]) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
   var onSessionDetailsUpdated: (() -> Void)?
   var onSessionEnded: (() -> Void)?
@@ -712,12 +1332,25 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private let service: ChatSessionService
   private var pollingTask: Task<Void, Never>?
   private var hasReportedLessonEnd = false
+  private var hasReportedLessonStart = false
   private var didObserveActiveSession = false
   private var lastSentChatPaused: Bool?
+  private var lastSentMediaPending: Bool?
+  private var lastSentBoardViewport: BoardViewport?
+  private var isChatVisible = true
+  private var isBoardVisible = false
 
-  init(questionId: String, role: String, initialDetails: ChatSessionDetails? = nil) {
+  init(
+    questionId: String,
+    role: String,
+    initialDetails: ChatSessionDetails? = nil,
+    liveKitRoom: String = "",
+    liveKitToken: String = ""
+  ) {
     self.questionId = questionId
     self.role = role
+    self.liveKitRoom = liveKitRoom.trimmingCharacters(in: .whitespacesAndNewlines)
+    self.liveKitToken = liveKitToken.trimmingCharacters(in: .whitespacesAndNewlines)
     self.details = initialDetails
     self.service = ChatSessionService(questionId: questionId)
   }
@@ -732,7 +1365,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         logger.info("[ChatSession] start blocked: session details unavailable questionId=\(self.questionId) role=\(self.role)")
         return
       }
-      try? await Task.sleep(nanoseconds: 1_400_000_000)
       guard !Task.isCancelled else {
         logger.info("[ChatSession] start cancelled before connected questionId=\(self.questionId) role=\(self.role)")
         return
@@ -741,6 +1373,34 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       onConnectingUpdated?(false)
       logger.info("[ChatSession] connected questionId=\(self.questionId) role=\(self.role)")
       beginListening()
+      await reportLessonStarted()
+    }
+  }
+
+  /// Tells the backend this participant is in the session.
+  ///
+  /// Nothing used to call `startLesson`, which left the lesson document
+  /// uncreated, the 30-minute hard cap unarmed — it is scheduled by that call —
+  /// and the billing clock running from the moment the teacher accepted rather
+  /// than from when the two of them were actually together. It is also how the
+  /// backend learns the student turned up at all: a lesson they never joined is
+  /// written off after a grace period and charged to nobody.
+  ///
+  /// Both sides call it as they connect, and the backend treats the second
+  /// arrival as ordinary. Best-effort: failing here must not throw anyone out
+  /// of a session they are already connected to.
+  private func reportLessonStarted() async {
+    guard !hasReportedLessonStart else { return }
+    guard let questionId = nonEmpty(self.questionId) else { return }
+    hasReportedLessonStart = true
+
+    do {
+      let lessonId = try await FunctionsService.shared.startLesson(questionId: questionId)
+      logger.info("[ChatSession] startLesson reported questionId=\(questionId) lessonId=\(lessonId)")
+    } catch {
+      logger.error(
+        "[ChatSession] startLesson failed questionId=\(questionId): \(error.localizedDescription)"
+      )
     }
   }
 
@@ -759,12 +1419,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         return true
       }
       errorMessage = LocalizationSupport.localized("Session is no longer available.")
-      onErrorUpdated?(errorMessage)
       logger.info("[ChatSession] details missing questionId=\(self.questionId) role=\(self.role)")
       return false
     } catch {
       errorMessage = error.localizedDescription
-      onErrorUpdated?(errorMessage)
       logger.error("[ChatSession] details failed questionId=\(self.questionId) role=\(self.role): \(error.localizedDescription)")
       return false
     }
@@ -776,55 +1434,117 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     pollingTask = Task {
       while !Task.isCancelled {
         do {
-          if try await service.fetchSessionDetails() == nil {
+          guard let updatedDetails = try await service.fetchSessionDetails() else {
             guard !Task.isCancelled else { return }
             await handleRemoteSessionEnded()
             return
           }
           didObserveActiveSession = true
+          details = mergedDetails(current: details, updated: updatedDetails)
+          onSessionDetailsUpdated?()
           let rows = try await service.fetchMessages()
           let strokes = try await service.fetchBoardStrokes()
           let viewports = try await service.fetchBoardViewports()
           let paused = try await service.fetchChatPaused()
+          let mediaPending = try await service.fetchMediaPending()
           guard !Task.isCancelled else { return }
-          messages = rows
-          boardStrokes = strokes
-          boardViewports = viewports
+          receiveMessages(rows)
+          receiveBoardStrokes(strokes)
+          receiveBoardViewports(viewports)
           chatPausedStates = paused
-          onMessagesUpdated?(rows)
-          onBoardStrokesUpdated?(strokes)
-          onBoardViewportsUpdated?(viewports)
+          mediaPendingStates = mediaPending
           onChatPausedUpdated?(paused)
+          onMediaPendingUpdated?(mediaPending)
         } catch {
           errorMessage = error.localizedDescription
-          onErrorUpdated?(errorMessage)
         }
         try? await Task.sleep(nanoseconds: 1_500_000_000)
       }
     }
 #else
-    service.startSessionListening { [weak self] in
-      Task { @MainActor in
-        await self?.handleRemoteSessionEnded()
+    // A retried start must not stack a second set of observers on the first.
+    service.stopListening()
+    service.startSessionListening(
+      onEnded: { [weak self] in
+        Task { @MainActor in
+          await self?.handleRemoteSessionEnded()
+        }
+      },
+      onUpdate: { [weak self] updatedDetails in
+        guard let self else { return }
+        self.details = self.mergedDetails(current: self.details, updated: updatedDetails)
+        self.onSessionDetailsUpdated?()
       }
-    }
+    )
     service.startListening { [weak self] rows in
-      self?.messages = rows
-      self?.onMessagesUpdated?(rows)
+      self?.receiveMessages(rows)
     }
     service.startBoardListening { [weak self] strokes in
-      self?.boardStrokes = strokes
-      self?.onBoardStrokesUpdated?(strokes)
+      self?.receiveBoardStrokes(strokes)
     }
     service.startBoardViewportListening { [weak self] viewports in
-      self?.boardViewports = viewports
-      self?.onBoardViewportsUpdated?(viewports)
+      self?.receiveBoardViewports(viewports)
     }
     service.startChatPausedListening { [weak self] states in
       self?.chatPausedStates = states
       self?.onChatPausedUpdated?(states)
     }
+    service.startMediaPendingListening { [weak self] states in
+      self?.mediaPendingStates = states
+      self?.onMediaPendingUpdated?(states)
+    }
 #endif
+  }
+
+  // MARK: Incoming
+
+  /// Takes the latest thread. Messages from the other side that were not in
+  /// the last one are announced, and mark the chat unread when it is not on
+  /// screen.
+  private func receiveMessages(_ rows: [ChatMessage]) {
+    guard rows != messages else { return }
+    let previousIDs = Set(messages.map(\.id))
+    let incoming = rows.filter { !$0.isMine && !previousIDs.contains($0.id) }
+    if !incoming.isEmpty, !isChatVisible {
+      hasUnreadChat = true
+    }
+    for message in incoming {
+      LocalNotificationService.shared.scheduleChatMessage(
+        questionId: questionId,
+        message: message,
+        currentRole: role
+      )
+    }
+    if incoming.contains(where: { ChatBubble.containsFormula($0.text) }) {
+      incomingFormulaCount += 1
+    }
+    messages = rows
+    noteFarewell(in: rows)
+  }
+
+  private func receiveBoardStrokes(_ strokes: [BoardStroke]) {
+    guard strokes != boardStrokes else { return }
+    let previousIDs = Set(boardStrokes.map(\.id))
+    if !isBoardVisible, strokes.contains(where: { !$0.isMine && !previousIDs.contains($0.id) }) {
+      hasUnreadBoard = true
+    }
+    boardStrokes = strokes
+  }
+
+  private func receiveBoardViewports(_ viewports: [String: BoardViewport]) {
+    guard viewports != boardViewports else { return }
+    boardViewports = viewports
+  }
+
+  func sessionTabChanged(showsChat: Bool, showsBoard: Bool) {
+    isChatVisible = showsChat
+    isBoardVisible = showsBoard
+    if showsChat { hasUnreadChat = false }
+    if showsBoard { hasUnreadBoard = false }
+  }
+
+  func finishSetup() {
+    isInSetup = false
   }
 
   func stop() {
@@ -841,7 +1561,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func primaryAmountText(at date: Date) -> String {
     let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
-    let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
+    let grossCents = elapsedMinutes * Double(pricePerMinuteCents)
     let cents = isTeacherRole ? grossCents * (teacherSharePercent / 100.0) : grossCents
     return currencyText(cents: max(0, cents))
   }
@@ -901,16 +1621,40 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   func send(_ messageText: String) {
     let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
+    // A held session is paused for both sides: nothing past the deadline is
+    // billed, so nothing past it is taught either. The parting note goes out
+    // through endLessonWithFarewell, which does not come through here.
+    guard minutesHoldState(at: Date()) != .held else { return }
     errorMessage = nil
-#if os(Android)
-#endif
+    // Shown at once; the next snapshot of the thread replaces it.
+    messages.append(localMessage(text: text))
     Task {
       do {
         try await service.sendText(text, senderRole: role)
       } catch {
         errorMessage = error.localizedDescription
-        onErrorUpdated?(errorMessage)
 		logger.error("[ChatSession] Chat send failed: \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func sendQuestionFormula(_ formulaText: String) {
+    let text = formulaText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    send(text)
+
+    guard role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student" else { return }
+    let currentText = details?.questionText ?? ""
+    let localQuestionText = ChatSessionService.appendingQuestionText(addition: text, to: currentText)
+    updateLocalQuestionText(localQuestionText)
+
+    Task {
+      do {
+        let remoteQuestionText = try await service.appendQuestionText(text)
+        updateLocalQuestionText(remoteQuestionText)
+      } catch {
+        errorMessage = error.localizedDescription
+        logger.error("[ChatSession] Question formula append failed: \(error.localizedDescription)")
       }
     }
   }
@@ -919,14 +1663,12 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     guard !points.isEmpty else { return }
     guard !hasReportedLessonEnd else { return }
     errorMessage = nil
-#if os(Android)
-#endif
+    boardStrokes.append(localStroke(points: points))
     Task {
       do {
         try await service.sendStroke(points)
       } catch {
         errorMessage = error.localizedDescription
-        onErrorUpdated?(errorMessage)
 		logger.error("[ChatSession] Board stroke send failed: \(error.localizedDescription)")
       }
     }
@@ -934,15 +1676,12 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func clearBoard() {
     errorMessage = nil
-    onErrorUpdated?(nil)
+    boardStrokes = []
     Task {
       do {
         try await service.clearBoard()
-        boardStrokes = []
-        onBoardStrokesUpdated?([])
       } catch {
         errorMessage = error.localizedDescription
-        onErrorUpdated?(errorMessage)
 		logger.error("[ChatSession] Board clear failed: \(error.localizedDescription)")
       }
     }
@@ -953,6 +1692,13 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     // backend, so a late viewport write races into a permission_denied. Suppress
     // any board writes after the session has been reported ended.
     guard !hasReportedLessonEnd else { return }
+    // A board being dragged reports every frame; only a real move goes out.
+    if let previous = lastSentBoardViewport {
+      let positionDelta = abs(previous.x - viewport.x) + abs(previous.y - viewport.y)
+      let sizeDelta = abs(previous.width - viewport.width) + abs(previous.height - viewport.height)
+      guard positionDelta > 2 || sizeDelta > 2 else { return }
+    }
+    lastSentBoardViewport = viewport
     Task {
       do {
         try await service.updateBoardViewport(viewport, role: role)
@@ -984,6 +1730,30 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     return false
   }
 
+  /// Tells the other side this participant is in the lesson without audio —
+  /// still connecting, or started by chat instead — so they type rather than
+  /// talk. Nothing is written until there is something to say.
+  func setSelfMediaPending(_ pending: Bool) {
+    if (lastSentMediaPending ?? false) == pending { return }
+    lastSentMediaPending = pending
+    mediaPendingStates[roleKey(role)] = pending
+    Task {
+      do {
+        try await service.setMediaPending(pending, role: role)
+      } catch {
+        logger.error("[ChatSession] setMediaPending failed pending=\(pending): \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func peerMediaPending() -> Bool {
+    let selfKey = roleKey(role)
+    for (key, value) in mediaPendingStates where key != selfKey && value {
+      return true
+    }
+    return false
+  }
+
   private func roleKey(_ role: String) -> String {
     let trimmed = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     return trimmed.isEmpty ? "participant" : trimmed
@@ -991,9 +1761,60 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func endLesson() async {
     setSelfChatPaused(false)
+    setSelfMediaPending(false)
     await reportLessonEnded()
     await LiveKitService.shared.disconnect()
     stop()
+  }
+
+  /// Warn a minute before the student's credit runs out, so they can top up
+  /// before the session is interrupted at all.
+  private static let minutesWarningSeconds: Double = 60
+
+  func minutesHoldState(at date: Date) -> MinutesHoldState {
+    // Zero means the backend published no allowance — a lesson that started
+    // before this existed runs as it always did.
+    guard let deadlineMs = details?.minutesDeadlineAt, deadlineMs > 0 else { return .none }
+
+    let secondsLeft = deadlineMs / 1000.0 - date.timeIntervalSince1970
+    if secondsLeft <= 0 { return .held }
+    return secondsLeft <= Self.minutesWarningSeconds ? .warning : .none
+  }
+
+  /// The other side's parting note, once it has arrived. Read when the session
+  /// ends: the note is shown to them before the screen closes, rather than
+  /// flashing past in a chat that is about to disappear.
+  private(set) var peerFarewellNote: String?
+
+  /// Remembers a parting note the moment it lands, because it arrives just
+  /// ahead of the session ending and the chat is torn down with it.
+  private func noteFarewell(in rows: [ChatMessage]) {
+    guard let note = rows.last(where: { $0.kind == ChatMessage.farewellKind && !$0.isMine }) else {
+      return
+    }
+    peerFarewellNote = note.text
+  }
+
+  func endLessonWithFarewell(_ message: String) async {
+    let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty {
+      do {
+        try await service.sendText(
+          String(trimmed.prefix(farewellMessageMaxLength)),
+          senderRole: role,
+          // Flagged so the other side can show it rather than let it scroll
+          // past: it lands in both chats either way.
+          kind: ChatMessage.farewellKind
+        )
+      } catch {
+        // The call is ending either way; a note that failed to send must not
+        // strand the student in a session they have already left.
+        logger.error(
+          "[ChatSession] farewell failed questionId=\(self.questionId): \(error.localizedDescription)"
+        )
+      }
+    }
+    await endLesson()
   }
 
   private func handleRemoteSessionEnded() async {
@@ -1018,7 +1839,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       logger.info("[ChatSession] endLesson reported questionId=\(questionId)")
     } catch {
       errorMessage = error.localizedDescription
-      onErrorUpdated?(errorMessage)
       logger.error("[ChatSession] endLesson failed questionId=\(self.questionId): \(error.localizedDescription)")
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "ChatSession.endLesson")
     }
@@ -1034,10 +1854,6 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       }
     }
     return role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "teacher"
-  }
-
-  private var connectionFeeCents: Int {
-    details?.connectionFeeCents ?? 0
   }
 
   private var pricePerMinuteCents: Int {
@@ -1070,6 +1886,11 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   private func mergedDetails(current: ChatSessionDetails?, updated: ChatSessionDetails) -> ChatSessionDetails {
+    if let published = publishedConversationType,
+       updated.conversationType == published
+        || Date().timeIntervalSince(publishedConversationTypeAt) > Self.publishedConversationTypeGraceSeconds {
+      publishedConversationType = nil
+    }
     guard let current else { return updated }
     return ChatSessionDetails(
       questionId: nonEmpty(updated.questionId) ?? current.questionId,
@@ -1083,11 +1904,41 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       questionPhotoUrls: updated.questionPhotoUrls.isEmpty ? current.questionPhotoUrls : updated.questionPhotoUrls,
       createdAt: updated.createdAt > 0 ? updated.createdAt : current.createdAt,
       acceptedAt: updated.acceptedAt > 0 ? updated.acceptedAt : current.acceptedAt,
-      connectionFeeCents: updated.connectionFeeCents > 0 ? updated.connectionFeeCents : current.connectionFeeCents,
       pricePerMinuteCents: updated.pricePerMinuteCents > 0 ? updated.pricePerMinuteCents : current.pricePerMinuteCents,
       teacherSharePercent: updated.teacherSharePercent > 0 ? updated.teacherSharePercent : current.teacherSharePercent,
-      currencyCode: nonEmpty(updated.currencyCode) ?? current.currencyCode
+      currencyCode: nonEmpty(updated.currencyCode) ?? current.currencyCode,
+      // A later snapshot that omits the deadline must not clear a known one:
+      // the hold would lift itself and the student would keep talking for free.
+      minutesDeadlineAt: updated.minutesDeadlineAt > 0
+        ? updated.minutesDeadlineAt
+        : current.minutesDeadlineAt,
+      conversationType: nonEmpty(updated.conversationType) ?? current.conversationType
     )
+  }
+
+  private func updateLocalQuestionText(_ questionText: String) {
+    guard let current = details else { return }
+    let trimmed = questionText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed != current.questionText else { return }
+    details = ChatSessionDetails(
+      questionId: current.questionId,
+      studentId: current.studentId,
+      teacherId: current.teacherId,
+      studentName: current.studentName,
+      teacherName: current.teacherName,
+      studentImageURL: current.studentImageURL,
+      teacherImageURL: current.teacherImageURL,
+      questionText: trimmed,
+      questionPhotoUrls: current.questionPhotoUrls,
+      createdAt: current.createdAt,
+      acceptedAt: current.acceptedAt,
+      pricePerMinuteCents: current.pricePerMinuteCents,
+      teacherSharePercent: current.teacherSharePercent,
+      currencyCode: current.currencyCode,
+      minutesDeadlineAt: current.minutesDeadlineAt,
+      conversationType: current.conversationType
+    )
+    onSessionDetailsUpdated?()
   }
 
   private func loadParticipantProfiles() async {
@@ -1134,12 +1985,153 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       questionPhotoUrls: current.questionPhotoUrls,
       createdAt: current.createdAt,
       acceptedAt: current.acceptedAt,
-      connectionFeeCents: current.connectionFeeCents,
       pricePerMinuteCents: current.pricePerMinuteCents,
       teacherSharePercent: current.teacherSharePercent,
-      currencyCode: current.currencyCode
+      currencyCode: current.currencyCode,
+      minutesDeadlineAt: current.minutesDeadlineAt,
+      conversationType: current.conversationType
     )
   }
+
+  /// A switch this side wrote, reported as the shared medium until a read of
+  /// the node agrees. On Android a poll that set off before the write can
+  /// still come back with the old medium, which would otherwise look like the
+  /// other side switching straight back.
+  private var publishedConversationType: String?
+  private var publishedConversationTypeAt = Date.distantPast
+  private static let publishedConversationTypeGraceSeconds: TimeInterval = 5
+
+  var sharedConversationType: String {
+    publishedConversationType ?? details?.conversationType ?? ""
+  }
+
+  func prepareMedia(for conversationType: String) async -> String? {
+    guard let type = ConversationType(rawValue: conversationType) else { return nil }
+
+    if type.requiresMic {
+      let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+      if !micState.isGranted {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, parameters: [
+          "permission_type": "microphone",
+          "conversation_type": conversationType
+        ])
+        return type == .video
+          ? LocalizationSupport.localized("Microphone and camera access are required for this video session.")
+          : LocalizationSupport.localized("Microphone access is required for this audio session.")
+      }
+    }
+
+    if type.requiresCamera {
+      let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+      if !cameraState.isGranted {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, parameters: [
+          "permission_type": "camera",
+          "conversation_type": conversationType
+        ])
+        return LocalizationSupport.localized("Microphone and camera access are required for this video session.")
+      }
+    }
+
+    return nil
+  }
+
+  func publishConversationType(_ conversationType: String) async -> String? {
+    guard ConversationType(rawValue: conversationType) != nil else { return nil }
+    let previous = sharedConversationType
+    publishedConversationType = conversationType
+    publishedConversationTypeAt = Date()
+    do {
+      try await service.setConversationType(conversationType)
+      publishedConversationTypeAt = Date()
+      AnalyticsService.shared.logEvent(AnalyticsEvent.sessionTypeChanged, parameters: [
+        "question_id": questionId,
+        "role": role,
+        "from_conversation_type": previous,
+        "conversation_type": conversationType
+      ])
+      logger.info("[ChatSession] conversation type changed questionId=\(self.questionId) role=\(self.role) from=\(previous) to=\(conversationType)")
+      return nil
+    } catch {
+      publishedConversationType = nil
+      logger.error("[ChatSession] conversation type change failed questionId=\(self.questionId) to=\(conversationType): \(error.localizedDescription)")
+      return sessionTypeChangeFailedNotice
+    }
+  }
+
+  func fetchMediaCredentials() async -> MediaCredentials? {
+    do {
+      let result = try await FunctionsService.shared.getQuestionStatus(questionId: questionId)
+      guard let room = nonEmpty(result.liveKitRoom), let token = nonEmpty(result.liveKitToken) else {
+        logger.error("[ChatSession] media credentials missing questionId=\(self.questionId) status=\(result.status)")
+        return nil
+      }
+      return MediaCredentials(room: room, token: token)
+    } catch {
+      logger.error("[ChatSession] media credentials failed questionId=\(self.questionId): \(error.localizedDescription)")
+      return nil
+    }
+  }
+
+  // MARK: Media
+
+  var mediaConnectionPhase: MediaConnectionPhase { LiveKitService.shared.connectionPhase }
+
+  var mediaDidFallBackToAudioOnly: Bool { LiveKitService.shared.didFallBackToAudioOnly }
+
+  func mediaQuality() -> SessionMediaQuality {
+    LiveKitService.shared.currentMediaQuality()
+  }
+
+  func connectMedia(enableVideo: Bool) {
+    logger.info("[ChatSession] connecting media questionId=\(self.questionId) role=\(self.role) video=\(enableVideo)")
+    LiveKitService.shared.startConnecting(roomName: liveKitRoom, token: liveKitToken, enableVideo: enableVideo)
+  }
+
+  func waitUntilMediaConnected() async -> Bool {
+    await LiveKitService.shared.waitUntilConnected()
+  }
+
+  func disconnectMedia() async {
+    await LiveKitService.shared.disconnect()
+  }
+
+  func setMicrophoneEnabled(_ enabled: Bool) async {
+    await LiveKitService.shared.setMicrophoneEnabled(enabled)
+  }
+
+  func setCameraEnabled(_ enabled: Bool) async {
+    await LiveKitService.shared.setCameraEnabled(enabled)
+  }
+
+#if !os(Android)
+  var onMediaTracksUpdated: (@MainActor @Sendable () -> Void)? {
+    get { LiveKitService.shared.onTracksUpdated }
+    set { LiveKitService.shared.onTracksUpdated = newValue }
+  }
+
+  var localCameraVideoTrack: VideoTrack? { LiveKitService.shared.localCameraVideoTrack }
+
+  var remoteCameraVideoTrack: VideoTrack? { LiveKitService.shared.remoteCameraVideoTrack }
+#else
+  /// Android draws video through its own bridge and reports no track changes.
+  var onMediaTracksUpdated: (@MainActor @Sendable () -> Void)?
+#endif
+
+  func logSessionStarted(conversationType: String) {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.studentChatStarted, parameters: [
+      "question_id": questionId,
+      "role": role,
+      "conversation_type": conversationType
+    ])
+  }
+
+#if !os(Android)
+  func sendBoardSnapshot(_ snapshotData: Data, senderRole: String) async throws {
+    let url = try await StorageService.shared.uploadBoardSnapshot(data: snapshotData, questionId: questionId)
+    let service = ChatSessionService(questionId: questionId)
+    try await service.sendImage(downloadURL: url, senderRole: senderRole)
+  }
+#endif
 }
 
 
@@ -1153,7 +2145,11 @@ private enum AndroidChatBridge {
   )!
   private static let sendMethod = managerClass.getStaticMethodID(
     name: "sendText",
-    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
+    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
+  )!
+  private static let appendQuestionTextMethod = managerClass.getStaticMethodID(
+    name: "appendQuestionText",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
   )!
   private static let fetchBoardMethod = managerClass.getStaticMethodID(
     name: "fetchBoardStrokesJson",
@@ -1183,6 +2179,18 @@ private enum AndroidChatBridge {
     name: "fetchChatPausedJson",
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
   )!
+  private static let setMediaPendingMethod = managerClass.getStaticMethodID(
+    name: "setMediaPending",
+    sig: "(Ljava/lang/String;Ljava/lang/String;Z)V"
+  )!
+  private static let setConversationTypeMethod = managerClass.getStaticMethodID(
+    name: "setConversationType",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)V"
+  )!
+  private static let fetchMediaPendingMethod = managerClass.getStaticMethodID(
+    name: "fetchMediaPendingJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
   private static let markQuestionAcceptedMethod = managerClass.getStaticMethodID(
     name: "markQuestionAccepted",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
@@ -1202,7 +2210,7 @@ private enum AndroidChatBridge {
     } as String
   }
 
-  static func sendText(questionId: String, text: String, senderRole: String) throws {
+  static func sendText(questionId: String, text: String, senderRole: String, kind: String) throws {
     try jniContext {
       try managerClass.callStatic(
         method: sendMethod,
@@ -1210,10 +2218,24 @@ private enum AndroidChatBridge {
         args: [
           questionId.toJavaParameter(options: [.kotlincompat]),
           text.toJavaParameter(options: [.kotlincompat]),
-          senderRole.toJavaParameter(options: [.kotlincompat])
+          senderRole.toJavaParameter(options: [.kotlincompat]),
+          kind.toJavaParameter(options: [.kotlincompat])
         ]
       )
     }
+  }
+
+  static func appendQuestionText(questionId: String, addition: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: appendQuestionTextMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          addition.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    } as String
   }
 
   static func fetchBoardStrokes(questionId: String) throws -> String {
@@ -1301,6 +2323,43 @@ private enum AndroidChatBridge {
     try jniContext {
       try managerClass.callStatic(
         method: fetchChatPausedMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
+  }
+
+  static func setMediaPending(questionId: String, role: String, pending: Bool) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setMediaPendingMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat]),
+          pending.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func setConversationType(questionId: String, conversationType: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setConversationTypeMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          conversationType.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func fetchMediaPending(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchMediaPendingMethod,
         options: [.kotlincompat],
         args: [questionId.toJavaParameter(options: [.kotlincompat])]
       )

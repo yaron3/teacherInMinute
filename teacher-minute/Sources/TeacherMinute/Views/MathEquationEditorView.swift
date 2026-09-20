@@ -6,6 +6,9 @@
 //  chat input, plus a math keyboard sitting above it. The only difference
 //  from the regular input is the keyboard.
 //
+//  Used by the chat session, where the equation is sent as a message, and by
+//  the ask-a-teacher sheet, where it is appended to the question being typed.
+//
 
 import SwiftUI
 
@@ -15,6 +18,18 @@ struct MathEquationEditorView: View {
     // mutate on Android. Bumping this counter from every mutation forces
     // SwiftUI to re-evaluate body and pick up the new model state.
     @State var modelTick: Int = 0
+    /// Icon on the commit button. The chat composer sends the equation as a
+    /// message; the ask-a-teacher sheet appends it to the question being
+    /// written, so the same editor needs to promise two different things.
+    var actionSystemImage: String = "paperplane.fill"
+    /// Corner radius for the formula field. `nil` keeps the capsule the chat
+    /// composer wants; a radius lets a caller match a neighbouring text field,
+    /// which is what the ask-a-teacher sheet does so the formula field reads as
+    /// the bottom of the question field rather than a second kind of input.
+    var fieldCornerRadius: CGFloat? = nil
+    var onDraftChange: (String) -> Void = { _ in }
+    /// Called with the finished LaTeX. The editor clears itself first, so the
+    /// handler is free to rebuild the view that owns it.
     let onSend: (String) -> Void
     @Environment(\.colorScheme) var colorScheme
 
@@ -43,18 +58,13 @@ struct MathEquationEditorView: View {
         return VStack(spacing: 8) {
 
             HStack(spacing: 10) {
-                MathFormulaView(latex: preview, displayMode: false)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: inputCapsuleHeight)
-                    .padding(.horizontal, 6)
-                    .background(theme.fieldBackground)
-                    .clipShape(Capsule())
+                formulaField(preview: preview)
 
                 Button {
                     sendCurrent(exported: exported)
                     modelTick &+= 1
                 } label: {
-                    PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.onAccentText)
+                    PlatformIcon(systemName: actionSystemImage, size: 15, weight: .bold, color: theme.onDarkFill)
                         .frame(width: 42, height: 42)
                         .background(
                             LinearGradient(
@@ -74,6 +84,20 @@ struct MathEquationEditorView: View {
         .environment(\.layoutDirection, .leftToRight)
     }
 
+    @ViewBuilder func formulaField(preview: String) -> some View {
+        let field = MathFormulaView(latex: preview, displayMode: false)
+            .frame(maxWidth: .infinity)
+            .frame(height: inputCapsuleHeight)
+            .padding(.horizontal, 6)
+            .background(theme.fieldBackground)
+
+        if let fieldCornerRadius {
+            field.clipShape(RoundedRectangle(cornerRadius: fieldCornerRadius, style: .continuous))
+        } else {
+            field.clipShape(Capsule())
+        }
+    }
+
     func sendCurrent(exported: String) {
         let trimmed = exported.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -83,6 +107,7 @@ struct MathEquationEditorView: View {
         // clear afterwards lands on the discarded one. The equation then stays
         // in the field, which reads as "the send button did nothing".
         model.clear()
+        onDraftChange("")
         onSend(trimmed)
     }
 
@@ -102,6 +127,7 @@ struct MathEquationEditorView: View {
         case .fraction:
             model.wrapPreviousAsNumerator()
         }
+        onDraftChange(model.exportLatex())
         modelTick &+= 1
         logger.info("[MathEditor] after action tick=\(modelTick) latex='\(model.currentLatex)' cursor=\(model.cursorIndex)")
     }

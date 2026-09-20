@@ -8,6 +8,7 @@
 import SwiftUI
 import Observation
 import Foundation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
@@ -23,6 +24,12 @@ enum StudentSearchState {
   case matched(questionId: String, liveKitRoom: String, liveKitToken: String)
   case noMatch
   case error(String)
+}
+
+struct StudentLiveSessionDestination {
+  let questionId: String
+  let liveKitRoom: String
+  let liveKitToken: String
 }
 
 // MARK: - Supporting Models
@@ -88,6 +95,12 @@ struct RecentLesson: Identifiable {
   let teacherImageURL: String
   let time: String
   let duration: String
+  /// What the student scored this lesson, 1–5, or 0 when they never rated it.
+  /// Drives the stars on the "Last Lesson" card, which used to be five filled
+  /// stars regardless of the score.
+  var rating: Int = 0
+
+  var hasRating: Bool { rating > 0 }
 }
 
 // MARK: - Coupon State
@@ -123,38 +136,66 @@ struct PurchaseSummary {
 // MARK: - ViewModel Protocol
 
 @MainActor
-protocol StudentHomeViewModeling: AnyObject {
+protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   var name: String { get set }
   var searchState: StudentSearchState { get set }
   var activeQuestionText: String { get set }
-  var activeConnectionFeeCents: Int { get set }
   var activeConversationType: String { get set }
   var selectedPricePerMinuteCents: Int { get set }
   var questionId: String? { get set }
   var pricingOptions: [PricingOption] { get }
   var availablePaymentMethods: [PaymentMethod] { get }
+  var savedPayPalEmail: String? { get set }
   var recentLessons: [RecentLesson] { get set }
+  var onlineTeachers: [OnlineTeacher] { get set }
+  var subjects: [StudentSubject] { get }
+  var pricePerMinuteText: String { get }
+  var averageConnectText: String { get }
+  var connectPromiseText: String { get }
+  var appMainIssueText: String { get }
+  var connectStepTitle: String { get }
+  var averageResponseText: String { get }
+  var registeredTeacherCountText: String { get }
   var totalTimeLearnedText: String { get }
   var totalPurchasedText: String { get }
   var lessonCount: Int { get }
   var hasUnreadMessages: Bool { get set }
   var profileImageURL: String { get set }
   var remainingMinutes: Int { get set }
+  /// Whether `remainingMinutes` has been read from the profile yet. Until it
+  /// has, the balance is unknown rather than zero — see `canAskTeacher`.
+  var isProfileLoaded: Bool { get }
   var checkoutURL: URL? { get set }
   var isStartingCheckout: Bool { get set }
+  var isPreparingCheckout: Bool { get set }
   var checkoutPricingOptionID: String? { get set }
   var isAwaitingPaymentReturn: Bool { get set }
   var couponCode: String { get set }
   var couponState: CouponRedemptionState { get set }
   var purchaseSummary: PurchaseSummary? { get set }
+  var paymentReturnVersion: Int { get }
+  var paymentReturnResult: PaymentReturnResult? { get }
+  var liveSessionDestination: StudentLiveSessionDestination? { get }
+  var isInLiveSession: Bool { get }
+  var canAskTeacher: Bool { get }
+  var couponStateKey: String { get }
+  var paymentReturnTitle: String { get }
+  var paymentReturnMessage: String { get }
 
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async
+  /// Starts an ask that outlives the screen that asked for it. The ask sheet
+  /// dismisses itself as it submits, and work owned by that screen dies with
+  /// it — on Android the task is scoped to the composable, so the question was
+  /// simply never sent and nothing appeared to say so.
+  func submitQuestion(topic: String, text: String, photoUrls: [String], conversationType: String)
   func cancelSearch() async
   func resetSearch()
   func selectTier(_ option: PricingOption)
+  func preparePaymentOptions() async
   func checkout(_ option: PricingOption, method: PaymentMethod) async
   func consumeCheckoutURL()
   func checkoutDidOpen()
+  func resumeCheckoutSpinner()
   func handlePaymentReturn(_ result: PaymentReturnResult) async
   func handleCheckoutReturnWithoutResult() async -> Bool
   func viewAllLessons()
@@ -166,6 +207,415 @@ protocol StudentHomeViewModeling: AnyObject {
   func redeemCoupon() async
   func resetCouponState()
   func consumePurchaseSummary()
+  func consumePurchaseSummaryAndPaymentResult()
+  func submitQuestionWithPermissions(topic: String, text: String, photoUrls: [String], conversationType: String) async -> String?
+  func handleCouponStateChange() -> Bool
+  func beginCheckout(_ option: PricingOption) async
+  func supportedPaymentMethods(for option: PricingOption) -> [PaymentMethod]
+  func handlePaymentReturnVersionChange() async
+  func handleAppActiveAfterCheckout() async
+  func consumePaymentResult()
+  func shouldShowPaymentReturnResult() -> Bool
+  func redeemCouponFromHome() async
+  func requestAndroidCameraPermission() async -> PermissionState
+}
+
+// MARK: - Default Localized Strings
+
+extension StudentHomeViewModeling {
+
+  var liveSessionDestination: StudentLiveSessionDestination? {
+    if case .matched(let questionId, let liveKitRoom, let liveKitToken) = searchState {
+      return StudentLiveSessionDestination(
+        questionId: questionId,
+        liveKitRoom: liveKitRoom,
+        liveKitToken: liveKitToken
+      )
+    }
+    return nil
+  }
+
+  var isInLiveSession: Bool {
+    liveSessionDestination != nil
+  }
+
+  /// Whether the student can be sent to the ask screen right now.
+  ///
+  /// False while the profile is still loading as well as when the balance is
+  /// genuinely short, because `remainingMinutes` starts at zero and only the
+  /// profile can say otherwise. Callers must therefore check
+  /// `isProfileLoaded` before treating a false here as "out of minutes" —
+  /// offering to sell minutes to someone who already has them is worse than
+  /// making them wait a moment.
+  var canAskTeacher: Bool {
+    isProfileLoaded && remainingMinutes >= 2
+  }
+
+  var couponStateKey: String {
+    switch couponState {
+    case .idle: return "idle"
+    case .loading: return "loading"
+    case .success(let minutes): return "success-\(minutes)"
+    case .alreadyActivated(let date): return "already-\(date)"
+    case .invalid: return "invalid"
+    case .error(let message): return "error-\(message)"
+    }
+  }
+
+  var paymentReturnTitle: String {
+    paymentReturnResult?.title ?? paymentFallbackTitle
+  }
+
+  var paymentReturnMessage: String {
+    paymentReturnResult?.message ?? ""
+  }
+
+  func consumePurchaseSummaryAndPaymentResult() {
+    consumePurchaseSummary()
+    consumePaymentResult()
+  }
+
+  func supportedPaymentMethods(for option: PricingOption) -> [PaymentMethod] {
+    PaymentMethod.supported(availablePaymentMethods, forCurrency: option.currency)
+  }
+
+  func handlePaymentReturnVersionChange() async {
+    guard let result = paymentReturnResult else { return }
+    logger.info("[PaymentReturn] StudentHome observed resultVersion=\(self.paymentReturnVersion) rawURL=\(result.rawURL.absoluteString)")
+    await handlePaymentReturn(result)
+  }
+
+  func redeemCouponFromHome() async {
+    await redeemCoupon()
+    if case .alreadyActivated = couponState {
+      couponCode = ""
+    }
+  }
+
+    // MARK: Payment method sheet
+    var choosePaymentMethodTitle: String { LocalizationSupport.localized("Choose a payment method") }
+    var choosePackageTitle: String { LocalizationSupport.localized("Choose a package") }
+
+    // MARK: Notification permission explainer
+    var notificationExplainerTitle: String { LocalizationSupport.localized("Stay in the loop") }
+    var notificationExplainerText: String {
+        LocalizationSupport.localized("Turn on notifications so we can let you know the moment a teacher accepts your request, replies to a message, or your session is about to start.")
+    }
+    var enableNotificationsLabel: String { LocalizationSupport.localized("Enable Notifications") }
+    var enablingLabel: String { LocalizationSupport.localized("Enabling...") }
+    var notNowLabel: String { LocalizationSupport.localized("Not now") }
+
+    /// Label for the enable button, which reports progress while the system
+    /// prompt is up.
+    func enableNotificationsButtonLabel(isRequesting: Bool) -> String {
+        isRequesting ? enablingLabel : enableNotificationsLabel
+    }
+
+  // MARK: Dialog & button labels
+  var askATeacherSheetTitle: String { LocalizationSupport.localized("Ask a Teacher") }
+  var lowBalanceAlertTitle: String { LocalizationSupport.localized("Low Balance") }
+  var balanceLoadingTitle: String { LocalizationSupport.localized("Checking your balance") }
+  var balanceLoadingMessage: String {
+    LocalizationSupport.localized("Your minutes are still loading. This takes a moment the first time you open the app.")
+  }
+  var okLabel: String { LocalizationSupport.localized("OK") }
+  var purchaseCompleteTitle: String { LocalizationSupport.localized("Purchase complete") }
+  var openingCheckoutText: String { LocalizationSupport.localized("Opening secure checkout\u{2026}") }
+  var paymentFallbackTitle: String { LocalizationSupport.localized("Payment") }
+  var meetLabel: String { LocalizationSupport.localized("Meet") }
+  var redeemLabel: String { LocalizationSupport.localized("Redeem") }
+  var couponPlaceholder: String { LocalizationSupport.localized("Have a code?") }
+  var chatTeacherTitle: String { LocalizationSupport.localized("Teacher") }
+  var perMinuteSuffix: String { LocalizationSupport.localized("/min") }
+
+  // MARK: Ask-a-teacher keyboard switch
+  var keyboardSectionTitle: String { LocalizationSupport.localized("Keyboard") }
+  var regularKeyboardLabel: String { LocalizationSupport.localized("Regular") }
+  var algebraKeyboardLabel: String { LocalizationSupport.localized("Algebra") }
+  var addFormulaHint: String {
+    LocalizationSupport.localized("Build the formula, then add it to your question.")
+  }
+
+  // MARK: Ask errors
+  /// Shown when the backend refuses a question for exceeding the published
+  /// character limit. The limit arrives with the error rather than being
+  /// repeated here, so changing it in Remote Config changes this sentence too.
+  func questionTooLongMessage(maxLength: Int) -> String {
+    String(
+      format: LocalizationSupport.localized("Your question is too long. Please shorten it to %d characters."),
+      maxLength
+    )
+  }
+
+  /// The same refusal from a backend that did not say what the limit is.
+  var questionTooLongFallbackMessage: String {
+    LocalizationSupport.localized("Your question is too long. Please shorten it.")
+  }
+
+  /// Asked again too soon. The wait comes from the backend rather than from a
+  /// copy of the allowance here, so changing the published limit changes this
+  /// sentence with it.
+  func askingTooQuicklyMessage(retryAfterSeconds: Int) -> String {
+    String(
+      format: LocalizationSupport.localized("You're asking too quickly. Try again in %d seconds."),
+      max(1, retryAfterSeconds)
+    )
+  }
+
+  /// The hourly allowance, where seconds would read as a strange way to say
+  /// "in a while".
+  func hourlyAskLimitMessage(retryAfterMinutes: Int) -> String {
+    String(
+      format: LocalizationSupport.localized("You've asked a lot of questions this hour. Try again in %d minutes."),
+      max(1, retryAfterMinutes)
+    )
+  }
+
+  // MARK: Section headers & captions
+  var availableSubjectsTitle: String { LocalizationSupport.localized("Available Subjects") }
+  var teachersOnlineNowTitle: String { LocalizationSupport.localized("Teachers online now") }
+  var teachersOnlineNowCaption: String { LocalizationSupport.localized("All") }
+  var creditsTitle: String { LocalizationSupport.localized("Credits") }
+
+  // MARK: Hero section
+  var appDisplayName: String { LocalizationSupport.localized("Teacher in a Moment") }
+  var minutesLabel: String { LocalizationSupport.localized(" total minutes") }
+  var askQuestionNowLabel: String { LocalizationSupport.localized("Ask a question now") }
+
+  // MARK: Overview cards
+  var yourBalanceTitle: String { LocalizationSupport.localized("Your Balance") }
+  var leftToLearnDetail: String { LocalizationSupport.localized("Left to learn") }
+  var buyMoreLabel: String { LocalizationSupport.localized("Buy More +") }
+  var lastLessonCardTitle: String { LocalizationSupport.localized("Last Lesson") }
+  var noLessonsText: String { LocalizationSupport.localized("None yet") }
+  var noLessonsSubtitle: String { LocalizationSupport.localized("Ask a teacher to start") }
+  var noTeachersOnlineText: String { LocalizationSupport.localized("No teachers online right now") }
+
+  // MARK: How it works
+  var howItWorksTitle: String { LocalizationSupport.localized("How it works") }
+  /// The panel's steps in order. The view renders whatever is in the array,
+  /// so a step is added or reworded here rather than in two places.
+  var howItWorksSteps: [HowItWorksStep] {
+    [
+      HowItWorksStep(
+        title: LocalizationSupport.localized("Ask a question"),
+        subtitle: LocalizationSupport.localized("Describe the problem – text, image, or whiteboard drawing")
+      ),
+      HowItWorksStep(
+        title: connectStepTitle,
+        subtitle: LocalizationSupport.localized("The system finds an available teacher for your subject")
+      ),
+      HowItWorksStep(
+        title: LocalizationSupport.localized("Live lesson"),
+        subtitle: LocalizationSupport.localized("Chat, whiteboard, voice messages – real time")
+      ),
+      HowItWorksStep(
+        title: LocalizationSupport.localized("Pay only for what you used"),
+        // The live rate when Remote Config has one, and a rate-free
+        // reassurance when it does not.
+        subtitle: pricePerMinuteText.isEmpty
+          ? LocalizationSupport.localized("Only billed minutes count")
+          : pricePerMinuteText
+      ),
+    ]
+  }
+
+  // MARK: Stats strip
+  var timeLearnedTitle: String { LocalizationSupport.localized("Time Learned") }
+  var totalPurchasedTitle: String { LocalizationSupport.localized("Total Purchased") }
+
+  // MARK: Ask card
+  var askMathTeacherLabel: String { LocalizationSupport.localized("Ask a math teacher") }
+  var perMinuteBillingLabel: String { LocalizationSupport.localized("Per-minute billing") }
+
+  // MARK: Tips card
+  var tipsTitle: String { LocalizationSupport.localized("Tips for faster matches") }
+  var tip1Text: String { LocalizationSupport.localized("Upload a clear photo of your math problem") }
+  var tip2Text: String { LocalizationSupport.localized("Specify the exact topic (e.g., \u{201C}Derivatives\u{201D})") }
+
+  // MARK: Dynamic computed strings
+
+  var studentDisplayName: String {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? LocalizationSupport.localized("Student") : trimmed
+  }
+
+  var greetingText: String {
+    String(format: LocalizationSupport.localized("Hello, %@"), studentDisplayName)
+  }
+
+  /// Hebrew and English both read wrong as "1 teachers available now", and a
+  /// single format string cannot carry both forms, so the singular gets its own
+  /// string the way "1 teacher"/"%d teachers" already do.
+  var onlineTeachersCountText: String {
+    if onlineTeachers.count == 1 {
+      return LocalizationSupport.localized("1 teacher available now")
+    }
+    return String(format: LocalizationSupport.localized("%d teachers available now"), onlineTeachers.count)
+  }
+
+  /// Stand-in shown wherever the balance would otherwise be quoted before it
+  /// has been read. `remainingMinutes` is zero until the profile arrives, and
+  /// a zero the app never read is one the student acts on — see
+  /// `canAskTeacher`.
+  var loadingText: String { LocalizationSupport.localized("Loading...") }
+
+  /// The bare number in the header ring.
+  var balanceCountText: String {
+    isProfileLoaded ? "\(remainingMinutes)" : loadingText
+  }
+
+  /// The balance on the overview card, in minutes.
+  var balanceMinutesText: String {
+    isProfileLoaded ? LessonFormatting.minutesText(remainingMinutes) : loadingText
+  }
+
+  var remainingMinutesText: String {
+    guard isProfileLoaded else { return loadingText }
+    return String(format: LocalizationSupport.localized("%d min remaining"), remainingMinutes)
+  }
+
+  var lowBalanceMessage: String {
+    let format = LocalizationSupport.localized("You have %@ remaining. You need at least 2 minutes to ask a teacher. Please buy more minutes to continue.")
+    return String(format: format, LessonFormatting.minutesText(remainingMinutes))
+  }
+
+  var couponAlertTitle: String {
+    switch couponState {
+    case .success: return LocalizationSupport.localized("Success")
+    case .alreadyActivated: return LocalizationSupport.localized("Code Already Used")
+    case .invalid: return LocalizationSupport.localized("Invalid Code")
+    case .error: return LocalizationSupport.localized("Error")
+    default: return ""
+    }
+  }
+
+  var couponAlertMessage: String {
+    switch couponState {
+    case .success(let minutes):
+      return String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), minutes)
+    case .alreadyActivated(let date):
+      return String(format: LocalizationSupport.localized("This code was already activated on %@."), date)
+    case .invalid:
+      return LocalizationSupport.localized("This code is not valid.")
+    case .error(let msg):
+      return msg
+    default:
+      return ""
+    }
+  }
+
+  var purchaseSummaryMessage: String {
+    guard let summary = purchaseSummary else { return "" }
+    let purchased = String(format: LocalizationSupport.localized("%@ purchased for %@."), summary.packageName, summary.priceText)
+    guard let minutesText = summary.minutesText else { return purchased }
+    let added = String(format: LocalizationSupport.localized("Added %@ to your balance."), minutesText)
+    return purchased + "\n" + added
+  }
+
+  // MARK: Per-item text helpers
+
+  func teacherCountText(for subject: StudentSubject) -> String {
+    subject.teacherCount == 1
+      ? LocalizationSupport.localized("1 teacher")
+      : String(format: LocalizationSupport.localized("%d teachers"), subject.teacherCount)
+  }
+
+  func teacherAvailabilityText(for subject: StudentSubject) -> String {
+    subject.hasTeachersOnline
+      ? LocalizationSupport.localized("Teacher available now")
+      : LocalizationSupport.localized("No one available now")
+  }
+
+  func localizedName(for option: PricingOption) -> String {
+    LocalizationSupport.localized(option.name)
+  }
+
+  func localizedDescription(for option: PricingOption) -> String {
+    LocalizationSupport.localized(option.description)
+  }
+
+  // MARK: Overlay & card labels
+
+  var searchingTitle: String { LocalizationSupport.localized("Searching for a teacher\u{2026}") }
+  var searchingSubtitle: String { LocalizationSupport.localized("This usually takes under 30 seconds.") }
+  var cancelLabel: String { LocalizationSupport.localized("Cancel") }
+  var teacherFoundTitle: String { LocalizationSupport.localized("Teacher Found!") }
+  var doneLabel: String { LocalizationSupport.localized("Done") }
+  var noTeachersAvailableTitle: String { LocalizationSupport.localized("No Teachers Available") }
+  var noTeachersAvailableMessage: String { LocalizationSupport.localized("All teachers are busy right now.\nTry again in a few minutes.") }
+  var couldNotSendQuestionTitle: String { LocalizationSupport.localized("Could Not Send Question") }
+  var checkoutLabel: String { LocalizationSupport.localized("Checkout") }
+  var checkoutConnectingLabel: String { LocalizationSupport.localized("checkout_connecting") }
+  var solvedLabel: String { LocalizationSupport.localized("Solved") }
+  var redeemCodeNavigationTitle: String { LocalizationSupport.localized("Redeem Code") }
+  var successLabel: String { LocalizationSupport.localized("Success") }
+
+  func sessionReadyText(room: String) -> String {
+    String(format: LocalizationSupport.localized("Your session is ready.\nRoom: %@"), room)
+  }
+
+  func lessonTeacherTimeText(teacher: String, time: String) -> String {
+    String(format: LocalizationSupport.localized("%@ \u{2022} %@"), teacher, time)
+  }
+
+  func codeAppliedText(minutes: Int) -> String {
+    String(format: LocalizationSupport.localized("Code applied! Added %d minutes."), minutes)
+  }
+
+  // MARK: Ask-a-teacher sheet
+
+  var sessionTypeSectionTitle: String { LocalizationSupport.localized("Session type") }
+  var textSessionTypeLabel: String { LocalizationSupport.localized("Text") }
+  var audioSessionTypeLabel: String { LocalizationSupport.localized("Audio") }
+  var videoSessionTypeLabel: String { LocalizationSupport.localized("Video") }
+  var topicSectionTitle: String { LocalizationSupport.localized("Topic") }
+  var yourQuestionSectionTitle: String { LocalizationSupport.localized("Your question") }
+  var sendLabel: String { LocalizationSupport.localized("Send") }
+  var findTeacherNowLabel: String { LocalizationSupport.localized("Find me a Teacher Now") }
+
+  /// The topic list is stored lowercased and localized by its capitalized form.
+  func localizedTopicName(_ topic: String) -> String {
+    LocalizationSupport.localized(topic.capitalized)
+  }
+
+  func minimumCharactersText(count: Int) -> String {
+    String(format: LocalizationSupport.localized("%d / 10 minimum characters"), count)
+  }
+
+  // MARK: Ask-a-teacher permissions
+
+  var permissionRequiredTitle: String { LocalizationSupport.localized("Permission required") }
+  var videoPermissionRequiredMessage: String {
+    LocalizationSupport.localized("Microphone and camera access are required for a video session.")
+  }
+  var audioPermissionRequiredMessage: String {
+    LocalizationSupport.localized("Microphone access is required for an audio session.")
+  }
+
+  // MARK: Ask-a-teacher photo attachment
+
+  var attachPhotoSectionTitle: String { LocalizationSupport.localized("Attach a photo (optional)") }
+  var addPhotoDialogTitle: String { LocalizationSupport.localized("Add a photo") }
+  var takePhotoLabel: String { LocalizationSupport.localized("Take Photo") }
+  var chooseFromLibraryLabel: String { LocalizationSupport.localized("Choose from Library") }
+  var tapToUploadPhotoText: String { LocalizationSupport.localized("Tap to upload a photo of your question") }
+  var signInToAttachPhotoError: String { LocalizationSupport.localized("You need to be signed in to attach a photo.") }
+  var cameraRequiredForPhotoError: String { LocalizationSupport.localized("Camera access is required to take a photo.") }
+  var couldNotReadImageError: String { LocalizationSupport.localized("Could not read selected image") }
+
+  // MARK: Ask-a-teacher footer
+
+  /// Both figures come off the protocol, so the whole sentence is built here
+  /// rather than half in the sheet.
+  var askTeacherFooterText: String {
+    let minutesStr = String(format: LocalizationSupport.localized("You have %d minutes"), remainingMinutes)
+    guard selectedPricePerMinuteCents > 0 else { return minutesStr }
+    let valueStr = LessonFormatting.currencyText(cents: remainingMinutes * selectedPricePerMinuteCents)
+    let approxStr = String(format: LocalizationSupport.localized("~%@ value"), valueStr)
+    return minutesStr + " · " + approxStr
+  }
+
 }
 
 // MARK: - ViewModel
@@ -177,48 +627,139 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var name = ""
   var searchState: StudentSearchState = .idle
   var activeQuestionText = ""
-  var activeConnectionFeeCents = 0
   var activeConversationType = "text"
   var selectedPricePerMinuteCents = 50
   var questionId: String?
 
   var pricingOptions: [PricingOption] = []
   var availablePaymentMethods: [PaymentMethod] = PaymentMethod.availableForCurrentPlatform
+  var savedPayPalEmail: String?
 
   var recentLessons: [RecentLesson] = []
+  var onlineTeachers: [OnlineTeacher] = []
+  /// The subject grid: the Remote Config catalog joined with how many teachers
+  /// are online for each subject right now.
+  var subjects: [StudentSubject] = []
+  /// "2₪ per minute • pay only for time used" — the rate comes from Remote
+  /// Config, not a number written into the copy.
+  var pricePerMinuteText = LocalizationSupport.localized("2₪ per minute • pay only for time used")
+  /// "90 sec avg to connect", measured by the backend. Empty until there is a
+  /// measurement, so the view can leave the claim out entirely.
+  var averageConnectText = ""
+  /// "237 registered teachers", counted by the backend. Empty until the counter
+  /// is seeded, so the view omits the caption rather than claiming zero.
+  var registeredTeacherCountText = ""
+  /// The hero line and the "how it works" step, both of which used to promise a
+  /// fixed 90 seconds. They now quote the measured average, and fall back to
+  /// wording that makes no numeric claim when there is nothing to quote.
+  var appMainIssueText = LocalizationSupport.localized("Stuck? You will have a teacher immediately")
+  var connectPromiseText = LocalizationSupport.localized("Help from a real teacher, exactly when you need it") 
+
+  var connectStepTitle = LocalizationSupport.localized("A teacher connects quickly")
+  /// The line on the ask-a-question sheet. Empty when nothing has been
+  /// measured, so the sheet drops it instead of quoting a made-up figure.
+  var averageResponseText = ""
   var totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: [])
   var totalPurchasedText = LessonFormatting.minutesText(0)
   var lessonCount = 0
   var hasUnreadMessages = false
-  var profileImageURL = ""
+  var profileImageURL: String {
+    get { UserPhotoStore.shared.profileImageURL }
+    set { UserPhotoStore.shared.profileImageURL = newValue }
+  }
   var remainingMinutes = 0
+  /// Set once the profile summary has actually been read. `didLoadProfile`
+  /// cannot stand in for it: that one is raised before the fetch to keep the
+  /// load from running twice, so it is true while the balance is still zero.
+  var isProfileLoaded = false
   var checkoutURL: URL?
   var isStartingCheckout = false
+  /// True from the moment checkout starts until the buyer is handed off to
+  /// something they can see — the wallet sheet, or the browser. Distinct from
+  /// `isStartingCheckout`, which stays true for the whole wallet payment and
+  /// so would leave a spinner sitting behind the Apple Pay sheet.
+  var isPreparingCheckout = false
   var checkoutPricingOptionID: String?
   var isAwaitingPaymentReturn = false
   var couponCode = ""
   var couponState: CouponRedemptionState = .idle
   var purchaseSummary: PurchaseSummary?
+  var paymentReturnVersion: Int {
+    PaymentReturnStore.shared.resultVersion
+  }
+  var paymentReturnResult: PaymentReturnResult? {
+    PaymentReturnStore.shared.latestResult
+  }
 
   private var pollingTask: Task<Void, Never>?
+  /// Held by the view model rather than the ask sheet, so dismissing the sheet
+  /// cannot cancel the question it just sent.
+  private var askTask: Task<Void, Never>?
+  /// The question this student last asked, along with the LiveKit credentials
+  /// minted for it, so an accepted lesson does not have to ask for them again.
+  private var createdQuestion: CreateQuestionResult?
+  private var onlineTeachersStore: OnlineTeachersStore?
+  /// Subject keys (e.g. "math", "physics") enabled via Remote Config
+  /// (`enable_<key>`). "math" is the only one on by default; every other
+  /// subject stays hidden until its flag is explicitly turned on remotely.
+  private var enabledSubjectKeys: Set<String> = ["math"]
+  /// The subject catalog as published, kept so the grid can be rebuilt with new
+  /// teacher counts whenever presence changes without re-reading Remote Config.
+  private var subjectCatalog: [RemoteTeachingSubject] = []
+  /// Normalized subject keys of every teacher currently online, one entry per
+  /// teacher, so a subject's count is how many of these sets match it.
+  private var onlineTeacherSubjectKeys: [Set<String>] = []
+  /// The student's own currency, so the per-minute rate is quoted in it.
+  private var currencyCode = LessonFormatting.defaultCurrencyCode
   private var didLoadProfile = false
   private var checkoutStartedRemainingMinutes = 0
   /// The option being bought. Unlike `checkoutPricingOptionID` this survives
   /// the end of `checkout(_:method:)`, because the redirect flows only learn
   /// the purchase succeeded once the buyer comes back from the browser.
   private var pendingPurchaseOption: PricingOption?
+  /// Last-resort timer that takes the checkout spinner down if the browser
+  /// hand-off never happened. See `checkoutDidOpen`.
+  private var checkoutHandoffWatchdog: Task<Void, Never>?
   private var purchasedCurrencyCode = LessonFormatting.defaultCurrencyCode
 
   // MARK: - Actions
 
+  func submitQuestion(topic: String, text: String, photoUrls: [String], conversationType: String) {
+    askTask?.cancel()
+    askTask = Task { [weak self] in
+      await self?.askTeacher(
+        topic: topic,
+        text: text,
+        photoUrls: photoUrls,
+        conversationType: conversationType
+      )
+    }
+  }
+
   func askTeacher(topic: String, text: String, photoUrls: [String] = [], conversationType: String = "text") async {
-    guard case .idle = searchState else { return }
+    // A finished state is not a reason to refuse the next question. The ask
+    // sheet dismisses itself before calling this, so returning here dropped the
+    // question with nothing on screen to say why — the student saw their
+    // question vanish. Only a question actually in flight blocks another.
+    switch searchState {
+    case .idle:
+      break
+    case .error, .noMatch:
+      searchState = .idle
+    case .searching, .matched:
+      logger.info("TeacherMinute askTeacher ignored: a question is already in flight")
+      return
+    }
 	logger.info("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
     activeConversationType = conversationType
     searchState = .searching(questionId: "")
 
-    let hasOnlineTeacher = await TeacherAvailabilityStore.hasOnlineTeacher()
-    if !hasOnlineTeacher {
+    // `onlineTeachers` is kept current by a live listener on the same presence
+    // projection this check would read, so when it holds anyone the answer is
+    // already here and the ask goes straight out. Only an empty list — which is
+    // also what a listener that has not fired yet looks like — is worth a round
+    // trip to tell "nobody is online" apart from "we have not heard yet".
+    if onlineTeachers.isEmpty, !(await TeacherAvailabilityStore.hasOnlineTeacher()) {
       logger.info("TeacherMinute askTeacher aborted: no online teachers")
       searchState = .noMatch
       return
@@ -233,13 +774,36 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
 	  logger.info("TeacherMinute askTeacher created questionId=\(result.questionId)")
       activeQuestionText = text
-      activeConnectionFeeCents = result.connectionFeeCents
+      createdQuestion = result
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
     } catch let err as FunctionsError {
-      if case .serverError(_, let status) = err, status == "RESOURCE_EXHAUSTED" {
+      if case .serverError(_, _, let details) = err,
+         details?.reason == ServerErrorDetails.rateLimited {
+        // Checked before the balance branch below: both refusals arrive as
+        // RESOURCE_EXHAUSTED, and only the reason tells them apart.
+        let waitSeconds = details?.retryAfterSeconds ?? 60
+        logger.info(
+          "TeacherMinute askTeacher blocked: rate limited scope=\(details?.scope ?? "none") retryAfter=\(waitSeconds)s"
+        )
+        searchState = .error(
+          details?.scope == ServerErrorDetails.hourScope
+            ? hourlyAskLimitMessage(retryAfterMinutes: Int((Double(waitSeconds) / 60.0).rounded(.up)))
+            : askingTooQuicklyMessage(retryAfterSeconds: waitSeconds)
+        )
+      } else if case .serverError(_, let status, _) = err, status == "RESOURCE_EXHAUSTED" {
         logger.info("TeacherMinute askTeacher blocked: insufficient minutes")
         searchState = .error(LocalizationSupport.localized("Not enough time left. Please purchase more minutes."))
+      } else if case .serverError(_, _, let details) = err,
+                details?.reason == ServerErrorDetails.questionTooLong {
+        // Told apart from every other invalid-argument by the reason, so the
+        // student reads a sentence about their question's length rather than
+        // the backend's English log line.
+        logger.info("TeacherMinute askTeacher blocked: question too long limit=\(details?.limit ?? 0)")
+        searchState = .error(
+          details?.limit.map { questionTooLongMessage(maxLength: $0) }
+            ?? questionTooLongFallbackMessage
+        )
       } else {
         logger.error("TeacherMinute askTeacher failed error=\(err)")
         searchState = .error(err.localizedDescription)
@@ -254,6 +818,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     guard case .searching(let qid) = searchState else { return }
     pollingTask?.cancel()
     pollingTask = nil
+    QuestionStatusStore.stopListening()
     if !qid.isEmpty {
       try? await FunctionsService.shared.cancelQuestion(questionId: qid)
     }
@@ -263,6 +828,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   func resetSearch() {
     pollingTask?.cancel()
     pollingTask = nil
+    QuestionStatusStore.stopListening()
     searchState = .idle
   }
 
@@ -270,10 +836,26 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     selectedPricePerMinuteCents = option.priceCents
   }
 
+  /// Settles everything the payment picker needs before it is put on screen, so
+  /// the buyer sees the finished list of methods rather than one that grows a
+  /// row at a time. Deliberately leaves `isPreparingCheckout` set: the caller
+  /// clears it once the picker is up, so the spinner hands straight over to the
+  /// sheet with no bare frame in between.
+  func preparePaymentOptions() async {
+    isPreparingCheckout = true
+    await loadPaymentMethods()
+#if canImport(UIKit)
+    if availablePaymentMethods.contains(.applePay) {
+      ApplePayService.shared.warmUpPaymentButton()
+    }
+#endif
+  }
+
   func checkout(_ option: PricingOption, method: PaymentMethod = .paypal) async {
     guard !isStartingCheckout else { return }
     logger.info("[PaymentReturn] checkout start pricingOptionID=\(option.id) method=\(method.rawValue)")
     isStartingCheckout = true
+    isPreparingCheckout = true
     checkoutPricingOptionID = option.id
     checkoutStartedRemainingMinutes = remainingMinutes
     pendingPurchaseOption = option
@@ -283,25 +865,46 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
     selectTier(option)
 
+    // The wallets run the whole payment inside the awaited call below, so the
+    // spinner covers everything from the tap to the charge being confirmed or
+    // rejected — including the beat after the wallet sheet closes, while the
+    // nonce is sent to the backend.
     if method == .applePay {
       await checkoutWithApplePay(option)
+      isPreparingCheckout = false
       return
     }
 
     if method == .googlePay {
       await checkoutWithGooglePay(option)
+      isPreparingCheckout = false
       return
     }
+
+#if canImport(UIKit)
+    if method == .savedPayPal {
+      await checkoutWithSavedPayPal(option)
+      isPreparingCheckout = false
+      return
+    }
+#endif
 
     do {
       let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: method)
       checkoutURL = result.checkoutURL
+      // Left running on purpose. The browser takes over from here, and the
+      // purchase is only finished once we are back in the app and the balance
+      // has been refreshed — `handlePaymentReturn` /
+      // `handleCheckoutReturnWithoutResult` clear it, so the buyer comes back
+      // to a spinner rather than an idle screen.
       logger.info("[PaymentReturn] checkout session created url=\(result.checkoutURL.absoluteString)")
     } catch let error as FunctionsError {
+      isPreparingCheckout = false
       logger.error("[PaymentReturn] createCheckoutSession failed details=\(error.localizedDescription)")
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.createCheckoutSession")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     } catch {
+      isPreparingCheckout = false
       logger.error("[StudentHome] failed creating checkout session: \(error.localizedDescription)")
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.createCheckoutSession")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
@@ -321,11 +924,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
       try await FunctionsService.shared.confirmApplePayPayment(checkoutId: session.checkoutId, nonce: nonce)
       logger.info("[PaymentReturn] Apple Pay confirmed checkoutId=\(session.checkoutId)")
-      announcePurchase(option)
-
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
       }
+      // Announced last so the summary appears with the new balance already in
+      // place, rather than on top of the spinner that is still refreshing it.
+      announcePurchase(option)
     } catch ApplePayService.ApplePayServiceError.cancelled {
       logger.info("[PaymentReturn] Apple Pay cancelled by user")
     } catch let error as FunctionsError {
@@ -345,6 +949,29 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   }
   #endif
 
+  /// Charges the student's previously vaulted PayPal account directly — no
+  /// checkout URL, no PayPal login, mirroring the wallet flows above.
+  #if canImport(UIKit)
+  private func checkoutWithSavedPayPal(_ option: PricingOption) async {
+    do {
+      try await FunctionsService.shared.chargeSavedPayPal(pricingOptionID: option.id)
+      logger.info("[PaymentReturn] saved PayPal charged pricingOptionID=\(option.id)")
+      if let uid = Auth.auth().currentUser?.uid {
+        _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
+      }
+      announcePurchase(option)
+    } catch let error as FunctionsError {
+      logger.error("[PaymentReturn] saved PayPal charge failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.chargeSavedPayPal")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    } catch {
+      logger.error("[PaymentReturn] saved PayPal charge failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.chargeSavedPayPal")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    }
+  }
+  #endif
+
   /// Google Pay is the Android mirror of Apple Pay — same Braintree
   /// create/confirm pair, no checkout URL or deep-link round trip.
   #if os(Android)
@@ -361,11 +988,10 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       )
       try await FunctionsService.shared.confirmGooglePayPayment(checkoutId: session.checkoutId, nonce: nonce)
       logger.info("[PaymentReturn] Google Pay confirmed checkoutId=\(session.checkoutId)")
-      announcePurchase(option)
-
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
       }
+      announcePurchase(option)
     } catch GooglePayServiceError.cancelled {
       logger.info("[PaymentReturn] Google Pay cancelled by user")
     } catch let error as FunctionsError {
@@ -392,28 +1018,61 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   func checkoutDidOpen() {
     isAwaitingPaymentReturn = true
     logger.info("[PaymentReturn] checkout opened; awaiting payment return")
+    // The spinner is meant to sit under the browser and still be there on the
+    // way back, but if the browser never actually opened there is nothing to
+    // come back from — this stops that case from stranding a modal overlay the
+    // buyer cannot dismiss. Coming back into the app re-arms it
+    // (`resumeCheckoutSpinner`), so a long stay in the browser is unaffected.
+    checkoutHandoffWatchdog?.cancel()
+    checkoutHandoffWatchdog = Task { @MainActor [weak self] in
+      try? await Task.sleep(nanoseconds: 90_000_000_000)
+      guard !Task.isCancelled, let self, self.isAwaitingPaymentReturn else { return }
+      self.isPreparingCheckout = false
+    }
+  }
+
+  /// Puts the spinner back while a return from the browser is being resolved,
+  /// so the buyer is not looking at an idle home screen between the payment
+  /// finishing and the confirmation appearing.
+  func resumeCheckoutSpinner() {
+    guard isAwaitingPaymentReturn else { return }
+    checkoutHandoffWatchdog?.cancel()
+    isPreparingCheckout = true
   }
 
   func handlePaymentReturn(_ result: PaymentReturnResult) async {
     logger.info("[PaymentReturn] handling result status=\(String(describing: result.status)) rawURL=\(result.rawURL.absoluteString)")
     isAwaitingPaymentReturn = false
+    checkoutHandoffWatchdog?.cancel()
+    // The spinner has been up since the browser opened; it comes down here,
+    // once the outcome is known and the balance is up to date, so the buyer
+    // never sees an idle screen between returning and the confirmation.
+    defer { isPreparingCheckout = false }
     if case .success = result.status {
-      announcePurchase(pendingPurchaseOption)
       if let uid = Auth.auth().currentUser?.uid {
         _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
         logger.info("[PaymentReturn] success handled; refreshed lessons and remaining minutes")
       }
+      announcePurchase(pendingPurchaseOption)
     }
   }
 
   func handleCheckoutReturnWithoutResult() async -> Bool {
     guard isAwaitingPaymentReturn else { return false }
     isAwaitingPaymentReturn = false
+    checkoutHandoffWatchdog?.cancel()
+    // Same hand-off as `handlePaymentReturn`: the spinner started when the
+    // browser opened and only stops once we know where the purchase landed.
+    defer { isPreparingCheckout = false }
     logger.info("[PaymentReturn] checkout returned without a deep link result")
     guard let uid = Auth.auth().currentUser?.uid else { return false }
 
     let startingMinutes = checkoutStartedRemainingMinutes
-    let credited = await refreshAfterPurchase(uid: uid, startingMinutes: startingMinutes)
+    let credited = await refreshAfterPurchase(
+      uid: uid,
+      startingMinutes: startingMinutes,
+      retryDelays: Self.unconfirmedReturnPollDelays
+    )
     // Only a confirmed balance increase proves the purchase went through; the
     // caller shows a "pending confirmation" notice otherwise.
     if credited {
@@ -451,7 +1110,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       }
       logger.info("[Coupon] redeemed minutesAdded=\(result.minutesAdded)")
     } catch let err as FunctionsError {
-      if case .serverError(let message, let status) = err {
+      if case .serverError(let message, let status, _) = err {
         switch status {
         case "NOT_FOUND":
           couponState = .invalid
@@ -478,49 +1137,194 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func loadProfileIfNeeded() async {
     await loadPricingOptions()
-    guard !didLoadProfile, let uid = Auth.auth().currentUser?.uid else { return }
+    await loadSubjectAvailability()
+    startObservingOnlineTeachersIfNeeded()
+    guard !didLoadProfile, let uid = Auth.auth().currentUser?.uid else {
+      // Still worth showing the fee and connect time to a signed-out or
+      // already-loaded screen; it just falls back to the default currency.
+      return
+    }
     didLoadProfile = true
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
       remainingMinutes = profile.remainingMinutes
+      currencyCode = profile.currency
+      isProfileLoaded = true
+    } else {
+      // The balance is still unknown, so let the next appearance try again
+      // rather than leave the screen quoting a zero it never read.
+      didLoadProfile = false
     }
+    // After the profile, so the fee is quoted in the student's own currency.
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
+  }
+
+  /// Loads the published subject catalog — the same list teachers pick the
+  /// subjects they teach from — and reads `enable_<key>` for each one. "math"
+  /// defaults to visible; every other subject stays hidden until Remote Config
+  /// turns it on.
+  private func loadSubjectAvailability() async {
+    await RemoteConfigService.shared.ready()
+    subjectCatalog = (try? await SettingsRemoteConfigService.shared.fetchTeachingSubjects()) ?? []
+
+    var enabled: Set<String> = []
+    for subject in subjectCatalog {
+      let key = SubjectPresentation.flagKey(for: subject.title)
+      if RemoteConfigService.shared.getBool("enable_\(key)", default: key == "math") {
+        enabled.insert(key)
+      }
+    }
+    enabledSubjectKeys = enabled
+    rebuildSubjects()
+  }
+
+  /// Joins the catalog with live presence. Called whenever either side
+  /// changes, so the grid's teacher counts track teachers going on and offline.
+  private func rebuildSubjects() {
+    subjects = subjectCatalog.compactMap { subject in
+      let key = SubjectPresentation.flagKey(for: subject.title)
+      guard enabledSubjectKeys.contains(key) else { return nil }
+
+      let englishTitle = SubjectPresentation.displayTitle(for: subject.title)
+      return StudentSubject(
+        key: key,
+        title: LocalizationSupport.localized(englishTitle),
+        topics: subject.subtopics
+          .map { LocalizationSupport.localized($0) }
+          .joined(separator: ", "),
+        systemImage: SubjectPresentation.systemImage(for: subject.title),
+        teacherCount: onlineTeacherCount(for: subject)
+      )
+    }
+  }
+
+  /// Teachers are online for a subject when any of the subtopic keys they
+  /// published matches one of the subject's — the same normalized form the
+  /// dispatcher matches on. The area name itself counts too, for a teacher who
+  /// registered the area rather than its subtopics.
+  private func onlineTeacherCount(for subject: RemoteTeachingSubject) -> Int {
+    var keys = Set(subject.subtopics.map { SubjectPresentation.matchKey(for: $0) })
+    keys.insert(SubjectPresentation.matchKey(for: subject.title))
+    if subject.subtopics.isEmpty {
+      // A subject published without subtopics is stored by teachers as "all".
+      keys.insert("all")
+    }
+    keys.remove("")
+    return onlineTeacherSubjectKeys.filter { !$0.isDisjoint(with: keys) }.count
+  }
+
+
+  // MARK: - Online Teachers
+
+  private func startObservingOnlineTeachersIfNeeded() {
+    guard onlineTeachersStore == nil else { return }
+    let store = OnlineTeachersStore { [weak self] presences in
+      self?.resolveOnlineTeachers(presences)
+    }
+    store.startListening()
+    onlineTeachersStore = store
+  }
+
+  private func resolveOnlineTeachers(_ presences: [OnlineTeacherPresence]) {
+    // The subject grid's teacher counts come straight from presence, so they
+    // update the moment a teacher goes online.
+    onlineTeacherSubjectKeys = presences.map { presence in
+      Set(presence.subjects.map { SubjectPresentation.matchKey(for: $0) })
+    }
+    rebuildSubjects()
+
+    // The projection already carries each teacher's name and photo, so the
+    // grid is built straight from presence — no per-teacher profile reads, and
+    // nothing to cache or invalidate.
+    onlineTeachers = presences.map { presence in
+      OnlineTeacher(
+        id: presence.id,
+        name: presence.displayName.isEmpty ? LocalizationSupport.localized("Teacher") : presence.displayName,
+        subject: presence.subjects.first.map { LocalizationSupport.localized($0) } ?? LocalizationSupport.localized("Math"),
+        profileImageURL: presence.photoUrl
+      )
+    }
   }
 
   /// Pull-to-refresh: re-reads the authoritative balance and profile summary
   /// from Firestore, along with recent lessons and unread messages.
   func refresh() async {
     await loadPricingOptions()
+    await loadSubjectAvailability()
     guard let uid = Auth.auth().currentUser?.uid else { return }
     if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
       remainingMinutes = profile.remainingMinutes
+      currencyCode = profile.currency
+      isProfileLoaded = true
+      didLoadProfile = true
     }
+    // Pull-to-refresh: re-read the measured connect time rather than reuse the
+    // one cached when the screen first appeared.
     hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
     await loadRecentLessons(uid: uid)
   }
 
   func refreshAfterLessonEnded() async {
     guard let uid = Auth.auth().currentUser?.uid else { return }
-    await loadRemainingMinutes(uid: uid)
-    await loadRecentLessons(uid: uid)
-  }
 
-  private func refreshAfterPurchase(uid: String, startingMinutes: Int) async -> Bool {
-    for attempt in 1...8 {
+    // `endLesson` debits the balance in a Firestore transaction that has often
+    // not landed by the time the chat closes, so a single read here showed the
+    // pre-lesson balance until the next pull-to-refresh. Wait for the debit the
+    // same way refreshAfterPurchase waits for a credit.
+    //
+    // A lesson billed at zero minutes never changes the balance, so this always
+    // stops after the last attempt rather than depending on seeing a change.
+    let startingMinutes = remainingMinutes
+    for attempt in 1...5 {
       await loadRemainingMinutes(uid: uid)
       await loadRecentLessons(uid: uid)
-      logger.info("[PaymentReturn] balance refresh attempt=\(attempt) startingMinutes=\(startingMinutes) currentMinutes=\(self.remainingMinutes)")
+      if remainingMinutes < startingMinutes {
+        logger.info("[StudentHome] balance debited after lesson attempt=\(attempt) minutes=\(self.remainingMinutes)")
+        return
+      }
+      try? await Task.sleep(nanoseconds: 1_500_000_000)
+    }
+    logger.info("[StudentHome] balance unchanged after lesson startingMinutes=\(startingMinutes)")
+  }
+
+  /// Gaps between balance re-reads when we know money moved — a deep link said
+  /// so, or a wallet returned a confirmed charge. PayPal's capture webhook is
+  /// not instant, so this stays patient, but it looks several times in the
+  /// first two seconds: when the credit has already landed, it has almost
+  /// always landed by then, and the old flat 2s cadence made the buyer wait
+  /// for a result we could have had immediately.
+  private static let confirmedPurchasePollDelays: [Double] = [0.3, 0.5, 0.9, 1.5, 2.5, 4, 4, 4]
+
+  /// Gaps to use when the buyer came back from the browser with nothing to say
+  /// a payment was ever made. PayPal captures during its own return redirect,
+  /// so a completed payment nearly always arrives with a deep link — no deep
+  /// link means a cancel in all but the rarest case. This gives a late credit
+  /// a couple of seconds to appear and then stops, instead of holding the
+  /// spinner for the full patient schedule before saying "cancelled".
+  private static let unconfirmedReturnPollDelays: [Double] = [0.4, 0.6, 1.0]
+
+  private func refreshAfterPurchase(
+    uid: String,
+    startingMinutes: Int,
+    retryDelays: [Double] = StudentHomeViewModel.confirmedPurchasePollDelays
+  ) async -> Bool {
+    var attempt = 0
+    while true {
+      await loadRemainingMinutes(uid: uid)
+      await loadRecentLessons(uid: uid)
+      logger.info("[PaymentReturn] balance refresh attempt=\(attempt + 1) startingMinutes=\(startingMinutes) currentMinutes=\(self.remainingMinutes)")
       if remainingMinutes > startingMinutes {
         logger.info("[PaymentReturn] balance increased after checkout")
         return true
       }
-      try? await Task.sleep(nanoseconds: 2_000_000_000)
+      guard attempt < retryDelays.count else { return false }
+      try? await Task.sleep(nanoseconds: UInt64(retryDelays[attempt] * 1_000_000_000))
+      attempt += 1
     }
-    return false
   }
 
   /// Reads the authoritative remaining-minutes balance straight from the
@@ -555,6 +1359,15 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 #if canImport(UIKit)
     if !ApplePayService.shared.canMakePayments() {
       methods = methods.filter { $0 != .applePay }
+    }
+    if let uid = Auth.auth().currentUser?.uid {
+      savedPayPalEmail = try? await UserService.shared.fetchSavedPayPalEmail(uid: uid)
+    }
+    // A saved account replaces the redirect-based PayPal entry outright —
+    // charging it goes through chargeSavedPayPal directly, so both options
+    // would just be two ways to pay with the same PayPal account.
+    if savedPayPalEmail != nil {
+      methods = methods.map { $0 == .paypal ? .savedPayPal : $0 }
     }
 #endif
     availablePaymentMethods = methods
@@ -592,7 +1405,6 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       questionPhotoUrls: [],
       createdAt: 0,
       acceptedAt: Date().timeIntervalSince1970 * 1000.0,
-      connectionFeeCents: activeConnectionFeeCents,
       pricePerMinuteCents: selectedPricePerMinuteCents,
       teacherSharePercent: 75,
       currencyCode: purchasedCurrencyCode
@@ -603,25 +1415,94 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   private static let noTeacherTimeoutSeconds: Double = 60
 
+  /// How often the wait loop consults the listener's cache. This is a memory
+  /// read, not a network call, so it can be frequent — what it replaces is a
+  /// Cloud Function round trip every second.
+  private static let questionWatchTickNanos: UInt64 = 200_000_000
+  /// How often to ask the server anyway, as a backstop. RTDB carries the status
+  /// within milliseconds of a teacher accepting, but if that write is lost the
+  /// student would otherwise sit on the searching screen until the timeout.
+  private static let questionStatusBackstopSeconds: Double = 10
+
   private func startPolling(questionId: String) {
     pollingTask?.cancel()
     let startedAt = Date().timeIntervalSince1970
+    QuestionStatusStore.startListening(questionId: questionId)
+
     pollingTask = Task {
+      defer { QuestionStatusStore.stopListening() }
+      var lastBackstopAt = Date().timeIntervalSince1970
+      var lastLoggedStatus = ""
+      // Starts at .pending so simply attaching does not count as a change and
+      // fire a needless call on the first tick.
+      var lastLiveKind = "pending"
+
       while !Task.isCancelled {
-        do {
-          let result = try await currentQuestionStatus(questionId: questionId)
+        var result: QuestionStatusResult?
+        let live = QuestionStatusStore.latest()
+        let now = Date().timeIntervalSince1970
+
+        let liveKind: String
+        switch live {
+        case .ready: liveKind = "ready"
+        case .gone: liveKind = "gone"
+        case .pending: liveKind = "pending"
+        case .failed: liveKind = "failed"
+        }
+
+        if case .ready(let realtime) = live {
+          result = realtime
+        } else if liveKind != lastLiveKind || now - lastBackstopAt >= Self.questionStatusBackstopSeconds {
+          // The node vanished, the listener died, or the backstop came due. Ask
+          // the server — but only on the change itself, never once per tick:
+          // a status the loop takes no action on ("unanswered", say) would
+          // otherwise turn this into a call every 200ms until the timeout.
+          result = try? await currentQuestionStatus(questionId: questionId)
+          lastBackstopAt = now
+        }
+        lastLiveKind = liveKind
+
+        if let result {
           let status = result.status.lowercased()
-          logger.info("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
+          if status != lastLoggedStatus {
+            lastLoggedStatus = status
+            logger.info("TeacherMinute questionStatus questionId=\(questionId) status=\(result.status)")
+          }
 
           if isAcceptedStatus(status) {
-            let room = result.liveKitRoom ?? ""
-            let token = result.liveKitToken ?? ""
+            // The realtime node never carries LiveKit credentials —
+            // `questions/$qid` is readable by any signed-in user — so they came
+            // back with createQuestion instead, and the lesson connects without
+            // another round trip. getQuestionStatus mints them only for a
+            // question that did not get any: an older backend, or a failed mint.
+            var room = result.liveKitRoom ?? ""
+            var token = result.liveKitToken ?? ""
+            if room.isEmpty || token.isEmpty,
+               let created = createdQuestion, created.questionId == questionId,
+               let createdRoom = created.liveKitRoom, !createdRoom.isEmpty,
+               let createdToken = created.liveKitToken, !createdToken.isEmpty {
+              room = createdRoom
+              token = createdToken
+            }
+            if room.isEmpty || token.isEmpty,
+               let minted = try? await FunctionsService.shared.getQuestionStatus(questionId: questionId) {
+              room = minted.liveKitRoom ?? room
+              token = minted.liveKitToken ?? token
+            }
+
             if self.requiresMediaConnection(conversationType: self.activeConversationType), (room.isEmpty || token.isEmpty) {
               logger.info("TeacherMinute questionStatus accepted but media credentials missing questionId=\(questionId) roomEmpty=\(room.isEmpty) tokenEmpty=\(token.isEmpty) conversationType=\(self.activeConversationType)")
               try? await Task.sleep(nanoseconds: 1_000_000_000)
               continue
             }
+
             self.questionId = result.questionId
+            let responseTime = Date().timeIntervalSince1970 - startedAt
+            AnalyticsService.shared.logEvent(AnalyticsEvent.studentChatResponseTime, parameters: [
+              "question_id": questionId,
+              "response_time_seconds": Int(responseTime),
+              "conversation_type": activeConversationType
+            ])
             searchState = .matched(
               questionId: questionId,
               liveKitRoom: room,
@@ -634,30 +1515,47 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
           case "unanswered", "waiting", "pending":
             break
           case "cancelled", "canceled", "expired":
+            let responseTime = Date().timeIntervalSince1970 - startedAt
+            AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherNoMatch, parameters: [
+              "question_id": questionId,
+              "response_time_seconds": Int(responseTime),
+              "reason": "teacher_declined",
+              "conversation_type": activeConversationType
+            ])
             searchState = .noMatch
             return
           case "completed":
             // Completed without an AI answer means the question was force-ended
             // or cancelled server-side before a teacher connected.
+            let responseTime = Date().timeIntervalSince1970 - startedAt
+            AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherNoMatch, parameters: [
+              "question_id": questionId,
+              "response_time_seconds": Int(responseTime),
+              "reason": "completed_no_teacher",
+              "conversation_type": activeConversationType
+            ])
             searchState = .noMatch
             return
           default:
             break
           }
-
-          let elapsed = Date().timeIntervalSince1970 - startedAt
-          if elapsed >= Self.noTeacherTimeoutSeconds {
-            logger.info("TeacherMinute questionStatus timed out after \(Int(elapsed))s questionId=\(questionId); transitioning to noMatch")
-            try? await FunctionsService.shared.cancelQuestion(questionId: questionId)
-            searchState = .noMatch
-            return
-          }
-        } catch {
-          guard !Task.isCancelled else { return }
-          logger.error("TeacherMinute questionStatus polling error=\(error)")
         }
 
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        let elapsed = Date().timeIntervalSince1970 - startedAt
+        if elapsed >= Self.noTeacherTimeoutSeconds {
+          logger.info("TeacherMinute questionStatus timed out after \(Int(elapsed))s questionId=\(questionId); transitioning to noMatch")
+          AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherNoMatch, parameters: [
+            "question_id": questionId,
+            "response_time_seconds": Int(elapsed),
+            "reason": "timeout",
+            "conversation_type": activeConversationType
+          ])
+          try? await FunctionsService.shared.cancelQuestion(questionId: questionId)
+          searchState = .noMatch
+          return
+        }
+
+        try? await Task.sleep(nanoseconds: Self.questionWatchTickNanos)
       }
     }
   }
@@ -698,8 +1596,110 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       teacher: String(format: LocalizationSupport.localized("with %@"), lesson.otherParticipantName),
       teacherImageURL: lesson.otherParticipantImageURL,
       time: LessonFormatting.relativeDateText(lesson.acceptedAt),
-      duration: LessonFormatting.durationText(seconds: lesson.durationSeconds)
+      duration: LessonFormatting.durationText(seconds: lesson.durationSeconds),
+      rating: lesson.studentRating
     )
+  }
+
+  func submitQuestionWithPermissions(topic: String, text: String, photoUrls: [String], conversationType: String) async -> String? {
+    var micPermissionGranted = true
+    var cameraPermissionGranted = true
+
+    if conversationType == "audio" || conversationType == "video" {
+      let micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+      micPermissionGranted = micState.isGranted
+      if !micState.isGranted {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, parameters: [
+          "permission_type": "microphone",
+          "conversation_type": conversationType
+        ])
+        return conversationType == "video"
+          ? LocalizationSupport.localized("Video and audio access are required for a video session.")
+          : LocalizationSupport.localized("Microphone access is required for an audio session.")
+      }
+    }
+
+    if conversationType == "video" {
+      let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+      cameraPermissionGranted = cameraState.isGranted
+      if !cameraState.isGranted {
+        AnalyticsService.shared.logEvent(AnalyticsEvent.permissionDenied, parameters: [
+          "permission_type": "camera",
+          "conversation_type": conversationType
+        ])
+        return LocalizationSupport.localized("Video and audio access are required for a video session.")
+      }
+    }
+
+    AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherSubmitted, parameters: [
+      "topic": topic,
+      "text_length": text.count,
+      "photo_count": photoUrls.count,
+      "conversation_type": conversationType,
+      "microphone_permission": micPermissionGranted ? 1 : 0,
+      "camera_permission": cameraPermissionGranted ? 1 : 0
+    ])
+
+    submitQuestion(topic: topic, text: text, photoUrls: photoUrls, conversationType: conversationType)
+    return nil
+  }
+
+  func handleCouponStateChange() -> Bool {
+    switch couponState {
+    case .success, .alreadyActivated, .invalid, .error:
+      return true
+    default:
+      return false
+    }
+  }
+
+  func beginCheckout(_ option: PricingOption) async {
+    guard !isPreparingCheckout else { return }
+    isPreparingCheckout = true
+    await preparePaymentOptions()
+    selectTier(option)
+    isPreparingCheckout = false
+  }
+
+  func handleAppActiveAfterCheckout() async {
+    guard isAwaitingPaymentReturn else { return }
+    resumeCheckoutSpinner()
+    let resultVersionBeforeWait = PaymentReturnStore.shared.resultVersion
+    logger.info("[PaymentReturn] app active after checkout; waiting for deep link resultVersion=\(resultVersionBeforeWait)")
+
+    for _ in 0..<12 {
+      try? await Task.sleep(nanoseconds: 100_000_000)
+      guard isAwaitingPaymentReturn else {
+        logger.info("[PaymentReturn] fallback skipped; no longer awaiting return")
+        return
+      }
+      guard PaymentReturnStore.shared.resultVersion == resultVersionBeforeWait, PaymentReturnStore.shared.latestResult == nil else {
+        logger.info("[PaymentReturn] fallback skipped; payment result arrived resultVersion=\(PaymentReturnStore.shared.resultVersion)")
+        return
+      }
+    }
+    logger.info("[PaymentReturn] no payment return URL arrived after wait; refreshing balance before fallback")
+    let confirmedByBalance = await handleCheckoutReturnWithoutResult()
+    if confirmedByBalance {
+      PaymentReturnStore.shared.handleConfirmedWithoutReturnURL()
+    } else {
+      logger.info("[PaymentReturn] balance did not update after checkout return; showing pending confirmation")
+      PaymentReturnStore.shared.handleMissingReturn()
+    }
+  }
+
+  func consumePaymentResult() {
+    PaymentReturnStore.shared.consumeLatestResult()
+  }
+
+  func shouldShowPaymentReturnResult() -> Bool {
+    guard let result = PaymentReturnStore.shared.latestResult else { return false }
+    if case .success = result.status { return false }
+    return true
+  }
+
+  func requestAndroidCameraPermission() async -> PermissionState {
+    await PermissionService.shared.requestCapturePermission(for: .camera)
   }
 }
 
@@ -709,33 +1709,47 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var name: String
   var searchState: StudentSearchState
   var activeQuestionText: String
-  var activeConnectionFeeCents: Int
   var activeConversationType: String = "text"
   var selectedPricePerMinuteCents: Int
   var questionId: String?
 
   let pricingOptions: [PricingOption]
   var availablePaymentMethods: [PaymentMethod] = PaymentMethod.availableForCurrentPlatform
+  var savedPayPalEmail: String?
   var recentLessons: [RecentLesson]
+  var onlineTeachers: [OnlineTeacher] = [
+    OnlineTeacher(id: "1", name: "Cohen", subject: "Math", profileImageURL: ""),
+    OnlineTeacher(id: "2", name: "Levi", subject: "Physics", profileImageURL: ""),
+    OnlineTeacher(id: "3", name: "Mizrahi", subject: "Chemistry", profileImageURL: ""),
+    OnlineTeacher(id: "4", name: "Shalev", subject: "Statistics", profileImageURL: ""),
+  ]
   var totalTimeLearnedText: String
   var totalPurchasedText: String
   var lessonCount: Int
   var hasUnreadMessages: Bool
   var profileImageURL: String
   var remainingMinutes: Int
+  /// Previews and tests stand in for a screen whose profile has arrived.
+  var isProfileLoaded = true
   var checkoutURL: URL?
   var isStartingCheckout = false
+  /// True from the moment checkout starts until the buyer is handed off to
+  /// something they can see — the wallet sheet, or the browser. Distinct from
+  /// `isStartingCheckout`, which stays true for the whole wallet payment and
+  /// so would leave a spinner sitting behind the Apple Pay sheet.
+  var isPreparingCheckout = false
   var checkoutPricingOptionID: String?
   var isAwaitingPaymentReturn = false
   var couponCode = ""
   var couponState: CouponRedemptionState = .idle
   var purchaseSummary: PurchaseSummary?
+  var paymentReturnVersion = 0
+  var paymentReturnResult: PaymentReturnResult? = nil
 
   init(
     name: String = "Sarah Jenkins",
     searchState: StudentSearchState = .idle,
     activeQuestionText: String = "",
-    activeConnectionFeeCents: Int = 0,
     selectedPricePerMinuteCents: Int = 50,
     remainingMinutes: Int = 30,
     pricingOptions: [PricingOption] = [
@@ -765,14 +1779,13 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       ),
     ],
     recentLessons: [RecentLesson] = [
-      RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis", teacherImageURL: "", time: "Today, 2:30 PM", duration: "14 mins"),
-      RecentLesson(title: "Algebra II", teacher: "with Ms. Chen", teacherImageURL: "", time: "Yesterday", duration: "22 mins"),
+      RecentLesson(title: "Calculus Help", teacher: "with Mr. Davis", teacherImageURL: "", time: "Today, 2:30 PM", duration: "14 mins", rating: 5),
+      RecentLesson(title: "Algebra II", teacher: "with Ms. Chen", teacherImageURL: "", time: "Yesterday", duration: "22 mins", rating: 4),
     ]
   ) {
     self.name = name
     self.searchState = searchState
     self.activeQuestionText = activeQuestionText
-    self.activeConnectionFeeCents = activeConnectionFeeCents
     self.selectedPricePerMinuteCents = selectedPricePerMinuteCents
     self.remainingMinutes = remainingMinutes
     self.questionId = "mock-lesson"
@@ -785,9 +1798,19 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     self.profileImageURL = ""
   }
 
+  func submitQuestion(topic: String, text: String, photoUrls: [String], conversationType: String) {
+    Task {
+      await askTeacher(
+        topic: topic,
+        text: text,
+        photoUrls: photoUrls,
+        conversationType: conversationType
+      )
+    }
+  }
+
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {
     activeQuestionText = text
-    activeConnectionFeeCents = 50
     activeConversationType = conversationType
     searchState = .searching(questionId: "mock-question")
   }
@@ -804,6 +1827,10 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     selectedPricePerMinuteCents = option.priceCents
   }
 
+  func preparePaymentOptions() async {
+    isPreparingCheckout = true
+  }
+
   func checkout(_ option: PricingOption, method: PaymentMethod = .paypal) async {
     selectTier(option)
   }
@@ -815,6 +1842,11 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   func checkoutDidOpen() {
     isAwaitingPaymentReturn = true
     logger.info("[PaymentReturn] mock checkout opened")
+  }
+
+  func resumeCheckoutSpinner() {
+    guard isAwaitingPaymentReturn else { return }
+    isPreparingCheckout = true
   }
 
   func handlePaymentReturn(_ result: PaymentReturnResult) async {
@@ -842,6 +1874,18 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
 
   func viewAllLessons() {}
 
+  var subjects: [StudentSubject] = [
+    StudentSubject(key: "math", title: "Math", topics: "Algebra, Trigonometry", systemImage: "function", teacherCount: 3),
+    StudentSubject(key: "physics", title: "Physics", topics: "Mechanics", systemImage: "atom", teacherCount: 1),
+  ]
+  var pricePerMinuteText = "2 NIS per minute • pay only for time used"
+  var averageConnectText = "90 sec avg to connect"
+  var registeredTeacherCountText = "237 registered teachers"
+  var connectPromiseText = "Help from a real teacher, exactly when you need it Mock"
+  var appMainIssueText = "Stuck? You will have a teacher immediately"
+  var connectStepTitle = "Teacher connects within 90 sec"
+  var averageResponseText = "Average response time: 90 seconds"
+
   func loadProfileIfNeeded() async {}
 
   func refresh() async {}
@@ -865,10 +1909,34 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
       questionPhotoUrls: [],
       createdAt: 0,
       acceptedAt: Date().timeIntervalSince1970 * 1000.0,
-      connectionFeeCents: activeConnectionFeeCents,
       pricePerMinuteCents: selectedPricePerMinuteCents,
       teacherSharePercent: 75,
       currencyCode: pricingOptions.first?.currency ?? LessonFormatting.defaultCurrencyCode
     )
+  }
+
+  func submitQuestionWithPermissions(topic: String, text: String, photoUrls: [String], conversationType: String) async -> String? {
+    return nil
+  }
+
+  func handleCouponStateChange() -> Bool {
+    return false
+  }
+
+  func beginCheckout(_ option: PricingOption) async {
+  }
+
+  func handleAppActiveAfterCheckout() async {
+  }
+
+  func consumePaymentResult() {
+  }
+
+  func shouldShowPaymentReturnResult() -> Bool {
+    false
+  }
+
+  func requestAndroidCameraPermission() async -> PermissionState {
+    .denied
   }
 }

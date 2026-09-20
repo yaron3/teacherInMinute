@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import SkipFuse
 
 #if !os(Android)
 import FirebaseAuth
@@ -72,6 +73,13 @@ final class StudentLessonHistoryViewModel {
     func view(_ lesson: LessonHistoryItem) {
         selectedLessonDetails = nil
         selectedLesson = lesson
+        AnalyticsService.shared.logEvent(AnalyticsEvent.lessonTapped, parameters: [
+            "lesson_id": lesson.questionId,
+            "lesson_title": lesson.title,
+            "other_participant": lesson.otherParticipant,
+            "duration": lesson.duration,
+            "completed_at": lesson.completedAt
+        ])
     }
     
     func toggleAudio(for lesson: LessonHistoryItem) {

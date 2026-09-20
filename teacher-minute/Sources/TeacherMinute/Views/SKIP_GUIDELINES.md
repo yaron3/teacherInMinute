@@ -111,6 +111,36 @@ import SkipBridge
 #endif
 ```
 
+### 7. **Never Build an Empty `AccessibilityTraits`**
+
+SkipFuseUI declares `AccessibilityTraits.init()` as `self = []`, and `[]` goes
+through `SetAlgebra`'s default array-literal initializer, which calls `init()`
+again. Asking for an empty set therefore recurses until the stack overflows and
+the process dies — a `SIGSEGV` in `swift_getGenericMetadata` with no Swift
+frames in the tombstone. iOS has Apple's own type and is unaffected, so this
+only ever shows up on Android.
+
+❌ **Don't do this:**
+```swift
+.accessibilityAddTraits(isSelected ? .isSelected : [])  // ❌ [] never returns
+```
+
+✅ **Do this instead** — add the trait, or add nothing:
+```swift
+.accessibilitySelected(isSelected)  // see SettingsView.swift
+
+@ViewBuilder
+func accessibilitySelected(_ isSelected: Bool) -> some View {
+    if isSelected {
+        self.accessibilityAddTraits(.isSelected)
+    } else {
+        self
+    }
+}
+```
+
+The same trap applies to `AccessibilityTechnologies`.
+
 ## Common Patterns in This Project
 
 ### Photo Picking

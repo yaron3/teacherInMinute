@@ -10,8 +10,18 @@ struct ProfileAvatarView: View {
     let fallbackSystemImage: String
     let background: Color
     let tint: Color
+    let initial: String?
 
     @Environment(\.colorScheme) var colorScheme
+
+    init(imageURL: String, size: CGFloat, fallbackSystemImage: String, background: Color, tint: Color, initial: String? = nil) {
+        self.imageURL = imageURL
+        self.size = size
+        self.fallbackSystemImage = fallbackSystemImage
+        self.background = background
+        self.tint = tint
+        self.initial = initial
+    }
 
 #if os(iOS)
     @State private var image: UIImage?
@@ -70,12 +80,18 @@ struct ProfileAvatarView: View {
         Circle()
             .fill(background)
             .overlay {
-                PlatformIcon(
-                    systemName: fallbackSystemImage,
-                    size: max(14, size * 0.55),
-                    weight: .semibold,
-                    color: tint
-                )
+                if let initial = initial, !initial.isEmpty {
+                    Text(initial)
+                        .font(.system(size: max(14, size * 0.4), weight: .bold))
+                        .foregroundStyle(tint)
+                } else {
+                    PlatformIcon(
+                        systemName: fallbackSystemImage,
+                        size: max(14, size * 0.55),
+                        weight: .semibold,
+                        color: tint
+                    )
+                }
             }
     }
 

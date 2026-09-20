@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct WelcomeView: View {
+  @State var viewModel = WelcomeViewModel()
   @Environment(\.appRouter) var router
 
   @Environment(\.colorScheme) var colorScheme
@@ -22,6 +23,7 @@ struct WelcomeView: View {
 
 	  welcomeContent
 	}
+	.trackScreen(AnalyticsScreen.welcome)
   }
 
   private var welcomeContent: some View {
@@ -30,18 +32,18 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 0) {
           header
           
-          Text(LocalizationSupport.localized("Help you anywhere"))
+          Text(viewModel.headline)
             .font(.system(size: 35, weight: .bold, design: .default))
             .foregroundStyle(theme.primaryText)
             .lineSpacing(-4)
-            .padding(.top, 42)
+            .padding(.top, 12)
           
-          Image("student")
+          Image("sqaure-logo", bundle: .module)
             .resizable()
             .scaledToFit()
-            .padding(.top, 32)
+            .padding(.top, 6)
           
-          Text(LocalizationSupport.localized("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise."))
+          Text(viewModel.subheadline)
             .font(.system(size: 16, weight: .regular))
             .foregroundStyle(theme.secondaryText)
             .lineSpacing(7)
@@ -55,7 +57,7 @@ struct WelcomeView: View {
           Button {
             router.push(.createAccount)
           } label: {
-            Text(LocalizationSupport.localized("Sign Up"))
+            Text(viewModel.signUpLabel)
               .font(.system(size: 17, weight: .bold))
               .foregroundStyle(theme.onAccentText)
               .frame(maxWidth: .infinity)
@@ -67,7 +69,7 @@ struct WelcomeView: View {
         Button {
           router.push(.login)
         } label: {
-          Text(LocalizationSupport.localized("Already have an account? Log In"))
+          Text(viewModel.logInLabel)
             .fontWeight(.semibold)
             .foregroundStyle(theme.primaryText)
         }
@@ -87,19 +89,11 @@ struct WelcomeView: View {
   
   private var header: some View {
 	HStack(spacing: 12) {
-	  RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
-		.fill(theme.screenBackground)
-		.frame(width: 34, height: 34)
-		.overlay {
-		  PlatformIcon(
-			systemName: "graduationcap.fill",
-			size: 15,
-			weight: .semibold,
-			color: theme.primaryText
-		  )
-		}
-	  
-	  Text(LocalizationSupport.localized("Teacher in a Minute"))
+
+	  Image("AppIcon", bundle: .module)
+		.resizable()
+		.frame(width: 30, height: 30)
+	  Text(viewModel.appName)
 		.font(.system(size: 16, weight: .semibold))
 		.foregroundStyle(theme.primaryText)
 	  
@@ -123,7 +117,7 @@ struct WelcomeView: View {
 		  color: theme.secondaryText
 		)
 		
-		Text(LocalizationSupport.localized("App Preview"))
+		Text(viewModel.appPreviewLabel)
 		  .font(.system(size: 16))
 		  .foregroundStyle(theme.primaryText)
 	  }
@@ -136,7 +130,7 @@ struct WelcomeView: View {
   private var badges: some View {
 	HStack(spacing: 12) {
 	  BadgeView(
-		title: LocalizationSupport.localized("Verified Tutors"),
+		title: viewModel.verifiedTutorsBadge,
 		systemImage: "checkmark.seal",
 		foreground: theme.positive,
 		background: theme.positiveBackground,
@@ -144,7 +138,7 @@ struct WelcomeView: View {
 	  )
 	  Spacer()
 	  BadgeView(
-		title: LocalizationSupport.localized("Privacy Protected"),
+		title: viewModel.privacyProtectedBadge,
 		systemImage: "lock.fill",
 		foreground: theme.badgeText,
 		background: theme.badgeBackground,
@@ -166,7 +160,7 @@ struct BadgeView: View {
 	  PlatformIcon(systemName: systemImage)
 		.font(.system(size: 12, weight: .medium))
 	  
-	  Text(LocalizationSupport.localized(title))
+	  Text(title)
 		.font(.system(size: 13, weight: .medium))
 	}
 	.foregroundStyle(foreground)

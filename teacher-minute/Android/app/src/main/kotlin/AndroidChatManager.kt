@@ -3,7 +3,11 @@ package teacher.minute
 import android.util.Log
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -47,7 +51,7 @@ object AndroidChatManager {
     }
 
     @JvmStatic
-    fun sendText(questionId: String, text: String, senderRole: String) {
+    fun sendText(questionId: String, text: String, senderRole: String, kind: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
             ?: throw IllegalStateException("Not signed in")
         val ref = FirebaseDatabase.getInstance(DATABASE_URL)
@@ -61,11 +65,32 @@ object AndroidChatManager {
             "senderUid" to uid,
             "senderRole" to senderRole,
             "createdAt" to System.currentTimeMillis().toDouble(),
-            "kind" to "text"
+            "kind" to kind
         )
 
-        Log.i(TAG, "Sending message questionId=$questionId role=$senderRole")
+        Log.i(TAG, "Sending message questionId=$questionId role=$senderRole kind=$kind")
         Tasks.await(ref.setValue(payload), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    @JvmStatic
+    fun appendQuestionText(questionId: String, addition: String): String {
+        val trimmedAddition = addition.trim()
+        if (trimmedAddition.isEmpty()) return ""
+
+        val questionRef = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+        val snapshot = Tasks.await(questionRef.get(), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        val current = snapshot.firstString("text", "questionText", "originalQuestion", "message", "topic")
+        val next = appendingQuestionText(trimmedAddition, current)
+        val payload = mapOf(
+            "text" to next,
+            "questionText" to next
+        )
+
+        Log.i(TAG, "Appending formula to question text questionId=$questionId")
+        Tasks.await(questionRef.updateChildren(payload), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        return next
     }
 
     @JvmStatic
@@ -238,6 +263,57 @@ object AndroidChatManager {
         return rows.toString()
     }
 
+    /**
+     * Raised by a participant who is in the lesson without their audio yet —
+     * still connecting, or started by chat instead — so the other side knows
+     * to type rather than talk. It is also what lets a teacher still waiting on
+     * their own audio join a student who has already started by chat.
+     */
+    @JvmStatic
+    fun setMediaPending(questionId: String, role: String, pending: Boolean) {
+        val key = role.trim().lowercase().ifBlank { "participant" }
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+            .child("mediaPending")
+            .child(key)
+        Tasks.await(ref.setValue(pending), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    /**
+     * Switches the lesson's medium — text, audio or video — for both
+     * participants. The other side follows it from the session details.
+     */
+    @JvmStatic
+    fun setConversationType(questionId: String, conversationType: String) {
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+            .child("conversationType")
+        Tasks.await(ref.setValue(conversationType), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    @JvmStatic
+    fun fetchMediaPendingJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance(DATABASE_URL)
+                .getReference("questions")
+                .child(questionId)
+                .child("mediaPending")
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+
+        val rows = JSONObject()
+        for (child in snapshot.children) {
+            val key = child.key ?: continue
+            val value = child.getValue(Boolean::class.java) ?: continue
+            rows.put(key, value)
+        }
+        return rows.toString()
+    }
+
     @JvmStatic
     fun markQuestionAccepted(questionId: String, teacherId: String) {
         val values = mutableMapOf<String, Any>(
@@ -253,6 +329,100 @@ object AndroidChatManager {
             .getReference("questions")
             .child(questionId)
         Tasks.await(ref.updateChildren(values), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    // A student waiting for a teacher used to learn the answer by calling
+    // getQuestionStatus once a second — a Cloud Function round trip per tick,
+    // and up to a second of delay after the teacher actually accepted. This
+    // listener keeps the question's live status in memory so the Swift side can
+    // read it locally and react as soon as RTDB pushes the change.
+    @Volatile private var cachedQuestionStatusJson: String? = null
+    @Volatile private var questionStatusRemoved: Boolean = false
+    @Volatile private var questionStatusError: String? = null
+    private var questionStatusListener: ValueEventListener? = null
+    private var questionStatusRef: DatabaseReference? = null
+    private var questionStatusId: String? = null
+
+    @JvmStatic
+    @Synchronized
+    fun startQuestionStatusListener(questionId: String) {
+        if (questionStatusId == questionId && questionStatusListener != null) return
+        stopQuestionStatusListener()
+
+        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            .getReference("questions")
+            .child(questionId)
+
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val status = snapshot.child("status").getValue(String::class.java)
+                if (status.isNullOrBlank()) {
+                    // The backend deletes this node when a question is cancelled
+                    // or archived, so its disappearance is itself the answer.
+                    questionStatusRemoved = !snapshot.exists()
+                    cachedQuestionStatusJson = JSONObject().toString()
+                    return
+                }
+                questionStatusRemoved = false
+                cachedQuestionStatusJson = JSONObject()
+                    .put("status", status)
+                    .put("liveKitRoom", snapshot.child("liveKitRoom").getValue(String::class.java) ?: "")
+                    .put("liveKitToken", snapshot.child("liveKitToken").getValue(String::class.java) ?: "")
+                    .put("questionId", snapshot.firstString("questionId", "questionID", "id"))
+                    .toString()
+                questionStatusError = null
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Question status listener cancelled qid=$questionId", error.toException())
+                questionStatusError = error.message
+            }
+        }
+
+        ref.addValueEventListener(listener)
+        questionStatusListener = listener
+        questionStatusRef = ref
+        questionStatusId = questionId
+        Log.i(TAG, "Question status listener attached qid=$questionId")
+    }
+
+    @JvmStatic
+    @Synchronized
+    fun stopQuestionStatusListener() {
+        val listener = questionStatusListener
+        val ref = questionStatusRef
+        if (listener != null && ref != null) {
+            ref.removeEventListener(listener)
+            Log.i(TAG, "Question status listener detached qid=$questionStatusId")
+        }
+        questionStatusListener = null
+        questionStatusRef = null
+        questionStatusId = null
+        cachedQuestionStatusJson = null
+        questionStatusRemoved = false
+        questionStatusError = null
+    }
+
+    /**
+     * The listener's latest view, as `{"state": ..., "question": {...}}`.
+     *
+     * `state` is "ready" once a snapshot has arrived, "gone" when the question
+     * node has been removed, "error" if the listener was cancelled, and
+     * "pending" before the first delivery.
+     */
+    @JvmStatic
+    fun liveQuestionStatusJson(): String {
+        val cached = cachedQuestionStatusJson
+        val state = when {
+            questionStatusError != null -> "error"
+            cached == null -> "pending"
+            questionStatusRemoved -> "gone"
+            else -> "ready"
+        }
+        return JSONObject()
+            .put("state", state)
+            .put("question", JSONObject(cached ?: "{}"))
+            .toString()
     }
 
     @JvmStatic
@@ -307,12 +477,6 @@ object AndroidChatManager {
                     ?: 0.0
             )
             .put(
-                "connectionFeeCents",
-                snapshot.child("connectionFeeCents").value.asIntOrNull()
-                    ?: snapshot.child("connectionFee").value.asIntOrNull()
-                    ?: 0
-            )
-            .put(
                 "pricePerMinuteCents",
                 snapshot.child("pricePerMinuteCents").value.asIntOrNull()
                     ?: snapshot.child("ratePerMinuteCents").value.asIntOrNull()
@@ -325,7 +489,17 @@ object AndroidChatManager {
                     ?: snapshot.child("teacherShare").value.asDoubleOrNull()
                     ?: 75.0
             )
+            .put("conversationType", snapshot.firstString("conversationType"))
             .toString()
+    }
+
+    private fun appendingQuestionText(addition: String, current: String): String {
+        val trimmedCurrent = current.trim()
+        val trimmedAddition = addition.trim()
+        if (trimmedAddition.isEmpty()) return trimmedCurrent
+        if (trimmedCurrent.isEmpty()) return trimmedAddition
+        if (trimmedCurrent.contains(trimmedAddition)) return trimmedCurrent
+        return "$trimmedCurrent\n$trimmedAddition"
     }
 
     private fun Any?.asDoubleOrNull(): Double? {

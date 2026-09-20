@@ -23,6 +23,11 @@ export async function sendInvitePush(params: {
       studentName,
       questionText: questionText.slice(0, 300),
       wave: String(wave),
+      // Carried in the payload as well as in `android.ttl` so the client can
+      // expire its own notification with the invite. `ttl` only governs how
+      // long FCM keeps trying to deliver; without this the client would have to
+      // hardcode a copy of INVITE_EXPIRY_SECONDS and drift from it.
+      ttlSeconds: String(ttlSeconds),
     },
     android: {
       priority: "high",

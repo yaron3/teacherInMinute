@@ -24,7 +24,7 @@ struct AboutWebView: View {
         WebContentView(url: url, colorScheme: colorScheme)
             .background(Color(.systemBackground))
             .ignoresSafeArea(edges: .bottom)
-            .navigationTitle(LocalizationSupport.localized(title))
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .trackScreen(AnalyticsScreen.about)
     }
@@ -62,7 +62,7 @@ struct AboutWebView: View {
     var body: some View {
         Link("Open \(title)", destination: url)
             .font(.system(size: 16, weight: .semibold))
-            .navigationTitle(LocalizationSupport.localized(title))
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .trackScreen(AnalyticsScreen.about)
     }

@@ -1,6 +1,7 @@
 {
   "rules": {
     "teachers": {
+      ".indexOn": ["status"],
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid"
@@ -35,6 +36,10 @@
           ".write": false
         }
       }
+    },
+    "onlineTeachers": {
+      ".read": "auth != null",
+      ".write": false
     }
   }
 }

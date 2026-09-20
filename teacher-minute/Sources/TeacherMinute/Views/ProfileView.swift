@@ -14,11 +14,17 @@ import SkipBridge
 #endif
 
 struct ProfileView: View {
-  @State var viewModel: ProfileViewModel
+  /// `@Bindable`, not `@State`. MainTabView already owns this view model in its
+  /// own `@State` and passes it down; wrapping it a second time here left the
+  /// body reading a copy that Skip never re-read, so a completed load updated
+  /// the view model — the logs showed name and contact rows arriving — while
+  /// the screen kept rendering its initial placeholders. `@Bindable` observes
+  /// without taking ownership, and still vends the `$viewModel` bindings the
+  /// editor sheets need.
+  @Bindable var viewModel: ProfileViewModel
   @State var isShowingProfileEditor = false
   @State var isShowingSubjectEditor = false
   @State var isShowingDocuments = false
-  @State var hasProfileDataForDisplay = false
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
 #if os(Android)
   @State var showAndroidPhotoSourceDialog = false
@@ -28,37 +34,102 @@ struct ProfileView: View {
 	AppTheme(colorScheme: colorScheme)
   }
   init(viewModel: ProfileViewModel = ProfileViewModel()) {
-	self._viewModel = State(initialValue: viewModel)
+	self.viewModel = viewModel
   }
   var body: some View {
 	ScrollView(.vertical, showsIndicators: false) {
-      if hasProfileDataForDisplay {
+      // The profile renders straight away and fills in as the load lands, the
+      // way the home tabs do. Swapping the whole subtree on a loaded flag did
+      // not survive Skip: the load completed in tens of milliseconds and set
+      // `isProfileLoaded`, but the branch never re-evaluated on Android and the
+      // screen sat on "Loading profile..." indefinitely. Rendering one tree and
+      // letting the individual fields update removes the branch entirely.
     VStack(alignment: .leading, spacing: 0) {
-      profileHeader
-        .padding(.top, 20)
-
-      FlatSectionHeader(LocalizationSupport.localized("Account Info"))
-        .padding(.top, 32)
-
+      if let error = viewModel.errorMessage {
+        profileLoadError(error)
+      }
       FlatCard(padding: 0, outlined: true) {
         VStack(spacing: 0) {
-          ForEach($viewModel.contactRows, id: \.description) { $row in
-            ProfileInfoRow(parameter: $row, isEditing: viewModel.isEditing)
+          profileHeader
+            .padding(16)
 
-            if row.description != viewModel.contactRows.last?.description {
-              FlatRule()
-            }
-          }
+          FlatRule()
+
+          ProfileInfoRow(
+            parameter: .constant(Parameter(
+              description: viewModel.emailFieldLabel,
+              value: viewModel.email,
+              image: "envelope.fill"
+            )),
+            isEditing: false,
+          )
+          FlatRule()
+          ProfileInfoRow(
+            parameter: .constant(Parameter(
+              description: viewModel.phoneFieldLabel,
+              value: viewModel.phoneNumber,
+              image: "phone.fill"
+            )),
+            isEditing: false
+          )
+          FlatRule()
+//          ProfileInfoRow(
+//            parameter: .constant(Parameter(
+//              description: LocalizationSupport.localized("Username"),
+//              value: viewModel.username,
+//              image: "person.text.rectangle.fill"
+//            )),
+//            isEditing: false
+//          )
         }
       }
-      .padding(.top, 14)
+      .padding(.top, 20)
+	  if viewModel.shouldShowTeacherPaymentsMethod {
+		FlatSectionHeader("")
+		  .padding(.top, 32)
+		FlatCard {
+		  VStack {
+			HStack {
+			  Label(viewModel.paymentMethodLabel, systemImage: "creditcard")
+			  Spacer()
+			  Button(action: showProfileEditor) {
+				Text(viewModel.editLabel)
+				  .font(.system(size: 14, weight: .bold))
+				  .foregroundStyle(theme.primaryText)
+			  }
+			  .buttonStyle(.plain)
+			}
+			.padding(6)
+			
+			HStack {
+			  PlatformIcon(systemName: viewModel.payoutMethodSystemImage)
+			  VStack(alignment: .leading, spacing: 4) {
+				Text(viewModel.payoutMethodTitle)
+				  .font(.system(size: 14, weight: .bold))
+				  .foregroundStyle(theme.primaryText)
+				Text(viewModel.payoutMethodDetail)
+				  .font(.system(size: 13))
+				  .foregroundStyle(viewModel.hasPayoutMethod ? theme.primaryText : theme.secondaryText)
+			  }
+			  Spacer()
+			}
+		  }
+		}
+//		teachingCard(
+//		  title: LocalizationSupport.localized("Active accounts"),
+//		  chips: viewModel.paymentsMethdsLabels,
+//		  includeAdd: viewModel.paymentsMethdsLabels.isEmpty,
+//		  editAction: showProfileEditor,
+//		  addAction: showProfileEditor
+//		)
 
+	  }
       if viewModel.shouldShowTeachingDetails {
-        FlatSectionHeader(LocalizationSupport.localized("Teaching Details"))
+        FlatSectionHeader(viewModel.teachingDetailsSectionTitle)
           .padding(.top, 32)
 
         teachingCard(
-          title: LocalizationSupport.localized("Grade Levels Taught"),
+          title: viewModel.gradeLevelsTaughtTitle,
           chips: viewModel.gradeLevelLabels,
           includeAdd: viewModel.gradeLevels.isEmpty,
           editAction: showProfileEditor,
@@ -67,7 +138,7 @@ struct ProfileView: View {
         .padding(.top, 14)
 
         teachingCard(
-          title: LocalizationSupport.localized("Subjects"),
+          title: viewModel.subjectsSectionTitle,
           chips: viewModel.subjectsOrPlaceholder,
           includeAdd: viewModel.subjects.isEmpty,
           editAction: { isShowingSubjectEditor = true },
@@ -79,14 +150,14 @@ struct ProfileView: View {
           .padding(.top, 12)
       }
 
-      FlatSectionHeader(LocalizationSupport.localized("Device Permissions"))
+      FlatSectionHeader(viewModel.devicePermissionsSectionTitle)
         .padding(.top, 32)
 
       FlatCard(padding: 0, outlined: true) {
         VStack(spacing: 0) {
           ProfilePermissionRow(
             icon: "mic.fill",
-            title: LocalizationSupport.localized("Microphone"),
+            title: viewModel.microphoneLabel,
             state: viewModel.microphoneState,
             iconColor: permissionColor(viewModel.microphoneState),
             action: viewModel.requestMicrophonePermission
@@ -96,7 +167,7 @@ struct ProfileView: View {
 
           ProfilePermissionRow(
             icon: "camera.fill",
-            title: LocalizationSupport.localized("Camera"),
+            title: viewModel.cameraLabel,
             state: viewModel.cameraState,
             iconColor: permissionColor(viewModel.cameraState),
             action: viewModel.requestCameraPermission
@@ -106,7 +177,7 @@ struct ProfileView: View {
 
           ProfilePermissionRow(
             icon: "bell.fill",
-            title: LocalizationSupport.localized("Notifications"),
+            title: viewModel.notificationsLabel,
             state: viewModel.notificationsState,
             iconColor: permissionColor(viewModel.notificationsState),
             action: viewModel.manageNotifications
@@ -117,9 +188,6 @@ struct ProfileView: View {
     }
     .padding(.horizontal, 20)
     .padding(.bottom, 40)
-      } else {
-        profileLoadingView
-      }
 	}
     .background(theme.screenBackground)
 			.task {
@@ -157,72 +225,74 @@ struct ProfileView: View {
               .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
               .id(languagePreference)
             }
-	  }
+	  .trackScreen(AnalyticsScreen.profile)
+  }
 	  
-  var profileLoadingView: some View {
+  /// Shown above the profile when a load failed, rather than in place of it.
+  /// A failure leaves the fields at their placeholder values, which is still a
+  /// usable screen — the tab bar and the retry stay reachable either way.
+  func profileLoadError(_ error: String) -> some View {
     VStack(spacing: 12) {
-      if let error = viewModel.errorMessage {
-        Text(error)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(theme.danger)
+      Text(error)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(theme.danger)
 
-        Button {
-          Task { await loadProfileForDisplay() }
-        } label: {
-          Text(LocalizationSupport.localized("Retry"))
-            .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(theme.primaryText)
-        }
-        .buttonStyle(.plain)
-      } else {
-        ProgressView()
-          .tint(theme.primaryText)
-
-        Text(LocalizationSupport.localized("Loading profile..."))
-          .font(.system(size: 14))
-          .foregroundStyle(theme.secondaryText)
+      Button {
+        Task { await viewModel.loadProfile() }
+      } label: {
+        Text(viewModel.retryLabel)
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(theme.primaryText)
       }
+      .buttonStyle(.plain)
     }
-    .frame(maxWidth: .infinity, minHeight: 420)
-    .padding(.horizontal, 20)
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 16)
   }
 
-	  // Name leads at page-title scale with the photo trailing it, matching the
-	  // account screen in the reference.
 	  var profileHeader: some View {
-	VStack(alignment: .leading, spacing: 0) {
-	  HStack(alignment: .top, spacing: 16) {
-		VStack(alignment: .leading, spacing: 8) {
+	HStack(alignment: .center, spacing: 16) {
+	  ZStack(alignment: .bottomTrailing) {
+		profilePhotoButton
+	  }
+	  VStack(alignment: .leading, spacing: 6) {
+		HStack(alignment: .center, spacing: 6) {
 		  Text(viewModel.name)
-			.font(.system(size: 34, weight: .bold))
+			.font(.system(size: 22, weight: .bold))
 			.foregroundStyle(theme.primaryText)
 			.lineLimit(2)
 			.minimumScaleFactor(0.7)
-
-		  FlatChip(title: viewModel.role)
-
-		  // Teacher verification badge is intentionally hidden for now.
+		  Spacer()
+		  Button(action: showProfileEditor) {
+			PlatformIcon(systemName: "pencil", size: 14, weight: .semibold, color: theme.secondaryText)
+			  
+		  }
+		  .buttonStyle(.plain)
+		  
 		}
 
-		Spacer()
+		Text(viewModel.role)
+		  .font(.system(size: 14))
+		  .foregroundStyle(theme.secondaryText)
 
-		ZStack(alignment: .bottomTrailing) {
-		  profilePhotoButton
+		if viewModel.hasRating {
+		  HStack(spacing: 4) {
+			Text(LessonFormatting.ratingText(viewModel.rating))
+			  .font(.system(size: 13, weight: .semibold))
+			  .foregroundStyle(theme.primaryText)
+
+			RatingStarsView(rating: viewModel.rating, size: 12)
+
+			Text(viewModel.reviewCountText)
+			  .font(.system(size: 12))
+			  .foregroundStyle(theme.secondaryText)
+		  }
 		}
 	  }
 
-	  Text(viewModel.memberSince)
-		.font(.system(size: 14))
-		.foregroundStyle(theme.secondaryText)
-		.padding(.top, 12)
+	  
 
-	  Button {
-		showProfileEditor()
-	  } label: {
-		FlatChip(title: LocalizationSupport.localized("Edit Profile"), systemImage: "pencil")
-	  }
-	  .buttonStyle(.plain)
-	  .padding(.top, 14)
+
 	}
 	.frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -230,7 +300,7 @@ struct ProfileView: View {
   @ViewBuilder
   var profilePhotoButton: some View {
 #if !os(Android)
-    PhotoSourceButton(onImageData: { data in
+    PhotoSourceButton(viewModel: viewModel, onImageData: { data in
       viewModel.uploadProfileImage(data: data)
     }) {
       profilePhotoContent
@@ -243,17 +313,17 @@ struct ProfileView: View {
     }
     .buttonStyle(.plain)
     .confirmationDialog(
-      LocalizationSupport.localized("Add a photo"),
+      viewModel.addPhotoDialogTitle,
       isPresented: $showAndroidPhotoSourceDialog,
       titleVisibility: .visible
     ) {
-      Button(LocalizationSupport.localized("Take Photo")) {
+      Button(viewModel.takePhotoLabel) {
         pickAndroidProfilePhoto(source: .camera)
       }
-      Button(LocalizationSupport.localized("Choose from Library")) {
+      Button(viewModel.chooseFromLibraryLabel) {
         pickAndroidProfilePhoto(source: .gallery)
       }
-      Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+      Button(viewModel.cancelLabel, role: .cancel) {}
     }
 #endif
   }
@@ -265,8 +335,9 @@ struct ProfileView: View {
           imageURL: viewModel.profileImageURL,
           size: 88,
           fallbackSystemImage: "person.crop.circle.fill",
-          background: theme.cardBackground,
-          tint: theme.primaryText
+          background: theme.accentBackground,
+          tint: theme.accentStrong,
+          initial: viewModel.nameInitial
         )
       }
       .frame(width: 88, height: 88)
@@ -318,26 +389,8 @@ struct ProfileView: View {
   }
 
   private func loadProfileForDisplay() async {
-    if viewModel.hasDisplayableProfileData {
-      hasProfileDataForDisplay = true
-      return
-    }
-
-    hasProfileDataForDisplay = false
-    var didStartLoad = false
-    while !Task.isCancelled {
-      if viewModel.hasDisplayableProfileData {
-        hasProfileDataForDisplay = true
-        return
-      }
-
-      if !didStartLoad || !viewModel.isLoading {
-        didStartLoad = true
-        Task { await viewModel.loadProfile() }
-      }
-
-      try? await Task.sleep(for: .seconds(1))
-    }
+    guard !viewModel.hasDisplayableProfileData else { return }
+    await viewModel.loadProfile()
   }
 
   var documentsButton: some View {
@@ -350,14 +403,14 @@ struct ProfileView: View {
 
 		  VStack(alignment: .leading, spacing: 3) {
 			Text(viewModel.hasMissingDocuments
-				 ? LocalizationSupport.localized("Complete Your Documents")
-				 : LocalizationSupport.localized("Documents Uploaded"))
+				 ? viewModel.completeDocumentsTitle
+				 : viewModel.documentsUploadedTitle)
 			  .font(.system(size: 15, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
 
 			Text(viewModel.hasMissingDocuments
-				 ? LocalizationSupport.localized("Upload your remaining verification documents")
-				 : LocalizationSupport.localized("View the verification documents you uploaded"))
+				 ? viewModel.uploadRemainingDocumentsSubtitle
+				 : viewModel.viewUploadedDocumentsSubtitle)
 			  .font(.system(size: 13))
 			  .foregroundStyle(theme.secondaryText)
 		  }
@@ -388,7 +441,7 @@ struct ProfileView: View {
 		  Spacer()
 
 		  Button(action: editAction) {
-			Text(LocalizationSupport.localized("Edit"))
+			Text(viewModel.editLabel)
 			  .font(.system(size: 14, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
 		  }
@@ -402,7 +455,7 @@ struct ProfileView: View {
 
 		  if includeAdd {
 			Button(action: addAction) {
-			  FlatChip(title: LocalizationSupport.localized("+ Add"), outlined: true)
+			  FlatChip(title: viewModel.addChipLabel, outlined: true)
 			}
 			.buttonStyle(.plain)
 		  }
@@ -421,9 +474,10 @@ struct ProfileView: View {
     Task {
       do {
         if source == .camera {
-          let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+          let cameraState = await PermissionService.shared.resolveCapturePermission(for: .camera)
+          viewModel.cameraState = cameraState
           guard cameraState.isGranted else {
-            viewModel.errorMessage = LocalizationSupport.localized("Camera access is required to take a photo.")
+            viewModel.errorMessage = viewModel.cameraAccessRequiredMessage
             return
           }
         }
@@ -458,12 +512,12 @@ struct ProfileEditView: View {
   var body: some View {
     ScrollView(.vertical, showsIndicators: false) {
 	  VStack(alignment: .leading, spacing: 0) {
-        Text(LocalizationSupport.localized("Edit Profile"))
+        Text(viewModel.editProfileTitle)
           .font(.system(size: 26, weight: .bold))
           .foregroundStyle(theme.primaryText)
           .padding(.top, 24)
 
-        Text(LocalizationSupport.localized("Update the details students and teachers use to recognize and contact you."))
+        Text(viewModel.editProfileSubtitle)
           .font(.system(size: 13))
           .foregroundStyle(theme.secondaryText)
           .lineSpacing(5)
@@ -472,25 +526,34 @@ struct ProfileEditView: View {
 
         VStack(spacing: 16) {
           ForEach($viewModel.contactRows, id: \.description) { $row in
-            if viewModel.roleType == .student && row.description == LocalizationSupport.localized("Grade") {
+            if viewModel.roleType == .student && row.description == viewModel.gradeFieldLabel {
               ProfileGradePicker(
+                viewModel: viewModel,
                 title: row.description,
                 selectedGrade: $row.value,
                 grades: viewModel.availableStudentGrades
               )
-            } else if viewModel.roleType == .student && row.description == LocalizationSupport.localized("Date of Birth") {
+            } else if viewModel.roleType == .student && row.description == viewModel.dateOfBirthFieldLabel {
               ProfileDateOfBirthPicker(
+                viewModel: viewModel,
                 title: row.description,
                 date: $viewModel.dateOfBirth
               )
             } else {
-              ProfileEditInfoRow(parameter: $row)
+              ProfileEditInfoRow(
+                viewModel: viewModel,
+                parameter: $row,
+                isValid: viewModel.isRowValid(row),
+                errorMessage: viewModel.rowErrorMessage(for: row),
+				
+              )
             }
           }
 
           if viewModel.roleType == .teacher {
             ProfileTeachingGradePicker(
-              title: LocalizationSupport.localized("Grade Levels Taught"),
+              viewModel: viewModel,
+              title: viewModel.gradeLevelsTaughtTitle,
               selectedGrades: $viewModel.selectedTeachingGrades
             )
           }
@@ -505,9 +568,9 @@ struct ProfileEditView: View {
         }
 
         AuthPrimaryButton(
-          title: viewModel.isLoading ? LocalizationSupport.localized("Saving...") : LocalizationSupport.localized("Save Changes"),
+          title: viewModel.saveButtonLabel,
           systemImage: "checkmark",
-          isEnabled: !viewModel.isLoading
+          isEnabled: viewModel.canSaveProfileEdits
         ) {
           Task { @MainActor in
             viewModel.saveProfileEdits()
@@ -522,7 +585,7 @@ struct ProfileEditView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .cancellationAction) {
-        Button(LocalizationSupport.localized("Cancel")) {
+        Button(viewModel.cancelLabel) {
           viewModel.cancelProfileEditing()
           dismiss()
         }
@@ -537,6 +600,7 @@ struct ProfileEditView: View {
 }
 
 struct ProfileTeachingGradePicker: View {
+  let viewModel: ProfileViewModel
   let title: String
   @Binding var selectedGrades: Set<String>
   @Environment(\.colorScheme) var colorScheme
@@ -551,7 +615,7 @@ struct ProfileTeachingGradePicker: View {
   let grades = ProfileViewModel.availableTeachingGrades
 
   var body: some View {
-    VStack(alignment: contentAlignment, spacing: 10) {
+	VStack(alignment: .leading, spacing: 10) {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
@@ -559,7 +623,7 @@ struct ProfileTeachingGradePicker: View {
 
         Spacer()
 
-        Text(selectedGrades.isEmpty ? LocalizationSupport.localized("Choose grades") : String(format: LocalizationSupport.localized("%d selected"), selectedGrades.count))
+        Text(selectedGrades.isEmpty ? viewModel.chooseGradesLabel : viewModel.selectedGradesCountText(selectedGrades.count))
           .font(.system(size: 11, weight: .semibold))
           .foregroundStyle(theme.secondaryText)
           .padding(.horizontal, 10)
@@ -572,7 +636,7 @@ struct ProfileTeachingGradePicker: View {
 		FlowLayout(spacing: 10) {
 		  ForEach(grades, id: \.self) { grade in
 			ProfileTeachingGradeChip(
-			  title: LocalizationSupport.localizedGradeLabel(grade),
+			  title: viewModel.gradeLabel(for: grade),
 			  isSelected: selectedGrades.contains(grade)
 			) {
 			  toggleGrade(grade)
@@ -594,6 +658,7 @@ struct ProfileTeachingGradePicker: View {
 }
 
 struct ProfileDateOfBirthPicker: View {
+  let viewModel: ProfileViewModel
   let title: String
   @Binding var date: Date?
   @Environment(\.colorScheme) var colorScheme
@@ -630,7 +695,7 @@ struct ProfileDateOfBirthPicker: View {
           Button {
             date = nil
           } label: {
-            Text(LocalizationSupport.localized("Clear"))
+            Text(viewModel.clearLabel)
               .font(.system(size: 13, weight: .semibold))
               .foregroundStyle(theme.accent)
           }
@@ -649,7 +714,7 @@ struct ProfileDateOfBirthPicker: View {
           date = defaultDate
         } label: {
           HStack {
-            Text(LocalizationSupport.localized("Set date of birth"))
+            Text(viewModel.setDateOfBirthLabel)
               .font(.system(size: 17))
               .foregroundStyle(theme.secondaryText)
 
@@ -678,6 +743,7 @@ struct ProfileDateOfBirthPicker: View {
 }
 
 struct ProfileGradePicker: View {
+  let viewModel: ProfileViewModel
   let title: String
   @Binding var selectedGrade: String
   let grades: [String]
@@ -700,7 +766,7 @@ struct ProfileGradePicker: View {
         }
       } label: {
         HStack {
-          Text(selectedGrade.isEmpty ? LocalizationSupport.localized("Select") : selectedGrade)
+          Text(selectedGrade.isEmpty ? viewModel.selectLabel : selectedGrade)
             .font(.system(size: 17))
             .foregroundStyle(selectedGrade.isEmpty ? theme.secondaryText : theme.primaryText)
 
@@ -741,7 +807,7 @@ struct ProfileCurrencyPicker: View {
 
 
   var body: some View {
-    VStack(alignment: contentAlignment, spacing: 10) {
+	VStack(alignment: .leading, spacing: 10) {
       HStack {
         Text(title)
           .font(.system(size: 13, weight: .semibold))
@@ -817,7 +883,7 @@ struct ProfileTeachingGradeChip: View {
         PlatformIcon(systemName: "graduationcap")
           .font(.system(size: 12, weight: .semibold))
 
-        Text(LocalizationSupport.localized(title))
+        Text(title)
           .font(.system(size: 13, weight: .medium))
       }
       .foregroundStyle(theme.primaryText)
@@ -835,7 +901,10 @@ struct ProfileTeachingGradeChip: View {
 }
 
 struct ProfileEditInfoRow: View {
+  let viewModel: ProfileViewModel
   @Binding var parameter: Parameter
+  var isValid = true
+  var errorMessage: String?
 
   var body: some View {
     AuthInputField(
@@ -844,15 +913,18 @@ struct ProfileEditInfoRow: View {
       systemImage: parameter.image,
       text: $parameter.value,
       keyboardType: keyboardType,
-      textContentType: textContentType
+      textContentType: textContentType,
+      isValid: isValid,
+      errorMessage: errorMessage
     )
+	.disabled(textContentType == .emailAddress)
   }
 
   private var keyboardType: UIKeyboardType {
     switch parameter.description {
-    case LocalizationSupport.localized("Email"):
+    case viewModel.emailFieldLabel:
       return .emailAddress
-    case LocalizationSupport.localized("Phone"):
+    case viewModel.phoneFieldLabel:
       return .phonePad
     default:
       return .default
@@ -861,11 +933,11 @@ struct ProfileEditInfoRow: View {
 
   private var textContentType: UITextContentType? {
     switch parameter.description {
-    case LocalizationSupport.localized("Full Name"):
+    case viewModel.fullNameFieldLabel:
       return .name
-    case LocalizationSupport.localized("Email"):
+    case viewModel.emailFieldLabel:
       return .emailAddress
-    case LocalizationSupport.localized("Phone"):
+    case viewModel.phoneFieldLabel:
       return .telephoneNumber
     default:
       return nil
@@ -953,36 +1025,79 @@ struct ProfileInfoRow: View {
   }
   let isEditing: Bool
   var body: some View {
-	HStack(spacing: 14) {
-	  FlatIconTile(systemName: parameter.image, size: 44)
+	HStack(spacing: 10) {
+	  FlatIconTile(systemName: parameter.image, size: 28)
 
-	  VStack(alignment: .leading, spacing: 3) {
-		Text(parameter.description)
-		  .font(.system(size: 13))
-		  .foregroundStyle(theme.secondaryText)
-
-		if isEditing {
-		  TextField(parameter.description, text: $parameter.value)
-			.font(.system(size: 16, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.75)
-			.multilineTextAlignment(.leading)
-			.environment(\.layoutDirection, .leftToRight)
-		} else {
-		  Text(parameter.value.isEmpty ? "-" : parameter.value)
-			.font(.system(size: 16, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.75)
-			.frame(maxWidth: .infinity, alignment: .leading)
-			.multilineTextAlignment(.leading)
-		}
-	  }
+	  Text(parameter.description)
+		.font(.system(size: 13))
+		.foregroundStyle(theme.secondaryText)
 
 	  Spacer()
+
+	  if isEditing {
+		TextField(parameter.description, text: $parameter.value)
+		  .textFieldStyle(.plain)
+		  .font(.system(size: 15, weight: .semibold))
+		  .foregroundStyle(theme.primaryText)
+		  .lineLimit(1)
+		  .minimumScaleFactor(0.75)
+		  .multilineTextAlignment(.trailing)
+		  .environment(\.layoutDirection, .leftToRight)
+	  } else {
+		Text(parameter.value.isEmpty ? "-" : parameter.value)
+		  .font(.system(size: 15, weight: .semibold))
+		  .foregroundStyle(theme.primaryText)
+		  .lineLimit(1)
+		  .minimumScaleFactor(0.75)
+	  }
 	}
 	.padding(.horizontal, 16)
 	.padding(.vertical, 14)
   }
 }
+
+#if !os(Android)
+#Preview("Teacher Profile") {
+  let vm = ProfileViewModel(roleType: .teacher, repository: ProfileRepository())
+  vm.name = "Dr. Miri Cohen"
+  vm.role = "Mathematics"
+  vm.email = "miri@gmail.com"
+  vm.phoneNumber = "0521234567"
+  vm.username = "miri"
+  vm.rating = 4.9
+  vm.reviewCount = 128
+  vm.subjects = ["Math", "Algebra", "Calculus"]
+  vm.grade = "Grade 9, Grade 10, Grade 11"
+  vm.hasMissingDocuments = false
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+}
+
+#Preview("Teacher Profile - Hebrew") {
+  let vm = ProfileViewModel(roleType: .teacher, repository: ProfileRepository())
+  vm.name = "ד\"ר מירי כהן"
+  vm.role = "מתמטיקה"
+  vm.email = "miri@gmail.com"
+  vm.phoneNumber = "0521234567"
+  vm.username = "miri"
+  vm.rating = 4.9
+  vm.reviewCount = 128
+  vm.subjects = ["מתמטיקה", "אלגברה", "חדו\"א"]
+  vm.grade = "Grade 9, Grade 10, Grade 11"
+  vm.hasMissingDocuments = false
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+    .environment(\.locale, Locale(identifier: "he"))
+    .environment(\.layoutDirection, .rightToLeft)
+}
+#Preview("Student Profile") {
+  let vm = ProfileViewModel(roleType: .student, repository: ProfileRepository())
+  vm.name = "Alex Ben-David"
+  vm.role = "Student"
+  vm.email = "alex@gmail.com"
+  vm.phoneNumber = "0541112233"
+  vm.username = "alex"
+  vm.cancelProfileEditing()
+  return ProfileView(viewModel: vm)
+}
+#endif

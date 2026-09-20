@@ -20,6 +20,12 @@ enum PaymentMethod: String, CaseIterable {
     // it with a clear "not available yet" error, so it stays out of
     // `availableForCurrentPlatform` until a provider is wired up.
     case bit
+    // A previously vaulted PayPal account (see PayPalVaultService /
+    // ProfileViewModel.addSavedPayPal). Never offered by default — the
+    // student home view swaps `.paypal` for this once a saved account exists,
+    // since charging it goes through `chargeSavedPayPal` directly rather than
+    // `createCheckoutSession`'s redirect flow.
+    case savedPayPal = "saved_paypal"
 
     /// The payment methods to offer for the given platform right now. PayPal,
     /// and credit card are always available (credit card opens a hosted PayPal
@@ -56,7 +62,7 @@ enum PaymentMethod: String, CaseIterable {
 
     /// Wallets that settle through Braintree and so share its per-currency
     /// merchant-account requirement.
-    private static let braintreeWallets: Set<PaymentMethod> = [.applePay, .googlePay]
+    private static let braintreeWallets: Set<PaymentMethod> = [.applePay, .googlePay, .savedPayPal]
 
     /// Filters `methods` down to what's actually usable for a given pricing
     /// option's currency — affects the Braintree wallets (Apple Pay, Google Pay).
@@ -71,7 +77,7 @@ enum PaymentMethod: String, CaseIterable {
     /// flow must send no value at all.
     var walletParameter: String? {
         switch self {
-        case .paypal:                              return nil
+        case .paypal, .savedPayPal:                    return nil
         case .applePay, .googlePay, .bit, .creditCard: return rawValue
         }
     }
@@ -79,11 +85,12 @@ enum PaymentMethod: String, CaseIterable {
     /// Localized label shown to the student in the payment-method chooser.
     var displayName: String {
         switch self {
-        case .paypal:     return LocalizationSupport.localized("Pay with PayPal")
-        case .applePay:   return LocalizationSupport.localized("Pay with Apple Pay")
-        case .googlePay:  return LocalizationSupport.localized("Pay with Google Pay")
-        case .bit:        return LocalizationSupport.localized("Pay with Bit")
-        case .creditCard: return LocalizationSupport.localized("Pay with credit card")
+        case .paypal:      return LocalizationSupport.localized("Pay with PayPal")
+        case .savedPayPal: return LocalizationSupport.localized("Pay with saved PayPal")
+        case .applePay:    return LocalizationSupport.localized("Pay with Apple Pay")
+        case .googlePay:   return LocalizationSupport.localized("Pay with Google Pay")
+        case .bit:         return LocalizationSupport.localized("Pay with Bit")
+        case .creditCard:  return LocalizationSupport.localized("Pay with credit card")
         }
     }
 }

@@ -10,54 +10,33 @@
 import SwiftUI
 #if !os(Android)
 @preconcurrency import PhotosUI
-import AVFoundation
 import FirebaseAuth
 #else
 import SkipBridge
 import SkipFirebaseAuth
 #endif
 
-/// Question composer.
-///
-/// One scrolling column of labelled blocks — session type, topic, question,
-/// photos — over a pinned action bar. The labels are quiet (secondary, 13pt)
-/// so the controls, not the headings, carry the page; every control shares the
-/// same geometry (filled `fieldBackground`, hairline border, accent fill when
-/// selected) so a selection reads the same wherever it appears.
 struct AskTeacherSheet: View {
     let viewModel: any StudentHomeViewModeling
 
-    /// Topics are laid out as two fixed rows rather than a horizontal scroller:
-    /// the scroller clipped the last chip and gave no hint that it scrolled.
-    static let topicsRowOne = [("Algebra"), ("Geometry"), ("Trigonometry")]
-    static let topicsRowTwo = [("Calculus"), ("Statistics"), ("Arithmetic")]
+    static let topics = [("Algebra"), ("Geometry"), ("Trigonometry"), ("Calculus"), ("Statistics"), ("Arithmetic")]
     static let maxPhotoCount = 4
+    private static let initialScrollID = "askTeacherInitialScroll"
+    private static let questionScrollID = "askTeacherQuestionScroll"
+    private static let keyboardScrollID = "askTeacherKeyboardScroll"
 
     init(viewModel: any StudentHomeViewModeling) {
         self.viewModel = viewModel
+        // The default session type is configurable in Settings and defaults to
+        // an audio call when the student has not chosen otherwise.
         let stored = UserDefaults.standard.string(forKey: SessionPreferences.defaultQuestionTypeKey)
-        let preferred = stored ?? ConversationType.audio.rawValue
-        // Only keep audio/video as the default if mic is already granted; any other
-        // state (not determined, denied) defaults to text so the student isn't stuck
-        // on a mode they can't use before granting permission.
-        #if !os(Android)
-        let micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-        if !micGranted && (preferred == ConversationType.audio.rawValue || preferred == ConversationType.video.rawValue) {
-            _conversationType = State(initialValue: ConversationType.text.rawValue)
-        } else {
-            _conversationType = State(initialValue: preferred)
-        }
-        #else
-        _conversationType = State(initialValue: preferred)
-        #endif
+        _conversationType = State(initialValue: stored ?? ConversationType.audio.rawValue)
     }
 
     @State  var selectedTopic = ("Algebra")
     @State  var questionText = ""
     @State  var conversationType: String
-    @State  var composerMode: ChatComposerMode = .regular
     @State  var permissionAlertMessage: String? = nil
-    @State  var isRequestingPermission = false
     @State  var uploadedPhotoUrls: [String] = []
     @State  var isUploadingPhoto = false
     @State  var photoUploadError: String? = nil
@@ -65,44 +44,67 @@ struct AskTeacherSheet: View {
     @State  var showAndroidPhotoSourceDialog = false
 #endif
     @FocusState var isQuestionFocused: Bool
+    /// Which keyboard writes the question. The same switch the chat composer
+    /// offers, so a student who has used one recognises the other.
+    @State  var keyboardMode: ChatComposerMode = .regular
+    @State  var pendingFormulaLatex = ""
+    /// Formulas the student has committed with the keyboard's `+`, kept as
+    /// LaTeX and shown rendered. They join the question only as it is sent.
+    @State  var attachedFormulas: [String] = []
     @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
     @Environment(\.dismiss) var dismiss
   private var canSubmit: Bool {
-    questionText.trimmingCharacters(in: .whitespaces).count >= 10
-      || composerMode == .algebra
+    composedQuestionText.count >= 10
       || !uploadedPhotoUrls.isEmpty
+      || hasFormula
   }
-  var isFindDisabled: Bool {
-    !canSubmit || isRequestingPermission
+
+  private var composedQuestionText: String {
+    var parts: [String] = []
+    let text = questionText.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !text.isEmpty { parts.append(text) }
+    for latex in attachedFormulas {
+      parts.append("$$\(latex)$$")
+    }
+    let pending = wrappedPendingFormula
+    if !pending.isEmpty { parts.append(pending) }
+    return parts.joined(separator: "\n")
+  }
+
+  private var wrappedPendingFormula: String {
+    let trimmed = pendingFormulaLatex.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? "" : "$$\(trimmed)$$"
+  }
+
+  /// A formula built with the algebra keyboard is a whole question on its own:
+  /// `$$x^{2}$$` is nine characters and says everything the student is asking.
+  /// So it clears the ten-character minimum the way a photo does, and the
+  /// character counter steps aside for it too.
+  private var hasFormula: Bool {
+    !attachedFormulas.isEmpty || !pendingFormulaLatex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
 
-  // MARK: - Metrics
-
-  /// Outer gutter shared by the scrolling column and the action bar, so the
-  /// button lines up with the fields above it.
-  private var horizontalPadding: CGFloat {
+  private var sheetSpacing: CGFloat {
 #if os(Android)
-    14
-#else
-    16
-#endif
-  }
-
-  /// Space between two labelled blocks.
-  private var blockSpacing: CGFloat {
-#if os(Android)
-    16
+    12
 #else
     20
 #endif
   }
 
-  /// Space between a block's label and its control.
-  private var labelSpacing: CGFloat {
+  private var sectionSpacing: CGFloat {
+#if os(Android)
+    7
+#else
+    10
+#endif
+  }
+
+  private var sheetPadding: CGFloat {
 #if os(Android)
     8
 #else
@@ -112,440 +114,373 @@ struct AskTeacherSheet: View {
 
   private var editorMinHeight: CGFloat {
 #if os(Android)
-    124
+    120
 #else
-    140
+    120
 #endif
   }
 
   private var findButtonHeight: CGFloat {
 #if os(Android)
-    48
+    46
 #else
-    54
+    52
 #endif
   }
 
-  private var fieldRadius: CGFloat {
-    14
-  }
-
-  // MARK: - Layout
-
     var body: some View {
-        sheetLayout
-        .background(theme.screenBackground)
-        .navigationTitle(LocalizationSupport.localized("Ask a Teacher"))
+        VStack(spacing: 0) {
+        ScrollViewReader { scrollProxy in
+        ScrollView(.vertical, showsIndicators: false) {
+				  LazyVStack(alignment: .leading, spacing: sheetSpacing) {
+                    Color.clear
+                        .frame(height: 0)
+                        .id(Self.initialScrollID)
+
+				VStack(alignment: .leading, spacing: sectionSpacing) {
+                    Text(viewModel.sessionTypeSectionTitle)
+                        .font(.system(size: 14, weight: .semibold))
+						.multilineTextAlignment(.leading)
+						.frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(theme.primaryText)
+
+                    HStack(spacing: 10) {
+                        ConversationTypeChip(
+                            title: viewModel.textSessionTypeLabel,
+                            isSelected: conversationType == "text",
+                            systemIcons: ["bubble.left.fill"],
+                            accent: .teal
+                        ) {
+                            conversationType = "text"
+                        }
+                        ConversationTypeChip(
+                            title: viewModel.audioSessionTypeLabel,
+                            isSelected: conversationType == "audio",
+                            systemIcons: ["mic.fill"],
+                            accent: .teal
+                        ) {
+                            conversationType = "audio"
+                        }
+                        ConversationTypeChip(
+                            title: viewModel.videoSessionTypeLabel,
+                            isSelected: conversationType == "video",
+                            systemIcons: ["video.fill"],
+                            accent: .teal
+                        ) {
+                            conversationType = "video"
+                        }
+                    }
+					.frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+			VStack(alignment: .leading, spacing: sectionSpacing) {
+                    Text(viewModel.topicSectionTitle)
+                        .font(.system(size: 14, weight: .semibold))
+						.multilineTextAlignment(.leading)
+						.frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(theme.primaryText)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(AskTeacherSheet.topics, id: \.self) { topic in
+                                Button {
+                                    selectedTopic = topic
+                                } label: {
+                                    Text(viewModel.localizedTopicName(topic))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(selectedTopic == topic ? theme.onAccentText : theme.primaryText)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(selectedTopic == topic ? theme.accent : theme.cardBackground)
+                                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+						.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+			  VStack(alignment: .leading, spacing: sectionSpacing) {
+                    HStack(spacing: 8) {
+                        Text(viewModel.yourQuestionSectionTitle)
+                            .font(.system(size: 14, weight: .semibold))
+                            .multilineTextAlignment(.leading)
+                            .foregroundStyle(theme.primaryText)
+
+                        Spacer(minLength: 0)
+
+                        keyboardModePills(scrollProxy: scrollProxy)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextEditor(text: $questionText)
+                        .focused($isQuestionFocused)
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled(true)
+                        .font(.system(size: 14))
+                        .multilineTextAlignment(.leading)
+                        .foregroundStyle(theme.primaryText)
+                        .tint(theme.accent)
+                        .scrollContentBackground(.hidden)
+                        .padding(12)
+                        .frame(minHeight: editorMinHeight, alignment: .leading)
+                        .background(theme.fieldBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    if !attachedFormulas.isEmpty {
+                        attachedFormulaStrip
+                    }
+
+                    if keyboardMode == .algebra {
+                        algebraKeyboard
+                            .id(Self.keyboardScrollID)
+                    }
+
+                    // The primary "Find me a Teacher Now" button sits below the
+                    // photo and info sections, off-screen while the keyboard is
+                    // up. This second entry point rides alongside the character
+                    // counter so the question can be sent without dismissing it.
+                    HStack(spacing: 10) {
+                        // A formula clears the minimum on its own, so the
+                        // counter steps aside for it as it does for a photo.
+                        if uploadedPhotoUrls.isEmpty, !hasFormula {
+                            Text(viewModel.minimumCharactersText(count: composedQuestionText.count))
+                                .font(.system(size: 11))
+                                .multilineTextAlignment(.leading)
+                                .foregroundStyle(canSubmit ? theme.positive : theme.secondaryText)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        Button {
+                            Task { await findTeacherTapped() }
+                        } label: {
+                            Text(viewModel.sendLabel)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(canSubmit ? theme.onAccentText : theme.secondaryText)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 8)
+                                .background(canSubmit ? theme.accent : theme.cardBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .opacity(canSubmit ? 1.0 : 0.6)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canSubmit)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .id(Self.questionScrollID)
+
+                photoAttachmentSection
+
+                infoCard
+
+                Button {
+                    Task { await findTeacherTapped() }
+                } label: {
+                    Text(viewModel.findTeacherNowLabel)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(canSubmit ? theme.onAccentText : theme.secondaryText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: findButtonHeight)
+                        .background(canSubmit ? theme.accent : theme.cardBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .opacity(canSubmit ? 1.0 : 0.6)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSubmit)
+
+                footerText
+            }
+            .padding(sheetPadding)
+        }
+        .scrollDismissesKeyboard(.immediately)
+        .onChange(of: keyboardMode) { _, mode in
+            // Whichever route flipped the mode, the algebra pad is the keyboard
+            // now and the system one has to leave the screen before the scroll
+            // measures what is visible.
+            if mode == .algebra {
+                isQuestionFocused = false
+                SoftKeyboard.dismiss()
+            }
+            scrollForKeyboardMode(mode, proxy: scrollProxy)
+        }
+        }
+        }
+        .navigationTitle(viewModel.askATeacherSheetTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(LocalizationSupport.localized("Cancel")) { closeAskTeacher() }
+                Button(viewModel.cancelLabel) { closeAskTeacher() }
             }
         }
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
         .id(languagePreference)
         .task {
-            isQuestionFocused = true
+            await focusQuestionOnAppear()
+        }
+        .onChange(of: isQuestionFocused) { _, focused in
+            // Tapping into the question field asks for the system keyboard, so
+            // the algebra pad steps aside rather than stacking underneath it.
+            if focused {
+                keyboardMode = .regular
+            }
         }
         .trackScreen(AnalyticsScreen.askTeacherSheet)
         .appDialog(
-            LocalizationSupport.localized("Permission required"),
+            viewModel.permissionRequiredTitle,
             isPresented: Binding(
                 get: { permissionAlertMessage != nil },
                 set: { if !$0 { permissionAlertMessage = nil } }
             ),
             message: permissionAlertMessage ?? "",
-            actions: [
-                AppDialogAction(LocalizationSupport.localized("Open Settings")) {
-                    PermissionService.shared.openAppSettings()
-                },
-                AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
-            ]
+            actions: [AppDialogAction(viewModel.okLabel)]
         )
     }
 
-    /// The action bar rides above the keyboard through `safeAreaInset` on iOS;
-    /// SkipUI has no equivalent, so on Android it is the last row of the stack.
-    var sheetLayout: some View {
-        VStack(spacing: 0) {
-            formScroll
-
-            if composerMode == .algebra {
-                VStack(spacing: 0) {
-                    // The panel sits directly under the scrolling form, so it
-                    // needs its own top edge to read as a keyboard rather than
-                    // as more of the form.
-                    Rectangle()
-                        .fill(theme.separator)
-                        .frame(height: flatHairline)
-                        .frame(maxWidth: .infinity)
-
-                    MathEquationEditorView { latex in
-                        appendEquation(latex)
-                    }
-                    .environment(\.layoutDirection, .leftToRight)
-                    .padding(.horizontal, horizontalPadding)
-                    .padding(.bottom, 8)
-                }
-                .background(theme.cardBackground)
-            }
-
+    /// Puts the cursor in the question field when the sheet opens, and keeps the
+    /// keyboard there.
+    ///
+    /// All of the Android trouble is one thing: this screen is pushed with
+    /// `navigationDestination(isPresented:)`, and Skip re-runs that modifier on
+    /// every recomposition — `if id.value == nil || !navigator.isViewPresented(…)`
+    /// pushes again whenever the navigator no longer recognises the entry, which
+    /// happens when `syncState()` rebuilds `backStackState` in a
+    /// `LaunchedEffect { delay(1000) … }` about a second after the push. Every
+    /// push runs `keyboardController?.hide()`, so roughly a second after the
+    /// sheet opens the keyboard is taken away.
+    ///
+    /// That hide leaves Compose focus alone, which is why the focus state cannot
+    /// fix it: `isQuestionFocused` still reads `true`, so setting it changes
+    /// nothing and SkipUI's `requestFocus()` is a no-op on a field that already
+    /// has focus — the student is left tapping a focused field to get the
+    /// keyboard back. So the keyboard itself is what gets watched and re-raised,
+    /// past the reconciliation that takes it.
+    func focusQuestionOnAppear() async {
+        isQuestionFocused = true
 #if os(Android)
-            submitBar
+        // Long enough to cover the ~1s back-stack reconciliation and the hide
+        // that rides along with it, checked often enough to put the keyboard
+        // back before the student reaches for it.
+        //
+        // The cap on raises matters as much as the window. Asking whether the
+        // keyboard is up is a best-effort answer — before Android 11 it is a
+        // measurement, not a fact — so a wrong answer must cost a couple of
+        // wasted calls, not a keyboard fighting the student for two seconds.
+        // Only worth doing where the keyboard can be observed. On Android 10
+        // and older the answer is a guess, and a wrong guess asks for a
+        // keyboard that is already up — which is a flicker in the student's
+        // face, worse than the problem being corrected.
+        guard SoftKeyboard.isVisibilityObservable else { return }
+
+        var checks = 0
+        var raises = 0
+        while checks < 8 && raises < 3 {
+            checks += 1
+            try? await Task.sleep(nanoseconds: 250_000_000)
+
+            // Anything the student did themselves outranks this: they may have
+            // switched to the algebra pad, started writing, or put the keyboard
+            // away on purpose after typing.
+            guard keyboardMode == .regular, questionText.isEmpty else { return }
+            guard !SoftKeyboard.isVisible else { continue }
+
+            raises += 1
+            logger.info("[AskTeacher][Android] keyboard gone while the question field held focus; raising it again (\(raises))")
+
+            if !isQuestionFocused {
+                isQuestionFocused = true
+            }
+            SoftKeyboard.show()
+        }
 #endif
-        }
-#if !os(Android)
-        .safeAreaInset(edge: .bottom) {
-            submitBar
-        }
+    }
+
+    /// Brings the chosen keyboard into view.
+    ///
+    /// The question section is the Android target in both modes, because the
+    /// algebra field and its keys now live inside it and Skip can only scroll
+    /// to a direct child of the `LazyVStack` — it looks the id up in the lazy
+    /// item collector, which does not see ids nested inside an item. Aligning
+    /// that item's top with the top of the viewport is what shows the question
+    /// field, the formula field under it and the keys under that; Skip ignores
+    /// the anchor on Android, so top alignment is all there is.
+    ///
+    /// The scroll also runs twice on Android. Switching to the algebra pad
+    /// drops focus, and the system keyboard takes a moment to slide away; a
+    /// scroll issued while it is still up is clamped against the shrunken
+    /// viewport and drifts once the space comes back. The second pass lands
+    /// once the keyboard has gone (the delays add up), and is a no-op when the
+    /// first pass already arrived.
+    func scrollForKeyboardMode(_ mode: ChatComposerMode, proxy: ScrollViewProxy) {
+#if os(Android)
+        let target = Self.questionScrollID
+        let anchor: UnitPoint = .top
+        let firstDelay: UInt64 = 120_000_000
+        let settleDelay: UInt64 = 300_000_000
+#else
+        let target = mode == .algebra ? Self.keyboardScrollID : Self.initialScrollID
+        let anchor: UnitPoint = mode == .algebra ? .bottom : .top
+        let firstDelay: UInt64 = 80_000_000
+        let settleDelay: UInt64 = 0
 #endif
-    }
-
-    var formScroll: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: blockSpacing) {
-                Text(LocalizationSupport.localized("Tell us what you're stuck on. A teacher usually joins within a minute."))
-                    .font(.system(size: 13))
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(theme.secondaryText)
-
-                sessionTypeBlock
-                topicBlock
-                questionBlock
-                photoAttachmentSection
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: firstDelay)
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(target, anchor: anchor)
             }
-            .padding(.horizontal, horizontalPadding)
-            .padding(.top, 10)
-            .padding(.bottom, 20)
-        }
-        .scrollDismissesKeyboard(.immediately)
-    }
-
-    /// Quiet block heading. Secondary and small on purpose — the filled
-    /// controls below it are what the eye should land on.
-    func sectionLabel(_ key: String) -> some View {
-        Text(LocalizationSupport.localized(key))
-            .font(.system(size: 13, weight: .semibold))
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .foregroundStyle(theme.secondaryText)
-    }
-
-    // MARK: - Session type
-
-    var sessionTypeBlock: some View {
-        VStack(alignment: .leading, spacing: labelSpacing) {
-            sectionLabel("Session type")
-
-            HStack(spacing: 8) {
-                sessionTypeSegment(value: "text", icon: "bubble.left.fill", title: "Text")
-                sessionTypeSegment(value: "audio", icon: "mic.fill", title: "Audio")
-                sessionTypeSegment(value: "video", icon: "video.fill", title: "Video")
+            guard settleDelay > 0 else { return }
+            try? await Task.sleep(nanoseconds: settleDelay)
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(target, anchor: anchor)
             }
         }
-    }
-
-    /// Equal-width segment: the three session types are one choice, so they get
-    /// one row of identical targets instead of three differently sized chips.
-    func sessionTypeSegment(value: String, icon: String, title: String) -> some View {
-        let isSelected = conversationType == value
-        return Button {
-            Task { await selectConversationType(value) }
-        } label: {
-            VStack(spacing: 5) {
-                PlatformIcon(
-                    systemName: icon,
-                    size: 16,
-                    weight: .semibold,
-                    color: isSelected ? theme.onAccentText : theme.secondaryText
-                )
-                Text(LocalizationSupport.localized(title))
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 60)
-            .background(isSelected ? theme.accent : theme.fieldBackground)
-            .clipShape(RoundedRectangle(cornerRadius: fieldRadius, style: .continuous))
-            .overlay {
-                if !isSelected {
-                    RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
-                        .stroke(theme.controlBorder, lineWidth: flatHairline)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Topic
-
-    var topicBlock: some View {
-        VStack(alignment: .leading, spacing: labelSpacing) {
-            sectionLabel("Topic")
-
-            VStack(spacing: 8) {
-                topicRow(AskTeacherSheet.topicsRowOne)
-                topicRow(AskTeacherSheet.topicsRowTwo)
-            }
-        }
-    }
-
-    func topicRow(_ topics: [String]) -> some View {
-        HStack(spacing: 8) {
-            ForEach(topics, id: \.self) { topic in
-                topicChip(topic)
-            }
-        }
-    }
-
-    func topicChip(_ topic: String) -> some View {
-        let isSelected = selectedTopic == topic
-        return Button {
-            selectedTopic = topic
-        } label: {
-            Text(LocalizationSupport.localized(topic))
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 38)
-                .background(isSelected ? theme.accent : theme.fieldBackground)
-                .clipShape(Capsule())
-                .overlay {
-                    if !isSelected {
-                        Capsule()
-                            .stroke(theme.controlBorder, lineWidth: flatHairline)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Question
-
-    var questionBlock: some View {
-        VStack(alignment: .leading, spacing: labelSpacing) {
-            HStack(spacing: 8) {
-                sectionLabel("Your question")
-                composerModeToggle
-            }
-
-            questionEditor
-
-            if composerMode == .regular {
-                questionHint
-            }
-        }
-    }
-
-    @ViewBuilder
-    var questionEditor: some View {
-        ZStack(alignment: .topLeading) {
-            // The placeholder sits under the editor rather than over it, so it
-            // never intercepts a tap — `TextEditor` draws no background of its
-            // own once `scrollContentBackground` is hidden.
-            if composerMode == .regular && questionText.isEmpty {
-                Text(LocalizationSupport.localized("For example: I got stuck on question 3 right after opening the parentheses."))
-                    .font(.system(size: 14))
-                    .multilineTextAlignment(.leading)
-                    .foregroundStyle(theme.secondaryText)
-                    .padding(.horizontal, 15)
-                    .padding(.vertical, 16)
-            }
-
-            if composerMode == .regular {
-                TextEditor(text: $questionText)
-                    .focused($isQuestionFocused)
-                    .textInputAutocapitalization(.sentences)
-                    .autocorrectionDisabled(true)
-                    .font(.system(size: 14))
-                    .multilineTextAlignment(.leading)
-                    .foregroundStyle(theme.primaryText)
-                    .tint(theme.accent)
-                    .scrollContentBackground(.hidden)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-            } else {
-                Text(questionText.isEmpty
-                     ? LocalizationSupport.localized("Tap math keys, then send to add to your question.")
-                     : questionText)
-                    .font(.system(size: 14))
-                    .multilineTextAlignment(.leading)
-                    .foregroundStyle(questionText.isEmpty ? theme.secondaryText : theme.primaryText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(15)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(minHeight: editorMinHeight, alignment: .topLeading)
-        .background(theme.fieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: fieldRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
-                .stroke(isQuestionFocused ? theme.accent : theme.controlBorder, lineWidth: flatHairline)
-        }
-    }
-
-    /// Below the field: how far off the minimum the student is, replaced by a
-    /// positive confirmation the moment the question is long enough to send.
-    @ViewBuilder
-    var questionHint: some View {
-        if canSubmit {
-            Text(LocalizationSupport.localized("Ready to send"))
-                .font(.system(size: 12, weight: .semibold))
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundStyle(theme.positive)
-        } else {
-            Text(String(format: LocalizationSupport.localized("%d / 10 minimum characters"), questionText.count))
-                .font(.system(size: 12))
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundStyle(theme.secondaryText)
-        }
-    }
-
-    // MARK: - Action bar
-
-    var submitBar: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(theme.separator)
-                .frame(height: flatHairline)
-                .frame(maxWidth: .infinity)
-
-            Button {
-                Task { await findTeacherTapped() }
-            } label: {
-                Text(LocalizationSupport.localized("Find a Teacher"))
-                    .font(.system(size: 17, weight: .bold))
-                    // Enabled, this sits on `accent`, so the label needs the
-                    // on-accent token; `primaryText` is black in light mode.
-                    // Disabled it sits on `cardBackground`, where secondary
-                    // text is the readable choice.
-                    .foregroundStyle(isFindDisabled ? theme.secondaryText : theme.onAccentText)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: findButtonHeight)
-                    .background(isFindDisabled ? theme.cardBackground : theme.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .disabled(isFindDisabled)
-            .padding(.horizontal, horizontalPadding)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-        }
-        .background(theme.screenBackground)
     }
 
     func findTeacherTapped() async {
-        guard !isRequestingPermission else { return }
-        isRequestingPermission = true
-        defer { isRequestingPermission = false }
-
-        // Permission was already validated when the user tapped the session type
-        // segment, so just capture the current type and submit.
-        let finalType = conversationType
-        closeAskTeacher()
-        await viewModel.askTeacher(
+        let error = await viewModel.submitQuestionWithPermissions(
             topic: selectedTopic.lowercased(),
-            text: questionText.trimmingCharacters(in: .whitespaces),
+            text: composedQuestionText,
             photoUrls: uploadedPhotoUrls,
-            conversationType: finalType
+            conversationType: conversationType
         )
-    }
 
-    /// Validates permissions for the requested session type and updates
-    /// `conversationType` to reflect what is actually allowed. Called when the
-    /// student taps a segment — before they hit "Find a Teacher" — so the
-    /// selected type always reflects real permission state by submit time.
-    func selectConversationType(_ type: String) async {
-        guard !isRequestingPermission else { return }
-
-        // Text needs no permission.
-        guard type == ConversationType.audio.rawValue || type == ConversationType.video.rawValue else {
-            conversationType = type
-            return
-        }
-
-        if type == ConversationType.audio.rawValue {
-            let micState = PermissionService.shared.captureStatus(for: .microphone)
-            if micState == .granted {
-                conversationType = ConversationType.audio.rawValue
-            } else if micState == .denied {
-                // Stay on text and explain what to do.
-                conversationType = ConversationType.text.rawValue
-                permissionAlertMessage = LocalizationSupport.localized("Microphone access is required for an audio session. Enable it in Settings.")
-            } else {
-                // Not determined — show system dialog immediately.
-                isRequestingPermission = true
-                let result = await PermissionService.shared.requestCapturePermission(for: .microphone)
-                isRequestingPermission = false
-                conversationType = result.isGranted ? ConversationType.audio.rawValue : ConversationType.text.rawValue
-            }
-            return
-        }
-
-        // Video
-        var micState = PermissionService.shared.captureStatus(for: .microphone)
-        var cameraState = PermissionService.shared.captureStatus(for: .camera)
-
-        if micState == .denied && cameraState == .denied {
-            conversationType = ConversationType.text.rawValue
-            permissionAlertMessage = LocalizationSupport.localized("Microphone and camera access are required for a video session. Enable them in Settings.")
-            return
-        }
-
-        // Request any permissions that haven't been asked yet (system dialog).
-        isRequestingPermission = true
-        if micState == .notDetermined {
-            micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
-        }
-        if cameraState == .notDetermined {
-            cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
-        }
-        isRequestingPermission = false
-
-        if micState.isGranted && cameraState.isGranted {
-            conversationType = ConversationType.video.rawValue
-        } else if micState.isGranted {
-            // Camera unavailable but mic works — silently downgrade to audio.
-            conversationType = ConversationType.audio.rawValue
+        if let error = error {
+            permissionAlertMessage = error
         } else {
-            // Mic denied — revert to text and explain.
-            conversationType = ConversationType.text.rawValue
-            permissionAlertMessage = cameraState.isGranted
-                ? LocalizationSupport.localized("Microphone access is required for a video session. Enable it in Settings.")
-                : LocalizationSupport.localized("Microphone and camera access are required for a video session. Enable them in Settings.")
+            closeAskTeacher()
         }
     }
-
-    // MARK: - Photos
 
     var photoAttachmentSection: some View {
-        VStack(alignment: .leading, spacing: labelSpacing) {
-            sectionLabel("Attach a photo (optional)")
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            Text(viewModel.attachPhotoSectionTitle)
+                .font(.system(size: 14, weight: .semibold))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(theme.primaryText)
 
-            HStack(spacing: 10) {
-                ForEach(uploadedPhotoUrls, id: \.self) { url in
-                    photoThumbnail(url: url)
+            if uploadedPhotoUrls.isEmpty {
+                largeAddPhotoButton
+            } else {
+                HStack(spacing: 10) {
+                    ForEach(uploadedPhotoUrls, id: \.self) { url in
+                        photoThumbnail(url: url)
+                    }
+
+                    if uploadedPhotoUrls.count < AskTeacherSheet.maxPhotoCount {
+                        addPhotoButton
+                    }
+
+                    Spacer(minLength: 0)
                 }
-
-                if uploadedPhotoUrls.count < AskTeacherSheet.maxPhotoCount {
-                    addPhotoButton
-                }
-
-                Spacer(minLength: 0)
             }
 
             if let photoUploadError {
                 Text(photoUploadError)
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.danger)
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.accent)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -554,7 +489,7 @@ struct AskTeacherSheet: View {
     @ViewBuilder
     var addPhotoButton: some View {
 #if !os(Android)
-        PhotoSourceButton(onImageData: { data in
+        PhotoSourceButton(viewModel: viewModel, onImageData: { data in
             uploadPhotoData(data)
         }) {
             addPhotoLabel
@@ -569,28 +504,81 @@ struct AskTeacherSheet: View {
         .buttonStyle(.plain)
         .disabled(isUploadingPhoto)
         .confirmationDialog(
-            LocalizationSupport.localized("Add a photo"),
+            viewModel.addPhotoDialogTitle,
             isPresented: $showAndroidPhotoSourceDialog,
             titleVisibility: .visible
         ) {
-            Button(LocalizationSupport.localized("Take Photo")) {
+            Button(viewModel.takePhotoLabel) {
                 pickAndroidPhoto(source: .camera)
             }
-            Button(LocalizationSupport.localized("Choose from Library")) {
+            Button(viewModel.chooseFromLibraryLabel) {
                 pickAndroidPhoto(source: .gallery)
             }
-            Button(LocalizationSupport.localized("Cancel"), role: .cancel) {}
+            Button(viewModel.cancelLabel, role: .cancel) {}
         }
 #endif
     }
 
-    /// Dashed outline — the same "empty slot, drop something here" treatment
-    /// the document uploads use, so the tile reads as an invitation rather than
-    /// as a control that is already holding something.
+    @ViewBuilder
+    var largeAddPhotoButton: some View {
+#if !os(Android)
+        PhotoSourceButton(viewModel: viewModel, onImageData: { data in
+            uploadPhotoData(data)
+        }) {
+            largeAddPhotoLabel
+        }
+        .disabled(isUploadingPhoto)
+#else
+        Button {
+            showAndroidPhotoSourceDialog = true
+        } label: {
+            largeAddPhotoLabel
+        }
+        .buttonStyle(.plain)
+        .disabled(isUploadingPhoto)
+        .confirmationDialog(
+            viewModel.addPhotoDialogTitle,
+            isPresented: $showAndroidPhotoSourceDialog,
+            titleVisibility: .visible
+        ) {
+            Button(viewModel.takePhotoLabel) {
+                pickAndroidPhoto(source: .camera)
+            }
+            Button(viewModel.chooseFromLibraryLabel) {
+                pickAndroidPhoto(source: .gallery)
+            }
+            Button(viewModel.cancelLabel, role: .cancel) {}
+        }
+#endif
+    }
+
+    var largeAddPhotoLabel: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(theme.controlBorder, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                .frame(maxWidth: .infinity)
+                .frame(height: 90)
+
+            if isUploadingPhoto {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(theme.secondaryText)
+            } else {
+                VStack(spacing: 6) {
+                    PlatformIcon(systemName: "camera.fill", size: 20, weight: .semibold, color: theme.secondaryText)
+                    Text(viewModel.tapToUploadPhotoText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.secondaryText)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        }
+    }
+
     var addPhotoLabel: some View {
-        RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
-            .fill(theme.fieldBackground)
-            .frame(width: 72, height: 72)
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(theme.cardBackground)
+            .frame(width: 64, height: 64)
             .overlay {
                 if isUploadingPhoto {
                     ProgressView()
@@ -601,24 +589,23 @@ struct AskTeacherSheet: View {
                 }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                    .foregroundStyle(theme.controlBorder)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(theme.controlBorder, lineWidth: 1)
             }
     }
 
     func photoThumbnail(url: String) -> some View {
         ZStack(alignment: .topTrailing) {
-            RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
-                .fill(theme.fieldBackground)
-                .frame(width: 72, height: 72)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(theme.cardBackground)
+                .frame(width: 64, height: 64)
                 .overlay {
                     CachedRemoteImage(url: url, contentMode: .fill)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: fieldRadius, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: fieldRadius, style: .continuous)
-                        .stroke(theme.controlBorder, lineWidth: flatHairline)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(theme.controlBorder, lineWidth: 1)
                 }
 
             Button {
@@ -626,13 +613,13 @@ struct AskTeacherSheet: View {
             } label: {
                 Circle()
                     .fill(theme.primaryText.opacity(0.85))
-                    .frame(width: 22, height: 22)
+                    .frame(width: 20, height: 20)
                     .overlay {
                         PlatformIcon(systemName: "xmark", size: 10, weight: .bold, color: theme.invertedText)
                     }
             }
             .buttonStyle(.plain)
-            .offset(x: 7, y: -7)
+            .offset(x: 6, y: -6)
         }
     }
 
@@ -648,7 +635,7 @@ struct AskTeacherSheet: View {
                 photoUploadError = nil
                 defer { isUploadingPhoto = false }
                 guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
-                    photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
+                    photoUploadError = viewModel.signInToAttachPhotoError
                     return
                 }
                 let url = try await StorageService.shared.uploadQuestionImage(data: data, uid: uid)
@@ -668,9 +655,9 @@ struct AskTeacherSheet: View {
     func pickAndroidPhoto(source: AndroidPhotoSource) {
         Task {
             if source == .camera {
-                let cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+                let cameraState = await viewModel.requestAndroidCameraPermission()
                 guard cameraState.isGranted else {
-                    photoUploadError = LocalizationSupport.localized("Camera access is required to take a photo.")
+                    photoUploadError = viewModel.cameraRequiredForPhotoError
                     return
                 }
             }
@@ -686,11 +673,11 @@ struct AskTeacherSheet: View {
                 }.value
                 guard !base64.isEmpty else { return }
                 guard let data = Data(base64Encoded: base64) else {
-                    photoUploadError = LocalizationSupport.localized("Could not read selected image")
+                    photoUploadError = viewModel.couldNotReadImageError
                     return
                 }
                 guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
-                    photoUploadError = LocalizationSupport.localized("You need to be signed in to attach a photo.")
+                    photoUploadError = viewModel.signInToAttachPhotoError
                     return
                 }
                 let url = try await StorageService.shared.uploadQuestionImage(data: data, uid: uid)
@@ -707,49 +694,165 @@ struct AskTeacherSheet: View {
         dismiss()
     }
 
-    /// Sits on the `Your question` label line: it switches how you type, so it
-    /// belongs with the field's heading, not below the field where it read as
-    /// a second topic picker.
-    var composerModeToggle: some View {
-        HStack(spacing: 4) {
-            composerModePill(title: "Regular", isSelected: composerMode == .regular) {
-                composerMode = .regular
+    /// Which keyboard writes the question, offered next to the question's own
+    /// title so the switch sits with the field it types into.
+    ///
+    /// The old version of this was a strip of bare symbols that appended a
+    /// character and dropped focus, so every symbol cost the student their
+    /// keyboard. Now the two keyboards are alternatives the student picks
+    /// between, and the algebra one stays up for as long as they are building
+    /// the formula.
+    func keyboardModePills(scrollProxy: ScrollViewProxy) -> some View {
+        HStack(spacing: 8) {
+            keyboardModePill(title: viewModel.regularKeyboardLabel, isSelected: keyboardMode == .regular) {
+                keyboardMode = .regular
+                pendingFormulaLatex = ""
                 isQuestionFocused = true
+                scrollForKeyboardMode(.regular, proxy: scrollProxy)
             }
-            composerModePill(title: "Math keyboard", isSelected: composerMode == .algebra) {
-                composerMode = .algebra
+            // "Algebra" is also one of the topic chips higher up this screen,
+            // so the pills carry identifiers to tell the two apart.
+            .accessibilityIdentifier("keyboard_mode_regular")
+            keyboardModePill(title: viewModel.algebraKeyboardLabel, isSelected: keyboardMode == .algebra) {
+                keyboardMode = .algebra
+                // The math keys are the keyboard in this mode, so the system
+                // one gives up the space it was holding. Dropping the focus
+                // state is only half of it — on Android that alone leaves
+                // the IME up and the pad stacks on top of it — so the
+                // keyboard is dismissed outright.
                 isQuestionFocused = false
+                SoftKeyboard.dismiss()
+                scrollForKeyboardMode(.algebra, proxy: scrollProxy)
             }
+            .accessibilityIdentifier("keyboard_mode_algebra")
         }
-        .padding(3)
-        .background(theme.fieldBackground)
-        .clipShape(Capsule())
     }
 
-    func composerModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    /// The algebra keys and the field they write into, sitting immediately
+    /// below the question field.
+    ///
+    /// A formula cannot be typed into the question field itself: it is a
+    /// `TextEditor` holding plain text, so the keys would have to write raw
+    /// LaTeX into it — `\sqrt{}` and `\frac{}{}` where the student expects to
+    /// see √ and a fraction — and SwiftUI offers no caret position to insert at
+    /// anyway, on either platform. So the formula gets its own field, built to
+    /// match the question field (same corner radius, same fill) and placed at
+    /// the bottom of it, and its `+` files the finished formula into
+    /// `attachedFormulas`, where it shows rendered until the question is sent.
+    var algebraKeyboard: some View {
+        VStack(alignment: .leading, spacing: sectionSpacing) {
+            MathEquationEditorView(
+                actionSystemImage: "plus",
+                fieldCornerRadius: 12,
+                onDraftChange: { latex in
+                    pendingFormulaLatex = latex
+                }
+            ) { latex in
+                appendFormula(latex)
+            }
+            .environment(\.layoutDirection, .leftToRight)
+
+            Text(viewModel.addFormulaHint)
+                .font(.system(size: 11))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(theme.secondaryText)
+        }
+    }
+
+    func keyboardModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button {
             action()
         } label: {
-            Text(LocalizationSupport.localized(title))
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? theme.onAccentText : theme.secondaryText)
-                .padding(.horizontal, 12)
-                .frame(height: 26)
-                .background(isSelected ? theme.accent : theme.fieldBackground)
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(isSelected ? theme.onDarkFill : theme.primaryText)
+                .padding(.horizontal, 14)
+                .frame(height: 28)
+                .background(isSelected ? theme.accentStrong : theme.secondaryText)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
 
-    func appendEquation(_ latex: String) {
+    /// Keeps the finished equation as LaTeX and shows it rendered above the
+    /// keys. Writing it into the question field instead would print the markup
+    /// at the student — `$$5x^{\\frac{3}{2}}$$` where they just drew a
+    /// fraction — and hand them a string they could break by editing it. The
+    /// `$$` delimiters go on only as the question is sent, which is where they
+    /// matter: they are what tells the teacher's incoming-question card and
+    /// the chat bubbles to render a formula rather than print it.
+    func appendFormula(_ latex: String) {
         let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        if !questionText.isEmpty && !questionText.hasSuffix(" ") && !questionText.hasSuffix("\n") {
-            questionText += " "
-        }
-        questionText += trimmed
+        pendingFormulaLatex = ""
+        attachedFormulas.append(trimmed)
     }
+
+    /// The committed formulas, rendered, each with the `×` that takes it back
+    /// off the question.
+    var attachedFormulaStrip: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(0..<attachedFormulas.count, id: \.self) { index in
+                HStack(spacing: 8) {
+                    MathFormulaView(latex: attachedFormulas[index], displayMode: false)
+                        .frame(height: 44)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .environment(\.layoutDirection, .leftToRight)
+
+                    Button {
+                        attachedFormulas.remove(at: index)
+                    } label: {
+                        Circle()
+                            .fill(theme.primaryText.opacity(0.85))
+                            .frame(width: 20, height: 20)
+                            .overlay {
+                                PlatformIcon(systemName: "xmark", size: 10, weight: .bold, color: theme.invertedText)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(theme.fieldBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+    }
+
+    var infoCard: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                // Both figures are live: the response time is the backend's
+                // measured average, the count is who is actually online.
+                if !viewModel.averageResponseText.isEmpty {
+                    Text(viewModel.averageResponseText)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(theme.accent)
+                }
+                Text(viewModel.onlineTeachersCountText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.secondaryText)
+            }
+            Spacer()
+
+        }
+        .padding(12)
+        .background(theme.accent.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
+    var footerText: some View {
+        if viewModel.remainingMinutes > 0 {
+            Text(viewModel.askTeacherFooterText)
+                .font(.system(size: 12))
+                .foregroundStyle(theme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
+        }
+    }
+
 }
 
 #if os(Android)
@@ -801,9 +904,7 @@ private struct AskTeacherSheetLanguagePreview: View {
   let language: SettingsLanguageChoice
 
     var body: some View {
-    NavigationStack {
-      AskTeacherSheet(viewModel: MockStudentHomeViewModel())
-    }
+    AskTeacherSheet(viewModel: MockStudentHomeViewModel())
     .environment(\.locale, LocalizationSupport.locale(languagePreference: language.rawValue))
     .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: language.rawValue))
     .onAppear {

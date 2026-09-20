@@ -35,9 +35,20 @@ final class ApplePayService: NSObject {
 
   private var continuation: CheckedContinuation<String, Error>?
   private var applePayClient: BTApplePayClient?
+  private var warmPaymentButton: PKPaymentButton?
 
   func canMakePayments() -> Bool {
     PKPaymentAuthorizationViewController.canMakePayments()
+  }
+
+  /// PassKit pays a one-off cost the first time a `PKPaymentButton` is built in
+  /// a process, which is why the Apple Pay row used to pop into the payment
+  /// picker a couple of seconds after every other row. Building one here — and
+  /// holding on to it, so its cached artwork is not thrown away again — moves
+  /// that cost in front of the picker, where the checkout spinner covers it.
+  func warmUpPaymentButton() {
+    guard warmPaymentButton == nil, canMakePayments() else { return }
+    warmPaymentButton = PKPaymentButton(paymentButtonType: .plain, paymentButtonStyle: .automatic)
   }
 
   /// Presents the Apple Pay sheet. Returns a Braintree payment method nonce on success,

@@ -1,6 +1,9 @@
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 
+import { CONNECTION_FEE_CENTS } from "./types";
+import { readRcNumber } from "./remoteConfig";
+
 const firestore = admin.firestore();
 
 export const DEFAULT_CURRENCY = "ILS";
@@ -22,22 +25,6 @@ function normalizeCurrencyCode(value: unknown): string {
   if (typeof value !== "string") return DEFAULT_CURRENCY;
   const trimmed = value.trim().toUpperCase();
   return trimmed.length === 3 ? trimmed : DEFAULT_CURRENCY;
-}
-
-async function readRcNumber(key: string): Promise<number | undefined> {
-  try {
-    const template = await admin.remoteConfig().getTemplate();
-    const param = template.parameters?.[key] as
-      | { defaultValue?: { value?: string } }
-      | undefined;
-    const raw = param?.defaultValue?.value;
-    if (raw == null) return undefined;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  } catch (error) {
-    logger.warn(`[pricing] failed reading Remote Config ${key}`, error);
-    return undefined;
-  }
 }
 
 export async function getStudentCurrency(studentUid: string): Promise<string> {
@@ -92,6 +79,17 @@ export async function getPricePerMinute(currency: string): Promise<number> {
   }
   const rate = await getExchangeRateToUsd(currency);
   return Math.round(usdPrice * rate * 100) / 100;
+}
+
+/** The one-off fee charged when a lesson connects, in cents of the student's
+ *  currency. Source of truth is Remote Config `connection_fee_cents`, which the
+ *  apps read too — so the fee the student is quoted on the home screen is the
+ *  same number this backend bills. Falls back to the built-in constant when the
+ *  key is absent. */
+export async function getConnectionFeeCents(): Promise<number> {
+  const fromRc = await readRcNumber("connection_fee_cents");
+  if (fromRc !== undefined && fromRc >= 0) return Math.round(fromRc);
+  return CONNECTION_FEE_CENTS;
 }
 
 export async function getTeacherShare(): Promise<number> {

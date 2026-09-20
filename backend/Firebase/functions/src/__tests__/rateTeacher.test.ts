@@ -1,14 +1,21 @@
 const txGet = jest.fn();
 const txSet = jest.fn();
+const txUpdate = jest.fn();
 const runTransaction = jest.fn();
 const collectionMock = jest.fn();
 const adminFirestore = jest.fn();
 const adminDatabase = jest.fn();
 const dbRef = jest.fn();
 const dbOnce = jest.fn();
+const dbUpdate = jest.fn();
+const teacherGet = jest.fn();
 
 let questionRef: { path: string };
-let teacherRef: { path: string; collection: (name: string) => { path: string; doc: (id: string) => { path: string } } };
+let teacherRef: {
+  path: string;
+  get: typeof teacherGet;
+  collection: (name: string) => { path: string; doc: (id: string) => { path: string } };
+};
 let ratingsCollectionRef: { path: string; doc: (id: string) => { path: string } };
 let ratingRef: { path: string };
 let lessonRef: { path: string };
@@ -70,6 +77,9 @@ describe("rateTeacher", () => {
     };
     teacherRef = {
       path: "teachers/teacher-1",
+      // Read back after the transaction commits, to mirror the new average into
+      // RTDB — so this returns the aggregate as it stands once the rating landed.
+      get: teacherGet,
       collection: (name: string) => {
         if (name !== "ratings") throw new Error(`Unexpected collection: ${name}`);
         return ratingsCollectionRef;
@@ -99,8 +109,13 @@ describe("rateTeacher", () => {
     dbOnce.mockResolvedValue({
       exists: () => false,
     });
+    dbUpdate.mockResolvedValue(undefined);
     dbRef.mockReturnValue({
       once: dbOnce,
+      update: dbUpdate,
+    });
+    teacherGet.mockResolvedValue({
+      data: () => ({ averageRate: 4.333333333333333, ratingCount: 3 }),
     });
     adminDatabase.mockReturnValue({
       ref: dbRef,
@@ -153,9 +168,12 @@ describe("rateTeacher", () => {
     });
 
     txSet.mockResolvedValue(undefined);
-    runTransaction.mockImplementation(async (handler: (tx: { get: typeof txGet; set: typeof txSet }) => Promise<void>) => {
-      await handler({ get: txGet, set: txSet });
-    });
+    txUpdate.mockResolvedValue(undefined);
+    runTransaction.mockImplementation(
+      async (handler: (tx: { get: typeof txGet; set: typeof txSet; update: typeof txUpdate }) => Promise<void>) => {
+        await handler({ get: txGet, set: txSet, update: txUpdate });
+      }
+    );
   });
 
   test("stores a student rating and updates the teacher average", async () => {
@@ -186,9 +204,86 @@ describe("rateTeacher", () => {
     expect(txSet).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ path: teacherRef.path }),
-      expect.objectContaining({ averageRate: 4.333333333333333 }),
+      expect.objectContaining({ averageRate: 4.333333333333333, ratingCount: 3 }),
       { merge: true }
     );
+    // Mirrored onto the question so the student can see the score they gave —
+    // they cannot read the teacher's ratings subcollection.
+    expect(txUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ path: questionRef.path }),
+      expect.objectContaining({ studentRating: 5 })
+    );
+  });
+
+  // Ranking is decided on the RTDB copy, so a rating that reached only
+  // Firestore would never change who gets the next question.
+  test("mirrors the new average into the record the dispatcher ranks on", async () => {
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: { questionId: "question-1", teacherId: "teacher-1", rating: 5 },
+    });
+
+    expect(dbRef).toHaveBeenCalledWith("teachers/teacher-1");
+    expect(dbUpdate).toHaveBeenCalledWith({
+      ratingAvg: 4.333333333333333,
+      ratingCount: 3,
+    });
+  });
+
+  test("leaves an unrated teacher with no rating at all", async () => {
+    teacherGet.mockResolvedValue({ data: () => ({}) });
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: { questionId: "question-1", teacherId: "teacher-1", rating: 5 },
+    });
+
+    // Null removes the key: absent means unrated, which is what scoring reads.
+    expect(dbUpdate).toHaveBeenCalledWith({ ratingAvg: null, ratingCount: null });
+  });
+
+  test("stores a trimmed student comment when one is written", async () => {
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: {
+        questionId: "question-1",
+        teacherId: "teacher-1",
+        rating: 5,
+        comment: "   Explained fractions really clearly.  ",
+      },
+    });
+
+    expect(txSet).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ path: ratingRef.path }),
+      expect.objectContaining({ studentComment: "Explained fractions really clearly." })
+    );
+  });
+
+  test("omits the comment field when the student wrote nothing", async () => {
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: {
+        questionId: "question-1",
+        teacherId: "teacher-1",
+        rating: 5,
+        comment: "   ",
+      },
+    });
+
+    const [, ratingDoc] = txSet.mock.calls[0] as [unknown, Record<string, unknown>];
+    expect(ratingDoc).not.toHaveProperty("studentComment");
   });
 
   test("rejects non-integer ratings", async () => {

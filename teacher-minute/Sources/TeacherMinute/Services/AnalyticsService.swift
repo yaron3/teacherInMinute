@@ -29,6 +29,9 @@ enum AnalyticsEvent {
     static let loginFailure      = "login_failure"
     static let logout            = "logout"
     static let passwordResetSent = "password_reset_sent"
+    static let emailVerificationSent = "email_verification_sent"
+    static let emailRewardGranted    = "email_reward_granted"
+    static let emailRewardRejected   = "email_reward_rejected"
     static let phoneVerifySent   = "phone_verify_sent"
     static let phoneVerified     = "phone_verified"
 
@@ -44,17 +47,27 @@ enum AnalyticsEvent {
     static let askTeacherMatched   = "ask_teacher_matched"
     static let askTeacherNoMatch   = "ask_teacher_no_match"
     static let askTeacherFailed    = "ask_teacher_failed"
+    static let lessonTapped        = "lesson_tapped"
+    static let lessonTappedWithDetails = "lesson_tapped_with_details"
+    static let permissionStateOnAskTeacher = "permission_state_on_ask_teacher"
 
     // Teacher flow
     static let teacherAcceptingToggled = "teacher_accepting_toggled"
     static let teacherInviteAccepted   = "teacher_invite_accepted"
     static let teacherInviteDeclined   = "teacher_invite_declined"
     static let teacherDemoQuestionSimulated = "teacher_demo_question_simulated"
+    static let teacherCallAnswered     = "teacher_call_answered"
+    static let teacherCallDenied       = "teacher_call_denied"
+    static let studentQuestionResponseTime = "student_question_response_time"
+    static let teacherCallResponseTime = "teacher_call_response_time"
 
     // Chat / session
     static let chatMessageSent  = "chat_message_sent"
     static let chatPhotoSent    = "chat_photo_sent"
     static let chatSessionEnded = "chat_session_ended"
+    static let studentChatStarted = "student_chat_started"
+    static let sessionTypeChanged = "session_type_changed"
+    static let studentChatResponseTime = "student_chat_response_time"
 
     // Purchase
     static let beginCheckout          = "begin_checkout"  // also a GA4 standard event
@@ -106,6 +119,12 @@ enum AnalyticsScreen {
     static let about                 = "about_web"
     static let connectionSetup       = "connection_setup"
     static let whiteboard            = "whiteboard"
+    static let teacherDocuments      = "teacher_documents"
+    static let teacherEarnings       = "teacher_earnings"
+    static let teacherPayoutMethod   = "teacher_payout_method"
+    static let launchSplash          = "launch_splash"
+    static let minutesPackage        = "minutes_package"
+    static let rateSession           = "rate_session"
 }
 
 @MainActor
@@ -146,6 +165,7 @@ final class AnalyticsService {
     // MARK: - Events
 
     func logEvent(_ name: String, parameters: [String: Any]? = nil) {
+        guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
         let sanitized = AnalyticsService.sanitize(parameters)
         Analytics.logEvent(name, parameters: sanitized)
         let breadcrumb = sanitized?.isEmpty == false ? "\(name) \(sanitized!)" : name
@@ -153,13 +173,18 @@ final class AnalyticsService {
     }
 
     func logScreen(_ screen: String, screenClass: String? = nil) {
-        var params: [String: Any] = [
-            AnalyticsParameterScreenName: screen
+        guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
+        // Without an explicit class Firebase fills `screen_class` with the
+        // native container (`MainActivity`, `_TtGC7SwiftUI19UIHosting…`),
+        // which is what the console's "screen class" reports group by.
+        let params: [String: Any] = [
+            AnalyticsParameterScreenName: screen,
+            AnalyticsParameterScreenClass: screenClass ?? AnalyticsService.screenTitle(for: screen)
         ]
-        if let screenClass {
-            params[AnalyticsParameterScreenClass] = screenClass
-        }
         Analytics.logEvent(AnalyticsEventScreenView, parameters: params)
+        // The Events list shows every screen_view as one row; a per-screen
+        // event (`screen_student_home`) makes each screen its own row there.
+        Analytics.logEvent("screen_\(screen)", parameters: nil)
         Crashlytics.crashlytics().log("screen_view \(screen)")
     }
 
@@ -264,6 +289,11 @@ final class AnalyticsService {
     #endif
 
     // MARK: - Helpers
+
+    /// `student_home` → `Student Home`.
+    static func screenTitle(for screen: String) -> String {
+        screen.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 
     /// Firebase Analytics on iOS only accepts `NSNumber` / `NSString` /
     /// boxed Swift primitives in the parameters dict. We do a defensive

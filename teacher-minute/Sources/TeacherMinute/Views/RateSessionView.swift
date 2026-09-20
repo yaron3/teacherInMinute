@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RateSessionView: View {
+  let viewModel: any ChatSessionViewModeling
   let teacherName: String
   let teacherImageURL: String
   let subject: String
@@ -10,6 +11,9 @@ struct RateSessionView: View {
   let onFinish: @MainActor () -> Void
 
   @State var rating: Int = 0
+  /// Optional free text. The teacher reads it later without knowing who wrote
+  /// it, which is what the placeholder promises.
+  @State var comment: String = ""
   @State var isSending = false
   @State var errorMessage: String?
   @Environment(\.colorScheme) var colorScheme
@@ -18,6 +22,7 @@ struct RateSessionView: View {
   }
 
   init(
+    viewModel: any ChatSessionViewModeling,
     teacherName: String,
     teacherImageURL: String,
     subject: String,
@@ -26,6 +31,7 @@ struct RateSessionView: View {
     prepareForRating: @escaping @MainActor () async -> Void = {},
     onFinish: @escaping @MainActor () -> Void
   ) {
+    self.viewModel = viewModel
     self.teacherName = teacherName
     self.teacherImageURL = teacherImageURL
     self.subject = subject
@@ -64,18 +70,15 @@ struct RateSessionView: View {
             .overlay {
               PlatformIcon(systemName: "checkmark")
                 .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(theme.onAccentText)
+                .foregroundStyle(theme.onDarkFill)
             }
             .padding(.top, 8)
 
           VStack(spacing: 6) {
-            Text(LocalizationSupport.localized("Session Complete!"))
+            Text(viewModel.sessionCompleteTitle)
               .font(.system(size: 22, weight: .bold))
               .foregroundStyle(theme.primaryText)
-            Text(String(
-              format: LocalizationSupport.localized("Great job learning with %@"),
-              teacherName
-            ))
+            Text(viewModel.greatJobText(teacherName: teacherName))
               .font(.system(size: 14))
               .foregroundStyle(theme.secondaryText)
               .multilineTextAlignment(.center)
@@ -95,10 +98,20 @@ struct RateSessionView: View {
                   .font(.system(size: 16, weight: .bold))
                   .foregroundStyle(theme.primaryText)
                 if !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                  Text(subject)
-                    .font(.system(size: 13))
-                    .foregroundStyle(theme.secondaryText)
-                    .lineLimit(2)
+                  // The question can carry a formula the student built with
+                  // the algebra keyboard, so it goes through the same renderer
+                  // the chat bubbles and the question banner use. A plain
+                  // `Text` here printed the `$$...$$` markup back at them on
+                  // the last screen of the lesson.
+                  FormulaAwareText(
+                    text: subject,
+                    textColor: theme.secondaryText,
+                    font: .system(size: 13),
+                    lineSpacing: 3,
+                    formulaMinWidth: 160,
+                    formulaMaxWidth: 240,
+                    lineLimit: 2
+                  )
                 }
               }
               Spacer()
@@ -107,13 +120,10 @@ struct RateSessionView: View {
 
           RoundedInfoCard {
             VStack(spacing: 14) {
-              Text(LocalizationSupport.localized("Rate this session"))
+              Text(viewModel.rateSessionTitle)
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(theme.primaryText)
-              Text(String(
-                format: LocalizationSupport.localized("How was your experience with %@?"),
-                teacherName
-              ))
+              Text(viewModel.rateExperienceText(teacherName: teacherName))
                 .font(.system(size: 13))
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
@@ -127,6 +137,46 @@ struct RateSessionView: View {
                       .foregroundStyle(index <= rating ? theme.ratingStar : theme.secondaryText)
                   }
                   .buttonStyle(.plain)
+                }
+              }
+
+              // The box appears only once a score is picked: with no stars
+              // chosen the Send button is disabled anyway, so an empty text
+              // field would just be dead space above it.
+              if rating > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                  TextEditor(text: $comment)
+                    .textInputAutocapitalization(.sentences)
+                    .font(.system(size: 14))
+                    .multilineTextAlignment(.leading)
+                    .foregroundStyle(theme.primaryText)
+                    .tint(theme.accent)
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+                    .frame(minHeight: 88, alignment: .leading)
+                    .background(theme.fieldBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    // The card behind it is already a light fill, so without a
+                    // border the field does not read as somewhere to type.
+                    .overlay {
+                      RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(theme.controlBorder, lineWidth: 1)
+                    }
+                    .overlay(alignment: .topLeading) {
+                      if comment.isEmpty {
+                        Text(viewModel.rateCommentPlaceholderTitle)
+                          .font(.system(size: 14))
+                          .foregroundStyle(theme.secondaryText)
+                          .padding(.horizontal, 15)
+                          .padding(.vertical, 18)
+                          .allowsHitTesting(false)
+                      }
+                    }
+
+                  Text(viewModel.rateCommentPrivacyNote)
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
               }
             }
@@ -149,11 +199,11 @@ struct RateSessionView: View {
           Spacer()
           if isSending {
             ProgressView()
-              .tint(theme.onAccentText)
+              .tint(theme.onDarkFill)
           } else {
-            Text(LocalizationSupport.localized("Send"))
+            Text(viewModel.sendLabel)
               .font(.system(size: 16, weight: .bold))
-              .foregroundStyle(theme.onAccentText)
+              .foregroundStyle(theme.onDarkFill)
           }
           Spacer()
         }
@@ -187,7 +237,7 @@ struct RateSessionView: View {
         onFinish()
       } catch {
         isSending = false
-        errorMessage = LocalizationSupport.localized("Could not send rating. Please try again next time.")
+        errorMessage = viewModel.ratingFailedMessage
         logger.error("[RateSession] rateTeacher failed: \(error.localizedDescription)")
       }
     }
@@ -199,7 +249,8 @@ struct RateSessionView: View {
         try await FunctionsService.shared.rateTeacher(
           questionId: questionId,
           teacherId: teacherId,
-          rating: rating
+          rating: rating,
+          comment: comment
         )
         return
       } catch {
@@ -213,7 +264,7 @@ struct RateSessionView: View {
 private extension Error {
   var isLessonFinalizingError: Bool {
     guard let functionError = self as? FunctionsError else { return false }
-    if case .serverError(let message, let status) = functionError {
+    if case .serverError(let message, let status, _) = functionError {
       return status == "FAILED_PRECONDITION"
         && message.localizedCaseInsensitiveContains("finaliz")
     }

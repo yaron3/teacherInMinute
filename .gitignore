@@ -39,3 +39,6 @@ npm-debug.log*
 DerivedData/
 *.xcarchive
 teacher-minute/TeacherMinute App */
+# Integration-test run output
+backend/Firebase/functions/scripts/lesson-result-*.json
+.derivedData/

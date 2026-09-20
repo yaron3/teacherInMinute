@@ -7,6 +7,10 @@
 
 import Foundation
 import Observation
+import SkipFuse
+#if !os(Android)
+import LiveKit
+#endif
 
 @Observable
 @MainActor
@@ -18,8 +22,15 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var boardStrokes: [BoardStroke]
   var boardViewports: [String: BoardViewport] = [:]
   var chatPausedStates: [String: Bool] = [:]
+  var mediaPendingStates: [String: Bool] = [:]
   var errorMessage: String?
   var isConnecting: Bool
+  private(set) var isInSetup: Bool
+  let hasUnreadChat = false
+  let hasUnreadBoard = false
+  let incomingFormulaCount = 0
+  var isMicMuted = false
+  var isCameraOff = false
   let participantName: String
   let participantImageURL: String
   let currentUserImageURL: String
@@ -29,19 +40,30 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   let primaryAmountSubtitle: String
   let sessionNoticeText: String
   let sessionStartedAt: Double
-  let connectionFeeCents: Int
   let pricePerMinuteCents: Int
   let teacherSharePercent: Double
-  var onMessagesUpdated: (([ChatMessage]) -> Void)?
-  var onBoardStrokesUpdated: (([BoardStroke]) -> Void)?
-  var onBoardViewportsUpdated: (([String: BoardViewport]) -> Void)?
   var onChatPausedUpdated: (([String: Bool]) -> Void)?
-  var onErrorUpdated: ((String?) -> Void)?
+  var onMediaPendingUpdated: (([String: Bool]) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
-  var onSessionDetailsUpdated: (() -> Void)?
+  /// Announced as soon as a screen listens, the way the real session reports
+  /// its first reading of the question node.
+  var onSessionDetailsUpdated: (() -> Void)? {
+    didSet {
+      guard onSessionDetailsUpdated != nil else { return }
+      Task { @MainActor in self.onSessionDetailsUpdated?() }
+    }
+  }
   var onSessionEnded: (() -> Void)?
 
   private let currentUid = "mock-current-user"
+
+  /// The medium both sides see. Switched by this side through
+  /// `publishConversationType`, and by the pretend other side through
+  /// `simulatePeerConversationType`.
+  private(set) var sharedConversationType: String
+  var liveKitRoom = ""
+  var liveKitToken = ""
+  var lastSeenSharedConversationType = ""
 
   init(
     questionId: String = "mock-question",
@@ -49,7 +71,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     teacherId: String = "mock-teacher",
     messages: [ChatMessage] = [],
     boardStrokes: [BoardStroke] = [],
-    isConnecting: Bool = true,
+    isConnecting: Bool = false,
     participantName: String = "Michael",
     participantImageURL: String = "",
     currentUserImageURL: String = "",
@@ -57,9 +79,9 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     questionPhotoUrls: [String] = [],
     sessionNoticeText: String = "Session started - Billing active",
     sessionStartedAt: Double = Date().timeIntervalSince1970 * 1000.0 - 83_000.0,
-    connectionFeeCents: Int = 0,
     pricePerMinuteCents: Int = 60,
-    teacherSharePercent: Double = 75
+    teacherSharePercent: Double = 75,
+    conversationType: String = "text"
   ) {
     self.questionId = questionId
     self.role = role
@@ -67,6 +89,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.messages = messages.isEmpty ? Self.defaultMessages(currentRole: role) : messages
     self.boardStrokes = boardStrokes
     self.isConnecting = isConnecting
+    self.isInSetup = isConnecting
     self.participantName = participantName
     self.participantImageURL = participantImageURL
     self.currentUserImageURL = currentUserImageURL
@@ -77,9 +100,64 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     self.primaryAmountSubtitle = isTeacherRole ? "Your share (\(Int(teacherSharePercent))%)" : "Total so far"
     self.sessionNoticeText = sessionNoticeText
     self.sessionStartedAt = sessionStartedAt
-    self.connectionFeeCents = connectionFeeCents
     self.pricePerMinuteCents = pricePerMinuteCents
     self.teacherSharePercent = teacherSharePercent
+    self.sharedConversationType = conversationType
+  }
+
+  func publishConversationType(_ conversationType: String) async -> String? {
+    sharedConversationType = conversationType
+    onSessionDetailsUpdated?()
+    return nil
+  }
+
+  func finishSetup() {
+    isInSetup = false
+  }
+
+  func sessionTabChanged(showsChat: Bool, showsBoard: Bool) {}
+
+  /// A room that is never reached: the mock has no backend to mint one.
+  func fetchMediaCredentials() async -> MediaCredentials? {
+    MediaCredentials(room: "mock-room", token: "mock-token")
+  }
+
+  // MARK: Media
+  //
+  // No room: a connect succeeds at once and nothing is published, so a preview
+  // or a UI test never reaches the LiveKit server.
+
+  private(set) var mediaConnectionPhase: MediaConnectionPhase = .idle
+  let mediaDidFallBackToAudioOnly = false
+  var onMediaTracksUpdated: (@MainActor @Sendable () -> Void)?
+
+  func mediaQuality() -> SessionMediaQuality { .good }
+
+  func connectMedia(enableVideo: Bool) {
+    mediaConnectionPhase = .connected
+  }
+
+  func waitUntilMediaConnected() async -> Bool {
+    mediaConnectionPhase == .connected
+  }
+
+  func disconnectMedia() async {
+    mediaConnectionPhase = .idle
+  }
+
+  func setMicrophoneEnabled(_ enabled: Bool) async {}
+
+  func setCameraEnabled(_ enabled: Bool) async {}
+
+#if !os(Android)
+  var localCameraVideoTrack: VideoTrack? { nil }
+  var remoteCameraVideoTrack: VideoTrack? { nil }
+#endif
+
+  /// Plays the other participant switching the lesson.
+  func simulatePeerConversationType(_ conversationType: String) {
+    sharedConversationType = conversationType
+    onSessionDetailsUpdated?()
   }
 
   func start() {
@@ -90,10 +168,6 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
         isConnecting = false
         onConnectingUpdated?(false)
       }
-      onMessagesUpdated?(messages)
-      onBoardStrokesUpdated?(boardStrokes)
-      onBoardViewportsUpdated?(boardViewports)
-      onErrorUpdated?(errorMessage)
     }
   }
 
@@ -104,7 +178,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
 
   func primaryAmountText(at date: Date) -> String {
     let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
-    let grossCents = Double(connectionFeeCents) + elapsedMinutes * Double(pricePerMinuteCents)
+    let grossCents = elapsedMinutes * Double(pricePerMinuteCents)
     let cents = Self.isTeacherRole(role) ? grossCents * (teacherSharePercent / 100.0) : grossCents
     return String(format: "$%.2f", max(0, cents) / 100.0)
   }
@@ -148,24 +222,24 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     guard !text.isEmpty else { return }
     let message = localMessage(text: text)
     messages.append(message)
-    onMessagesUpdated?(messages)
+  }
+
+  func sendQuestionFormula(_ formulaText: String) {
+    send(formulaText)
   }
 
   func sendStroke(_ points: [BoardPoint]) {
     guard !points.isEmpty else { return }
     let stroke = localStroke(points: points)
     boardStrokes.append(stroke)
-    onBoardStrokesUpdated?(boardStrokes)
   }
 
   func clearBoard() {
     boardStrokes.removeAll()
-    onBoardStrokesUpdated?([])
   }
 
   func updateBoardViewport(_ viewport: BoardViewport) {
     boardViewports[role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] = viewport
-    onBoardViewportsUpdated?(boardViewports)
   }
 
   func setSelfChatPaused(_ paused: Bool) {
@@ -177,6 +251,20 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func peerChatPaused() -> Bool {
     let selfKey = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     for (key, value) in chatPausedStates where key != selfKey && value {
+      return true
+    }
+    return false
+  }
+
+  func setSelfMediaPending(_ pending: Bool) {
+    let key = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    mediaPendingStates[key.isEmpty ? "participant" : key] = pending
+    onMediaPendingUpdated?(mediaPendingStates)
+  }
+
+  func peerMediaPending() -> Bool {
+    let selfKey = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    for (key, value) in mediaPendingStates where key != selfKey && value {
       return true
     }
     return false
@@ -202,7 +290,15 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
         senderRole: "student",
         createdAt: Date().timeIntervalSince1970 * 1000.0 - 60_000.0,
         isMine: currentRole == "student"
-      )
+      ),
+	  ChatMessage(
+		id: "mock-3",
+		text: "Do you know the quadratic formula? It's -b ± √(b^2 - 4ac) / 2a. Let's try it out with x^2 - 5x + 6 = 0",
+		senderUid: currentRole == "student" ? "mock-current-user" : "mock-other-user",
+		senderRole: "teacher",
+		createdAt: Date().timeIntervalSince1970 * 1000.0 - 30_000.0,
+		isMine: currentRole == "teacher"
+	  )
     ]
   }
 

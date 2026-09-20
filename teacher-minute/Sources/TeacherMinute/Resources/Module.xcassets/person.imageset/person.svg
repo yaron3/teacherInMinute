@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="60"
+     height="60"
+     viewBox="0 0 1024 1024"
+     role="img"
+     aria-label="Profile tab icon, outline">
+  <g fill="none"
+     stroke="#000000"
+     stroke-width="24"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+    <!-- Head. -->
+    <circle cx="512" cy="377" r="92"/>
+
+    <!-- Shoulders. -->
+    <path d="M 340 699
+             L 340 653
+             C 340 583 417 526 512 526
+             C 607 526 684 583 684 653
+             L 684 699 Z"/>
+  </g>
+</svg>

@@ -10,33 +10,38 @@ import SwiftUI
 
 @MainActor
 struct TeacherDashboardView: View {
-  @State var viewModel: TeacherDashboardViewModel
+  @State var viewModel: any TeacherDashboardViewModeling
   @Binding var hidesTabBar: Bool
   let showsSessionOverlay: Bool
   let showsIncomingOverlay: Bool
-  let onOpenPermissions: (() -> Void)?
+  /// The warning the header is currently showing. Mirrors the view model, but
+  /// is only ever assigned inside `withAnimation`, which is what gives the
+  /// banner something to animate — a modifier on the banner itself would be
+  /// inserted and removed along with it and never drive the transition.
+  @State var warningMessage: String?
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
+  @State var showsMessages = false
   @State var showsQuestionSimulator = false
   @State  var isDemoEnabled = DemoStudentService.isEnabled
-  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
+  @State var emailReward = EmailRewardViewModel()
+  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? "en" : SettingsLanguageChoice.system.rawValue
+  //@AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.scenePhase) var scenePhase
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
   init(
-	viewModel: TeacherDashboardViewModel = TeacherDashboardViewModel(),
+	viewModel: any TeacherDashboardViewModeling = TeacherDashboardViewModel(),
 	hidesTabBar: Binding<Bool> = .constant(false),
 	showsSessionOverlay: Bool = true,
-	showsIncomingOverlay: Bool = true,
-	onOpenPermissions: (() -> Void)? = nil
+	showsIncomingOverlay: Bool = true
   ) {
 	self._viewModel = State(initialValue: viewModel)
 	self._hidesTabBar = hidesTabBar
 	self.showsSessionOverlay = showsSessionOverlay
 	self.showsIncomingOverlay = showsIncomingOverlay
-	self.onOpenPermissions = onOpenPermissions
   }
 
   var body: some View {
@@ -44,7 +49,7 @@ struct TeacherDashboardView: View {
 	  ConnectionSetupView(
 		participantName: viewModel.activeStudentName,
 		conversationType: viewModel.activeConversationType,
-		footerText: LocalizationSupport.localized("Setting up the session"),
+		footerText: viewModel.settingUpSessionText,
 		onCancel: {
 		  viewModel.cancelAcceptingInvite()
 		}
@@ -58,13 +63,13 @@ struct TeacherDashboardView: View {
 	} else if showsSessionOverlay, let questionId = viewModel.activeQuestionId {
 	  ChatSessionView(
 		questionId: questionId,
-			role: "teacher",
-			title: LocalizationSupport.localized("Student"),
-			conversationType: viewModel.activeConversationType,
-            liveKitRoom: viewModel.activeCallRoom ?? "",
-            liveKitToken: viewModel.activeCallToken ?? "",
-			initialDetails: viewModel.activeChatInitialDetails()
-		  ) {
+		role: "teacher",
+		title: viewModel.chatStudentTitle,
+		conversationType: viewModel.activeConversationType,
+		liveKitRoom: viewModel.activeCallRoom ?? "",
+		liveKitToken: viewModel.activeCallToken ?? "",
+		initialDetails: viewModel.activeChatInitialDetails()
+	  ) {
 		viewModel.endCall()
 	  }
 	  .onAppear {
@@ -74,45 +79,55 @@ struct TeacherDashboardView: View {
 		hidesTabBar = false
 	  }
 	} else {
-	  ZStack {
+	  VStack(spacing: 0) {
+		generalWarningHeader
+
 		ScrollView(.vertical, showsIndicators: false) {
 		  VStack(alignment: .leading, spacing: 0) {
 			FlatTopHeader(
-			  eyebrow: LocalizationSupport.localized("Teacher Dashboard"),
+			  eyebrow: viewModel.teacherEyebrow,
 			  name: viewModel.teacherName,
+			  avatarImageURL: viewModel.teacherImageURL,
 			  avatarSystemImage: "person.crop.circle.fill",
-			  showNotificationBadge: viewModel.isOnline
+			  showNotificationBadge: false
 			)
 			.padding(.top, 16)
 
-			statusHero
-			  .padding(.top, 28)
+			EmailRewardBanner(viewModel: emailReward, topPadding: 20)
+
+			statusToggleCard
+			  .padding(.top, 20)
+
 			if viewModel.isOnline {
-
-
 			  liveEarningsCard
 				.padding(.top, 28)
 
 			  onlineStatusCard
 				.padding(.top, 12)
-			  ZStack {
-				liveQueue
-				  .padding(.top, 28)
-				  .disabled(viewModel.isAcceptingCalls)
-				if viewModel.isAcceptingCalls {
-				  ProgressView()
+			  if viewModel.inviteIDs.count > 0 {
+				ZStack {
+				  liveQueue
+					.padding(.top, 28)
+					.disabled(viewModel.isAcceptingCalls)
+				  if viewModel.isAcceptingCalls {
+					ProgressView()
+				  }
 				}
 			  }
 			} else {
-
-
 			  teacherStatusCard
 				.padding(.top, 28)
 
-			  earningsSnapshot
+			  statsCards
 				.padding(.top, 28)
 
+			  ratingSection
+				.padding(.top, 16)
+
 			  readinessChecklist
+				.padding(.top, 28)
+
+			  howItWorksSection
 				.padding(.top, 28)
 			}
 
@@ -123,9 +138,12 @@ struct TeacherDashboardView: View {
 		  }
 		  .padding(.horizontal, 20)
 		  .padding(.bottom, 40)
-		}
-		.background(theme.screenBackground)
-
+	  }
+	  .background(theme.screenBackground)
+	  }
+	  // Drawn over the whole screen, header included, so an arriving question
+	  // covers the warning rather than leaving a stripe above it.
+	  .overlay {
 		if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
 		  TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
 			.onAppear {
@@ -136,7 +154,11 @@ struct TeacherDashboardView: View {
 			}
 		}
 	  }
-	  .sheet(isPresented: $viewModel.showsSubjectEditor, onDismiss: {
+	  .emailRewardDialogs(emailReward)
+	  .sheet(isPresented: $showsMessages) {
+		NotificationMessagesView()
+	  }
+	  .sheet(isPresented: Binding(get: { viewModel.showsSubjectEditor }, set: { viewModel.showsSubjectEditor = $0 }), onDismiss: {
 		viewModel.reloadSubjects()
 	  }) {
 		NavigationStack {
@@ -146,12 +168,12 @@ struct TeacherDashboardView: View {
 	  // After a teacher's first lesson (> 1 min) suggest completing the
 	  // optional verification documents — a one-time, dismissible prompt (bug #24).
 	  .sheet(isPresented: $showsDocumentsSuggestion) {
-		TeacherDocumentsSuggestionView {
-		  TeacherDocumentsPromptStore.markSuggestionShown()
+		TeacherDocumentsSuggestionView(viewModel: viewModel) {
+		  viewModel.markDocumentsSuggestionShown()
 		  showsDocumentsSuggestion = false
 		  showsDocuments = true
 		} onDismiss: {
-		  TeacherDocumentsPromptStore.markSuggestionShown()
+		  viewModel.markDocumentsSuggestionShown()
 		  showsDocumentsSuggestion = false
 		}
 		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
@@ -179,8 +201,11 @@ struct TeacherDashboardView: View {
 		.id(languagePreference)
 	  }
 	  .onAppear {
+		// Seeded without animation: a banner that is already true on the first
+		// frame should be there, not slide in.
+		warningMessage = viewModel.errorMessageGeneral
 		Task {
-		  if await TeacherDocumentsPromptStore.shouldPresentSuggestion() {
+		  if await viewModel.checkDocumentsSuggestion() {
 			showsDocumentsSuggestion = true
 		  }
 		}
@@ -188,11 +213,6 @@ struct TeacherDashboardView: View {
 	  .task {
 		await RemoteConfigService.shared.ready()
 		isDemoEnabled = DemoStudentService.isEnabled
-	  }
-	  .onChange(of: scenePhase) { _, phase in
-		if phase == .active {
-		  viewModel.refreshPermissionStatus()
-		}
 	  }
 	  .appDialog(
 		LocalizationSupport.localized("Permission required"),
@@ -215,45 +235,160 @@ struct TeacherDashboardView: View {
 		  }
 		]
 	  )
+	  .onChange(of: viewModel.errorMessageGeneral) { _, message in
+		withAnimation(.easeInOut(duration: 0.25)) {
+		  warningMessage = message
+		}
+	  }
+	  .onChange(of: scenePhase) { _, phase in
+		if phase == .active {
+		  viewModel.refreshPermissions()
+		} else if phase == .background {
+		  // If notifications are disabled, an online teacher cannot be reached
+		  // in the background, so take them offline immediately.
+		  viewModel.enforceNotificationRequirement()
+		}
+	  }
+	  .trackScreen(AnalyticsScreen.teacherDashboard)
+	}
+  }
+
+  var teacherHeader: some View {
+	HStack(alignment: .center, spacing: 14) {
+		ProfileAvatarView(
+		  imageURL: viewModel.teacherImageURL,
+		  size: 72,
+		  fallbackSystemImage: "person.crop.circle.fill",
+		  background: theme.cardBackground,
+		  tint: theme.primaryText
+		)
+
+  
+	  VStack(alignment: .leading, spacing: 4) {
+		Text(viewModel.teacherDashboardTitle)
+		  .font(.system(size: 12, weight: .semibold))
+		  .foregroundStyle(theme.accent)
+
+		Text(viewModel.teacherName)
+		  .font(.system(size: 22, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+		  .multilineTextAlignment(.leading)
+	  }
+	  Spacer()
+	  Button {
+		showsMessages = true
+	  } label: {
+		ZStack {
+		  Circle()
+			.fill(theme.cardBackground)
+			.frame(width: 20, height: 20)
+			.overlay {
+			  Circle()
+				.stroke(theme.screenBackground, lineWidth: 2)
+			}
+		  PlatformIcon(systemName: "bell", size: 20, weight: .medium, color: theme.primaryText)
+		}
+	  }
+	  .buttonStyle(.plain)
 
 	}
   }
 
-  // Status is carried by type weight and a single solid dot rather than a
-  // stacked-circle badge, so the block reads as one clean left-aligned column.
-  var statusHero: some View {
-	VStack(alignment: .leading, spacing: 0) {
-	  HStack(spacing: 8) {
-		FlatStatusDot(color: viewModel.isOnline ? theme.positive : theme.secondaryText)
+  var statusToggleCard: some View {
+	HStack(spacing: 16) {
 
-		Text(viewModel.isOnline ? LocalizationSupport.localized("ONLINE") : LocalizationSupport.localized("OFFLINE"))
-		  .font(.system(size: 11, weight: .bold))
-		  .foregroundStyle(viewModel.isOnline ? theme.positive : theme.secondaryText)
+	  VStack(alignment: .leading, spacing: 4) {
+		  Text(viewModel.statusToggleTitle)
+			.font(.system(size: 14, weight: .semibold))
+			.foregroundStyle(theme.primaryText)
+		  
+		
+		Text(viewModel.statusToggleSubtitle)
+		  .font(.system(size: 12))
+		  .foregroundStyle(theme.secondaryText)
+		  .frame(maxWidth: .infinity, alignment: .leading)
 	  }
+	  Spacer()
 
-	  FlatPageTitle(title: viewModel.isOnline ? LocalizationSupport.localized("You're Online") : LocalizationSupport.localized("You're Offline"))
-		.padding(.top, 10)
+	  // Reads the pending state too: going online waits on the notification
+	  // permission, and without this the switch springs back to off while the
+	  // system dialog is up, which reads as the tap having been rejected.
+	  Toggle("", isOn: Binding(
+		get: { viewModel.isOnline || viewModel.isAwaitingOnlinePermission },
+		set: { _ in viewModel.toggleOnline() }
+	  ))
+	  .labelsHidden()
+	  .disabled(viewModel.isAwaitingOnlinePermission)
+	}
+	.padding(16)
+	.background(theme.cardBackground)
+	.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
 
-	  Text(viewModel.isOnline ? LocalizationSupport.localized("Waiting for students...") : LocalizationSupport.localized("Go online to start receiving student requests and\nearn money."))
-		.font(.system(size: 15))
-		.foregroundStyle(theme.secondaryText)
-		.lineSpacing(4)
-		.padding(.top, 6)
-		.frame(maxWidth: .infinity, alignment: .leading)
+  var statsCards: some View {
+	HStack(spacing: 12) {
+	  statCard(
+		value: viewModel.lessonCountText,
+		label: viewModel.lessonsLabel,
+		valueColor: theme.accent
+	  )
+	  statCard(
+		value: viewModel.formattedMonthEarnings,
+		label: viewModel.monthlyIncomeLabel,
+		valueColor: theme.positive
+	  )
+	}
+  }
 
-	  if viewModel.isOnline {
-		FlatSecondaryButton(title: LocalizationSupport.localized("Go Offline"), systemImage: "moon.fill") {
-		  viewModel.toggleOnline()
+  func statCard(value: String, label: String, valueColor: Color) -> some View {
+	FlatCard {
+	  VStack(alignment: .leading, spacing: 6) {
+		Text(value)
+		  .font(.system(size: 32, weight: .bold))
+		  .foregroundStyle(valueColor)
+		  // The placeholder shown while the figures load is a word, not a
+		  // number, and is far wider than anything this card was sized for.
+		  .lineLimit(1)
+		  .minimumScaleFactor(0.5)
+		Text(label)
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.secondaryText)
+	  }
+	  .frame(maxWidth: .infinity, alignment: .leading)
+	}
+	.frame(maxWidth: .infinity)
+  }
+
+  var ratingSection: some View {
+	FlatCard {
+	  VStack(alignment: .leading, spacing: 8) {
+		HStack {
+		  Text(viewModel.myRatingLabel)
+			.font(.system(size: 14, weight: .semibold))
+			.foregroundStyle(theme.primaryText)
+			.frame(maxWidth: .infinity, alignment: .leading)
+		  Spacer()
+		  Text(viewModel.reviewCountText)
+			.font(.system(size: 13))
+			.foregroundStyle(theme.secondaryText)
 		}
-		.padding(.top, 22)
-	  } else {
-		FlatPrimaryButton(title: LocalizationSupport.localized("Go Online"), systemImage: "antenna.radiowaves.left.and.right") {
-		  viewModel.toggleOnline()
+	  
+
+		  // Until someone has rated this teacher there is no score to draw, and
+		  // five empty stars would read as a rating of zero.
+		if viewModel.hasRating {
+		  HStack {
+			Spacer()
+			RatingStarsView(rating: viewModel.teacherRating, size: 16, filledColor: theme.warning)
+			
+			Text(viewModel.ratingText)
+			  .font(.system(size: 15, weight: .bold))
+			  .foregroundStyle(theme.primaryText)
+			Spacer()
+		  }
 		}
-		.padding(.top, 22)
 	  }
 	}
-	.frame(maxWidth: .infinity, alignment: .leading)
   }
   
   /// Demo-only entry point: sends this teacher a simulated student question,
@@ -323,7 +458,7 @@ struct TeacherDashboardView: View {
 		  )
 
 		  VStack(alignment: .leading, spacing: 3) {
-			Text(viewModel.isVerified ? LocalizationSupport.localized("Verified Expert") : LocalizationSupport.localized("Pending Verification"))
+			Text(viewModel.verificationStatusText)
 			  .font(.system(size: 15, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
 
@@ -334,32 +469,35 @@ struct TeacherDashboardView: View {
 
 		  Spacer()
 		}
-
-		Button {
-		  viewModel.editSubjects()
-		} label: {
-		  FlatChip(title: LocalizationSupport.localized("Edit Subjects"), systemImage: "pencil", outlined: true)
+		HStack {
+		  Spacer()
+		  Button {
+			viewModel.editSubjects()
+		  } label: {
+			FlatChip(title: viewModel.editSubjectsLabel, systemImage: "pencil", outlined: true)
+		  }
+		  .buttonStyle(.plain)
+		  Spacer()
 		}
-		.buttonStyle(.plain)
 	  }
 	}
   }
 
   var earningsSnapshot: some View {
 	VStack(alignment: .leading, spacing: 12) {
-	  FlatSectionHeader(LocalizationSupport.localized("Earnings Snapshot"))
+	  FlatSectionHeader(viewModel.earningsSnapshotHeader)
 
 	  HStack(spacing: 12) {
-		EarningsCard(title: LocalizationSupport.localized("Today"), amount: viewModel.formattedTodayEarnings, subtitle: String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
+		EarningsCard(title: viewModel.earningsTodayTitle, amount: viewModel.formattedTodayEarnings, subtitle: viewModel.todayMinutesTutoredText)
 		  .frame(maxWidth: .infinity)
-		EarningsCard(title: LocalizationSupport.localized("This Week"), amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.weekMinutesTutored), subtitleColor: viewModel.weekChangeText != nil ? theme.positive : nil)
+		EarningsCard(title: viewModel.earningsThisWeekTitle, amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? viewModel.weekMinutesTutoredText, subtitleColor: viewModel.weekChangeText != nil ? theme.positive : nil)
 		  .frame(maxWidth: .infinity)
 	  }
 
 	  EarningsCard(
-		title: LocalizationSupport.localized("All Time"),
-		amount: String(format: LocalizationSupport.localized("%d min"), viewModel.totalMinutes),
-		subtitle: LocalizationSupport.localized("Total minutes tutored")
+		title: viewModel.earningsAllTimeTitle,
+		amount: viewModel.totalMinutesText,
+		subtitle: viewModel.totalMinutesTutoredLabel
 	  )
 	  .frame(maxWidth: .infinity)
 	}
@@ -371,34 +509,69 @@ struct TeacherDashboardView: View {
 	FlatCard(padding: 20) {
 	  HStack(alignment: .top) {
 		VStack(alignment: .leading, spacing: 6) {
-		  Text(LocalizationSupport.localized("Live Earnings Today"))
+		  Text(viewModel.liveEarningsTodayLabel)
 			.font(.system(size: 14))
 			.foregroundStyle(theme.secondaryText)
 
 		  Text(viewModel.formattedTodayEarnings)
 			.font(.system(size: 40, weight: .bold))
 			.foregroundStyle(theme.primaryText)
+			.lineLimit(1)
+			.minimumScaleFactor(0.5)
 
-		  Text(String(format: LocalizationSupport.localized("%d mins tutored"), viewModel.todayMinutesTutored))
+		  Text(viewModel.todayMinutesTutoredText)
 			.font(.system(size: 13))
 			.foregroundStyle(theme.secondaryText)
 		}
 
 		Spacer()
 
-		FlatBadge(title: String(format: LocalizationSupport.localized("%@/min"), viewModel.formattedRate))
+		FlatBadge(title: viewModel.ratePerMinBadgeText)
 	  }
+	}
+  }
+
+  /// A standing warning that the teacher cannot be reached — notifications
+  /// switched off while online, or no connection to the server. It sits above
+  /// the scrolling dashboard rather than inside it, because the state it
+  /// reports is one a teacher must not be able to scroll past.
+  ///
+  /// The message is the view model's, so what counts as unreachable is decided
+  /// in one place; the view only decides that it is drawn in warning colours.
+  @ViewBuilder
+  var generalWarningHeader: some View {
+	if let warning = warningMessage, !warning.isEmpty {
+	  HStack(alignment: .top, spacing: 10) {
+		PlatformIcon(systemName: "exclamationmark.triangle.fill", size: 14, weight: .bold, color: theme.warning)
+		  .padding(.top, 1)
+
+		Text(warning)
+		  .font(.system(size: 13, weight: .semibold))
+		  .foregroundStyle(theme.warning)
+		  .multilineTextAlignment(.leading)
+		  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
+	  }
+	  .padding(.horizontal, 20)
+	  .padding(.vertical, 12)
+	  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
+	  .background(theme.warningBackground)
+	  .overlay(alignment: .bottom) {
+		Rectangle()
+		  .fill(theme.warningBorder)
+		  .frame(height: flatHairline)
+	  }
+	  .transition(.opacity)
 	}
   }
 
   var onlineStatusCard: some View {
 	FlatCard(padding: 14) {
 	  HStack(spacing: 0) {
-		statusItem(icon: "mic.fill", title: LocalizationSupport.localized("Mic"), subtitle: viewModel.hasMicAccess ? LocalizationSupport.localized("On") : LocalizationSupport.localized("Off"), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText, onTap: viewModel.hasMicAccess ? nil : onOpenPermissions)
+		statusItem(icon: "mic.fill", title: viewModel.micStatusTitle, subtitle: viewModel.micStatusSubtitle, color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText)
 		verticalRule
-		statusItem(icon: "video.fill", title: LocalizationSupport.localized("Cam"), subtitle: viewModel.hasCameraAccess ? LocalizationSupport.localized("Ready") : LocalizationSupport.localized("Off"), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText, onTap: viewModel.hasCameraAccess ? nil : onOpenPermissions)
+		statusItem(icon: "video.fill", title: viewModel.camStatusTitle, subtitle: viewModel.camStatusSubtitle, color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
 		verticalRule
-		statusItem(icon: "circle.fill", title: LocalizationSupport.localized("Status"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
+		statusItem(icon: "circle.fill", title: viewModel.connectionStatusTitle, subtitle: viewModel.connectionStatusSubtitle, color: theme.positive)
 	  }
 	}
   }
@@ -411,8 +584,8 @@ struct TeacherDashboardView: View {
 
   var liveQueue: some View {
 	VStack(alignment: .leading, spacing: 12) {
-	  FlatSectionHeader(LocalizationSupport.localized("Live Queue")) {
-		FlatChip(title: String(format: LocalizationSupport.localized("%d Waiting"), viewModel.inviteIDs.count))
+	  FlatSectionHeader(viewModel.liveQueueHeader) {
+		FlatChip(title: viewModel.liveQueueWaitingText)
 	  }
 
 	  ForEach(viewModel.inviteIDs, id: \.self) { inviteID in
@@ -427,10 +600,23 @@ struct TeacherDashboardView: View {
 		  voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 		  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
-			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
+			  viewModel: viewModel
 		) {
+		  viewModel.logTeacherCallAnswered(
+			questionId: inviteID,
+			topic: viewModel.inviteTopics[inviteID] ?? "",
+			wave: viewModel.inviteWaves[inviteID] ?? 1,
+			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+		  )
 		  viewModel.acceptInvite(questionId: inviteID)
 		} decline: {
+		  viewModel.logTeacherCallDenied(
+			questionId: inviteID,
+			topic: viewModel.inviteTopics[inviteID] ?? "",
+			wave: viewModel.inviteWaves[inviteID] ?? 1,
+			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+		  )
 		  viewModel.declineInvite(questionId: inviteID)
 		}
 	  }
@@ -454,15 +640,32 @@ struct TeacherDashboardView: View {
 			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
-			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
+			  viewModel: viewModel
 		  ) {
+			viewModel.logTeacherCallAnswered(
+			  questionId: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  wave: viewModel.inviteWaves[inviteID] ?? 1,
+			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			)
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {
+			viewModel.logTeacherCallDenied(
+			  questionId: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  wave: viewModel.inviteWaves[inviteID] ?? 1,
+			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			)
 			viewModel.declineInvite(questionId: inviteID)
 		  }
 		  .padding(.horizontal, 20)
 		  .padding(.top, 24)
 
+		  // `errorMessage`, not `errorMessageGeneral`: this line reports the
+		  // accept or decline that just failed. The standing "you are
+		  // unreachable" warning has the dashboard header now, and showing it
+		  // here as well would bury a failed accept under it.
 		  if let errorMessage = viewModel.errorMessage {
 			Text(errorMessage)
 			  .font(.system(size: 13, weight: .semibold))
@@ -480,46 +683,78 @@ struct TeacherDashboardView: View {
 	.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
   }
 
+  /// The same panel the teacher saw when they chose the role. It answers "what
+  /// happens next" for a teacher who has signed up but not taught yet, which is
+  /// exactly who is looking at this screen.
+  var howItWorksSection: some View {
+	HowItWorksPanel(
+	  title: viewModel.howItWorksTitle,
+	  steps: viewModel.howItWorksSteps,
+	  theme: theme
+	)
+  }
+
   var readinessChecklist: some View {
 	VStack(alignment: .leading, spacing: 12) {
-	  FlatSectionHeader(LocalizationSupport.localized("Readiness Checklist"))
+	  FlatSectionHeader(viewModel.readinessChecklistHeader)
 
 	  FlatCard(padding: 0, outlined: true) {
 		VStack(spacing: 0) {
-		  checklistRow(icon: "mic.fill", title: viewModel.hasMicAccess ? LocalizationSupport.localized("Microphone Enabled") : LocalizationSupport.localized("Microphone Disabled"), subtitle: LocalizationSupport.localized("Required for voice sessions."), color: viewModel.hasMicAccess ? theme.positive : theme.secondaryText, onTap: viewModel.hasMicAccess ? nil : onOpenPermissions)
+		  permissionChecklistRow(
+			icon: "mic.fill",
+			title: viewModel.micChecklistTitle,
+			subtitle: viewModel.micChecklistSubtitle,
+			actionTitle: viewModel.micChecklistActionTitle,
+			isGranted: viewModel.hasMicAccess,
+			action: viewModel.requestMicrophoneAccess
+		  )
 		  FlatRule()
-		  checklistRow(icon: "camera.fill", title: viewModel.hasCameraAccess ? LocalizationSupport.localized("Camera Enabled") : LocalizationSupport.localized("Camera Disabled"), subtitle: LocalizationSupport.localized("Enable for video tutoring."), color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText, onTap: viewModel.hasCameraAccess ? nil : onOpenPermissions)
+		  permissionChecklistRow(
+			icon: "camera.fill",
+			title: viewModel.camChecklistTitle,
+			subtitle: viewModel.camChecklistSubtitle,
+			actionTitle: viewModel.camChecklistActionTitle,
+			isGranted: viewModel.hasCameraAccess,
+			action: viewModel.requestCameraAccess
+		  )
 		  FlatRule()
-		  checklistRow(icon: "wifi", title: LocalizationSupport.localized("Connection"), subtitle: LocalizationSupport.localized("Connected"), color: theme.positive)
+		  checklistRow(icon: "wifi", title: viewModel.connectionChecklistTitle, subtitle: viewModel.connectionChecklistSubtitle, color: theme.positive)
 		}
 	  }
 	}
   }
 
-  func statusItem(icon: String, title: String, subtitle: String, color: Color, onTap: (() -> Void)? = nil) -> some View {
-	Button { onTap?() } label: {
-	  HStack(spacing: 8) {
-		PlatformIcon(systemName: icon, size: 14, weight: .semibold, color: color)
+  func statusItem(icon: String, title: String, subtitle: String, color: Color) -> some View {
+	HStack(spacing: 8) {
+	  PlatformIcon(systemName: icon, size: 14, weight: .semibold, color: color)
 
-		VStack(alignment: .leading, spacing: 1) {
-		  Text(title)
-			.font(.system(size: 12, weight: .bold))
-			.foregroundStyle(theme.primaryText)
+	  VStack(alignment: .leading, spacing: 1) {
+		Text(title)
+		  .font(.system(size: 12, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
 
-		  Text(subtitle)
-			.font(.system(size: 11))
-			.foregroundStyle(theme.secondaryText)
-		}
+		Text(subtitle)
+		  .font(.system(size: 11))
+		  .foregroundStyle(theme.secondaryText)
 	  }
-	  .frame(maxWidth: .infinity)
 	}
-	.buttonStyle(.plain)
+	.frame(maxWidth: .infinity)
   }
 
-  func checklistRow(icon: String, title: String, subtitle: String, color: Color, onTap: (() -> Void)? = nil) -> some View {
-	Button { onTap?() } label: {
+  /// A checklist row the teacher can act on. The plain `checklistRow` reports
+  /// something the app cannot change — the network — while these two stand for
+  /// a switch the OS owns, so tapping one goes and asks for it.
+  func permissionChecklistRow(
+	icon: String,
+	title: String,
+	subtitle: String,
+	actionTitle: String,
+	isGranted: Bool,
+	action: @escaping () -> Void
+  ) -> some View {
+	Button(action: action) {
 	  HStack(spacing: 14) {
-		FlatIconTile(systemName: icon, size: 44, tint: color)
+		FlatIconTile(systemName: icon, size: 44, tint: isGranted ? theme.positive : theme.secondaryText)
 
 		VStack(alignment: .leading, spacing: 2) {
 		  Text(title)
@@ -533,14 +768,39 @@ struct TeacherDashboardView: View {
 
 		Spacer()
 
-		if onTap != nil {
-		  PlatformIcon(systemName: "chevron.right", size: 12, weight: .semibold, color: theme.secondaryText)
-		}
+		Text(actionTitle)
+		  .font(.system(size: 14, weight: .bold))
+		  .foregroundStyle(isGranted ? theme.secondaryText : theme.accent)
 	  }
+	  .frame(maxWidth: .infinity, alignment: .leading)
 	  .padding(.horizontal, 16)
 	  .padding(.vertical, 12)
+	  // An opaque background keeps the whole row tappable rather than just the
+	  // glyphs in it; `contentShape` is not available in Skip's SwiftUI. This
+	  // is the outlined card's own fill, so nothing looks different.
+	  .background(theme.screenBackground)
 	}
 	.buttonStyle(.plain)
+  }
+
+  func checklistRow(icon: String, title: String, subtitle: String, color: Color) -> some View {
+	HStack(spacing: 14) {
+	  FlatIconTile(systemName: icon, size: 44, tint: color)
+
+	  VStack(alignment: .leading, spacing: 2) {
+		Text(title)
+		  .font(.system(size: 15, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+
+		Text(subtitle)
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.secondaryText)
+	  }
+
+	  Spacer()
+	}
+	.padding(.horizontal, 16)
+	.padding(.vertical, 12)
   }
 
   struct EarningsCard: View {
@@ -563,10 +823,14 @@ struct TeacherDashboardView: View {
 		  Text(amount)
 			.font(.system(size: 26, weight: .bold))
 			.foregroundStyle(theme.primaryText)
+			.lineLimit(1)
+			.minimumScaleFactor(0.5)
 
 		  Text(subtitle)
 			.font(.system(size: 12))
 			.foregroundStyle(subtitleColor ?? theme.secondaryText)
+			.lineLimit(1)
+			.minimumScaleFactor(0.7)
 		}
 		.frame(maxWidth: .infinity, alignment: .leading)
 	  }
@@ -587,12 +851,13 @@ struct TeacherDashboardView: View {
 	var conversationType: String = "text"
 	var studentName: String = ""
 	var studentImageURL: String = ""
+	let viewModel: any TeacherDashboardViewModeling
 	let accept: () -> Void
 	let decline: () -> Void
 
 	private var displayStudentName: String {
 	  let trimmed = studentName.trimmingCharacters(in: .whitespacesAndNewlines)
-	  return trimmed.isEmpty ? LocalizationSupport.localized("Student") : trimmed
+	  return trimmed.isEmpty ? viewModel.unnamedStudentLabel : trimmed
 	}
 
 	private var sessionIcon: String? {
@@ -621,7 +886,7 @@ struct TeacherDashboardView: View {
 	private var isExpired: Bool { now > expiresAt }
 
 	private var timerCaption: String {
-	  now <= expiresAt ? LocalizationSupport.localized("SECONDS") : LocalizationSupport.localized("WAITING")
+	  viewModel.liveRequestTimerCaption(isExpired: isExpired)
 	}
 	@Environment(\.colorScheme) var colorScheme
 	@Environment(\.horizontalSizeClass) var hSizeClass
@@ -664,7 +929,7 @@ struct TeacherDashboardView: View {
 		  if let icon = sessionIcon {
 			PlatformIcon(systemName: icon, size: 14, weight: .medium, color: theme.primaryText)
 		  }
-		  FlatChip(title: LocalizationSupport.localized(topic.capitalized))
+		  FlatChip(title: viewModel.localizedTopicName(topic))
 		}
 	  }
 	  .padding(.horizontal, 16)
@@ -686,7 +951,7 @@ struct TeacherDashboardView: View {
 			.font(.system(size: 15, weight: .bold))
 			.foregroundStyle(theme.primaryText)
 
-		  Text(LocalizationSupport.localized("Waiting now"))
+		  Text(viewModel.waitingNowLabel)
 			.font(.system(size: 12))
 			.foregroundStyle(theme.secondaryText)
 		}
@@ -699,16 +964,20 @@ struct TeacherDashboardView: View {
 
 	var questionSection: some View {
 	  VStack(alignment: .leading, spacing: 12) {
-		Text(LocalizationSupport.localized("QUESTION"))
+		Text(viewModel.questionSectionHeader)
 		  .font(.system(size: 11, weight: .bold))
 		  .foregroundStyle(theme.secondaryText)
 
-		Text(text)
-		  .font(.system(size: 15))
-		  .foregroundStyle(theme.primaryText)
-		  .lineSpacing(4)
-		  .lineLimit(6)
-		  .frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
+		// A student can build the question out of equations, so this is the
+		// same formula-aware renderer the chat bubbles use: the teacher decides
+		// on the question as the student wrote it, not on raw LaTeX.
+		FormulaAwareText(
+		  text: text,
+		  textColor: theme.primaryText,
+		  font: .system(size: 15),
+		  lineLimit: 6
+		)
+		.frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
 
 		if !photoUrls.isEmpty {
 		  VStack(spacing: 10) {
@@ -748,7 +1017,7 @@ struct TeacherDashboardView: View {
 		FlatIconTile(systemName: "play.fill", size: 40, background: theme.screenBackground)
 
 		VStack(alignment: .leading, spacing: 1) {
-		  Text(LocalizationSupport.localized("Voice Message"))
+		  Text(viewModel.voiceMessageLabel)
 			.font(.system(size: 14, weight: .bold))
 			.foregroundStyle(theme.primaryText)
 		  if let formatted = formattedVoiceMessageDuration {
@@ -775,10 +1044,10 @@ struct TeacherDashboardView: View {
 
 	var actions: some View {
 	  VStack(spacing: 10) {
-		FlatPrimaryButton(title: LocalizationSupport.localized("Accept Question"), action: accept)
+		FlatPrimaryButton(title: viewModel.acceptQuestionLabel, action: accept)
 
 		Button(action: decline) {
-		  Text(LocalizationSupport.localized("Decline"))
+		  Text(viewModel.declineLabel)
 			.font(.system(size: 14, weight: .bold))
 			.foregroundStyle(theme.secondaryText)
 			.frame(maxWidth: .infinity)
@@ -793,7 +1062,7 @@ struct TeacherDashboardView: View {
 }
 struct TeacherIncomingQuestionOverlay: View {
   let inviteID: String
-  let viewModel: TeacherDashboardViewModel
+  let viewModel: any TeacherDashboardViewModeling
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
@@ -815,10 +1084,23 @@ struct TeacherIncomingQuestionOverlay: View {
 			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
-			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? ""
+			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
+			  viewModel: viewModel
 		  ) {
+			viewModel.logTeacherCallAnswered(
+			  questionId: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  wave: viewModel.inviteWaves[inviteID] ?? 1,
+			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			)
 			viewModel.acceptInvite(questionId: inviteID)
 		  } decline: {
+			viewModel.logTeacherCallDenied(
+			  questionId: inviteID,
+			  topic: viewModel.inviteTopics[inviteID] ?? "",
+			  wave: viewModel.inviteWaves[inviteID] ?? 1,
+			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
+			)
 			viewModel.declineInvite(questionId: inviteID)
 		  }
 		  .padding(.horizontal, 20)
@@ -845,3 +1127,31 @@ struct TeacherIncomingQuestionOverlay: View {
 	)
   }
 }
+
+#if os(iOS)
+#Preview("Offline") {
+  TeacherDashboardView(
+    viewModel: MockTeacherDashboardViewModel(),
+    showsSessionOverlay: false,
+    showsIncomingOverlay: false
+  )
+}
+
+#Preview("Online — Unreachable") {
+  let viewModel = MockTeacherDashboardViewModel(isOnline: true)
+  viewModel.errorMessageGeneral = viewModel.poorConnectionWarning
+  return TeacherDashboardView(
+    viewModel: viewModel,
+    showsSessionOverlay: false,
+    showsIncomingOverlay: false
+  )
+}
+
+#Preview("Online — Live Queue") {
+  TeacherDashboardView(
+	viewModel: MockTeacherDashboardViewModel(isOnline: true, errorMessageGeneral: "Must have notification enabled"),
+    showsSessionOverlay: false,
+    showsIncomingOverlay: false
+  )
+}
+#endif

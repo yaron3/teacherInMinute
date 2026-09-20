@@ -1,13 +1,33 @@
 import { Timestamp } from "firebase-admin/firestore";
 
+import { PayoutMethod } from "./payoutMethod";
+
 // ─── Pricing / dispatch constants ───
 // Per-minute pricing now lives in Remote Config (see pricing.ts); these
 // constants remain only for dispatch sizing and connection-fee fallback.
+
+// A Cloud Functions instance gets CPU in proportion to its memory, and the
+// question path is almost entirely cold-start cost: at the 256MiB default,
+// loading the module graph took ~4.4s before a single line of a handler ran.
+// The extra memory buys ~3.5x the CPU, which is the only lever on cold starts
+// short of paying for warm instances. It is close to free — these handlers
+// finish in well under a second, and billing is memory x duration, so the
+// shorter run largely pays for the bigger box.
+export const HOT_PATH = { memory: "1GiB" as const };
 
 export const WAVE_SIZES = [3, 5, 10] as const;
 export const WAVE_TIMEOUT_SECONDS = 12;
 export const INVITE_EXPIRY_SECONDS = 90;
 export const HARD_CAP_MINUTES = 30;
+
+// How long a teacher who accepted waits for the student to actually turn up
+// before the lesson is written off. A student's app joins within seconds of
+// seeing the acceptance, so this is generous; what it bounds is the case where
+// the student is not there at all — their app was killed while searching, or
+// they gave up before a teacher with a still-valid invite claimed the question.
+// Nobody is charged for such a lesson, and clearing it is what ends the
+// teacher's session, since the apps end when the live question node disappears.
+export const ABANDONED_LESSON_GRACE_SECONDS = 120;
 export const CONNECTION_FEE_CENTS = 50;
 export const MIN_BILLABLE_SECONDS = 30;
 export const ROUND_UP_SECONDS = 30;
@@ -19,10 +39,23 @@ export const ROUND_UP_SECONDS = 30;
 
 export interface TeacherRecord {
   status: "online" | "offline";
+  /** What the teacher asked for, as opposed to whether the app is connected.
+   *  Written only when they work the availability toggle. */
+  availability?: "available" | "dnd";
   subjects: string[];       // ["algebra", "geometry", ...]
-  ratingAvg: number;        // 0–5,  default 3.0 for new teachers
-  acceptRate: number;       // 0–1,  default 1.0 for new teachers
-  lastActiveAt: number;     // Unix ms
+  /** 0–5, and absent until a student has actually rated them. Written by the
+   *  backend alone — `rateTeacher` mirrors it here and presence stamps it when
+   *  a teacher comes online — so it cannot be set by the app that benefits
+   *  from it. Absent means unrated, which ./scoring reads as a prior rather
+   *  than as zero. */
+  ratingAvg?: number;
+  /** How many ratings `ratingAvg` is the mean of. */
+  ratingCount?: number;
+  /** 0–1. Absent until there is anything to measure. */
+  acceptRate?: number;
+  /** Unix ms. Android writes it; iOS does not, so absence means "unknown",
+   *  not "idle". */
+  lastActiveAt?: number;
   fcmToken?: string;        // registered by the app on login
   displayName: string;
   photoUrl?: string;
@@ -107,6 +140,10 @@ export interface LessonDoc {
   teacherShare: number;          // 0–1, e.g. 0.75
   exchangeRateToUsd: number;     // multiplicative rate USD → currencyCode
   totalCents?: number;
+  /** Settled at endLesson, in major units of `currencyCode` (not cents). */
+  cost?: number;
+  /** The teacher's share of `cost`, also in major units. */
+  teacherEarnings?: number;
   status: LessonStatus;
   liveKitRoom: string;          // "lesson_<questionId>"
   liveKitTokenExpiry: Timestamp;
@@ -162,6 +199,19 @@ export interface UserDoc {
   totalMinutes: number;      // teachers: cumulative minutes taught
   questions?: string[];
   currency?: string;         // ISO 4217 code; controls pricing for students and display for teachers
+  /** A student's vaulted PayPal account (see ./braintree.ts), for one-tap
+   *  future purchases without a PayPal login redirect. Unrelated to
+   *  `paypalEmail` below, which is a teacher's payout destination. */
+  savedPayPal?: {
+    paymentMethodToken: string;
+    email: string;
+    updatedAt: Timestamp;
+  };
+  paypalEmail?: string;       // teachers: PayPal payout destination
+  /** Teachers: where the monthly payout is sent — a bank account, Bit, or
+   *  PayPal. Written only by `updateTeacherPayoutMethod`, which validates the
+   *  fields required for the chosen type (see ./payoutMethod). */
+  payoutMethod?: PayoutMethod & { updatedAt: Timestamp };
 }
 
 // ─── Firestore — coupons/{couponId} ──────────────────────────────────────────

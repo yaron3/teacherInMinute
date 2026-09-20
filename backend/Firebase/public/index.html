@@ -3,7 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teacher in Minute - שיעורים פרטיים ברגע | Private Tutoring</title>
+  <title>מורה ברגע · Teacher in a Minute — עזרה במתמטיקה כשצריך</title>
+  <meta name="description" content="מורה ברגע מחברת תלמידים למורי מתמטיקה מוסמכים תוך דקות, בתשלום לפי דקה בלבד. Teacher in a Minute connects students with certified math teachers in minutes, billed by the minute.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#08080C" media="(prefers-color-scheme: dark)">
+
+  <!-- Applied before first paint so a stored choice never flashes the other
+       scheme. No stored choice means the system decides. -->
+  <script>
+    (function () {
+      var stored = null;
+      try { stored = localStorage.getItem('theme'); } catch (e) {}
+      if (stored === 'light' || stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', stored);
+      }
+    })();
+  </script>
+
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="מורה ברגע · Teacher in a Minute">
+  <meta property="og:description" content="עזרה כשצריך, ממורה שזמין עכשיו — תשלום לפי דקה.">
+  <meta property="og:image" content="logo.png">
+  <meta name="twitter:card" content="summary_large_image">
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -24,14 +49,22 @@
             sans: ['Assistant', 'Inter', 'sans-serif'],
           },
           colors: {
+            /* Every brand color resolves through a CSS variable, so one
+               `data-theme` swap re-skins the page. The variables hold bare
+               RGB channels, which is what lets `/opacity` modifiers keep
+               working (bg-brand-card/40 and friends). */
             brand: {
-              black: '#0D0D0E',
-              dark: '#161618',
-              card: '#1F1F23',
-              purple: '#D946EF',
-              pink: '#EC4899',
-              accent: '#8B5CF6',
-              textGray: '#A1A1AA'
+              black: 'rgb(var(--surface-0) / <alpha-value>)',
+              dark: 'rgb(var(--surface-1) / <alpha-value>)',
+              card: 'rgb(var(--surface-2) / <alpha-value>)',
+              line: 'rgb(var(--line) / <alpha-value>)',
+              strong: 'rgb(var(--text-1) / <alpha-value>)',
+              body: 'rgb(var(--text-2) / <alpha-value>)',
+              textGray: 'rgb(var(--text-3) / <alpha-value>)',
+              sky: 'rgb(var(--sky) / <alpha-value>)',
+              amber: 'rgb(var(--amber) / <alpha-value>)',
+              accent: 'rgb(var(--accent) / <alpha-value>)',
+              accentStrong: 'rgb(var(--accent-strong) / <alpha-value>)'
             }
           }
         }
@@ -39,15 +72,124 @@
     }
   </script>
   <style>
+    /* Light is the base scheme; the dark values below override it, first
+       for people whose system asks for dark, then for an explicit choice
+       made with the header toggle. */
+    :root {
+      --surface-0: 255 255 255;
+      --surface-1: 245 245 247;
+      --surface-2: 255 255 255;
+      --line: 226 226 232;
+      --text-1: 10 10 15;
+      --text-2: 63 63 70;
+      --text-3: 113 113 122;
+      --accent: 67 64 214;
+      --accent-strong: 55 52 190;
+      --sky: 30 111 217;
+      --amber: 194 98 14;
+      --bezel-a: #E6E6EC;
+      --bezel-b: #C8C8D2;
+      --device-shadow: 0 20px 45px -22px rgba(15, 15, 30, .45);
+      --aura-opacity: .5;
+      color-scheme: light;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --surface-0: 8 8 12;
+        --surface-1: 16 16 22;
+        --surface-2: 23 23 31;
+        --line: 38 38 47;
+        --text-1: 255 255 255;
+        --text-2: 212 212 216;
+        --text-3: 161 161 170;
+        --accent: 91 91 245;
+        --accent-strong: 67 64 214;
+        --sky: 46 134 240;
+        --amber: 245 146 30;
+        --bezel-a: #2A2A34;
+        --bezel-b: #14141A;
+        --device-shadow: 0 24px 60px -20px rgba(0, 0, 0, .9);
+        --aura-opacity: 1;
+        color-scheme: dark;
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --surface-0: 8 8 12;
+      --surface-1: 16 16 22;
+      --surface-2: 23 23 31;
+      --line: 38 38 47;
+      --text-1: 255 255 255;
+      --text-2: 212 212 216;
+      --text-3: 161 161 170;
+      --accent: 91 91 245;
+      --accent-strong: 67 64 214;
+      --sky: 46 134 240;
+      --amber: 245 146 30;
+      --bezel-a: #2A2A34;
+      --bezel-b: #14141A;
+      --device-shadow: 0 24px 60px -20px rgba(0, 0, 0, .9);
+      --aura-opacity: 1;
+      color-scheme: dark;
+    }
+
     body {
-      background-color: #0D0D0E;
-      color: #F4F4F5;
+      background-color: rgb(var(--surface-0));
+      color: rgb(var(--text-2));
       font-family: 'Assistant', 'Inter', sans-serif;
+      transition: background-color .2s ease, color .2s ease;
+    }
+
+    /* Only one of the two toggle glyphs is ever the useful one. */
+    :root[data-theme="dark"] .theme-icon-dark,
+    .theme-icon-light { display: none; }
+    :root[data-theme="dark"] .theme-icon-light,
+    :root[data-theme="light"] .theme-icon-dark { display: inline-block; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .theme-icon-dark { display: none; }
+      :root:not([data-theme="light"]) .theme-icon-light { display: inline-block; }
     }
     .gradient-text {
-      background: linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%);
+      background: linear-gradient(135deg, rgb(var(--accent)) 0%, rgb(var(--sky)) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+    }
+
+    /* Screenshot frame: a thin dark bezel so a light app screen keeps its
+       edges on the dark page, with the phone's own rounded corners. */
+    .device {
+      border-radius: 2rem;
+      padding: 6px;
+      background: linear-gradient(160deg, var(--bezel-a) 0%, var(--bezel-b) 60%);
+      box-shadow: var(--device-shadow), 0 0 0 1px rgb(var(--line));
+    }
+    .device img {
+      border-radius: 1.6rem;
+      display: block;
+      width: 100%;
+    }
+    /* A screenshot pair shows whichever half matches the page theme.
+       Specificity has to clear `.device img`, hence the qualified selectors. */
+    .device img.shot-dark { display: none; }
+    :root[data-theme="dark"] .device img.shot-light { display: none; }
+    :root[data-theme="dark"] .device img.shot-dark { display: block; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .device img.shot-light { display: none; }
+      :root:not([data-theme="light"]) .device img.shot-dark { display: block; }
+    }
+
+    .device-lift {
+      transition: transform .3s ease;
+    }
+    .device-lift:hover {
+      transform: translateY(-6px);
+    }
+    /* Ambient wash behind the hero devices. */
+    .aura {
+      background: radial-gradient(60% 50% at 50% 40%, rgba(91, 91, 245, .35) 0%, rgba(46, 134, 240, .12) 45%, transparent 75%);
+      filter: blur(28px);
+      opacity: var(--aura-opacity);
     }
     
     /* Multilingual display logic */
@@ -59,55 +201,61 @@
       width: 6px;
     }
     .custom-scrollbar::-webkit-scrollbar-track {
-      background: #161618;
+      background: rgb(var(--surface-1));
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #3F3F46;
+      background: rgb(var(--line));
       border-radius: 3px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: #52525B;
+      background: rgb(var(--text-3));
     }
   </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between">
 
-  <header class="sticky top-0 z-50 bg-brand-black/80 backdrop-blur-md border-b border-zinc-800/80 px-4 py-3">
+  <header class="sticky top-0 z-50 bg-brand-black/80 backdrop-blur-md border-b border-brand-line/80 px-4 py-3">
     <div class="max-w-6xl mx-auto flex items-center justify-between">
       <div class="flex items-center gap-3">
         <a href="#" class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-pink to-brand-accent flex items-center justify-center shadow-lg shadow-brand-pink/20">
-            <i class="ph ph-graduation-cap text-white text-2xl"></i>
-          </div>
+          <img src="logo-mark.png" alt="מורה ברגע" class="h-10 w-auto drop-shadow-[0_4px_12px_rgba(46,134,240,.35)]">
           <div>
-            <span class="font-extrabold text-lg tracking-wide text-white block leading-tight">Teacher in minute</span>
-            <span class="text-[10px] text-brand-purple font-semibold lang-he">שיעורים פרטיים ברגע</span>
-            <span class="text-[10px] text-brand-purple font-semibold lang-en">On-Demand Private Tutoring</span>
+            <span class="font-extrabold text-lg tracking-wide text-brand-strong block leading-tight lang-he">מורה ברגע</span>
+            <span class="font-extrabold text-lg tracking-wide text-brand-strong block leading-tight lang-en">Teacher in a Minute</span>
+            <span class="text-[10px] text-brand-sky font-semibold lang-he">עזרה כשצריך, ממורה שזמין עכשיו</span>
+            <span class="text-[10px] text-brand-sky font-semibold lang-en">Help right when you need it</span>
           </div>
         </a>
       </div>
       
       <nav class="hidden md:flex items-center gap-6">
-        <a href="#about" class="text-zinc-300 hover:text-white transition font-medium lang-he">על האפליקציה</a>
-        <a href="#about" class="text-zinc-300 hover:text-white transition font-medium lang-en">About</a>
+        <a href="#about" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">על האפליקציה</a>
+        <a href="#about" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">About</a>
         
-        <a href="#screens" class="text-zinc-300 hover:text-white transition font-medium lang-he">צילומי מסך</a>
-        <a href="#screens" class="text-zinc-300 hover:text-white transition font-medium lang-en">Screenshots</a>
+        <a href="#screens" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">צילומי מסך</a>
+        <a href="#screens" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Screenshots</a>
         
-        <a href="#privacy" class="text-zinc-300 hover:text-white transition font-medium lang-he">מדיניות פרטיות</a>
-        <a href="#privacy" class="text-zinc-300 hover:text-white transition font-medium lang-en">Privacy Policy</a>
+        <a href="#privacy" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">מדיניות פרטיות</a>
+        <a href="#privacy" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Privacy Policy</a>
 
-        <a href="#eula" class="text-zinc-300 hover:text-white transition font-medium lang-he">תנאי שימוש</a>
-        <a href="#eula" class="text-zinc-300 hover:text-white transition font-medium lang-en">Terms (EULA)</a>
+        <a href="#eula" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">תנאי שימוש</a>
+        <a href="#eula" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Terms (EULA)</a>
         
-        <a href="#contact" class="text-zinc-300 hover:text-white transition font-medium lang-he">צור קשר</a>
-        <a href="#contact" class="text-zinc-300 hover:text-white transition font-medium lang-en">Contact</a>
+        <a href="#contact" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">צור קשר</a>
+        <a href="#contact" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Contact</a>
       </nav>
 
       <div class="flex items-center gap-3">
+        <!-- Light / Dark Switcher Button -->
+        <button onclick="toggleTheme()" id="theme-toggle" aria-label="Toggle light and dark mode"
+                class="bg-brand-card hover:bg-brand-line text-brand-body hover:text-brand-strong w-9 h-9 rounded-xl border border-brand-line transition flex items-center justify-center">
+          <i class="ph-bold ph-moon text-base theme-icon-dark"></i>
+          <i class="ph-bold ph-sun text-base theme-icon-light"></i>
+        </button>
+
         <!-- Language Switcher Button -->
-        <button onclick="toggleLanguage()" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs px-3 py-2 rounded-xl border border-zinc-800 transition flex items-center gap-2">
-          <i class="ph-bold ph-translate text-sm text-brand-pink"></i>
+        <button onclick="toggleLanguage()" class="bg-brand-card hover:bg-brand-line text-brand-body hover:text-brand-strong text-xs px-3 py-2 rounded-xl border border-brand-line transition flex items-center gap-2">
+          <i class="ph-bold ph-translate text-sm text-brand-amber"></i>
           <span class="lang-he font-semibold">English</span>
           <span class="lang-en font-semibold">עברית</span>
         </button>
@@ -126,47 +274,47 @@
         <div class="lg:col-span-7 space-y-6 text-center lg:text-start">
           <!-- Hebrew Hero Intro -->
           <div class="lang-he space-y-6">
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-pink/10 border border-brand-pink/30 text-brand-pink text-xs font-bold">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-amber/10 border border-brand-amber/30 text-brand-amber text-xs font-bold">
               <i class="ph-bold ph-sparkle"></i>
               <span>מענה ממוקד תוך דקות ספורות בלבד!</span>
             </div>
             
-            <h1 class="text-4xl md:text-6xl font-black text-white leading-tight">
+            <h1 class="text-4xl md:text-6xl font-black text-brand-strong leading-tight">
               מורה למתמטיקה <br class="hidden md:inline">
               <span class="gradient-text">בדיוק כשצריך.</span>
             </h1>
             
             <p class="text-lg text-brand-textGray max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              נתקעתם בשיעורי הבית? צריכים הכנה מהירה למבחן? <span class="text-white font-semibold">Teacher in minute</span> מחברת אתכם באופן מיידי למורים מוסמכים למתמטיקה בעלי רישיון הוראה. משלמים רק על הזמן שלמדתם בפועל – לפי דקה!
+              נתקעתם בשיעורי הבית? צריכים הכנה מהירה למבחן? <span class="text-brand-strong font-semibold">מורה ברגע</span> מחברת אתכם באופן מיידי למורים מוסמכים למתמטיקה בעלי רישיון הוראה. משלמים רק על הזמן שלמדתם בפועל – לפי דקה!
             </p>
           </div>
 
           <!-- English Hero Intro -->
           <div class="lang-en space-y-6">
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-pink/10 border border-brand-pink/30 text-brand-pink text-xs font-bold">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-amber/10 border border-brand-amber/30 text-brand-amber text-xs font-bold">
               <i class="ph-bold ph-sparkle"></i>
               <span>Get answered in minutes!</span>
             </div>
             
-            <h1 class="text-4xl md:text-6xl font-black text-white leading-tight">
+            <h1 class="text-4xl md:text-6xl font-black text-brand-strong leading-tight">
               A Math Teacher <br class="hidden md:inline">
               <span class="gradient-text">Right when you need it.</span>
             </h1>
             
             <p class="text-lg text-brand-textGray max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              Stuck on homework? Need a quick pre-exam prep session? <span class="text-white font-semibold">Teacher in minute</span> connects you instantly with certified math teachers. Pay only for the minutes you actually learn!
+              Stuck on homework? Need a quick pre-exam prep session? <span class="text-brand-strong font-semibold">Teacher in a Minute</span> connects you instantly with certified math teachers. Pay only for the minutes you actually learn!
             </p>
           </div>
 
           <div class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-4">
-            <a href="#" class="flex items-center gap-3 bg-white hover:bg-zinc-100 text-black px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
+            <a href="#" class="flex items-center gap-3 bg-brand-strong hover:opacity-90 text-brand-black px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
               <i class="ph-bold ph-app-store-logo text-2xl"></i>
               <div class="text-left">
                 <span class="text-[10px] block font-medium opacity-70">Download on the</span>
                 <span class="text-sm block font-bold leading-tight -mt-0.5 font-sans">App Store</span>
               </div>
             </a>
-            <a href="#" class="flex items-center gap-3 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-700 px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
+            <a href="#" class="flex items-center gap-3 bg-brand-card hover:bg-brand-line text-brand-strong border border-brand-line px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
               <i class="ph-bold ph-google-play-logo text-2xl"></i>
               <div class="text-left font-sans">
                 <span class="text-[10px] block font-medium text-brand-textGray">GET IT ON</span>
@@ -176,13 +324,13 @@
           </div>
 
           <!-- Feature Badges -->
-          <div class="grid grid-cols-2 md:grid-cols-3 gap-4 pt-8 border-t border-zinc-800 max-w-lg mx-auto lg:mx-0 text-right lg:text-start">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4 pt-8 border-t border-brand-line max-w-lg mx-auto lg:mx-0 text-right lg:text-start">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-brand-pink">
+              <div class="w-10 h-10 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-amber">
                 <i class="ph-bold ph-clock-countdown text-xl"></i>
               </div>
               <div>
-                <h4 class="font-bold text-sm text-white">
+                <h4 class="font-bold text-sm text-brand-strong">
                   <span class="lang-he">תמחור לפי דקה</span>
                   <span class="lang-en">By-the-minute</span>
                 </h4>
@@ -194,11 +342,11 @@
             </div>
             
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-brand-accent">
+              <div class="w-10 h-10 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-accent">
                 <i class="ph-bold ph-certificate text-xl"></i>
               </div>
               <div>
-                <h4 class="font-bold text-sm text-white">
+                <h4 class="font-bold text-sm text-brand-strong">
                   <span class="lang-he">מורים מוסמכים</span>
                   <span class="lang-en">Certified Teachers</span>
                 </h4>
@@ -210,11 +358,11 @@
             </div>
 
             <div class="flex items-center gap-3 col-span-2 md:col-span-1">
-              <div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-brand-purple">
+              <div class="w-10 h-10 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-sky">
                 <i class="ph-bold ph-shield-check text-xl"></i>
               </div>
               <div>
-                <h4 class="font-bold text-sm text-white">
+                <h4 class="font-bold text-sm text-brand-strong">
                   <span class="lang-he">סביבה מוגנת</span>
                   <span class="lang-en">Safe Space</span>
                 </h4>
@@ -228,48 +376,162 @@
         </div>
 
         <!-- Phone Screenshots Column -->
-        <div id="screens" class="lg:col-span-5 flex flex-row items-center justify-center gap-4 md:gap-6 relative">
-          <!-- Ambient glowing backgrounds under images -->
-          <div class="absolute -inset-1 bg-gradient-to-r from-brand-pink to-brand-accent rounded-[2.5rem] blur-2xl opacity-10 max-w-sm mx-auto"></div>
+        <div class="lg:col-span-5 flex flex-row items-center justify-center gap-4 md:gap-6 relative">
+          <!-- Ambient wash under the devices -->
+          <div class="aura absolute inset-0 pointer-events-none"></div>
 
-          <!-- Phone Mockup 1 (Pricing) -->
-          <div class="w-1/2 max-w-[240px] transition-all hover:scale-105 duration-300 z-10">
-            <p class="text-xs text-center text-zinc-500 mb-2 font-medium">
-              <span class="lang-he">מסך הבית והתמחור</span>
-              <span class="lang-en">Home & Pricing</span>
+          <div class="w-1/2 max-w-[240px] device-lift z-10">
+            <p class="text-xs text-center text-brand-textGray mb-2 font-medium">
+              <span class="lang-he">מסך הפתיחה</span>
+              <span class="lang-en">Getting started</span>
             </p>
-            <div class="rounded-3xl border-4 border-zinc-800 overflow-hidden shadow-2xl bg-zinc-900 relative">
-              <img src="screen1.png" alt="Home Screen" class="w-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/430x932/161618/ffffff?text=Home+Screen'">
+            <div class="device">
+              <img src="screen-welcome.jpg" alt="מסך הפתיחה של מורה ברגע" loading="lazy" width="620" height="1347">
             </div>
           </div>
 
-          <!-- Phone Mockup 2 (History) -->
-          <div class="w-1/2 max-w-[240px] transition-all hover:scale-105 duration-300 mt-8 z-10">
-            <p class="text-xs text-center text-zinc-500 mb-2 font-medium">
-              <span class="lang-he">היסטוריית שיעורים</span>
-              <span class="lang-en">Lesson History</span>
+          <div class="w-1/2 max-w-[240px] mt-8 device-lift z-10">
+            <p class="text-xs text-center text-brand-textGray mb-2 font-medium">
+              <span class="lang-he">מסך הבית והתמחור</span>
+              <span class="lang-en">Home & pricing</span>
             </p>
-            <div class="rounded-3xl border-4 border-zinc-800 overflow-hidden shadow-2xl bg-zinc-900 relative">
-              <img src="screen2.png" alt="Lesson History" class="w-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/430x932/161618/ffffff?text=Lesson+History'">
+            <div class="device">
+              <img src="screen-home.png" class="shot-light" alt="מסך הבית עם חבילות דקות" loading="lazy" width="620" height="1347">
+              <img src="screen-home-dark.png" class="shot-dark" alt="מסך הבית במצב כהה" loading="lazy" width="620" height="1347">
             </div>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- Screenshot gallery -->
+    <section id="screens" class="py-16 md:py-20 px-4 border-t border-brand-line/70">
+      <div class="max-w-6xl mx-auto space-y-10">
+        <div class="text-center space-y-3">
+          <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-accent/10 border border-brand-accent/30 text-brand-accent text-xs font-bold">
+            <i class="ph-bold ph-device-mobile"></i>
+            <span class="lang-he">מתוך האפליקציה</span>
+            <span class="lang-en">Inside the app</span>
+          </span>
+          <h2 class="text-2xl md:text-4xl font-black text-brand-strong">
+            <span class="lang-he">מהשאלה ועד המורה — בכמה הקשות</span>
+            <span class="lang-en">From question to teacher in a few taps</span>
+          </h2>
+          <p class="text-brand-textGray text-sm md:text-base max-w-2xl mx-auto">
+            <span class="lang-he">בוחרים נושא וסוג שיעור, שולחים את השאלה, ומורה זמין מצטרף. בסוף השיעור משלמים רק על הדקות שנוצלו. המסכים כאן מוצגים במצב התצוגה שבחרתם.</span>
+            <span class="lang-en">Pick a topic and a session type, send the question, and an available teacher joins. You pay only for the minutes you used. The screens below follow the theme you are viewing in.</span>
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-8">
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screen-welcome.jpg" alt="מסך פתיחה — עזרה מכל מקום" loading="lazy" width="620" height="1347">
+            </div>
+            <figcaption class="text-center">
+              <span class="block text-sm font-bold text-brand-strong lang-he">עזרה מכל מקום</span>
+              <span class="block text-sm font-bold text-brand-strong lang-en">Help from anywhere</span>
+              <span class="block text-xs text-brand-textGray lang-he">מורים מאומתים, סביבה מוגנת</span>
+              <span class="block text-xs text-brand-textGray lang-en">Verified teachers, safe space</span>
+            </figcaption>
+          </figure>
+
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screen-home.png" class="shot-light" alt="מסך הבית — יתרת דקות וחבילות" loading="lazy" width="620" height="1347">
+              <img src="screen-home-dark.png" class="shot-dark" alt="מסך הבית במצב כהה — יתרת דקות וחבילות" loading="lazy" width="620" height="1347">
+            </div>
+            <figcaption class="text-center">
+              <span class="block text-sm font-bold text-brand-strong lang-he">יתרה וחבילות דקות</span>
+              <span class="block text-sm font-bold text-brand-strong lang-en">Balance & minute packs</span>
+              <span class="block text-xs text-brand-textGray lang-he">רואים בדיוק כמה נשאר</span>
+              <span class="block text-xs text-brand-textGray lang-en">See exactly what is left</span>
+            </figcaption>
+          </figure>
+
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screen-pay.png" class="shot-light" alt="בחירת אמצעי תשלום" loading="lazy" width="620" height="1347">
+              <img src="screen-pay-dark.png" class="shot-dark" alt="בחירת אמצעי תשלום במצב כהה" loading="lazy" width="620" height="1347">
+            </div>
+            <figcaption class="text-center">
+              <span class="block text-sm font-bold text-brand-strong lang-he">תשלום נוח ומאובטח</span>
+              <span class="block text-sm font-bold text-brand-strong lang-en">Simple, secure checkout</span>
+              <span class="block text-xs text-brand-textGray lang-he">PayPal, ביט, Apple Pay וכרטיס אשראי</span>
+              <span class="block text-xs text-brand-textGray lang-en">PayPal, Bit, Apple Pay & card</span>
+            </figcaption>
+          </figure>
+
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screen-teacher.png" alt="לוח המורה — מצב מקוון ותור חי" loading="lazy" width="620" height="1347">
+            </div>
+            <figcaption class="text-center">
+              <span class="block text-sm font-bold text-brand-strong lang-he">גם צד המורה</span>
+              <span class="block text-sm font-bold text-brand-strong lang-en">The teacher side too</span>
+              <span class="block text-xs text-brand-textGray lang-he">מתחברים, מקבלים שאלות, מרוויחים</span>
+              <span class="block text-xs text-brand-textGray lang-en">Go online, take questions, earn</span>
+            </figcaption>
+          </figure>
+        </div>
+
+        <!-- Both schemes at once, so the point lands whichever theme the
+             visitor is reading the page in. -->
+        <div class="rounded-3xl border border-brand-line bg-brand-dark p-6 md:p-10 grid md:grid-cols-2 gap-8 md:gap-10 items-center">
+          <div class="space-y-3 text-center md:text-start">
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-sky/10 border border-brand-sky/30 text-brand-sky text-xs font-bold">
+              <i class="ph-bold ph-circle-half"></i>
+              <span class="lang-he">בהיר וכהה</span>
+              <span class="lang-en">Light & dark</span>
+            </span>
+            <h3 class="text-xl md:text-2xl font-black text-brand-strong">
+              <span class="lang-he">מתאימה את עצמה למכשיר שלכם</span>
+              <span class="lang-en">It follows your device</span>
+            </h3>
+            <p class="text-brand-textGray text-sm">
+              <span class="lang-he">האפליקציה עוברת למצב בהיר או כהה יחד עם ההגדרות של המכשיר — אותם מסכים, אותה קריאוּת, גם בלילה. גם האתר הזה.</span>
+              <span class="lang-en">The app switches between light and dark with your system settings — same screens, same readability, late at night too. This site does the same.</span>
+            </p>
+          </div>
+
+          <div class="flex flex-row items-center justify-center gap-4 md:gap-6">
+            <figure class="w-1/2 max-w-[190px] space-y-2">
+              <div class="device">
+                <img src="screen-login.png" alt="מסך התחברות במצב בהיר" loading="lazy" width="620" height="1347">
+              </div>
+              <figcaption class="text-center text-xs font-semibold text-brand-textGray">
+                <span class="lang-he">בהיר</span>
+                <span class="lang-en">Light</span>
+              </figcaption>
+            </figure>
+
+            <figure class="w-1/2 max-w-[190px] space-y-2">
+              <div class="device">
+                <img src="screen-login-dark.png" alt="מסך התחברות במצב כהה" loading="lazy" width="620" height="1347">
+              </div>
+              <figcaption class="text-center text-xs font-semibold text-brand-textGray">
+                <span class="lang-he">כהה</span>
+                <span class="lang-en">Dark</span>
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Support / Call to Action inside landing -->
-    <section class="py-12 bg-zinc-950/40 text-center px-4">
+    <section class="py-12 bg-brand-dark/40 text-center px-4">
       <div class="max-w-4xl mx-auto space-y-4">
-        <h2 class="text-xl md:text-2xl font-extrabold text-white">
+        <h2 class="text-xl md:text-2xl font-extrabold text-brand-strong">
           <span class="lang-he">זמינים גם לעיון במסמכים משפטיים</span>
           <span class="lang-en">Looking for Legal Agreements?</span>
         </h2>
         <div class="flex flex-wrap gap-4 justify-center">
-          <a href="#privacy" class="px-5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 font-semibold transition text-sm">
+          <a href="#privacy" class="px-5 py-2.5 rounded-xl border border-brand-line bg-brand-card hover:bg-brand-line font-semibold transition text-sm">
             <span class="lang-he">מדיניות הפרטיות המלאה</span>
             <span class="lang-en">Full Privacy Policy</span>
           </a>
-          <a href="#eula" class="px-5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 font-semibold transition text-sm">
+          <a href="#eula" class="px-5 py-2.5 rounded-xl border border-brand-line bg-brand-card hover:bg-brand-line font-semibold transition text-sm">
             <span class="lang-he">הסכם רישיון משתמש קצה (EULA)</span>
             <span class="lang-en">End User License Agreement (EULA)</span>
           </a>
@@ -279,11 +541,11 @@
   </main>
 
   <!-- INDEPENDENT PRIVACY POLICY COMPLIANCE VIEW -->
-  <main id="view-privacy" class="hidden flex-grow py-12 md:py-20 px-4 bg-zinc-950">
+  <main id="view-privacy" class="hidden flex-grow py-12 md:py-20 px-4 bg-brand-dark">
     <div class="max-w-4xl mx-auto space-y-8">
-      <div class="flex items-center justify-between border-b border-zinc-800 pb-6">
+      <div class="flex items-center justify-between border-b border-brand-line pb-6">
         <div>
-          <h1 class="text-3xl font-black text-white">
+          <h1 class="text-3xl font-black text-brand-strong">
             <span class="lang-he">מדיניות פרטיות</span>
             <span class="lang-en">Privacy Policy</span>
           </h1>
@@ -292,7 +554,7 @@
             <span class="lang-en">Last updated: May 2026 &nbsp;·&nbsp; Teacher in Minute</span>
           </p>
         </div>
-        <button onclick="copyCurrentDocumentText('content-privacy-he', 'content-privacy-en')" class="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs px-4 py-2 rounded-xl font-bold transition border border-zinc-800">
+        <button onclick="copyCurrentDocumentText('content-privacy-he', 'content-privacy-en')" class="flex items-center gap-2 bg-brand-card hover:bg-brand-line text-brand-body text-xs px-4 py-2 rounded-xl font-bold transition border border-brand-line">
           <i class="ph ph-copy"></i> 
           <span class="lang-he">העתק הכל</span>
           <span class="lang-en">Copy Full Text</span>
@@ -300,23 +562,23 @@
       </div>
 
       <!-- Compliance alert highlight -->
-      <div class="bg-brand-accent/5 border-l-4 border-brand-accent p-4 rounded-r-xl text-zinc-300 text-sm leading-normal">
+      <div class="bg-brand-accent/5 border-l-4 border-brand-accent p-4 rounded-r-xl text-brand-body text-sm leading-normal">
         <span class="lang-he">מדיניות זו מפרטת כיצד אנו אוספים, שומרים ומשתמשים במידע האישי שלכם בעת השימוש באפליקציית Teacher in Minute.</span>
         <span class="lang-en">This policy explains how we collect, use, and protect your personal data when using the Teacher in Minute app.</span>
       </div>
 
       <!-- Bilingual text parsed from teacher_in_minute_legal_docs_v2.html -->
-      <div class="text-zinc-300 leading-relaxed text-sm space-y-6">
+      <div class="text-brand-body leading-relaxed text-sm space-y-6">
         <!-- Hebrew Container -->
         <div class="lang-he space-y-6" id="content-privacy-he">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">1. מי אנחנו</h3>
+            <h3 class="text-base font-bold text-brand-strong">1. מי אנחנו</h3>
             <p>אפליקציית Teacher in Minute ("אנחנו", "שלנו") מופעלת על ידי Teacher in Minute, מרחוב הכפר 7, קרית אונו, ישראל. ליצירת קשר: yaron@yaronj.com. מדיניות זו מסבירה את האופן שבו אנו אוספים ומגנים על הנתונים האישיים שלכם.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">2. המידע שאנו אוספים</h3>
-            <ul class="list-disc pr-6 space-y-1 text-zinc-400">
+            <h3 class="text-base font-bold text-brand-strong">2. המידע שאנו אוספים</h3>
+            <ul class="list-disc pr-6 space-y-1 text-brand-textGray">
               <li><strong>נתוני חשבון:</strong> שם, כתובת אימייל, ותמונת פרופיל (אופציונלי).</li>
               <li><strong>נתוני תלמיד:</strong> שכבת גיל (כיתה), העדפות נושאי לימוד והיסטוריית שיעורים.</li>
               <li><strong>נתוני שימוש:</strong> שיעורים שבוצעו, דקות שנצרכו ותכונות בשימוש.</li>
@@ -325,10 +587,10 @@
               <li><strong>תקשורת:</strong> הודעות שאתם שולחים לנו דרך ערוצי התמיכה.</li>
             </ul>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">3. כיצד אנו משתמשים במידע</h3>
-            <ul class="list-disc pr-6 space-y-1 text-zinc-400">
+            <h3 class="text-base font-bold text-brand-strong">3. כיצד אנו משתמשים במידע</h3>
+            <ul class="list-disc pr-6 space-y-1 text-brand-textGray">
               <li>אספקת, תחזוקת ושיפור האפליקציה ושירותיה.</li>
               <li>חיבור מהיר והתאמה בין התלמידים למורים המוסמכים המתאימים ביותר.</li>
               <li>מעקב והצגה של יתרת חבילות הדקות והצריכה בפועל.</li>
@@ -338,45 +600,45 @@
               <li>עמידה בדרישות חוקיות ומניעת הונאות או שימוש לרעה.</li>
             </ul>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">4. בסיס חוקי לעיבוד נתונים (GDPR / החוק הישראלי)</h3>
+            <h3 class="text-base font-bold text-brand-strong">4. בסיס חוקי לעיבוד נתונים (GDPR / החוק הישראלי)</h3>
             <p>אנו מעבדים את הנתונים שלך על בסיס: ביצוע חוזה (על מנת לספק את השירות), אינטרסים לגיטימיים שלנו (אבטחה, שיפור שירות), הסכמה (דיוור ועדכונים) ועמידה בחובות חוקיות. הטיפול בנתונים מבוצע בהתאם להוראות חוק הגנת הפרטיות, התשמ"א-1981 ותקנותיו.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">5. שיתוף מידע</h3>
+            <h3 class="text-base font-bold text-brand-strong">5. שיתוף מידע</h3>
             <p>איננו מוכרים או משכירים את המידע האישי שלכם לצדדים שלישיים. אנו משתפים מידע אך ורק עם:</p>
-            <ul class="list-disc pr-6 space-y-1 text-zinc-400">
+            <ul class="list-disc pr-6 space-y-1 text-brand-textGray">
               <li><strong>המורים המוסמכים:</strong> אך ורק מידע הנדרש להעברת השיעור ביעילות (שם פרטי של התלמיד, כיתה והנושא ללימוד).</li>
               <li><strong>ספקי שירותים:</strong> שירותי אירוח (Hosting), כלים לניתוח נתונים אנליטיים ותמיכת לקוחות (הכל תחת הסכמי סודיות קפדניים).</li>
               <li><strong>חנויות האפליקציות:</strong> Apple ו-Google לצורך אימות וניהול רכישות.</li>
               <li><strong>רשויות החוק:</strong> כאשר נדרש על פי חוק או לצורך הגנה על זכויותינו המשפטיות.</li>
             </ul>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">6. שמירת נתונים</h3>
+            <h3 class="text-base font-bold text-brand-strong">6. שמירת נתונים</h3>
             <p>אנו שומרים את המידע שלך כל עוד החשבון שלך פעיל או ככל שנדרש כדי לספק לך את השירותים. באפשרותך לבקש את מחיקת המידע האישי שלך בכל עת על ידי פנייה בדוא"ל. אנו נטפל בבקשה תוך 30 יום, בכפוף לחובות שמירת מידע על פי חוק.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">7. הזכויות שלך</h3>
+            <h3 class="text-base font-bold text-brand-strong">7. הזכויות שלך</h3>
             <p>בהתאם למיקומך הגיאוגרפי, עשויות לעמוד לרשותך הזכויות הבאות: גישה, תיקון או מחיקה של הנתונים האישיים שלך; התנגדות לעיבוד או הגבלתו; ניידות נתונים; ביטול ההסכמה שלך לעיבוד בכל עת; הגשת תלונה לרשות להגנת הפרטיות בישראל או לרשות המפקחת המקומית שלך. למימוש זכויות אלו, פנה אלינו בכתובת yaron@yaronj.com.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">8. קבצי Cookie ומעקב</h3>
+            <h3 class="text-base font-bold text-brand-strong">8. קבצי Cookie ומעקב</h3>
             <p>גרסת הווב של השירות עשויה להשתמש בקבצי Cookie לצורך ניהול פגישות ואנליטיקה. תוכל לשלוט בהגדרות אלו דרך הגדרות הדפדפן שלך.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">9. פרטיות ילדים (כיתה א' ומעלה)</h3>
+            <h3 class="text-base font-bold text-brand-strong">9. פרטיות ילדים (כיתה א' ומעלה)</h3>
             <p>השירות מיועד לתלמידים החל מכיתה א' ומעלה. עבור תלמידים מתחת לגיל 13, אנו דורשים הסכמה הורית מאומתת לפני פתיחת החשבון. ההורים רשאים בכל עת לקבל מידע על הנתונים שנאספו, לדרוש את מחיקתם או לבטל את הסכמתם (מה שיגרום לסגירת החשבון). כל המורים בפלטפורמה המלמדים תלמידי יסודי מחזיקים ברישיון ותעודת הוראה תקפים מטעם משרד החינוך.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">10. אבטחת מידע</h3>
+            <h3 class="text-base font-bold text-brand-strong">10. אבטחת מידע</h3>
             <p>אנו משתמשים באמצעי אבטחה סטנדרטיים המקובלים בתעשייה, לרבות הצפנה בתנועה (TLS) ובמנוחה (Encryption at rest). נודיע למשתמשים על אירועי אבטחה או דליפת מידע כנדרש על פי החוק בישראל.</p>
           </div>
         </div>
@@ -384,13 +646,13 @@
         <!-- English Container -->
         <div class="lang-en space-y-6 text-left" dir="ltr" id="content-privacy-en">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">1. Who we are</h3>
+            <h3 class="text-base font-bold text-brand-strong">1. Who we are</h3>
             <p>Teacher in Minute ("we", "us", "our") operates the Teacher in Minute app, located at Hakfar 7, Kiryat Ono, Israel. Contact: yaron@yaronj.com. This policy explains how we collect, use, and protect your personal data.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">2. Data we collect</h3>
-            <ul class="list-disc pl-6 space-y-1 text-zinc-400">
+            <h3 class="text-base font-bold text-brand-strong">2. Data we collect</h3>
+            <ul class="list-disc pl-6 space-y-1 text-brand-textGray">
               <li><strong>Account data:</strong> name, email address, profile photo (optional)</li>
               <li><strong>Student data:</strong> grade level, subject preferences, lesson history</li>
               <li><strong>Usage data:</strong> lessons attended, minutes consumed, features used</li>
@@ -399,10 +661,10 @@
               <li><strong>Communications:</strong> messages you send us via support channels</li>
             </ul>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">3. How we use your data</h3>
-            <ul class="list-disc pl-6 space-y-1 text-zinc-400">
+            <h3 class="text-base font-bold text-brand-strong">3. How we use your data</h3>
+            <ul class="list-disc pl-6 space-y-1 text-brand-textGray">
               <li>Provide, maintain, and improve the App</li>
               <li>Match students with certified teachers</li>
               <li>Track and display minute package balances and usage</li>
@@ -412,19 +674,19 @@
               <li>Comply with legal obligations</li>
             </ul>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">4. Legal basis (GDPR)</h3>
+            <h3 class="text-base font-bold text-brand-strong">4. Legal basis (GDPR)</h3>
             <p>Where GDPR applies, we process your data on the basis of: contract performance (to provide the service), legitimate interests (security, improvements), consent (marketing emails), and legal obligation. Under Israeli Privacy Protection Law (5741-1981) and its amendments, we handle data accordingly.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">5. Data sharing</h3>
+            <h3 class="text-base font-bold text-brand-strong">5. Data sharing</h3>
             <p>We do not sell your personal data. We may share data with certified teachers (only required data), service providers (hosting, analytics under secrecy agreement), and App Stores for verification.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">6. Children's data (Grade 1 and above)</h3>
+            <h3 class="text-base font-bold text-brand-strong">6. Children's data (Grade 1 and above)</h3>
             <p>Teacher in Minute serves students from Grade 1 and above. For students under the age of 13, we require verifiable parental or guardian consent before creating an account. Parents/guardians may review child's data and ask for immediate deletion.</p>
           </div>
         </div>
@@ -433,11 +695,11 @@
   </main>
 
   <!-- INDEPENDENT EULA COMPLIANCE VIEW -->
-  <main id="view-eula" class="hidden flex-grow py-12 md:py-20 px-4 bg-zinc-950">
+  <main id="view-eula" class="hidden flex-grow py-12 md:py-20 px-4 bg-brand-dark">
     <div class="max-w-4xl mx-auto space-y-8">
-      <div class="flex items-center justify-between border-b border-zinc-800 pb-6">
+      <div class="flex items-center justify-between border-b border-brand-line pb-6">
         <div>
-          <h1 class="text-3xl font-black text-white">
+          <h1 class="text-3xl font-black text-brand-strong">
             <span class="lang-he">הסכם רישיון משתמש קצה (EULA)</span>
             <span class="lang-en">End User License Agreement (EULA)</span>
           </h1>
@@ -446,7 +708,7 @@
             <span class="lang-en">Last updated: May 2026 &nbsp;·&nbsp; Teacher in Minute</span>
           </p>
         </div>
-        <button onclick="copyCurrentDocumentText('content-eula-he', 'content-eula-en')" class="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs px-4 py-2 rounded-xl font-bold transition border border-zinc-800">
+        <button onclick="copyCurrentDocumentText('content-eula-he', 'content-eula-en')" class="flex items-center gap-2 bg-brand-card hover:bg-brand-line text-brand-body text-xs px-4 py-2 rounded-xl font-bold transition border border-brand-line">
           <i class="ph ph-copy"></i> 
           <span class="lang-he">העתק הכל</span>
           <span class="lang-en">Copy Full Text</span>
@@ -454,46 +716,46 @@
       </div>
 
       <!-- Compliance alert highlight -->
-      <div class="bg-brand-pink/5 border-l-4 border-brand-pink p-4 rounded-r-xl text-zinc-300 text-sm leading-normal">
+      <div class="bg-brand-amber/5 border-l-4 border-brand-amber p-4 rounded-r-xl text-brand-body text-sm leading-normal">
         <span class="lang-he">הסכם זה קובע את תנאי השימוש באפליקציית Teacher in Minute. שימוש באפליקציה מהווה הסכמה מלאה לכל התנאים המפורטים להלן.</span>
         <span class="lang-en">This agreement establishes the terms of use for the Teacher in Minute mobile app. By using the app, you agree in full to all terms.</span>
       </div>
 
       <!-- Bilingual text parsed from teacher_in_minute_legal_docs_v2.html -->
-      <div class="text-zinc-300 leading-relaxed text-sm space-y-6">
+      <div class="text-brand-body leading-relaxed text-sm space-y-6">
         <!-- Hebrew Container -->
         <div class="lang-he space-y-6" id="content-eula-he">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">1. הסכמה לתנאים</h3>
+            <h3 class="text-base font-bold text-brand-strong">1. הסכמה לתנאים</h3>
             <p>בעצם הורדת, התקנת או השימוש באפליקציה Teacher in Minute ("האפליקציה"), הינך מסכים להיות כפוף להסכם רישיון משתמש קצה זה ("ההסכם"). אם אינך מסכים לתנאים אלו, אל תשתמש באפליקציה.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">2. הענקת רישיון</h3>
+            <h3 class="text-base font-bold text-brand-strong">2. הענקת רישיון</h3>
             <p>אנו מעניקים לך רישיון מוגבל, לא בלעדי, בלתי ניתן להעברה, הניתן לביטול, לעשות שימוש באפליקציה לצרכיך החינוכיים האישיים והלא מסחריים בלבד, במכשירים שבבעלותך או בשליטתך.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">3. הגבלות שימוש</h3>
-            <ul class="list-disc pr-6 space-y-1 text-zinc-400">
+            <h3 class="text-base font-bold text-brand-strong">3. הגבלות שימוש</h3>
+            <ul class="list-disc pr-6 space-y-1 text-brand-textGray">
               <li>להעתיק, לשנות או להפיץ את האפליקציה או תכניה.</li>
               <li>לבצע הנדסה לאחור (Reverse Engineering), דה-קומפילציה או פירוק של האפליקציה.</li>
               <li>להשתמש באפליקציה כדי לבנות מוצר או שירות מתחרה.</li>
             </ul>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">4. חבילות דקות ורכישות (Prepaid)</h3>
+            <h3 class="text-base font-bold text-brand-strong">4. חבילות דקות ורכישות (Prepaid)</h3>
             <p>האפליקציה פועלת במודל של חבילות דקות בתשלום מראש (Prepaid). משתמשים רוכשים חבילות דקות מראש ומשתמשים בהן במהלך השיעורים. התשלום מבוצע בצורה מאובטחת דרך Apple App Store או Google Play — איננו שומרים את פרטי כרטיסי האשראי שלכם. דקות שלא נוצלו אינן פוקעות.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">5. הסמכת מורים ושימוש על ידי ילדים</h3>
+            <h3 class="text-base font-bold text-brand-strong">5. הסמכת מורים ושימוש על ידי ילדים</h3>
             <p>אפליקציית Teacher in Minute מיועדת לתלמידים החל מכיתה א' ומעלה. כל המורים המספקים שיעורים לתלמידי בית ספר יסודי (כיתות א'-ו') מחזיקים בתעודת הוראה תקפה שהונפקה או הוכרה על ידי רשויות החינוך המוסמכות בישראל. השימוש באפליקציה על ידי ילדים מכיתה א' מותנה בפיקוח והסכמת ההורים.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">6. הדין החל וסמכות שיפוט</h3>
+            <h3 class="text-base font-bold text-brand-strong">6. הדין החל וסמכות שיפוט</h3>
             <p>הסכם זה כפוף לחוקי מדינת ישראל. כל מחלוקת הנובעת מהסכם זה או בקשר אליו תובא להכרעה בלעדית בבתי המשפט המוסמכים במחוז תל אביב, ישראל.</p>
           </div>
         </div>
@@ -501,27 +763,27 @@
         <!-- English Container -->
         <div class="lang-en space-y-6 text-left" dir="ltr" id="content-eula-en">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">1. Agreement to terms</h3>
+            <h3 class="text-base font-bold text-brand-strong">1. Agreement to terms</h3>
             <p>By downloading, installing, or using Teacher in Minute ("the App"), you agree to be bound by this End User License Agreement ("Agreement"). If you do not agree, do not use the App.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">2. License grant</h3>
+            <h3 class="text-base font-bold text-brand-strong">2. License grant</h3>
             <p>We grant you a limited, non-exclusive, non-transferable, revocable license to use the App for your personal, non-commercial educational purposes on devices you own or control.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">3. Minute packages and purchases</h3>
+            <h3 class="text-base font-bold text-brand-strong">3. Minute packages and purchases</h3>
             <p>The App operates on a prepaid minutes model. Users purchase minute packages in advance and consume them as lessons are used. Payment is processed securely through Apple App Store or Google Play.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">4. Teacher qualifications and children's use</h3>
+            <h3 class="text-base font-bold text-brand-strong">4. Teacher qualifications and children's use</h3>
             <p>Teacher in Minute is designed for students from Grade 1 and above. All teachers providing lessons for elementary school students (Grades 1–6) hold a valid teaching certificate recognized by the relevant Israeli educational authorities.</p>
           </div>
-          <hr class="border-zinc-800">
+          <hr class="border-brand-line">
           <div class="space-y-3">
-            <h3 class="text-base font-bold text-white">5. Governing law and jurisdiction</h3>
+            <h3 class="text-base font-bold text-brand-strong">5. Governing law and jurisdiction</h3>
             <p>This Agreement is governed by the laws of the State of Israel. Disputes shall be submitted to the exclusive jurisdiction of the competent courts in Tel Aviv, Israel.</p>
           </div>
         </div>
@@ -531,24 +793,24 @@
 
   <!-- Support Section -->
   <section id="contact" class="py-16 max-w-4xl mx-auto px-4 text-center space-y-6">
-    <div class="w-16 h-16 rounded-2xl bg-brand-card border border-zinc-800 flex items-center justify-center mx-auto text-brand-pink text-3xl shadow-lg">
+    <div class="w-16 h-16 rounded-2xl bg-brand-card border border-brand-line flex items-center justify-center mx-auto text-brand-amber text-3xl shadow-lg">
       <i class="ph ph-envelope-open"></i>
     </div>
-    <h2 class="text-2xl md:text-3xl font-extrabold text-white">
+    <h2 class="text-2xl md:text-3xl font-extrabold text-brand-strong">
       <span class="lang-he">זקוקים לעזרה או תמיכה?</span>
       <span class="lang-en">Need Help or Support?</span>
     </h2>
     <p class="text-brand-textGray text-sm max-w-lg mx-auto">
-      <span class="lang-he">צוות התמיכה של Teacher in minute זמין עבורכם לכל שאלה, משוב או בקשה לבירור יתרת הדקות שלכם. פנו אלינו ונשמח לעזור!</span>
+      <span class="lang-he">צוות התמיכה של מורה ברגע זמין עבורכם לכל שאלה, משוב או בקשה לבירור יתרת הדקות שלכם. פנו אלינו ונשמח לעזור!</span>
       <span class="lang-en">The Teacher in Minute support team is available for any questions, feedback, or inquiries regarding your prepaid minute balances. Contact us today!</span>
     </p>
     
     <div class="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2">
-      <a href="mailto:yaron@yaronj.com" class="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 px-6 py-3 rounded-xl font-bold transition w-full sm:w-auto justify-center">
+      <a href="mailto:yaron@yaronj.com" class="flex items-center gap-2 bg-brand-card hover:bg-brand-line text-brand-strong border border-brand-line px-6 py-3 rounded-xl font-bold transition w-full sm:w-auto justify-center">
         <i class="ph ph-envelope"></i>
         <span>yaron@yaronj.com</span>
       </a>
-      <div class="flex items-center gap-2 bg-zinc-900/40 text-brand-textGray border border-zinc-800/60 px-6 py-3 rounded-xl text-sm w-full sm:w-auto justify-center font-sans">
+      <div class="flex items-center gap-2 bg-brand-card/40 text-brand-textGray border border-brand-line/60 px-6 py-3 rounded-xl text-sm w-full sm:w-auto justify-center font-sans">
         <i class="ph ph-map-pin"></i>
         <span class="lang-he">הכפר 7, קרית אונו, ישראל</span>
         <span class="lang-en">Hakfar 7, Kiryat Ono, Israel</span>
@@ -556,19 +818,22 @@
     </div>
   </section>
 
-  <footer class="bg-brand-black border-t border-zinc-900/80 py-8 px-4 text-center">
-    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
+  <footer class="bg-brand-black border-t border-brand-line/70 py-8 px-4 text-center">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-brand-textGray">
+      <div class="flex items-center gap-3">
+        <img src="logo.png" alt="מורה ברגע" class="h-12 w-auto opacity-90">
+      </div>
       <p>
         <span class="lang-he">© 2026 Teacher in Minute. כל הזכויות שמורות.</span>
         <span class="lang-en">© 2026 Teacher in Minute. All rights reserved.</span>
       </p>
       <div class="flex gap-4">
-        <a href="#privacy" class="hover:text-white transition">
+        <a href="#privacy" class="hover:text-brand-strong transition">
           <span class="lang-he">מדיניות פרטיות</span>
           <span class="lang-en">Privacy Policy</span>
         </a>
         <span>·</span>
-        <a href="#eula" class="hover:text-white transition">
+        <a href="#eula" class="hover:text-brand-strong transition">
           <span class="lang-he">תנאי שימוש (EULA)</span>
           <span class="lang-en">Terms of Use (EULA)</span>
         </a>
@@ -577,6 +842,20 @@
   </footer>
 
   <script>
+    // Theme: an explicit choice wins and is remembered; with nothing stored
+    // the page simply follows the operating system.
+    function currentTheme() {
+      const attr = document.documentElement.getAttribute('data-theme');
+      if (attr === 'light' || attr === 'dark') return attr;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function toggleTheme() {
+      const next = currentTheme() === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('theme', next); } catch (e) {}
+    }
+
     // Auto-detect browser or device locale preference
     const browserLang = (navigator.language || navigator.userLanguage || 'he').toLowerCase();
     let currentLang = (browserLang.startsWith('he') || browserLang.startsWith('iw')) ? 'he' : 'en';
@@ -617,15 +896,15 @@
 
       if (hash === '#privacy') {
         viewPrivacy.classList.remove('hidden');
-        document.title = "Privacy Policy - Teacher in Minute";
+        document.title = "מדיניות פרטיות · מורה ברגע";
         window.scrollTo(0, 0);
       } else if (hash === '#eula') {
         viewEula.classList.remove('hidden');
-        document.title = "EULA - Teacher in Minute";
+        document.title = "תנאי שימוש · מורה ברגע";
         window.scrollTo(0, 0);
       } else {
         viewLanding.classList.remove('hidden');
-        document.title = "Teacher in Minute - On-Demand Private Tutoring";
+        document.title = "מורה ברגע · Teacher in a Minute";
       }
     }
 
@@ -668,12 +947,12 @@
 
     function showToast() {
       const toast = document.createElement('div');
-      toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700 text-white text-xs md:text-sm font-bold px-6 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 animate-bounce transition-all';
+      toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-brand-card border border-brand-line text-brand-strong text-xs md:text-sm font-bold px-6 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 animate-bounce transition-all';
       
       if (currentLang === 'he') {
-        toast.innerHTML = '<i class="ph-bold ph-check-circle text-brand-pink text-lg"></i> המסמך הועתק בהצלחה ללוח!';
+        toast.innerHTML = '<i class="ph-bold ph-check-circle text-brand-amber text-lg"></i> המסמך הועתק בהצלחה ללוח!';
       } else {
-        toast.innerHTML = '<i class="ph-bold ph-check-circle text-brand-pink text-lg"></i> Document copied successfully!';
+        toast.innerHTML = '<i class="ph-bold ph-check-circle text-brand-amber text-lg"></i> Document copied successfully!';
       }
       
       document.body.appendChild(toast);

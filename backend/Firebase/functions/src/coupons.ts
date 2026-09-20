@@ -4,6 +4,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 import { CouponDoc } from "./types";
+import { extendLessonMinutes } from "./lessons";
 
 const firestore = admin.firestore();
 
@@ -89,6 +90,11 @@ export const redeemCoupon = onCall(async (req) => {
       createdBy: coupon.createdBy,
     });
   });
+
+  // Redeeming during a lesson lifts a hold the same way buying does.
+  await extendLessonMinutes(uid, minutes).catch((err) =>
+    logger.warn(`[coupons] could not extend a running lesson uid=${uid}`, err)
+  );
 
   logger.info(`[coupons] redeemCoupon success uid=${uid} couponId=${couponId} minutes=${minutes}`);
   return { success: true, minutesAdded: minutes };

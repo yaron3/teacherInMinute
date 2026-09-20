@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="60"
+     height="60"
+     viewBox="0 0 1024 1024"
+     role="img"
+     aria-label="Profile tab icon">
+  <g fill="#000000">
+    <!-- Head. The outline's stroke reaches 12 units past its path, so the
+         filled variant carries that half-stroke as extra radius and inset. -->
+    <circle cx="512" cy="377" r="104"/>
+
+    <!-- Shoulders, with the outline's round joins as corner radii. -->
+    <path d="M 328 653
+             C 328 576 410 514 512 514
+             C 614 514 696 576 696 653
+             L 696 699
+             Q 696 711 684 711
+             L 340 711
+             Q 328 711 328 699 Z"/>
+  </g>
+</svg>

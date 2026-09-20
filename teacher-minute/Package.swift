@@ -35,8 +35,12 @@ let package = Package(
                 .product(name: "LiveKit", package: "client-sdk-swift", condition: .when(platforms: [.iOS])),
                 .product(name: "BraintreeCore", package: "braintree_ios", condition: .when(platforms: [.iOS])),
                 .product(name: "BraintreeApplePay", package: "braintree_ios", condition: .when(platforms: [.iOS])),
+                .product(name: "BraintreePayPal", package: "braintree_ios", condition: .when(platforms: [.iOS])),
             ],
-            resources: [.process("Resources")],
+            // KaTeX is copied rather than processed: its stylesheet reaches the
+            // font files by relative path, which only survives if the folder
+            // does. Bundling it is what lets a formula draw with no network.
+            resources: [.process("Resources"), .copy("KaTeX")],
             plugins: [.plugin(name: "skipstone", package: "skip")]
         ),
         .testTarget(

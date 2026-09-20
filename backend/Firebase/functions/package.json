@@ -4,7 +4,9 @@
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
-    "test": "jest"
+    "test": "jest",
+    "test:integration:presence": "node scripts/test-teacher-presence.js",
+    "test:integration:lesson": "node scripts/test-full-lesson.js"
   },
   "engines": {
     "node": "22"
