@@ -116,7 +116,7 @@ struct AppTheme {
     var cardBackground: Color {
         adaptive(
             light: (242, 242, 244),
-            dark: (30, 30, 30)
+            dark: (45, 45, 42)
         )
     }
 
