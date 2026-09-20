@@ -8,7 +8,6 @@ import com.google.firebase.database.ServerValue
 
 object AndroidPushTokenManager {
     private const val TAG = "PushToken"
-    private const val DATABASE_URL = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
     private const val PREFS_NAME = "teacher_minute_push"
     private const val KEY_UID = "uid"
     private const val KEY_IS_TEACHER = "isTeacher"
@@ -77,7 +76,7 @@ object AndroidPushTokenManager {
     }
 
     private fun write(path: String, values: Map<String, Any>) {
-        FirebaseDatabase.getInstance(DATABASE_URL)
+        FirebaseDatabase.getInstance()
             .getReference(path)
             .updateChildren(values)
             .addOnSuccessListener {

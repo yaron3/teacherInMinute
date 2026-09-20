@@ -142,6 +142,7 @@
 				499CD43A2AC5B799001AE8D8 /* Sources */,
 				499CD43C2AC5B799001AE8D8 /* Frameworks */,
 				499CD43E2AC5B799001AE8D8 /* Resources */,
+				4AB6CD602FAB8C5C003E7ADA /* Select the Firebase config */,
 				499CD4452AC5B869001AE8D8 /* Run skip gradle */,
 				499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */,
 			);
@@ -239,6 +240,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		4AB6CD602FAB8C5C003E7ADA /* Select the Firebase config */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Select the Firebase config";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = "/bin/sh -e";
+			shellScript = "# Debug builds run against staging when a staging config is present;\n# release builds always use production. Drop GoogleService-Info-Staging.plist\n# next to GoogleService-Info.plist to turn this on. With no staging file the\n# app keeps the production config it was built with.\nSTAGING=\"${SRCROOT}/GoogleService-Info-Staging.plist\"\nBUNDLED=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/GoogleService-Info.plist\"\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -f \"${STAGING}\" ]; then\n  cp \"${STAGING}\" \"${BUNDLED}\"\n  echo \"note: Firebase config: staging\"\nelse\n  echo \"note: Firebase config: production\"\nfi\n";
+		};
 		499CD4452AC5B869001AE8D8 /* Run skip gradle */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;

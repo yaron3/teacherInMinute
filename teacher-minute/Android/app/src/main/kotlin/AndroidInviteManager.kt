@@ -13,7 +13,6 @@ import java.util.concurrent.TimeUnit
 
 object AndroidInviteManager {
     private const val TAG = "AndroidInviteManager"
-    private const val DATABASE_URL = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
     private const val TIMEOUT_SECONDS = 15L
 
     // A question reaching an Android teacher used to mean waiting for the next
@@ -33,7 +32,7 @@ object AndroidInviteManager {
         if (listenerTeacherId == teacherId && listener != null) return
         stopListening()
 
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("teacherInvites")
             .child(teacherId)
 
@@ -101,7 +100,7 @@ object AndroidInviteManager {
         Log.i(TAG, "Fetching invites uid=$teacherId")
 
         val snapshot = Tasks.await(
-            FirebaseDatabase.getInstance(DATABASE_URL)
+            FirebaseDatabase.getInstance()
                 .getReference("teacherInvites")
                 .child(teacherId)
                 .get(),

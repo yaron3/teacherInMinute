@@ -10,7 +10,6 @@ import java.util.concurrent.TimeUnit
 
 object AndroidTeacherPresenceManager {
     private const val TAG = "TeacherPresence"
-    private const val DATABASE_URL = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
     private const val AVAILABILITY_TIMEOUT_SECONDS = 5L
 
     /**
@@ -25,7 +24,7 @@ object AndroidTeacherPresenceManager {
     fun hasOnlineTeacher(): Boolean {
         return try {
             val snapshot = Tasks.await(
-                FirebaseDatabase.getInstance(DATABASE_URL)
+                FirebaseDatabase.getInstance()
                     .getReference("onlineTeachers")
                     .get(),
                 AVAILABILITY_TIMEOUT_SECONDS,
@@ -61,7 +60,7 @@ object AndroidTeacherPresenceManager {
     fun onlineTeachersJSON(): String {
         return try {
             val snapshot = Tasks.await(
-                FirebaseDatabase.getInstance(DATABASE_URL)
+                FirebaseDatabase.getInstance()
                     .getReference("onlineTeachers")
                     .get(),
                 AVAILABILITY_TIMEOUT_SECONDS,
@@ -147,7 +146,7 @@ object AndroidTeacherPresenceManager {
     }
 
     private fun updateTeacherRecord(uid: String, status: String, values: Map<String, Any>) {
-        val teacherRef = FirebaseDatabase.getInstance(DATABASE_URL)
+        val teacherRef = FirebaseDatabase.getInstance()
             .getReference("teachers")
             .child(uid)
 

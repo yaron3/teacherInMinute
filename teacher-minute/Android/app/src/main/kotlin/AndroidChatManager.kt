@@ -14,13 +14,12 @@ import java.util.concurrent.TimeUnit
 
 object AndroidChatManager {
     private const val TAG = "AndroidChatManager"
-    private const val DATABASE_URL = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
     private const val TIMEOUT_SECONDS = 15L
 
     @JvmStatic
     fun fetchMessagesJson(questionId: String): String {
         val snapshot = Tasks.await(
-            FirebaseDatabase.getInstance(DATABASE_URL)
+            FirebaseDatabase.getInstance()
                 .getReference("questions")
                 .child(questionId)
                 .child("messages")
@@ -54,7 +53,7 @@ object AndroidChatManager {
     fun sendText(questionId: String, text: String, senderRole: String, kind: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
             ?: throw IllegalStateException("Not signed in")
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
             .child("messages")
@@ -77,7 +76,7 @@ object AndroidChatManager {
         val trimmedAddition = addition.trim()
         if (trimmedAddition.isEmpty()) return ""
 
-        val questionRef = FirebaseDatabase.getInstance(DATABASE_URL)
+        val questionRef = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
         val snapshot = Tasks.await(questionRef.get(), TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -96,7 +95,7 @@ object AndroidChatManager {
     @JvmStatic
     fun fetchBoardStrokesJson(questionId: String): String {
         val snapshot = Tasks.await(
-            FirebaseDatabase.getInstance(DATABASE_URL)
+            FirebaseDatabase.getInstance()
                 .getReference("questions")
                 .child(questionId)
                 .child("board")
@@ -143,7 +142,7 @@ object AndroidChatManager {
         }
         if (points.isEmpty()) return
 
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
             .child("board")
@@ -164,7 +163,7 @@ object AndroidChatManager {
 
     @JvmStatic
     fun clearBoard(questionId: String) {
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
             .child("board")
@@ -175,7 +174,7 @@ object AndroidChatManager {
     @JvmStatic
     fun fetchBoardViewportsJson(questionId: String): String {
         val snapshot = Tasks.await(
-            FirebaseDatabase.getInstance(DATABASE_URL)
+            FirebaseDatabase.getInstance()
                 .getReference("questions")
                 .child(questionId)
                 .child("board")
@@ -215,7 +214,7 @@ object AndroidChatManager {
     ) {
         if (width <= 0.0 || height <= 0.0) return
         val key = role.trim().lowercase().ifBlank { "participant" }
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
             .child("board")
@@ -234,7 +233,7 @@ object AndroidChatManager {
     @JvmStatic
     fun setChatPaused(questionId: String, role: String, paused: Boolean) {
         val key = role.trim().lowercase().ifBlank { "participant" }
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
             .child("chatPaused")
@@ -245,7 +244,7 @@ object AndroidChatManager {
     @JvmStatic
     fun fetchChatPausedJson(questionId: String): String {
         val snapshot = Tasks.await(
-            FirebaseDatabase.getInstance(DATABASE_URL)
+            FirebaseDatabase.getInstance()
                 .getReference("questions")
                 .child(questionId)
                 .child("chatPaused")
@@ -272,7 +271,7 @@ object AndroidChatManager {
     @JvmStatic
     fun setMediaPending(questionId: String, role: String, pending: Boolean) {
         val key = role.trim().lowercase().ifBlank { "participant" }
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
             .child("mediaPending")
@@ -286,7 +285,7 @@ object AndroidChatManager {
      */
     @JvmStatic
     fun setConversationType(questionId: String, conversationType: String) {
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
             .child("conversationType")
@@ -296,7 +295,7 @@ object AndroidChatManager {
     @JvmStatic
     fun fetchMediaPendingJson(questionId: String): String {
         val snapshot = Tasks.await(
-            FirebaseDatabase.getInstance(DATABASE_URL)
+            FirebaseDatabase.getInstance()
                 .getReference("questions")
                 .child(questionId)
                 .child("mediaPending")
@@ -325,7 +324,7 @@ object AndroidChatManager {
         }
 
         Log.i(TAG, "Marking question accepted questionId=$questionId teacherId=$teacherId")
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
         Tasks.await(ref.updateChildren(values), TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -349,7 +348,7 @@ object AndroidChatManager {
         if (questionStatusId == questionId && questionStatusListener != null) return
         stopQuestionStatusListener()
 
-        val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+        val ref = FirebaseDatabase.getInstance()
             .getReference("questions")
             .child(questionId)
 
@@ -428,7 +427,7 @@ object AndroidChatManager {
     @JvmStatic
     fun fetchQuestionStatusJson(questionId: String): String {
         val snapshot = Tasks.await(
-            FirebaseDatabase.getInstance(DATABASE_URL)
+            FirebaseDatabase.getInstance()
                 .getReference("questions")
                 .child(questionId)
                 .get(),
@@ -452,7 +451,7 @@ object AndroidChatManager {
     @JvmStatic
     fun fetchSessionDetailsJson(questionId: String): String {
         val snapshot = Tasks.await(
-            FirebaseDatabase.getInstance(DATABASE_URL)
+            FirebaseDatabase.getInstance()
                 .getReference("questions")
                 .child(questionId)
                 .get(),
