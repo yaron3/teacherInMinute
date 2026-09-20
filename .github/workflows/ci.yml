@@ -98,9 +98,22 @@ jobs:
 
   ios:
     name: iOS build
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      # The app is written against Swift 6.2: AuthService declares an isolated
+      # `@MainActor deinit`, which older compilers reject as an experimental
+      # feature. Take the newest Xcode the image carries rather than its
+      # default, and print what that turned out to be — if it is still too old
+      # the versions below say so directly, instead of surfacing as puzzling
+      # errors in code that compiles fine on a developer's machine.
+      - name: Select the newest Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+          swift --version
 
       # The SwiftPM target runs Skip's `skipstone` plugin, which shells out to
       # the `skip` tool. Without it the plugin fails before any Swift compiles.
