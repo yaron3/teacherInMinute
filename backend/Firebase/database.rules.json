@@ -16,7 +16,20 @@
     "questions": {
       "$qid": {
         ".read": "auth != null",
-        ".write": "auth != null && (data.child('teacherUid').val() == auth.uid || data.child('studentUid').val() == auth.uid || data.child('teacherId').val() == auth.uid || data.child('studentId').val() == auth.uid)"
+        "board": {
+          "viewports": {
+            ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid)"
+          },
+          "strokes": {
+            ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid) && (newData.exists() || (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid))",
+            "$strokeId": {
+              ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid) && (newData.exists() || (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid))"
+            }
+          }
+        },
+        "$field": {
+          ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid) && $field != 'board'"
+        }
       }
     },
     "users": {
