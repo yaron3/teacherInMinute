@@ -3,17 +3,32 @@ import org.gradle.api.GradleException
 import java.util.Properties
 
 plugins {
-    // No alias(libs.plugins.kotlin.android) here: current Skip releases dropped
-    // that alias from the generated `libs` catalog, because the Android
-    // Application plugin already brings Kotlin's Android support along. Naming
-    // it fails the script with "Unresolved reference 'android'" before any
-    // Kotlin compiles, and `skip gradle` warns about the line by name.
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.android.application)
     id("skip-build-plugin")
     id("com.google.gms.google-services") version "4.4.4"
     id("com.google.firebase.crashlytics") version "3.0.6"
 }
+
+// The Kotlin Android plugin, applied here rather than in plugins { } above.
+//
+// It has to be applied: app/src/main/kotlin holds 22 hand-written Kotlin files,
+// among them Main.kt, which declares the teacher.minute.AndroidAppMain that the
+// manifest names as the Application class. Without the plugin this module has
+// no Kotlin compilation at all — no :app:compileDebugKotlin task — so none of
+// them reach the APK, and the app dies at launch on a ClassNotFoundException
+// for AndroidAppMain. Gradle does not warn about a source set with no compiler
+// attached, so that failure looks like a successful build. (`skip gradle` does
+// ask for the plugin to go, and it is right for an app module that is all
+// transpiled Swift, as Skip's own samples are. This one is not.)
+//
+// It cannot go in plugins { }: libs.plugins.kotlin.android no longer exists in
+// the generated catalog, and a bare id there is resolved as a plugin marker
+// from a repository, which Gradle refuses without a version. apply() instead
+// looks the id up on the buildscript classpath, where the Kotlin Gradle plugin
+// already is — the same classpath that makes the KotlinCompile and JvmTarget
+// references further down this file resolve.
+apply(plugin = "org.jetbrains.kotlin.android")
 
 skip {
 }
@@ -108,9 +123,19 @@ fun verifyNoForegroundServiceEntriesInGeneratedManifests() {
     }
 }
 
-kotlin {
+// Kotlin's bytecode level, kept equal to the Java source and target
+// compatibility set in android { compileOptions } below — the two halves of the
+// module have to agree. Configured on the compile tasks rather than through a
+// `kotlin { }` block, at the top level or inside android { }, because both of
+// those are extension accessors the Kotlin DSL generates from an applied
+// plugin. This script applies no Kotlin plugin: `skip gradle` asked for the
+// kotlin.android alias to be removed and the generated catalog no longer
+// defines it, so neither accessor exists here and naming either one fails
+// script compilation. The task type comes from the Kotlin Gradle plugin on the
+// buildscript classpath, which needs no accessor.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get().toString())
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get())
     }
 }
 
