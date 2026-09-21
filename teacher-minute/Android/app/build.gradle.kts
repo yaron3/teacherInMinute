@@ -108,21 +108,25 @@ fun verifyNoForegroundServiceEntriesInGeneratedManifests() {
     }
 }
 
+// Kotlin's bytecode level, kept equal to the Java source and target
+// compatibility set in android { compileOptions } below — the two halves of the
+// module have to agree. Configured on the compile tasks rather than through a
+// `kotlin { }` block, at the top level or inside android { }, because both of
+// those are extension accessors the Kotlin DSL generates from an applied
+// plugin. This script applies no Kotlin plugin: `skip gradle` asked for the
+// kotlin.android alias to be removed and the generated catalog no longer
+// defines it, so neither accessor exists here and naming either one fails
+// script compilation. The task type comes from the Kotlin Gradle plugin on the
+// buildscript classpath, which needs no accessor.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get())
+    }
+}
+
 android {
     namespace = group as String
     compileSdk = libs.versions.android.sdk.compile.get().toInt()
-    // Inside android { }, not at the top level. The top-level `kotlin { }`
-    // accessor comes from the Kotlin Android plugin, and this script no longer
-    // applies it — AGP's own built-in Kotlin support is what replaced it, and
-    // it puts the same DSL here. Left outside, the script fails to compile with
-    // "None of the following candidates is applicable" on `kotlin`. The block
-    // still has to exist: it holds Kotlin's jvmTarget level with the Java
-    // source/target compatibility set just below, and they must agree.
-    kotlin {
-        compilerOptions {
-            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get().toString())
-        }
-    }
     compileOptions {
         sourceCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
         targetCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
