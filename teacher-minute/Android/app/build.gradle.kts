@@ -3,27 +3,32 @@ import org.gradle.api.GradleException
 import java.util.Properties
 
 plugins {
-    // Applied by id, not through libs.plugins.kotlin.android: current Skip
-    // releases dropped that alias from the generated `libs` catalog, and naming
-    // it fails the script with "Unresolved reference 'android'". No version,
-    // because the Kotlin Gradle plugin is already on the buildscript classpath.
-    //
-    // `skip gradle` warns that the alias is "no longer needed for building
-    // apps". That is true of an app module whose code is all transpiled Swift.
-    // This one is not: app/src/main/kotlin holds 22 hand-written Kotlin files,
-    // among them Main.kt, which declares the teacher.minute.AndroidAppMain the
-    // manifest names as the Application class. Without this plugin the module
-    // has no Kotlin compilation at all — no :app:compileDebugKotlin task — so
-    // none of them reach the APK. Gradle does not warn about a source set with
-    // no compiler, so the build goes green and the app dies at launch with
-    // ClassNotFoundException on AndroidAppMain.
-    id("org.jetbrains.kotlin.android")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.android.application)
     id("skip-build-plugin")
     id("com.google.gms.google-services") version "4.4.4"
     id("com.google.firebase.crashlytics") version "3.0.6"
 }
+
+// The Kotlin Android plugin, applied here rather than in plugins { } above.
+//
+// It has to be applied: app/src/main/kotlin holds 22 hand-written Kotlin files,
+// among them Main.kt, which declares the teacher.minute.AndroidAppMain that the
+// manifest names as the Application class. Without the plugin this module has
+// no Kotlin compilation at all — no :app:compileDebugKotlin task — so none of
+// them reach the APK, and the app dies at launch on a ClassNotFoundException
+// for AndroidAppMain. Gradle does not warn about a source set with no compiler
+// attached, so that failure looks like a successful build. (`skip gradle` does
+// ask for the plugin to go, and it is right for an app module that is all
+// transpiled Swift, as Skip's own samples are. This one is not.)
+//
+// It cannot go in plugins { }: libs.plugins.kotlin.android no longer exists in
+// the generated catalog, and a bare id there is resolved as a plugin marker
+// from a repository, which Gradle refuses without a version. apply() instead
+// looks the id up on the buildscript classpath, where the Kotlin Gradle plugin
+// already is — the same classpath that makes the KotlinCompile and JvmTarget
+// references further down this file resolve.
+apply(plugin = "org.jetbrains.kotlin.android")
 
 skip {
 }
