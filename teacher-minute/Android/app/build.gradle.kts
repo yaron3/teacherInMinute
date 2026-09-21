@@ -3,11 +3,21 @@ import org.gradle.api.GradleException
 import java.util.Properties
 
 plugins {
-    // No alias(libs.plugins.kotlin.android) here: current Skip releases dropped
-    // that alias from the generated `libs` catalog, because the Android
-    // Application plugin already brings Kotlin's Android support along. Naming
-    // it fails the script with "Unresolved reference 'android'" before any
-    // Kotlin compiles, and `skip gradle` warns about the line by name.
+    // Applied by id, not through libs.plugins.kotlin.android: current Skip
+    // releases dropped that alias from the generated `libs` catalog, and naming
+    // it fails the script with "Unresolved reference 'android'". No version,
+    // because the Kotlin Gradle plugin is already on the buildscript classpath.
+    //
+    // `skip gradle` warns that the alias is "no longer needed for building
+    // apps". That is true of an app module whose code is all transpiled Swift.
+    // This one is not: app/src/main/kotlin holds 22 hand-written Kotlin files,
+    // among them Main.kt, which declares the teacher.minute.AndroidAppMain the
+    // manifest names as the Application class. Without this plugin the module
+    // has no Kotlin compilation at all — no :app:compileDebugKotlin task — so
+    // none of them reach the APK. Gradle does not warn about a source set with
+    // no compiler, so the build goes green and the app dies at launch with
+    // ClassNotFoundException on AndroidAppMain.
+    id("org.jetbrains.kotlin.android")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.android.application)
     id("skip-build-plugin")
