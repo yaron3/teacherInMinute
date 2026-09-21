@@ -62,12 +62,19 @@ playground.xcworkspace
 # Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
 Packages/
 Package.pins
-# Package.resolved is deliberately NOT ignored. The stock template ignores it
-# because it is written for libraries, which should resolve against whatever a
-# consumer already has. This is an app: it wants every build — a new machine, a
-# release, CI — to resolve the same dependency versions. Leaving it out let CI
-# pick a nanopb newer than LiveKit's generated headers expect, and the build
-# died in CLiveKitProto with no error of ours anywhere in it.
+# Package.resolved is deliberately NOT ignored — both copies of it. The stock
+# template ignores it because it is written for libraries, which should resolve
+# against whatever a consumer already has. This is an app: it wants every build
+# — a new machine, a release, CI — to resolve the same dependency versions.
+#
+# There are two because Xcode and SwiftPM read different ones. `swift build`
+# reads the package's own Package.resolved next to Package.swift; Xcode builds
+# this through Project.xcworkspace and reads
+# Project.xcworkspace/xcshareddata/swiftpm/Package.resolved. Only the second
+# was missing, which is how a machine could resolve client-sdk-swift 2.17.0
+# while the committed lockfile said 2.14.1 — and 2.17.0 vendors a nanopb that
+# collides with Firebase's. Keep the two in step; Package.swift caps LiveKit so
+# that drifting cannot reach 2.17.0 either way.
 #*.xcodeproj
 
 Carthage/Build/
