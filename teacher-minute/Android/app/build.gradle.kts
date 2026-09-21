@@ -3,7 +3,11 @@ import org.gradle.api.GradleException
 import java.util.Properties
 
 plugins {
-    alias(libs.plugins.kotlin.android)
+    // No alias(libs.plugins.kotlin.android) here: current Skip releases dropped
+    // that alias from the generated `libs` catalog, because the Android
+    // Application plugin already brings Kotlin's Android support along. Naming
+    // it fails the script with "Unresolved reference 'android'" before any
+    // Kotlin compiles, and `skip gradle` warns about the line by name.
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.android.application)
     id("skip-build-plugin")
