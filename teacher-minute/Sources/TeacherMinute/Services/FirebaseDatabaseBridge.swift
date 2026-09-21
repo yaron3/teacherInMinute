@@ -166,9 +166,11 @@ public final class Database {
   }
   
   public static func database() -> Database {
-	let url = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
-	dbLog("[Bridge] Database.database() getting instance for url=\(url)")
-	let instance = com.google.firebase.database.FirebaseDatabase.getInstance(url)
+	// No URL: the instance follows `firebase_url` in whichever
+	// google-services.json was built in, the same way the iOS side follows
+	// DATABASE_URL in its GoogleService-Info.plist. Naming it here would pin
+	// the app to one project no matter which config it shipped with.
+	let instance = com.google.firebase.database.FirebaseDatabase.getInstance()
 	dbLog("[Bridge] FirebaseDatabase instance obtained: \(instance.toString())")
 	return Database(instance)
   }

@@ -14,7 +14,6 @@ import java.util.concurrent.TimeUnit
  */
 object AndroidDemoStudentManager {
     private const val TAG = "AndroidDemoStudent"
-    private const val DATABASE_URL = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
     private const val TIMEOUT_SECONDS = 15L
     private const val REQUESTS_PATH = "demoStudent/requests"
 
@@ -25,7 +24,7 @@ object AndroidDemoStudentManager {
 
         return try {
             val snapshot = Tasks.await(
-                FirebaseDatabase.getInstance(DATABASE_URL)
+                FirebaseDatabase.getInstance()
                     .getReference(REQUESTS_PATH)
                     .child(requestId)
                     .get(),

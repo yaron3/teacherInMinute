@@ -18,7 +18,6 @@ import java.util.concurrent.TimeUnit
 
 object AndroidBoardImageSaver {
     private const val TAG = "AndroidBoardImageSaver"
-    private const val DATABASE_URL = "https://teacher-in-a-moment-default-rtdb.firebaseio.com"
     private const val UPLOAD_TIMEOUT_SECONDS = 30L
     private const val WRITE_TIMEOUT_SECONDS = 15L
 
@@ -182,7 +181,7 @@ object AndroidBoardImageSaver {
         try {
             val uid = FirebaseAuth.getInstance().currentUser?.uid
                 ?: throw IllegalStateException("Not signed in")
-            val ref = FirebaseDatabase.getInstance(DATABASE_URL)
+            val ref = FirebaseDatabase.getInstance()
                 .getReference("questions")
                 .child(questionId)
                 .child("messages")
