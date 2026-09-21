@@ -3,7 +3,11 @@ import org.gradle.api.GradleException
 import java.util.Properties
 
 plugins {
-    alias(libs.plugins.kotlin.android)
+    // No alias(libs.plugins.kotlin.android) here: current Skip releases dropped
+    // that alias from the generated `libs` catalog, because the Android
+    // Application plugin already brings Kotlin's Android support along. Naming
+    // it fails the script with "Unresolved reference 'android'" before any
+    // Kotlin compiles, and `skip gradle` warns about the line by name.
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.android.application)
     id("skip-build-plugin")
@@ -190,7 +194,19 @@ android {
                     "intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib"
                 )
             }
-            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            // proguard-android-optimize.txt rather than proguard-android.txt:
+            // the two differ by the latter's -dontoptimize, and AGP 9 drops the
+            // non-optimizing file, which `skip gradle` warns about by name.
+            // R8 already ran here — isMinifyEnabled shrinks and obfuscates
+            // either way — so what this turns on is the optimization pass:
+            // inlining, dead-branch removal, class merging. proguard-rules.pro
+            // keeps teacher.minute.**, skip.**, tools.skip.** and the JNA and
+            // bridge classes whole, which is everything reached reflectively or
+            // over JNI, so optimization has nothing load-bearing to rewrite.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
