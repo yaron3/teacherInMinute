@@ -83,6 +83,24 @@ jobs:
         with:
           install-swift-android-sdk: 'true'
 
+      # setup-skip ends by exporting ANDROID_NDK_ROOT as an empty string, working
+      # around finagolfin/swift-android-sdk#207, and something downstream reads
+      # that as "the NDK is at ''" rather than "there is no NDK". Restoring it
+      # here, through $GITHUB_ENV, puts a real path in the environment of every
+      # later step — and of any Gradle daemon started in one, which matters:
+      # a daemon keeps the environment it was launched with, so exporting the
+      # variable inside the build step alone (run 8) can be invisible to the
+      # compiler if a daemon was already up.
+      #
+      # :- substitutes for empty as well as unset, so a non-empty value set by
+      # anything else survives.
+      - name: Restore a non-empty ANDROID_NDK_ROOT
+        run: |
+          ndk="${ANDROID_NDK_ROOT:-$ANDROID_NDK_HOME}"
+          echo "using ANDROID_NDK_ROOT=$ndk"
+          test -d "$ndk" || { echo "::error::$ndk is not a directory"; exit 1; }
+          echo "ANDROID_NDK_ROOT=$ndk" >> "$GITHUB_ENV"
+
       # Diagnostic, not a build step. Runs 3 and 4 both died on
       #   error: No Android NDK is installed at any of the standard locations
       # and the two fixes tried so far were guesses about where the NDK comes
@@ -143,21 +161,25 @@ jobs:
         if: ${{ ! inputs.diagnostics-only }}
         working-directory: teacher-minute/Android
         run: |
-          # setup-skip exports ANDROID_NDK_ROOT as an empty string — not unset —
-          # to work around finagolfin/swift-android-sdk#207. The diagnostic
-          # confirms it: ${ANDROID_NDK_ROOT+yes} prints yes while the value is
-          # "". A caller that tests whether the variable is defined rather than
-          # whether it has a value then takes "" as the NDK path, which is how a
-          # runner holding 27.3.13750724, 28.2.13676358 and 29.0.14206865 under
-          # $ANDROID_HOME/ndk still reports
-          #   error: No Android NDK is installed at any of the standard locations
+          # --no-daemon so the build runs in a JVM started now, with the
+          # ANDROID_NDK_ROOT the previous step set, rather than reusing a daemon
+          # that may have been launched during Set up Skip with the empty one.
+          # A single CI build gains nothing from a reusable daemon anyway.
           #
-          # :- substitutes for empty as well as unset, so this puts back the
-          # image's own default NDK, the one ANDROID_NDK_HOME names, and leaves
-          # a non-empty value set by anything else alone.
-          export ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-$ANDROID_NDK_HOME}"
-          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT"
-          ./gradlew assembleDebug --console=plain --stacktrace
+          # --stacktrace is gone: it added several hundred lines of Gradle
+          # internals per failure across runs 3 to 8 and never identified
+          # anything the error line above it had not already said.
+          rc=0
+          ./gradlew assembleDebug --console=plain --no-daemon || rc=$?
+          # Last lines of the step, so they survive log truncation: the API
+          # returns only the final 5000 lines of a job log, and a full build
+          # overruns that, which is why run 8 could not be checked.
+          echo "::group::environment as this step saw it"
+          echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT:-<empty or unset>}"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME:-<empty or unset>}"
+          echo "gradlew exit=$rc"
+          echo "::endgroup::"
+          exit $rc
 
       # The assertion that earns this job its keep.
       #
