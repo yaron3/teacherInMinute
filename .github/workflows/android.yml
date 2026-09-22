@@ -88,8 +88,16 @@ jobs:
       #   error: Swift package target 'SkipFirebaseCore' is linked as a static
       #   library by 'TeacherMinute-product' and 8 other targets, but cannot be
       #   built dynamically because there is a package product with the same name
-      # The swift on the runner's PATH is 6.3.3, and 6.3 is what developers build
-      # this with locally, so CI should compile with the same one.
+      # Pinning to a 6.3 SDK cleared that error outright in run 12.
+      #
+      # Three parts, not two. "6.3" is accepted, but it installs the
+      # swift-6.3-RELEASE SDK beside a swift-6.3.3-RELEASE host toolchain, and
+      # .swiftmodule files demand an exact compiler match:
+      #   error: module compiled with Swift 6.3 cannot be imported by the
+      #   Swift 6.3.3 compiler: .../swift-6.3-RELEASE_android.artifactbundle/
+      #   .../Swift.swiftmodule/aarch64-unknown-linux-android.swiftmodule
+      # So the version has to name the same release the host toolchain is, which
+      # is what 6.3.3 does. Unpinned 6.4.0 matched by accident; 6.3 does not.
       #
       # Note this is the input that matters, not swift-version: that one only
       # runs `swiftly install` without ever selecting the toolchain, and is
@@ -98,7 +106,7 @@ jobs:
         uses: skiptools/actions/setup-skip@v1
         with:
           install-swift-android-sdk: 'true'
-          swift-android-sdk-version: '6.3'
+          swift-android-sdk-version: '6.3.3'
 
       # setup-skip ends by exporting ANDROID_NDK_ROOT as an empty string, working
       # around finagolfin/swift-android-sdk#207, and something downstream reads
