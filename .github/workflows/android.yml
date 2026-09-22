@@ -1,9 +1,9 @@
 name: Android
 
-# Manual only, and it does not pass yet. CI that fails for its own reasons is
-# worse than no CI, because it trains everyone to ignore a red check — so this
-# stays on workflow_dispatch until it has passed twice on an unchanged tree,
-# and only then does the pull_request trigger below get uncommented.
+# Manual only for now. It passes as of run 14, but CI that fails for its own
+# reasons is worse than no CI, so the bar to uncomment the pull_request trigger
+# below is two green runs on an unchanged tree. Note the cost when weighing it:
+# a green run takes 35-40 minutes, nearly all of it compiling Swift for Android.
 #
 # Read android-ci-notes.md in this directory before changing anything here. It
 # records where the job stops, which explanations have been ruled out, which

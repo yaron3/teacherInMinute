@@ -1,30 +1,35 @@
 # Android CI: what is known
 
-Notes for `android.yml`, written after ten runs on 2026-09-22. The job is
-**manual only** (`workflow_dispatch`) and **has never passed**, though run 10
-got down to a single remaining failure. It is kept
-because what it has already found is worth more than its current red status
-costs — nothing depends on it, so nothing is blocked by it.
+Notes for `android.yml`, from fourteen runs on 2026-09-22. **Run 14 passed** —
+the first green run, end to end, including the dex assertion. The job is still
+`workflow_dispatch` only; the bar for wiring it into pull requests is two green
+runs on an unchanged tree.
 
-Start here before touching the workflow again.
+Start here before touching the workflow again. Most of what follows is a record
+of what was wrong with the *environment*, not with this repository's code — the
+same build succeeded on a developer Mac throughout.
 
-## Where it stops
+## What a green run looks like
 
-As of run 10, **one** failure remains. Gradle configures, resolves, compiles the
-app module's Kotlin and runs 599 tasks over roughly 19 minutes, and both Swift
-tasks then fail on the same thing:
+Run 14, on `82eefc1`:
 
-```
-error: Swift package target 'SkipFirebaseCore' is linked as a static library by
-       'TeacherMinute-product' and 8 other targets, but cannot be built
-       dynamically because there is a package product with the same name.
-  > Task :TeacherMinute:buildAndroidSwiftPackageDebug FAILED
-  > Task :skipstone:TeacherMinute:buildAndroidSwiftPackageDebug FAILED
-```
+| Step | |
+|---|---|
+| Set up Skip | 3m39s |
+| Build the Android app | **34m43s**, `assembleDebug`, Gradle 9.5.0 |
+| Verify the Application class reached the APK | pass |
 
-It is an environment problem, not a defect in this repository's code: the same
-build succeeds on a developer Mac. See "The one remaining failure" below.
+That last step is the assertion the job exists for. It runs under
+`set -euo pipefail` and exits 1 unless `grep -qa 'teacher/minute/AndroidAppMain'`
+matches the dex, so the step passing *is* the proof that the Application class
+reached the APK. A green `assembleDebug` alone never was: that is exactly what
+shipped an APK with no Application class and a ClassNotFoundException at launch.
 
+**Budget ~35-40 minutes.** Before the Swift-for-Android compile worked, every
+run died inside 21 minutes, so the earlier timings in this file are timings of
+failures, not of the work.
+
+## Settled facts
 ## Settled facts
 
 **The runner is not missing anything.** `macos-latest` ships the Android SDK at
@@ -85,26 +90,52 @@ input does **not** control this — it only runs `swiftly install` and never
 selects the toolchain, and it is skipped entirely when empty. The lever is
 `swift-android-sdk-version`, whose valid values were never established.
 
-## The one remaining failure, and where to resume
+## What made it pass
 
-`SkipFirebaseCore` cannot be built dynamically because a package product shares
-its name. Nothing in this repository is wrong: the toolchain differs.
+Four environment problems, cleared in this order. Task counts are a usable
+progress signal: 552 → 567 → 599 → 617 → green.
 
-The next thing to try is pinning `swift-android-sdk-version` on `setup-skip` to
-a 6.3 SDK, so CI compiles with the toolchain that works locally. A wrong version
-string fails during setup after about three minutes rather than eighteen, so it
-is cheap to probe — and the valid values were never established, which is the
-first thing to find out.
+1. **`setup-android` asked for a retired package.** Its `packages` input
+   defaults to `tools platform-tools`, and `tools` no longer exists, so
+   `sdkmanager` exits 1. Pinned to `platform-tools`.
+2. **`gradle-wrapper.jar` was missing from the repository.** See below.
+3. **`ANDROID_NDK_ROOT` was the empty string.** See above.
+4. **Swift 6.4 rejected the package graph.** Unpinned, `skip android sdk
+   install` brings 6.4.0, which fails with `SkipFirebaseCore ... cannot be built
+   dynamically because there is a package product with the same name`. Pinning
+   `swift-android-sdk-version` fixed it — but the version must have **three
+   parts**. `'6.3'` is accepted and installs a `swift-6.3-RELEASE` SDK next to a
+   `swift-6.3.3-RELEASE` host toolchain, and a `.swiftmodule` records the exact
+   compiler that produced it:
 
-Two observations worth carrying in, both unexplained:
+   ```
+   error: module compiled with Swift 6.3 cannot be imported by the
+   Swift 6.3.3 compiler: .../Swift.swiftmodule/...
+   ```
 
-- The same generated `build.gradle.kts` is registered under two Gradle projects,
-  `:skipstone:TeacherMinute` and `:TeacherMinute`, and both run `swift build`
-  against the same scratch path. In runs 3 to 9 the two failed in *different*
-  ways, which is what a race looks like; in run 10 they failed identically.
-  Whether this duplication is normal for Skip is unknown.
-- Task counts rose 552 → 567 → 599 as each environment problem was cleared, so
-  the count is a decent progress signal across runs.
+   `'6.3.3'` matches SDK, host toolchain and the `swift` on PATH, and builds.
+   Unpinned 6.4.0 matched on both sides only by accident.
+
+## Still worth doing
+
+- **Uncomment the `pull_request` trigger** once a second run passes on an
+  unchanged tree. Weigh the ~35-40 minute runtime against the coverage.
+- **Delete the `setup-android` step.** It is redundant (see above); it was kept
+  only so that removing it would not confuse attribution while something else
+  was being fixed.
+- **Make the diagnostic version-agnostic.** It hardcodes
+  `swift-6.4.0-RELEASE.xctoolchain` when calling `swift sdk list`, which now
+  prints `No such file or directory`. Harmless — it is guarded by `|| true` —
+  but wrong.
+- **Watch the Swift pin.** `'6.3.3'` freezes CI against a toolchain that will
+  age. When it moves, both halves have to move together.
+
+One thing remains unexplained: the same generated `build.gradle.kts` is
+registered under two Gradle projects, `:skipstone:TeacherMinute` and
+`:TeacherMinute`, and both run `swift build` against the same scratch path. In
+runs 3 to 9 the two failed in *different* ways, which is what a race looks like;
+from run 10 on they behaved identically. Whether this duplication is normal for
+Skip is unknown.
 
 ## Reading the logs is the bottleneck
 
