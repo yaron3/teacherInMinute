@@ -82,10 +82,23 @@ jobs:
       # ANDROID_NDK_ROOT afterwards on purpose, working around
       # finagolfin/swift-android-sdk#207, so do not set that variable here:
       # discovery is meant to go through the SDK root.
+      #
+      # swift-android-sdk-version pins the toolchain. Left unset, `skip android
+      # sdk install` brings 6.4.0, and Swift 6.4 is what rejects this project:
+      #   error: Swift package target 'SkipFirebaseCore' is linked as a static
+      #   library by 'TeacherMinute-product' and 8 other targets, but cannot be
+      #   built dynamically because there is a package product with the same name
+      # The swift on the runner's PATH is 6.3.3, and 6.3 is what developers build
+      # this with locally, so CI should compile with the same one.
+      #
+      # Note this is the input that matters, not swift-version: that one only
+      # runs `swiftly install` without ever selecting the toolchain, and is
+      # skipped entirely when empty. The Android toolchain arrives with the SDK.
       - name: Set up Skip
         uses: skiptools/actions/setup-skip@v1
         with:
           install-swift-android-sdk: 'true'
+          swift-android-sdk-version: '6.3'
 
       # setup-skip ends by exporting ANDROID_NDK_ROOT as an empty string, working
       # around finagolfin/swift-android-sdk#207, and something downstream reads
