@@ -14,6 +14,11 @@ name: Android
 # compilation produced a green build and an APK missing its Application class.
 on:
   workflow_dispatch:
+    inputs:
+      diagnostics-only:
+        description: 'Report the toolchain and stop, without building'
+        type: boolean
+        default: false
   # pull_request:
   #   paths:
   #     - 'teacher-minute/**'
@@ -112,6 +117,7 @@ jobs:
       # JVM, which the runner already has. If provisioning fails, that is the
       # place to look.
       - name: Build the Android app
+        if: ${{ ! inputs.diagnostics-only }}
         working-directory: teacher-minute/Android
         run: ./gradlew assembleDebug --console=plain --stacktrace
 
@@ -130,6 +136,7 @@ jobs:
       # dex string pool as "Lteacher/minute/AndroidAppMain;", which grep -a finds
       # without needing build-tools or a dex parser.
       - name: Verify the Application class reached the APK
+        if: ${{ ! inputs.diagnostics-only }}
         working-directory: teacher-minute/Android
         run: |
           set -euo pipefail
@@ -150,7 +157,7 @@ jobs:
       # Keeps the APK for a few days so a failure can be inspected without
       # reproducing the whole build locally.
       - name: Upload the APK
-        if: always()
+        if: ${{ always() && ! inputs.diagnostics-only }}
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
