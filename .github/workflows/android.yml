@@ -51,9 +51,19 @@ jobs:
       # The Android SDK proper, for the Android Gradle Plugin. Some macOS runner
       # images ship it and some do not, and which is true has changed between
       # image versions; installing it explicitly costs a minute and removes the
-      # question. Drop this step if the image turns out to provide it.
+      # question.
+      #
+      # packages has to be set. Its default is "tools platform-tools", and
+      # "tools" is the retired SDK Tools package Google removed from the
+      # repository, so sdkmanager reports "Failed to find package 'tools'" and
+      # exits 1, which fails the step before Gradle ever runs. platform-tools
+      # is a real package and the only one worth asking for here; the platform
+      # and build-tools the project needs are downloaded by AGP itself, which
+      # is what accept-android-sdk-licenses (on by default) permits.
       - name: Set up the Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       # Android/gradle/gradle-daemon-jvm.properties pins the daemon to JetBrains
       # JDK 25 and carries the download URLs, so Gradle provisions it itself on
