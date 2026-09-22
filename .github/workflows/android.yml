@@ -1,10 +1,14 @@
 name: Android
 
-# Deliberately not wired into the pull request checks yet. This job has never
-# run green, and CI that fails for its own reasons is worse than no CI: it
-# trains everyone to ignore a red check. Run it by hand from the Actions tab
-# until it passes twice on an unchanged tree, then uncomment the pull_request
-# trigger below and let it block merges.
+# Manual only, and it does not pass yet. CI that fails for its own reasons is
+# worse than no CI, because it trains everyone to ignore a red check — so this
+# stays on workflow_dispatch until it has passed twice on an unchanged tree,
+# and only then does the pull_request trigger below get uncommented.
+#
+# Read android-ci-notes.md in this directory before changing anything here. It
+# records where the job stops, which explanations have been ruled out, which
+# two guesses were already tried and failed, and why reading the logs is harder
+# than it sounds. It will save a run or six.
 #
 # It exists because the iOS job cannot see any of this. That job passes
 # SKIP_ZERO=1, which makes the "Run skip gradle" phase exit 0 without
