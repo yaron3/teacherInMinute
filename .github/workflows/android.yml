@@ -164,7 +164,14 @@ jobs:
           # the "standard locations" message follows even with three NDKs here.
           echo "--- installed Swift SDKs ---"
           ls -1 "$HOME/.swiftpm/swift-sdks" 2>/dev/null || echo "(nothing under ~/.swiftpm/swift-sdks)"
-          "$HOME/Library/Developer/Toolchains/swift-6.4.0-RELEASE.xctoolchain/usr/bin/swift" sdk list || true
+          # Every installed toolchain, rather than a hardcoded version: the
+          # point of this line is to show which Swift SDKs each one can see,
+          # and the version changes whenever the pin does.
+          for tc in "$HOME/Library/Developer/Toolchains"/*.xctoolchain; do
+            [ -x "$tc/usr/bin/swift" ] || continue
+            echo "--- swift sdk list, from $(basename "$tc") ---"
+            "$tc/usr/bin/swift" sdk list || true
+          done
           echo "--- Swift SDK json ---"
           find -L "$HOME/.swiftpm/swift-sdks" -maxdepth 4 -name "*.json" 2>/dev/null | while read -r f; do
             echo "=== $f"

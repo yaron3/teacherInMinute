@@ -1,9 +1,9 @@
 # Android CI: what is known
 
-Notes for `android.yml`, from fourteen runs on 2026-09-22. **Run 14 passed** —
-the first green run, end to end, including the dex assertion. The job is still
-`workflow_dispatch` only; the bar for wiring it into pull requests is two green
-runs on an unchanged tree.
+Notes for `android.yml`, from fifteen runs on 2026-09-22. **Runs 14 and 15 both
+passed**, end to end, on the same tree — including the dex assertion. That meets
+the two-green bar for wiring the job into pull requests; whether to pay the
+runtime for that is a judgement call, not a technical one.
 
 Start here before touching the workflow again. Most of what follows is a record
 of what was wrong with the *environment*, not with this repository's code — the
@@ -11,13 +11,13 @@ same build succeeded on a developer Mac throughout.
 
 ## What a green run looks like
 
-Run 14, on `82eefc1`:
+Runs 14 and 15, both on `82eefc1`:
 
-| Step | |
-|---|---|
-| Set up Skip | 3m39s |
-| Build the Android app | **34m43s**, `assembleDebug`, Gradle 9.5.0 |
-| Verify the Application class reached the APK | pass |
+| Step | Run 14 | Run 15 |
+|---|---|---|
+| Set up Skip | 3m39s | 3m22s |
+| Build the Android app | **34m43s** | **33m22s** |
+| Verify the Application class reached the APK | pass | pass |
 
 That last step is the assertion the job exists for. It runs under
 `set -euo pipefail` and exits 1 unless `grep -qa 'teacher/minute/AndroidAppMain'`
@@ -29,7 +29,6 @@ shipped an APK with no Application class and a ClassNotFoundException at launch.
 run died inside 21 minutes, so the earlier timings in this file are timings of
 failures, not of the work.
 
-## Settled facts
 ## Settled facts
 
 **The runner is not missing anything.** `macos-latest` ships the Android SDK at
@@ -118,15 +117,12 @@ progress signal: 552 → 567 → 599 → 617 → green.
 
 ## Still worth doing
 
-- **Uncomment the `pull_request` trigger** once a second run passes on an
-  unchanged tree. Weigh the ~35-40 minute runtime against the coverage.
+- **Uncomment the `pull_request` trigger.** The two-green bar is met, so this
+  is now purely a cost decision: ~35 minutes of macOS runner time per pull
+  request touching `teacher-minute/**`.
 - **Delete the `setup-android` step.** It is redundant (see above); it was kept
   only so that removing it would not confuse attribution while something else
   was being fixed.
-- **Make the diagnostic version-agnostic.** It hardcodes
-  `swift-6.4.0-RELEASE.xctoolchain` when calling `swift sdk list`, which now
-  prints `No such file or directory`. Harmless — it is guarded by `|| true` —
-  but wrong.
 - **Watch the Swift pin.** `'6.3.3'` freezes CI against a toolchain that will
   age. When it moves, both halves have to move together.
 
