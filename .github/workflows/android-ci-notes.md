@@ -1,7 +1,8 @@
 # Android CI: what is known
 
 Notes for `android.yml`, written after ten runs on 2026-09-22. The job is
-**manual only** (`workflow_dispatch`) and **has never passed**. It is kept
+**manual only** (`workflow_dispatch`) and **has never passed**, though run 10
+got down to a single remaining failure. It is kept
 because what it has already found is worth more than its current red status
 costs — nothing depends on it, so nothing is blocked by it.
 
@@ -9,22 +10,20 @@ Start here before touching the workflow again.
 
 ## Where it stops
 
-The job now gets all the way into the build. Gradle configures, resolves,
-compiles the app module's Kotlin, and runs ~550 tasks over roughly 16 minutes
-before two failures in the Swift-for-Android stage:
+As of run 10, **one** failure remains. Gradle configures, resolves, compiles the
+app module's Kotlin and runs 599 tasks over roughly 19 minutes, and both Swift
+tasks then fail on the same thing:
 
 ```
-error: No Android NDK is installed at any of the standard locations
-  > Task :skipstone:TeacherMinute:buildAndroidSwiftPackageDebug FAILED
-
 error: Swift package target 'SkipFirebaseCore' is linked as a static library by
        'TeacherMinute-product' and 8 other targets, but cannot be built
        dynamically because there is a package product with the same name.
   > Task :TeacherMinute:buildAndroidSwiftPackageDebug FAILED
+  > Task :skipstone:TeacherMinute:buildAndroidSwiftPackageDebug FAILED
 ```
 
-Both are environment problems, not defects in this repository's code. The same
-build succeeds on a developer Mac.
+It is an environment problem, not a defect in this repository's code: the same
+build succeeds on a developer Mac. See "The one remaining failure" below.
 
 ## Settled facts
 
@@ -46,9 +45,23 @@ defined=yes
 ```
 
 Anything testing whether the variable is *defined*, rather than whether it holds
-a value, takes `""` as the NDK path. That is the most likely reading of the "no
-NDK at any standard location" message on a machine holding three of them, and it
-is the hypothesis the workflow currently acts on. **It is not yet confirmed.**
+a value, takes `""` as the NDK path. That is why a machine holding three NDKs
+reported having none.
+
+**Confirmed in run 10, and fixed.** The workflow restores the value through
+`$GITHUB_ENV` in its own step, and the build runs `--no-daemon`. Both parts
+matter: a Gradle daemon keeps the environment of the JVM it started in, and
+`setup-skip` pulls in `gradle/actions/setup-gradle`, so a daemon can already be
+up holding the empty value — which is why run 8's in-step `export` changed
+nothing. Run 10 ends with
+
+```
+ANDROID_NDK_ROOT=/Users/runner/Library/Android/sdk/ndk/27.3.13750724
+```
+
+and the NDK error is absent from the log. Setting the variable did **not**
+trigger [finagolfin/swift-android-sdk#207], the bug the empty export exists to
+avoid.
 
 **It is not an NDK version mismatch.** The Swift SDK carries its own sysroot and
 names no external NDK. Every target in
@@ -72,26 +85,26 @@ input does **not** control this — it only runs `swiftly install` and never
 selects the toolchain, and it is skipped entirely when empty. The lever is
 `swift-android-sdk-version`, whose valid values were never established.
 
-## Unverified, and where to resume
+## The one remaining failure, and where to resume
 
-Run 10 (`073c144`) was in flight when this work stopped, testing one change:
-`ANDROID_NDK_ROOT` set through `$GITHUB_ENV` in its own step rather than
-exported inside the build step, plus `--no-daemon`.
+`SkipFirebaseCore` cannot be built dynamically because a package product shares
+its name. Nothing in this repository is wrong: the toolchain differs.
 
-The reasoning: a Gradle daemon keeps the environment of the JVM it started in.
-`setup-skip` pulls in `gradle/actions/setup-gradle`, so a daemon may already be
-running with the empty value by the time the build step executes, which would
-make an in-step `export` invisible to the compiler. Run 8 exported it in-step
-and changed nothing — consistent with that, though not proof, because the
-evidence could not be read (see below).
+The next thing to try is pinning `swift-android-sdk-version` on `setup-skip` to
+a 6.3 SDK, so CI compiles with the toolchain that works locally. A wrong version
+string fails during setup after about three minutes rather than eighteen, so it
+is cheap to probe — and the valid values were never established, which is the
+first thing to find out.
 
-**Its result is in the Actions tab and has not been looked at.** That is the
-first thing to check.
+Two observations worth carrying in, both unexplained:
 
-If the NDK error is gone, only the Swift 6.4 `SkipFirebaseCore` failure remains,
-and the next thing to try is pinning `swift-android-sdk-version` on `setup-skip`
-to a 6.3 SDK — a wrong version string fails in setup after ~3 minutes rather
-than ~18, so it is cheap to probe.
+- The same generated `build.gradle.kts` is registered under two Gradle projects,
+  `:skipstone:TeacherMinute` and `:TeacherMinute`, and both run `swift build`
+  against the same scratch path. In runs 3 to 9 the two failed in *different*
+  ways, which is what a race looks like; in run 10 they failed identically.
+  Whether this duplication is normal for Skip is unknown.
+- Task counts rose 552 → 567 → 599 as each environment problem was cleared, so
+  the count is a decent progress signal across runs.
 
 ## Reading the logs is the bottleneck
 
