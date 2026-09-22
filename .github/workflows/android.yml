@@ -1,0 +1,108 @@
+name: Android
+
+# Deliberately not wired into the pull request checks yet. This job has never
+# run green, and CI that fails for its own reasons is worse than no CI: it
+# trains everyone to ignore a red check. Run it by hand from the Actions tab
+# until it passes twice on an unchanged tree, then uncomment the pull_request
+# trigger below and let it block merges.
+#
+# It exists because the iOS job cannot see any of this. That job passes
+# SKIP_ZERO=1, which makes the "Run skip gradle" phase exit 0 without
+# transpiling or building anything for Android, so the entire Android half of
+# the app has no automated coverage at all. Three separate failures shipped to
+# master that way, the worst of them silent: an app module with no Kotlin
+# compilation produced a green build and an APK missing its Application class.
+on:
+  workflow_dispatch:
+  # pull_request:
+  #   paths:
+  #     - 'teacher-minute/**'
+  #     - '.github/workflows/android.yml'
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android build
+    # macOS only: the Android build starts in Android/settings.gradle.kts, which
+    # shells out to `skip plugin --prebuild` before Gradle configures anything,
+    # and skip ships for macOS alone.
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Skip's own action. It installs Homebrew, Gradle and the Skip CLI, and
+      # tells Xcode to accept Skip's package plugins without an interactive
+      # prompt a runner cannot answer.
+      #
+      # install-swift-android-sdk is the one that matters here. This is a Skip
+      # Fuse app — the gradle build runs `skip android build` to compile the
+      # Swift sources into libTeacherMinute.so — and that needs the Swift SDK
+      # for Android, which this input installs via `skip android sdk install`.
+      # Without it the build dies in :skipstone:TeacherMinute:buildAndroidSwiftPackageDebug.
+      - name: Set up Skip
+        uses: skiptools/actions/setup-skip@v1
+        with:
+          install-swift-android-sdk: 'true'
+
+      # The Android SDK proper, for the Android Gradle Plugin. Some macOS runner
+      # images ship it and some do not, and which is true has changed between
+      # image versions; installing it explicitly costs a minute and removes the
+      # question. Drop this step if the image turns out to provide it.
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Android/gradle/gradle-daemon-jvm.properties pins the daemon to JetBrains
+      # JDK 25 and carries the download URLs, so Gradle provisions it itself on
+      # first run. No setup-java step: adding one would only supply the launcher
+      # JVM, which the runner already has. If provisioning fails, that is the
+      # place to look.
+      - name: Build the Android app
+        working-directory: teacher-minute/Android
+        run: ./gradlew assembleDebug --console=plain --stacktrace
+
+      # The assertion that earns this job its keep.
+      #
+      # `assembleDebug` succeeding is not enough. Gradle does not warn about a
+      # source set with no compiler attached, so when the Kotlin Android plugin
+      # went missing the build stayed green while all 22 files under
+      # app/src/main/kotlin silently stopped being compiled — including Main.kt,
+      # which declares the teacher.minute.AndroidAppMain the manifest names as
+      # the Application class. The APK installed and the app died at launch on a
+      # ClassNotFoundException.
+      #
+      # So check the artifact rather than the build result: the class the
+      # manifest depends on has to be in the dex. Type descriptors live in the
+      # dex string pool as "Lteacher/minute/AndroidAppMain;", which grep -a finds
+      # without needing build-tools or a dex parser.
+      - name: Verify the Application class reached the APK
+        working-directory: teacher-minute/Android
+        run: |
+          set -euo pipefail
+          apk=$(find ../.build -name 'app-debug.apk' -print -quit)
+          if [ -z "$apk" ]; then
+            echo "::error::no app-debug.apk was produced"
+            exit 1
+          fi
+          echo "checking $apk"
+          rm -rf "$RUNNER_TEMP/dex" && mkdir -p "$RUNNER_TEMP/dex"
+          unzip -o -j "$apk" 'classes*.dex' -d "$RUNNER_TEMP/dex"
+          if ! grep -qa 'teacher/minute/AndroidAppMain' "$RUNNER_TEMP"/dex/*.dex; then
+            echo "::error::teacher.minute.AndroidAppMain is not in the APK — the app module's Kotlin was not compiled"
+            exit 1
+          fi
+          echo "AndroidAppMain present"
+
+      # Keeps the APK for a few days so a failure can be inspected without
+      # reproducing the whole build locally.
+      - name: Upload the APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: teacher-minute/.build/**/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 7
