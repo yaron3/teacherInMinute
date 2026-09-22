@@ -34,24 +34,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Skip's own action. It installs Homebrew, Gradle and the Skip CLI, and
-      # tells Xcode to accept Skip's package plugins without an interactive
-      # prompt a runner cannot answer.
+      # The Android SDK proper. It comes first, before Skip, because
+      # `skip android sdk install` in the next step puts the Android NDK under
+      # the Android SDK root — and run 3 showed what happens when that root
+      # does not exist yet:
       #
-      # install-swift-android-sdk is the one that matters here. This is a Skip
-      # Fuse app — the gradle build runs `skip android build` to compile the
-      # Swift sources into libTeacherMinute.so — and that needs the Swift SDK
-      # for Android, which this input installs via `skip android sdk install`.
-      # Without it the build dies in :skipstone:TeacherMinute:buildAndroidSwiftPackageDebug.
-      - name: Set up Skip
-        uses: skiptools/actions/setup-skip@v1
-        with:
-          install-swift-android-sdk: 'true'
-
-      # The Android SDK proper, for the Android Gradle Plugin. Some macOS runner
-      # images ship it and some do not, and which is true has changed between
-      # image versions; installing it explicitly costs a minute and removes the
-      # question.
+      #   error: No Android NDK is installed at any of the standard locations
+      #
+      # macOS arm64 runner images do not ship the Android SDK (run 1 shows this
+      # action creating it from scratch at ~/Library/Android/sdk), so with the
+      # steps the other way round Skip had nowhere standard to put the NDK and
+      # the Swift build could not find one.
       #
       # packages has to be set. Its default is "tools platform-tools", and
       # "tools" is the retired SDK Tools package Google removed from the
@@ -64,6 +57,26 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'
+
+      # Skip's own action. It installs Homebrew, Gradle and the Skip CLI, and
+      # tells Xcode to accept Skip's package plugins without an interactive
+      # prompt a runner cannot answer.
+      #
+      # install-swift-android-sdk is the one that matters here. This is a Skip
+      # Fuse app — the gradle build runs `skip android build` to compile the
+      # Swift sources into libTeacherMinute.so — and that needs the Swift SDK
+      # for Android, which this input installs via `skip android sdk install`.
+      # Without it the build dies in :skipstone:TeacherMinute:buildAndroidSwiftPackageDebug.
+      #
+      # That same command installs the NDK, which is why this step runs after
+      # the Android SDK is in place. The action also exports an empty
+      # ANDROID_NDK_ROOT afterwards on purpose, working around
+      # finagolfin/swift-android-sdk#207, so do not set that variable here:
+      # discovery is meant to go through the SDK root.
+      - name: Set up Skip
+        uses: skiptools/actions/setup-skip@v1
+        with:
+          install-swift-android-sdk: 'true'
 
       # Android/gradle/gradle-daemon-jvm.properties pins the daemon to JetBrains
       # JDK 25 and carries the download URLs, so Gradle provisions it itself on
