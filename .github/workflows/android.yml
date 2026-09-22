@@ -110,6 +110,29 @@ jobs:
           skip --version || true
           echo "--- skip doctor ---"
           skip doctor || true
+          # Is ANDROID_NDK_ROOT absent, or present and empty? setup-skip exports
+          # it empty, and a check for "defined" rather than "non-empty" would
+          # then take "" as the NDK path. ${VAR+set} tells the two apart;
+          # the ${VAR:-...} forms above cannot.
+          echo "--- ANDROID_NDK_ROOT defined? ---"
+          echo "defined=${ANDROID_NDK_ROOT+yes}${ANDROID_NDK_ROOT-no}"
+          # The Swift SDK for Android bakes absolute NDK paths into its toolset
+          # at install time. If those name a version this runner does not have,
+          # the "standard locations" message follows even with three NDKs here.
+          echo "--- installed Swift SDKs ---"
+          ls -1 "$HOME/.swiftpm/swift-sdks" 2>/dev/null || echo "(nothing under ~/.swiftpm/swift-sdks)"
+          "$HOME/Library/Developer/Toolchains/swift-6.4.0-RELEASE.xctoolchain/usr/bin/swift" sdk list || true
+          echo "--- Swift SDK json ---"
+          find "$HOME/.swiftpm/swift-sdks" -maxdepth 3 -name "*.json" 2>/dev/null | while read -r f; do
+            echo "=== $f"
+            cat "$f"
+            echo
+          done
+          echo "--- ndk paths named in those json, and whether they exist ---"
+          find "$HOME/.swiftpm/swift-sdks" -maxdepth 3 -name "*.json" -exec cat {} + 2>/dev/null \
+            | tr "," "\n" | grep -o "/[^\"]*[Nn][Dd][Kk][^\"]*" | sort -u | while read -r q; do
+              if [ -e "$q" ]; then echo "EXISTS  $q"; else echo "MISSING $q"; fi
+            done
 
       # Android/gradle/gradle-daemon-jvm.properties pins the daemon to JetBrains
       # JDK 25 and carries the download URLs, so Gradle provisions it itself on
