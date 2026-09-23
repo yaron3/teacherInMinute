@@ -14,6 +14,8 @@ struct OnlineTeacher: Identifiable {
   let name: String
   let subject: String
   let profileImageURL: String
+  /// In a session: shown in the grid, but not counted as available.
+  var isBusy: Bool = false
 
   var initial: String {
     String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased()
@@ -29,4 +31,7 @@ struct OnlineTeacherPresence: Identifiable {
   let subjects: [String]
   let displayName: String
   let photoUrl: String
+  /// Teaching someone right now. Absent in entries published before the
+  /// backend wrote it, which reads as free.
+  var isBusy: Bool = false
 }

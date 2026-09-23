@@ -2,9 +2,11 @@
 //  OnlineTeachersStore.swift
 //  teacher-minute
 //
-// Reads RTDB path: teachers/{uid}/
-//   status   : String ("online" | "offline")
-//   subjects : [String]
+// Reads RTDB path: onlineTeachers/{uid}/
+//   subjects    : [String]
+//   displayName : String
+//   photoUrl    : String
+//   busy        : Bool — in a session right now
 //
 // Supplies the teachers currently online for the student home
 // "Teachers online now" grid.
@@ -71,7 +73,7 @@ final class OnlineTeachersStore {
   /// Order-independent, so a reshuffled read is not mistaken for a change.
   private static func signature(for presences: [OnlineTeacherPresence]) -> String {
     presences
-      .map { "\($0.id):\($0.subjects.sorted().joined(separator: ","))" }
+      .map { "\($0.id):\($0.isBusy):\($0.subjects.sorted().joined(separator: ","))" }
       .sorted()
       .joined(separator: "|")
   }
@@ -100,7 +102,8 @@ final class OnlineTeachersStore {
           id: id,
           subjects: row["subjects"] as? [String] ?? [],
           displayName: row["displayName"] as? String ?? "",
-          photoUrl: row["photoUrl"] as? String ?? ""
+          photoUrl: row["photoUrl"] as? String ?? "",
+          isBusy: row["busy"] as? Bool ?? false
         )
       )
     }
@@ -156,7 +159,8 @@ final class OnlineTeachersStore {
             id: snap.key,
             subjects: dict["subjects"] as? [String] ?? [],
             displayName: dict["displayName"] as? String ?? "",
-            photoUrl: dict["photoUrl"] as? String ?? ""
+            photoUrl: dict["photoUrl"] as? String ?? "",
+            isBusy: dict["busy"] as? Bool ?? false
           )
         )
       }

@@ -561,7 +561,8 @@ struct StudentHomeView: View {
               initial: teacher.initial,
               imageURL: teacher.profileImageURL,
               tint: tint.fill,
-              tintForeground: tint.foreground
+              tintForeground: tint.foreground,
+              busyLabel: teacher.isBusy ? viewModel.teacherBusyLabel : nil
             )
             .frame(width: 155)
           }
@@ -752,7 +753,10 @@ struct StudentHomeView: View {
     }
   }
 
-  func onlineTeacherCard(name: String, subject: String, initial: String, imageURL: String, tint: Color, tintForeground: Color) -> some View {
+  /// `busyLabel` is set for a teacher in a session: their dot goes amber and
+  /// the label takes the subject's place, since a busy teacher is not one the
+  /// student can reach for it right now.
+  func onlineTeacherCard(name: String, subject: String, initial: String, imageURL: String, tint: Color, tintForeground: Color, busyLabel: String? = nil) -> some View {
     FlatCard(outlined: true) {
       VStack(alignment: .center, spacing: 10) {
         ZStack(alignment: .bottomTrailing) {
@@ -767,7 +771,7 @@ struct StudentHomeView: View {
             initial: initial
           )
           Circle()
-            .fill(theme.positive)
+            .fill(busyLabel == nil ? theme.positive : theme.warning)
             .frame(width: 18, height: 18)
             .overlay { Circle().stroke(theme.screenBackground, lineWidth: 3) }
         }
@@ -777,9 +781,9 @@ struct StudentHomeView: View {
           .foregroundStyle(theme.primaryText)
           .lineLimit(1)
 
-        Text(subject)
+        Text(busyLabel ?? subject)
           .font(.system(size: 14, weight: .bold))
-          .foregroundStyle(tint)
+          .foregroundStyle(busyLabel == nil ? tint : theme.warning)
           .lineLimit(1)
 
 //        Button {

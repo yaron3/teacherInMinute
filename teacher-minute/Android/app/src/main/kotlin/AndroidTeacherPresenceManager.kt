@@ -74,6 +74,7 @@ object AndroidTeacherPresenceManager {
                 entry.put("subjects", org.json.JSONArray(stringList(child.child("subjects").value)))
                 entry.put("displayName", child.child("displayName").getValue(String::class.java) ?: "")
                 entry.put("photoUrl", child.child("photoUrl").getValue(String::class.java) ?: "")
+                entry.put("busy", child.child("busy").getValue(Boolean::class.java) ?: false)
                 teachers.put(entry)
             }
             Log.i(TAG, "onlineTeachersJSON count=${teachers.length()}")

@@ -447,12 +447,18 @@ extension StudentHomeViewModeling {
   /// Hebrew and English both read wrong as "1 teachers available now", and a
   /// single format string cannot carry both forms, so the singular gets its own
   /// string the way "1 teacher"/"%d teachers" already do.
+  ///
+  /// A teacher in a session is online but not available, so is not counted.
   var onlineTeachersCountText: String {
-    if onlineTeachers.count == 1 {
+    let available = onlineTeachers.filter { !$0.isBusy }.count
+    if available == 1 {
       return LocalizationSupport.localized("1 teacher available now")
     }
-    return String(format: LocalizationSupport.localized("%d teachers available now"), onlineTeachers.count)
+    return String(format: LocalizationSupport.localized("%d teachers available now"), available)
   }
+
+  /// Under a teacher in the online grid who is teaching someone right now.
+  var teacherBusyLabel: String { LocalizationSupport.localized("Busy") }
 
   /// Stand-in shown wherever the balance would otherwise be quoted before it
   /// has been read. `remainingMinutes` is zero until the profile arrives, and
@@ -1229,23 +1235,27 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   private func resolveOnlineTeachers(_ presences: [OnlineTeacherPresence]) {
     // The subject grid's teacher counts come straight from presence, so they
-    // update the moment a teacher goes online.
-    onlineTeacherSubjectKeys = presences.map { presence in
+    // update the moment a teacher goes online. They read as "available now",
+    // so a teacher in a session is left out until it ends.
+    onlineTeacherSubjectKeys = presences.filter { !$0.isBusy }.map { presence in
       Set(presence.subjects.map { SubjectPresentation.matchKey(for: $0) })
     }
     rebuildSubjects()
 
     // The projection already carries each teacher's name and photo, so the
     // grid is built straight from presence — no per-teacher profile reads, and
-    // nothing to cache or invalidate.
-    onlineTeachers = presences.map { presence in
+    // nothing to cache or invalidate. Free teachers lead; busy ones follow,
+    // each group in the order the projection gave them.
+    let teachers = presences.map { presence in
       OnlineTeacher(
         id: presence.id,
         name: presence.displayName.isEmpty ? LocalizationSupport.localized("Teacher") : presence.displayName,
         subject: presence.subjects.first.map { LocalizationSupport.localized($0) } ?? LocalizationSupport.localized("Math"),
-        profileImageURL: presence.photoUrl
+        profileImageURL: presence.photoUrl,
+        isBusy: presence.isBusy
       )
     }
+    onlineTeachers = teachers.filter { !$0.isBusy } + teachers.filter { $0.isBusy }
   }
 
   /// Pull-to-refresh: re-reads the authoritative balance and profile summary
@@ -1721,7 +1731,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
     OnlineTeacher(id: "1", name: "Cohen", subject: "Math", profileImageURL: ""),
     OnlineTeacher(id: "2", name: "Levi", subject: "Physics", profileImageURL: ""),
     OnlineTeacher(id: "3", name: "Mizrahi", subject: "Chemistry", profileImageURL: ""),
-    OnlineTeacher(id: "4", name: "Shalev", subject: "Statistics", profileImageURL: ""),
+    OnlineTeacher(id: "4", name: "Shalev", subject: "Statistics", profileImageURL: "", isBusy: true),
   ]
   var totalTimeLearnedText: String
   var totalPurchasedText: String

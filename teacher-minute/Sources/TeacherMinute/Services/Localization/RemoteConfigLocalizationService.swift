@@ -353,6 +353,9 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Singular counterpart of "%d teachers available now"; a lone format
         // string rendered "1 מורים פנויים עכשיו".
         "1 teacher available now": "מורה אחד פנוי עכשיו",
+        // Student home grid — a teacher in a session. New key (`busy`), not in
+        // the published config until the template is republished.
+        "Busy": "בשיעור",
         // Ask a Teacher sheet — the heading stayed English above its Hebrew
         // description.
         "Attach a photo (optional)": "צירוף תמונה (לא חובה)",

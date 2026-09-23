@@ -15,6 +15,9 @@ import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onValueWritten } from "firebase-functions/v2/database";
 
+import { isTeacherBusy } from "./scoring";
+import { TeacherRecord } from "./types";
+
 const firestore = admin.firestore();
 
 export const ONLINE_TEACHERS_PATH = "onlineTeachers";
@@ -27,6 +30,10 @@ export interface OnlineTeacherProjection {
   photoUrl: string;
   /** When the teacher came online, for ordering and staleness checks. */
   since: number;
+  /** In a session right now: online, but not taking questions until it ends.
+   *  A flag rather than the session itself — which question they are on is
+   *  nobody else's business. */
+  busy: boolean;
 }
 
 function database() {
@@ -111,10 +118,14 @@ export async function republishTeacherPresence(uid: string): Promise<boolean> {
   const existingSince = (await entryRef.child("since").get()).val();
   const since = typeof existingSince === "number" ? existingSince : Date.now();
 
-  const projection: OnlineTeacherProjection = { subjects, displayName, photoUrl, since };
+  const busy = isTeacherBusy((teacherSnap.val() ?? {}) as TeacherRecord);
+
+  const projection: OnlineTeacherProjection = { subjects, displayName, photoUrl, since, busy };
   await entryRef.set(projection);
 
-  logger.info(`[presence] published online entry uid=${uid} subjects=${subjects.length}`);
+  logger.info(
+    `[presence] published online entry uid=${uid} subjects=${subjects.length} busy=${busy}`
+  );
   return true;
 }
 
@@ -140,6 +151,20 @@ export const onTeacherPresenceSubjectsWritten = onValueWritten(
       await republishTeacherPresence(uid);
     } catch (err) {
       logger.error(`[presence] failed publishing subjects uid=${uid}`, err);
+    }
+  }
+);
+
+/** Shows students a teacher starting or finishing a session. ./busy writes
+ *  the mark; this carries it into the public entry. */
+export const onTeacherPresenceBusyWritten = onValueWritten(
+  "teachers/{uid}/busy",
+  async (event) => {
+    const uid = event.params.uid;
+    try {
+      await republishTeacherPresence(uid);
+    } catch (err) {
+      logger.error(`[presence] failed publishing busy uid=${uid}`, err);
     }
   }
 );

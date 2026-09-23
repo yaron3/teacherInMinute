@@ -3594,6 +3594,17 @@
       },
       "valueType": "STRING"
     },
+    "busy": {
+      "defaultValue": {
+        "value": "Busy"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בשיעור"
+        }
+      },
+      "valueType": "STRING"
+    },
     "teacher_available_now": {
       "defaultValue": {
         "value": "1 teacher available now"
