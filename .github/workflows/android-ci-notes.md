@@ -1,9 +1,9 @@
 # Android CI: what is known
 
 Notes for `android.yml`, from fifteen runs on 2026-09-22. **Runs 14 and 15 both
-passed**, end to end, on the same tree — including the dex assertion. That meets
-the two-green bar for wiring the job into pull requests; whether to pay the
-runtime for that is a judgement call, not a technical one.
+passed**, end to end, on the same tree — including the dex assertion. It now
+runs automatically on pushes to `master` that touch `teacher-minute/**`, and on
+demand.
 
 Start here before touching the workflow again. Most of what follows is a record
 of what was wrong with the *environment*, not with this repository's code — the
@@ -117,9 +117,12 @@ progress signal: 552 → 567 → 599 → 617 → green.
 
 ## Still worth doing
 
-- **Uncomment the `pull_request` trigger.** The two-green bar is met, so this
-  is now purely a cost decision: ~35 minutes of macOS runner time per pull
-  request touching `teacher-minute/**`.
+- **Consider the `pull_request` trigger.** It is written out and commented in
+  `android.yml`. The job currently runs post-merge, so a regression is reported
+  after it lands rather than blocked before it. Switching means paying ~35
+  minutes of macOS runner time — billed at ten times the Linux rate — for every
+  push to every open pull request touching `teacher-minute/**`. Worth revisiting
+  if something ever does reach `master`.
 - **Delete the `setup-android` step.** It is redundant (see above); it was kept
   only so that removing it would not confuse attribution while something else
   was being fixed.

@@ -1,9 +1,13 @@
 name: Android
 
-# Manual only for now. It passes as of run 14, but CI that fails for its own
-# reasons is worse than no CI, so the bar to uncomment the pull_request trigger
-# below is two green runs on an unchanged tree. Note the cost when weighing it:
-# a green run takes 35-40 minutes, nearly all of it compiling Swift for Android.
+# Runs after merge, not before it. Runs 14 and 15 both passed on an unchanged
+# tree, which was the bar for automating this at all; post-merge rather than
+# per-pull-request is a cost decision. A green run takes 35-40 minutes, nearly
+# all of it compiling Swift for Android, and macOS runner minutes bill at ten
+# times the Linux rate — so one run per merge, rather than one per push to every
+# open pull request. The trade is that this reports breakage after it lands
+# instead of blocking it, which is why the pull_request trigger is written out
+# below rather than deleted: swap to it if a regression ever reaches master.
 #
 # Read android-ci-notes.md in this directory before changing anything here. It
 # records where the job stops, which explanations have been ruled out, which
@@ -23,6 +27,13 @@ on:
         description: 'Report the toolchain and stop, without building'
         type: boolean
         default: false
+  push:
+    branches:
+      - master
+    paths:
+      - 'teacher-minute/**'
+      - '.github/workflows/android.yml'
+  # The blocking alternative, deliberately not enabled. See the note above.
   # pull_request:
   #   paths:
   #     - 'teacher-minute/**'
