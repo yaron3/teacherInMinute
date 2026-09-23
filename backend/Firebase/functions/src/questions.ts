@@ -25,6 +25,8 @@ import {
   withdrawTeacherFromOtherQuestions,
 } from "./dispatch";
 import { enqueueAbandonedLessonCheck } from "./lessons";
+import { markTeacherBusy, releaseTeacherBusy } from "./busy";
+import { isTeacherBusy } from "./scoring";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -320,6 +322,7 @@ export const cancelQuestion = onCall(HOT_PATH, async (req) => {
 
   const qRef = firestore.collection("questions").doc(questionId);
   let alreadyInvited: string[] = [];
+  let sessionTeacherUid: string | undefined;
 
   await firestore.runTransaction(async (tx) => {
     const snap = await tx.get(qRef);
@@ -337,6 +340,8 @@ export const cancelQuestion = onCall(HOT_PATH, async (req) => {
     }
 
     alreadyInvited = data.alreadyInvited ?? [];
+    // Cancelling after a teacher accepted ends that teacher's session.
+    if (data.status === "accepted") sessionTeacherUid = data.acceptedByTeacher;
 
     tx.update(qRef, {
       status: "cancelled",
@@ -347,6 +352,12 @@ export const cancelQuestion = onCall(HOT_PATH, async (req) => {
   });
 
   await cleanupRtdb(questionId, alreadyInvited);
+
+  if (sessionTeacherUid) {
+    await releaseTeacherBusy(sessionTeacherUid, questionId).catch((error) => {
+      logger.error(`[questions] failed releasing teacher=${sessionTeacherUid} qid=${questionId}`, error);
+    });
+  }
 
   logger.info(`[questions] cancelled qid=${questionId} by student=${uid}`);
   return { success: true };
@@ -370,6 +381,20 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
 
   let studentUid = "";
   let questionCreatedAtMillis: number | undefined;
+
+  // One session at a time. Their other invites are withdrawn as they accept,
+  // but two cards tapped in quick succession can both get here first.
+  const acceptingTeacher = (await db.ref(`teachers/${teacherUid}`).once("value")).val();
+  if (
+    acceptingTeacher &&
+    isTeacherBusy(acceptingTeacher) &&
+    acceptingTeacher.busy.questionId !== questionId
+  ) {
+    logger.info(
+      `[questions] acceptInvite refused qid=${questionId} teacher=${teacherUid} busyWith=${acceptingTeacher.busy.questionId}`
+    );
+    throw new HttpsError("failed-precondition", "Already in a session");
+  }
 
   // Atomic claim — only one teacher can win
   await firestore.runTransaction(async (tx) => {
@@ -419,6 +444,14 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
     });
 
     tx.update(inviteRef, { response: "accept" });
+  });
+
+  // Out of the pool from this moment, before anything slower below, so no wave
+  // that fires in the meantime can page a teacher who is already taken. A
+  // failure must not undo a claim that has committed; the teacher is then only
+  // as reachable as before this existed.
+  await markTeacherBusy(teacherUid, questionId).catch((error) => {
+    logger.error(`[questions] failed marking teacher=${teacherUid} busy qid=${questionId}`, error);
   });
 
   await upsertLiveQuestion(

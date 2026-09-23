@@ -2,8 +2,9 @@
  * Wave routing, end to end, against an in-memory Firebase.
  *
  * Ten virtual teachers, all online for algebra and each with a different
- * rating, and two virtual students. Questions go in through the real
- * createQuestion, waves fire from the task queue on a simulated clock through
+ * rating, and virtual students — two for the concurrent-question scenarios, a
+ * third who asks while a teacher is in a session. Questions go in through the
+ * real createQuestion, waves fire from the task queue on a simulated clock through
  * the real evaluateWave, teachers claim through the real acceptInvite, and the
  * ranking is the real rankTeachers. Only the edges — push, LiveKit, pricing,
  * stats, rate limits — are stubbed.
@@ -90,7 +91,7 @@ jest.mock("../lessons", () => ({
 }));
 
 import { evaluateWave, questionWatchdog } from "../dispatch";
-import { createQuestion, acceptInvite } from "../questions";
+import { createQuestion, acceptInvite, cancelQuestion } from "../questions";
 import { WAVE_SIZES, WAVE_TIMEOUT_SECONDS } from "../types";
 
 // ─── The virtual roster ──────────────────────────────────────────────────────
@@ -111,7 +112,7 @@ const TEACHERS_BY_RATING: Array<[uid: string, rating: number]> = [
 ];
 
 const RANKED = TEACHERS_BY_RATING.map(([uid]) => uid);
-const STUDENTS = ["student-maya", "student-noam"];
+const STUDENTS = ["student-maya", "student-noam", "student-omer"];
 
 /** The order they are written to RTDB in, deliberately not the rating order,
  *  so a pass cannot come from the dispatcher reading keys in insertion order. */
@@ -380,5 +381,94 @@ describe("two students asking at the same time", () => {
 
     await expect(accept(anna, q2)).rejects.toMatchObject({ code: "failed-precondition" });
     expect(question(q2).status).toBe("searching");
+  });
+});
+
+describe("a teacher in a session is busy", () => {
+  test("accepting marks the teacher busy with that question", async () => {
+    const qid = await ask("student-maya");
+    const [anna] = RANKED;
+
+    await advanceTo(3);
+    await accept(anna, qid);
+
+    expect(fakeRtdb.read(`teachers/${anna}/busy`)).toEqual({
+      questionId: qid,
+      since: START_MS + 3000,
+    });
+    // Still online — the app's own status is left alone.
+    expect(fakeRtdb.read(`teachers/${anna}/status`)).toBe("online");
+  });
+
+  test("a question asked during the session skips the busy teacher in every wave", async () => {
+    const q1 = await ask("student-maya");
+    const [anna, ben, carmen, dan] = RANKED;
+
+    await advanceTo(3);
+    await accept(anna, q1);
+
+    await advanceTo(4);
+    const q2 = await ask("student-omer");
+    expect(pendingInWave(q2, 1)).toEqual([ben, carmen, dan]);
+
+    await advanceTo(4 + 12);
+    expect(pendingInWave(q2, 2)).toEqual(RANKED.slice(4, 9));
+
+    await advanceTo(4 + 24);
+    // Every free teacher has it; the one teaching never did.
+    expect(dashboardsShowing(q2)).toEqual(RANKED.slice(1));
+    expect(invitesFor(q2)[anna]).toBeUndefined();
+  });
+
+  test("the busy teacher cannot accept a second question", async () => {
+    const q1 = await ask("student-maya");
+    const [anna] = RANKED;
+
+    await advanceTo(3);
+    await accept(anna, q1);
+
+    // Plant an invite as if one had slipped through before the mark landed.
+    const q2 = await ask("student-omer");
+    fakeFirestore.write(
+      `questions/${q2}/invites/${anna}`,
+      {
+        teacherUid: anna,
+        questionId: q2,
+        wave: 1,
+        response: "pending",
+        expiresAt: { toMillis: () => START_MS + 90_000 },
+      },
+      false
+    );
+
+    await expect(accept(anna, q2)).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(question(q2).status).toBe("searching");
+  });
+
+  test("when the student cancels the accepted question, the teacher is free again", async () => {
+    const q1 = await ask("student-maya");
+    const [anna] = RANKED;
+
+    await advanceTo(3);
+    await accept(anna, q1);
+    await (cancelQuestion as unknown as Callable)({
+      auth: { uid: "student-maya" },
+      data: { questionId: q1 },
+    });
+
+    expect(fakeRtdb.read(`teachers/${anna}/busy`)).toBeUndefined();
+
+    const q2 = await ask("student-omer");
+    expect(pendingInWave(q2, 1)).toEqual(RANKED.slice(0, 3));
+  });
+
+  test("a mark left behind past the longest possible session stops blocking the teacher", async () => {
+    const [anna] = RANKED;
+    fakeRtdb.write(`teachers/${anna}/busy`, { questionId: "lost", since: START_MS });
+
+    await advanceTo(46 * 60);
+    const qid = await ask("student-maya");
+
+    expect(pendingInWave(qid, 1)).toEqual(RANKED.slice(0, 3));
   });
 });

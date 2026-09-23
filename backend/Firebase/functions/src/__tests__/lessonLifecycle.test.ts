@@ -185,7 +185,19 @@ jest.mock("../dispatch", () => ({
   backfillPendingQuestionsForTeacher: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { endAbandonedLesson, endLesson, extendLessonMinutes, startLesson } from "../lessons";
+const mockReleaseTeacherBusy = jest.fn().mockResolvedValue(undefined);
+jest.mock("../busy", () => ({
+  releaseTeacherBusy: (...args: unknown[]) => mockReleaseTeacherBusy(...args),
+}));
+
+import {
+  endAbandonedLesson,
+  endLesson,
+  extendLessonMinutes,
+  forceEndLesson,
+  startLesson,
+} from "../lessons";
+import { backfillPendingQuestionsForTeacher } from "../dispatch";
 
 type TaskHandler = (req: { data: { questionId: string } }) => Promise<void>;
 type CallableHandler = (request: {
@@ -433,5 +445,52 @@ describe("endLesson when the other side got there first", () => {
     await expect(
       callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } })
     ).rejects.toThrow();
+  });
+});
+
+describe("every way a session ends frees the teacher", () => {
+  test("endLesson, before the teacher is offered the next question", async () => {
+    seedQuestion({ status: "in_progress", startedAt: { toMillis: () => 1_700_000_060_000 } });
+    const order: string[] = [];
+    mockReleaseTeacherBusy.mockImplementationOnce(async () => void order.push("release"));
+    (backfillPendingQuestionsForTeacher as jest.Mock).mockImplementationOnce(
+      async () => void order.push("backfill")
+    );
+
+    await callEndLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } });
+
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+    expect(order).toEqual(["release", "backfill"]);
+  });
+
+  test("endAbandonedLesson, when the student never turned up", async () => {
+    seedQuestion();
+
+    await runAbandonedCheck({ data: { questionId: "q-1" } });
+
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+  });
+
+  test("but not endAbandonedLesson on a lesson the student did join", async () => {
+    seedQuestion({ joinedParticipants: ["student-1", "teacher-1"] });
+
+    await runAbandonedCheck({ data: { questionId: "q-1" } });
+
+    expect(mockReleaseTeacherBusy).not.toHaveBeenCalled();
+  });
+
+  test("forceEndLesson, at the hard cap", async () => {
+    seedQuestion({
+      status: "in_progress",
+      lessonId: "lesson-1",
+      startedAt: { toMillis: () => 1_700_000_060_000 },
+    });
+    store.set("lessons/lesson-1", { questionId: "q-1", status: "in_progress" });
+
+    await (forceEndLesson as unknown as (req: { data: { lessonId: string } }) => Promise<void>)({
+      data: { lessonId: "lesson-1" },
+    });
+
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
   });
 });

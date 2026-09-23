@@ -28,6 +28,13 @@ export const HARD_CAP_MINUTES = 30;
 // Nobody is charged for such a lesson, and clearing it is what ends the
 // teacher's session, since the apps end when the live question node disappears.
 export const ABANDONED_LESSON_GRACE_SECONDS = 120;
+
+// How long a teacher's busy mark is believed without anything clearing it.
+// Every way a session ends clears it, and the longest a session can run is the
+// hard cap, so a mark older than that plus a margin is one whose clear was
+// lost. Past it the teacher is treated as free, so a missed clear costs them
+// at most this long out of the pool rather than every question from then on.
+export const BUSY_STALE_AFTER_MINUTES = HARD_CAP_MINUTES + 15;
 export const CONNECTION_FEE_CENTS = 50;
 export const MIN_BILLABLE_SECONDS = 30;
 export const ROUND_UP_SECONDS = 30;
@@ -58,7 +65,19 @@ export interface TeacherRecord {
   lastActiveAt?: number;
   fcmToken?: string;        // registered by the app on login
   displayName: string;
+  /** Set by the backend alone while the teacher is in a session — from the
+   *  moment they accept a question until it ends however it ends — and absent
+   *  otherwise. A busy teacher stays online but is not sent questions. See
+   *  ./busy. */
+  busy?: TeacherBusy;
   photoUrl?: string;
+}
+
+export interface TeacherBusy {
+  /** The question whose session the teacher is in. */
+  questionId: string;
+  /** Unix ms the session was claimed. */
+  since: number;
 }
 
 // ─── Firestore — questions/{qid} ─────────────────────────────────────────────

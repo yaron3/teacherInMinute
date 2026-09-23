@@ -16,6 +16,7 @@ import {
 import { calculateBilling, billingStartMillis, applyTeacherBonus } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
 import { stampAuthoritativeRating } from "./presence";
+import { releaseTeacherBusy } from "./busy";
 import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
 import { readTeacherBonus } from "./emailRewards";
 
@@ -843,6 +844,15 @@ export const endLesson = onCall(async (req) => {
       `[lessons] endLesson migrated qid=${questionId} from RTDB to Firestore and marked ended`
     );
 
+    // Free before the backfill below: it ranks the teacher, and a teacher
+    // still marked busy is not eligible for anything.
+    await releaseTeacherBusy(context.teacherUid, questionId).catch((releaseError) => {
+      logger.error(
+        `[lessons] endLesson failed releasing teacher=${context.teacherUid} qid=${questionId}`,
+        releaseError
+      );
+    });
+
     logger.info(
       `[lessons] endLesson triggering dispatch backfill for teacher=${context.teacherUid} qid=${questionId} endedBy=${endedBy}`
     );
@@ -1051,6 +1061,7 @@ export const endAbandonedLesson = onTaskDispatched<{ questionId: string }>(
 
     const qRef = firestore.collection("questions").doc(questionId);
 
+    let teacherUid: string | undefined;
     const abandoned = await firestore.runTransaction(async (tx) => {
       const snap = await tx.get(qRef);
       if (!snap.exists) return false;
@@ -1066,6 +1077,7 @@ export const endAbandonedLesson = onTaskDispatched<{ questionId: string }>(
         : [];
       if (joined.includes(question.studentUid)) return false;
 
+      teacherUid = question.acceptedByTeacher;
       tx.update(qRef, {
         status: "cancelled",
         endedBy: "system",
@@ -1087,6 +1099,12 @@ export const endAbandonedLesson = onTaskDispatched<{ questionId: string }>(
     }
 
     await db.ref(`questions/${questionId}`).remove();
+
+    if (teacherUid) {
+      await releaseTeacherBusy(teacherUid, questionId).catch((error) => {
+        logger.error(`[lessons] endAbandonedLesson failed releasing teacher=${teacherUid}`, error);
+      });
+    }
 
     // A lesson document exists only if someone called startLesson — the
     // teacher, in this case, since the student never arrived.
@@ -1151,6 +1169,10 @@ export const forceEndLesson = onTaskDispatched<{ lessonId: string }>(
 
     const context = await resolveQuestionContext(questionId);
     await migrateQuestionToFirestore(questionId, "system", context);
+
+    await releaseTeacherBusy(context.teacherUid, questionId).catch((error) => {
+      logger.error(`[lessons] forceEndLesson failed releasing teacher=${context.teacherUid}`, error);
+    });
 
     await firestore.collection("lessons").doc(lessonId).set(
       {

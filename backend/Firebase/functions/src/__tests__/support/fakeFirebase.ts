@@ -313,6 +313,20 @@ export class FakeRtdbRef {
     this.db.write(this.path, null);
   }
 
+  /** Runs once against the stored value — no contention here to retry on. An
+   *  `undefined` return aborts, as it does in the real SDK. */
+  async transaction(
+    update: (current: unknown) => unknown
+  ): Promise<{ committed: boolean; snapshot: FakeRtdbSnapshot }> {
+    const current = this.db.read(this.path);
+    const next = update(current === undefined ? null : current);
+    if (next === undefined) {
+      return { committed: false, snapshot: new FakeRtdbSnapshot(current) };
+    }
+    this.db.write(this.path, next);
+    return { committed: true, snapshot: new FakeRtdbSnapshot(this.db.read(this.path)) };
+  }
+
   orderByChild(field: string) {
     return {
       equalTo: (expected: unknown) => ({
