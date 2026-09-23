@@ -175,6 +175,29 @@ final class MainTabViewModel {
 	}
   }
 
+  // MARK: - Navigation stacks
+
+  /// Whether the section on screen brings its own `NavigationStack`. Those
+  /// sections must not be wrapped in another: on Android SkipUI lays a nested
+  /// stack out against the outer one's safe area and pushes its content far
+  /// down the screen, leaving a large gap above the header.
+  var selectedSectionOwnsNavigationStack: Bool {
+	switch selectedTab {
+	  case .home: userMode == .student
+	  case .lessons, .settings, .help: true
+	  case .earnings, .profile: false
+	}
+  }
+
+  /// A teacher's lesson started. It is pushed on the stack the teacher's home
+  /// sits in, which a section with its own stack is not inside — so bring the
+  /// teacher home for it.
+  func teacherLessonStarted() {
+	if selectedSectionOwnsNavigationStack {
+	  select(.home)
+	}
+  }
+
   /// Log Out was tapped in the menu. It asks first, as Settings does.
   func logOutTapped() {
 	isSideMenuOpen = false
