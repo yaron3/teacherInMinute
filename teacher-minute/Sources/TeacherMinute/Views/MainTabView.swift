@@ -113,10 +113,11 @@ struct MainTabView: View {
 	}
   }
 
-  /// Sections that bring their own `NavigationStack` (the student home,
-  /// Lessons, Settings, Help) are shown as they are. The rest go inside this
-  /// one, which also carries the teacher's live session: that is pushed rather
-  /// than laid over the sections. Its bar stays hidden, since those sections
+  /// Sections that bring their own `NavigationStack` (Lessons, Settings,
+  /// Help) are shown as they are. The rest go inside this one, which also
+  /// carries the lessons — the teacher's, and the student's through the
+  /// student home's own destinations: they are pushed rather than laid over
+  /// the sections. Its bar stays hidden, since those sections
   /// draw their own header.
   @ViewBuilder
   var sectionStack: some View {
