@@ -17,6 +17,15 @@ struct HelpSupportView: View {
 
     var body: some View {
         NavigationStack {
+#if os(Android)
+            // The title and menu button are drawn above the form instead; see
+            // SideMenuSectionHeader.
+            VStack(spacing: 0) {
+                SideMenuSectionHeader(title: viewModel.helpSupportTitle)
+                ContactSupportView(viewModel: viewModel)
+            }
+            .toolbar(.hidden, for: .navigationBar)
+#else
             ContactSupportView(viewModel: viewModel)
                 .navigationTitle(viewModel.helpSupportTitle)
                 .toolbar {
@@ -24,6 +33,7 @@ struct HelpSupportView: View {
                         SideMenuButton(size: 36)
                     }
                 }
+#endif
         }
         .appDialog(
             viewModel.alertTitle,

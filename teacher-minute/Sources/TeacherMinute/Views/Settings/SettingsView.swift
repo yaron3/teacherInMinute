@@ -27,34 +27,46 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack(path: navigationPath) {
-            ZStack {
-                List {
-                    ForEach(viewModel.sections) { section in
-                        SettingsSectionView(section: section) { row in
-                            viewModel.select(row)
+            VStack(spacing: 0) {
+#if os(Android)
+                SideMenuSectionHeader(title: viewModel.settingsTitle)
+#endif
+                ZStack {
+                    List {
+                        ForEach(viewModel.sections) { section in
+                            SettingsSectionView(section: section) { row in
+                                viewModel.select(row)
+                            }
+                        }
+
+                        Section {
+                            Text(viewModel.appVersion)
+                                .font(.system(size: 13))
+                                .foregroundStyle(theme.secondaryText)
+                                .frame(maxWidth: .infinity)
+                                .listRowBackground(Color.clear)
                         }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(theme.screenBackground)
 
-                    Section {
-                        Text(viewModel.appVersion)
-                            .font(.system(size: 13))
-                            .foregroundStyle(theme.secondaryText)
-                            .frame(maxWidth: .infinity)
-                            .listRowBackground(Color.clear)
-                    }
+                    loadingOverlay
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(theme.screenBackground)
-
-                loadingOverlay
             }
+            .background(theme.screenBackground)
+#if os(Android)
+            // The title and menu button are drawn above the list instead; see
+            // SideMenuSectionHeader.
+            .toolbar(.hidden, for: .navigationBar)
+#else
             .navigationTitle(viewModel.settingsTitle)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     SideMenuButton(size: 36)
                 }
             }
+#endif
             .navigationDestination(for: SettingsDestination.self) { destination in
                 destinationView(destination)
                     .navigationTitle(destination.title)

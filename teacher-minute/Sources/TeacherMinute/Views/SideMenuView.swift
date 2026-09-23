@@ -78,6 +78,34 @@ struct SideMenuButton: View {
   }
 }
 
+/// A section title with the menu button beside it, drawn in the content.
+///
+/// For Settings and Help on Android, which would otherwise take both from the
+/// navigation bar. SkipUI 1.53.1 leaves a large gap above a root screen whose
+/// title sits in the bar, while screens that hide the bar and draw their own
+/// header — Home, Profile — lay out correctly.
+struct SideMenuSectionHeader: View {
+  let title: String
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+	AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+	HStack(spacing: 12) {
+	  SideMenuButton(size: 36)
+
+	  Text(title)
+		.font(.system(size: 24, weight: .bold))
+		.foregroundStyle(theme.primaryText)
+
+	  Spacer()
+	}
+	.padding(.horizontal, 16)
+	.padding(.vertical, 8)
+  }
+}
+
 // MARK: - Drawer
 
 struct SideMenuView: View {

@@ -131,7 +131,13 @@ struct MainTabView: View {
   }
 
   var showsNavigationBar: Bool {
+#if os(Android)
+	// Settings and Help draw their own header on Android; see
+	// SideMenuSectionHeader.
+	false
+#else
 	viewModel.selectedTab == .settings || viewModel.selectedTab == .help
+#endif
   }
 
   var sideMenuAction: SideMenuAction {
