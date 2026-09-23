@@ -35,7 +35,25 @@ struct MainTabView: View {
   }
   
   var body: some View {
-	sectionsWithMenu
+	// The stack exists for the teacher's live session, which is pushed rather
+	// than laid over the sections. Its bar stays hidden for the sections that
+	// draw their own header. Settings and Help have none: their own stacks sit
+	// directly inside this one, so their titles and menu buttons come through
+	// this bar.
+	ZStack {
+	  NavigationStack {
+		tabLayers
+		  .toolbar(showsNavigationBar ? .visible : .hidden, for: .navigationBar)
+		  .navigationDestination(isPresented: isTeacherInLiveSession) {
+			teacherSessionScreen
+		  }
+	  }
+
+	  // Outside the stack so it covers the navigation bar Settings shows.
+	  SideMenuView(viewModel: viewModel, profile: profileViewModel) {
+		viewModel.logOutTapped()
+	  }
+	}
 	.appDialog(
 	  viewModel.logOutLabel,
 	  isPresented: $viewModel.isConfirmingLogOut,
@@ -50,16 +68,33 @@ struct MainTabView: View {
 	)
   }
 
-  // Split out of `body`: as one modifier chain it is more than the Swift
-  // type checker will solve on the Android build.
-  var sectionsWithMenu: some View {
-	ZStack {
-	  sectionStack
+  /// Drives the push off `activeQuestionId` alone. As on the student side the
+  /// setter is inert: a lesson is billed by the minute, so it ends through the
+  /// session's own control — which clears the id and so pops this screen.
+  var isTeacherInLiveSession: Binding<Bool> {
+	Binding(
+	  get: { viewModel.userMode == .teacher && teacherDashboardViewModel?.activeQuestionId != nil },
+	  set: { _ in }
+	)
+  }
 
-	  // Outside the stacks so it covers the navigation bar Settings shows.
-	  SideMenuView(viewModel: viewModel, profile: profileViewModel) {
-		viewModel.logOutTapped()
-	  }
+  @ViewBuilder
+  var teacherSessionScreen: some View {
+	if let teacherDashboardViewModel, let questionId = teacherDashboardViewModel.activeQuestionId {
+	  TeacherLiveSessionScreen(viewModel: teacherDashboardViewModel, questionId: questionId)
+	}
+  }
+
+  /// Only the selected section is on screen; the side menu switches between
+  /// them. Each section places `SideMenuButton` in its own header, and the
+  /// button finds its action through the environment.
+  var tabLayers: some View {
+	ZStack {
+	  tabContent(viewModel.selectedTab)
+		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+		.environment(\.sideMenuAction, sideMenuAction)
+
+	  teacherGlobalOverlay
 	}
 	.onChange(of: teacherDashboardViewModel?.lessonCount ?? 0) { _, newCount in
 	  viewModel.updateLessonCount(newCount)
@@ -68,9 +103,8 @@ struct MainTabView: View {
 	  // An arriving question or a starting lesson takes the whole screen.
 	  if isVisible { viewModel.closeSideMenu() }
 	}
-	.onChange(of: teacherDashboardViewModel?.activeQuestionId) { _, id in
-	  if id != nil { viewModel.teacherLessonStarted() }
-	}
+	.background(Color(.systemBackground))
+	.navigationBarBackButtonHidden(true)
 	.task {
 	  print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
 	  PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
@@ -96,56 +130,8 @@ struct MainTabView: View {
 	}
   }
 
-  /// Drives the push off `activeQuestionId` alone. As on the student side the
-  /// setter is inert: a lesson is billed by the minute, so it ends through the
-  /// session's own control — which clears the id and so pops this screen.
-  var isTeacherInLiveSession: Binding<Bool> {
-	Binding(
-	  get: { viewModel.userMode == .teacher && teacherDashboardViewModel?.activeQuestionId != nil },
-	  set: { _ in }
-	)
-  }
-
-  @ViewBuilder
-  var teacherSessionScreen: some View {
-	if let teacherDashboardViewModel, let questionId = teacherDashboardViewModel.activeQuestionId {
-	  TeacherLiveSessionScreen(viewModel: teacherDashboardViewModel, questionId: questionId)
-	}
-  }
-
-  /// Sections that bring their own `NavigationStack` (the student home,
-  /// Lessons, Settings, Help) are shown as they are. The rest go inside this
-  /// one, which also carries the teacher's live session: that is pushed rather
-  /// than laid over the sections. Its bar stays hidden, since those sections
-  /// draw their own header.
-  @ViewBuilder
-  var sectionStack: some View {
-	if viewModel.selectedSectionOwnsNavigationStack {
-	  tabLayers
-	} else {
-	  NavigationStack {
-		tabLayers
-		  .toolbar(.hidden, for: .navigationBar)
-		  .navigationDestination(isPresented: isTeacherInLiveSession) {
-			teacherSessionScreen
-		  }
-	  }
-	}
-  }
-
-  /// Only the selected section is on screen; the side menu switches between
-  /// them. Each section places `SideMenuButton` in its own header, and the
-  /// button finds its action through the environment.
-  var tabLayers: some View {
-	ZStack {
-	  tabContent(viewModel.selectedTab)
-		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
-		.environment(\.sideMenuAction, sideMenuAction)
-
-	  teacherGlobalOverlay
-	}
-	.background(Color(.systemBackground))
-	.navigationBarBackButtonHidden(true)
+  var showsNavigationBar: Bool {
+	viewModel.selectedTab == .settings || viewModel.selectedTab == .help
   }
 
   var sideMenuAction: SideMenuAction {
