@@ -2,7 +2,7 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { rankTeachers, scoreTeacher } from "../scoring";
+import { isTeacherBusy, rankTeachers, scoreTeacher } from "../scoring";
 import { TeacherRecord } from "../types";
 
 const NOW = Date.now();
@@ -133,5 +133,34 @@ describe("who is considered at all", () => {
     );
 
     expect(ranked.map((t) => t.uid)).toEqual(["fresh"]);
+  });
+});
+
+describe("teachers in a session", () => {
+  const MINUTE = 60_000;
+
+  test("a busy teacher is not ranked, however well rated", () => {
+    expect(
+      order({
+        teaching: teacher({ ratingAvg: 5, busy: { questionId: "q-1", since: NOW - 5 * MINUTE } }),
+        free: teacher({ ratingAvg: 3 }),
+      })
+    ).toEqual(["free"]);
+  });
+
+  test("a mark older than any session can last is a lost clear, not a busy teacher", () => {
+    const stale = teacher({ busy: { questionId: "q-1", since: NOW - 46 * MINUTE } });
+    const current = teacher({ busy: { questionId: "q-1", since: NOW - 44 * MINUTE } });
+
+    expect(isTeacherBusy(stale)).toBe(false);
+    expect(isTeacherBusy(current)).toBe(true);
+    expect(order({ stale })).toEqual(["stale"]);
+  });
+
+  test("no mark, or one without a question, is not busy", () => {
+    expect(isTeacherBusy(teacher())).toBe(false);
+    expect(
+      isTeacherBusy(teacher({ busy: { questionId: "", since: NOW } as TeacherRecord["busy"] }))
+    ).toBe(false);
   });
 });

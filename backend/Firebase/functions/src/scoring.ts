@@ -1,5 +1,5 @@
 import { logger } from "firebase-functions";
-import { TeacherRecord } from "./types";
+import { BUSY_STALE_AFTER_MINUTES, TeacherRecord } from "./types";
 
 // FR-B-002: score = 0.6·(ratingAvg/5) + 0.25·acceptRate + 0.15·recencyFactor
 // recencyFactor = exp(-hoursAgo / 24)  →  1.0 when just active, decays to ~0 after 72h
@@ -64,6 +64,16 @@ export function scoreTeacher(teacher: TeacherRecord): number {
   );
 }
 
+/** Whether the teacher is in a session now. A mark older than any session
+ *  can last is ignored: its clear was lost, and the teacher is free. */
+export function isTeacherBusy(teacher: TeacherRecord, now = Date.now()): boolean {
+  const busy = teacher.busy;
+  if (!busy || typeof busy.questionId !== "string" || !busy.questionId) return false;
+  const since = finite(busy.since);
+  if (since === undefined) return true;
+  return now - since < BUSY_STALE_AFTER_MINUTES * 60_000;
+}
+
 export interface ScoredTeacher {
   uid: string;
   score: number;
@@ -77,7 +87,7 @@ function normalizeSubject(s: string): string {
   return afterColon.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// Returns all eligible (online + matching topic) teachers sorted best-first.
+// Returns all eligible (online, not in a session, matching topic) teachers sorted best-first.
 // The dispatcher slices the result per wave, skipping alreadyInvited UIDs.
 export function rankTeachers(
   teachers: Record<string, TeacherRecord>,
@@ -92,11 +102,17 @@ export function rankTeachers(
   // per wave that grow with the roster while saying the same thing.
   let offline = 0;
   let topicMismatch = 0;
+  let busy = 0;
+  const now = Date.now();
 
   for (const [uid, t] of Object.entries(teachers)) {
     if (exclude.has(uid)) continue;
     if (t.status !== "online") {
       offline += 1;
+      continue;
+    }
+    if (isTeacherBusy(t, now)) {
+      busy += 1;
       continue;
     }
     // RTDB can deserialize arrays as {0: "algebra", ...} objects when written by mobile SDKs.
@@ -115,7 +131,7 @@ export function rankTeachers(
   }
 
   logger.info(
-    `[scoring] ranked topic=${topic} considered=${Object.keys(teachers).length} excluded=${exclude.size} skippedOffline=${offline} skippedTopic=${topicMismatch} eligible=${candidates.length}`
+    `[scoring] ranked topic=${topic} considered=${Object.keys(teachers).length} excluded=${exclude.size} skippedOffline=${offline} skippedBusy=${busy} skippedTopic=${topicMismatch} eligible=${candidates.length}`
   );
 
   // Unrated teachers all score alike, so ties are ordinary rather than rare.

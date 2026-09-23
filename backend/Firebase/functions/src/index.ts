@@ -23,6 +23,7 @@ export {
 export {
   onTeacherPresenceStatusWritten,
   onTeacherPresenceSubjectsWritten,
+  onTeacherPresenceBusyWritten,
 } from "./presence";
 
 // Platform statistics
