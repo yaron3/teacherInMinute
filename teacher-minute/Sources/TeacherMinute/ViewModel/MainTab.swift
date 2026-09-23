@@ -183,8 +183,9 @@ final class MainTabViewModel {
   /// down the screen, leaving a large gap above the header.
   var selectedSectionOwnsNavigationStack: Bool {
 	switch selectedTab {
+	  case .home: userMode == .student
 	  case .lessons, .settings, .help: true
-	  case .home, .earnings, .profile: false
+	  case .earnings, .profile: false
 	}
   }
 

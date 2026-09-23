@@ -31,18 +31,18 @@ struct StudentHomeView: View {
   }
 
   var body: some View {
-	// Pushes onto the stack it is shown in — `MainTabView`'s, or the welcome
-	// flow's — rather than one of its own: on Android SkipUI leaves a gap above
-	// the header of a screen that brings its own stack. The home screen draws
-	// its own header, so the bar stays hidden here and appears only on the
-	// pushed ask screen, which supplies the title and the back button.
-	homeContent
-	.toolbar(.hidden, for: .navigationBar)
-	.navigationDestination(isPresented: $showsAskTeacher) {
-	  askTeacherScreen
-	}
-	.navigationDestination(isPresented: isInLiveSession) {
-	  liveSessionScreen
+	// The home screen draws its own header, so the stack's bar stays hidden
+	// here and appears only on the pushed ask screen, which supplies the title
+	// and the back button.
+	NavigationStack {
+	  homeContent
+		.toolbar(.hidden, for: .navigationBar)
+		.navigationDestination(isPresented: $showsAskTeacher) {
+		  askTeacherScreen
+		}
+		.navigationDestination(isPresented: isInLiveSession) {
+		  liveSessionScreen
+		}
 	}
 	.trackScreen(AnalyticsScreen.studentHome)
 	.sheet(isPresented: $showsNotificationExplainer) {
@@ -1800,15 +1800,11 @@ struct StudentLiveSessionScreen: View {
 
 #if os(iOS)
 #Preview {
-  NavigationStack {
-	StudentHomeView(viewModel: MockStudentHomeViewModel())
-  }
+  StudentHomeView(viewModel: MockStudentHomeViewModel())
 }
 struct StudentHomeView_Previews: PreviewProvider {
   static var previews: some View {
-	NavigationStack {
-	  StudentHomeView(viewModel: MockStudentHomeViewModel())
-	}
+	StudentHomeView(viewModel: MockStudentHomeViewModel())
   }
 }
 
