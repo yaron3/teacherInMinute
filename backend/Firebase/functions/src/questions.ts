@@ -19,7 +19,11 @@ import { getQuestionMaxLength, getQuestionRateLimits } from "./questionLimits";
 import { checkQuestionAllowance, recordSessionStart } from "./rateLimit";
 import { isOwnQuestionImageUrl } from "./storageUrls";
 import { recordQuestionConnected } from "./stats";
-import { dispatchFirstWave, enqueueQuestionWatchdog } from "./dispatch";
+import {
+  dispatchFirstWave,
+  enqueueQuestionWatchdog,
+  withdrawTeacherFromOtherQuestions,
+} from "./dispatch";
 import { enqueueAbandonedLessonCheck } from "./lessons";
 
 const db = admin.database();
@@ -502,6 +506,13 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
   await Promise.all(
     alreadyInvited.map((uid) => db.ref(`teacherInvites/${uid}/${questionId}`).remove())
   );
+
+  // This teacher is now busy, so any other question still waiting on them gets
+  // their slot handed to someone else. Best-effort: the lesson is already
+  // claimed, and those questions still have their other invites and waves.
+  await withdrawTeacherFromOtherQuestions(teacherUid, questionId).catch((error) => {
+    logger.warn(`[questions] failed withdrawing teacher=${teacherUid} from other questions`, error);
+  });
 
   // Feeds the "avg time to connect" the student home shows. Best-effort: the
   // teacher has already claimed the question, so a stats failure must not fail

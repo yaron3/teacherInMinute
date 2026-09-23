@@ -202,10 +202,16 @@ export async function enqueueQuestionWatchdog(qid: string): Promise<void> {
   );
 }
 
+/** Adds one teacher to a question's wave if that wave still has room.
+ *
+ *  `targetWave` defaults to the wave the question is on now. A replacement for a
+ *  withdrawn invite passes the withdrawn invite's own wave instead, so the slot
+ *  is refilled where it was lost even if the question has since moved on. */
 async function tryInviteTeacherForQuestionWave(
   teacherUid: string,
   teacher: TeacherRecord,
-  qid: string
+  qid: string,
+  targetWave?: number
 ): Promise<boolean> {
   const qRef = firestore.collection("questions").doc(qid);
   const inviteRef = qRef.collection("invites").doc(teacherUid);
@@ -222,7 +228,7 @@ async function tryInviteTeacherForQuestionWave(
       return { invited: false, reason: "demo-question" };
     }
 
-    const wave = question.dispatchWave;
+    const wave = targetWave ?? question.dispatchWave;
     if (!wave || wave < 1 || wave > WAVE_SIZES.length) {
       return { invited: false, reason: `invalid-wave-${wave ?? 0}` };
     }
@@ -244,8 +250,12 @@ async function tryInviteTeacherForQuestionWave(
     const waveSize = WAVE_SIZES[wave - 1];
     const waveInviteQuery = qRef.collection("invites").where("wave", "==", wave);
     const waveInvitesSnap = await tx.get(waveInviteQuery);
-    if (waveInvitesSnap.size >= waveSize) {
-      return { invited: false, reason: `wave-full-${waveInvitesSnap.size}/${waveSize}` };
+    // A withdrawn invite no longer reaches anyone, so it does not hold a slot.
+    const liveWaveInvites = waveInvitesSnap.docs.filter(
+      (doc) => (doc.data() as DispatchInviteDoc).response !== "withdrawn"
+    ).length;
+    if (liveWaveInvites >= waveSize) {
+      return { invited: false, reason: `wave-full-${liveWaveInvites}/${waveSize}` };
     }
 
     const now = Timestamp.now();
@@ -368,6 +378,81 @@ export async function backfillPendingQuestionsForTeacher(teacherUid: string): Pr
 
   logger.info(
     `[dispatch] backfill completed teacher=${teacherUid} invitedCount=${invitedCount} searched=${searchingSnap.size}`
+  );
+}
+
+// ─── withdrawTeacherFromOtherQuestions ────────────────────────────────────────
+// Two students asking at once are both sent the same top-ranked teachers. When
+// one of those teachers accepts, they are no longer available to the other
+// student, whose question would otherwise sit with one fewer live invite than
+// its wave promised. This takes the busy teacher's other pending invites back and
+// hands each slot to the next-best teacher who has not seen that question yet.
+
+/** Marks the teacher's invite on `qid` withdrawn, if it is still pending on a
+ *  question that is still searching. Returns what the refill needs, or null. */
+async function withdrawPendingInvite(
+  teacherUid: string,
+  qid: string
+): Promise<{ wave: number; topic: string; alreadyInvited: string[] } | null> {
+  const qRef = firestore.collection("questions").doc(qid);
+  const inviteRef = qRef.collection("invites").doc(teacherUid);
+
+  return firestore.runTransaction(async (tx) => {
+    const [qSnap, invSnap] = await Promise.all([tx.get(qRef), tx.get(inviteRef)]);
+    if (!qSnap.exists || !invSnap.exists) return null;
+
+    const question = qSnap.data() as QuestionDoc;
+    const invite = invSnap.data() as DispatchInviteDoc;
+    if (question.status !== "searching" || invite.response !== "pending") return null;
+
+    tx.update(inviteRef, { response: "withdrawn" });
+    return {
+      wave: invite.wave,
+      topic: question.topic,
+      alreadyInvited: question.alreadyInvited ?? [],
+    };
+  });
+}
+
+export async function withdrawTeacherFromOtherQuestions(
+  teacherUid: string,
+  acceptedQid: string
+): Promise<void> {
+  // teacherInvites/{uid} is exactly the set of cards on the teacher's
+  // dashboard, which is the set of invites that still need taking back.
+  const pendingSnap = await db.ref(`teacherInvites/${teacherUid}`).once("value");
+  const pending = (pendingSnap.val() as Record<string, unknown> | null) ?? {};
+  const otherQids = Object.keys(pending).filter((qid) => qid !== acceptedQid);
+
+  if (otherQids.length === 0) return;
+
+  logger.info(
+    `[dispatch] withdrawing teacher=${teacherUid} from ${otherQids.length} other question(s) after accepting qid=${acceptedQid}`
+  );
+
+  await Promise.all(
+    otherQids.map(async (qid) => {
+      const withdrawn = await withdrawPendingInvite(teacherUid, qid);
+      await db.ref(`teacherInvites/${teacherUid}/${qid}`).remove();
+      if (!withdrawn) return;
+
+      const teachers = await onlineTeachers();
+      const exclude = new Set([...withdrawn.alreadyInvited, teacherUid]);
+      const ranked = rankTeachers(teachers, withdrawn.topic, exclude);
+
+      for (const { uid } of ranked) {
+        if (await tryInviteTeacherForQuestionWave(uid, teachers[uid], qid, withdrawn.wave)) {
+          logger.info(
+            `[dispatch] qid=${qid} wave=${withdrawn.wave} slot of teacher=${teacherUid} refilled by teacher=${uid}`
+          );
+          return;
+        }
+      }
+
+      logger.info(
+        `[dispatch] qid=${qid} wave=${withdrawn.wave} slot of teacher=${teacherUid} left empty, no eligible replacement`
+      );
+    })
   );
 }
 

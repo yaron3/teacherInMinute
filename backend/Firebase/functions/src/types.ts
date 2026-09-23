@@ -107,7 +107,9 @@ export interface QuestionDoc {
 
 // ─── Firestore — questions/{qid}/invites/{tid} ───────────────────────────────
 
-export type InviteResponse = "pending" | "accept" | "decline" | "timeout";
+/** `withdrawn`: the teacher accepted a different question while this invite was
+ *  still pending, so the backend took it back and gave the slot to someone else. */
+export type InviteResponse = "pending" | "accept" | "decline" | "timeout" | "withdrawn";
 
 export interface DispatchInviteDoc {
   teacherUid: string;
