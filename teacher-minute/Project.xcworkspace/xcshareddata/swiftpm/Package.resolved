@@ -258,8 +258,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://source.skip.tools/skip-ui.git",
       "state" : {
-        "revision" : "7b2b4c3602879803334c5c6d2fb8a42002909f82",
-        "version" : "1.54.0"
+        "revision" : "d6c2dadd489a0292dca94c0b96e5b0100fbcdf96",
+        "version" : "1.53.1"
       }
     },
     {
