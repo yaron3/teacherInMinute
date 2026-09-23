@@ -10,9 +10,16 @@ let package = Package(
         .library(name: "TeacherMinute", type: .dynamic, targets: ["TeacherMinute"]),
     ],
     dependencies: [
-        .package(url: "https://source.skip.tools/skip.git", from: "1.8.13"),
-        .package(url: "https://source.skip.tools/skip-fuse-ui.git", from: "1.0.0"),
-        .package(url: "https://github.com/skiptools/skip-firebase.git", from: "0.16.0"),
+        // Skip moved its packages from source.skip.tools to github.com/skiptools,
+        // and the releases from skip-ui 1.59.2 and skip-firebase 0.20.4 on name
+        // their own dependencies by the new address. These floors keep every
+        // Skip package on it, so no package is reached through both. They also
+        // hold skip-ui at 1.59.3 or later (through skip-fuse-ui 1.18.2): 1.54.0
+        // left a gap above every Android screen that hides its navigation bar,
+        // and 1.53.1, the version before it, one above those that show it.
+        .package(url: "https://github.com/skiptools/skip.git", from: "1.9.8"),
+        .package(url: "https://github.com/skiptools/skip-fuse-ui.git", from: "1.18.2"),
+        .package(url: "https://github.com/skiptools/skip-firebase.git", from: "0.20.4"),
         .package(url: "https://github.com/google/GoogleSignIn-iOS", from: "9.0.0"),
         // Capped below 2.17.0, which is the release that replaced SwiftProtobuf
         // with a vendored nanopb (the CLiveKitProto target). Its generated
