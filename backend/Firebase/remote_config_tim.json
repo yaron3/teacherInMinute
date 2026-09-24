@@ -9469,6 +9469,28 @@
       },
       "valueType": "STRING"
     },
+    "connection_setup_student_finishing_setup": {
+      "defaultValue": {
+        "value": "The student needs to finish setting up and will join shortly. Do you want to wait?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד/ה צריך/ה לסיים את ההגדרות ויצטרף/תצטרף בקרוב. רוצה להמתין?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_teacher_finishing_setup": {
+      "defaultValue": {
+        "value": "Your teacher needs to finish setting up and will join shortly. Do you want to wait?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה צריך/ה לסיים את ההגדרות ויצטרף/תצטרף בקרוב. רוצה להמתין?"
+        }
+      },
+      "valueType": "STRING"
+    },
     "the_student_cancelled": {
       "defaultValue": {
         "value": "The student cancelled the session."

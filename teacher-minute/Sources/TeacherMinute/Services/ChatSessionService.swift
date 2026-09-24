@@ -969,12 +969,21 @@ protocol ChatSessionViewModeling: AnyObject {
   var peerSetupPrompt: PeerSetupPrompt? { get }
   /// The permission the other side is being asked for, while they still are.
   var peerAwaitedPermission: CapturePermissionKind? { get }
+  /// The other side is in Settings finishing its setup.
+  var isPeerFinishingSetup: Bool { get }
+  /// This side took the lesson on its way to Settings, to turn on a permission
+  /// it had refused. Its setup sends it there, and the other side is told it
+  /// is finishing setup rather than being asked for a permission.
+  var finishesSetupInSettings: Bool { get }
   var onPeerSetupUpdated: (() -> Void)? { get set }
   /// Starts following the other side. Called as the lesson screen appears,
   /// before this side has connected anything.
   func startWatchingPeerSetup()
   /// Tells the other side what this one is waiting on, or that it no longer is.
   func setSelfAwaitingPermission(_ kind: CapturePermissionKind?)
+  /// Tells the other side this one is going to Settings to finish its setup,
+  /// and returns once that has landed, before the app is left.
+  func announceFinishingSetup() async
   /// This side keeps waiting while the other side answers a permission prompt.
   func waitForPeerPermission()
   /// Leaves a lesson that has not started: tells the other side, then ends it.
@@ -1399,7 +1408,7 @@ extension ChatSessionViewModeling {
 
   func peerSetupTitle(for prompt: PeerSetupPrompt) -> String {
     switch prompt {
-    case .awaitingPermission: return waitingForPeerText
+    case .awaitingPermission, .finishingSetup: return waitingForPeerText
     case .cancelled: return peerCancelledTitle
     }
   }
@@ -1407,8 +1416,16 @@ extension ChatSessionViewModeling {
   func peerSetupMessage(for prompt: PeerSetupPrompt) -> String {
     switch prompt {
     case .awaitingPermission(let kind): return peerPermissionMessage(for: kind)
+    case .finishingSetup: return peerFinishingSetupMessage
     case .cancelled: return peerCancelledMessage
     }
+  }
+
+  var peerFinishingSetupMessage: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    return isStudentRole
+      ? LocalizationSupport.localized("Your teacher needs to finish setting up and will join shortly. Do you want to wait?")
+      : LocalizationSupport.localized("The student needs to finish setting up and will join shortly. Do you want to wait?")
   }
 
   /// Heads the permission question, and stays on screen as a reminder once
@@ -1533,6 +1550,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var onPeerSetupUpdated: (() -> Void)?
   var peerSetupPrompt: PeerSetupPrompt? { peerSetup.prompt }
   var peerAwaitedPermission: CapturePermissionKind? { peerSetup.peerAwaitedPermission }
+  var isPeerFinishingSetup: Bool { peerSetup.isPeerFinishingSetup }
+  /// Set by the screen that opens the lesson — see the protocol.
+  var finishesSetupInSettings = false
 
   private let service: ChatSessionService
   private var pollingTask: Task<Void, Never>?
@@ -2082,6 +2102,11 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   func setSelfAwaitingPermission(_ kind: CapturePermissionKind?) {
     guard !isLeaving else { return }
     sendSetupSignal(kind.map(ConnectionSetupSignal.awaiting))
+  }
+
+  func announceFinishingSetup() async {
+    guard !isLeaving else { return }
+    await sendSetupSignal(.finishingSetup)?.value
   }
 
   func waitForPeerPermission() {

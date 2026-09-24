@@ -168,10 +168,14 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var onPeerSetupUpdated: (() -> Void)?
   var peerSetupPrompt: PeerSetupPrompt? { peerSetup.prompt }
   var peerAwaitedPermission: CapturePermissionKind? { peerSetup.peerAwaitedPermission }
+  var isPeerFinishingSetup: Bool { peerSetup.isPeerFinishingSetup }
+  var finishesSetupInSettings = false
 
   func startWatchingPeerSetup() {}
 
   func setSelfAwaitingPermission(_ kind: CapturePermissionKind?) {}
+
+  func announceFinishingSetup() async {}
 
   func waitForPeerPermission() {
     peerSetup.waitForPeerPermission()

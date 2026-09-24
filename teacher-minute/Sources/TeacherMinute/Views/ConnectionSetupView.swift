@@ -7,6 +7,7 @@ struct ConnectionSetupView: View {
   var onSessionStarted: (@MainActor @Sendable () -> Void)? = nil
   var onContinueAsText: (@MainActor @Sendable () -> Void)? = nil
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.scenePhase) var scenePhase
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
   }
@@ -61,6 +62,11 @@ struct ConnectionSetupView: View {
     }
     .task {
       await viewModel.loadParticipantRating()
+    }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active {
+        viewModel.recheckPermissions()
+      }
     }
     .trackScreen(AnalyticsScreen.connectionSetup)
   }

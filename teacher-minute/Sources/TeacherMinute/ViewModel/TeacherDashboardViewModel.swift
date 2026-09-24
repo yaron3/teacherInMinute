@@ -46,6 +46,9 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var activeStudentName: String { get set }
   var activeStudentImageURL: String { get set }
   var activeConversationType: String { get set }
+  /// The running lesson was taken on the way to Settings, to turn on a
+  /// permission the teacher had refused.
+  var activeFinishesSetupInSettings: Bool { get }
   var acceptingQuestionId: String? { get set }
   var errorMessage: String? { get set }
   /// A standing warning about the teacher's own reachability, shown as a header
@@ -99,6 +102,9 @@ protocol TeacherDashboardViewModeling: AnyObject {
   func toggleOnline()
   func enforceNotificationRequirement()
   func acceptInvite(questionId: String)
+  /// Takes the question whose accept a refused permission stopped, on the way
+  /// to Settings to turn it on. Nil just opens Settings.
+  func finishSetupInSettings(questionId: String?)
   func declineInvite(questionId: String)
   func cancelAcceptingInvite()
   func endCall()
@@ -400,6 +406,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeStudentImageURL = ""
   var activePricePerMinuteCents = 50
   var activeConversationType = "text"
+  /// The lesson was taken on the way to Settings — see `finishSetupInSettings`.
+  var activeFinishesSetupInSettings = false
   var activeAcceptedAt = 0.0
   var activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   var acceptingQuestionId: String? = nil
@@ -958,6 +966,22 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   // MARK: - Invite Actions
   
   func acceptInvite(questionId: String) {
+	accept(questionId: questionId, finishesSetupInSettings: false)
+  }
+
+  /// "Open Settings" on the dialog that stopped an accept for a refused
+  /// permission. The teacher takes the question now, and the lesson's setup
+  /// sends them to Settings: the student is told the teacher is finishing
+  /// setup and will join shortly, instead of being left searching.
+  func finishSetupInSettings(questionId: String?) {
+	guard let questionId else {
+	  PermissionService.shared.openAppSettings()
+	  return
+	}
+	accept(questionId: questionId, finishesSetupInSettings: true)
+  }
+
+  private func accept(questionId: String, finishesSetupInSettings: Bool) {
 	guard acceptingQuestionId == nil, activeQuestionId == nil else { return }
 	errorMessage = nil
 	let conversationType = inviteConversationTypes[questionId] ?? "text"
@@ -966,12 +990,13 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	acceptingTask = Task { [weak self] in
 	  guard let self else { return }
 	  
-	  // A permission already refused sends the teacher to Settings before they
-	  // claim a lesson they could not take. One never asked for is left to the
-	  // lesson's setup screen: the student is connecting by then, and is told the
+	  // A permission already refused stops the accept, and the teacher is asked
+	  // to turn it on in Settings; saying yes comes back here with
+	  // `finishesSetupInSettings`. One never asked for is left to the lesson's
+	  // setup screen: the student is connecting by then, and is told the
 	  // teacher is being asked instead of being left searching while the system
 	  // prompt is up.
-	  if conversationType == "audio" || conversationType == "video" {
+	  if !finishesSetupInSettings, conversationType == "audio" || conversationType == "video" {
 		let micState = PermissionService.shared.captureStatus(for: .microphone)
 		if micState == .denied {
 		  permissionAlertQuestionId = questionId
@@ -982,7 +1007,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		  return
 		}
 	  }
-	  if conversationType == "video" {
+	  if !finishesSetupInSettings, conversationType == "video" {
 		let cameraState = PermissionService.shared.captureStatus(for: .camera)
 		if cameraState == .denied {
 		  permissionAlertQuestionId = questionId
@@ -1000,6 +1025,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  activeStudentName = inviteStudentNames[questionId]?.isEmpty == false ? inviteStudentNames[questionId] ?? "Student" : "Student"
 	  activePricePerMinuteCents = invitePricePerMinuteCents[questionId] ?? 50
 	  activeConversationType = conversationType
+	  activeFinishesSetupInSettings = finishesSetupInSettings
 	  activeAcceptedAt = Date().timeIntervalSince1970 * 1000.0
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.teacherInviteAccepted, parameters: [
 		"question_id": questionId,
@@ -1167,6 +1193,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	activeStudentImageURL = ""
 	activePricePerMinuteCents = 50
 	activeConversationType = "text"
+	activeFinishesSetupInSettings = false
 	activeAcceptedAt = 0
 	activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   }
@@ -1502,6 +1529,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeStudentName: String = "Student"
   var activeStudentImageURL: String = ""
   var activeConversationType: String = "text"
+  var activeFinishesSetupInSettings = false
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
   var studentCancelledBeforeStart = false
@@ -1608,6 +1636,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// preview teacher stays online regardless of the host's notification state.
   func enforceNotificationRequirement() {}
   func acceptInvite(questionId: String) {}
+  func finishSetupInSettings(questionId: String?) {}
   func declineInvite(questionId: String) { inviteIDs = inviteIDs.filter { $0 != questionId } }
   func cancelAcceptingInvite() {}
   func endCall() { activeQuestionId = nil }

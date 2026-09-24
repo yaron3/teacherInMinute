@@ -83,9 +83,54 @@ struct PeerSetupTrackerTests {
         #expect(tracker.prompt == nil)
     }
 
+    @Test func goingToSettingsAsksWhetherToWait() {
+        var tracker = PeerSetupTracker()
+        tracker.receive(.finishingSetup)
+
+        #expect(tracker.prompt == .finishingSetup)
+        #expect(tracker.isPeerFinishingSetup)
+        #expect(tracker.peerAwaitedPermission == nil)
+    }
+
+    @Test func choosingToWaitForSettingsIsNotAskedAgainUntilTheyAreBack() {
+        var tracker = PeerSetupTracker()
+        tracker.receive(.finishingSetup)
+        tracker.waitForPeerPermission()
+        #expect(tracker.prompt == nil)
+        // Still said on screen while they are away.
+        #expect(tracker.isPeerFinishingSetup)
+
+        tracker.receive(nil)
+        #expect(!tracker.isPeerFinishingSetup)
+
+        tracker.receive(.finishingSetup)
+        #expect(tracker.prompt == .finishingSetup)
+    }
+
+    @Test func waitingOnAPromptCoversTheTripToSettingsThatFollows() {
+        var tracker = PeerSetupTracker()
+        tracker.receive(.microphonePermission)
+        tracker.waitForPeerPermission()
+
+        tracker.receive(.finishingSetup)
+        #expect(tracker.prompt == nil)
+        #expect(tracker.isPeerFinishingSetup)
+    }
+
+    @Test func theQuestionEndingWhileTheOtherSideIsInSettingsIsACancel() {
+        var tracker = PeerSetupTracker()
+        tracker.receive(.finishingSetup)
+        tracker.waitForPeerPermission()
+        tracker.questionEnded(whileConnecting: false)
+
+        #expect(tracker.prompt == .cancelled)
+        #expect(!tracker.isPeerFinishingSetup)
+    }
+
     @Test func signalsReadBackAsWritten() {
         #expect(ConnectionSetupSignal(rawValue: "microphone") == .microphonePermission)
         #expect(ConnectionSetupSignal(rawValue: "camera") == .cameraPermission)
+        #expect(ConnectionSetupSignal(rawValue: "settings") == .finishingSetup)
         #expect(ConnectionSetupSignal(rawValue: "cancelled") == .cancelled)
         // Something a newer app writes is ignored rather than misread.
         #expect(ConnectionSetupSignal(rawValue: "somethingNewer") == nil)
@@ -107,6 +152,16 @@ struct PeerSetupPromptCopyTests {
             viewModel.peerSetupMessage(for: .awaitingPermission(.camera))
                 == LocalizationSupport.localized(
                     "Your teacher was asked to allow access to their camera. Do you want to wait until they approve?"
+                )
+        )
+        #expect(
+            viewModel.peerSetupTitle(for: .finishingSetup)
+                == LocalizationSupport.localized("Waiting for your teacher")
+        )
+        #expect(
+            viewModel.peerSetupMessage(for: .finishingSetup)
+                == LocalizationSupport.localized(
+                    "Your teacher needs to finish setting up and will join shortly. Do you want to wait?"
                 )
         )
     }

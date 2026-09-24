@@ -16,6 +16,9 @@ enum ConnectionSetupSignal: String {
   case microphonePermission = "microphone"
   /// The same, for the camera.
   case cameraPermission = "camera"
+  /// This side went to Settings to turn on a permission it had refused, and
+  /// joins once it is back.
+  case finishingSetup = "settings"
   /// This side left before the lesson started.
   case cancelled
 
@@ -36,15 +39,22 @@ enum ConnectionSetupSignal: String {
     switch self {
     case .microphonePermission: return .microphone
     case .cameraPermission: return .camera
-    case .cancelled: return nil
+    case .finishingSetup, .cancelled: return nil
     }
   }
+
+  /// This side is held up — on a permission prompt, or in Settings — and the
+  /// other side may choose to wait for it.
+  var isHold: Bool { self != .cancelled }
 }
 
 /// What the lesson screen puts to this side about the other one.
 enum PeerSetupPrompt: Equatable {
   /// The other side was asked for a permission: wait for them, or cancel.
   case awaitingPermission(CapturePermissionKind)
+  /// The other side went to Settings to finish its setup: wait for them, or
+  /// cancel.
+  case finishingSetup
   /// The other side left before the lesson started.
   case cancelled
 }
@@ -58,16 +68,16 @@ struct PeerSetupTracker: Equatable {
   /// Sticky: once the other side has left, nothing read afterwards brings the
   /// lesson back.
   private(set) var peerCancelled = false
-  /// This side chose to wait out the other side's permission prompt, and is not
-  /// asked again until that prompt is over.
+  /// This side chose to wait out the other side's permission prompt or trip to
+  /// Settings, and is not asked again until the other side is through it.
   private(set) var isWaitingForPeerPermission = false
 
   mutating func receive(_ signal: ConnectionSetupSignal?) {
     if signal == .cancelled {
       peerCancelled = true
     }
-    if signal?.awaitedPermission == nil {
-      // The prompt is over, one way or another. A later one asks again.
+    if signal?.isHold != true {
+      // The hold is over, one way or another. A later one asks again.
       isWaitingForPeerPermission = false
     }
     peerSignal = signal
@@ -75,33 +85,39 @@ struct PeerSetupTracker: Equatable {
 
   /// The question went away, or reached an end state, and this side did not end
   /// it. While this side is still connecting, or the other side was last heard
-  /// waiting on a permission, that is the other side leaving before the lesson
+  /// held up on a permission, that is the other side leaving before the lesson
   /// started. Otherwise it is an ordinary end.
   ///
   /// The other side announces a cancel before it ends the lesson, but that
   /// write can be missed: Android reads it on a timer, and the question may be
   /// gone by the next reading.
   mutating func questionEnded(whileConnecting isConnecting: Bool) {
-    if isConnecting || peerSignal?.awaitedPermission != nil {
+    if isConnecting || peerSignal?.isHold == true {
       peerCancelled = true
     }
   }
 
   mutating func waitForPeerPermission() {
-    guard peerSignal?.awaitedPermission != nil else { return }
+    guard peerSignal?.isHold == true else { return }
     isWaitingForPeerPermission = true
   }
 
   var prompt: PeerSetupPrompt? {
     if peerCancelled { return .cancelled }
-    if let kind = peerSignal?.awaitedPermission, !isWaitingForPeerPermission {
+    guard let signal = peerSignal, signal.isHold, !isWaitingForPeerPermission else { return nil }
+    if let kind = signal.awaitedPermission {
       return .awaitingPermission(kind)
     }
-    return nil
+    return .finishingSetup
   }
 
   /// The permission the other side is being asked for, while they still are.
   var peerAwaitedPermission: CapturePermissionKind? {
     peerCancelled ? nil : peerSignal?.awaitedPermission
+  }
+
+  /// The other side is in Settings finishing its setup.
+  var isPeerFinishingSetup: Bool {
+    !peerCancelled && peerSignal == .finishingSetup
   }
 }

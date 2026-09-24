@@ -59,7 +59,8 @@ struct TeacherDashboardView: View {
 		conversationType: viewModel.activeConversationType,
 		liveKitRoom: viewModel.activeCallRoom ?? "",
 		liveKitToken: viewModel.activeCallToken ?? "",
-		initialDetails: viewModel.activeChatInitialDetails()
+		initialDetails: viewModel.activeChatInitialDetails(),
+		finishesSetupInSettings: viewModel.activeFinishesSetupInSettings
 	  ) {
 		viewModel.endCall()
 	  }
@@ -211,8 +212,10 @@ struct TeacherDashboardView: View {
 		),
 		message: viewModel.permissionAlertMessage ?? "",
 		actions: [
-		  AppDialogAction(LocalizationSupport.localized("Open Settings")) {
-			PermissionService.shared.openAppSettings()
+		  // The dialog clears the question before it runs a handler, so it is
+		  // taken now, as the buttons are built.
+		  AppDialogAction(LocalizationSupport.localized("Open Settings")) { [questionId = viewModel.permissionAlertQuestionId] in
+			viewModel.finishSetupInSettings(questionId: questionId)
 		  },
 		  AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel) {
 			if let qid = viewModel.permissionAlertQuestionId {
@@ -1105,8 +1108,8 @@ struct TeacherIncomingQuestionOverlay: View {
 	  ),
 	  message: viewModel.permissionAlertMessage ?? "",
 	  actions: [
-		AppDialogAction(LocalizationSupport.localized("Open Settings")) {
-		  PermissionService.shared.openAppSettings()
+		AppDialogAction(LocalizationSupport.localized("Open Settings")) { [questionId = viewModel.permissionAlertQuestionId] in
+		  viewModel.finishSetupInSettings(questionId: questionId)
 		},
 		AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
 	  ]

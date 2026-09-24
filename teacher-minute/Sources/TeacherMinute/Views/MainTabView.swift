@@ -255,7 +255,8 @@ struct TeacherLiveSessionScreen: View {
 	  conversationType: viewModel.activeConversationType,
 	  liveKitRoom: viewModel.activeCallRoom ?? "",
 	  liveKitToken: viewModel.activeCallToken ?? "",
-	  initialDetails: viewModel.activeChatInitialDetails()
+	  initialDetails: viewModel.activeChatInitialDetails(),
+	  finishesSetupInSettings: viewModel.activeFinishesSetupInSettings
 	) {
 	  viewModel.endCall()
 	  dismiss()

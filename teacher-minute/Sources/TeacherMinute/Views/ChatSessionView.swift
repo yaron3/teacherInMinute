@@ -88,6 +88,7 @@ struct ChatSessionView: View {
   /// asked for. Mirrored from the view model.
   @State var peerSetupPrompt: PeerSetupPrompt?
   @State var peerAwaitedPermission: CapturePermissionKind?
+  @State var isPeerFinishingSetup = false
   @State var inputBarHeight: CGFloat = 0
   /// Whether the scrolling chat layout still has its tab strip on screen.
   /// The strip scrolls away with the rest of the chrome, and a badge that
@@ -128,6 +129,7 @@ struct ChatSessionView: View {
     liveKitRoom: String = "",
     liveKitToken: String = "",
     initialDetails: ChatSessionDetails? = nil,
+    finishesSetupInSettings: Bool = false,
     onBuyMinutes: (@MainActor @Sendable () -> Void)? = nil,
     onClose: @escaping @MainActor @Sendable () -> Void
   ) {
@@ -138,6 +140,7 @@ struct ChatSessionView: View {
       liveKitRoom: liveKitRoom,
       liveKitToken: liveKitToken
     )
+    viewModel.finishesSetupInSettings = finishesSetupInSettings
     self._viewModel = State(initialValue: viewModel)
     self._conversationType = State(initialValue: conversationType)
 	self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
@@ -324,7 +327,7 @@ struct ChatSessionView: View {
   /// clears `peerSetupPrompt` before it runs a handler.
   var peerSetupActions: [AppDialogAction] {
     switch peerSetupPrompt {
-    case .awaitingPermission:
+    case .awaitingPermission, .finishingSetup:
       return [
         AppDialogAction(viewModel.waitForPeerLabel) {
           viewModel.waitForPeerPermission()
@@ -355,6 +358,10 @@ struct ChatSessionView: View {
     let awaited = viewModel.peerAwaitedPermission
     if awaited != peerAwaitedPermission {
       peerAwaitedPermission = awaited
+    }
+    let finishing = viewModel.isPeerFinishingSetup
+    if finishing != isPeerFinishingSetup {
+      isPeerFinishingSetup = finishing
     }
   }
 
@@ -1677,6 +1684,9 @@ struct ChatSessionView: View {
         text: viewModel.waitingForPeerText,
         color: theme.warning
       )
+    } else if isPeerFinishingSetup {
+      // The same, while they turn a permission on in Settings.
+      conditionLine(icon: "gearshape.fill", text: viewModel.waitingForPeerText, color: theme.warning)
     } else if hasAudio, peerAwaitingAudio {
       conditionLine(icon: "bubble.left.and.bubble.right.fill", text: viewModel.peerAudioPendingNotice, color: theme.warning)
     } else if hasVideo, didFallBackToAudioOnly {
