@@ -38,6 +38,9 @@ final class ConnectionSetupViewModel {
   var setupStatusText = LocalizationSupport.localized("Checking session requirements")
   var isStartingSession = false
   var didStartSession = false
+  /// Connected on this side, and waiting on this screen for the other side:
+  /// both go into the lesson together, as it starts.
+  var isWaitingForPeer = false
   /// True while the room is being connected. The chat offer only counts down
   /// during this, so time spent on a permission prompt is not held against
   /// the connection.
@@ -314,9 +317,39 @@ final class ConnectionSetupViewModel {
     hasTimedOut = false
     showsChatOffer = false
     isStartingSession = false
+    if let sessionViewModel {
+      sessionViewModel.reportConnected()
+      if !sessionViewModel.hasLessonStarted {
+        // This side is connected, but the lesson starts only once the other
+        // side is too, and both go into it together. Until then this screen
+        // stays up, and is where anything holding the other side up is said.
+        setupStatusText = sessionViewModel.waitingForPeerText
+        isWaitingForPeer = true
+        logger.info("[ConnectionSetup] connected; waiting for the other side qid=\(sessionViewModel.questionId)")
+        return
+      }
+    }
+    enterSession()
+  }
+
+  private func enterSession() {
+    isWaitingForPeer = false
     setupStatusText = LocalizationSupport.localized("Session connected")
     didStartSession = true
     notifySessionStartedIfNeeded()
+  }
+
+  /// Holds this side on the connecting screen until the lesson has started —
+  /// both sides connected — then goes into it.
+  func waitForLessonStart() async {
+    while isWaitingForPeer, !Task.isCancelled {
+      if sessionViewModel?.hasLessonStarted ?? true {
+        logger.info("[ConnectionSetup] both sides connected qid=\(self.sessionViewModel?.questionId ?? "none")")
+        enterSession()
+        return
+      }
+      try? await Task.sleep(nanoseconds: 500_000_000)
+    }
   }
 
   private func notifySessionStartedIfNeeded() {
@@ -328,7 +361,8 @@ final class ConnectionSetupViewModel {
   func startTimeoutTimer() async {
     guard hasAudio else { return }
     try? await Task.sleep(nanoseconds: Self.timeoutSeconds * 1_000_000_000)
-    if !Task.isCancelled {
+    // Connected and waiting on the other side is not a connection that failed.
+    if !Task.isCancelled, !isWaitingForPeer {
 	  logger.info("[ConnectionSetup] timeout")
       hasTimedOut = true
     }

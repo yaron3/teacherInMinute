@@ -929,6 +929,12 @@ protocol ChatSessionViewModeling: AnyObject {
   /// ready. Unlike `isConnecting`, which clears once chat alone is up.
   var isInSetup: Bool { get }
   func finishSetup()
+  /// This side has finished connecting. The backend starts the lesson once the
+  /// other side has too.
+  func reportConnected()
+  /// Both sides have finished connecting, and the lesson — and its billing —
+  /// has started.
+  var hasLessonStarted: Bool { get }
 
   /// New activity from the other side on a tab this side is not looking at.
   var hasUnreadChat: Bool { get }
@@ -1568,6 +1574,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private var hasReportedLessonEnd = false
   private var hasReportedLessonJoin = false
   private var hasReportedLessonReady = false
+  /// This side's ready report started the lesson, or found it running.
+  private var isLessonStartConfirmed = false
   /// Sends of the ready report before one gets through — see `reportLessonReady`.
   private static let readyReportAttempts = 5
   private var didObserveActiveSession = false
@@ -1656,6 +1664,11 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       do {
         let result = try await FunctionsService.shared.startLesson(questionId: questionId, ready: true)
         logger.info("[ChatSession] ready reported questionId=\(questionId) started=\(result.started)")
+        // The second side to finish hears it started the lesson straight
+        // away, rather than waiting for the live node to say so.
+        if result.started {
+          isLessonStartConfirmed = true
+        }
         return
       } catch FunctionsError.serverError(let message, let status, _) {
         logger.error("[ChatSession] ready refused questionId=\(questionId) status=\(status): \(message)")
@@ -1812,6 +1825,14 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   func finishSetup() {
     isInSetup = false
     Task { await reportLessonReady() }
+  }
+
+  func reportConnected() {
+    Task { await reportLessonReady() }
+  }
+
+  var hasLessonStarted: Bool {
+    isLessonStartConfirmed || (details?.startedAt ?? 0) > 0
   }
 
   func stop() {

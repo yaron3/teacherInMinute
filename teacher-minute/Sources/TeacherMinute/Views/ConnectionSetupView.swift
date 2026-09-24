@@ -60,6 +60,9 @@ struct ConnectionSetupView: View {
     .task(id: viewModel.chatOfferTimerKey) {
       await viewModel.startChatOfferTimer()
     }
+    .task(id: viewModel.isWaitingForPeer) {
+      await viewModel.waitForLessonStart()
+    }
     .task {
       await viewModel.loadParticipantRating()
     }

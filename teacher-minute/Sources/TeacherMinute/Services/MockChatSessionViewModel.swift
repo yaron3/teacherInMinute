@@ -115,6 +115,11 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     isInSetup = false
   }
 
+  func reportConnected() {}
+
+  /// No other side to wait for: a preview goes straight into the lesson.
+  var hasLessonStarted = true
+
   func sessionTabChanged(showsChat: Bool, showsBoard: Bool) {}
 
   /// A room that is never reached: the mock has no backend to mint one.
