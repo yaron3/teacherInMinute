@@ -372,6 +372,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Your teacher cancelled the session.": "המורה ביטל/ה את השיעור.",
         "You can take the next question.": "אפשר לקבל את השאלה הבאה.",
         "You can ask your question again.": "אפשר לשאול את השאלה שוב.",
+        // Session header until both sides have connected. New key
+        // (`billing_starts_once`), not in the published config until the
+        // template is republished.
+        "Billing starts once you're both connected.": "החיוב מתחיל כששניכם מחוברים.",
         // Ask a Teacher sheet — the heading stayed English above its Hebrew
         // description.
         "Attach a photo (optional)": "צירוף תמונה (לא חובה)",

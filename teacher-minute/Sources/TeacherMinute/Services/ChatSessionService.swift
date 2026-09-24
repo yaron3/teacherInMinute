@@ -74,6 +74,10 @@ struct ChatSessionDetails: Equatable {
   /// `ConversationType` raw values. Empty when the node has not said. Either
   /// side may change it while the lesson runs, and the other follows.
   var conversationType: String = ""
+  /// When the lesson started — both sides had finished connecting — in epoch
+  /// milliseconds, as published by `startLesson`. Zero until then: nothing is
+  /// counted, or billed, before it.
+  var startedAt: Double = 0
 }
 
 /// The room and token one participant joins the lesson's media with.
@@ -851,7 +855,8 @@ final class ChatSessionService {
       teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75,
       currencyCode: currencyCode(from: dict),
       minutesDeadlineAt: normalizedMilliseconds(doubleValue(dict["minutesDeadlineAt"]) ?? 0),
-      conversationType: firstString(in: dict, keys: ["conversationType"])
+      conversationType: firstString(in: dict, keys: ["conversationType"]),
+      startedAt: normalizedMilliseconds(doubleValue(dict["startedAt"]) ?? 0)
     )
   }
 
@@ -1507,7 +1512,13 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     }
     return LocalizationSupport.localized("Total so far")
   }
-  let sessionNoticeText = LocalizationSupport.localized("Session started - Billing active")
+  /// Billing runs from when both sides had finished connecting, so until then
+  /// the notice says what it is waiting for.
+  var sessionNoticeText: String {
+    (details?.startedAt ?? 0) > 0
+      ? LocalizationSupport.localized("Session started - Billing active")
+      : LocalizationSupport.localized("Billing starts once you're both connected.")
+  }
   var onChatPausedUpdated: (([String: Bool]) -> Void)?
   var onMediaPendingUpdated: (([String: Bool]) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
@@ -1535,7 +1546,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   /// away afterwards is not taken for the other side leaving.
   private var isLeaving = false
   private var hasReportedLessonEnd = false
-  private var hasReportedLessonStart = false
+  private var hasReportedLessonJoin = false
+  private var hasReportedLessonReady = false
+  /// Sends of the ready report before one gets through — see `reportLessonReady`.
+  private static let readyReportAttempts = 5
   private var didObserveActiveSession = false
   private var lastSentChatPaused: Bool?
   private var lastSentMediaPending: Bool?
@@ -1576,34 +1590,63 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       onConnectingUpdated?(false)
       logger.info("[ChatSession] connected questionId=\(self.questionId) role=\(self.role)")
       beginListening()
-      await reportLessonStarted()
+      await reportLessonJoined()
     }
   }
 
-  /// Tells the backend this participant is in the session.
+  /// Tells the backend this participant turned up, as its chat connects.
   ///
   /// Nothing used to call `startLesson`, which left the lesson document
   /// uncreated, the 30-minute hard cap unarmed — it is scheduled by that call —
   /// and the billing clock running from the moment the teacher accepted rather
-  /// than from when the two of them were actually together. It is also how the
-  /// backend learns the student turned up at all: a lesson they never joined is
-  /// written off after a grace period and charged to nobody.
+  /// than from when the two of them were actually together. This first call is
+  /// how the backend learns the student turned up at all: a lesson they never
+  /// joined is written off after a grace period and charged to nobody. It does
+  /// not start the lesson; `reportLessonReady` does, once both sides send it.
   ///
-  /// Both sides call it as they connect, and the backend treats the second
-  /// arrival as ordinary. Best-effort: failing here must not throw anyone out
-  /// of a session they are already connected to.
-  private func reportLessonStarted() async {
-    guard !hasReportedLessonStart else { return }
+  /// Best-effort: failing here must not throw anyone out of a session they are
+  /// already connected to.
+  private func reportLessonJoined() async {
+    guard !hasReportedLessonJoin else { return }
     guard let questionId = nonEmpty(self.questionId) else { return }
-    hasReportedLessonStart = true
+    hasReportedLessonJoin = true
 
     do {
-      let lessonId = try await FunctionsService.shared.startLesson(questionId: questionId)
-      logger.info("[ChatSession] startLesson reported questionId=\(questionId) lessonId=\(lessonId)")
+      let result = try await FunctionsService.shared.startLesson(questionId: questionId, ready: false)
+      logger.info("[ChatSession] joined questionId=\(questionId) started=\(result.started)")
     } catch {
       logger.error(
-        "[ChatSession] startLesson failed questionId=\(questionId): \(error.localizedDescription)"
+        "[ChatSession] startLesson join failed questionId=\(questionId): \(error.localizedDescription)"
       )
+    }
+  }
+
+  /// Tells the backend this side has finished connecting. The lesson — its
+  /// billing, the hard cap, the student's minutes — starts once both sides
+  /// have, so nobody pays for the connecting phase and a session cancelled
+  /// during it costs nothing. A report lost on the way would leave a lesson
+  /// that really happened unbilled, so it is sent again; one the backend
+  /// answered, even with a refusal, is not.
+  private func reportLessonReady() async {
+    guard !hasReportedLessonReady, let questionId = nonEmpty(self.questionId) else { return }
+    hasReportedLessonReady = true
+
+    for attempt in 1...Self.readyReportAttempts {
+      guard !isLeaving else { return }
+      do {
+        let result = try await FunctionsService.shared.startLesson(questionId: questionId, ready: true)
+        logger.info("[ChatSession] ready reported questionId=\(questionId) started=\(result.started)")
+        return
+      } catch FunctionsError.serverError(let message, let status, _) {
+        logger.error("[ChatSession] ready refused questionId=\(questionId) status=\(status): \(message)")
+        return
+      } catch {
+        logger.error(
+          "[ChatSession] ready report failed attempt=\(attempt) questionId=\(questionId): \(error.localizedDescription)"
+        )
+        guard attempt < Self.readyReportAttempts else { return }
+        try? await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
+      }
     }
   }
 
@@ -1748,6 +1791,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func finishSetup() {
     isInSetup = false
+    Task { await reportLessonReady() }
   }
 
   func stop() {
@@ -2209,8 +2253,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     details?.teacherSharePercent ?? 75
   }
 
+  /// Counted from when the lesson started — both sides in — as it is billed.
+  /// Zero while either side is still connecting.
   func sessionDurationSeconds(at date: Date) -> Int {
-    let startMilliseconds = details?.acceptedAt ?? 0
+    let startMilliseconds = details?.startedAt ?? 0
     guard startMilliseconds > 0 else { return 0 }
     return max(0, Int(date.timeIntervalSince1970 - startMilliseconds / 1000.0))
   }
@@ -2257,7 +2303,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       minutesDeadlineAt: updated.minutesDeadlineAt > 0
         ? updated.minutesDeadlineAt
         : current.minutesDeadlineAt,
-      conversationType: nonEmpty(updated.conversationType) ?? current.conversationType
+      conversationType: nonEmpty(updated.conversationType) ?? current.conversationType,
+      // Once known, kept: a snapshot that omits it must not stop the count.
+      startedAt: updated.startedAt > 0 ? updated.startedAt : current.startedAt
     )
   }
 
@@ -2281,7 +2329,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       teacherSharePercent: current.teacherSharePercent,
       currencyCode: current.currencyCode,
       minutesDeadlineAt: current.minutesDeadlineAt,
-      conversationType: current.conversationType
+      conversationType: current.conversationType,
+      startedAt: current.startedAt
     )
     onSessionDetailsUpdated?()
   }
@@ -2334,7 +2383,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       teacherSharePercent: current.teacherSharePercent,
       currencyCode: current.currencyCode,
       minutesDeadlineAt: current.minutesDeadlineAt,
-      conversationType: current.conversationType
+      conversationType: current.conversationType,
+      startedAt: current.startedAt
     )
   }
 

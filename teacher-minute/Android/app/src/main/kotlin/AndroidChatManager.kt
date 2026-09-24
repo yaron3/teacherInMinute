@@ -529,6 +529,9 @@ object AndroidChatManager {
                     ?: snapshot.child("startedAt").value.asDoubleOrNull()
                     ?: 0.0
             )
+            // When both sides had finished connecting: the session is counted
+            // from here, and absent until then.
+            .put("startedAt", snapshot.child("startedAt").value.asDoubleOrNull() ?: 0.0)
             .put(
                 "pricePerMinuteCents",
                 snapshot.child("pricePerMinuteCents").value.asIntOrNull()

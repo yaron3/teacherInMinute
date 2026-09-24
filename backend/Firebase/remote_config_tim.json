@@ -2818,6 +2818,17 @@
       },
       "valueType": "STRING"
     },
+    "billing_starts_once": {
+      "defaultValue": {
+        "value": "Billing starts once you're both connected."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "החיוב מתחיל כששניכם מחוברים."
+        }
+      },
+      "valueType": "STRING"
+    },
     "this_permanently_deletes": {
       "defaultValue": {
         "value": "This permanently deletes your account and profile data. This cannot be undone."

@@ -193,13 +193,14 @@ jest.mock("../busy", () => ({
 import {
   endAbandonedLesson,
   endLesson,
+  enqueueAbandonedLessonCheck,
   extendLessonMinutes,
   forceEndLesson,
   startLesson,
 } from "../lessons";
 import { backfillPendingQuestionsForTeacher } from "../dispatch";
 
-type TaskHandler = (req: { data: { questionId: string } }) => Promise<void>;
+type TaskHandler = (req: { data: { questionId: string; unstarted?: boolean } }) => Promise<void>;
 type CallableHandler = (request: {
   auth?: { uid: string };
   data: Record<string, unknown>;
@@ -289,6 +290,66 @@ describe("endAbandonedLesson", () => {
       teacherEarnings: 0,
     });
   });
+
+  test("is armed twice when a teacher accepts: the grace period, then the start deadline", async () => {
+    await enqueueAbandonedLessonCheck("q-1");
+
+    expect(mockEnqueue).toHaveBeenCalledWith(
+      "endAbandonedLesson",
+      { questionId: "q-1" },
+      { scheduleDelaySeconds: 120 }
+    );
+    expect(mockEnqueue).toHaveBeenCalledWith(
+      "endAbandonedLesson",
+      { questionId: "q-1", unstarted: true },
+      { scheduleDelaySeconds: 5 * 60 }
+    );
+  });
+
+  // Both apps joined, but they never both finished connecting, and neither
+  // ended it — killed mid-setup, say. Nothing else would ever end it.
+  test("the later check writes off a lesson that never started, charging nobody", async () => {
+    seedQuestion({
+      joinedParticipants: ["teacher-1", "student-1"],
+      readyParticipants: ["teacher-1"],
+    });
+
+    await runAbandonedCheck({ data: { questionId: "q-1", unstarted: true } });
+
+    expect(question()).toMatchObject({
+      status: "cancelled",
+      endedBy: "system",
+      endedReason: "never_started",
+      billedSeconds: 0,
+      cost: 0,
+      teacherEarnings: 0,
+    });
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+  });
+
+  test("the grace-period check leaves a joined lesson that is still connecting", async () => {
+    seedQuestion({ joinedParticipants: ["teacher-1", "student-1"] });
+
+    await runAbandonedCheck({ data: { questionId: "q-1" } });
+
+    expect(question().status).toBe("accepted");
+    expect(rtdb.has(QUESTION_PATH)).toBe(true);
+  });
+
+  test("the later check leaves a lesson that started", async () => {
+    seedQuestion({
+      status: "in_progress",
+      lessonId: "lesson-1",
+      joinedParticipants: ["teacher-1", "student-1"],
+    });
+
+    await runAbandonedCheck({ data: { questionId: "q-1", unstarted: true } });
+
+    expect(question().status).toBe("in_progress");
+    expect(rtdb.has(QUESTION_PATH)).toBe(true);
+    expect(mockReleaseTeacherBusy).not.toHaveBeenCalled();
+  });
 });
 
 describe("startLesson", () => {
@@ -328,6 +389,129 @@ describe("startLesson", () => {
     await expect(
       callStartLesson({ auth: { uid: "stranger" }, data: { questionId: "q-1" } })
     ).rejects.toThrow("Not a participant in this lesson");
+  });
+});
+
+describe("a lesson starts once both apps have finished connecting", () => {
+  // What the current apps send: `ready: false` as their chat connects, then
+  // `ready: true` once they are fully in the lesson.
+  const report = (uid: string, ready: boolean) =>
+    callStartLesson({ auth: { uid }, data: { questionId: "q-1", ready } });
+
+  test("joining records the arrival without starting anything", async () => {
+    seedQuestion();
+
+    await expect(report("student-1", false)).resolves.toEqual({ lessonId: null, started: false });
+
+    expect(question()).toMatchObject({ status: "accepted", joinedParticipants: ["student-1"] });
+    expect(question().lessonId).toBeUndefined();
+    expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  test("one side ready is not enough", async () => {
+    seedQuestion();
+
+    await expect(report("teacher-1", true)).resolves.toEqual({ lessonId: null, started: false });
+
+    expect(question()).toMatchObject({ status: "accepted", readyParticipants: ["teacher-1"] });
+    expect(store.has("lessons/lesson-1")).toBe(false);
+    // Nothing published, so neither app starts counting.
+    expect((rtdb.get(QUESTION_PATH) as DocData).startedAt).toBeUndefined();
+  });
+
+  test("the second side ready starts it", async () => {
+    seedQuestion();
+    await report("student-1", false);
+    await report("teacher-1", true);
+
+    await expect(report("student-1", true)).resolves.toEqual({
+      lessonId: "lesson-1",
+      started: true,
+    });
+
+    expect(question()).toMatchObject({
+      status: "in_progress",
+      lessonId: "lesson-1",
+      joinedParticipants: ["student-1", "teacher-1"],
+      readyParticipants: ["teacher-1", "student-1"],
+    });
+    expect(store.get("lessons/lesson-1")).toMatchObject({ status: "in_progress" });
+    // Both apps count the session from here.
+    expect((rtdb.get(QUESTION_PATH) as DocData).startedAt).toEqual(expect.any(Number));
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
+    expect(mockEnqueue).toHaveBeenCalledWith(
+      "forceEndLesson",
+      { lessonId: "lesson-1" },
+      { scheduleDelaySeconds: 30 * 60 }
+    );
+  });
+
+  test("a report after the start changes nothing", async () => {
+    seedQuestion();
+    await report("teacher-1", true);
+    await report("student-1", true);
+
+    await expect(report("teacher-1", true)).resolves.toEqual({
+      lessonId: "lesson-1",
+      started: true,
+    });
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
+  });
+
+  test("ending it before it started is free, and leaves no history", async () => {
+    seedQuestion();
+    store.set("users/student-1", { remainingMinutes: 20 });
+    await report("student-1", true);
+
+    await expect(
+      callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } })
+    ).resolves.toMatchObject({ success: true, endedBy: "teacher", cancelledBeforeStart: true });
+
+    expect(question()).toMatchObject({
+      status: "cancelled",
+      endedBy: "teacher",
+      endedReason: "cancelled_while_connecting",
+      billedSeconds: 0,
+      cost: 0,
+      teacherEarnings: 0,
+    });
+    // Nothing charged or paid, and the lesson is in neither history.
+    expect(store.get("users/student-1")).toEqual({ remainingMinutes: 20 });
+    expect(store.get("users/teacher-1")).toBeUndefined();
+    // Removing the live node ends the other side's session, and the teacher
+    // is free for the next question.
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+    expect(backfillPendingQuestionsForTeacher).toHaveBeenCalledWith("teacher-1");
+  });
+
+  test("the other side ending it afterwards is told it is already over", async () => {
+    seedQuestion();
+    await callEndLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } });
+
+    await expect(
+      callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } })
+    ).resolves.toMatchObject({ success: true, alreadyEnded: true });
+    expect(question()).toMatchObject({ status: "cancelled", endedBy: "student" });
+  });
+
+  test("a ready report arriving after the cancel does not start it", async () => {
+    seedQuestion();
+    await report("teacher-1", true);
+    await callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } });
+
+    await expect(report("student-1", true)).resolves.toEqual({ lessonId: null, started: false });
+    expect(question().status).toBe("cancelled");
+    expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  test("nobody else can end it", async () => {
+    seedQuestion();
+
+    await expect(
+      callEndLesson({ auth: { uid: "stranger" }, data: { questionId: "q-1" } })
+    ).rejects.toThrow("Not a participant in this lesson");
+    expect(question().status).toBe("accepted");
   });
 });
 
@@ -439,7 +623,9 @@ describe("endLesson when the other side got there first", () => {
   });
 
   test("still fails when the lesson is not over", async () => {
-    seedQuestion();
+    // Started: one that never did is written off rather than settled, which
+    // does not need the live node (see "a lesson starts once both apps...").
+    seedQuestion({ status: "in_progress", lessonId: "lesson-1" });
     rtdb.delete(QUESTION_PATH);
 
     await expect(
