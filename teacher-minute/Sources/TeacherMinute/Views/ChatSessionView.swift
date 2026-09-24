@@ -83,6 +83,11 @@ struct ChatSessionView: View {
   /// The other side moved the lesson up to audio or video, waiting on this
   /// side's yes — a camera or microphone is never turned on without it.
   @State var pendingPeerConversationType: String?
+  /// What the other side's setup asks of this one — wait out their permission
+  /// prompt, or read that they left — and the permission they are still being
+  /// asked for. Mirrored from the view model.
+  @State var peerSetupPrompt: PeerSetupPrompt?
+  @State var peerAwaitedPermission: CapturePermissionKind?
   @State var inputBarHeight: CGFloat = 0
   /// Whether the scrolling chat layout still has its tab strip on screen.
   /// The strip scrolls away with the rest of the chrome, and a badge that
@@ -171,8 +176,13 @@ struct ChatSessionView: View {
               viewModel: viewModel,
               liveKitRoom: viewModel.liveKitRoom,
               liveKitToken: viewModel.liveKitToken,
-              onCancel: onClose,
+              onCancel: { @MainActor @Sendable in
+                cancelSetup()
+              },
               onSessionStarted: { @MainActor @Sendable in
+                // The other side left while this one connected, and the dialog
+                // over this screen is saying so.
+                guard viewModel.peerSetupPrompt != .cancelled else { return }
                 logger.info("[ChatSessionView] setup complete qid=\(viewModel.questionId) role=\(viewModel.role) conversationType=\(conversationType)")
                 viewModel.logSessionStarted(conversationType: conversationType)
                 viewModel.finishSetup()
@@ -224,7 +234,19 @@ struct ChatSessionView: View {
         displayDate = Date()
         followSharedConversationType()
       }
+      viewModel.onPeerSetupUpdated = {
+        refreshPeerSetup()
+      }
+      // Before this side connects anything: the other side can leave, or be
+      // held up by a permission prompt, while this one is still on its own.
+      viewModel.startWatchingPeerSetup()
       viewModel.onSessionEnded = {
+        if viewModel.peerSetupPrompt == .cancelled, !didRequestLessonEnd {
+          // They left before the lesson started. The dialog says so, and
+          // closes the screen once it has been read.
+          refreshPeerSetup()
+          return
+        }
         if sessionFrozenDate == nil { sessionFrozenDate = Date() }
         if let note = viewModel.peerFarewellNote, !note.isEmpty,
            !didRequestLessonEnd, !isEndingSession {
@@ -254,6 +276,7 @@ struct ChatSessionView: View {
         displayDate = Date()
         refreshMediaCondition()
         refreshMinutesHold()
+        refreshPeerSetup()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
       }
     }
@@ -286,6 +309,71 @@ struct ChatSessionView: View {
       message: viewModel.peerUpgradeMessage(for: pendingPeerConversationType ?? ""),
       actions: peerUpgradeActions
     )
+    .appDialog(
+      viewModel.peerSetupTitle(for: peerSetupPrompt ?? .cancelled),
+      isPresented: Binding(
+        get: { peerSetupPrompt != nil },
+        set: { if !$0 { peerSetupPrompt = nil } }
+      ),
+      message: viewModel.peerSetupMessage(for: peerSetupPrompt ?? .cancelled),
+      actions: peerSetupActions
+    )
+  }
+
+  /// Built from the prompt as it stands, like `peerUpgradeActions`: the dialog
+  /// clears `peerSetupPrompt` before it runs a handler.
+  var peerSetupActions: [AppDialogAction] {
+    switch peerSetupPrompt {
+    case .awaitingPermission:
+      return [
+        AppDialogAction(viewModel.waitForPeerLabel) {
+          viewModel.waitForPeerPermission()
+        },
+        AppDialogAction(viewModel.cancelSessionLabel, kind: .cancel) {
+          cancelSetup()
+        }
+      ]
+    case .cancelled, nil:
+      return [
+        AppDialogAction(viewModel.okLabel) {
+          acknowledgePeerCancelled()
+        }
+      ]
+    }
+  }
+
+  /// Mirrors what the session says about the other side's setup. Nothing moves
+  /// once this side is on its way out, so a dialog just answered does not come
+  /// back on the way.
+  func refreshPeerSetup() {
+    guard !didRequestLessonEnd else { return }
+    let prompt = viewModel.peerSetupPrompt
+    if prompt != peerSetupPrompt {
+      if prompt != nil { dismissChatInput() }
+      peerSetupPrompt = prompt
+    }
+    let awaited = viewModel.peerAwaitedPermission
+    if awaited != peerAwaitedPermission {
+      peerAwaitedPermission = awaited
+    }
+  }
+
+  /// Leaves a lesson that is still connecting — from the setup screen, or from
+  /// the question about the other side's permission prompt. The other side is
+  /// told why; no rating is asked for a lesson that never happened.
+  func cancelSetup() {
+    guard !didRequestLessonEnd else { return }
+    didRequestLessonEnd = true
+    viewModel.cancelSetup()
+    onClose()
+  }
+
+  /// The other side left before the lesson started, and the user has read it.
+  func acknowledgePeerCancelled() {
+    guard !didRequestLessonEnd else { return }
+    didRequestLessonEnd = true
+    viewModel.acknowledgePeerCancelled()
+    onClose()
   }
 
   /// The dialog clears `pendingPeerConversationType` before it runs a
@@ -1581,6 +1669,14 @@ struct ChatSessionView: View {
       conditionLine(icon: "exclamationmark.triangle.fill", text: viewModel.lostConnectionNotice, color: theme.danger)
     } else if hasAudio, mediaQuality == .poor {
       conditionLine(icon: "exclamationmark.triangle.fill", text: viewModel.weakConnectionNotice, color: theme.warning)
+    } else if let peerAwaitedPermission {
+      // The other side is still answering a permission prompt, and this one
+      // chose to wait: nothing reaches them until they are through it.
+      conditionLine(
+        icon: peerAwaitedPermission == .camera ? "video.fill" : "mic.fill",
+        text: viewModel.waitingForPeerText,
+        color: theme.warning
+      )
     } else if hasAudio, peerAwaitingAudio {
       conditionLine(icon: "bubble.left.and.bubble.right.fill", text: viewModel.peerAudioPendingNotice, color: theme.warning)
     } else if hasVideo, didFallBackToAudioOnly {

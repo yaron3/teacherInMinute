@@ -160,6 +160,34 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     onSessionDetailsUpdated?()
   }
 
+  // MARK: Connecting
+  //
+  // No other side to hear from: `simulatePeerSetupSignal` plays it.
+
+  private(set) var peerSetup = PeerSetupTracker()
+  var onPeerSetupUpdated: (() -> Void)?
+  var peerSetupPrompt: PeerSetupPrompt? { peerSetup.prompt }
+  var peerAwaitedPermission: CapturePermissionKind? { peerSetup.peerAwaitedPermission }
+
+  func startWatchingPeerSetup() {}
+
+  func setSelfAwaitingPermission(_ kind: CapturePermissionKind?) {}
+
+  func waitForPeerPermission() {
+    peerSetup.waitForPeerPermission()
+    onPeerSetupUpdated?()
+  }
+
+  func cancelSetup() {}
+
+  func acknowledgePeerCancelled() {}
+
+  /// Plays the other participant's setup: a permission prompt, or leaving.
+  func simulatePeerSetupSignal(_ signal: ConnectionSetupSignal?) {
+    peerSetup.receive(signal)
+    onPeerSetupUpdated?()
+  }
+
   func start() {
     onConnectingUpdated?(isConnecting)
     Task {

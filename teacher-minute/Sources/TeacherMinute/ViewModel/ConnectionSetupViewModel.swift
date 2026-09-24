@@ -108,6 +108,15 @@ final class ConnectionSetupViewModel {
 
   // MARK: - View strings
 
+  /// The line under the connection title. While the other side is answering a
+  /// permission prompt, that is what this side is waiting on.
+  var statusText: String {
+    guard let sessionViewModel, sessionViewModel.peerAwaitedPermission != nil else {
+      return setupStatusText
+    }
+    return sessionViewModel.waitingForPeerText
+  }
+
   var cancelSessionLabel: String { LocalizationSupport.localized("Cancel Session") }
   var cancelLabel: String { LocalizationSupport.localized("Cancel") }
   var retryLabel: String { LocalizationSupport.localized("Retry") }
@@ -171,30 +180,44 @@ final class ConnectionSetupViewModel {
     isConnectingMedia = false
     setupStatusText = LocalizationSupport.localized("Checking device permissions")
 
+    // Only a screen with a lesson behind it asks. The placeholder shown while a
+    // teacher's accept is on its way leaves a missing permission to the
+    // lesson's own setup, where the student is told the teacher is being asked.
+    let asksForPermissions = sessionViewModel != nil
     if hasAudio {
-      microphoneState = await PermissionService.shared.requestCapturePermission(for: .microphone)
+      microphoneState = await capturePermission(.microphone, asks: asksForPermissions)
       logger.info("[ConnectionSetup] microphone state=\(self.microphoneState.rawValue) qid=\(self.sessionViewModel?.questionId ?? "none")")
     }
     if hasVideo {
-      cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
+      cameraState = await capturePermission(.camera, asks: asksForPermissions)
       logger.info("[ConnectionSetup] camera state=\(self.cameraState.rawValue) qid=\(self.sessionViewModel?.questionId ?? "none")")
-    }
-
-    guard hasRequiredPermissions else {
-      setupStatusText = permissionBlockedText
-      logger.info("[ConnectionSetup] blocked by permissions qid=\(self.sessionViewModel?.questionId ?? "none") mic=\(self.microphoneState.rawValue) camera=\(self.cameraState.rawValue)")
-      return
-    }
-
-    guard hasMediaCredentials else {
-      setupStatusText = LocalizationSupport.localized("Waiting for audio/video connection")
-      logger.info("[ConnectionSetup] blocked by missing media credentials qid=\(self.sessionViewModel?.questionId ?? "none") roomEmpty=\(self.liveKitRoom.isEmpty) tokenEmpty=\(self.liveKitToken.isEmpty) conversationType=\(self.conversationType)")
-      return
     }
 
     guard let sessionViewModel else {
       setupStatusText = LocalizationSupport.localized("Waiting for the other side")
       logger.info("[ConnectionSetup] no session view model; showing passive setup conversationType=\(self.conversationType)")
+      return
+    }
+
+    guard hasRequiredPermissions else {
+      // Still waiting on the user, so the other side goes on hearing about it.
+      sessionViewModel.setSelfAwaitingPermission(missingPermission)
+      setupStatusText = permissionBlockedText
+      logger.info("[ConnectionSetup] blocked by permissions qid=\(sessionViewModel.questionId) mic=\(self.microphoneState.rawValue) camera=\(self.cameraState.rawValue)")
+      return
+    }
+    sessionViewModel.setSelfAwaitingPermission(nil)
+
+    // The other side left while this one was answering a prompt: there is no
+    // lesson left to connect to, and the screen is saying so.
+    guard sessionViewModel.peerSetupPrompt != .cancelled else {
+      logger.info("[ConnectionSetup] the other side left; not connecting qid=\(sessionViewModel.questionId)")
+      return
+    }
+
+    guard hasMediaCredentials else {
+      setupStatusText = LocalizationSupport.localized("Waiting for audio/video connection")
+      logger.info("[ConnectionSetup] blocked by missing media credentials qid=\(sessionViewModel.questionId) roomEmpty=\(self.liveKitRoom.isEmpty) tokenEmpty=\(self.liveKitToken.isEmpty) conversationType=\(self.conversationType)")
       return
     }
 
@@ -343,7 +366,7 @@ final class ConnectionSetupViewModel {
 
   func requestPermission(_ kind: CapturePermissionKind) {
     Task {
-      let state = await PermissionService.shared.requestCapturePermission(for: kind)
+      let state = await capturePermission(kind, asks: true)
       switch kind {
       case .microphone:
         microphoneState = state
@@ -357,9 +380,27 @@ final class ConnectionSetupViewModel {
       if hasRequiredPermissions {
         attempt += 1
       } else {
+        sessionViewModel?.setSelfAwaitingPermission(missingPermission)
         setupStatusText = permissionBlockedText
       }
     }
+  }
+
+  /// Where one capture permission stands, asking for it when `asks` and it is
+  /// still missing. The other side is told before the prompt goes up: they
+  /// are left waiting while it is on screen, with no other way to know why.
+  private func capturePermission(_ kind: CapturePermissionKind, asks: Bool) async -> PermissionState {
+    let current = PermissionService.shared.captureStatus(for: kind)
+    guard asks, !current.isGranted else { return current }
+    sessionViewModel?.setSelfAwaitingPermission(kind)
+    return await PermissionService.shared.requestCapturePermission(for: kind)
+  }
+
+  /// The first permission this lesson still lacks.
+  private var missingPermission: CapturePermissionKind? {
+    if hasAudio, !microphoneState.isGranted { return .microphone }
+    if hasVideo, !cameraState.isGranted { return .camera }
+    return nil
   }
 }
 

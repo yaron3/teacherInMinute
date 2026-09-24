@@ -384,6 +384,28 @@ describe("two students asking at the same time", () => {
   });
 });
 
+describe("a student who cancels before a teacher's accept lands", () => {
+  test("the accept is refused with a reason the app can tell apart", async () => {
+    const qid = await ask("student-maya");
+    const [anna] = RANKED;
+
+    await advanceTo(3);
+    await (cancelQuestion as unknown as Callable)({
+      auth: { uid: "student-maya" },
+      data: { questionId: qid },
+    });
+
+    // The teacher's app says the student cancelled, rather than dropping them
+    // back on the dashboard with nothing on screen to explain it.
+    await expect(accept(anna, qid)).rejects.toMatchObject({
+      code: "failed-precondition",
+      details: { reason: "question_cancelled" },
+    });
+    expect(question(qid).status).toBe("cancelled");
+    expect(fakeRtdb.read(`teachers/${anna}/busy`)).toBeUndefined();
+  });
+});
+
 describe("a teacher in a session is busy", () => {
   test("accepting marks the teacher busy with that question", async () => {
     const qid = await ask("student-maya");

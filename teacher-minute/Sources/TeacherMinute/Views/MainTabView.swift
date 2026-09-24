@@ -66,6 +66,21 @@ struct MainTabView: View {
 		}
 	  ]
 	)
+	.appDialog(
+	  teacherDashboardViewModel?.studentCancelledTitle ?? "",
+	  isPresented: isStudentCancelledDialogPresented,
+	  message: teacherDashboardViewModel?.studentCancelledMessage,
+	  actions: [AppDialogAction(teacherDashboardViewModel?.okLabel ?? "")]
+	)
+  }
+
+  /// The student cancelled while this teacher's accept was on its way. By then
+  /// the question's card is gone, so a dialog says what happened.
+  var isStudentCancelledDialogPresented: Binding<Bool> {
+	Binding(
+	  get: { teacherDashboardViewModel?.studentCancelledBeforeStart ?? false },
+	  set: { teacherDashboardViewModel?.studentCancelledBeforeStart = $0 }
+	)
   }
 
   /// Drives the push off `activeQuestionId` alone. As on the student side the

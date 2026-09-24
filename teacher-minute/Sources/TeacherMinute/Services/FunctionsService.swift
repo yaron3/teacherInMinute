@@ -69,6 +69,9 @@ extension ServerErrorDetails {
   /// `scope` names the allowance and `retryAfterSeconds` says how long.
   static let rateLimited = "rate_limited"
 
+  /// `acceptInvite` refused because the student cancelled the question first.
+  static let questionCancelled = "question_cancelled"
+
   /// The value `scope` carries when it is the hourly allowance.
   static let hourScope = "hour"
 }

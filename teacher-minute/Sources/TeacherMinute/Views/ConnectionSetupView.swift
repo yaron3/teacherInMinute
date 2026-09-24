@@ -320,7 +320,7 @@ struct ConnectionSetupView: View {
         }
         HStack {
           Spacer()
-          Text(viewModel.setupStatusText)
+          Text(viewModel.statusText)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
             .multilineTextAlignment(.center)

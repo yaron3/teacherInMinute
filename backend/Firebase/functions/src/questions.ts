@@ -418,7 +418,11 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
       throw new HttpsError("already-exists", "Question already claimed by another teacher");
     }
     if (q.status === "cancelled") {
-      throw new HttpsError("failed-precondition", "Question was cancelled by the student");
+      // The app tells this apart by `reason`: the teacher is shown that the
+      // student cancelled, rather than just dropped back on the dashboard.
+      throw new HttpsError("failed-precondition", "Question was cancelled by the student", {
+        reason: "question_cancelled",
+      });
     }
     if (q.status !== "searching" && q.status !== "unanswered") {
       throw new HttpsError("failed-precondition", `Question is not available (status: ${q.status})`);
