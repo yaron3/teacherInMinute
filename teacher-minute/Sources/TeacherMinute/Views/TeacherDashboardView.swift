@@ -60,7 +60,11 @@ struct TeacherDashboardView: View {
 		liveKitRoom: viewModel.activeCallRoom ?? "",
 		liveKitToken: viewModel.activeCallToken ?? "",
 		initialDetails: viewModel.activeChatInitialDetails(),
-		finishesSetupInSettings: viewModel.activeFinishesSetupInSettings
+		finishesSetupInSettings: viewModel.activeFinishesSetupInSettings,
+		returnsFromSettings: viewModel.activeReturnsFromSettings,
+		onFinishingSetupInSettings: {
+		  viewModel.rememberLessonLeftForSettings()
+		}
 	  ) {
 		viewModel.endCall()
 	  }

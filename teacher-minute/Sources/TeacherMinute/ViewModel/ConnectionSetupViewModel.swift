@@ -53,9 +53,10 @@ final class ConnectionSetupViewModel {
   /// Set once the lesson may go ahead without audio: the student chose chat,
   /// or, on the teacher's side, the student is already in the lesson by chat.
   private var skipsMediaWait = false
-  /// This side has gone to Settings for a permission during this setup. From
-  /// then on the other side hears it is finishing setup, not that it was
-  /// asked for a permission.
+  /// This side has gone to Settings for a permission during this setup — on
+  /// this launch, or on the one iOS closed while it was there. From then on the
+  /// other side hears it is finishing setup, not that it was asked for a
+  /// permission.
   private var wentToSettings = false
   /// Stopped only on a permission the user has to act on, so a return to the
   /// app retries only then — not while a system prompt is still being answered.
@@ -79,6 +80,7 @@ final class ConnectionSetupViewModel {
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
     self.onSessionStarted = onSessionStarted
+    wentToSettings = sessionViewModel?.returnsFromSettings ?? false
   }
 
   var hasAudio: Bool { conversationType == "audio" || conversationType == "video" }

@@ -130,6 +130,8 @@ struct ChatSessionView: View {
     liveKitToken: String = "",
     initialDetails: ChatSessionDetails? = nil,
     finishesSetupInSettings: Bool = false,
+    returnsFromSettings: Bool = false,
+    onFinishingSetupInSettings: (@MainActor @Sendable () -> Void)? = nil,
     onBuyMinutes: (@MainActor @Sendable () -> Void)? = nil,
     onClose: @escaping @MainActor @Sendable () -> Void
   ) {
@@ -138,9 +140,11 @@ struct ChatSessionView: View {
       role: role,
       initialDetails: initialDetails,
       liveKitRoom: liveKitRoom,
-      liveKitToken: liveKitToken
+      liveKitToken: liveKitToken,
+      returnsFromSettings: returnsFromSettings
     )
     viewModel.finishesSetupInSettings = finishesSetupInSettings
+    viewModel.onFinishingSetupInSettings = onFinishingSetupInSettings
     self._viewModel = State(initialValue: viewModel)
     self._conversationType = State(initialValue: conversationType)
 	self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)

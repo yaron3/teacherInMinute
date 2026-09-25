@@ -981,6 +981,11 @@ protocol ChatSessionViewModeling: AnyObject {
   /// it had refused. Its setup sends it there, and the other side is told it
   /// is finishing setup rather than being asked for a permission.
   var finishesSetupInSettings: Bool { get }
+  /// This side is back in a lesson it left for Settings before it started:
+  /// iOS closed the app there, and reopening it came straight back here — see
+  /// `LessonLeftForSettings`. The other side is still told this one is
+  /// finishing setup, and the setup does not send it to Settings again.
+  var returnsFromSettings: Bool { get }
   var onPeerSetupUpdated: (() -> Void)? { get set }
   /// Starts following the other side. Called as the lesson screen appears,
   /// before this side has connected anything.
@@ -1559,6 +1564,12 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var isPeerFinishingSetup: Bool { peerSetup.isPeerFinishingSetup }
   /// Set by the screen that opens the lesson — see the protocol.
   var finishesSetupInSettings = false
+  /// Set as the lesson opens — see the protocol.
+  let returnsFromSettings: Bool
+  /// Told each time this side says it is finishing its setup in Settings,
+  /// which it does on its way there. The teacher's dashboard writes the lesson
+  /// down then, in case iOS closes the app while they are there.
+  var onFinishingSetupInSettings: (@MainActor @Sendable () -> Void)?
 
   private let service: ChatSessionService
   private var pollingTask: Task<Void, Never>?
@@ -1590,14 +1601,22 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     role: String,
     initialDetails: ChatSessionDetails? = nil,
     liveKitRoom: String = "",
-    liveKitToken: String = ""
+    liveKitToken: String = "",
+    returnsFromSettings: Bool = false
   ) {
     self.questionId = questionId
     self.role = role
     self.liveKitRoom = liveKitRoom.trimmingCharacters(in: .whitespacesAndNewlines)
     self.liveKitToken = liveKitToken.trimmingCharacters(in: .whitespacesAndNewlines)
     self.details = initialDetails
+    self.returnsFromSettings = returnsFromSettings
     self.service = ChatSessionService(questionId: questionId)
+    // The launch that left for Settings left this side's entry saying so. It
+    // is taken as written, so the setup clears it like any other once it gets
+    // past it — the other side would otherwise go on reading it.
+    if returnsFromSettings {
+      sentSetupSignal = .finishingSetup
+    }
   }
 
   func start() {
@@ -2127,6 +2146,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func announceFinishingSetup() async {
     guard !isLeaving else { return }
+    onFinishingSetupInSettings?()
     await sendSetupSignal(.finishingSetup)?.value
   }
 

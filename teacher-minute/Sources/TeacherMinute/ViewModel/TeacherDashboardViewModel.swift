@@ -49,6 +49,9 @@ protocol TeacherDashboardViewModeling: AnyObject {
   /// The running lesson was taken on the way to Settings, to turn on a
   /// permission the teacher had refused.
   var activeFinishesSetupInSettings: Bool { get }
+  /// The running lesson was left for Settings before it started, and reopened
+  /// after iOS closed the app there — see `LessonLeftForSettings`.
+  var activeReturnsFromSettings: Bool { get }
   var acceptingQuestionId: String? { get set }
   var errorMessage: String? { get set }
   /// A standing warning about the teacher's own reachability, shown as a header
@@ -105,6 +108,10 @@ protocol TeacherDashboardViewModeling: AnyObject {
   /// Takes the question whose accept a refused permission stopped, on the way
   /// to Settings to turn it on. Nil just opens Settings.
   func finishSetupInSettings(questionId: String?)
+  /// The running lesson is leaving for Settings before it started. Written
+  /// down, so the next launch can take the teacher back into it if iOS closes
+  /// the app there.
+  func rememberLessonLeftForSettings()
   func declineInvite(questionId: String)
   func cancelAcceptingInvite()
   func endCall()
@@ -408,6 +415,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeConversationType = "text"
   /// The lesson was taken on the way to Settings — see `finishSetupInSettings`.
   var activeFinishesSetupInSettings = false
+  /// See `resumeLessonLeftForSettings`.
+  var activeReturnsFromSettings = false
   var activeAcceptedAt = 0.0
   var activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   var acceptingQuestionId: String? = nil
@@ -542,6 +551,9 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		  guard let self, self.inviteService == nil else { return }
 #endif
 		  self.configurePresence(uid: uid)
+		  // Before the dashboard's own loading: a student may be waiting on the
+		  // connecting screen for this teacher to come back.
+		  await self.resumeLessonLeftForSettings(uid: uid)
 		  await self.loadProfile(uid: uid)
 		}
 	  } else {
@@ -1178,6 +1190,10 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   func endCall() {
 	activeQuestionId = nil
 	clearActiveCallState()
+	// Over, however it ended, so there is nothing to go back to after a relaunch.
+	if let uid = Auth.auth().currentUser?.uid {
+	  LessonLeftForSettingsStore.clear(teacherUid: uid)
+	}
 	// A lesson just finished — refresh earnings and the Lessons-tab badge count.
 	refreshEarnings()
   }
@@ -1194,10 +1210,77 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	activePricePerMinuteCents = 50
 	activeConversationType = "text"
 	activeFinishesSetupInSettings = false
+	activeReturnsFromSettings = false
 	activeAcceptedAt = 0
 	activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   }
   
+  // MARK: - Lesson left for Settings
+
+  func rememberLessonLeftForSettings() {
+	guard let questionId = activeQuestionId, let uid = Auth.auth().currentUser?.uid else { return }
+	LessonLeftForSettingsStore.save(LessonLeftForSettings(
+	  questionId: questionId,
+	  teacherUid: uid,
+	  conversationType: activeConversationType,
+	  studentUid: activeCallStudentUid ?? "",
+	  studentName: activeStudentName,
+	  studentImageURL: activeStudentImageURL,
+	  questionText: activeQuestionText,
+	  questionPhotoUrls: activeQuestionPhotoUrls,
+	  pricePerMinuteCents: activePricePerMinuteCents,
+	  currencyCode: activeCurrencyCode,
+	  acceptedAt: activeAcceptedAt,
+	  leftAt: Date().timeIntervalSince1970
+	))
+	logger.info("[VM] lesson left for Settings written down qid=\(questionId)")
+  }
+
+  /// Takes the teacher back into a lesson they left for Settings before it
+  /// started, when iOS closed the app while they were there. The student is
+  /// still on the connecting screen, told the teacher will join shortly, so
+  /// the lesson opens on its own connecting screen, where it was left.
+  ///
+  /// Only a lesson the server still has as accepted — taken, and neither
+  /// started nor ended — is gone back to. One it has as anything else is
+  /// dropped; one it could not be asked about is kept for the next launch.
+  private func resumeLessonLeftForSettings(uid: String) async {
+	guard let lesson = LessonLeftForSettingsStore.lesson(teacherUid: uid) else { return }
+	let questionId = lesson.questionId
+	let status: QuestionStatusResult
+	do {
+	  status = try await FunctionsService.shared.getQuestionStatus(questionId: questionId)
+	} catch {
+	  // Kept for the next launch, while it is still recent enough to matter.
+	  logger.error("[VM] could not check the lesson left for Settings qid=\(questionId): \(error.localizedDescription)")
+	  return
+	}
+	let hasMedia = lesson.conversationType == "audio" || lesson.conversationType == "video"
+	let hasMediaCredentials = status.liveKitRoom?.isEmpty == false && status.liveKitToken?.isEmpty == false
+	guard status.status == "accepted", !hasMedia || hasMediaCredentials else {
+	  LessonLeftForSettingsStore.clear(teacherUid: uid)
+	  logger.info("[VM] lesson left for Settings is not waiting any more qid=\(questionId) status=\(status.status)")
+	  return
+	}
+	// A question taken since the launch keeps the screen.
+	guard activeQuestionId == nil, acceptingQuestionId == nil else { return }
+	activeQuestionText = lesson.questionText
+	activeQuestionPhotoUrls = lesson.questionPhotoUrls
+	activeStudentName = lesson.studentName
+	activeStudentImageURL = lesson.studentImageURL
+	activePricePerMinuteCents = lesson.pricePerMinuteCents
+	activeConversationType = lesson.conversationType
+	activeCurrencyCode = lesson.currencyCode
+	activeAcceptedAt = lesson.acceptedAt
+	activeCallStudentUid = lesson.studentUid.isEmpty ? nil : lesson.studentUid
+	activeLessonId = questionId
+	activeCallRoom = status.liveKitRoom
+	activeCallToken = status.liveKitToken
+	activeReturnsFromSettings = true
+	activeQuestionId = questionId
+	logger.info("[VM] back in the lesson left for Settings qid=\(questionId)")
+  }
+
   // MARK: - Demo Simulation
 
   /// Kicks off a simulated student question and returns immediately. The work
@@ -1530,6 +1613,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeStudentImageURL: String = ""
   var activeConversationType: String = "text"
   var activeFinishesSetupInSettings = false
+  var activeReturnsFromSettings = false
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
   var studentCancelledBeforeStart = false
@@ -1637,6 +1721,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   func enforceNotificationRequirement() {}
   func acceptInvite(questionId: String) {}
   func finishSetupInSettings(questionId: String?) {}
+  func rememberLessonLeftForSettings() {}
   func declineInvite(questionId: String) { inviteIDs = inviteIDs.filter { $0 != questionId } }
   func cancelAcceptingInvite() {}
   func endCall() { activeQuestionId = nil }
