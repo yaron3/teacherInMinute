@@ -69,6 +69,9 @@ extension ServerErrorDetails {
   /// `scope` names the allowance and `retryAfterSeconds` says how long.
   static let rateLimited = "rate_limited"
 
+  /// `acceptInvite` refused because the student cancelled the question first.
+  static let questionCancelled = "question_cancelled"
+
   /// The value `scope` carries when it is the hourly allowance.
   static let hourScope = "hour"
 }
@@ -102,6 +105,13 @@ struct AcceptInviteResult {
   let liveKitToken: String?
   let studentId: String?
   let questionId: String?
+}
+
+/// What `startLesson` answered. `started` stays false until both participants
+/// have finished connecting; `lessonId` is empty until then.
+struct StartLessonResult {
+  let lessonId: String
+  let started: Bool
 }
 
 struct CreateQuestionResult {
@@ -706,10 +716,18 @@ final class FunctionsService {
     _ = try await call(function: "declineInvite", data: ["questionId": questionId])
   }
 
-  func startLesson(questionId: String) async throws -> String {
-    let result = try await call(function: "startLesson", data: ["questionId": questionId])
-    guard let questionId = result["questionId"] as? String else { throw FunctionsError.decodingError() }
-    return questionId
+  /// Tells the backend this participant is here: `ready: false` as its chat
+  /// connects, `ready: true` once it has finished connecting. The lesson — and
+  /// its billing — starts once both participants are ready.
+  func startLesson(questionId: String, ready: Bool) async throws -> StartLessonResult {
+    let result = try await call(function: "startLesson", data: ["questionId": questionId, "ready": ready])
+    let lessonId = result["lessonId"] as? String ?? ""
+    // A backend from before `ready` starts the lesson on the first call and
+    // answers with its id alone.
+    let started = (result["started"] as? Bool)
+      ?? (result["started"] as? NSNumber)?.boolValue
+      ?? !lessonId.isEmpty
+    return StartLessonResult(lessonId: lessonId, started: started)
   }
 
   func endLesson(questionId: String) async throws {

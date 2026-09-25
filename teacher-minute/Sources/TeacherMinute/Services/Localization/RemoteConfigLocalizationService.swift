@@ -356,6 +356,30 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Student home grid — a teacher in a session. New key (`busy`), not in
         // the published config until the template is republished.
         "Busy": "בשיעור",
+        // Telling one side about the other while the lesson connects. New keys,
+        // not in the published config until the template is republished.
+        "Waiting for the student": "בהמתנה לתלמיד/ה",
+        "Waiting for your teacher": "בהמתנה למורה",
+        "The student was asked to allow access to their microphone. Do you want to wait until they approve?":
+          "התלמיד/ה התבקש/ה לאשר גישה למיקרופון. רוצה להמתין עד לאישור?",
+        "The student was asked to allow access to their camera. Do you want to wait until they approve?":
+          "התלמיד/ה התבקש/ה לאשר גישה למצלמה. רוצה להמתין עד לאישור?",
+        "Your teacher was asked to allow access to their microphone. Do you want to wait until they approve?":
+          "המורה התבקש/ה לאשר גישה למיקרופון. רוצה להמתין עד לאישור?",
+        "Your teacher was asked to allow access to their camera. Do you want to wait until they approve?":
+          "המורה התבקש/ה לאשר גישה למצלמה. רוצה להמתין עד לאישור?",
+        "The student needs to finish setting up and will join shortly. Do you want to wait?":
+          "התלמיד/ה צריך/ה לסיים את ההגדרות ויצטרף/תצטרף בקרוב. רוצה להמתין?",
+        "Your teacher needs to finish setting up and will join shortly. Do you want to wait?":
+          "המורה צריך/ה לסיים את ההגדרות ויצטרף/תצטרף בקרוב. רוצה להמתין?",
+        "The student cancelled the session.": "התלמיד/ה ביטל/ה את השיעור.",
+        "Your teacher cancelled the session.": "המורה ביטל/ה את השיעור.",
+        "You can take the next question.": "אפשר לקבל את השאלה הבאה.",
+        "You can ask your question again.": "אפשר לשאול את השאלה שוב.",
+        // Session header until both sides have connected. New key
+        // (`billing_starts_once`), not in the published config until the
+        // template is republished.
+        "Billing starts once you're both connected.": "החיוב מתחיל כששניכם מחוברים.",
         // Ask a Teacher sheet — the heading stayed English above its Hebrew
         // description.
         "Attach a photo (optional)": "צירוף תמונה (לא חובה)",
@@ -716,6 +740,26 @@ enum LocalizationKey {
         "Your teacher switched the session to video.": "session_type_switched_teacher_video",
         "The student switched the session to audio.": "session_type_switched_student_audio",
         "The student switched the session to video.": "session_type_switched_student_video",
+
+        // Telling one side about the other while the lesson connects. The four
+        // permission questions differ only in who and which device, the two
+        // about finishing setup in Settings only in who, and "Waiting for the
+        // student" would share `waiting_for_the` with "Waiting for the other
+        // side".
+        "Waiting for the student": "connection_setup_waiting_for_student",
+        "Waiting for your teacher": "connection_setup_waiting_for_teacher",
+        "The student was asked to allow access to their microphone. Do you want to wait until they approve?":
+          "connection_setup_student_microphone_permission",
+        "The student was asked to allow access to their camera. Do you want to wait until they approve?":
+          "connection_setup_student_camera_permission",
+        "Your teacher was asked to allow access to their microphone. Do you want to wait until they approve?":
+          "connection_setup_teacher_microphone_permission",
+        "Your teacher was asked to allow access to their camera. Do you want to wait until they approve?":
+          "connection_setup_teacher_camera_permission",
+        "The student needs to finish setting up and will join shortly. Do you want to wait?":
+          "connection_setup_student_finishing_setup",
+        "Your teacher needs to finish setting up and will join shortly. Do you want to wait?":
+          "connection_setup_teacher_finishing_setup",
         "This email address has already received its welcome reward.": "email_reward_already_claimed",
         "I've verified": "email_reward_i_verified",
 

@@ -74,12 +74,24 @@ struct ChatSessionDetails: Equatable {
   /// `ConversationType` raw values. Empty when the node has not said. Either
   /// side may change it while the lesson runs, and the other follows.
   var conversationType: String = ""
+  /// When the lesson started — both sides had finished connecting — in epoch
+  /// milliseconds, as published by `startLesson`. Zero until then: nothing is
+  /// counted, or billed, before it.
+  var startedAt: Double = 0
 }
 
 /// The room and token one participant joins the lesson's media with.
 struct MediaCredentials: Equatable {
   let room: String
   let token: String
+}
+
+/// One reading of the lesson's `connectionSetup` entries — see
+/// `ConnectionSetupSignal` — and whether the question is still live.
+struct ConnectionSetupReading: Equatable {
+  let isLive: Bool
+  /// Each side's signal, keyed by role.
+  let signals: [String: String]
 }
 
 /// What this side should do about the lesson's shared medium.
@@ -114,12 +126,16 @@ final class ChatSessionService {
   private let boardViewportsRef: FirebaseDatabase.DatabaseReference
   private let chatPausedRef: FirebaseDatabase.DatabaseReference
   private let mediaPendingRef: FirebaseDatabase.DatabaseReference
+  private let connectionSetupRef: FirebaseDatabase.DatabaseReference
+  private let statusRef: FirebaseDatabase.DatabaseReference
   private var sessionHandle: DatabaseHandle?
   private var messagesHandle: DatabaseHandle?
   private var boardHandle: DatabaseHandle?
   private var boardViewportsHandle: DatabaseHandle?
   private var chatPausedHandle: DatabaseHandle?
   private var mediaPendingHandle: DatabaseHandle?
+  private var connectionSetupHandle: DatabaseHandle?
+  private var statusHandle: DatabaseHandle?
 #endif
 
   init(questionId: String, currentUserUid: String? = nil) {
@@ -133,6 +149,8 @@ final class ChatSessionService {
     self.boardViewportsRef = questionRef.child("board/viewports")
     self.chatPausedRef = questionRef.child("chatPaused")
     self.mediaPendingRef = questionRef.child("mediaPending")
+    self.connectionSetupRef = questionRef.child("connectionSetup")
+    self.statusRef = questionRef.child("status")
 #endif
   }
 
@@ -295,6 +313,48 @@ final class ChatSessionService {
         }
       }
       onUpdate(states)
+    }
+#endif
+  }
+
+  /// Follows both sides' `connectionSetup` entries, and the question's status:
+  /// `onEnded` fires once the question is gone or has reached an end state.
+  /// Separate from the lesson's own listeners, which only start once this side
+  /// has connected, and left running when those restart.
+  func startConnectionSetupListening(
+    onUpdate: @escaping ([String: String]) -> Void,
+    onEnded: @escaping () -> Void
+  ) {
+#if !os(Android)
+    stopConnectionSetupListening()
+    connectionSetupHandle = connectionSetupRef.observe(.value) { snapshot in
+      var signals: [String: String] = [:]
+      for child in snapshot.children {
+        guard let snap = child as? DataSnapshot,
+              let signal = snap.value as? String else { continue }
+        signals[snap.key] = signal
+      }
+      onUpdate(signals)
+    }
+    // Only the status, not the whole question: that would hand over every
+    // message and stroke of the lesson on each change.
+    statusHandle = statusRef.observe(.value) { snapshot in
+      if !snapshot.exists() || Self.isTerminalStatus(snapshot.value) {
+        onEnded()
+      }
+    }
+#endif
+  }
+
+  func stopConnectionSetupListening() {
+#if !os(Android)
+    if let connectionSetupHandle {
+      connectionSetupRef.removeObserver(withHandle: connectionSetupHandle)
+      self.connectionSetupHandle = nil
+    }
+    if let statusHandle {
+      statusRef.removeObserver(withHandle: statusHandle)
+      self.statusHandle = nil
     }
 #endif
   }
@@ -525,6 +585,36 @@ final class ChatSessionService {
 #endif
   }
 
+  /// This side's `connectionSetup` entry, which the other side reads while the
+  /// lesson connects. Nil removes it.
+  func setConnectionSetupSignal(_ signal: ConnectionSetupSignal?, role: String) async throws {
+    let trimmedRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let key = trimmedRole.isEmpty ? "participant" : trimmedRole
+
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.setConnectionSetupSignal(
+        questionId: self.questionId,
+        role: key,
+        signal: signal?.rawValue ?? ""
+      )
+    }.value
+#else
+    let ref = connectionSetupRef.child(key)
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      let completion: (Error?, FirebaseDatabase.DatabaseReference) -> Void = { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+      if let signal {
+        ref.setValue(signal.rawValue, withCompletionBlock: completion)
+      } else {
+        ref.removeValue(completionBlock: completion)
+      }
+    }
+#endif
+  }
+
   /// Switches the lesson's medium for both participants.
   func setConversationType(_ conversationType: String) async throws {
 #if os(Android)
@@ -581,6 +671,29 @@ final class ChatSessionService {
       }
     }
     return states
+  }
+
+  /// One reading of what the iOS setup listeners follow as it changes.
+  func fetchConnectionSetup() async throws -> ConnectionSetupReading {
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchConnectionSetup(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let row = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      // Unreadable is not the same as gone: nothing is inferred from it.
+      return ConnectionSetupReading(isLive: true, signals: [:])
+    }
+    var signals: [String: String] = [:]
+    for (key, value) in row["signals"] as? [String: Any] ?? [:] {
+      if let signal = value as? String {
+        signals[key] = signal
+      }
+    }
+    let status = row["status"] as? String ?? ""
+    return ConnectionSetupReading(
+      isLive: !status.isEmpty && !Self.isTerminalStatus(status),
+      signals: signals
+    )
   }
 
   func fetchMessages() async throws -> [ChatMessage] {
@@ -742,7 +855,8 @@ final class ChatSessionService {
       teacherSharePercent: doubleValue(dict["teacherSharePercent"]) ?? doubleValue(dict["teacherShare"]) ?? 75,
       currencyCode: currencyCode(from: dict),
       minutesDeadlineAt: normalizedMilliseconds(doubleValue(dict["minutesDeadlineAt"]) ?? 0),
-      conversationType: firstString(in: dict, keys: ["conversationType"])
+      conversationType: firstString(in: dict, keys: ["conversationType"]),
+      startedAt: normalizedMilliseconds(doubleValue(dict["startedAt"]) ?? 0)
     )
   }
 
@@ -815,6 +929,12 @@ protocol ChatSessionViewModeling: AnyObject {
   /// ready. Unlike `isConnecting`, which clears once chat alone is up.
   var isInSetup: Bool { get }
   func finishSetup()
+  /// This side has finished connecting. The backend starts the lesson once the
+  /// other side has too.
+  func reportConnected()
+  /// Both sides have finished connecting, and the lesson — and its billing —
+  /// has started.
+  var hasLessonStarted: Bool { get }
 
   /// New activity from the other side on a tab this side is not looking at.
   var hasUnreadChat: Bool { get }
@@ -845,6 +965,42 @@ protocol ChatSessionViewModeling: AnyObject {
   func setSelfMediaPending(_ pending: Bool)
   func peerMediaPending() -> Bool
   func endLesson() async
+
+  // MARK: Connecting
+  //
+  // What each side tells the other while the lesson connects — a permission
+  // prompt it is waiting on, or that it left. See `ConnectionSetupSignal`.
+
+  /// What to put to this side about the other one. Nil when there is nothing.
+  var peerSetupPrompt: PeerSetupPrompt? { get }
+  /// The permission the other side is being asked for, while they still are.
+  var peerAwaitedPermission: CapturePermissionKind? { get }
+  /// The other side is in Settings finishing its setup.
+  var isPeerFinishingSetup: Bool { get }
+  /// This side took the lesson on its way to Settings, to turn on a permission
+  /// it had refused. Its setup sends it there, and the other side is told it
+  /// is finishing setup rather than being asked for a permission.
+  var finishesSetupInSettings: Bool { get }
+  /// This side is back in a lesson it left for Settings before it started:
+  /// iOS closed the app there, and reopening it came straight back here — see
+  /// `LessonLeftForSettings`. The other side is still told this one is
+  /// finishing setup, and the setup does not send it to Settings again.
+  var returnsFromSettings: Bool { get }
+  var onPeerSetupUpdated: (() -> Void)? { get set }
+  /// Starts following the other side. Called as the lesson screen appears,
+  /// before this side has connected anything.
+  func startWatchingPeerSetup()
+  /// Tells the other side what this one is waiting on, or that it no longer is.
+  func setSelfAwaitingPermission(_ kind: CapturePermissionKind?)
+  /// Tells the other side this one is going to Settings to finish its setup,
+  /// and returns once that has landed, before the app is left.
+  func announceFinishingSetup() async
+  /// This side keeps waiting while the other side answers a permission prompt.
+  func waitForPeerPermission()
+  /// Leaves a lesson that has not started: tells the other side, then ends it.
+  func cancelSetup()
+  /// The user has read that the other side left before the lesson started.
+  func acknowledgePeerCancelled()
 
   /// What the student's remaining credit means at `date`. Read from the
   /// deadline the backend publishes, so both apps reach the same answer at the
@@ -1258,6 +1414,70 @@ extension ChatSessionViewModeling {
       return LocalizationSupport.localized("The student switched the session to audio.")
     }
   }
+
+  // MARK: Connecting — the other side
+
+  func peerSetupTitle(for prompt: PeerSetupPrompt) -> String {
+    switch prompt {
+    case .awaitingPermission, .finishingSetup: return waitingForPeerText
+    case .cancelled: return peerCancelledTitle
+    }
+  }
+
+  func peerSetupMessage(for prompt: PeerSetupPrompt) -> String {
+    switch prompt {
+    case .awaitingPermission(let kind): return peerPermissionMessage(for: kind)
+    case .finishingSetup: return peerFinishingSetupMessage
+    case .cancelled: return peerCancelledMessage
+    }
+  }
+
+  var peerFinishingSetupMessage: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    return isStudentRole
+      ? LocalizationSupport.localized("Your teacher needs to finish setting up and will join shortly. Do you want to wait?")
+      : LocalizationSupport.localized("The student needs to finish setting up and will join shortly. Do you want to wait?")
+  }
+
+  /// Heads the permission question, and stays on screen as a reminder once
+  /// this side chose to wait.
+  var waitingForPeerText: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    return isStudentRole
+      ? LocalizationSupport.localized("Waiting for your teacher")
+      : LocalizationSupport.localized("Waiting for the student")
+  }
+
+  func peerPermissionMessage(for kind: CapturePermissionKind) -> String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    switch (isStudentRole, kind) {
+    case (true, .microphone):
+      return LocalizationSupport.localized("Your teacher was asked to allow access to their microphone. Do you want to wait until they approve?")
+    case (true, .camera):
+      return LocalizationSupport.localized("Your teacher was asked to allow access to their camera. Do you want to wait until they approve?")
+    case (false, .microphone):
+      return LocalizationSupport.localized("The student was asked to allow access to their microphone. Do you want to wait until they approve?")
+    case (false, .camera):
+      return LocalizationSupport.localized("The student was asked to allow access to their camera. Do you want to wait until they approve?")
+    }
+  }
+
+  var peerCancelledTitle: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    return isStudentRole
+      ? LocalizationSupport.localized("Your teacher cancelled the session.")
+      : LocalizationSupport.localized("The student cancelled the session.")
+  }
+
+  var peerCancelledMessage: String {
+    let isStudentRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "student"
+    return isStudentRole
+      ? LocalizationSupport.localized("You can ask your question again.")
+      : LocalizationSupport.localized("You can take the next question.")
+  }
+
+  var waitForPeerLabel: String { LocalizationSupport.localized("Wait") }
+  var cancelSessionLabel: String { LocalizationSupport.localized("Cancel Session") }
 }
 
 @Observable
@@ -1320,7 +1540,13 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     }
     return LocalizationSupport.localized("Total so far")
   }
-  let sessionNoticeText = LocalizationSupport.localized("Session started - Billing active")
+  /// Billing runs from when both sides had finished connecting, so until then
+  /// the notice says what it is waiting for.
+  var sessionNoticeText: String {
+    (details?.startedAt ?? 0) > 0
+      ? LocalizationSupport.localized("Session started - Billing active")
+      : LocalizationSupport.localized("Billing starts once you're both connected.")
+  }
   var onChatPausedUpdated: (([String: Bool]) -> Void)?
   var onMediaPendingUpdated: (([String: Bool]) -> Void)?
   var onConnectingUpdated: ((Bool) -> Void)?
@@ -1330,10 +1556,39 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     boardStrokes.map { "\($0.id):\($0.points.count)" }.joined(separator: "|")
   }
 
+  /// What the other side has said about its setup — see `PeerSetupTracker`.
+  private(set) var peerSetup = PeerSetupTracker()
+  var onPeerSetupUpdated: (() -> Void)?
+  var peerSetupPrompt: PeerSetupPrompt? { peerSetup.prompt }
+  var peerAwaitedPermission: CapturePermissionKind? { peerSetup.peerAwaitedPermission }
+  var isPeerFinishingSetup: Bool { peerSetup.isPeerFinishingSetup }
+  /// Set by the screen that opens the lesson — see the protocol.
+  var finishesSetupInSettings = false
+  /// Set as the lesson opens — see the protocol.
+  let returnsFromSettings: Bool
+  /// Told each time this side says it is finishing its setup in Settings,
+  /// which it does on its way there. The teacher's dashboard writes the lesson
+  /// down then, in case iOS closes the app while they are there.
+  var onFinishingSetupInSettings: (@MainActor @Sendable () -> Void)?
+
   private let service: ChatSessionService
   private var pollingTask: Task<Void, Never>?
+  private var isWatchingPeerSetup = false
+  private var peerSetupTask: Task<Void, Never>?
+  /// This side's own `connectionSetup` entry as last written, and the write
+  /// in flight. Writes are chained so they land in the order they were made.
+  private var sentSetupSignal: ConnectionSetupSignal?
+  private var setupSignalWrite: Task<Void, Never>?
+  /// Set once this side ends or leaves the lesson itself, so the question going
+  /// away afterwards is not taken for the other side leaving.
+  private var isLeaving = false
   private var hasReportedLessonEnd = false
-  private var hasReportedLessonStart = false
+  private var hasReportedLessonJoin = false
+  private var hasReportedLessonReady = false
+  /// This side's ready report started the lesson, or found it running.
+  private var isLessonStartConfirmed = false
+  /// Sends of the ready report before one gets through — see `reportLessonReady`.
+  private static let readyReportAttempts = 5
   private var didObserveActiveSession = false
   private var lastSentChatPaused: Bool?
   private var lastSentMediaPending: Bool?
@@ -1346,14 +1601,22 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     role: String,
     initialDetails: ChatSessionDetails? = nil,
     liveKitRoom: String = "",
-    liveKitToken: String = ""
+    liveKitToken: String = "",
+    returnsFromSettings: Bool = false
   ) {
     self.questionId = questionId
     self.role = role
     self.liveKitRoom = liveKitRoom.trimmingCharacters(in: .whitespacesAndNewlines)
     self.liveKitToken = liveKitToken.trimmingCharacters(in: .whitespacesAndNewlines)
     self.details = initialDetails
+    self.returnsFromSettings = returnsFromSettings
     self.service = ChatSessionService(questionId: questionId)
+    // The launch that left for Settings left this side's entry saying so. It
+    // is taken as written, so the setup clears it like any other once it gets
+    // past it — the other side would otherwise go on reading it.
+    if returnsFromSettings {
+      sentSetupSignal = .finishingSetup
+    }
   }
 
   func start() {
@@ -1374,34 +1637,68 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       onConnectingUpdated?(false)
       logger.info("[ChatSession] connected questionId=\(self.questionId) role=\(self.role)")
       beginListening()
-      await reportLessonStarted()
+      await reportLessonJoined()
     }
   }
 
-  /// Tells the backend this participant is in the session.
+  /// Tells the backend this participant turned up, as its chat connects.
   ///
   /// Nothing used to call `startLesson`, which left the lesson document
   /// uncreated, the 30-minute hard cap unarmed — it is scheduled by that call —
   /// and the billing clock running from the moment the teacher accepted rather
-  /// than from when the two of them were actually together. It is also how the
-  /// backend learns the student turned up at all: a lesson they never joined is
-  /// written off after a grace period and charged to nobody.
+  /// than from when the two of them were actually together. This first call is
+  /// how the backend learns the student turned up at all: a lesson they never
+  /// joined is written off after a grace period and charged to nobody. It does
+  /// not start the lesson; `reportLessonReady` does, once both sides send it.
   ///
-  /// Both sides call it as they connect, and the backend treats the second
-  /// arrival as ordinary. Best-effort: failing here must not throw anyone out
-  /// of a session they are already connected to.
-  private func reportLessonStarted() async {
-    guard !hasReportedLessonStart else { return }
+  /// Best-effort: failing here must not throw anyone out of a session they are
+  /// already connected to.
+  private func reportLessonJoined() async {
+    guard !hasReportedLessonJoin else { return }
     guard let questionId = nonEmpty(self.questionId) else { return }
-    hasReportedLessonStart = true
+    hasReportedLessonJoin = true
 
     do {
-      let lessonId = try await FunctionsService.shared.startLesson(questionId: questionId)
-      logger.info("[ChatSession] startLesson reported questionId=\(questionId) lessonId=\(lessonId)")
+      let result = try await FunctionsService.shared.startLesson(questionId: questionId, ready: false)
+      logger.info("[ChatSession] joined questionId=\(questionId) started=\(result.started)")
     } catch {
       logger.error(
-        "[ChatSession] startLesson failed questionId=\(questionId): \(error.localizedDescription)"
+        "[ChatSession] startLesson join failed questionId=\(questionId): \(error.localizedDescription)"
       )
+    }
+  }
+
+  /// Tells the backend this side has finished connecting. The lesson — its
+  /// billing, the hard cap, the student's minutes — starts once both sides
+  /// have, so nobody pays for the connecting phase and a session cancelled
+  /// during it costs nothing. A report lost on the way would leave a lesson
+  /// that really happened unbilled, so it is sent again; one the backend
+  /// answered, even with a refusal, is not.
+  private func reportLessonReady() async {
+    guard !hasReportedLessonReady, let questionId = nonEmpty(self.questionId) else { return }
+    hasReportedLessonReady = true
+
+    for attempt in 1...Self.readyReportAttempts {
+      guard !isLeaving else { return }
+      do {
+        let result = try await FunctionsService.shared.startLesson(questionId: questionId, ready: true)
+        logger.info("[ChatSession] ready reported questionId=\(questionId) started=\(result.started)")
+        // The second side to finish hears it started the lesson straight
+        // away, rather than waiting for the live node to say so.
+        if result.started {
+          isLessonStartConfirmed = true
+        }
+        return
+      } catch FunctionsError.serverError(let message, let status, _) {
+        logger.error("[ChatSession] ready refused questionId=\(questionId) status=\(status): \(message)")
+        return
+      } catch {
+        logger.error(
+          "[ChatSession] ready report failed attempt=\(attempt) questionId=\(questionId): \(error.localizedDescription)"
+        )
+        guard attempt < Self.readyReportAttempts else { return }
+        try? await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
+      }
     }
   }
 
@@ -1546,11 +1843,21 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func finishSetup() {
     isInSetup = false
+    Task { await reportLessonReady() }
+  }
+
+  func reportConnected() {
+    Task { await reportLessonReady() }
+  }
+
+  var hasLessonStarted: Bool {
+    isLessonStartConfirmed || (details?.startedAt ?? 0) > 0
   }
 
   func stop() {
     pollingTask?.cancel()
     pollingTask = nil
+    stopWatchingPeerSetup()
     isConnecting = true
     onConnectingUpdated?(true)
     service.stopListening()
@@ -1760,7 +2067,151 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     return trimmed.isEmpty ? "participant" : trimmed
   }
 
+  // MARK: Connecting
+
+  /// How often Android reads the other side's setup. iOS is told as it changes.
+  private static let peerSetupPollNanos: UInt64 = 1_000_000_000
+  /// How long this side leaves the other one to end a lesson it cancelled
+  /// before ending it itself — see `acknowledgePeerCancelled`.
+  private static let peerCancelSettleNanos: UInt64 = 10_000_000_000
+
+  func startWatchingPeerSetup() {
+    guard !isWatchingPeerSetup, !isLeaving else { return }
+    isWatchingPeerSetup = true
+    logger.info("[ChatSession] watching the other side's setup questionId=\(self.questionId) role=\(self.role)")
+#if os(Android)
+    peerSetupTask?.cancel()
+    peerSetupTask = Task {
+      while !Task.isCancelled {
+        if let reading = try? await service.fetchConnectionSetup() {
+          guard !Task.isCancelled else { return }
+          receivePeerSetupSignals(reading.signals)
+          if !reading.isLive {
+            receiveQuestionEnded()
+            return
+          }
+        }
+        try? await Task.sleep(nanoseconds: Self.peerSetupPollNanos)
+      }
+    }
+#else
+    service.startConnectionSetupListening(
+      onUpdate: { [weak self] signals in
+        self?.receivePeerSetupSignals(signals)
+      },
+      onEnded: { [weak self] in
+        self?.receiveQuestionEnded()
+      }
+    )
+#endif
+  }
+
+  private func stopWatchingPeerSetup() {
+    isWatchingPeerSetup = false
+    peerSetupTask?.cancel()
+    peerSetupTask = nil
+    service.stopConnectionSetupListening()
+  }
+
+  private func receivePeerSetupSignals(_ signals: [String: String]) {
+    guard isWatchingPeerSetup else { return }
+    let peerKey = roleKey(role) == "teacher" ? "student" : "teacher"
+    var updated = peerSetup
+    updated.receive(signals[peerKey].flatMap(ConnectionSetupSignal.init(rawValue:)))
+    applyPeerSetup(updated)
+  }
+
+  /// The question is gone, or over. Whether that means the other side left
+  /// before the lesson started is `PeerSetupTracker`'s call.
+  private func receiveQuestionEnded() {
+    guard isWatchingPeerSetup, !isLeaving else { return }
+    var updated = peerSetup
+    updated.questionEnded(whileConnecting: isInSetup)
+    applyPeerSetup(updated)
+  }
+
+  private func applyPeerSetup(_ updated: PeerSetupTracker) {
+    guard updated != peerSetup else { return }
+    if updated.peerCancelled, !peerSetup.peerCancelled {
+      logger.info("[ChatSession] the other side left before the lesson started questionId=\(self.questionId) role=\(self.role)")
+    }
+    peerSetup = updated
+    onPeerSetupUpdated?()
+  }
+
+  func setSelfAwaitingPermission(_ kind: CapturePermissionKind?) {
+    guard !isLeaving else { return }
+    sendSetupSignal(kind.map(ConnectionSetupSignal.awaiting))
+  }
+
+  func announceFinishingSetup() async {
+    guard !isLeaving else { return }
+    onFinishingSetupInSettings?()
+    await sendSetupSignal(.finishingSetup)?.value
+  }
+
+  func waitForPeerPermission() {
+    var updated = peerSetup
+    updated.waitForPeerPermission()
+    applyPeerSetup(updated)
+  }
+
+  func cancelSetup() {
+    guard !isLeaving else { return }
+    isLeaving = true
+    stopWatchingPeerSetup()
+    logger.info("[ChatSession] leaving before the lesson started questionId=\(self.questionId) role=\(self.role)")
+    let announcement = sendSetupSignal(.cancelled)
+    Task {
+      await LiveKitService.shared.disconnect()
+      // Landed, and read, before the lesson is ended: that removes the
+      // question, and the other side reads the signal there to know this was
+      // a cancel rather than an ordinary end.
+      await announcement?.value
+      try? await Task.sleep(nanoseconds: ConnectionSetupSignal.cancelledAnnouncementNanos)
+      await endLesson()
+    }
+  }
+
+  func acknowledgePeerCancelled() {
+    guard !isLeaving else { return }
+    isLeaving = true
+    stopWatchingPeerSetup()
+    Task {
+      await LiveKitService.shared.disconnect()
+      // The other side ends the lesson as it leaves, and settling it from both
+      // sides at once could bill it twice. So this side only steps in when that
+      // end never arrived — the question is still there after a while.
+      try? await Task.sleep(nanoseconds: Self.peerCancelSettleNanos)
+      guard !hasReportedLessonEnd,
+            (try? await service.fetchSessionDetails()) != nil else { return }
+      logger.info("[ChatSession] the other side's end never arrived; ending the lesson questionId=\(self.questionId) role=\(self.role)")
+      await reportLessonEnded()
+    }
+  }
+
+  /// Writes this side's `connectionSetup` entry, after any write still in
+  /// flight: a prompt that opens and closes quickly must not end with the
+  /// "waiting" write landing last. Nil when there is nothing new to write.
+  @discardableResult
+  private func sendSetupSignal(_ signal: ConnectionSetupSignal?) -> Task<Void, Never>? {
+    guard signal != sentSetupSignal else { return nil }
+    sentSetupSignal = signal
+    let previous = setupSignalWrite
+    let write = Task {
+      await previous?.value
+      do {
+        try await service.setConnectionSetupSignal(signal, role: role)
+      } catch {
+        logger.error("[ChatSession] setConnectionSetupSignal failed signal=\(signal?.rawValue ?? "none"): \(error.localizedDescription)")
+      }
+    }
+    setupSignalWrite = write
+    return write
+  }
+
   func endLesson() async {
+    isLeaving = true
     setSelfChatPaused(false)
     setSelfMediaPending(false)
     await reportLessonEnded()
@@ -1821,6 +2272,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private func handleRemoteSessionEnded() async {
 	logger.info("[ChatSession] handleRemoteSessionEnded")
     guard didObserveActiveSession || details != nil else { return }
+    // Settled before anything is torn down: the screen reads it to tell the
+    // other side leaving before the lesson started from an ordinary end.
+    receiveQuestionEnded()
     await reportLessonEnded()
     await LiveKitService.shared.disconnect()
     stop()
@@ -1865,8 +2319,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     details?.teacherSharePercent ?? 75
   }
 
+  /// Counted from when the lesson started — both sides in — as it is billed.
+  /// Zero while either side is still connecting.
   func sessionDurationSeconds(at date: Date) -> Int {
-    let startMilliseconds = details?.acceptedAt ?? 0
+    let startMilliseconds = details?.startedAt ?? 0
     guard startMilliseconds > 0 else { return 0 }
     return max(0, Int(date.timeIntervalSince1970 - startMilliseconds / 1000.0))
   }
@@ -1913,7 +2369,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       minutesDeadlineAt: updated.minutesDeadlineAt > 0
         ? updated.minutesDeadlineAt
         : current.minutesDeadlineAt,
-      conversationType: nonEmpty(updated.conversationType) ?? current.conversationType
+      conversationType: nonEmpty(updated.conversationType) ?? current.conversationType,
+      // Once known, kept: a snapshot that omits it must not stop the count.
+      startedAt: updated.startedAt > 0 ? updated.startedAt : current.startedAt
     )
   }
 
@@ -1937,7 +2395,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       teacherSharePercent: current.teacherSharePercent,
       currencyCode: current.currencyCode,
       minutesDeadlineAt: current.minutesDeadlineAt,
-      conversationType: current.conversationType
+      conversationType: current.conversationType,
+      startedAt: current.startedAt
     )
     onSessionDetailsUpdated?()
   }
@@ -1990,7 +2449,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       teacherSharePercent: current.teacherSharePercent,
       currencyCode: current.currencyCode,
       minutesDeadlineAt: current.minutesDeadlineAt,
-      conversationType: current.conversationType
+      conversationType: current.conversationType,
+      startedAt: current.startedAt
     )
   }
 
@@ -2192,6 +2652,14 @@ private enum AndroidChatBridge {
     name: "fetchMediaPendingJson",
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
   )!
+  private static let setConnectionSetupSignalMethod = managerClass.getStaticMethodID(
+    name: "setConnectionSetupSignal",
+    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
+  )!
+  private static let fetchConnectionSetupMethod = managerClass.getStaticMethodID(
+    name: "fetchConnectionSetupJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
   private static let markQuestionAcceptedMethod = managerClass.getStaticMethodID(
     name: "markQuestionAccepted",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
@@ -2361,6 +2829,31 @@ private enum AndroidChatBridge {
     try jniContext {
       try managerClass.callStatic(
         method: fetchMediaPendingMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
+  }
+
+  /// An empty `signal` removes this side's entry.
+  static func setConnectionSetupSignal(questionId: String, role: String, signal: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setConnectionSetupSignalMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat]),
+          signal.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func fetchConnectionSetup(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchConnectionSetupMethod,
         options: [.kotlincompat],
         args: [questionId.toJavaParameter(options: [.kotlincompat])]
       )

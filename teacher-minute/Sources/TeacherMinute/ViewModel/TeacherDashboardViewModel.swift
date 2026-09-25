@@ -46,6 +46,12 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var activeStudentName: String { get set }
   var activeStudentImageURL: String { get set }
   var activeConversationType: String { get set }
+  /// The running lesson was taken on the way to Settings, to turn on a
+  /// permission the teacher had refused.
+  var activeFinishesSetupInSettings: Bool { get }
+  /// The running lesson was left for Settings before it started, and reopened
+  /// after iOS closed the app there — see `LessonLeftForSettings`.
+  var activeReturnsFromSettings: Bool { get }
   var acceptingQuestionId: String? { get set }
   var errorMessage: String? { get set }
   /// A standing warning about the teacher's own reachability, shown as a header
@@ -56,6 +62,10 @@ protocol TeacherDashboardViewModeling: AnyObject {
   /// until something is fixed, and while it holds the teacher may look
   /// available without being reachable.
   var errorMessageGeneral: String? { get set }
+  /// The student cancelled while this teacher's accept was on its way. Raised
+  /// as a dialog: the question's card is gone by then, and with it the line
+  /// that shows why an accept failed.
+  var studentCancelledBeforeStart: Bool { get set }
   var isAcceptingCalls: Bool { get set }
   var isVerified: Bool { get set }
   var todayEarningsCents: Int { get set }
@@ -95,6 +105,13 @@ protocol TeacherDashboardViewModeling: AnyObject {
   func toggleOnline()
   func enforceNotificationRequirement()
   func acceptInvite(questionId: String)
+  /// Takes the question whose accept a refused permission stopped, on the way
+  /// to Settings to turn it on. Nil just opens Settings.
+  func finishSetupInSettings(questionId: String?)
+  /// The running lesson is leaving for Settings before it started. Written
+  /// down, so the next launch can take the teacher back into it if iOS closes
+  /// the app there.
+  func rememberLessonLeftForSettings()
   func declineInvite(questionId: String)
   func cancelAcceptingInvite()
   func endCall()
@@ -144,6 +161,15 @@ extension TeacherDashboardViewModeling {
   var notificationsRequiredMessage: String {
     LocalizationSupport.localized("Turn on notifications, Questions reach you by notification when the app is in the background.")
   }
+
+  // MARK: Student cancelled while accepting
+  //
+  // The same words the lesson screen uses when a student leaves while it is
+  // still connecting.
+
+  var studentCancelledTitle: String { LocalizationSupport.localized("The student cancelled the session.") }
+  var studentCancelledMessage: String { LocalizationSupport.localized("You can take the next question.") }
+  var okLabel: String { LocalizationSupport.localized("OK") }
 
   // MARK: Dashboard warning header
 
@@ -387,6 +413,10 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeStudentImageURL = ""
   var activePricePerMinuteCents = 50
   var activeConversationType = "text"
+  /// The lesson was taken on the way to Settings — see `finishSetupInSettings`.
+  var activeFinishesSetupInSettings = false
+  /// See `resumeLessonLeftForSettings`.
+  var activeReturnsFromSettings = false
   var activeAcceptedAt = 0.0
   var activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   var acceptingQuestionId: String? = nil
@@ -394,6 +424,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var permissionAlertMessage: String? = nil
   var permissionAlertQuestionId: String? = nil
   var errorMessageGeneral: String? = nil
+  var studentCancelledBeforeStart = false
   var isAcceptingCalls = false
   var isVerified = false
   var subjects: [String] = []
@@ -493,6 +524,9 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #endif
   private var authListenerHandle: Any?
   private var acceptingTask: Task<Void, Never>?
+  /// Questions whose accept the teacher backed out of while it was still on
+  /// its way. See `cancelAcceptingInvite`.
+  private var withdrawnQuestionIds: Set<String> = []
   private var demoSimulationTask: Task<Void, Never>?
   private var didLoadProfile = false
   private var didApplyLaunchPresence = false
@@ -517,6 +551,9 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		  guard let self, self.inviteService == nil else { return }
 #endif
 		  self.configurePresence(uid: uid)
+		  // Before the dashboard's own loading: a student may be waiting on the
+		  // connecting screen for this teacher to come back.
+		  await self.resumeLessonLeftForSettings(uid: uid)
 		  await self.loadProfile(uid: uid)
 		}
 	  } else {
@@ -941,6 +978,22 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   // MARK: - Invite Actions
   
   func acceptInvite(questionId: String) {
+	accept(questionId: questionId, finishesSetupInSettings: false)
+  }
+
+  /// "Open Settings" on the dialog that stopped an accept for a refused
+  /// permission. The teacher takes the question now, and the lesson's setup
+  /// sends them to Settings: the student is told the teacher is finishing
+  /// setup and will join shortly, instead of being left searching.
+  func finishSetupInSettings(questionId: String?) {
+	guard let questionId else {
+	  PermissionService.shared.openAppSettings()
+	  return
+	}
+	accept(questionId: questionId, finishesSetupInSettings: true)
+  }
+
+  private func accept(questionId: String, finishesSetupInSettings: Bool) {
 	guard acceptingQuestionId == nil, activeQuestionId == nil else { return }
 	errorMessage = nil
 	let conversationType = inviteConversationTypes[questionId] ?? "text"
@@ -949,8 +1002,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	acceptingTask = Task { [weak self] in
 	  guard let self else { return }
 	  
-	  if conversationType == "audio" || conversationType == "video" {
-		var micState = PermissionService.shared.captureStatus(for: .microphone)
+	  // A permission already refused stops the accept, and the teacher is asked
+	  // to turn it on in Settings; saying yes comes back here with
+	  // `finishesSetupInSettings`. One never asked for is left to the lesson's
+	  // setup screen: the student is connecting by then, and is told the
+	  // teacher is being asked instead of being left searching while the system
+	  // prompt is up.
+	  if !finishesSetupInSettings, conversationType == "audio" || conversationType == "video" {
+		let micState = PermissionService.shared.captureStatus(for: .microphone)
 		if micState == .denied {
 		  permissionAlertQuestionId = questionId
 		  permissionAlertMessage = conversationType == "video"
@@ -959,28 +1018,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		  logger.info("[VM] acceptInvite blocked — mic permission denied qid=\(questionId)")
 		  return
 		}
-		if micState == .notDetermined {
-		  micState = await PermissionService.shared.requestCapturePermission(for: .microphone)
-		  if !micState.isGranted {
-			logger.info("[VM] acceptInvite — mic permission refused by user qid=\(questionId)")
-			return
-		  }
-		}
 	  }
-	  if conversationType == "video" {
-		var cameraState = PermissionService.shared.captureStatus(for: .camera)
+	  if !finishesSetupInSettings, conversationType == "video" {
+		let cameraState = PermissionService.shared.captureStatus(for: .camera)
 		if cameraState == .denied {
 		  permissionAlertQuestionId = questionId
 		  permissionAlertMessage = LocalizationSupport.localized("The student is requesting a video call. Enable camera access to accept.")
 		  logger.info("[VM] acceptInvite blocked — camera permission denied qid=\(questionId)")
 		  return
-		}
-		if cameraState == .notDetermined {
-		  cameraState = await PermissionService.shared.requestCapturePermission(for: .camera)
-		  if !cameraState.isGranted {
-			logger.info("[VM] acceptInvite — camera permission refused by user qid=\(questionId)")
-			return
-		  }
 		}
 	  }
 	  
@@ -992,6 +1037,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  activeStudentName = inviteStudentNames[questionId]?.isEmpty == false ? inviteStudentNames[questionId] ?? "Student" : "Student"
 	  activePricePerMinuteCents = invitePricePerMinuteCents[questionId] ?? 50
 	  activeConversationType = conversationType
+	  activeFinishesSetupInSettings = finishesSetupInSettings
 	  activeAcceptedAt = Date().timeIntervalSince1970 * 1000.0
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.teacherInviteAccepted, parameters: [
 		"question_id": questionId,
@@ -1002,6 +1048,10 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  
 	  do {
 		let result = try await FunctionsService.shared.acceptInvite(questionId: questionId)
+		if withdrawnQuestionIds.remove(questionId) != nil {
+		  await withdrawAcceptedQuestion(questionId)
+		  return
+		}
 		try Task.checkCancellation()
 		try await ChatSessionService.markQuestionAccepted(
 		  questionId: questionId,
@@ -1040,9 +1090,20 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		clearActiveCallState()
 		logger.info("[VM] acceptInvite cancelled — questionId=\(questionId)")
 	  } catch {
+		if withdrawnQuestionIds.remove(questionId) != nil {
+		  // Refused after the teacher had already backed out: the outcome they
+		  // asked for, and nothing left on screen to update.
+		  logger.info("[VM] withdrawn accept was refused — questionId=\(questionId)")
+		  return
+		}
 		acceptingQuestionId = nil
 		isAcceptingCalls = false
 		clearActiveCallState()
+		if Self.isCancelledByStudent(error) {
+		  studentCancelledBeforeStart = true
+		  logger.info("[VM] acceptInvite — the student cancelled first questionId=\(questionId)")
+		  return
+		}
 		errorMessage = error.localizedDescription
 		logger.error("[VM] acceptInvite failed — \(error.localizedDescription)")
 		AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.acceptInvite")
@@ -1067,19 +1128,72 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   func cancelAcceptingInvite() {
 	let questionId = acceptingQuestionId
-	acceptingTask?.cancel()
+	// The call already sent is left to finish rather than cancelled: dropping it
+	// on the device does not stop the server, which has often accepted by then —
+	// and the student is connecting to a lesson nobody is coming to. Its answer
+	// says what is left to undo; see `withdrawAcceptedQuestion`.
 	acceptingTask = nil
 	acceptingQuestionId = nil
 	isAcceptingCalls = false
 	clearActiveCallState()
-	if let questionId {
-	  declineInvite(questionId: questionId)
+	guard let questionId else { return }
+	withdrawnQuestionIds.insert(questionId)
+	AnalyticsService.shared.logEvent(AnalyticsEvent.teacherInviteDeclined, parameters: ["question_id": questionId])
+	// Declined too, so an accept the server has not reached yet never lands.
+	// Refused when the accept got there first, which is expected, not an error
+	// to show.
+	Task {
+	  do {
+		try await FunctionsService.shared.declineInvite(questionId: questionId)
+		logger.info("[VM] declined a withdrawn accept — qid=\(questionId)")
+	  } catch {
+		logger.info("[VM] decline of a withdrawn accept refused — qid=\(questionId): \(error.localizedDescription)")
+	  }
 	}
+  }
+
+  /// The accept landed after the teacher backed out of it, so the student may
+  /// already be connecting. They are told the teacher left — as when a teacher
+  /// cancels from the lesson's own setup screen — and the lesson is ended, so
+  /// nobody is kept in it and the teacher is free for the next question.
+  private func withdrawAcceptedQuestion(_ questionId: String) async {
+	logger.info("[VM] acceptInvite landed after the teacher backed out — withdrawing qid=\(questionId)")
+	do {
+	  // Landed, and read, before ending the lesson removes the question.
+	  try await ChatSessionService(questionId: questionId)
+		.setConnectionSetupSignal(.cancelled, role: "teacher")
+	  try? await Task.sleep(nanoseconds: ConnectionSetupSignal.cancelledAnnouncementNanos)
+	} catch {
+	  logger.error("[VM] withdraw signal failed qid=\(questionId): \(error.localizedDescription)")
+	}
+	do {
+	  try await FunctionsService.shared.endLesson(questionId: questionId)
+	} catch {
+	  logger.error("[VM] withdraw endLesson failed qid=\(questionId): \(error.localizedDescription)")
+	  AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.withdrawAccept")
+	}
+  }
+
+  /// `acceptInvite` refuses a question its student has cancelled. Told apart
+  /// by the `question_cancelled` reason; the sentence is checked as well, for
+  /// a backend deployed before the reason was sent.
+  private static func isCancelledByStudent(_ error: Error) -> Bool {
+	guard case FunctionsError.serverError(let message, let status, let details) = error else {
+	  return false
+	}
+	if details?.reason == ServerErrorDetails.questionCancelled {
+	  return true
+	}
+	return status == "FAILED_PRECONDITION" && message.contains("cancelled by the student")
   }
   
   func endCall() {
 	activeQuestionId = nil
 	clearActiveCallState()
+	// Over, however it ended, so there is nothing to go back to after a relaunch.
+	if let uid = Auth.auth().currentUser?.uid {
+	  LessonLeftForSettingsStore.clear(teacherUid: uid)
+	}
 	// A lesson just finished — refresh earnings and the Lessons-tab badge count.
 	refreshEarnings()
   }
@@ -1095,10 +1209,78 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	activeStudentImageURL = ""
 	activePricePerMinuteCents = 50
 	activeConversationType = "text"
+	activeFinishesSetupInSettings = false
+	activeReturnsFromSettings = false
 	activeAcceptedAt = 0
 	activeCurrencyCode = LessonFormatting.defaultCurrencyCode
   }
   
+  // MARK: - Lesson left for Settings
+
+  func rememberLessonLeftForSettings() {
+	guard let questionId = activeQuestionId, let uid = Auth.auth().currentUser?.uid else { return }
+	LessonLeftForSettingsStore.save(LessonLeftForSettings(
+	  questionId: questionId,
+	  teacherUid: uid,
+	  conversationType: activeConversationType,
+	  studentUid: activeCallStudentUid ?? "",
+	  studentName: activeStudentName,
+	  studentImageURL: activeStudentImageURL,
+	  questionText: activeQuestionText,
+	  questionPhotoUrls: activeQuestionPhotoUrls,
+	  pricePerMinuteCents: activePricePerMinuteCents,
+	  currencyCode: activeCurrencyCode,
+	  acceptedAt: activeAcceptedAt,
+	  leftAt: Date().timeIntervalSince1970
+	))
+	logger.info("[VM] lesson left for Settings written down qid=\(questionId)")
+  }
+
+  /// Takes the teacher back into a lesson they left for Settings before it
+  /// started, when iOS closed the app while they were there. The student is
+  /// still on the connecting screen, told the teacher will join shortly, so
+  /// the lesson opens on its own connecting screen, where it was left.
+  ///
+  /// Only a lesson the server still has as accepted — taken, and neither
+  /// started nor ended — is gone back to. One it has as anything else is
+  /// dropped; one it could not be asked about is kept for the next launch.
+  private func resumeLessonLeftForSettings(uid: String) async {
+	guard let lesson = LessonLeftForSettingsStore.lesson(teacherUid: uid) else { return }
+	let questionId = lesson.questionId
+	let status: QuestionStatusResult
+	do {
+	  status = try await FunctionsService.shared.getQuestionStatus(questionId: questionId)
+	} catch {
+	  // Kept for the next launch, while it is still recent enough to matter.
+	  logger.error("[VM] could not check the lesson left for Settings qid=\(questionId): \(error.localizedDescription)")
+	  return
+	}
+	let hasMedia = lesson.conversationType == "audio" || lesson.conversationType == "video"
+	let hasMediaCredentials = status.liveKitRoom?.isEmpty == false && status.liveKitToken?.isEmpty == false
+	guard status.status == "accepted", !hasMedia || hasMediaCredentials else {
+	  LessonLeftForSettingsStore.clear(teacherUid: uid)
+	  logger.info("[VM] lesson left for Settings is not waiting any more qid=\(questionId) status=\(status.status)")
+	  return
+	}
+	// A question taken since the launch keeps the screen.
+	guard activeQuestionId == nil, acceptingQuestionId == nil else { return }
+	activeQuestionText = lesson.questionText
+	activeQuestionPhotoUrls = lesson.questionPhotoUrls
+	activeStudentName = lesson.studentName
+	activeStudentImageURL = lesson.studentImageURL
+	activePricePerMinuteCents = lesson.pricePerMinuteCents
+	activeConversationType = lesson.conversationType
+	activeCurrencyCode = lesson.currencyCode
+	activeAcceptedAt = lesson.acceptedAt
+	activeCallStudentUid = lesson.studentUid.isEmpty ? nil : lesson.studentUid
+	activeLessonId = questionId
+	activeCallRoom = status.liveKitRoom
+	activeCallToken = status.liveKitToken
+	activeReturnsFromSettings = true
+	activeQuestionId = questionId
+	logger.info("[VM] back in the lesson left for Settings qid=\(questionId)")
+  }
+
   // MARK: - Demo Simulation
 
   /// Kicks off a simulated student question and returns immediately. The work
@@ -1430,8 +1612,11 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var activeStudentName: String = "Student"
   var activeStudentImageURL: String = ""
   var activeConversationType: String = "text"
+  var activeFinishesSetupInSettings = false
+  var activeReturnsFromSettings = false
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
+  var studentCancelledBeforeStart = false
   var isAcceptingCalls: Bool = false
   var isVerified: Bool
   var todayEarningsCents: Int
@@ -1535,6 +1720,8 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// preview teacher stays online regardless of the host's notification state.
   func enforceNotificationRequirement() {}
   func acceptInvite(questionId: String) {}
+  func finishSetupInSettings(questionId: String?) {}
+  func rememberLessonLeftForSettings() {}
   func declineInvite(questionId: String) { inviteIDs = inviteIDs.filter { $0 != questionId } }
   func cancelAcceptingInvite() {}
   func endCall() { activeQuestionId = nil }

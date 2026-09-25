@@ -313,6 +313,60 @@ object AndroidChatManager {
         return rows.toString()
     }
 
+    /**
+     * What this participant tells the other side while the lesson connects:
+     * a permission it is waiting on ("microphone", "camera"), or that it left
+     * ("cancelled"). A blank signal removes the entry.
+     */
+    @JvmStatic
+    fun setConnectionSetupSignal(questionId: String, role: String, signal: String) {
+        val key = role.trim().lowercase().ifBlank { "participant" }
+        val ref = FirebaseDatabase.getInstance()
+            .getReference("questions")
+            .child(questionId)
+            .child("connectionSetup")
+            .child(key)
+        val write = if (signal.isBlank()) ref.removeValue() else ref.setValue(signal)
+        Tasks.await(write, TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    /**
+     * Both sides' `connectionSetup` entries and the question's live status, as
+     * `{"status": "in_progress", "signals": {"student": "microphone"}}`. A
+     * removed question reads with an empty status.
+     *
+     * The entries are read first: a participant who leaves writes theirs just
+     * before the question is removed, and read the other way round that write
+     * could be missed between the two reads.
+     */
+    @JvmStatic
+    fun fetchConnectionSetupJson(questionId: String): String {
+        val question = FirebaseDatabase.getInstance()
+            .getReference("questions")
+            .child(questionId)
+        val entries = Tasks.await(
+            question.child("connectionSetup").get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+        val status = Tasks.await(
+            question.child("status").get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).value as? String ?: ""
+
+        val signals = JSONObject()
+        for (child in entries.children) {
+            val key = child.key ?: continue
+            val value = child.value as? String ?: continue
+            signals.put(key, value)
+        }
+        return JSONObject()
+            .put("status", status)
+            .put("signals", signals)
+            .toString()
+    }
+
     @JvmStatic
     fun markQuestionAccepted(questionId: String, teacherId: String) {
         val values = mutableMapOf<String, Any>(
@@ -475,6 +529,9 @@ object AndroidChatManager {
                     ?: snapshot.child("startedAt").value.asDoubleOrNull()
                     ?: 0.0
             )
+            // When both sides had finished connecting: the session is counted
+            // from here, and absent until then.
+            .put("startedAt", snapshot.child("startedAt").value.asDoubleOrNull() ?: 0.0)
             .put(
                 "pricePerMinuteCents",
                 snapshot.child("pricePerMinuteCents").value.asIntOrNull()

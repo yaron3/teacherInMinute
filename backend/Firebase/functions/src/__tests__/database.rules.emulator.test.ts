@@ -181,6 +181,18 @@ describe.each(SHAPES)("database rules (%s)", (_name, people) => {
     }
   });
 
+  it("lets either side tell the other what holds up its setup, and clear it", async () => {
+    // A permission prompt it is waiting on, cleared once answered, then a
+    // cancel — the three things ChatSessionService.setConnectionSetupSignal
+    // writes.
+    for (const [uid, role] of [[TEACHER, "teacher"], [STUDENT, "student"]]) {
+      const entry = ref(db(uid), `questions/${QID}/connectionSetup/${role}`);
+      await assertSucceeds(set(entry, "microphone"));
+      await assertSucceeds(remove(entry));
+      await assertSucceeds(set(entry, "cancelled"));
+    }
+  });
+
   it("lets either side switch the conversation type", async () => {
     await assertSucceeds(
       set(ref(db(TEACHER), `questions/${QID}/conversationType`), "video")
@@ -214,6 +226,10 @@ describe.each(SHAPES)("database rules (%s)", (_name, people) => {
     await assertFails(set(ref(outsider, `questions/${QID}/status`), "accepted"));
     await assertFails(
       set(ref(outsider, `questions/${QID}/messages/x`), { text: "hi" })
+    );
+    // Nobody else can tell a teacher their student left.
+    await assertFails(
+      set(ref(outsider, `questions/${QID}/connectionSetup/student`), "cancelled")
     );
   });
 });

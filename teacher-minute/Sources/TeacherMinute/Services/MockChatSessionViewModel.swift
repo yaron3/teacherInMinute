@@ -115,6 +115,11 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     isInSetup = false
   }
 
+  func reportConnected() {}
+
+  /// No other side to wait for: a preview goes straight into the lesson.
+  var hasLessonStarted = true
+
   func sessionTabChanged(showsChat: Bool, showsBoard: Bool) {}
 
   /// A room that is never reached: the mock has no backend to mint one.
@@ -158,6 +163,39 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func simulatePeerConversationType(_ conversationType: String) {
     sharedConversationType = conversationType
     onSessionDetailsUpdated?()
+  }
+
+  // MARK: Connecting
+  //
+  // No other side to hear from: `simulatePeerSetupSignal` plays it.
+
+  private(set) var peerSetup = PeerSetupTracker()
+  var onPeerSetupUpdated: (() -> Void)?
+  var peerSetupPrompt: PeerSetupPrompt? { peerSetup.prompt }
+  var peerAwaitedPermission: CapturePermissionKind? { peerSetup.peerAwaitedPermission }
+  var isPeerFinishingSetup: Bool { peerSetup.isPeerFinishingSetup }
+  var finishesSetupInSettings = false
+  var returnsFromSettings = false
+
+  func startWatchingPeerSetup() {}
+
+  func setSelfAwaitingPermission(_ kind: CapturePermissionKind?) {}
+
+  func announceFinishingSetup() async {}
+
+  func waitForPeerPermission() {
+    peerSetup.waitForPeerPermission()
+    onPeerSetupUpdated?()
+  }
+
+  func cancelSetup() {}
+
+  func acknowledgePeerCancelled() {}
+
+  /// Plays the other participant's setup: a permission prompt, or leaving.
+  func simulatePeerSetupSignal(_ signal: ConnectionSetupSignal?) {
+    peerSetup.receive(signal)
+    onPeerSetupUpdated?()
   }
 
   func start() {

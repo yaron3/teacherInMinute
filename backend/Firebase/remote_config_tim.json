@@ -2818,6 +2818,17 @@
       },
       "valueType": "STRING"
     },
+    "billing_starts_once": {
+      "defaultValue": {
+        "value": "Billing starts once you're both connected."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "החיוב מתחיל כששניכם מחוברים."
+        }
+      },
+      "valueType": "STRING"
+    },
     "this_permanently_deletes": {
       "defaultValue": {
         "value": "This permanently deletes your account and profile data. This cannot be undone."
@@ -9388,6 +9399,138 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "התלמיד/ה העביר/ה את השיעור לווידאו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_waiting_for_student": {
+      "defaultValue": {
+        "value": "Waiting for the student"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בהמתנה לתלמיד/ה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_waiting_for_teacher": {
+      "defaultValue": {
+        "value": "Waiting for your teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בהמתנה למורה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_student_microphone_permission": {
+      "defaultValue": {
+        "value": "The student was asked to allow access to their microphone. Do you want to wait until they approve?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד/ה התבקש/ה לאשר גישה למיקרופון. רוצה להמתין עד לאישור?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_student_camera_permission": {
+      "defaultValue": {
+        "value": "The student was asked to allow access to their camera. Do you want to wait until they approve?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד/ה התבקש/ה לאשר גישה למצלמה. רוצה להמתין עד לאישור?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_teacher_microphone_permission": {
+      "defaultValue": {
+        "value": "Your teacher was asked to allow access to their microphone. Do you want to wait until they approve?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה התבקש/ה לאשר גישה למיקרופון. רוצה להמתין עד לאישור?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_teacher_camera_permission": {
+      "defaultValue": {
+        "value": "Your teacher was asked to allow access to their camera. Do you want to wait until they approve?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה התבקש/ה לאשר גישה למצלמה. רוצה להמתין עד לאישור?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_student_finishing_setup": {
+      "defaultValue": {
+        "value": "The student needs to finish setting up and will join shortly. Do you want to wait?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד/ה צריך/ה לסיים את ההגדרות ויצטרף/תצטרף בקרוב. רוצה להמתין?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "connection_setup_teacher_finishing_setup": {
+      "defaultValue": {
+        "value": "Your teacher needs to finish setting up and will join shortly. Do you want to wait?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה צריך/ה לסיים את ההגדרות ויצטרף/תצטרף בקרוב. רוצה להמתין?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_student_cancelled": {
+      "defaultValue": {
+        "value": "The student cancelled the session."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד/ה ביטל/ה את השיעור."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_teacher_cancelled": {
+      "defaultValue": {
+        "value": "Your teacher cancelled the session."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה ביטל/ה את השיעור."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_can_take": {
+      "defaultValue": {
+        "value": "You can take the next question."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אפשר לקבל את השאלה הבאה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_can_ask": {
+      "defaultValue": {
+        "value": "You can ask your question again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אפשר לשאול את השאלה שוב."
         }
       },
       "valueType": "STRING"

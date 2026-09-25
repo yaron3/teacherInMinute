@@ -29,6 +29,14 @@ export const HARD_CAP_MINUTES = 30;
 // teacher's session, since the apps end when the live question node disappears.
 export const ABANDONED_LESSON_GRACE_SECONDS = 120;
 
+// How long the two apps have, from the teacher's acceptance, to both finish
+// connecting. A lesson starts — and is billed — only once they have (see
+// startLesson), so one still unstarted past this was abandoned mid-setup by
+// apps that never ended it: both killed while connecting, say. It is written
+// off like one the student never joined, since nothing else would end it: the
+// hard cap is armed by the start too.
+export const UNSTARTED_LESSON_TIMEOUT_SECONDS = 5 * 60;
+
 // How long a teacher's busy mark is believed without anything clearing it.
 // Every way a session ends clears it, and the longest a session can run is the
 // hard cap, so a mark older than that plus a margin is one whose clear was
@@ -115,7 +123,14 @@ export interface QuestionDoc {
   billedSeconds?: number;
   totalCents?: number;
   endedBy?: "student" | "teacher" | "system";
+  /** Why a question ended without a lesson being taught, e.g.
+   *  `cancelled_while_connecting`, `never_started` or `student_never_joined`. */
+  endedReason?: string;
   lessonId?: string;
+  /** Participants whose app has reported it finished connecting. An app that
+   *  reports this has the lesson start only once both participants are here —
+   *  see startLesson in ./lessons. */
+  readyParticipants?: string[];
   /** Written by the demo-student service — a simulated question, not a real one. */
   isDemo?: boolean;
   /** The teacher who asked for the simulation; the only one invited to it. */
