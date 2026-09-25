@@ -12,6 +12,12 @@ object AndroidTeacherPresenceManager {
     private const val TAG = "TeacherPresence"
     private const val AVAILABILITY_TIMEOUT_SECONDS = 5L
 
+    /** The status most recently asked of setTeacherStatus. Going online waits
+     *  on a profile read before it writes, so a toggle turned off meanwhile
+     *  must stop that write from landing after the offline one. */
+    @Volatile
+    private var requestedStatus: String? = null
+
     /**
      * Whether any teacher is online, from the public `onlineTeachers`
      * projection. Every entry there is online by construction, so the presence
@@ -98,11 +104,14 @@ object AndroidTeacherPresenceManager {
 
     @JvmStatic
     fun setTeacherStatus(uid: String, status: String) {
+        requestedStatus = status
         val baseValues = mutableMapOf<String, Any>(
-            // What the teacher asked for, as opposed to whether the app is
-            // connected. Only this path writes it — the onDisconnect handler
-            // below writes `status` alone — so an app killed with the toggle on
-            // stays "available", while a toggle turned off reads "dnd".
+            // What the teacher asked for, as opposed to whether they are in the
+            // dispatch pool. Only this path writes it. The backend writes
+            // `status` too — it takes offline a teacher whose app stopped
+            // sending keep-alives and who has no push token (see
+            // functions/src/keepAlive.ts) — but leaves this alone, so a toggle
+            // left on still reads "available", and a toggle turned off "dnd".
             "availability" to if (status == "online") "available" else "dnd",
             "status" to status,
             "isOnline" to (status == "online"),
@@ -114,11 +123,19 @@ object AndroidTeacherPresenceManager {
             return
         }
 
+        // In the same update as the status, so the backend never sees this
+        // teacher online beside a keep-alive left over from an earlier session.
+        baseValues["lastSeenAt"] = ServerValue.TIMESTAMP
+
         FirebaseFirestore.getInstance()
             .collection("users")
             .document(uid)
             .get()
             .addOnSuccessListener { document ->
+                if (requestedStatus != "online") {
+                    Log.i(TAG, "Skipped a stale online write uid=$uid; went offline meanwhile")
+                    return@addOnSuccessListener
+                }
                 val subjectSelections = document.get("subjectSelections")
                 val subjects = normalizedSubjects(subjectSelections)
 
@@ -141,27 +158,60 @@ object AndroidTeacherPresenceManager {
             }
             .addOnFailureListener { error ->
                 Log.e(TAG, "Failed loading Firestore profile for teacher uid=$uid", error)
+                if (requestedStatus != "online") {
+                    Log.i(TAG, "Skipped a stale online write uid=$uid; went offline meanwhile")
+                    return@addOnFailureListener
+                }
                 baseValues["lastActiveAt"] = System.currentTimeMillis()
                 updateTeacherRecord(uid, status, baseValues)
             }
     }
 
+    /**
+     * Tells the backend the app is still running — see TeacherKeepAlive.swift.
+     *
+     * Re-sends `status: "online"` with the timestamp, so a teacher the backend
+     * took offline while the app was away is back in the pool as soon as it
+     * runs again. The timestamp must be the server's: the database rules refuse
+     * any other.
+     *
+     * Takes the uid instead of reading the signed-in user, so a keep-alive
+     * still on its way when one account signs out cannot land on the next.
+     */
+    @JvmStatic
+    fun sendKeepAlive(uid: String) {
+        if (FirebaseAuth.getInstance().currentUser?.uid != uid) {
+            Log.w(TAG, "sendKeepAlive skipped: uid=$uid is not the signed-in user")
+            return
+        }
+        // Only ever repeats an "online". A keep-alive must not undo a teacher
+        // going offline, whoever asked for it.
+        if (requestedStatus != "online") {
+            Log.w(TAG, "sendKeepAlive skipped: last status asked for is $requestedStatus")
+            return
+        }
+        FirebaseDatabase.getInstance()
+            .getReference("teachers")
+            .child(uid)
+            .updateChildren(
+                mapOf<String, Any>(
+                    "status" to "online",
+                    "isOnline" to true,
+                    "lastSeenAt" to ServerValue.TIMESTAMP
+                )
+            )
+            .addOnFailureListener { error ->
+                Log.e(TAG, "Keep-alive write failed uid=$uid", error)
+            }
+    }
+
+    // No onDisconnect handler: it set `status` offline whenever the socket
+    // closed, with no regard for whether a push could still reach the teacher.
+    // The backend decides that from the keep-alive instead.
     private fun updateTeacherRecord(uid: String, status: String, values: Map<String, Any>) {
         val teacherRef = FirebaseDatabase.getInstance()
             .getReference("teachers")
             .child(uid)
-
-        if (status == "online") {
-            teacherRef.onDisconnect().updateChildren(
-                mapOf(
-                    "status" to "offline",
-                    "isOnline" to false,
-                    "updatedAt" to ServerValue.TIMESTAMP
-                )
-            )
-        } else {
-            teacherRef.onDisconnect().cancel()
-        }
 
         teacherRef
             .updateChildren(values)

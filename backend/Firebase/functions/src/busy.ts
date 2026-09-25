@@ -3,9 +3,9 @@
 // A teacher in a session is still online — their app is connected, and they
 // will want questions again the moment it ends — but they cannot take one now.
 // So busy is its own fact, kept at `teachers/{uid}/busy` beside `status` rather
-// than folded into it: the apps write `status`, and so does the onDisconnect
-// fallback when a connection drops mid-lesson, and either would silently
-// overwrite a "busy" there. `busy` is written by the backend alone.
+// than folded into it: the apps write `status` — every keep-alive re-sends it —
+// and so does ./keepAlive when an app goes silent mid-lesson, and either would
+// silently overwrite a "busy" there. `busy` is written by the backend alone.
 //
 // Set when a teacher accepts a question; cleared by every path that ends that
 // session — endLesson, forceEndLesson, endAbandonedLesson, and cancelQuestion

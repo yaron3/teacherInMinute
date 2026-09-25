@@ -153,13 +153,13 @@ final class AuthService {
   
   /// Clears teacher presence before dropping the auth session.
   ///
-  /// `onDisconnect` is registered on both platforms and covers a killed app or
-  /// a lost network, but it only fires when the RTDB socket actually closes.
-  /// Signing out leaves the process — and the socket — alive, so the dead man's
-  /// switch never ran and `teachers/{uid}/status` stayed "online" for as long
-  /// as the account was signed out. The public `onlineTeachers` projection is
-  /// rebuilt from that status (functions/src/presence.ts), so students kept
-  /// seeing a signed-out teacher and dispatch kept inviting them.
+  /// Nothing else would. The backend takes offline a teacher whose app has
+  /// stopped sending keep-alives (functions/src/keepAlive.ts), but only one it
+  /// cannot reach by push, and a signed-out teacher's push token is still on
+  /// record. So `teachers/{uid}/status` would stay "online", the public
+  /// `onlineTeachers` projection is rebuilt from that status
+  /// (functions/src/presence.ts), and students would keep seeing a signed-out
+  /// teacher while dispatch kept inviting them.
   ///
   /// The write has to happen first: afterwards `currentUser` is nil and the
   /// presence writer has no uid to write for.

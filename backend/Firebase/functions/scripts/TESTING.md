@@ -14,7 +14,10 @@ The student needs at least two existing minutes. No balances are seeded.
 
 Checks sign-in, offline/online student directory visibility, invitation delivery,
 offline teacher exclusion, a teacher joining a waiting question, and cancellation
-removing the live question and invitations. It restores the teachers' original
+removing the live question and invitations. Teachers are put online with a
+server-timestamped `lastSeenAt`, the keep-alive a running app sends; the backend
+takes a teacher with no push token offline three minutes after the last one
+(`src/keepAlive.ts`), so a slow run can lose its teachers partway. It restores the teachers' original
 status and subjects in `finally`, including after failures. Cancelled question
 history remains in Firestore. An interrupted/killed process may need manual cleanup.
 

@@ -236,6 +236,7 @@ struct TeacherDashboardView: View {
 	  .onChange(of: scenePhase) { _, phase in
 		if phase == .active {
 		  viewModel.refreshPermissions()
+		  viewModel.appDidBecomeActive()
 		} else if phase == .background {
 		  // If notifications are disabled, an online teacher cannot be reached
 		  // in the background, so take them offline immediately.

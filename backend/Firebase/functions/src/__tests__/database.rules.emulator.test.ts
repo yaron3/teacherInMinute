@@ -24,7 +24,7 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { ref, remove, set } from "firebase/database";
+import { ref, remove, serverTimestamp, set, update } from "firebase/database";
 
 const TEACHER = "teacher-uid";
 const STUDENT = "student-uid";
@@ -230,6 +230,56 @@ describe.each(SHAPES)("database rules (%s)", (_name, people) => {
     // Nobody else can tell a teacher their student left.
     await assertFails(
       set(ref(outsider, `questions/${QID}/connectionSetup/student`), "cancelled")
+    );
+  });
+});
+
+// ─── the teacher keep-alive ──────────────────────────────────────────────────
+//
+// `lastSeenAt` is how the backend decides whether a teacher's app is still
+// running (functions/src/keepAlive.ts), and it is compared with the server's
+// clock. A phone whose clock runs slow would make a live app look silent, so
+// only the server's own timestamp is accepted.
+
+describe("teacher keep-alive", () => {
+  const teacherNode = (uid: string) => ref(db(uid), `teachers/${TEACHER}`);
+
+  beforeEach(async () => {
+    await testEnv.clearDatabase();
+  });
+
+  it("lets a teacher go online stamped with the server's clock", async () => {
+    // What both apps write as the toggle goes on, in one update.
+    await assertSucceeds(
+      update(teacherNode(TEACHER), {
+        availability: "available",
+        status: "online",
+        subjects: ["algebra"],
+        lastSeenAt: serverTimestamp(),
+      })
+    );
+  });
+
+  it("lets a teacher send a keep-alive", async () => {
+    await assertSucceeds(
+      update(teacherNode(TEACHER), { status: "online", lastSeenAt: serverTimestamp() })
+    );
+  });
+
+  it("refuses a keep-alive stamped with the phone's clock", async () => {
+    await assertFails(
+      update(teacherNode(TEACHER), { status: "online", lastSeenAt: 1_700_000_000_000 })
+    );
+    await assertFails(set(ref(db(TEACHER), `teachers/${TEACHER}/lastSeenAt`), Date.now() + 3_600_000));
+  });
+
+  it("lets a teacher go offline without touching it", async () => {
+    await assertSucceeds(update(teacherNode(TEACHER), { availability: "dnd", status: "offline" }));
+  });
+
+  it("keeps everyone else from keeping a teacher alive", async () => {
+    await assertFails(
+      update(teacherNode(STRANGER), { status: "online", lastSeenAt: serverTimestamp() })
     );
   });
 });

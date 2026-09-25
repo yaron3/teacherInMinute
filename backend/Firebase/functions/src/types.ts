@@ -43,6 +43,11 @@ export const UNSTARTED_LESSON_TIMEOUT_SECONDS = 5 * 60;
 // lost. Past it the teacher is treated as free, so a missed clear costs them
 // at most this long out of the pool rather than every question from then on.
 export const BUSY_STALE_AFTER_MINUTES = HARD_CAP_MINUTES + 15;
+
+// How long a teacher's app can go without a keep-alive before it is taken to
+// be gone. The app sends one a minute while the teacher is online, so this is
+// three missed in a row rather than one late write. See ./keepAlive.
+export const KEEPALIVE_TIMEOUT_SECONDS = 3 * 60;
 export const CONNECTION_FEE_CENTS = 50;
 export const MIN_BILLABLE_SECONDS = 30;
 export const ROUND_UP_SECONDS = 30;
@@ -54,8 +59,9 @@ export const ROUND_UP_SECONDS = 30;
 
 export interface TeacherRecord {
   status: "online" | "offline";
-  /** What the teacher asked for, as opposed to whether the app is connected.
-   *  Written only when they work the availability toggle. */
+  /** What the teacher asked for, as opposed to `status`, which ./keepAlive
+   *  also writes when their app goes silent. Written only when they work the
+   *  availability toggle. */
   availability?: "available" | "dnd";
   subjects: string[];       // ["algebra", "geometry", ...]
   /** 0–5, and absent until a student has actually rated them. Written by the
@@ -71,6 +77,11 @@ export interface TeacherRecord {
   /** Unix ms. Android writes it; iOS does not, so absence means "unknown",
    *  not "idle". */
   lastActiveAt?: number;
+  /** Unix ms of the app's latest keep-alive, on the server's clock (the
+   *  database rules refuse any other). Written as the teacher goes online and
+   *  then once a minute while the app runs. Absent on app versions from before
+   *  the keep-alive, which are judged on `status` alone. See ./keepAlive. */
+  lastSeenAt?: number;
   fcmToken?: string;        // registered by the app on login
   displayName: string;
   /** Set by the backend alone while the teacher is in a session — from the

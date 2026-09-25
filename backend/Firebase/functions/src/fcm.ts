@@ -1,9 +1,39 @@
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 
+/** What FCM answers for a token that will never deliver again — the app was
+ *  uninstalled, or the token was replaced. */
+const DEAD_TOKEN_CODES = new Set([
+  "messaging/registration-token-not-registered",
+  "messaging/invalid-registration-token",
+]);
+
+/**
+ * Removes a teacher's push token that FCM has said is dead, if it is still the
+ * one on record — the app may have registered a new one since.
+ *
+ * ./keepAlive keeps a teacher whose app has gone silent online for as long as
+ * they have a push token. Without this, one who uninstalled the app while
+ * available would keep that token, and their place in the pool, for good.
+ */
+async function forgetDeadToken(teacherUid: string, deadToken: string): Promise<void> {
+  let dropped = false;
+  // Never aborts: the first pass may see an empty local cache, and writing
+  // back what is there is what lets the retry see the stored token.
+  await admin
+    .database()
+    .ref(`teachers/${teacherUid}/fcmToken`)
+    .transaction((current: string | null) => {
+      dropped = current === deadToken;
+      return dropped ? null : current;
+    });
+  if (dropped) logger.info(`[fcm] dropped dead push token teacher=${teacherUid}`);
+}
+
 // Teacher invite — data-only, high priority, TTL matches the wave timeout.
 // The client renders a full-screen incoming-call UI from these fields.
 export async function sendInvitePush(params: {
+  teacherUid: string;
   fcmToken: string;
   questionId: string;
   topic: string;
@@ -12,7 +42,8 @@ export async function sendInvitePush(params: {
   wave: number;
   ttlSeconds: number;
 }): Promise<void> {
-  const { fcmToken, questionId, topic, studentName, questionText, wave, ttlSeconds } = params;
+  const { teacherUid, fcmToken, questionId, topic, studentName, questionText, wave, ttlSeconds } =
+    params;
 
   await admin.messaging().send({
     token: fcmToken,
@@ -39,7 +70,15 @@ export async function sendInvitePush(params: {
         "apns-expiration": String(Math.floor(Date.now() / 1000) + ttlSeconds),
       },
     },
-  }).catch((err) => logger.warn(`FCM invite failed for token ${fcmToken}:`, err));
+  }).catch(async (err) => {
+    logger.warn(`FCM invite failed for token ${fcmToken}:`, err);
+    if (!DEAD_TOKEN_CODES.has(err?.code)) return;
+    // Swallowed like the send itself: the invite has already gone out through
+    // RTDB, and a failed cleanup must not fail the wave that called this.
+    await forgetDeadToken(teacherUid, fcmToken).catch((cleanupErr) =>
+      logger.warn(`[fcm] failed dropping dead push token teacher=${teacherUid}`, cleanupErr)
+    );
+  });
 }
 
 // Notify student that their question was accepted.
