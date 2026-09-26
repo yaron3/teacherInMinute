@@ -2,7 +2,7 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { isTeacherBusy, rankTeachers, scoreTeacher } from "../scoring";
+import { isTeacherBusy, isTeacherReachable, rankTeachers, scoreTeacher } from "../scoring";
 import { TeacherRecord } from "../types";
 
 const NOW = Date.now();
@@ -162,5 +162,44 @@ describe("teachers in a session", () => {
     expect(
       isTeacherBusy(teacher({ busy: { questionId: "", since: NOW } as TeacherRecord["busy"] }))
     ).toBe(false);
+  });
+});
+
+describe("teachers whose app has gone quiet", () => {
+  const MINUTE = 60_000;
+
+  test("a teacher whose app sent a keep-alive in the last three minutes is ranked", () => {
+    expect(order({ alive: teacher({ lastSeenAt: NOW - 2 * MINUTE }) })).toEqual(["alive"]);
+  });
+
+  test("three silent minutes without a push token take a teacher out, however well rated", () => {
+    expect(
+      order({
+        silent: teacher({ ratingAvg: 5, lastSeenAt: NOW - 3 * MINUTE }),
+        alive: teacher({ ratingAvg: 3, lastSeenAt: NOW - 30_000 }),
+      })
+    ).toEqual(["alive"]);
+  });
+
+  test("a silent teacher with a push token is still reached", () => {
+    expect(
+      order({ pushable: teacher({ lastSeenAt: NOW - 60 * MINUTE, fcmToken: "fcm-token" }) })
+    ).toEqual(["pushable"]);
+  });
+
+  test("an empty push token is no push token", () => {
+    expect(isTeacherReachable(teacher({ lastSeenAt: NOW - 10 * MINUTE, fcmToken: "" }))).toBe(false);
+  });
+
+  // Installed apps update on their own schedule. One that has never sent a
+  // keep-alive must not be read as one that stopped sending them.
+  test("an app from before the keep-alive is judged on status alone", () => {
+    expect(isTeacherReachable(teacher())).toBe(true);
+    expect(order({ legacy: teacher() })).toEqual(["legacy"]);
+  });
+
+  test("the timeout is three minutes to the millisecond", () => {
+    expect(isTeacherReachable(teacher({ lastSeenAt: NOW - 3 * MINUTE + 1 }))).toBe(true);
+    expect(isTeacherReachable(teacher({ lastSeenAt: NOW - 3 * MINUTE }))).toBe(false);
   });
 });

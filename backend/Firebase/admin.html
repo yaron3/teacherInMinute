@@ -847,7 +847,7 @@ async function republishPresence() {
 /** Signing out does not clear presence, so a teacher can keep receiving
  *  dispatched questions. Clears both the presence node and the projection. */
 async function forceOffline(uid, name) {
-  if (!confirm(`Take "${name}" offline?\n\nClears their RTDB presence and removes them from onlineTeachers, so dispatch stops sending them questions.`)) return;
+  if (!confirm(`Take "${name}" offline?\n\nClears their RTDB presence and removes them from onlineTeachers, so dispatch stops sending them questions.\n\nIf their app is still running with the toggle on, its next keep-alive puts them back within a minute.`)) return;
   try {
     await call("adminMutateUser", { action: "goOffline", uid });
     showToast(`${name} is now offline`);

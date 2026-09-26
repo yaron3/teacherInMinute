@@ -26,6 +26,10 @@ export {
   onTeacherPresenceBusyWritten,
 } from "./presence";
 
+// Takes offline teachers whose app stopped sending keep-alives and who have no
+// push token to be reached by instead
+export { teacherKeepAliveWatchdog } from "./keepAlive";
+
 // Platform statistics
 export { onUserRoleChange } from "./stats";
 

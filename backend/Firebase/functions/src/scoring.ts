@@ -1,5 +1,5 @@
 import { logger } from "firebase-functions";
-import { BUSY_STALE_AFTER_MINUTES, TeacherRecord } from "./types";
+import { BUSY_STALE_AFTER_MINUTES, KEEPALIVE_TIMEOUT_SECONDS, TeacherRecord } from "./types";
 
 // FR-B-002: score = 0.6·(ratingAvg/5) + 0.25·acceptRate + 0.15·recencyFactor
 // recencyFactor = exp(-hoursAgo / 24)  →  1.0 when just active, decays to ~0 after 72h
@@ -74,6 +74,29 @@ export function isTeacherBusy(teacher: TeacherRecord, now = Date.now()): boolean
   return now - since < BUSY_STALE_AFTER_MINUTES * 60_000;
 }
 
+/** Whether the teacher has a push token, which is the only way a question
+ *  reaches them once their app is no longer running. */
+export function hasPushToken(teacher: TeacherRecord): boolean {
+  return typeof teacher.fcmToken === "string" && teacher.fcmToken.length > 0;
+}
+
+/**
+ * Whether a question sent to this online teacher can reach them.
+ *
+ * A running app sends a keep-alive once a minute and hears about a question
+ * from the dashboard's own listener. Once it has been silent past the timeout
+ * the app is taken to be gone, and only a push is left — so a silent teacher
+ * is still reachable with a push token and out of reach without one. An app
+ * too old to send keep-alives has never written `lastSeenAt`, and is judged on
+ * `status` alone, as every teacher was before. See ./keepAlive.
+ */
+export function isTeacherReachable(teacher: TeacherRecord, now = Date.now()): boolean {
+  const lastSeenAt = finite(teacher.lastSeenAt);
+  if (lastSeenAt === undefined) return true;
+  if (now - lastSeenAt < KEEPALIVE_TIMEOUT_SECONDS * 1000) return true;
+  return hasPushToken(teacher);
+}
+
 export interface ScoredTeacher {
   uid: string;
   score: number;
@@ -87,8 +110,8 @@ function normalizeSubject(s: string): string {
   return afterColon.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// Returns all eligible (online, not in a session, matching topic) teachers sorted best-first.
-// The dispatcher slices the result per wave, skipping alreadyInvited UIDs.
+// Returns all eligible (online, not in a session, reachable, matching topic) teachers sorted
+// best-first. The dispatcher slices the result per wave, skipping alreadyInvited UIDs.
 export function rankTeachers(
   teachers: Record<string, TeacherRecord>,
   topic: string,
@@ -103,6 +126,7 @@ export function rankTeachers(
   let offline = 0;
   let topicMismatch = 0;
   let busy = 0;
+  let unreachable = 0;
   const now = Date.now();
 
   for (const [uid, t] of Object.entries(teachers)) {
@@ -113,6 +137,13 @@ export function rankTeachers(
     }
     if (isTeacherBusy(t, now)) {
       busy += 1;
+      continue;
+    }
+    // ./keepAlive takes such a teacher offline on its next sweep. Checked here
+    // too, so they are skipped from the moment the timeout passes rather than
+    // up to a minute later.
+    if (!isTeacherReachable(t, now)) {
+      unreachable += 1;
       continue;
     }
     // RTDB can deserialize arrays as {0: "algebra", ...} objects when written by mobile SDKs.
@@ -131,7 +162,7 @@ export function rankTeachers(
   }
 
   logger.info(
-    `[scoring] ranked topic=${topic} considered=${Object.keys(teachers).length} excluded=${exclude.size} skippedOffline=${offline} skippedBusy=${busy} skippedTopic=${topicMismatch} eligible=${candidates.length}`
+    `[scoring] ranked topic=${topic} considered=${Object.keys(teachers).length} excluded=${exclude.size} skippedOffline=${offline} skippedBusy=${busy} skippedUnreachable=${unreachable} skippedTopic=${topicMismatch} eligible=${candidates.length}`
   );
 
   // Unrated teachers all score alike, so ties are ordinary rather than rare.

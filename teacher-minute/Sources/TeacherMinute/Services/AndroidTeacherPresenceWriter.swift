@@ -13,6 +13,26 @@ enum AndroidTeacherPresenceWriter {
         name: "setCurrentTeacherStatus",
         sig: "(Ljava/lang/String;)V"
     )!
+    private static let sendKeepAliveMethod = managerClass.getStaticMethodID(
+        name: "sendKeepAlive",
+        sig: "(Ljava/lang/String;)V"
+    )!
+
+    /// One keep-alive for `uid` — see `TeacherKeepAlive`. Named rather than
+    /// taken from the signed-in user, so it can never land on another account.
+    static func sendKeepAlive(uid: String) {
+        jniContext {
+            do {
+                try managerClass.callStatic(
+                    method: sendKeepAliveMethod,
+                    options: [.kotlincompat],
+                    args: [uid.toJavaParameter(options: [.kotlincompat])]
+                )
+            } catch {
+                logger.error("[Presence] Android keep-alive call failed: \(error)")
+            }
+        }
+    }
 
     static func setCurrentTeacherStatus(_ status: String) {
         jniContext {

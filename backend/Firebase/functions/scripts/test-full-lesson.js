@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { setTimeout: sleep } = require('node:timers/promises');
-const { login, rtdb, call, request, eventually, project } = require('./test-teacher-presence');
+const { login, rtdb, call, request, eventually, project, KEEP_ALIVE } = require('./test-teacher-presence');
 
 const reportPath = path.resolve(process.env.REPORT_PATH || `scripts/lesson-result-${Date.now()}.json`);
 const report = { project, startedAt: new Date().toISOString(), checks: [], messages: [], cleanup: [] };
@@ -53,7 +53,7 @@ async function main() {
   try {
     for (let i = 0; i < teachers.length; i++) {
       changed.push(i);
-      await rtdb(teachers[i], `teachers/${teachers[i].uid}`, { status: 'online', subjects: ['algebra'] });
+      await rtdb(teachers[i], `teachers/${teachers[i].uid}`, { status: 'online', subjects: ['algebra'], ...KEEP_ALIVE });
     }
     await eventually('All three teachers appear online', async () => {
       const directory = await rtdb(student, 'onlineTeachers') || {};

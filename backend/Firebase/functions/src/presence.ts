@@ -134,6 +134,9 @@ export const onTeacherPresenceStatusWritten = onValueWritten(
   "teachers/{uid}/status",
   async (event) => {
     const uid = event.params.uid;
+    // Every keep-alive re-sends `status: "online"` (see ./keepAlive). A write
+    // that leaves the value as it was has nothing to mirror.
+    if (event.data.before.val() === event.data.after.val()) return;
     try {
       await republishTeacherPresence(uid);
     } catch (err) {

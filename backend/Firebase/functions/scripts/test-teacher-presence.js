@@ -38,6 +38,11 @@ async function login(email) {
   }
 }
 
+// What a running app sends with `status: 'online'`: a keep-alive on the
+// server's clock (see functions/src/keepAlive.ts). Without it, a test account
+// that has ever used the app reads as silent, and dispatch skips it.
+const KEEP_ALIVE = { lastSeenAt: { '.sv': 'timestamp' } };
+
 function rtdb(account, path, patch) {
   return request(`${database}/${path}.json?auth=${account.token}`, patch === undefined ? {} : {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
@@ -99,7 +104,7 @@ async function main() {
 
     // Keep the final teacher offline to exercise joining a waiting question.
     for (const teacher of teachers.slice(0, -1)) {
-      await rtdb(teacher, `teachers/${teacher.uid}`, { status: 'online' });
+      await rtdb(teacher, `teachers/${teacher.uid}`, { status: 'online', ...KEEP_ALIVE });
     }
     await eventually('online teachers appear with algebra in student directory', async () => {
       const directory = await rtdb(student, 'onlineTeachers') || {};
@@ -121,7 +126,7 @@ async function main() {
     assert.equal(await rtdb(lateTeacher, `teacherInvites/${lateTeacher.uid}/${questionId}`), null,
       'offline teacher must not receive an invite');
     console.log('PASS offline teacher is not invited');
-    await rtdb(lateTeacher, `teachers/${lateTeacher.uid}`, { status: 'online' });
+    await rtdb(lateTeacher, `teachers/${lateTeacher.uid}`, { status: 'online', ...KEEP_ALIVE });
     await eventually('teacher joining online receives the waiting question', async () => {
       const invite = await rtdb(lateTeacher, `teacherInvites/${lateTeacher.uid}/${questionId}`);
       return invite?.topic === 'algebra';
@@ -164,7 +169,7 @@ async function main() {
   console.log('PASS all multi-teacher integration scenarios');
 }
 
-module.exports = { login, rtdb, call, request, eventually, project };
+module.exports = { login, rtdb, call, request, eventually, project, KEEP_ALIVE };
 
 if (require.main === module) main().catch(error => {
   console.error(`FAIL ${error.message}`);

@@ -4,7 +4,10 @@
       ".indexOn": ["status"],
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
+        ".write": "auth != null && auth.uid == $uid",
+        "lastSeenAt": {
+          ".validate": "newData.val() == now"
+        }
       }
     },
     "teacherInvites": {
