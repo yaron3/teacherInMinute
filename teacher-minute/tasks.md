@@ -37,3 +37,10 @@
 ## 9. Disable back on Android — DONE
 - disable the option to use system back from the main tab to the onboarding phase
 - Implementation: `MainActivity` registers an `OnBackPressedCallback` that, when enabled, calls `moveTaskToBack(true)` instead of letting the system back unwind to onboarding. `MainTabView` enables/disables the callback via `AndroidBackNavigationBridge` in `onAppear`/`onDisappear`, so nested NavigationStacks inside tabs keep their normal back behavior.
+
+## 10. Verify invite pushes reach a teacher whose app is not running — TO VERIFY
+- Since the keep-alive (PR #22), a teacher whose app has stopped sending keep-alives stays available for as long as `teachers/{uid}/fcmToken` holds a push token, and questions reach them only by push. Nothing has confirmed yet that the push arrives.
+- Android: go online, then background or kill the app, and have a student ask on a topic only this teacher covers (see "Never send a demo question to a real teacher" in the root `CLAUDE.md`). Expect a notification from `AndroidIncomingQuestionNotifier`; tapping it opens the app with the invite on the dashboard, and the notification clears when the invite expires (90 s). Use a real device: the Android 14 emulator used before received no FCM at all (root `bugs.md`).
+- iOS: expected to fail today. The invite push is data-only, with no `aps` alert, so iOS shows nothing. The push needs an alert first; then run the same check as Android.
+- Dead token: uninstall the app while online. Once FCM rejects the token as unregistered, the next invite sent to this teacher drops `fcmToken`, and the keep-alive watchdog takes them offline within about a minute. FCM can take a while to notice an uninstall.
+- Afterwards, turn the toggle off: closing the app no longer takes a teacher with a push token offline.
