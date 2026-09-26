@@ -502,6 +502,11 @@ object AndroidChatManager {
             .toString()
     }
 
+    /**
+     * The question node as `ChatSessionService.details(from:)` reads it. iOS
+     * observes the node directly, so a key left out here goes missing on
+     * Android alone: every key that parser reads needs a line below.
+     */
     @JvmStatic
     fun fetchSessionDetailsJson(questionId: String): String {
         val snapshot = Tasks.await(
@@ -514,13 +519,22 @@ object AndroidChatManager {
         )
         if (!snapshot.exists()) return JSONObject().toString()
 
+        val photoUrls = JSONArray()
+        for (child in snapshot.child("photoUrls").children) {
+            val url = child.value as? String ?: continue
+            photoUrls.put(url)
+        }
+
         return JSONObject()
             .put("questionId", snapshot.firstString("questionId", "questionID", "id"))
             .put("studentId", snapshot.firstString("studentId", "studentUID", "studentId"))
             .put("teacherId", snapshot.firstString("teacherId", "teacherUID", "teacherId"))
             .put("studentName", snapshot.firstString("studentName", "studentFullName", "studentDisplayName", "name"))
             .put("teacherName", snapshot.firstString("teacherName", "teacherFullName", "teacherDisplayName"))
+            .put("studentImageURL", snapshot.firstString("studentImageURL", "studentProfileImageURL", "studentPhotoURL"))
+            .put("teacherImageURL", snapshot.firstString("teacherImageURL", "teacherProfileImageURL", "teacherPhotoURL"))
             .put("text", snapshot.firstString("text", "questionText", "originalQuestion", "message", "topic"))
+            .put("photoUrls", photoUrls)
             .put("createdAt", snapshot.child("createdAt").value.asDoubleOrNull() ?: 0.0)
             .put(
                 "acceptedAt",
@@ -532,6 +546,9 @@ object AndroidChatManager {
             // When both sides had finished connecting: the session is counted
             // from here, and absent until then.
             .put("startedAt", snapshot.child("startedAt").value.asDoubleOrNull() ?: 0.0)
+            // When the student's minutes run out, moved later when they buy
+            // more. The lesson warns a minute before it and holds there.
+            .put("minutesDeadlineAt", snapshot.child("minutesDeadlineAt").value.asDoubleOrNull() ?: 0.0)
             .put(
                 "pricePerMinuteCents",
                 snapshot.child("pricePerMinuteCents").value.asIntOrNull()
@@ -545,6 +562,7 @@ object AndroidChatManager {
                     ?: snapshot.child("teacherShare").value.asDoubleOrNull()
                     ?: 75.0
             )
+            .put("currencyCode", snapshot.firstString("currencyCode", "currency", "packageCurrency", "pricingCurrency", "purchaseCurrency"))
             .put("conversationType", snapshot.firstString("conversationType"))
             .toString()
     }
