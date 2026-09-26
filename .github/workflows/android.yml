@@ -1,10 +1,18 @@
 name: Android
 
-# Deliberately not wired into the pull request checks yet. This job has never
-# run green, and CI that fails for its own reasons is worse than no CI: it
-# trains everyone to ignore a red check. Run it by hand from the Actions tab
-# until it passes twice on an unchanged tree, then uncomment the pull_request
-# trigger below and let it block merges.
+# Runs after merge, not before it. Runs 14 and 15 both passed on an unchanged
+# tree, which was the bar for automating this at all; post-merge rather than
+# per-pull-request is a cost decision. A green run takes 35-40 minutes, nearly
+# all of it compiling Swift for Android, and macOS runner minutes bill at ten
+# times the Linux rate — so one run per merge, rather than one per push to every
+# open pull request. The trade is that this reports breakage after it lands
+# instead of blocking it, which is why the pull_request trigger is written out
+# below rather than deleted: swap to it if a regression ever reaches master.
+#
+# Read android-ci-notes.md in this directory before changing anything here. It
+# records where the job stops, which explanations have been ruled out, which
+# two guesses were already tried and failed, and why reading the logs is harder
+# than it sounds. It will save a run or six.
 #
 # It exists because the iOS job cannot see any of this. That job passes
 # SKIP_ZERO=1, which makes the "Run skip gradle" phase exit 0 without
@@ -14,6 +22,18 @@ name: Android
 # compilation produced a green build and an APK missing its Application class.
 on:
   workflow_dispatch:
+    inputs:
+      diagnostics-only:
+        description: 'Report the toolchain and stop, without building'
+        type: boolean
+        default: false
+  push:
+    branches:
+      - master
+    paths:
+      - 'teacher-minute/**'
+      - '.github/workflows/android.yml'
+  # The blocking alternative, deliberately not enabled. See the note above.
   # pull_request:
   #   paths:
   #     - 'teacher-minute/**'
@@ -34,6 +54,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The Android SDK proper. It comes first, before Skip, because
+      # `skip android sdk install` in the next step puts the Android NDK under
+      # the Android SDK root — and run 3 showed what happens when that root
+      # does not exist yet:
+      #
+      #   error: No Android NDK is installed at any of the standard locations
+      #
+      # macOS arm64 runner images do not ship the Android SDK (run 1 shows this
+      # action creating it from scratch at ~/Library/Android/sdk), so with the
+      # steps the other way round Skip had nowhere standard to put the NDK and
+      # the Swift build could not find one.
+      #
+      # packages has to be set. Its default is "tools platform-tools", and
+      # "tools" is the retired SDK Tools package Google removed from the
+      # repository, so sdkmanager reports "Failed to find package 'tools'" and
+      # exits 1, which fails the step before Gradle ever runs. platform-tools
+      # is a real package and the only one worth asking for here; the platform
+      # and build-tools the project needs are downloaded by AGP itself, which
+      # is what accept-android-sdk-licenses (on by default) permits.
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
       # Skip's own action. It installs Homebrew, Gradle and the Skip CLI, and
       # tells Xcode to accept Skip's package plugins without an interactive
       # prompt a runner cannot answer.
@@ -43,17 +87,113 @@ jobs:
       # Swift sources into libTeacherMinute.so — and that needs the Swift SDK
       # for Android, which this input installs via `skip android sdk install`.
       # Without it the build dies in :skipstone:TeacherMinute:buildAndroidSwiftPackageDebug.
+      #
+      # That same command installs the NDK, which is why this step runs after
+      # the Android SDK is in place. The action also exports an empty
+      # ANDROID_NDK_ROOT afterwards on purpose, working around
+      # finagolfin/swift-android-sdk#207, so do not set that variable here:
+      # discovery is meant to go through the SDK root.
+      #
+      # swift-android-sdk-version pins the toolchain. Left unset, `skip android
+      # sdk install` brings 6.4.0, and Swift 6.4 is what rejects this project:
+      #   error: Swift package target 'SkipFirebaseCore' is linked as a static
+      #   library by 'TeacherMinute-product' and 8 other targets, but cannot be
+      #   built dynamically because there is a package product with the same name
+      # Pinning to a 6.3 SDK cleared that error outright in run 12.
+      #
+      # Three parts, not two. "6.3" is accepted, but it installs the
+      # swift-6.3-RELEASE SDK beside a swift-6.3.3-RELEASE host toolchain, and
+      # .swiftmodule files demand an exact compiler match:
+      #   error: module compiled with Swift 6.3 cannot be imported by the
+      #   Swift 6.3.3 compiler: .../swift-6.3-RELEASE_android.artifactbundle/
+      #   .../Swift.swiftmodule/aarch64-unknown-linux-android.swiftmodule
+      # So the version has to name the same release the host toolchain is, which
+      # is what 6.3.3 does. Unpinned 6.4.0 matched by accident; 6.3 does not.
+      #
+      # Note this is the input that matters, not swift-version: that one only
+      # runs `swiftly install` without ever selecting the toolchain, and is
+      # skipped entirely when empty. The Android toolchain arrives with the SDK.
       - name: Set up Skip
         uses: skiptools/actions/setup-skip@v1
         with:
           install-swift-android-sdk: 'true'
+          swift-android-sdk-version: '6.3.3'
 
-      # The Android SDK proper, for the Android Gradle Plugin. Some macOS runner
-      # images ship it and some do not, and which is true has changed between
-      # image versions; installing it explicitly costs a minute and removes the
-      # question. Drop this step if the image turns out to provide it.
-      - name: Set up the Android SDK
-        uses: android-actions/setup-android@v3
+      # setup-skip ends by exporting ANDROID_NDK_ROOT as an empty string, working
+      # around finagolfin/swift-android-sdk#207, and something downstream reads
+      # that as "the NDK is at ''" rather than "there is no NDK". Restoring it
+      # here, through $GITHUB_ENV, puts a real path in the environment of every
+      # later step — and of any Gradle daemon started in one, which matters:
+      # a daemon keeps the environment it was launched with, so exporting the
+      # variable inside the build step alone (run 8) can be invisible to the
+      # compiler if a daemon was already up.
+      #
+      # :- substitutes for empty as well as unset, so a non-empty value set by
+      # anything else survives.
+      - name: Restore a non-empty ANDROID_NDK_ROOT
+        run: |
+          ndk="${ANDROID_NDK_ROOT:-$ANDROID_NDK_HOME}"
+          echo "using ANDROID_NDK_ROOT=$ndk"
+          test -d "$ndk" || { echo "::error::$ndk is not a directory"; exit 1; }
+          echo "ANDROID_NDK_ROOT=$ndk" >> "$GITHUB_ENV"
+
+      # Diagnostic, not a build step. Runs 3 and 4 both died on
+      #   error: No Android NDK is installed at any of the standard locations
+      # and the two fixes tried so far were guesses about where the NDK comes
+      # from. This prints what is actually on the runner, and it completes
+      # minutes before the 18-minute build does, so the answer arrives without
+      # waiting for the failure. Remove it once the NDK question is settled.
+      - name: Report the Android toolchain the runner actually has
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
+          echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT:-<unset>}"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME:-<unset>}"
+          echo "ANDROID_NDK_LATEST_HOME=${ANDROID_NDK_LATEST_HOME:-<unset>}"
+          echo "--- $ANDROID_HOME ---"
+          ls -1 "${ANDROID_HOME:-/nonexistent}" || true
+          echo "--- $ANDROID_HOME/ndk ---"
+          ls -1 "${ANDROID_HOME:-/nonexistent}/ndk" || echo "(no ndk directory)"
+          echo "--- ~/Library/Android ---"
+          ls -1 ~/Library/Android || true
+          echo "--- ~/Library/Developer/Toolchains ---"
+          ls -1 ~/Library/Developer/Toolchains || true
+          echo "--- swift ---"
+          swift --version || true
+          echo "--- skip ---"
+          skip --version || true
+          echo "--- skip doctor ---"
+          skip doctor || true
+          # Is ANDROID_NDK_ROOT absent, or present and empty? setup-skip exports
+          # it empty, and a check for "defined" rather than "non-empty" would
+          # then take "" as the NDK path. ${VAR+set} tells the two apart;
+          # the ${VAR:-...} forms above cannot.
+          echo "--- ANDROID_NDK_ROOT defined? ---"
+          echo "defined=${ANDROID_NDK_ROOT+yes}${ANDROID_NDK_ROOT-no}"
+          # The Swift SDK for Android bakes absolute NDK paths into its toolset
+          # at install time. If those name a version this runner does not have,
+          # the "standard locations" message follows even with three NDKs here.
+          echo "--- installed Swift SDKs ---"
+          ls -1 "$HOME/.swiftpm/swift-sdks" 2>/dev/null || echo "(nothing under ~/.swiftpm/swift-sdks)"
+          # Every installed toolchain, rather than a hardcoded version: the
+          # point of this line is to show which Swift SDKs each one can see,
+          # and the version changes whenever the pin does.
+          for tc in "$HOME/Library/Developer/Toolchains"/*.xctoolchain; do
+            [ -x "$tc/usr/bin/swift" ] || continue
+            echo "--- swift sdk list, from $(basename "$tc") ---"
+            "$tc/usr/bin/swift" sdk list || true
+          done
+          echo "--- Swift SDK json ---"
+          find -L "$HOME/.swiftpm/swift-sdks" -maxdepth 4 -name "*.json" 2>/dev/null | while read -r f; do
+            echo "=== $f"
+            cat "$f"
+            echo
+          done
+          echo "--- ndk paths named in those json, and whether they exist ---"
+          find -L "$HOME/.swiftpm/swift-sdks" -maxdepth 4 -name "*.json" -exec cat {} + 2>/dev/null \
+            | tr "," "\n" | grep -o "/[^\"]*[Nn][Dd][Kk][^\"]*" | sort -u | while read -r q; do
+              if [ -e "$q" ]; then echo "EXISTS  $q"; else echo "MISSING $q"; fi
+            done
 
       # Android/gradle/gradle-daemon-jvm.properties pins the daemon to JetBrains
       # JDK 25 and carries the download URLs, so Gradle provisions it itself on
@@ -61,8 +201,28 @@ jobs:
       # JVM, which the runner already has. If provisioning fails, that is the
       # place to look.
       - name: Build the Android app
+        if: ${{ ! inputs.diagnostics-only }}
         working-directory: teacher-minute/Android
-        run: ./gradlew assembleDebug --console=plain --stacktrace
+        run: |
+          # --no-daemon so the build runs in a JVM started now, with the
+          # ANDROID_NDK_ROOT the previous step set, rather than reusing a daemon
+          # that may have been launched during Set up Skip with the empty one.
+          # A single CI build gains nothing from a reusable daemon anyway.
+          #
+          # --stacktrace is gone: it added several hundred lines of Gradle
+          # internals per failure across runs 3 to 8 and never identified
+          # anything the error line above it had not already said.
+          rc=0
+          ./gradlew assembleDebug --console=plain --no-daemon || rc=$?
+          # Last lines of the step, so they survive log truncation: the API
+          # returns only the final 5000 lines of a job log, and a full build
+          # overruns that, which is why run 8 could not be checked.
+          echo "::group::environment as this step saw it"
+          echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT:-<empty or unset>}"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME:-<empty or unset>}"
+          echo "gradlew exit=$rc"
+          echo "::endgroup::"
+          exit $rc
 
       # The assertion that earns this job its keep.
       #
@@ -79,6 +239,7 @@ jobs:
       # dex string pool as "Lteacher/minute/AndroidAppMain;", which grep -a finds
       # without needing build-tools or a dex parser.
       - name: Verify the Application class reached the APK
+        if: ${{ ! inputs.diagnostics-only }}
         working-directory: teacher-minute/Android
         run: |
           set -euo pipefail
@@ -99,7 +260,7 @@ jobs:
       # Keeps the APK for a few days so a failure can be inspected without
       # reproducing the whole build locally.
       - name: Upload the APK
-        if: always()
+        if: ${{ always() && ! inputs.diagnostics-only }}
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
