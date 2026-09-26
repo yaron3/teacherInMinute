@@ -166,6 +166,7 @@ async function sendWave(
       const t = teachers[uid];
       if (!t?.fcmToken) return;
       await sendInvitePush({
+        teacherUid: uid,
         fcmToken: t.fcmToken,
         questionId: qid,
         topic: questionData.topic,
@@ -323,6 +324,7 @@ async function tryInviteTeacherForQuestionWave(
 
   if (teacher.fcmToken) {
     await sendInvitePush({
+      teacherUid,
       fcmToken: teacher.fcmToken,
       questionId: qid,
       topic: invitePayload.topic,
@@ -727,6 +729,9 @@ export const onTeacherStatusChange = onValueWritten(
     const newStatus = event.data.after.val() as string | null;
 
     if (newStatus !== "online") return;
+    // Every keep-alive re-sends "online" (see ./keepAlive). Only a teacher
+    // coming online has questions to be backfilled into.
+    if (event.data.before.val() === "online") return;
 
     logger.info(`[dispatch] teacher came online uid=${uid}, checking for waiting questions`);
     await backfillPendingQuestionsForTeacher(uid);

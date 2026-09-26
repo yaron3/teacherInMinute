@@ -99,7 +99,10 @@ them for a real session. Before submitting one:
 3. Re-check immediately before submitting — presence changes.
 
 Take the demo teachers offline afterwards, and confirm `onlineTeachers` is back
-to what it was. Signing out does not clear presence on its own.
+to what it was. Signing out does not clear presence on its own. Neither does
+closing or killing the app, for a teacher with a push token: the backend keeps
+a teacher whose app has gone silent available by push
+(`backend/Firebase/functions/src/keepAlive.ts`). Turn the toggle off in the app.
 
 ### Capture mechanics that are not obvious
 

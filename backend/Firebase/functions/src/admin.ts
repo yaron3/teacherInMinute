@@ -655,7 +655,9 @@ export const adminMutateUser = onCall(async (req) => {
 
     // Signing a teacher out does not clear presence, so a demo (or stuck)
     // teacher keeps receiving dispatched questions until someone clears both
-    // the authoritative node and the published projection.
+    // the authoritative node and the published projection. It sticks only for
+    // an app that is gone: a running app with the toggle on re-sends `status:
+    // "online"` with every keep-alive (see ./keepAlive).
     case "goOffline": {
       await db.ref(`teachers/${uid}/status`).set("offline");
       await db.ref(`${ONLINE_TEACHERS_PATH}/${uid}`).remove();

@@ -123,6 +123,10 @@ protocol TeacherDashboardViewModeling: AnyObject {
   /// rows are the app's report on a setting the user can change outside it, so
   /// they are re-checked on every return to the front.
   func refreshPermissions()
+  /// The app came back to the front. An available teacher's keep-alive goes
+  /// out now rather than on its next tick: the backend may have taken them
+  /// offline while the app was away, and this puts them straight back.
+  func appDidBecomeActive()
   func requestMicrophoneAccess()
   func requestCameraAccess()
   func logTeacherCallAnswered(questionId: String, topic: String, wave: Int, conversationType: String)
@@ -513,6 +517,9 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   // MARK: - Private
   
   private var presenceService: TeacherPresenceService?
+  /// Runs while the teacher is online, so the backend knows the app is still
+  /// here. Made per account by `configurePresence`.
+  private var keepAlive: TeacherKeepAlive?
 #if !os(Android)
   private var inviteService: InviteService?
 #endif
@@ -568,6 +575,10 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		  self?.connectionMonitor?.stopListening()
 		  self?.connectionMonitor = nil
 #endif
+		  // Sign-out has already written this teacher offline (see
+		  // AuthService); a keep-alive now would undo it.
+		  self?.keepAlive?.stop()
+		  self?.keepAlive = nil
 		  self?.presenceService = nil
 		}
 	  }
@@ -578,6 +589,11 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   private func configurePresence(uid: String) {
 	logger.info("[VM] configurePresence — uid=\(uid)")
+	// Bound to this account, and started once the teacher goes online.
+	keepAlive?.stop()
+	keepAlive = TeacherKeepAlive { [weak self] in
+	  self?.sendKeepAlive(uid: uid)
+	}
 #if os(Android)
 	presenceService = nil
 	isOnline = false
@@ -593,6 +609,13 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #else
 	presenceService = TeacherPresenceService(teacherUID: uid)
 	logger.info("[VM] configurePresence — presenceService ready")
+	// The backend can still hold this teacher online from the last run: once
+	// the app is gone, a teacher it can reach by push stays online. The
+	// dashboard starts offline until `applyLaunchPresence` decides, so the
+	// backend is told the same, as the Android branch above does.
+	if !isOnline {
+	  presenceService?.goOffline()
+	}
 #endif
 	
 #if !os(Android)
@@ -727,6 +750,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	// `.lastState` restores this on the next launch, so it has to follow every
 	// change of availability, not just the ones made from the dashboard.
 	TeacherPresencePreferences.lastKnownOnline = isOnline
+	syncKeepAlive()
 	// Going offline is the teacher's own decision, so the header has nothing
 	// left to warn about.
 	if !isOnline {
@@ -805,6 +829,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// notification rule above so both take the same path off.
   private func writePresence(online: Bool) {
 	TeacherPresencePreferences.lastKnownOnline = online
+	syncKeepAlive()
 	let status = online ? "online" : "offline"
 #if os(Android)
 	AndroidTeacherPresenceWriter.setCurrentTeacherStatus(status)
@@ -822,6 +847,38 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	}
 #endif
 	logger.info("[VM] writePresence status=\(status)")
+  }
+
+  // MARK: - Keep-alive
+
+  /// Runs the keep-alive while the teacher is online, and only then. Called
+  /// with every presence write, so it always follows `isOnline`.
+  private func syncKeepAlive() {
+	if isOnline {
+	  keepAlive?.start()
+	} else {
+	  keepAlive?.stop()
+	}
+  }
+
+  func appDidBecomeActive() {
+	keepAlive?.sendNow()
+  }
+
+  /// One keep-alive, for the account the loop was made for.
+  private func sendKeepAlive(uid: String) {
+	// Sign-out writes the teacher offline and the auth listener then stops the
+	// loop, but a tick can land in between — and whoever is signed in by then
+	// need not be this teacher.
+	guard Auth.auth().currentUser?.uid == uid else {
+	  keepAlive?.stop()
+	  return
+	}
+#if os(Android)
+	AndroidTeacherPresenceWriter.sendKeepAlive(uid: uid)
+#else
+	presenceService?.sendKeepAlive()
+#endif
   }
 
 #if os(Android)
@@ -1731,6 +1788,8 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Inert in previews, like `enforceNotificationRequirement`: a preview must
   /// not put the system's permission dialog up.
   func refreshPermissions() {}
+  /// Inert in previews: the mock has no backend to keep alive.
+  func appDidBecomeActive() {}
   func requestMicrophoneAccess() { micPermissionState = .granted }
   func requestCameraAccess() { cameraPermissionState = .granted }
   func activeChatInitialDetails() -> ChatSessionDetails {
