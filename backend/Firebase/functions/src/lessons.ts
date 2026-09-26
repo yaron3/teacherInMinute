@@ -287,11 +287,26 @@ async function resolveQuestionContext(questionId: string): Promise<{
  *  Derived from that function so the two cannot drift apart. */
 type QuestionContext = Awaited<ReturnType<typeof resolveQuestionContext>>;
 
+/** Whether a question with this status has reached a state no further ending
+ *  can change: settled, or written off. */
+function isEndedStatus(status: unknown): boolean {
+  return status === "completed" || status === "cancelled";
+}
+
+/**
+ * Settles a lesson — charges the student, pays the teacher and records the
+ * question completed — then removes its live RTDB node. Returns whether this
+ * call settled it.
+ *
+ * A question that had already ended is not billed again, and false is
+ * returned. Its node is removed all the same, since whatever ended the
+ * question may have died before it could, and the apps end on its removal.
+ */
 async function migrateQuestionToFirestore(
   questionId: string,
   endedBy: LessonDoc["endedBy"],
   context: QuestionContext
-): Promise<void> {
+): Promise<boolean> {
   const {
     questionRef,
     rtdbQuestion,
@@ -359,152 +374,172 @@ async function migrateQuestionToFirestore(
     `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} heldSeconds=${heldSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} bonusMinutesUsed=${bonusMinutesUsed} effectiveShare=${effectiveShare} teacherEarnings=${teacherEarnings}`
   );
 
-  const batch = firestore.batch();
   const qDocRef = firestore.collection("questions").doc(questionId);
-  batch.set(
-    qDocRef,
-    {
-      ...migratedQuestion,
-      state: "ended",
-      status: "completed",
-      studentUid,
-      acceptedByTeacher: teacherUid,
-      teacherId: teacherUid,
-      participants: [studentUid, teacherUid],
-      durationSeconds: roundedSeconds,
-      heldSeconds,
-      currencyCode,
-      pricePerMinute,
-      exchangeRateToUsd,
-      teacherShare,
-      teacherBonusMinutesUsed: bonusMinutesUsed,
-      effectiveTeacherShare: effectiveShare,
-      cost,
-      teacherEarnings,
-      // Legacy aliases for clients still reading the old field names.
-      costPerMinute: pricePerMinute,
-      commissionRate: teacherShare,
-      endedBy,
-      endedAt,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+  const studentRef = firestore.collection("users").doc(studentUid);
 
-  if (lessonRecord) {
-    batch.set(
-      lessonRecord.ref,
+  // Callers settle whenever the live node exists, and the node outlives the
+  // billing: it is removed only after this commits. A call that dies in
+  // between leaves it for the other app, a retry or the hard cap to find, and
+  // two calls ending the lesson at once both find it. So the status is checked
+  // in the transaction that bills, and an ended question is not billed again.
+  const alreadyEnded = await firestore.runTransaction(async (tx) => {
+    const status = ((await tx.get(qDocRef)).data() as Partial<QuestionDoc> | undefined)?.status;
+    if (isEndedStatus(status)) return status;
+
+    // Read with the status, since a transaction reads before it writes — and
+    // so the minutes drawn from each purchase are what it holds as it is billed.
+    const purchasesSnap =
+      roundedMinutesToCharge > 0
+        ? await tx.get(studentRef.collection("purchases").where("status", "==", "active").limit(50))
+        : undefined;
+
+    tx.set(
+      qDocRef,
       {
+        ...migratedQuestion,
+        state: "ended",
+        status: "completed",
+        studentUid,
+        acceptedByTeacher: teacherUid,
+        teacherId: teacherUid,
+        participants: [studentUid, teacherUid],
+        durationSeconds: roundedSeconds,
+        heldSeconds,
         currencyCode,
         pricePerMinute,
+        exchangeRateToUsd,
         teacherShare,
         teacherBonusMinutesUsed: bonusMinutesUsed,
         effectiveTeacherShare: effectiveShare,
-        exchangeRateToUsd,
         cost,
         teacherEarnings,
-        billedSeconds: roundedSeconds,
-        durationSeconds: roundedSeconds,
+        // Legacy aliases for clients still reading the old field names.
+        costPerMinute: pricePerMinute,
+        commissionRate: teacherShare,
         endedBy,
         endedAt,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
-  }
 
-  const studentRef = firestore.collection("users").doc(studentUid);
-  batch.set(
-    studentRef,
-    {
-      questions: FieldValue.arrayUnion(questionId),
-      remainingMinutes: FieldValue.increment(-roundedMinutesToCharge),
-      totalMinutesUsed: FieldValue.increment(roundedMinutesToCharge),
-    },
-    { merge: true }
-  );
-  batch.set(
-    teacherRef,
-    {
-      questions: FieldValue.arrayUnion(questionId),
-      totalMinutes: FieldValue.increment(roundedMinutes),
-      totalEarnings: FieldValue.increment(teacherEarnings),
-      earnings: FieldValue.increment(teacherEarnings),
-      totalRevenueGenerated: FieldValue.increment(cost),
-      ...(bonusMinutesUsed > 0
-        ? { teacherBonus: { minutesRemaining: FieldValue.increment(-bonusMinutesUsed) } }
-        : {}),
-    },
-    { merge: true }
-  );
-
-  if (roundedMinutesToCharge > 0) {
-    const purchasesSnap = await firestore
-      .collection("users")
-      .doc(studentUid)
-      .collection("purchases")
-      .where("status", "==", "active")
-      .limit(50)
-      .get();
-
-    const sortedPurchases = [...purchasesSnap.docs].sort((a, b) => {
-      const aTs = (a.data() as PurchaseDoc).purchasedAt?.toMillis?.() ?? 0;
-      const bTs = (b.data() as PurchaseDoc).purchasedAt?.toMillis?.() ?? 0;
-      return aTs - bTs;
-    });
-
-    let minutesToConsume = roundedMinutesToCharge;
-    for (const purchaseDoc of sortedPurchases) {
-      if (minutesToConsume <= 0) break;
-
-      const purchase = purchaseDoc.data() as PurchaseDoc;
-      const purchaseRef = purchaseDoc.ref;
-
-      const currentRemaining = Math.max(0, Number(purchase.minutesRemaining ?? 0));
-      if (currentRemaining <= 0) {
-        batch.set(
-          purchaseRef,
-          {
-            status: "expired",
-            updatedAt: Timestamp.now(),
-          },
-          { merge: true }
-        );
-        continue;
-      }
-
-      const usedNow = Math.min(currentRemaining, minutesToConsume);
-      const nextRemaining = Math.max(0, Math.round((currentRemaining - usedNow) * 100) / 100);
-      minutesToConsume = Math.max(0, Math.round((minutesToConsume - usedNow) * 100) / 100);
-
-      batch.set(
-        purchaseRef,
+    if (lessonRecord) {
+      tx.set(
+        lessonRecord.ref,
         {
-          minutesRemaining: nextRemaining,
-          minutesUsed: FieldValue.increment(usedNow),
-          status: nextRemaining === 0 ? "expired" : "active",
-          updatedAt: Timestamp.now(),
+          // Completed with its billing. The caller marks it again afterwards,
+          // but a call that dies first would leave a billed lesson in progress,
+          // and the calls that clear up after it leave the lesson alone.
+          status: "completed",
+          currencyCode,
+          pricePerMinute,
+          teacherShare,
+          teacherBonusMinutesUsed: bonusMinutesUsed,
+          effectiveTeacherShare: effectiveShare,
+          exchangeRateToUsd,
+          cost,
+          teacherEarnings,
+          billedSeconds: roundedSeconds,
+          durationSeconds: roundedSeconds,
+          endedBy,
+          endedAt,
+          updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
       );
     }
 
-    const consumedFromPurchases = roundedMinutesToCharge - minutesToConsume;
-    batch.set(
+    tx.set(
       studentRef,
       {
-        purchaseMinutesConsumed: FieldValue.increment(consumedFromPurchases),
+        questions: FieldValue.arrayUnion(questionId),
+        remainingMinutes: FieldValue.increment(-roundedMinutesToCharge),
+        totalMinutesUsed: FieldValue.increment(roundedMinutesToCharge),
+      },
+      { merge: true }
+    );
+    tx.set(
+      teacherRef,
+      {
+        questions: FieldValue.arrayUnion(questionId),
+        totalMinutes: FieldValue.increment(roundedMinutes),
+        totalEarnings: FieldValue.increment(teacherEarnings),
+        earnings: FieldValue.increment(teacherEarnings),
+        totalRevenueGenerated: FieldValue.increment(cost),
+        ...(bonusMinutesUsed > 0
+          ? { teacherBonus: { minutesRemaining: FieldValue.increment(-bonusMinutesUsed) } }
+          : {}),
       },
       { merge: true }
     );
 
-    logger.info(
-      `[lessons] purchase consumption qid=${questionId} studentUid=${studentUid} roundedMinutes=${roundedMinutesToCharge} consumedFromPurchases=${consumedFromPurchases} remainingUnmapped=${minutesToConsume}`
-    );
-  }
+    if (purchasesSnap) {
+      const sortedPurchases = [...purchasesSnap.docs].sort((a, b) => {
+        const aTs = (a.data() as PurchaseDoc).purchasedAt?.toMillis?.() ?? 0;
+        const bTs = (b.data() as PurchaseDoc).purchasedAt?.toMillis?.() ?? 0;
+        return aTs - bTs;
+      });
 
-  await batch.commit();
-  logger.info(`[lessons] migrateQuestionToFirestore firestore batch committed qid=${questionId}`);
+      let minutesToConsume = roundedMinutesToCharge;
+      for (const purchaseDoc of sortedPurchases) {
+        if (minutesToConsume <= 0) break;
+
+        const purchase = purchaseDoc.data() as PurchaseDoc;
+        const purchaseRef = purchaseDoc.ref;
+
+        const currentRemaining = Math.max(0, Number(purchase.minutesRemaining ?? 0));
+        if (currentRemaining <= 0) {
+          tx.set(
+            purchaseRef,
+            {
+              status: "expired",
+              updatedAt: Timestamp.now(),
+            },
+            { merge: true }
+          );
+          continue;
+        }
+
+        const usedNow = Math.min(currentRemaining, minutesToConsume);
+        const nextRemaining = Math.max(0, Math.round((currentRemaining - usedNow) * 100) / 100);
+        minutesToConsume = Math.max(0, Math.round((minutesToConsume - usedNow) * 100) / 100);
+
+        tx.set(
+          purchaseRef,
+          {
+            minutesRemaining: nextRemaining,
+            minutesUsed: FieldValue.increment(usedNow),
+            status: nextRemaining === 0 ? "expired" : "active",
+            updatedAt: Timestamp.now(),
+          },
+          { merge: true }
+        );
+      }
+
+      const consumedFromPurchases = roundedMinutesToCharge - minutesToConsume;
+      tx.set(
+        studentRef,
+        {
+          purchaseMinutesConsumed: FieldValue.increment(consumedFromPurchases),
+        },
+        { merge: true }
+      );
+
+      logger.info(
+        `[lessons] purchase consumption qid=${questionId} studentUid=${studentUid} roundedMinutes=${roundedMinutesToCharge} consumedFromPurchases=${consumedFromPurchases} remainingUnmapped=${minutesToConsume}`
+      );
+    }
+
+    return undefined;
+  });
+
+  if (alreadyEnded) {
+    logger.info(
+      `[lessons] migrateQuestionToFirestore skipped qid=${questionId} status=${alreadyEnded}: already ended, nothing billed`
+    );
+  } else {
+    logger.info(`[lessons] migrateQuestionToFirestore firestore transaction committed qid=${questionId}`);
+  }
 
   const existsBeforeRemove = (await questionRef.once("value")).exists();
   logger.info(
@@ -512,6 +547,7 @@ async function migrateQuestionToFirestore(
   );
   await questionRef.remove();
   logger.info(`[lessons] migrateQuestionToFirestore RTDB question removed qid=${questionId}`);
+  return alreadyEnded === undefined;
 }
 
 /** Whether the question has already reached a state no further ending can
@@ -519,8 +555,7 @@ async function migrateQuestionToFirestore(
 async function questionAlreadyEnded(questionId: string): Promise<boolean> {
   const snap = await firestore.collection("questions").doc(questionId).get();
   if (!snap.exists) return false;
-  const status = (snap.data() as QuestionDoc).status;
-  return status === "completed" || status === "cancelled";
+  return isEndedStatus((snap.data() as QuestionDoc).status);
 }
 
 /**
@@ -1014,7 +1049,22 @@ export const endLesson = onCall(async (req) => {
 
     debugContext.stage = "committing-firestore";
     logger.info(`[lessons] endLesson committing Firestore writes qid=${questionId}`);
-    await migrateQuestionToFirestore(questionId, endedBy, context);
+    const settled = await migrateQuestionToFirestore(questionId, endedBy, context);
+
+    if (!settled) {
+      // Already over. The live node was still here because whatever ended the
+      // lesson died before removing it, or is ending it right now. Nothing is
+      // billed again. The node is gone now, which ends both apps' sessions,
+      // and the teacher is freed in case that call never got that far.
+      await releaseTeacherBusy(context.teacherUid, questionId).catch((releaseError) => {
+        logger.error(
+          `[lessons] endLesson failed releasing teacher=${context.teacherUid} qid=${questionId}`,
+          releaseError
+        );
+      });
+      logger.info(`[lessons] endLesson already ended, cleared the live node qid=${questionId} uid=${uid}`);
+      return { success: true, questionId, alreadyEnded: true };
+    }
 
     const questionDoc = await firestore.collection("questions").doc(questionId).get();
     const lessonId = (questionDoc.data() as { lessonId?: string } | undefined)?.lessonId;
@@ -1366,11 +1416,19 @@ export const forceEndLesson = onTaskDispatched<{ lessonId: string }>(
     }
 
     const context = await resolveQuestionContext(questionId);
-    await migrateQuestionToFirestore(questionId, "system", context);
+    const settled = await migrateQuestionToFirestore(questionId, "system", context);
 
     await releaseTeacherBusy(context.teacherUid, questionId).catch((error) => {
       logger.error(`[lessons] forceEndLesson failed releasing teacher=${context.teacherUid}`, error);
     });
+
+    // Ended already, by a call that died before removing the live node — this
+    // task's own earlier attempt among them. The lesson stays as whatever
+    // ended it recorded it, rather than rewritten as ended by the cap.
+    if (!settled) {
+      logger.info(`[lessons] forceEndLesson lesson already ended qid=${questionId} lessonId=${lessonId}`);
+      return;
+    }
 
     await firestore.collection("lessons").doc(lessonId).set(
       {

@@ -13,7 +13,11 @@ const rtdb = new Map<string, unknown>();
 function resolveSentinels(existing: DocData, data: DocData): DocData {
   const next: DocData = { ...existing };
   for (const [key, value] of Object.entries(data)) {
-    const sentinel = value as { __arrayUnion?: unknown[]; __serverTimestamp?: boolean };
+    const sentinel = value as {
+      __arrayUnion?: unknown[];
+      __serverTimestamp?: boolean;
+      __increment?: number;
+    };
     if (sentinel && typeof sentinel === "object" && Array.isArray(sentinel.__arrayUnion)) {
       const current = Array.isArray(next[key]) ? (next[key] as unknown[]) : [];
       next[key] = [...new Set([...current, ...sentinel.__arrayUnion])];
@@ -21,6 +25,18 @@ function resolveSentinels(existing: DocData, data: DocData): DocData {
     }
     if (sentinel && typeof sentinel === "object" && sentinel.__serverTimestamp) {
       next[key] = { __timestamp: "server" };
+      continue;
+    }
+    // An increment adds to a number already there, so a balance a test seeded
+    // shows every charge made against it. On a field with no number it is kept
+    // as sent, for a test to read the charge itself.
+    if (
+      sentinel &&
+      typeof sentinel === "object" &&
+      typeof sentinel.__increment === "number" &&
+      typeof next[key] === "number"
+    ) {
+      next[key] = (next[key] as number) + sentinel.__increment;
       continue;
     }
     next[key] = value;
@@ -77,20 +93,28 @@ function collectionRef(path: string) {
   };
 }
 
+/** Transactions run one at a time, which is the guarantee real ones give. */
+let transactionQueue: Promise<unknown> = Promise.resolve();
+
 const fakeFirestore = {
   collection: (name: string) => collectionRef(name),
-  runTransaction: async <T>(
+  runTransaction: <T>(
     body: (tx: {
-      get: (ref: FakeDocRef) => Promise<ReturnType<typeof docSnapshot>>;
+      get: <S>(target: { get: () => Promise<S> }) => Promise<S>;
       update: (ref: FakeDocRef, data: DocData) => void;
       set: (ref: FakeDocRef, data: DocData, options?: { merge?: boolean }) => void;
     }) => Promise<T>
-  ): Promise<T> =>
-    body({
-      get: (ref) => ref.get(),
-      update: (ref, data) => void ref.update(data),
-      set: (ref, data, options) => void ref.set(data, options),
-    }),
+  ): Promise<T> => {
+    const run = transactionQueue.then(() =>
+      body({
+        get: (target) => target.get(),
+        update: (ref, data) => void ref.update(data),
+        set: (ref, data, options) => void ref.set(data, options),
+      })
+    );
+    transactionQueue = run.catch(() => undefined);
+    return run;
+  },
   batch: () => {
     const operations: Array<() => Promise<void>> = [];
     const batch = {
@@ -207,6 +231,7 @@ type CallableHandler = (request: {
 }) => Promise<Record<string, unknown>>;
 
 const runAbandonedCheck = endAbandonedLesson as unknown as TaskHandler;
+const runHardCap = forceEndLesson as unknown as (req: { data: { lessonId: string } }) => Promise<void>;
 const callStartLesson = startLesson as unknown as CallableHandler;
 const callEndLesson = endLesson as unknown as CallableHandler;
 
@@ -631,6 +656,144 @@ describe("endLesson when the other side got there first", () => {
     await expect(
       callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } })
     ).rejects.toThrow();
+  });
+});
+
+// Every caller settles a lesson whenever its live node still exists, and the
+// node is removed only after the billing commits. A call that dies in between
+// leaves it for the other app, a retry or the hard cap to find.
+describe("a lesson is billed once, however many calls end it", () => {
+  /** Timestamp.now() is pinned in the fakes, so the billing clock is fixed. */
+  const NOW_MS = 1_700_000_000_000;
+
+  /** Eight minutes in: 16 at 2 a minute, of which the teacher earns 12. */
+  function seedRunningLesson(): void {
+    seedQuestion({ status: "in_progress", lessonId: "lesson-1" });
+    rtdb.set(QUESTION_PATH, {
+      studentUid: "student-1",
+      teacherUid: "teacher-1",
+      acceptedAt: NOW_MS - 540_000,
+      startedAt: NOW_MS - 480_000,
+    });
+    store.set("lessons/lesson-1", { questionId: "q-1", status: "in_progress" });
+    store.set("users/student-1", { remainingMinutes: 20 });
+    store.set("users/teacher-1", { totalEarnings: 0 });
+  }
+
+  /** The same lesson once the teacher's call billed it and died before it
+   *  removed the live node. */
+  function seedSettledLessonWithLiveNode(): void {
+    seedRunningLesson();
+    store.set(QUESTION_PATH, {
+      ...question(),
+      status: "completed",
+      endedBy: "teacher",
+      cost: 16,
+      teacherEarnings: 12,
+    });
+    store.set("lessons/lesson-1", {
+      questionId: "q-1",
+      status: "completed",
+      endedBy: "teacher",
+      cost: 16,
+    });
+    store.set("users/student-1", { remainingMinutes: 12 });
+    store.set("users/teacher-1", { totalEarnings: 12 });
+  }
+
+  test("endLesson charges nothing more, and clears what the dead call left", async () => {
+    seedSettledLessonWithLiveNode();
+
+    await expect(
+      callEndLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } })
+    ).resolves.toEqual({ success: true, questionId: "q-1", alreadyEnded: true });
+
+    expect(store.get("users/student-1")).toEqual({ remainingMinutes: 12 });
+    expect(store.get("users/teacher-1")).toEqual({ totalEarnings: 12 });
+    expect(question()).toMatchObject({ status: "completed", endedBy: "teacher", cost: 16 });
+    // Removing the node is what ends both apps' sessions, and the teacher is
+    // free for the next question.
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+  });
+
+  test("the hard cap charges nothing more", async () => {
+    seedSettledLessonWithLiveNode();
+
+    await runHardCap({ data: { lessonId: "lesson-1" } });
+
+    expect(store.get("users/student-1")).toEqual({ remainingMinutes: 12 });
+    expect(store.get("users/teacher-1")).toEqual({ totalEarnings: 12 });
+    // Still the teacher's ending, not the cap's.
+    expect(question()).toMatchObject({ status: "completed", endedBy: "teacher" });
+    expect(store.get("lessons/lesson-1")).toMatchObject({ status: "completed", endedBy: "teacher" });
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+  });
+
+  test("a lesson written off is not billed when its node survived the write-off", async () => {
+    // endAbandonedLesson cancelled it, then died before removing the node.
+    seedRunningLesson();
+    store.set(QUESTION_PATH, { ...question(), status: "cancelled", endedBy: "system", cost: 0 });
+
+    await expect(
+      callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } })
+    ).resolves.toEqual({ success: true, questionId: "q-1", alreadyEnded: true });
+
+    expect(store.get("users/student-1")).toEqual({ remainingMinutes: 20 });
+    expect(store.get("users/teacher-1")).toEqual({ totalEarnings: 0 });
+    expect(question()).toMatchObject({ status: "cancelled", endedBy: "system", cost: 0 });
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
+  });
+
+  test("the other app ending a lesson whose settle died does not bill it again", async () => {
+    seedRunningLesson();
+
+    // The teacher ends it. The call bills the lesson, then dies before the
+    // live node is removed.
+    const workingRef = fakeDatabase.ref;
+    const removalFails = jest.spyOn(fakeDatabase, "ref").mockImplementation((path: string) => ({
+      ...workingRef(path),
+      remove: async () => {
+        throw new Error("deadline exceeded");
+      },
+    }));
+    try {
+      await expect(
+        callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } })
+      ).rejects.toThrow();
+    } finally {
+      removalFails.mockRestore();
+    }
+    expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 12 });
+    expect(rtdb.has(QUESTION_PATH)).toBe(true);
+
+    await expect(
+      callEndLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } })
+    ).resolves.toEqual({ success: true, questionId: "q-1", alreadyEnded: true });
+
+    expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 12 });
+    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 12 });
+    expect(question()).toMatchObject({ status: "completed", endedBy: "teacher" });
+    // Completed along with the billing: the calls that clear up after a dead
+    // one leave the lesson document alone.
+    expect(store.get("lessons/lesson-1")).toMatchObject({ status: "completed", endedBy: "teacher" });
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+  });
+
+  test("both apps ending it at the same moment bill it once", async () => {
+    seedRunningLesson();
+
+    const results = await Promise.all([
+      callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } }),
+      callEndLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } }),
+    ]);
+
+    expect(results.filter((result) => result.alreadyEnded)).toHaveLength(1);
+    expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 12 });
+    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 12 });
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
   });
 });
 
