@@ -11,8 +11,10 @@
  *   commissionRate = 0.75   (default; teacher keeps 75 % of lesson cost)
  *   studentInitialMinutes = 20.0
  *
- * Rounding rule: lesson duration is rounded to a whole minute. More than
- * 30 seconds rounds up; exactly 30 seconds rounds down.
+ * Charge rule: a lesson under 30 seconds is free. From there it is charged in
+ * whole minutes, each minute's band running from half past the minute before
+ * to half past this one: 0:30–1:30 is 1 minute, 1:31–2:30 is 2, 2:31–3:30 is
+ * 3, and so on.
  */
 
 import { calculateBilling, billingStartMillis } from "../billing";
@@ -134,10 +136,10 @@ describe("Edge cases", () => {
     expect(r.studentRemainingMinutes).toBe(INITIAL_STUDENT_MINUTES);
   });
 
-  test("exactly 30 s rounds down to 0 minutes", () => {
+  test("exactly 30 s is charged 1 minute", () => {
     const r = runLesson(30);
-    expect(r.minutesToCharge).toBe(0);
-    expect(r.cost).toBe(0);
+    expect(r.minutesToCharge).toBe(1);
+    expect(r.cost).toBe(1);
   });
 
   test("31 s rounds up to 1 minute", () => {
@@ -167,6 +169,33 @@ describe("Edge cases", () => {
   });
 });
 
+// ─── The charge bands ────────────────────────────────────────────────────────
+describe("the charge bands", () => {
+  it.each([
+    // Under half a minute is free.
+    [0, 0],
+    [29, 0],
+    // 0:30–1:30 is one minute.
+    [30, 1],
+    [60, 1],
+    [90, 1],
+    // 1:31–2:30 is two.
+    [91, 2],
+    [120, 2],
+    [150, 2],
+    // 2:31–3:30 is three, and so on.
+    [151, 3],
+    [210, 3],
+    [211, 4],
+  ])("%i s is charged %i minute(s)", (seconds, minutes) => {
+    const r = runLesson(seconds);
+    expect(r.rawSeconds).toBe(seconds);
+    expect(r.minutesToCharge).toBe(minutes);
+    expect(r.roundedSeconds).toBe(minutes * 60);
+    expect(r.cost).toBe(minutes * COST_PER_MINUTE);
+  });
+});
+
 /**
  * Which timestamp billing starts from.
  *
@@ -186,9 +215,11 @@ describe("billingStartMillis", () => {
     expect(billingStartMillis(undefined, accepted)).toBe(accepted);
   });
 
-  it("uses acceptedAt when it is somehow the later of the two", () => {
+  // Both apps count the lesson from startedAt, so billing must too. A later
+  // acceptedAt can only be a phone's clock: the teacher's app stamps it.
+  it("uses startedAt even when acceptedAt is somehow later", () => {
     const lateAccept = started + 5_000;
-    expect(billingStartMillis(started, lateAccept)).toBe(lateAccept);
+    expect(billingStartMillis(started, lateAccept)).toBe(started);
   });
 
   it("uses startedAt when there is no acceptedAt", () => {

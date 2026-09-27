@@ -114,6 +114,17 @@ struct StartLessonResult {
   let started: Bool
 }
 
+/// What `endLesson` answered: the lesson's time as the backend settled it, as
+/// of the first side to go. Both apps are told the same, whichever of them
+/// ended it. Nil for a lesson that never started, and from a backend that
+/// predates it.
+struct EndLessonResult {
+  /// How long the lesson ran, to the second, holds excluded.
+  let lessonSeconds: Int?
+  /// `lessonSeconds` rounded to the minutes billed, in seconds.
+  let billedSeconds: Int?
+}
+
 struct CreateQuestionResult {
   let questionId: String
   /// The student's LiveKit room and token for an audio or video question,
@@ -633,7 +644,8 @@ final class FunctionsService {
         questionText: text,
         questionPhotoUrls: photoUrls,
         acceptedAt: Self.isoDate(row["acceptedAt"]) ?? Self.isoDate(row["endedAt"]) ?? Date.distantPast,
-        durationSeconds: Self.intValue(row["durationSeconds"]) ?? 0,
+        // To the second; a lesson settled before that was kept, as billed.
+        durationSeconds: Self.intValue(row["lessonSeconds"]) ?? Self.intValue(row["durationSeconds"]) ?? 0,
         costCents: Self.intValue(row["costCents"]) ?? 0,
         teacherEarningsCents: Self.intValue(row["earningsCents"]) ?? 0,
         // Older lessons predate the per-lesson currency field; the summary's
@@ -730,8 +742,13 @@ final class FunctionsService {
     return StartLessonResult(lessonId: lessonId, started: started)
   }
 
-  func endLesson(questionId: String) async throws {
-    _ = try await call(function: "endLesson", data: ["questionId": questionId])
+  @discardableResult
+  func endLesson(questionId: String) async throws -> EndLessonResult {
+    let result = try await call(function: "endLesson", data: ["questionId": questionId])
+    return EndLessonResult(
+      lessonSeconds: Self.intValue(result["lessonSeconds"]),
+      billedSeconds: Self.intValue(result["durationSeconds"])
+    )
   }
 
   // MARK: - Core HTTP caller

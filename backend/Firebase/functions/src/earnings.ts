@@ -73,6 +73,8 @@ export type CompletedQuestion = QuestionDoc & {
   teacherEarnings?: number;
   currencyCode?: string;
   durationSeconds?: number;
+  /** The lesson's time to the second — see `EarningsLesson.lessonSeconds`. */
+  lessonSeconds?: number;
   cost?: number;
   studentRating?: number;
   // Older documents reached Firestore as a spread of the RTDB question node
@@ -100,7 +102,12 @@ export interface EarningsLesson {
   /** ISO-8601. When the teacher picked it up — what the history list sorts and
    *  dates rows by. Falls back to `endedAt` when the document has no start. */
   acceptedAt: string;
+  /** What the lesson was billed as, in seconds: whole minutes. */
   durationSeconds: number;
+  /** How long it ran, to the second — from the two sides connecting to the
+   *  first of them ending it, holds excluded. What the history shows. A lesson
+   *  settled before this was kept shows its billed time instead. */
+  lessonSeconds: number;
   earningsCents: number;
   costCents: number;
   currency: string;
@@ -214,11 +221,16 @@ export function summarizeCompletedQuestions(
       toDate(question.createdAt) ??
       endedAt;
 
+    const durationSeconds = Math.max(0, Math.floor(Number(question.durationSeconds) || 0));
     lessons.push({
       questionId: firstString(question.id, question.questionId),
       endedAt: endedAt.toISOString(),
       acceptedAt: acceptedAt.toISOString(),
-      durationSeconds: Math.max(0, Math.floor(Number(question.durationSeconds) || 0)),
+      durationSeconds,
+      lessonSeconds:
+        typeof question.lessonSeconds === "number" && Number.isFinite(question.lessonSeconds)
+          ? Math.max(0, Math.floor(question.lessonSeconds))
+          : durationSeconds,
       earningsCents,
       costCents: toCostCents(question.cost),
       currency: firstString(question.currencyCode).toUpperCase(),

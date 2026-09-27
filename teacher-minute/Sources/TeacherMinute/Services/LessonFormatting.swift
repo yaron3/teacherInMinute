@@ -30,18 +30,14 @@ enum LessonFormatting {
 	return formatter.string(from: date)
   }
   
+  /// A lesson's length to the second, as "m:ss": its time from the two sides
+  /// connecting to the first of them ending it, as the backend settled it —
+  /// the same the lesson's own timer ended on. Never rounded: what the lesson
+  /// was charged is the backend's to decide (billedMinutes in
+  /// functions/src/billing.ts), and shows as its amount.
   static func durationText(seconds: Int) -> String {
-	let minutes = max(1, Int((Double(max(0, seconds)) / 60.0).rounded(.up)))
-	return minutes == 1
-	? LocalizationSupport.localized("1 min")
-	: String(format: LocalizationSupport.localized("%d mins"), minutes)
-  }
-  
-  static func shortDurationText(seconds: Int) -> String {
-	let minutes = max(1, Int((Double(max(0, seconds)) / 60.0).rounded(.up)))
-	return minutes == 1
-	? LocalizationSupport.localized("1 min")
-	: String(format: LocalizationSupport.localized("%d min"), minutes)
+	let total = max(0, seconds)
+	return String(format: "%d:%02d", total / 60, total % 60)
   }
   
   static func currencyText(cents: Int, currencyCode: String = defaultCurrencyCode) -> String {
@@ -110,10 +106,11 @@ enum LessonFormatting {
 	return formatter.currencySymbol ?? currencyCode
   }
   
+  /// The lessons' own times, to the second, summed and shown in whole minutes:
+  /// never rounded up.
   static func totalDurationText(lessons: [HistoryLesson]) -> String {
-	let totalSeconds = lessons.reduce(0) { $0 + $1.durationSeconds }
-	let totalMinutes = max(0, Int((Double(totalSeconds) / 60.0).rounded(.up)))
-	return minutesText(totalMinutes)
+	let totalSeconds = lessons.reduce(0) { $0 + max(0, $1.durationSeconds) }
+	return minutesText(totalSeconds / 60)
   }
   
   static func minutesText(_ minutes: Int) -> String {

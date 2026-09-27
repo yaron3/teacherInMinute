@@ -24,7 +24,16 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { get, ref, remove, serverTimestamp, set, update } from "firebase/database";
+import {
+  get,
+  goOffline,
+  onDisconnect,
+  ref,
+  remove,
+  serverTimestamp,
+  set,
+  update,
+} from "firebase/database";
 
 const TEACHER = "teacher-uid";
 const STUDENT = "student-uid";
@@ -281,6 +290,102 @@ describe("teacher keep-alive", () => {
     await assertFails(
       update(teacherNode(STRANGER), { status: "online", lastSeenAt: serverTimestamp() })
     );
+  });
+});
+
+// ─── lesson presence ─────────────────────────────────────────────────────────
+//
+// Each side's app keeps its presence while a lesson runs: a connection entry
+// its disconnect handler removes, `lostAt` that handler stamps, and `leftAt` as
+// it leaves on purpose (functions/src/types.ts, LessonSidePresence). The lesson
+// ends — and is billed — as of the first of those, so they must be the
+// server's clock, each side's own, and a leave cannot be moved once stamped.
+
+describe.each(SHAPES)("lesson presence (%s)", (_name, people) => {
+  const presence = (uid: string, path: string) =>
+    ref(db(uid), `lessonPresence/${QID}/${path}`);
+
+  beforeEach(async () => {
+    await testEnv.clearDatabase();
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await set(ref(context.database(), `questions/${QID}`), { ...people, status: "in_progress" });
+    });
+  });
+
+  /** Reads as the backend does, past the rules. */
+  async function stored(path: string): Promise<unknown> {
+    let value: unknown;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      value = (await get(ref(context.database(), `lessonPresence/${QID}/${path}`))).val();
+    });
+    return value;
+  }
+
+  it("lets each side mark a connection of its own", async () => {
+    await assertSucceeds(set(presence(STUDENT, "student/connections/c1"), true));
+    await assertSucceeds(set(presence(TEACHER, "teacher/connections/c1"), true));
+  });
+
+  it("lets each side stamp its leaving with the server's clock, once", async () => {
+    for (const [uid, role] of [[STUDENT, "student"], [TEACHER, "teacher"]]) {
+      await assertSucceeds(set(presence(uid, `${role}/leftAt`), serverTimestamp()));
+      // A leave already stamped is where the lesson ended; it cannot be moved.
+      await assertFails(set(presence(uid, `${role}/leftAt`), serverTimestamp()));
+    }
+  });
+
+  it("refuses a time from the phone's clock", async () => {
+    await assertFails(set(presence(STUDENT, "student/leftAt"), Date.now()));
+    await assertFails(set(presence(STUDENT, "student/lostAt"), 1_700_000_000_000));
+  });
+
+  it("lets a side register the disconnect handler the server then runs", async () => {
+    const studentDb = db(STUDENT);
+    const side = `lessonPresence/${QID}/student`;
+    await assertSucceeds(set(ref(studentDb, `${side}/connections/c1`), true));
+    await assertSucceeds(onDisconnect(ref(studentDb, `${side}/connections/c1`)).remove());
+    await assertSucceeds(onDisconnect(ref(studentDb, `${side}/lostAt`)).set(serverTimestamp()));
+
+    const before = Date.now();
+    goOffline(studentDb);
+
+    // The server runs the handlers once it sees the connection close.
+    let lostAt: unknown;
+    for (let attempt = 0; attempt < 50 && typeof lostAt !== "number"; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      lostAt = await stored("student/lostAt");
+    }
+    expect(typeof lostAt).toBe("number");
+    expect(lostAt as number).toBeGreaterThanOrEqual(before - 5_000);
+    expect(await stored("student/connections")).toBeNull();
+  });
+
+  it("refuses writing the other side's presence", async () => {
+    await assertFails(set(presence(STUDENT, "teacher/leftAt"), serverTimestamp()));
+    await assertFails(set(presence(TEACHER, "student/connections/c1"), true));
+    await assertFails(set(presence(STUDENT, "teacher/lostAt"), serverTimestamp()));
+  });
+
+  it("refuses anything else under a side", async () => {
+    await assertFails(set(presence(STUDENT, "student/connections/c1"), "yes"));
+    await assertFails(set(presence(STUDENT, "student/status"), "online"));
+    await assertFails(set(presence(STUDENT, "someoneElse/leftAt"), serverTimestamp()));
+  });
+
+  it("lets the two sides read it, and nobody else", async () => {
+    await assertSucceeds(get(ref(db(TEACHER), `lessonPresence/${QID}`)));
+    await assertSucceeds(get(ref(db(STUDENT), `lessonPresence/${QID}`)));
+    await assertFails(get(ref(db(STRANGER), `lessonPresence/${QID}`)));
+    await assertFails(set(presence(STRANGER, "student/leftAt"), serverTimestamp()));
+  });
+
+  it("takes nothing once the lesson's question is gone", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await remove(ref(context.database(), `questions/${QID}`));
+    });
+
+    await assertFails(set(presence(STUDENT, "student/leftAt"), serverTimestamp()));
+    await assertFails(set(presence(STUDENT, "student/connections/c1"), true));
   });
 });
 

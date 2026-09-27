@@ -37,6 +37,13 @@ export const ABANDONED_LESSON_GRACE_SECONDS = 120;
 // hard cap is armed by the start too.
 export const UNSTARTED_LESSON_TIMEOUT_SECONDS = 5 * 60;
 
+// How long a side of a lesson that lost its connection has to come back. The
+// other side is shown that it is reconnecting meanwhile. One that does not
+// return in time has its lesson ended as of the moment its connection dropped
+// — the lesson ends with the first side to go, whether it left or was cut off.
+// See lessonPresence below, and endLostLesson in ./lessons.
+export const LESSON_RECONNECT_GRACE_SECONDS = 30;
+
 // How long a teacher's busy mark is believed without anything clearing it.
 // Every way a session ends clears it, and the longest a session can run is the
 // hard cap, so a mark older than that plus a margin is one whose clear was
@@ -49,6 +56,8 @@ export const BUSY_STALE_AFTER_MINUTES = HARD_CAP_MINUTES + 15;
 // three missed in a row rather than one late write. See ./keepAlive.
 export const KEEPALIVE_TIMEOUT_SECONDS = 3 * 60;
 export const CONNECTION_FEE_CENTS = 50;
+// A lesson shorter than this is free; from it on, its first minute is charged.
+// See billedMinutes in ./billing.
 export const MIN_BILLABLE_SECONDS = 30;
 export const ROUND_UP_SECONDS = 30;
 
@@ -99,6 +108,28 @@ export interface TeacherBusy {
   since: number;
 }
 
+// ─── RTDB — lessonPresence/{qid}/{role} ──────────────────────────────────────
+//
+// Written by each side's app while its lesson runs, under "student" or
+// "teacher". Kept beside the question node rather than in it: a disconnect
+// handler can fire after the lesson has ended, and it must not bring the
+// question node back. Removed with the question node when the lesson ends.
+
+export type LessonRole = "student" | "teacher";
+
+export interface LessonSidePresence {
+  /** One entry per live connection of this side's app. Each connection's
+   *  disconnect handler removes its own entry, so the side is connected while
+   *  any remain — including while an old connection's handler is still to
+   *  fire after the app has already reconnected. */
+  connections?: Record<string, true>;
+  /** Unix ms, server clock, of this side's connection last dropping. Written by
+   *  the disconnect handler; only meaningful while no connection remains. */
+  lostAt?: number;
+  /** Unix ms, server clock, of this side leaving the lesson on purpose. */
+  leftAt?: number;
+}
+
 // ─── Firestore — questions/{qid} ─────────────────────────────────────────────
 
 export type QuestionStatus =
@@ -134,8 +165,10 @@ export interface QuestionDoc {
   billedSeconds?: number;
   totalCents?: number;
   endedBy?: "student" | "teacher" | "system";
-  /** Why a question ended without a lesson being taught, e.g.
-   *  `cancelled_while_connecting`, `never_started` or `student_never_joined`. */
+  /** Why a question ended other than by someone leaving it: without a lesson
+   *  being taught (`cancelled_while_connecting`, `never_started`,
+   *  `student_never_joined`), or with `endedBy`'s connection lost for good
+   *  (`connection_lost`). */
   endedReason?: string;
   lessonId?: string;
   /** Participants whose app has reported it finished connecting. An app that

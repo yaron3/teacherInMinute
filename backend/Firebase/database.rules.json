@@ -35,6 +35,28 @@
         }
       }
     },
+    "lessonPresence": {
+      "$qid": {
+        ".read": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid)",
+        "$role": {
+          ".write": "auth != null && (($role == 'student' && (root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid)) || ($role == 'teacher' && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid)))",
+          "connections": {
+            "$connectionId": {
+              ".validate": "newData.val() == true"
+            }
+          },
+          "lostAt": {
+            ".validate": "newData.val() == now"
+          },
+          "leftAt": {
+            ".validate": "newData.val() == now && !data.exists()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",

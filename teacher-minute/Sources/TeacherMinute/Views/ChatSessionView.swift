@@ -212,7 +212,11 @@ struct ChatSessionView: View {
         }
       }
 
-      if isStudent, viewModel.minutesHoldState(at: displayDate) == .warning {
+      if let secondsLeft = viewModel.peerSecondsToReconnect(at: displayDate) {
+        // The other side's connection dropped. Unless it is back in time, the
+        // lesson ends as of that moment — see PeerPresenceTracker.
+        holdBanner(viewModel.peerReconnectingText(secondsLeft: secondsLeft))
+      } else if isStudent, viewModel.minutesHoldState(at: displayDate) == .warning {
         holdBanner(viewModel.minutesRunningOutNotice)
       } else if !isStudent, viewModel.minutesHoldState(at: displayDate) == .held {
         // Stays up for a teacher who chose to wait, so the paused session
@@ -758,11 +762,14 @@ struct ChatSessionView: View {
     VStack {
       Text(text)
         .font(.system(size: 12, weight: .semibold))
+        .multilineTextAlignment(.center)
         .foregroundStyle(theme.onAccentText)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(theme.accent)
         .clipShape(Capsule())
+        // Clear of the screen's edges when a longer notice wraps.
+        .padding(.horizontal, 16)
         .padding(.top, 8)
       Spacer()
     }
