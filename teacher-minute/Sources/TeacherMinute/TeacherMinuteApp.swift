@@ -129,6 +129,8 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 
   private func performLaunchSessionResume() async {
 	#if !targetEnvironment(preview)
+	// From here on, a session that ends on its own returns the app to sign-in.
+	router.followAuthState()
 	guard router.path.isEmpty else { return }
 	guard let uid = Auth.auth().currentUser?.uid else { return }
 	do {
