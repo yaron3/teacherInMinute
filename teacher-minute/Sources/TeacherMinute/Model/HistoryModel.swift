@@ -207,11 +207,13 @@ final class HistoryModel {
             ?? Self.dateValue(data["startedAt"])
             ?? Self.dateValue(data["createdAt"])
             ?? Date.distantPast
-        let createdAt = Self.dateValue(data["createdAt"]) ?? acceptedAt
-        let endedAt = Self.dateValue(data["endedAt"])
-            ?? Self.dateValue(data["completedAt"])
-            ?? Self.dateValue(data["finishedAt"])
-        let durationSeconds = endedAt.map { max(0, Int($0.timeIntervalSince(createdAt))) } ?? 0
+        // How long the lesson ran as the backend settled it — to the first side
+        // to go, holds excluded, rounded to the minutes billed. The teacher's
+        // history reads the same field (teacherEarningsSummary in
+        // functions/src/earnings.ts), so both sides show the same length. It
+        // used to be measured here from the question's creation, which also
+        // counted the search for a teacher and the connecting.
+        let durationSeconds = max(0, Self.intValue(data["durationSeconds"]) ?? 0)
         let currencyCode = Self.currencyCode(
             from: data,
             pricingCurrencyById: pricingCurrencyById,

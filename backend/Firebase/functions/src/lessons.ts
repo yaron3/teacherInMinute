@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onTaskDispatched } from "firebase-functions/v2/tasks";
+import { onValueWritten } from "firebase-functions/v2/database";
 import { getFunctions } from "firebase-admin/functions";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { v4 as uuidv4 } from "uuid";
@@ -12,6 +13,9 @@ import {
   HARD_CAP_MINUTES,
   ABANDONED_LESSON_GRACE_SECONDS,
   UNSTARTED_LESSON_TIMEOUT_SECONDS,
+  LESSON_RECONNECT_GRACE_SECONDS,
+  LessonRole,
+  LessonSidePresence,
   PurchaseDoc,
 } from "./types";
 import { calculateBilling, billingStartMillis, applyTeacherBonus } from "./billing";
@@ -197,6 +201,54 @@ function sanitizeForFirestore(value: unknown): unknown {
   return value;
 }
 
+/** The first side to go, as the lesson's presence records it — the moment the
+ *  lesson ended, for billing and for the time both apps show. */
+interface LessonDeparture {
+  atMs: number;
+  role: LessonRole;
+  /** Left on purpose, or cut off without coming back. */
+  reason: "left" | "connection_lost";
+}
+
+/** When one side went, if it has. Leaving on purpose counts from `leftAt`. A
+ *  dropped connection counts from `lostAt`, but only while the side has no
+ *  connection left: one that came back — or never went, and only saw an old
+ *  connection's handler fire late — is still in the lesson. */
+function sideDeparture(role: LessonRole, side: unknown): LessonDeparture | undefined {
+  if (!side || typeof side !== "object") return undefined;
+  const presence = side as LessonSidePresence;
+
+  const leftAt = Number(presence.leftAt);
+  if (Number.isFinite(leftAt) && leftAt > 0) return { atMs: leftAt, role, reason: "left" };
+
+  const connected =
+    typeof presence.connections === "object" &&
+    presence.connections !== null &&
+    Object.keys(presence.connections).length > 0;
+  const lostAt = Number(presence.lostAt);
+  if (!connected && Number.isFinite(lostAt) && lostAt > 0) {
+    return { atMs: lostAt, role, reason: "connection_lost" };
+  }
+  return undefined;
+}
+
+/** The earlier of the two sides' departures, from `lessonPresence/{qid}`. */
+function firstDeparture(presence: unknown): LessonDeparture | undefined {
+  if (!presence || typeof presence !== "object") return undefined;
+  const sides = presence as Record<string, unknown>;
+  const departures = (["student", "teacher"] as const)
+    .map((role) => sideDeparture(role, sides[role]))
+    .filter((departure): departure is LessonDeparture => departure !== undefined);
+  return departures.sort((a, b) => a.atMs - b.atMs)[0];
+}
+
+/** Removes what the apps watch while a lesson runs. Taking away the question
+ *  node is what ends both apps' sessions. */
+async function removeLiveLesson(questionId: string): Promise<void> {
+  await db.ref(`questions/${questionId}`).remove();
+  await db.ref(`lessonPresence/${questionId}`).remove();
+}
+
 async function resolveQuestionContext(questionId: string): Promise<{
   questionRef: admin.database.Reference;
   rtdbQuestion: Record<string, unknown>;
@@ -211,6 +263,9 @@ async function resolveQuestionContext(questionId: string): Promise<{
    *  everything after it is unbillable. Undefined for a lesson that started
    *  before allowances were recorded. */
   minutesDeadlineMs: number | undefined;
+  /** The first side to leave or be cut off, if either has: the lesson ended
+   *  then, however much later it is being settled. */
+  departure: LessonDeparture | undefined;
 }> {
   const questionRef = db.ref(`questions/${questionId}`);
   const questionSnap = await questionRef.once("value");
@@ -221,17 +276,19 @@ async function resolveQuestionContext(questionId: string): Promise<{
   const rtdbQuestion = (questionSnap.val() ?? {}) as Record<string, unknown>;
   const fsQuestionSnap = await firestore.collection("questions").doc(questionId).get();
   const fsQuestion = (fsQuestionSnap.data() ?? {}) as Partial<QuestionDoc> & Record<string, unknown>;
+  const presenceSnap = await db.ref(`lessonPresence/${questionId}`).once("value");
 
   const acceptedAtMs = firstNumber(
     toMillis(rtdbQuestion.acceptedAt),
     toMillis(fsQuestion.acceptedAt)
   );
 
-  // Billing starts from when both parties were fully connected (startLesson),
-  // not from when the teacher accepted the invite.
+  // The lesson runs from when both parties were fully connected (startLesson),
+  // not from when the teacher accepted the invite. Firestore first: only the
+  // backend writes it there, while either app can write to the live node.
   const startedAtMs = firstNumber(
-    toMillis(rtdbQuestion.startedAt),
-    toMillis(fsQuestion.startedAt)
+    toMillis(fsQuestion.startedAt),
+    toMillis(rtdbQuestion.startedAt)
   );
 
   const studentUid = firstString(
@@ -280,6 +337,7 @@ async function resolveQuestionContext(questionId: string): Promise<{
       toMillis(fsQuestion.minutesDeadlineAt),
       toMillis(rtdbQuestion.minutesDeadlineAt)
     ),
+    departure: firstDeparture(presenceSnap.val()),
   };
 }
 
@@ -293,20 +351,34 @@ function isEndedStatus(status: unknown): boolean {
   return status === "completed" || status === "cancelled";
 }
 
+/** A lesson as it was settled: who ended it, and the time both apps show. */
+interface SettledLesson {
+  endedBy: LessonDoc["endedBy"];
+  /** How long it ran, to the second, holds excluded. */
+  lessonSeconds: number;
+  /** `lessonSeconds` rounded to the minutes billed, in seconds. */
+  durationSeconds: number;
+}
+
 /**
  * Settles a lesson — charges the student, pays the teacher and records the
- * question completed — then removes its live RTDB node. Returns whether this
- * call settled it.
+ * question completed — then removes its live RTDB node.
  *
- * A question that had already ended is not billed again, and false is
+ * The lesson ends with the first side to go: the moment it left, or lost its
+ * connection and did not come back (see LessonDeparture). Only when neither
+ * side has gone — the hard cap, say — does it end now. One algorithm, run once,
+ * so the time the student pays for is the time the teacher is paid for, and
+ * the time both apps show.
+ *
+ * A question that had already ended is not billed again, and undefined is
  * returned. Its node is removed all the same, since whatever ended the
  * question may have died before it could, and the apps end on its removal.
  */
 async function migrateQuestionToFirestore(
   questionId: string,
-  endedBy: LessonDoc["endedBy"],
+  calledBy: LessonDoc["endedBy"],
   context: QuestionContext
-): Promise<boolean> {
+): Promise<SettledLesson | undefined> {
   const {
     questionRef,
     rtdbQuestion,
@@ -316,22 +388,31 @@ async function migrateQuestionToFirestore(
     startedAtMs,
     heldSeconds: bankedHeldSeconds,
     minutesDeadlineMs,
+    departure,
   } = context;
+  // Whoever went first ended the lesson, whichever call is settling it: the
+  // other app reacts to them going within moments, and can get here first.
+  const endedBy: LessonDoc["endedBy"] = departure?.role ?? calledBy;
   logger.info(
-    `[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} studentUid=${studentUid} teacherUid=${teacherUid}`
+    `[lessons] migrateQuestionToFirestore start qid=${questionId} endedBy=${endedBy} calledBy=${calledBy} departure=${departure ? `${departure.role}:${departure.reason}@${departure.atMs}` : "none"} studentUid=${studentUid} teacherUid=${teacherUid}`
   );
-  const endedAt = Timestamp.now();
-  const endedAtMs = endedAt.toMillis();
+  const nowMs = Timestamp.now().toMillis();
 
   const lessonRecord = await loadLessonDocByQuestionId(questionId);
   const pricing = await resolveLessonPricing(studentUid, lessonRecord?.data);
   const { currencyCode, pricePerMinute, teacherShare, exchangeRateToUsd } = pricing;
 
-  // Bill from the later of startedAt (both parties connected) and acceptedAt
-  // (teacher accepted) — see billingStartMillis. Falling back to endedAtMs only
-  // when neither exists means a lesson with no usable start bills zero rather
-  // than billing from an unknown point.
-  const billingStartMs = billingStartMillis(startedAtMs, acceptedAtMs) ?? endedAtMs;
+  // Bill from the lesson's start — see billingStartMillis. Falling back to now
+  // only when there is no usable start means a lesson with none bills zero
+  // rather than billing from an unknown point.
+  const billingStartMs = billingStartMillis(startedAtMs, acceptedAtMs) ?? nowMs;
+
+  // Kept within the lesson: a departure is never before its start, and never
+  // later than now.
+  const endedAtMs = departure
+    ? Math.min(nowMs, Math.max(billingStartMs, departure.atMs))
+    : nowMs;
+  const endedAt = Timestamp.fromMillis(endedAtMs);
 
   // Time the lesson spent held for want of minutes is not billed: the student
   // had already used everything they bought, and nothing was taught while the
@@ -404,6 +485,7 @@ async function migrateQuestionToFirestore(
         teacherId: teacherUid,
         participants: [studentUid, teacherUid],
         durationSeconds: roundedSeconds,
+        lessonSeconds: rawSeconds,
         heldSeconds,
         currencyCode,
         pricePerMinute,
@@ -417,6 +499,7 @@ async function migrateQuestionToFirestore(
         costPerMinute: pricePerMinute,
         commissionRate: teacherShare,
         endedBy,
+        ...(departure?.reason === "connection_lost" ? { endedReason: "connection_lost" } : {}),
         endedAt,
         updatedAt: FieldValue.serverTimestamp(),
       },
@@ -441,6 +524,7 @@ async function migrateQuestionToFirestore(
           teacherEarnings,
           billedSeconds: roundedSeconds,
           durationSeconds: roundedSeconds,
+          lessonSeconds: rawSeconds,
           endedBy,
           endedAt,
           updatedAt: FieldValue.serverTimestamp(),
@@ -545,17 +629,30 @@ async function migrateQuestionToFirestore(
   logger.info(
     `[lessons] migrateQuestionToFirestore removing RTDB question qid=${questionId} existsBeforeRemove=${existsBeforeRemove}`
   );
-  await questionRef.remove();
+  await removeLiveLesson(questionId);
   logger.info(`[lessons] migrateQuestionToFirestore RTDB question removed qid=${questionId}`);
-  return alreadyEnded === undefined;
+  if (alreadyEnded) return undefined;
+  return { endedBy, lessonSeconds: rawSeconds, durationSeconds: roundedSeconds };
 }
 
-/** Whether the question has already reached a state no further ending can
+type StoredQuestion = Partial<QuestionDoc> & Record<string, unknown>;
+
+/** The question, if it has already reached a state no further ending can
  *  change. Read from Firestore, which outlives the live RTDB node. */
-async function questionAlreadyEnded(questionId: string): Promise<boolean> {
+async function endedQuestion(questionId: string): Promise<StoredQuestion | undefined> {
   const snap = await firestore.collection("questions").doc(questionId).get();
-  if (!snap.exists) return false;
-  return isEndedStatus((snap.data() as QuestionDoc).status);
+  const question = snap.data() as StoredQuestion | undefined;
+  return question && isEndedStatus(question.status) ? question : undefined;
+}
+
+/** The time a settled lesson ran, as both apps are told it — whichever of them
+ *  ended it, and however it found out. Empty for a lesson written off before
+ *  it started, or settled before the time was recorded. */
+function settledTimes(question: StoredQuestion): { lessonSeconds?: number; durationSeconds?: number } {
+  const times: { lessonSeconds?: number; durationSeconds?: number } = {};
+  if (typeof question.lessonSeconds === "number") times.lessonSeconds = question.lessonSeconds;
+  if (typeof question.durationSeconds === "number") times.durationSeconds = question.durationSeconds;
+  return times;
 }
 
 /**
@@ -966,7 +1063,7 @@ async function writeOffUnstartedLesson(
   if (!endedBy) return undefined;
 
   // Removing the live node is what ends the other side's session.
-  await db.ref(`questions/${questionId}`).remove();
+  await removeLiveLesson(questionId);
 
   if (teacherUid) {
     const teacher = teacherUid;
@@ -1018,9 +1115,16 @@ export const endLesson = onCall(async (req) => {
       // lesson first, or the grace-period task wrote it off. Both apps call
       // this — the one that did not press End reaches here — and a lesson that
       // is already over is a success for the caller, not an error to show them.
-      if (await questionAlreadyEnded(questionId)) {
+      const ended = await endedQuestion(questionId);
+      if (ended) {
         logger.info(`[lessons] endLesson already ended qid=${questionId} uid=${uid}`);
-        return { success: true, questionId, alreadyEnded: true };
+        const isParticipant = uid === ended.studentUid || uid === ended.acceptedByTeacher;
+        return {
+          success: true,
+          questionId,
+          alreadyEnded: true,
+          ...(isParticipant ? settledTimes(ended) : {}),
+        };
       }
       throw error;
     }
@@ -1044,12 +1148,12 @@ export const endLesson = onCall(async (req) => {
     }
     debugContext.stage = "authorized";
 
-    const endedBy: LessonDoc["endedBy"] = uid === context.studentUid ? "student" : "teacher";
-    debugContext.endedBy = endedBy;
+    const callerRole: LessonDoc["endedBy"] = uid === context.studentUid ? "student" : "teacher";
+    debugContext.callerRole = callerRole;
 
     debugContext.stage = "committing-firestore";
     logger.info(`[lessons] endLesson committing Firestore writes qid=${questionId}`);
-    const settled = await migrateQuestionToFirestore(questionId, endedBy, context);
+    const settled = await migrateQuestionToFirestore(questionId, callerRole, context);
 
     if (!settled) {
       // Already over. The live node was still here because whatever ended the
@@ -1063,17 +1167,21 @@ export const endLesson = onCall(async (req) => {
         );
       });
       logger.info(`[lessons] endLesson already ended, cleared the live node qid=${questionId} uid=${uid}`);
-      return { success: true, questionId, alreadyEnded: true };
+      const ended = await endedQuestion(questionId);
+      return { success: true, questionId, alreadyEnded: true, ...(ended ? settledTimes(ended) : {}) };
     }
+    const { endedBy } = settled;
+    debugContext.endedBy = endedBy;
 
     const questionDoc = await firestore.collection("questions").doc(questionId).get();
     const lessonId = (questionDoc.data() as { lessonId?: string } | undefined)?.lessonId;
     if (lessonId) {
+      // Who ended it, and when, went in with the billing — as of the first side
+      // to go, which may be well before now. This only closes the lesson the
+      // question names.
       await firestore.collection("lessons").doc(lessonId).set(
         {
           status: "completed",
-          endedBy,
-          endedAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -1109,7 +1217,15 @@ export const endLesson = onCall(async (req) => {
       );
     }
 
-    return { success: true, questionId, endedBy };
+    // The settled time goes back to the caller, and to the other app when it
+    // calls in turn, so both show the lesson's one total.
+    return {
+      success: true,
+      questionId,
+      endedBy,
+      lessonSeconds: settled.lessonSeconds,
+      durationSeconds: settled.durationSeconds,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack : undefined;
@@ -1347,7 +1463,7 @@ export const endAbandonedLesson = onTaskDispatched<{ questionId: string; unstart
       return;
     }
 
-    await db.ref(`questions/${questionId}`).remove();
+    await removeLiveLesson(questionId);
 
     if (teacherUid) {
       await releaseTeacherBusy(teacherUid, questionId).catch((error) => {
@@ -1377,6 +1493,25 @@ export const endAbandonedLesson = onTaskDispatched<{ questionId: string; unstart
     logger.warn(`[lessons] endAbandonedLesson wrote off qid=${questionId} reason=${endedReason}`);
   }
 );
+
+/**
+ * Settles a lesson no app ended — at the hard cap, or once a side that lost
+ * its connection has stayed away — and frees its teacher. Returns what was
+ * settled, or undefined for a lesson that had already ended, whose leftovers
+ * it has cleared instead.
+ */
+async function endLessonAsSystem(
+  questionId: string,
+  caller: string
+): Promise<SettledLesson | undefined> {
+  const context = await resolveQuestionContext(questionId);
+  const settled = await migrateQuestionToFirestore(questionId, "system", context);
+
+  await releaseTeacherBusy(context.teacherUid, questionId).catch((error) => {
+    logger.error(`[lessons] ${caller} failed releasing teacher=${context.teacherUid}`, error);
+  });
+  return settled;
+}
 
 // ─── forceEndLesson — Cloud Tasks handler ────────────────────────────────────
 // FR-B-006: fires at hardCapAt (30 min after lesson start).
@@ -1415,12 +1550,7 @@ export const forceEndLesson = onTaskDispatched<{ lessonId: string }>(
       return;
     }
 
-    const context = await resolveQuestionContext(questionId);
-    const settled = await migrateQuestionToFirestore(questionId, "system", context);
-
-    await releaseTeacherBusy(context.teacherUid, questionId).catch((error) => {
-      logger.error(`[lessons] forceEndLesson failed releasing teacher=${context.teacherUid}`, error);
-    });
+    const settled = await endLessonAsSystem(questionId, "forceEndLesson");
 
     // Ended already, by a call that died before removing the live node — this
     // task's own earlier attempt among them. The lesson stays as whatever
@@ -1430,16 +1560,104 @@ export const forceEndLesson = onTaskDispatched<{ lessonId: string }>(
       return;
     }
 
+    // Who ended it, and when, went in with the billing: a side that left or
+    // was cut off long before the cap still ended it then.
     await firestore.collection("lessons").doc(lessonId).set(
       {
         status: "completed",
-        endedBy: "system",
-        endedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
 
-    logger.info(`[lessons] forceEndLesson hard cap applied qid=${questionId} lessonId=${lessonId}`);
+    logger.info(
+      `[lessons] forceEndLesson hard cap applied qid=${questionId} lessonId=${lessonId} endedBy=${settled.endedBy}`
+    );
+  }
+);
+
+// ─── A side that lost its connection ─────────────────────────────────────────
+// Once its lesson has started, each app keeps a connection entry and a
+// disconnect handler on its side of `lessonPresence` (see LessonSidePresence).
+// When its connection drops, the database server stamps `lostAt`. That side
+// then has LESSON_RECONNECT_GRACE_SECONDS to come back, while the other app
+// shows it reconnecting. If it does not, the lesson ends as of the moment the
+// connection dropped.
+//
+// The app still in the lesson ends it too when the grace runs out. This is
+// what ends it when that app is not running either — both cut off at once, or
+// the other phone locked with the app suspended — rather than leaving it to
+// the hard cap.
+
+/** Starts the grace period for a side whose connection has just dropped. */
+export const onLessonConnectionLost = onValueWritten(
+  "lessonPresence/{questionId}/{role}/lostAt",
+  async (event) => {
+    const lostAt = event.data.after.val();
+    // Cleared rather than stamped: nothing to wait for.
+    if (typeof lostAt !== "number") return;
+    const { questionId, role } = event.params;
+    if (role !== "student" && role !== "teacher") return;
+
+    await getFunctions()
+      .taskQueue("endLostLesson")
+      .enqueue(
+        { questionId, role, lostAt },
+        { scheduleDelaySeconds: LESSON_RECONNECT_GRACE_SECONDS }
+      );
+    logger.info(`[lessons] connection lost qid=${questionId} role=${role} lostAt=${lostAt}`);
+  }
+);
+
+/** Ends a lesson whose side stayed cut off for the whole grace period. */
+export const endLostLesson = onTaskDispatched<{
+  questionId: string;
+  role: LessonRole;
+  lostAt: number;
+}>(
+  {
+    retryConfig: { maxAttempts: 3 },
+    rateLimits: { maxConcurrentDispatches: 20 },
+  },
+  async (req) => {
+    const { questionId, role, lostAt } = req.data;
+    if (!questionId || (role !== "student" && role !== "teacher")) {
+      logger.warn("[lessons] endLostLesson missing questionId or role");
+      return;
+    }
+
+    const presence = (await db.ref(`lessonPresence/${questionId}`).once("value")).val() as
+      | Record<string, unknown>
+      | null;
+    const departure = sideDeparture(role, presence?.[role]);
+    // Back in time, or cut off again since — a later loss has a task of its
+    // own. One that went on to leave is ended by leaving.
+    if (departure?.reason !== "connection_lost" || departure.atMs !== lostAt) {
+      logger.info(`[lessons] endLostLesson skipped qid=${questionId} role=${role}: reconnected`);
+      return;
+    }
+
+    if (!(await db.ref(`questions/${questionId}`).once("value")).exists()) {
+      // Over already. A disconnect handler that fired after the lesson ended
+      // left this behind.
+      await db.ref(`lessonPresence/${questionId}`).remove();
+      logger.info(`[lessons] endLostLesson cleared presence left after the lesson qid=${questionId}`);
+      return;
+    }
+
+    // Only a lesson that started is ended here. One still connecting is
+    // endAbandonedLesson's to write off.
+    const status = (
+      (await firestore.collection("questions").doc(questionId).get()).data() as StoredQuestion | undefined
+    )?.status;
+    if (status !== "in_progress" && !isEndedStatus(status)) {
+      logger.info(`[lessons] endLostLesson skipped qid=${questionId} status=${status ?? "none"}`);
+      return;
+    }
+
+    const settled = await endLessonAsSystem(questionId, "endLostLesson");
+    logger.warn(
+      `[lessons] endLostLesson qid=${questionId} role=${role} lostAt=${lostAt} settled=${settled !== undefined} endedBy=${settled?.endedBy ?? "already"}`
+    );
   }
 );

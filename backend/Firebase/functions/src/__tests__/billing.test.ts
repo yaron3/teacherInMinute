@@ -186,9 +186,11 @@ describe("billingStartMillis", () => {
     expect(billingStartMillis(undefined, accepted)).toBe(accepted);
   });
 
-  it("uses acceptedAt when it is somehow the later of the two", () => {
+  // Both apps count the lesson from startedAt, so billing must too. A later
+  // acceptedAt can only be a phone's clock: the teacher's app stamps it.
+  it("uses startedAt even when acceptedAt is somehow later", () => {
     const lateAccept = started + 5_000;
-    expect(billingStartMillis(started, lateAccept)).toBe(lateAccept);
+    expect(billingStartMillis(started, lateAccept)).toBe(started);
   });
 
   it("uses startedAt when there is no acceptedAt", () => {

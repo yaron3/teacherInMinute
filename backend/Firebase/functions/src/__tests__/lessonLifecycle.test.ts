@@ -193,6 +193,10 @@ jest.mock("firebase-functions/v2/tasks", () => ({
   onTaskDispatched: (_options: unknown, handler: unknown) => handler,
 }));
 
+jest.mock("firebase-functions/v2/database", () => ({
+  onValueWritten: (_ref: unknown, handler: unknown) => handler,
+}));
+
 jest.mock("uuid", () => ({ v4: () => "lesson-1" }));
 
 jest.mock("../pricing", () => ({
@@ -217,9 +221,11 @@ jest.mock("../busy", () => ({
 import {
   endAbandonedLesson,
   endLesson,
+  endLostLesson,
   enqueueAbandonedLessonCheck,
   extendLessonMinutes,
   forceEndLesson,
+  onLessonConnectionLost,
   startLesson,
 } from "../lessons";
 import { backfillPendingQuestionsForTeacher } from "../dispatch";
@@ -768,9 +774,16 @@ describe("a lesson is billed once, however many calls end it", () => {
     expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 12 });
     expect(rtdb.has(QUESTION_PATH)).toBe(true);
 
+    // Told the time the dead call settled, so both apps show the same total.
     await expect(
       callEndLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } })
-    ).resolves.toEqual({ success: true, questionId: "q-1", alreadyEnded: true });
+    ).resolves.toEqual({
+      success: true,
+      questionId: "q-1",
+      alreadyEnded: true,
+      lessonSeconds: 480,
+      durationSeconds: 480,
+    });
 
     expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 12 });
     expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 12 });
@@ -841,5 +854,307 @@ describe("every way a session ends frees the teacher", () => {
     });
 
     expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+  });
+});
+
+// A lesson ends with the first side to go: the moment it left, or lost its
+// connection and did not come back. One algorithm, run once when the lesson is
+// settled, gives the time the student pays for, the time the teacher is paid
+// for, and the time both apps show.
+describe("a lesson ends with the first side to go", () => {
+  /** Timestamp.now() is pinned in the fakes, so the billing clock is fixed. */
+  const NOW_MS = 1_700_000_000_000;
+  const PRESENCE_PATH = "lessonPresence/q-1";
+
+  /** Ten minutes in, counted from startedAt as both apps count it. */
+  function seedTenMinuteLesson(live: DocData = {}): void {
+    seedQuestion({ status: "in_progress", lessonId: "lesson-1" });
+    rtdb.set(QUESTION_PATH, {
+      studentUid: "student-1",
+      teacherUid: "teacher-1",
+      acceptedAt: NOW_MS - 660_000,
+      startedAt: NOW_MS - 600_000,
+      ...live,
+    });
+    store.set("lessons/lesson-1", { questionId: "q-1", status: "in_progress" });
+    store.set("users/student-1", { remainingMinutes: 20 });
+    store.set("users/teacher-1", { totalEarnings: 0 });
+  }
+
+  const endedAtMs = () => (question().endedAt as { __timestamp: number }).__timestamp;
+  const endAsTeacher = () =>
+    callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } });
+
+  test("when the first side left, however much later it is settled", async () => {
+    seedTenMinuteLesson();
+    // The student left six minutes in. The teacher's app ends it only now.
+    rtdb.set(PRESENCE_PATH, {
+      student: { leftAt: NOW_MS - 240_000, connections: { c1: true } },
+      teacher: { connections: { c1: true } },
+    });
+
+    await expect(endAsTeacher()).resolves.toEqual({
+      success: true,
+      questionId: "q-1",
+      endedBy: "student",
+      lessonSeconds: 360,
+      durationSeconds: 360,
+    });
+
+    expect(question()).toMatchObject({
+      endedBy: "student",
+      lessonSeconds: 360,
+      durationSeconds: 360,
+      cost: 12,
+      teacherEarnings: 9,
+    });
+    expect(question().endedReason).toBeUndefined();
+    expect(endedAtMs()).toBe(NOW_MS - 240_000);
+    expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 14 });
+    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 9 });
+    // Cleared with the question node.
+    expect(rtdb.has(PRESENCE_PATH)).toBe(false);
+  });
+
+  test("when a side's connection dropped, if it never came back", async () => {
+    seedTenMinuteLesson();
+    rtdb.set(PRESENCE_PATH, {
+      student: { lostAt: NOW_MS - 300_000 },
+      teacher: { connections: { c1: true } },
+    });
+
+    await endAsTeacher();
+
+    expect(question()).toMatchObject({
+      endedBy: "student",
+      endedReason: "connection_lost",
+      lessonSeconds: 300,
+      durationSeconds: 300,
+      cost: 10,
+    });
+    expect(endedAtMs()).toBe(NOW_MS - 300_000);
+  });
+
+  test("not when the side that dropped came back", async () => {
+    seedTenMinuteLesson();
+    // Its old connection's handler can fire after it has already reconnected.
+    rtdb.set(PRESENCE_PATH, {
+      student: { lostAt: NOW_MS - 300_000, connections: { c2: true } },
+      teacher: { connections: { c1: true } },
+    });
+
+    await endAsTeacher();
+
+    expect(question()).toMatchObject({ endedBy: "teacher", lessonSeconds: 600, durationSeconds: 600 });
+    expect(question().endedReason).toBeUndefined();
+    expect(endedAtMs()).toBe(NOW_MS);
+  });
+
+  test("whichever side went first", async () => {
+    seedTenMinuteLesson();
+    rtdb.set(PRESENCE_PATH, {
+      student: { lostAt: NOW_MS - 400_000 },
+      teacher: { leftAt: NOW_MS - 200_000 },
+    });
+
+    await endAsTeacher();
+
+    // 3 minutes 20 seconds in, billed as 3 minutes.
+    expect(question()).toMatchObject({
+      endedBy: "student",
+      endedReason: "connection_lost",
+      lessonSeconds: 200,
+      durationSeconds: 180,
+      cost: 6,
+    });
+  });
+
+  test("counted from the start both apps count from, not a phone's acceptedAt", async () => {
+    // The teacher's app stamps acceptedAt with its own clock, which can run ahead.
+    seedTenMinuteLesson({ acceptedAt: NOW_MS - 60_000 });
+
+    await endAsTeacher();
+
+    expect(question()).toMatchObject({ lessonSeconds: 600, durationSeconds: 600 });
+  });
+
+  test("counted from the start the backend recorded, not one an app rewrote", async () => {
+    seedTenMinuteLesson({ startedAt: NOW_MS - 60_000 });
+    store.set(QUESTION_PATH, { ...question(), startedAt: { toMillis: () => NOW_MS - 600_000 } });
+
+    await endAsTeacher();
+
+    expect(question()).toMatchObject({ lessonSeconds: 600, durationSeconds: 600 });
+  });
+
+  test("with a hold still open when the first side left, only the time before it", async () => {
+    // Minutes ran out five minutes in; the student left three minutes later.
+    seedTenMinuteLesson({ minutesDeadlineAt: NOW_MS - 300_000 });
+    rtdb.set(PRESENCE_PATH, { student: { leftAt: NOW_MS - 120_000 } });
+
+    await endAsTeacher();
+
+    expect(question()).toMatchObject({ lessonSeconds: 300, heldSeconds: 180, durationSeconds: 300 });
+  });
+
+  test("both apps are told the same total", async () => {
+    seedTenMinuteLesson();
+    rtdb.set(PRESENCE_PATH, { student: { leftAt: NOW_MS - 240_000 } });
+
+    const settled = await endAsTeacher();
+    // The student's app, calling in turn, finds the lesson already over.
+    const told = await callEndLesson({ auth: { uid: "student-1" }, data: { questionId: "q-1" } });
+
+    expect(told).toMatchObject({
+      alreadyEnded: true,
+      lessonSeconds: settled.lessonSeconds,
+      durationSeconds: settled.durationSeconds,
+    });
+  });
+
+  test("an outsider asking after a lesson is told nothing of it", async () => {
+    seedQuestion({ status: "completed", lessonSeconds: 300, durationSeconds: 300 });
+    rtdb.delete(QUESTION_PATH);
+
+    await expect(
+      callEndLesson({ auth: { uid: "stranger" }, data: { questionId: "q-1" } })
+    ).resolves.toEqual({ success: true, questionId: "q-1", alreadyEnded: true });
+  });
+
+  test("the hard cap ends it at the first side's departure too", async () => {
+    seedTenMinuteLesson();
+    rtdb.set(PRESENCE_PATH, {
+      student: { lostAt: NOW_MS - 300_000 },
+      teacher: { connections: { c1: true } },
+    });
+
+    await runHardCap({ data: { lessonId: "lesson-1" } });
+
+    expect(question()).toMatchObject({
+      endedBy: "student",
+      endedReason: "connection_lost",
+      lessonSeconds: 300,
+    });
+    // Not rewritten as ended by the cap.
+    expect(store.get("lessons/lesson-1")).toMatchObject({
+      status: "completed",
+      endedBy: "student",
+      lessonSeconds: 300,
+    });
+  });
+});
+
+// A side whose connection drops has LESSON_RECONNECT_GRACE_SECONDS to come
+// back. The backend ends the lesson once it has not — as of the moment it
+// dropped — even when neither app is left running to do it.
+describe("a side cut off for the whole grace period", () => {
+  const NOW_MS = 1_700_000_000_000;
+  const PRESENCE_PATH = "lessonPresence/q-1";
+  const LOST_AT = NOW_MS - 300_000;
+
+  type LostEvent = { params: Record<string, string>; data: { after: { val: () => unknown } } };
+  const connectionLost = onLessonConnectionLost as unknown as (event: LostEvent) => Promise<void>;
+  const runLostCheck = endLostLesson as unknown as (req: {
+    data: { questionId: string; role: string; lostAt: number };
+  }) => Promise<void>;
+  const lostEvent = (value: unknown): LostEvent => ({
+    params: { questionId: "q-1", role: "student" },
+    data: { after: { val: () => value } },
+  });
+  const checkStudent = () =>
+    runLostCheck({ data: { questionId: "q-1", role: "student", lostAt: LOST_AT } });
+
+  function seedTenMinuteLesson(): void {
+    seedQuestion({ status: "in_progress", lessonId: "lesson-1" });
+    rtdb.set(QUESTION_PATH, {
+      studentUid: "student-1",
+      teacherUid: "teacher-1",
+      acceptedAt: NOW_MS - 660_000,
+      startedAt: NOW_MS - 600_000,
+    });
+    store.set("lessons/lesson-1", { questionId: "q-1", status: "in_progress" });
+    store.set("users/student-1", { remainingMinutes: 20 });
+  }
+
+  test("a dropped connection starts it", async () => {
+    await connectionLost(lostEvent(LOST_AT));
+
+    expect(mockEnqueue).toHaveBeenCalledWith(
+      "endLostLesson",
+      { questionId: "q-1", role: "student", lostAt: LOST_AT },
+      { scheduleDelaySeconds: 30 }
+    );
+  });
+
+  test("clearing the mark starts nothing", async () => {
+    await connectionLost(lostEvent(null));
+
+    expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  test("ends the lesson as of the moment the connection dropped", async () => {
+    seedTenMinuteLesson();
+    rtdb.set(PRESENCE_PATH, {
+      student: { lostAt: LOST_AT },
+      teacher: { connections: { c1: true } },
+    });
+
+    await checkStudent();
+
+    expect(question()).toMatchObject({
+      status: "completed",
+      endedBy: "student",
+      endedReason: "connection_lost",
+      lessonSeconds: 300,
+      cost: 10,
+    });
+    expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 15 });
+    expect(store.get("lessons/lesson-1")).toMatchObject({ status: "completed" });
+    // Both apps end on the node going, and the teacher is free again.
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
+    expect(rtdb.has(PRESENCE_PATH)).toBe(false);
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+  });
+
+  test("leaves the lesson of a side that came back in time", async () => {
+    seedTenMinuteLesson();
+    rtdb.set(PRESENCE_PATH, { student: { lostAt: LOST_AT, connections: { c2: true } } });
+
+    await checkStudent();
+
+    expect(question().status).toBe("in_progress");
+    expect(store.get("users/student-1")).toEqual({ remainingMinutes: 20 });
+    expect(rtdb.has(QUESTION_PATH)).toBe(true);
+  });
+
+  test("leaves a later loss to its own check", async () => {
+    seedTenMinuteLesson();
+    rtdb.set(PRESENCE_PATH, { student: { lostAt: NOW_MS - 100_000 } });
+
+    await checkStudent();
+
+    expect(question().status).toBe("in_progress");
+    expect(rtdb.has(QUESTION_PATH)).toBe(true);
+  });
+
+  test("clears what a disconnect handler left after the lesson had ended", async () => {
+    seedQuestion({ status: "completed", cost: 10 });
+    rtdb.delete(QUESTION_PATH);
+    rtdb.set(PRESENCE_PATH, { student: { lostAt: LOST_AT } });
+
+    await checkStudent();
+
+    expect(rtdb.has(PRESENCE_PATH)).toBe(false);
+    expect(question()).toMatchObject({ status: "completed", cost: 10 });
+  });
+
+  test("leaves a lesson that never started to endAbandonedLesson", async () => {
+    seedQuestion();
+    rtdb.set(PRESENCE_PATH, { student: { lostAt: LOST_AT } });
+
+    await checkStudent();
+
+    expect(question().status).toBe("accepted");
+    expect(rtdb.has(QUESTION_PATH)).toBe(true);
   });
 });

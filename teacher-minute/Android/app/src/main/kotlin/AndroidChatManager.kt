@@ -7,6 +7,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import org.json.JSONArray
 import org.json.JSONObject
@@ -547,6 +548,104 @@ object AndroidChatManager {
             )
             .put("conversationType", snapshot.firstString("conversationType"))
             .toString()
+    }
+
+    // ── Lesson presence ─────────────────────────────────────────────────────
+    //
+    // Once the lesson has started, each side keeps its entry under
+    // `lessonPresence/{qid}/{role}` — see LessonPresence.swift. The lesson ends,
+    // and is billed, as of the first side to leave or to lose its connection
+    // and not come back.
+
+    private var presenceListener: ValueEventListener? = null
+    private var presenceConnectedRef: DatabaseReference? = null
+
+    /**
+     * Keeps this side's presence while the lesson runs. On every connection —
+     * the first, and each reconnect — adds an entry the server removes when
+     * that connection drops, and asks the server to stamp `lostAt` then.
+     */
+    @JvmStatic
+    @Synchronized
+    fun startLessonPresence(questionId: String, role: String) {
+        detachPresenceListener()
+        val side = lessonPresenceSide(questionId, role)
+        val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.getValue(Boolean::class.java) != true) return
+                // A new entry for each connection: the handler of one that
+                // dropped removes its own entry only, however late the server
+                // gets to it.
+                val entry = side.child("connections").push()
+                entry.onDisconnect().removeValue()
+                side.child("lostAt").onDisconnect().setValue(ServerValue.TIMESTAMP)
+                entry.setValue(true)
+                Log.i(TAG, "Lesson presence connected questionId=$questionId role=$role")
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Lesson presence listener cancelled questionId=$questionId", error.toException())
+            }
+        }
+        connectedRef.addValueEventListener(listener)
+        presenceListener = listener
+        presenceConnectedRef = connectedRef
+    }
+
+    /**
+     * Stops keeping this side's presence, as its session ends. The disconnect
+     * handlers are cancelled, here and beneath, so a connection dropping
+     * afterwards writes nothing. The entry itself stays: the backend removes the
+     * lesson's presence as it settles the lesson.
+     */
+    @JvmStatic
+    @Synchronized
+    fun stopLessonPresence(questionId: String, role: String) {
+        detachPresenceListener()
+        lessonPresenceSide(questionId, role).onDisconnect().cancel()
+    }
+
+    /** Stamps this side leaving the lesson, on the server's clock. */
+    @JvmStatic
+    fun markLeftLesson(questionId: String, role: String) {
+        val write = lessonPresenceSide(questionId, role)
+            .child("leftAt")
+            .setValue(ServerValue.TIMESTAMP)
+        Tasks.await(write, TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    /** Both sides' presence as the node holds it, keyed by role. */
+    @JvmStatic
+    fun fetchLessonPresenceJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance()
+                .getReference("lessonPresence")
+                .child(questionId)
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+        val value = snapshot.value as? Map<*, *> ?: return JSONObject().toString()
+        return JSONObject(value).toString()
+    }
+
+    private fun lessonPresenceSide(questionId: String, role: String): DatabaseReference {
+        val key = role.trim().lowercase().ifBlank { "participant" }
+        return FirebaseDatabase.getInstance()
+            .getReference("lessonPresence")
+            .child(questionId)
+            .child(key)
+    }
+
+    private fun detachPresenceListener() {
+        val listener = presenceListener
+        val ref = presenceConnectedRef
+        if (listener != null && ref != null) {
+            ref.removeEventListener(listener)
+        }
+        presenceListener = null
+        presenceConnectedRef = null
     }
 
     private fun appendingQuestionText(addition: String, current: String): String {

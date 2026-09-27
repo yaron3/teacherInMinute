@@ -16,6 +16,8 @@ export {
   endLesson,
   forceEndLesson,
   endAbandonedLesson,
+  onLessonConnectionLost,
+  endLostLesson,
   rateTeacher,
 } from "./lessons";
 

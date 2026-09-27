@@ -4327,6 +4327,17 @@
       },
       "valueType": "STRING"
     },
+    "lost_connection_the": {
+      "defaultValue": {
+        "value": "%@ lost connection. The lesson ends in %d:%02d unless they reconnect."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "החיבור של %@ נותק. השיעור יסתיים בעוד %d:%02d אם החיבור לא יחזור."
+        }
+      },
+      "valueType": "STRING"
+    },
     "connected": {
       "defaultValue": {
         "value": "Connected"

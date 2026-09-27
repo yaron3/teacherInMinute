@@ -128,6 +128,11 @@ final class ChatSessionService {
   private let mediaPendingRef: FirebaseDatabase.DatabaseReference
   private let connectionSetupRef: FirebaseDatabase.DatabaseReference
   private let statusRef: FirebaseDatabase.DatabaseReference
+  /// `lessonPresence/{qid}` — see `LessonPresenceReading`.
+  private let presenceRef: FirebaseDatabase.DatabaseReference
+  private let connectedRef: FirebaseDatabase.DatabaseReference
+  private var presenceHandle: DatabaseHandle?
+  private var connectedHandle: DatabaseHandle?
   private var sessionHandle: DatabaseHandle?
   private var messagesHandle: DatabaseHandle?
   private var boardHandle: DatabaseHandle?
@@ -151,6 +156,10 @@ final class ChatSessionService {
     self.mediaPendingRef = questionRef.child("mediaPending")
     self.connectionSetupRef = questionRef.child("connectionSetup")
     self.statusRef = questionRef.child("status")
+    self.presenceRef = FirebaseDatabase.Database.database()
+      .reference(withPath: "lessonPresence/\(questionId)")
+    self.connectedRef = FirebaseDatabase.Database.database()
+      .reference(withPath: ".info/connected")
 #endif
   }
 
@@ -385,6 +394,10 @@ final class ChatSessionService {
       mediaPendingRef.removeObserver(withHandle: mediaPendingHandle)
       self.mediaPendingHandle = nil
     }
+    if let presenceHandle {
+      presenceRef.removeObserver(withHandle: presenceHandle)
+      self.presenceHandle = nil
+    }
 #endif
   }
 
@@ -615,6 +628,89 @@ final class ChatSessionService {
 #endif
   }
 
+  // MARK: Presence
+  //
+  // Once the lesson has started, each side keeps its entry under
+  // `lessonPresence/{qid}/{role}` — see `LessonPresenceReading`. The lesson ends,
+  // and is billed, as of the first side to leave or to lose its connection and
+  // not come back.
+
+  /// Keeps this side's presence while the lesson runs. On every connection —
+  /// the first, and each reconnect — it adds an entry the server removes when
+  /// that connection drops, and asks the server to stamp `lostAt` then.
+  func startPresence(role: String) async throws {
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.startLessonPresence(questionId: self.questionId, role: role)
+    }.value
+#else
+    if let connectedHandle {
+      connectedRef.removeObserver(withHandle: connectedHandle)
+    }
+    let side = presenceRef.child(role)
+    connectedHandle = connectedRef.observe(.value) { snapshot in
+      guard (snapshot.value as? Bool) == true else { return }
+      // A new entry for each connection: the handler of one that dropped
+      // removes its own entry only, however late the server gets to it.
+      let entry = side.child("connections").childByAutoId()
+      entry.onDisconnectRemoveValue()
+      side.child("lostAt").onDisconnectSetValue(FirebaseDatabase.ServerValue.timestamp())
+      entry.setValue(true)
+    }
+#endif
+  }
+
+  /// Stops keeping this side's presence, as its session ends. The disconnect
+  /// handlers are cancelled, so a connection dropping afterwards writes
+  /// nothing. The entry itself stays: removing it could make an old `lostAt`
+  /// look like this side dropping, and the backend removes the lesson's
+  /// presence as it settles the lesson.
+  func stopPresence(role: String) async throws {
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.stopLessonPresence(questionId: self.questionId, role: role)
+    }.value
+#else
+    if let connectedHandle {
+      connectedRef.removeObserver(withHandle: connectedHandle)
+      self.connectedHandle = nil
+    }
+    // Cancels the handlers here and on everything beneath.
+    presenceRef.child(role).cancelDisconnectOperations()
+#endif
+  }
+
+  /// Stamps this side leaving the lesson, on the server's clock. The lesson
+  /// ends there, and the other side ends its session as soon as it reads it.
+  func markLeft(role: String) async throws {
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.markLeftLesson(questionId: self.questionId, role: role)
+    }.value
+#else
+    let leftAtRef = presenceRef.child(role).child("leftAt")
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      leftAtRef.setValue(FirebaseDatabase.ServerValue.timestamp()) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
+  /// Follows both sides' presence as it changes, keyed by role. Android reads
+  /// it on a timer instead — see `fetchPresence`.
+  func startPresenceListening(onUpdate: @escaping ([String: LessonPresenceReading]) -> Void) {
+#if !os(Android)
+    if let presenceHandle {
+      presenceRef.removeObserver(withHandle: presenceHandle)
+    }
+    presenceHandle = presenceRef.observe(.value) { snapshot in
+      onUpdate(LessonPresenceReading.sides(from: snapshot.value))
+    }
+#endif
+  }
+
   /// Switches the lesson's medium for both participants.
   func setConversationType(_ conversationType: String) async throws {
 #if os(Android)
@@ -671,6 +767,19 @@ final class ChatSessionService {
       }
     }
     return states
+  }
+
+  /// One reading of both sides' presence, keyed by role — what iOS follows as
+  /// it changes.
+  func fetchPresence() async throws -> [String: LessonPresenceReading] {
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchLessonPresence(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let row = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return [:]
+    }
+    return LessonPresenceReading.sides(from: row)
   }
 
   /// One reading of what the iOS setup listeners follow as it changes.
@@ -966,6 +1075,16 @@ protocol ChatSessionViewModeling: AnyObject {
   func peerMediaPending() -> Bool
   func endLesson() async
 
+  // MARK: Presence
+  //
+  // The lesson ends with the first side to go — left, or lost its connection
+  // and did not come back — and both sides are shown the time it settled at.
+  // See `LessonPresenceReading`.
+
+  /// Whole seconds the other side still has to reconnect, while its
+  /// connection is lost. Nil while it is in the lesson.
+  func peerSecondsToReconnect(at date: Date) -> Int?
+
   // MARK: Connecting
   //
   // What each side tells the other while the lesson connects — a permission
@@ -1189,6 +1308,8 @@ extension ChatSessionViewModeling {
 
   func minutesHoldState(at date: Date) -> MinutesHoldState { .none }
 
+  func peerSecondsToReconnect(at date: Date) -> Int? { nil }
+
   func endLessonWithFarewell(_ message: String) async { await endLesson() }
 
   var peerFarewellNote: String? { nil }
@@ -1242,6 +1363,16 @@ extension ChatSessionViewModeling {
   var connectedVideoText: String { LocalizationSupport.localized("Connected - Video session") }
   var connectedAudioText: String { LocalizationSupport.localized("Connected - Audio session") }
   var connectedText: String { LocalizationSupport.localized("Connected") }
+  /// Shown while the other side's connection is lost, counting down the time
+  /// it has to come back — see `peerSecondsToReconnect`.
+  func peerReconnectingText(secondsLeft: Int) -> String {
+    String(
+      format: LocalizationSupport.localized("%@ lost connection. The lesson ends in %d:%02d unless they reconnect."),
+      participantName,
+      secondsLeft / 60,
+      secondsLeft % 60
+    )
+  }
 
   // MARK: Composer
 
@@ -1596,6 +1727,34 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private var isChatVisible = true
   private var isBoardVisible = false
 
+  /// What this side makes of the other one while the lesson runs — see
+  /// `PeerPresenceTracker`.
+  private(set) var peerPresence = PeerPresenceTracker()
+  /// Counts each time the other side is seen cut off, so a check still
+  /// waiting on an earlier loss knows it has been overtaken.
+  private var peerLossCount = 0
+  /// This side's presence is being kept — see `startPresenceIfLessonStarted`.
+  private var isKeepingPresence = false
+  /// This side's leave has been stamped — see `markLeavingLesson`.
+  private var hasStampedLeave = false
+  /// Presence writes, chained so they land in the order they were made: a stop
+  /// must not overtake the start it undoes.
+  private var presenceWrite: Task<Void, Never>?
+  /// The session's end has been handled. A second signal of it — the question
+  /// going away after the other side's leave was read — is not handled again.
+  private var hasHandledSessionEnd = false
+  /// The lesson's time as the backend settled it: the same for both sides,
+  /// whichever of them ended it. Shown in place of this device's own count
+  /// once known.
+  private(set) var settledLessonSeconds: Int?
+  /// `settledLessonSeconds` rounded to the minutes billed.
+  private var settledBilledSeconds: Int?
+  /// How long past the grace period this side waits before ending a lesson
+  /// whose other side stayed cut off. The backend ends it at the grace period
+  /// itself (endLostLesson in functions/src/lessons.ts); this covers a backend
+  /// that has not.
+  private static let peerLostEndMarginSeconds: TimeInterval = 5
+
   init(
     questionId: String,
     role: String,
@@ -1687,6 +1846,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         // away, rather than waiting for the live node to say so.
         if result.started {
           isLessonStartConfirmed = true
+          startPresenceIfLessonStarted()
         }
         return
       } catch FunctionsError.serverError(let message, let status, _) {
@@ -1707,6 +1867,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       if let updated = try await service.fetchSessionDetails() {
         didObserveActiveSession = true
         details = mergedDetails(current: details, updated: updated)
+        startPresenceIfLessonStarted()
         await loadParticipantProfiles()
         onSessionDetailsUpdated?()
         logger.info("[ChatSession] details loaded questionId=\(self.questionId) role=\(self.role)")
@@ -1739,7 +1900,13 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           }
           didObserveActiveSession = true
           details = mergedDetails(current: details, updated: updatedDetails)
+          startPresenceIfLessonStarted()
           onSessionDetailsUpdated?()
+          // Read before the messages and acted on after them: a parting note is
+          // written before its sender's leave, so this way it is always in
+          // hand when the leave ends the session. Optional, so a failed read
+          // costs only itself.
+          let presence = try? await service.fetchPresence()
           let rows = try await service.fetchMessages()
           let strokes = try await service.fetchBoardStrokes()
           let viewports = try await service.fetchBoardViewports()
@@ -1753,6 +1920,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           mediaPendingStates = mediaPending
           onChatPausedUpdated?(paused)
           onMediaPendingUpdated?(mediaPending)
+          if let presence {
+            receivePeerPresence(presence)
+          }
         } catch {
           errorMessage = error.localizedDescription
         }
@@ -1771,9 +1941,13 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       onUpdate: { [weak self] updatedDetails in
         guard let self else { return }
         self.details = self.mergedDetails(current: self.details, updated: updatedDetails)
+        self.startPresenceIfLessonStarted()
         self.onSessionDetailsUpdated?()
       }
     )
+    service.startPresenceListening { [weak self] sides in
+      self?.receivePeerPresence(sides)
+    }
     service.startListening { [weak self] rows in
       self?.receiveMessages(rows)
     }
@@ -1858,6 +2032,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     pollingTask?.cancel()
     pollingTask = nil
     stopWatchingPeerSetup()
+    stopKeepingPresence()
     isConnecting = true
     onConnectingUpdated?(true)
     service.stopListening()
@@ -1868,7 +2043,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   func primaryAmountText(at date: Date) -> String {
-    let elapsedMinutes = Double(sessionDurationSeconds(at: date)) / 60.0
+    // Once settled, what was billed: the lesson rounded to whole minutes.
+    let elapsedMinutes = Double(settledBilledSeconds ?? sessionDurationSeconds(at: date)) / 60.0
     let grossCents = elapsedMinutes * Double(pricePerMinuteCents)
     let cents = isTeacherRole ? grossCents * (teacherSharePercent / 100.0) : grossCents
     return currencyText(cents: max(0, cents))
@@ -2212,11 +2388,111 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
 
   func endLesson() async {
     isLeaving = true
+    markLeavingLesson()
     setSelfChatPaused(false)
     setSelfMediaPending(false)
     await reportLessonEnded()
     await LiveKitService.shared.disconnect()
     stop()
+  }
+
+  // MARK: Presence
+
+  private var peerRoleKey: String {
+    roleKey(role) == "teacher" ? "student" : "teacher"
+  }
+
+  /// Starts keeping this side's presence once the lesson has started: only a
+  /// lesson that started ends with a side going. Called wherever the start may
+  /// just have become known.
+  private func startPresenceIfLessonStarted() {
+    guard hasLessonStarted, !isKeepingPresence, !isLeaving, !hasHandledSessionEnd else { return }
+    isKeepingPresence = true
+    let side = roleKey(role)
+    let previous = presenceWrite
+    presenceWrite = Task {
+      await previous?.value
+      do {
+        try await service.startPresence(role: side)
+        logger.info("[ChatSession] keeping presence questionId=\(self.questionId) role=\(side)")
+      } catch {
+        logger.error("[ChatSession] startPresence failed questionId=\(self.questionId): \(error.localizedDescription)")
+      }
+    }
+  }
+
+  private func stopKeepingPresence() {
+    guard isKeepingPresence else { return }
+    isKeepingPresence = false
+    let side = roleKey(role)
+    let previous = presenceWrite
+    presenceWrite = Task {
+      await previous?.value
+      do {
+        try await service.stopPresence(role: side)
+      } catch {
+        logger.error("[ChatSession] stopPresence failed questionId=\(self.questionId): \(error.localizedDescription)")
+      }
+    }
+  }
+
+  /// Stamps this side leaving, on the server's clock: the lesson ends there,
+  /// and the other side ends its session on reading it. Done as the session is
+  /// torn down — the call is still up while an ending prompt, such as saving
+  /// the board to the chat, is answered, and that save has to land first.
+  private func markLeavingLesson() {
+    guard !hasStampedLeave, hasLessonStarted, !hasHandledSessionEnd else { return }
+    hasStampedLeave = true
+    let side = roleKey(role)
+    let previous = presenceWrite
+    presenceWrite = Task {
+      await previous?.value
+      do {
+        try await service.markLeft(role: side)
+        logger.info("[ChatSession] leave stamped questionId=\(self.questionId) role=\(side)")
+      } catch {
+        // The lesson still ends as this side's endLesson reaches the backend,
+        // a moment later than the leave itself.
+        logger.error("[ChatSession] markLeft failed questionId=\(self.questionId): \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func peerSecondsToReconnect(at date: Date) -> Int? {
+    // Nothing to count down once the session is ending anyway.
+    guard !isLeaving, !hasHandledSessionEnd else { return nil }
+    return peerPresence.secondsToReconnect(at: date)
+  }
+
+  /// Takes a reading of both sides' presence and acts on the other side's: its
+  /// leaving ends this side's session at once, and its connection dropping
+  /// gives it the grace period to come back.
+  private func receivePeerPresence(_ sides: [String: LessonPresenceReading]) {
+    guard !isLeaving, !hasHandledSessionEnd else { return }
+    let wasLost = peerPresence.lostSince != nil
+    var updated = peerPresence
+    updated.receive(sides[peerRoleKey], at: Date())
+    guard updated != peerPresence else { return }
+    peerPresence = updated
+
+    if updated.hasLeft {
+      logger.info("[ChatSession] the other side left questionId=\(self.questionId) role=\(self.role)")
+      Task { await handleRemoteSessionEnded() }
+    } else if updated.lostSince != nil, !wasLost {
+      logger.info("[ChatSession] the other side lost its connection questionId=\(self.questionId) role=\(self.role)")
+      peerLossCount += 1
+      let loss = peerLossCount
+      Task { [weak self] in
+        try? await Task.sleep(
+          nanoseconds: UInt64((PeerPresenceTracker.graceSeconds + Self.peerLostEndMarginSeconds) * 1_000_000_000)
+        )
+        guard let self, loss == self.peerLossCount, self.peerPresence.isGone(at: Date()) else { return }
+        logger.info("[ChatSession] the other side did not come back; ending the lesson questionId=\(self.questionId) role=\(self.role)")
+        await self.handleRemoteSessionEnded()
+      }
+    } else if updated.lostSince == nil, wasLost {
+      logger.info("[ChatSession] the other side reconnected questionId=\(self.questionId) role=\(self.role)")
+    }
   }
 
   /// Warn a minute before the student's credit runs out, so they can top up
@@ -2272,6 +2548,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private func handleRemoteSessionEnded() async {
 	logger.info("[ChatSession] handleRemoteSessionEnded")
     guard didObserveActiveSession || details != nil else { return }
+    // Once: the other side's leave, the question going away, and the end of
+    // the grace period can each report the same end.
+    guard !hasHandledSessionEnd else { return }
+    hasHandledSessionEnd = true
     // Settled before anything is torn down: the screen reads it to tell the
     // other side leaving before the lesson started from an ordinary end.
     receiveQuestionEnded()
@@ -2290,8 +2570,14 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         logger.error("[ChatSession] cannot report endLesson without questionId questionId=\(self.questionId)")
         return
       }
-      try await FunctionsService.shared.endLesson(questionId: self.questionId)
-      logger.info("[ChatSession] endLesson reported questionId=\(questionId)")
+      let result = try await FunctionsService.shared.endLesson(questionId: self.questionId)
+      // The same settled time reaches both apps, whichever of them ended it.
+      if let lessonSeconds = result.lessonSeconds {
+        settledLessonSeconds = lessonSeconds
+        settledBilledSeconds = result.billedSeconds
+      }
+      let settledText = result.lessonSeconds.map { String($0) } ?? "none"
+      logger.info("[ChatSession] endLesson reported questionId=\(questionId) lessonSeconds=\(settledText)")
     } catch {
       errorMessage = error.localizedDescription
       logger.error("[ChatSession] endLesson failed questionId=\(self.questionId): \(error.localizedDescription)")
@@ -2320,8 +2606,11 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   /// Counted from when the lesson started — both sides in — as it is billed.
-  /// Zero while either side is still connecting.
+  /// Zero while either side is still connecting. Once the lesson is over, the
+  /// time the backend settled it at, as of the first side to go: the same on
+  /// both sides, rather than each device's own count to when it noticed.
   func sessionDurationSeconds(at date: Date) -> Int {
+    if let settledLessonSeconds { return settledLessonSeconds }
     let startMilliseconds = details?.startedAt ?? 0
     guard startMilliseconds > 0 else { return 0 }
     return max(0, Int(date.timeIntervalSince1970 - startMilliseconds / 1000.0))
@@ -2668,6 +2957,22 @@ private enum AndroidChatBridge {
     name: "fetchSessionDetailsJson",
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
   )!
+  private static let startLessonPresenceMethod = managerClass.getStaticMethodID(
+    name: "startLessonPresence",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)V"
+  )!
+  private static let stopLessonPresenceMethod = managerClass.getStaticMethodID(
+    name: "stopLessonPresence",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)V"
+  )!
+  private static let markLeftLessonMethod = managerClass.getStaticMethodID(
+    name: "markLeftLesson",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)V"
+  )!
+  private static let fetchLessonPresenceMethod = managerClass.getStaticMethodID(
+    name: "fetchLessonPresenceJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
 
   static func fetchMessages(questionId: String) throws -> String {
     try jniContext {
@@ -2877,6 +3182,55 @@ private enum AndroidChatBridge {
     try jniContext {
       try managerClass.callStatic(
         method: fetchSessionDetailsMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
+  }
+
+  static func startLessonPresence(questionId: String, role: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: startLessonPresenceMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func stopLessonPresence(questionId: String, role: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: stopLessonPresenceMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func markLeftLesson(questionId: String, role: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: markLeftLessonMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func fetchLessonPresence(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchLessonPresenceMethod,
         options: [.kotlincompat],
         args: [questionId.toJavaParameter(options: [.kotlincompat])]
       )

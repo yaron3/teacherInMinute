@@ -37,15 +37,15 @@ export function calculateBilling(
 /**
  * When billing for a lesson starts.
  *
- * `startedAt` is written by `startLesson`, once both parties are connected, and
- * is the intended start. `acceptedAt` is written when the teacher accepts. The
- * later of the two is used: whichever happened last is the point both sides
- * were certainly in the session, so it never bills a student for time before
- * that.
+ * `startedAt` is written by `startLesson`, once both parties are connected: it
+ * is the lesson's start, and the moment both apps count its time from. A lesson
+ * is billed from the same moment, so the time either side sees is the time it
+ * pays or is paid for.
  *
- * Taking the max also keeps a lesson billable when `startLesson` was never
- * called — previously `startedAt` alone was consulted, so a missing call made
- * the billed duration zero and the lesson silently free.
+ * `acceptedAt`, written when the teacher accepts, stands in only when there is
+ * no start at all — a lesson from before `startLesson` existed — so that one is
+ * still billed rather than silently free. It is never preferred over a start:
+ * acceptance comes first, so a later `acceptedAt` can only be a phone's clock.
  *
  * Returns `undefined` when neither timestamp is usable, which the caller treats
  * as nothing to bill.
@@ -54,11 +54,9 @@ export function billingStartMillis(
   startedAtMs: number | undefined,
   acceptedAtMs: number | undefined
 ): number | undefined {
-  const candidates = [startedAtMs, acceptedAtMs].filter(
+  return [startedAtMs, acceptedAtMs].find(
     (value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0
   );
-  if (candidates.length === 0) return undefined;
-  return Math.max(...candidates);
 }
 
 export interface TeacherBonusSplit {
