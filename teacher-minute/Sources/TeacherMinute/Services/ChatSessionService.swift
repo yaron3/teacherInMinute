@@ -675,8 +675,17 @@ final class ChatSessionService {
       connectedRef.removeObserver(withHandle: connectedHandle)
       self.connectedHandle = nil
     }
-    // Cancels the handlers here and on everything beneath.
-    presenceRef.child(role).cancelDisconnectOperations()
+    // Cancels the handlers here and on everything beneath. Not waited on, as
+    // on Android: waiting cannot save the handlers of a connection that is
+    // already down, which the server runs regardless. The block form is
+    // called for the purpose — in an async function, the bare call is the
+    // SDK's async overload, which waits for the server to answer.
+    let questionId = self.questionId
+    presenceRef.child(role).cancelDisconnectOperations { error, _ in
+      if let error {
+        logger.error("[ChatSession] cancelling presence handlers failed questionId=\(questionId): \(error.localizedDescription)")
+      }
+    }
 #endif
   }
 
