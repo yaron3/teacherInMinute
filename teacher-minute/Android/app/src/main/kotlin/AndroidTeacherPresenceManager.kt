@@ -61,9 +61,18 @@ object AndroidTeacherPresenceManager {
      * strings cheaply, and this is read once per load rather than continuously.
      * Returns "[]" on failure: an empty grid is a better outcome than blocking
      * the home screen on a presence read.
+     *
+     * Skips the read and returns "[]" when nobody is signed in. The rules open
+     * the projection to signed-in users only, and OnlineTeachersStore keeps
+     * polling after a sign-out until the student home is torn down — so every
+     * student sign-out used to end in a "Permission denied" here.
      */
     @JvmStatic
     fun onlineTeachersJSON(): String {
+        if (FirebaseAuth.getInstance().currentUser == null) {
+            Log.i(TAG, "onlineTeachersJSON skipped: no current user")
+            return "[]"
+        }
         return try {
             val snapshot = Tasks.await(
                 FirebaseDatabase.getInstance()

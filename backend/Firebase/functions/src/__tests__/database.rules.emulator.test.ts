@@ -24,7 +24,7 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { ref, remove, serverTimestamp, set, update } from "firebase/database";
+import { get, ref, remove, serverTimestamp, set, update } from "firebase/database";
 
 const TEACHER = "teacher-uid";
 const STUDENT = "student-uid";
@@ -281,5 +281,39 @@ describe("teacher keep-alive", () => {
     await assertFails(
       update(teacherNode(STRANGER), { status: "online", lastSeenAt: serverTimestamp() })
     );
+  });
+});
+
+// ─── the online-teachers projection ──────────────────────────────────────────
+//
+// The student home reads `onlineTeachers` to show who is available, and both
+// apps check it before asking. It is open to any signed-in user and to nobody
+// else, which is why the Android reader skips the read after a sign-out
+// (AndroidTeacherPresenceManager.onlineTeachersJSON) rather than let it be
+// refused.
+
+describe("online-teachers projection", () => {
+  beforeEach(async () => {
+    await testEnv.clearDatabase();
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      // As functions/src/presence.ts publishes it.
+      await set(ref(context.database(), `onlineTeachers/${TEACHER}`), {
+        subjects: ["algebra"],
+        displayName: "Teacher",
+        photoUrl: "",
+        since: 1_700_000_000_000,
+        busy: false,
+      });
+    });
+  });
+
+  it("lets any signed-in user read it", async () => {
+    for (const uid of [STUDENT, STRANGER]) {
+      await assertSucceeds(get(ref(db(uid), "onlineTeachers")));
+    }
+  });
+
+  it("refuses a read with nobody signed in", async () => {
+    await assertFails(get(ref(testEnv.unauthenticatedContext().database(), "onlineTeachers")));
   });
 });
