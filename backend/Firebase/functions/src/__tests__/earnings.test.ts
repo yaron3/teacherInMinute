@@ -149,6 +149,25 @@ describe("summarizeCompletedQuestions", () => {
       expect(lessons[0].earningsCents).toBe(400);
     });
 
+    it("carries each lesson's time to the second, beside what it was billed as", () => {
+      const now = new Date("2026-05-20T00:00:00Z");
+      // 45 seconds, billed as a minute.
+      const questions = [completedQuestion({ durationSeconds: 60, lessonSeconds: 45 })];
+
+      const { lessons } = summarizeCompletedQuestions(questions, now);
+
+      expect(lessons[0].lessonSeconds).toBe(45);
+      expect(lessons[0].durationSeconds).toBe(60);
+    });
+
+    it("shows the billed time for a lesson settled before its exact time was kept", () => {
+      const now = new Date("2026-05-20T00:00:00Z");
+
+      const { lessons } = summarizeCompletedQuestions([completedQuestion({ durationSeconds: 120 })], now);
+
+      expect(lessons[0].lessonSeconds).toBe(120);
+    });
+
     it("orders lessons newest first by when the teacher took them", () => {
       const now = new Date("2026-05-20T00:00:00Z");
       const questions = [

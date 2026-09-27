@@ -103,7 +103,7 @@ final class TeacherLessonHistoryViewModel {
             otherParticipantImageURL: lesson.otherParticipantImageURL,
             currentUserImageURL: currentUserImageURL,
             completedAt: LessonFormatting.relativeDateText(lesson.acceptedAt),
-            duration: LessonFormatting.shortDurationText(seconds: lesson.durationSeconds),
+            duration: LessonFormatting.durationText(seconds: lesson.durationSeconds),
             amount: LessonFormatting.currencyText(cents: lesson.teacherEarningsCents, currencyCode: lesson.currencyCode),
             amountCents: lesson.teacherEarningsCents,
             summary: String(

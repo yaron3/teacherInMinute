@@ -1,3 +1,5 @@
+import { MIN_BILLABLE_SECONDS } from "./types";
+
 const SECONDS_PER_MINUTE = 60;
 const HALF_MINUTE_SECONDS = SECONDS_PER_MINUTE / 2;
 
@@ -11,11 +13,34 @@ export interface BillingResult {
 }
 
 /**
+ * The whole minutes a lesson of `seconds` is charged.
+ *
+ * Under half a minute is free. From there each minute's band runs from half
+ * past the minute before to half past this one:
+ *
+ *   0:00 – 0:29   free
+ *   0:30 – 1:30   1 minute
+ *   1:31 – 2:30   2 minutes
+ *   2:31 – 3:30   3 minutes, and so on.
+ *
+ * Past the first minute, a partial minute of more than 30 seconds counts as a
+ * whole one and 30 seconds or less does not; the first minute is charged from
+ * 30 seconds exactly.
+ */
+export function billedMinutes(seconds: number): number {
+  if (seconds < MIN_BILLABLE_SECONDS) return 0;
+  const completedMinutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+  const remainingSeconds = seconds % SECONDS_PER_MINUTE;
+  return Math.max(1, completedMinutes + (remainingSeconds > HALF_MINUTE_SECONDS ? 1 : 0));
+}
+
+/**
  * Pure billing calculation — no Firebase calls, safe to unit-test.
  *
- * Rounding rule: round the duration to a whole minute. Durations with more
- * than 30 seconds in the partial minute round up; exactly 30 seconds rounds
- * down. For example, 3m 12s becomes 3 minutes and 3m 31s becomes 4 minutes.
+ * The lesson's time is counted to the second, from `acceptedAtMs` (by now the
+ * lesson's start: both sides connected — see billingStartMillis) to
+ * `endedAtMs`, and charged in whole minutes by `billedMinutes`. For example,
+ * 3m 12s is charged 3 minutes and 3m 31s is charged 4.
  */
 export function calculateBilling(
   acceptedAtMs: number,
@@ -24,9 +49,7 @@ export function calculateBilling(
   commissionRate: number
 ): BillingResult {
   const rawSeconds = Math.max(0, Math.floor((endedAtMs - acceptedAtMs) / 1000));
-  const completedMinutes = Math.floor(rawSeconds / SECONDS_PER_MINUTE);
-  const remainingSeconds = rawSeconds % SECONDS_PER_MINUTE;
-  const roundedMinutes = completedMinutes + (remainingSeconds > HALF_MINUTE_SECONDS ? 1 : 0);
+  const roundedMinutes = billedMinutes(rawSeconds);
   const roundedSeconds = roundedMinutes * SECONDS_PER_MINUTE;
   const minutesToCharge = roundedMinutes;
   const cost = Math.round(roundedMinutes * costPerMinute * 100) / 100;

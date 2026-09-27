@@ -1523,25 +1523,29 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		  let startOfLastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: startOfWeek) else { return }
 
 	var todayEarnings = 0
-	var todayMinutes = 0
+	var todaySeconds = 0
 	var weekEarnings = 0
-	var weekMinutes = 0
+	var weekSeconds = 0
 	var lastWeekEarnings = 0
 
 	for lesson in lessons {
 	  let date = lesson.acceptedAt
 	  if date >= startOfToday {
 		todayEarnings += lesson.teacherEarningsCents
-		todayMinutes += max(1, lesson.durationSeconds / 60)
+		todaySeconds += max(0, lesson.durationSeconds)
 	  }
 	  if date >= startOfWeek {
 		weekEarnings += lesson.teacherEarningsCents
-		weekMinutes += max(1, lesson.durationSeconds / 60)
+		weekSeconds += max(0, lesson.durationSeconds)
 	  }
 	  if date >= startOfLastWeek && date < startOfWeek {
 		lastWeekEarnings += lesson.teacherEarningsCents
 	  }
 	}
+	// The lessons' own times, to the second, summed and then shown in whole
+	// minutes: never rounded up, and no lesson counted as longer than it ran.
+	let todayMinutes = todaySeconds / 60
+	let weekMinutes = weekSeconds / 60
 
 	earningsCurrencyCode = summary.currency
 	todayEarningsCents = todayEarnings

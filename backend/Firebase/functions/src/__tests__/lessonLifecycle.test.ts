@@ -997,6 +997,28 @@ describe("a lesson ends with the first side to go", () => {
     expect(question()).toMatchObject({ lessonSeconds: 300, heldSeconds: 180, durationSeconds: 300 });
   });
 
+  // From the two sides connecting to the first of them leaving, to the
+  // second, and charged by the bands in billedMinutes: under half a minute
+  // free, 0:30–1:30 one minute.
+  test.each([
+    [29, 0, 0],
+    [30, 1, 2],
+    [90, 1, 2],
+    [91, 2, 4],
+  ])("a %i-second lesson is charged %i minute(s)", async (seconds, minutes, cost) => {
+    seedTenMinuteLesson();
+    rtdb.set(PRESENCE_PATH, { student: { leftAt: NOW_MS - 600_000 + seconds * 1000 } });
+
+    await endAsTeacher();
+
+    expect(question()).toMatchObject({
+      lessonSeconds: seconds,
+      durationSeconds: minutes * 60,
+      cost,
+    });
+    expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 20 - minutes });
+  });
+
   test("both apps are told the same total", async () => {
     seedTenMinuteLesson();
     rtdb.set(PRESENCE_PATH, { student: { leftAt: NOW_MS - 240_000 } });

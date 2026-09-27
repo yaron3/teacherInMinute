@@ -22,6 +22,9 @@ struct HistoryLesson: Identifiable, Hashable {
     let questionText: String
     let questionPhotoUrls: [String]
     let acceptedAt: Date
+    /// How long the lesson ran, to the second: from the two sides connecting
+    /// to the first of them ending it. Not what it was charged — that is
+    /// `costCents`, worked out by the backend in whole minutes.
     let durationSeconds: Int
     let costCents: Int
     let teacherEarningsCents: Int
@@ -207,13 +210,17 @@ final class HistoryModel {
             ?? Self.dateValue(data["startedAt"])
             ?? Self.dateValue(data["createdAt"])
             ?? Date.distantPast
-        // How long the lesson ran as the backend settled it — to the first side
-        // to go, holds excluded, rounded to the minutes billed. The teacher's
-        // history reads the same field (teacherEarningsSummary in
-        // functions/src/earnings.ts), so both sides show the same length. It
+        // How long the lesson ran, to the second, as the backend settled it: from
+        // the two sides connecting to the first of them ending it, holds
+        // excluded. The teacher's history is given the same (lessonSeconds in
+        // functions/src/earnings.ts), so both sides show the same length. A
+        // lesson settled before that was kept shows what it was billed as. It
         // used to be measured here from the question's creation, which also
         // counted the search for a teacher and the connecting.
-        let durationSeconds = max(0, Self.intValue(data["durationSeconds"]) ?? 0)
+        let durationSeconds = max(
+            0,
+            Self.intValue(data["lessonSeconds"]) ?? Self.intValue(data["durationSeconds"]) ?? 0
+        )
         let currencyCode = Self.currencyCode(
             from: data,
             pricingCurrencyById: pricingCurrencyById,

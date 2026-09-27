@@ -56,6 +56,8 @@ export const BUSY_STALE_AFTER_MINUTES = HARD_CAP_MINUTES + 15;
 // three missed in a row rather than one late write. See ./keepAlive.
 export const KEEPALIVE_TIMEOUT_SECONDS = 3 * 60;
 export const CONNECTION_FEE_CENTS = 50;
+// A lesson shorter than this is free; from it on, its first minute is charged.
+// See billedMinutes in ./billing.
 export const MIN_BILLABLE_SECONDS = 30;
 export const ROUND_UP_SECONDS = 30;
 

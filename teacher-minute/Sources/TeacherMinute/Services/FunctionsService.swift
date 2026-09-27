@@ -644,7 +644,8 @@ final class FunctionsService {
         questionText: text,
         questionPhotoUrls: photoUrls,
         acceptedAt: Self.isoDate(row["acceptedAt"]) ?? Self.isoDate(row["endedAt"]) ?? Date.distantPast,
-        durationSeconds: Self.intValue(row["durationSeconds"]) ?? 0,
+        // To the second; a lesson settled before that was kept, as billed.
+        durationSeconds: Self.intValue(row["lessonSeconds"]) ?? Self.intValue(row["durationSeconds"]) ?? 0,
         costCents: Self.intValue(row["costCents"]) ?? 0,
         teacherEarningsCents: Self.intValue(row["earningsCents"]) ?? 0,
         // Older lessons predate the per-lesson currency field; the summary's
