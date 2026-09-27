@@ -20,7 +20,6 @@ extension OnboardingBackViewModeling {
     var onboardingBackConfirmLabel: String { LocalizationSupport.localized("Log Out") }
 }
 
-extension ChooseRoleViewModel: OnboardingBackViewModeling {}
 extension TeacherSubjectsViewModel: OnboardingBackViewModeling {}
 extension TeacherIdentityVerificationViewModel: OnboardingBackViewModeling {}
 extension CompleteProfileViewModel: OnboardingBackViewModeling {}

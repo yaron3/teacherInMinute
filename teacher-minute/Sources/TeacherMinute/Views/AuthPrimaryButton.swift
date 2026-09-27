@@ -139,63 +139,6 @@ struct AuthInputField: View {
     }
 }
 
-struct AuthSegmentedRolePicker: View {
-    @Binding var selectedRole: AuthRole
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(AuthRole.allCases) { role in
-                roleButton(for: role)
-            }
-        }
-        .padding(3)
-        .background(theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-    }
-
-    private func roleButton(for role: AuthRole) -> some View {
-        let isSelected = selectedRole == role
-
-        return Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                selectedRole = role
-            }
-        } label: {
-            Text(role.title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(isSelected ? theme.primaryText : theme.secondaryText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 40)
-                .background {
-                    AuthSelectedRoleBackground(
-                        isSelected: isSelected,
-                        shadowColor: theme.primaryText
-                    )
-                }
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct AuthSelectedRoleBackground: View {
-	@Environment(\.colorScheme) var colorScheme
-	var theme: AppTheme {
-	  AppTheme(colorScheme: colorScheme)
-	}
-    let isSelected: Bool
-    let shadowColor: Color
-
-    var body: some View {
-        if isSelected {
-            RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous)
-                .fill(theme.accent)
-        }
-    }
-}
-
 struct SubjectChip: View {
     let subject: SubjectOption
     let title: String

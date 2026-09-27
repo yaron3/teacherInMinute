@@ -11,20 +11,22 @@ the repository; the first section is the part only you can do.
    **Firestore**, **Storage** and **Remote Config**. The app reads all five at
    launch, and a missing one fails as a permission error rather than something
    that names the cause.
-3. Register an **iOS app** with bundle id `com.yaronj.tim` and download
+3. Register two **iOS apps**, bundle ids `com.yaronj.student` (Instant
+   Teacher) and `com.yaronj.teacher` (Pro Teacher), and download each one's
    `GoogleService-Info.plist`.
-4. Register an **Android app** with package `com.yaronj.tim` and download
-   `google-services.json`.
+4. Register two **Android apps** with the same two packages and download
+   `google-services.json`, which lists both.
 
-The same bundle id and package are deliberate: the two builds never coexist on
-one device, and keeping them equal means nothing else in the project has to
-know which environment it is.
+The same bundle ids and packages as production are deliberate: a staging and a
+production build of one app never coexist on one device, and keeping them equal
+means nothing else in the project has to know which environment it is.
 
 ## 2. Drop the two files in
 
 | File | Goes to |
 | --- | --- |
-| `GoogleService-Info.plist` (staging) | `teacher-minute/Darwin/GoogleService-Info-Staging.plist` |
+| Instant Teacher's `GoogleService-Info.plist` (staging) | `teacher-minute/Darwin/InstantTeacher/GoogleService-Info-Staging.plist` |
+| Pro Teacher's `GoogleService-Info.plist` (staging) | `teacher-minute/Darwin/ProTeacher/GoogleService-Info-Staging.plist` |
 | `google-services.json` (staging) | `teacher-minute/Android/app/src/debug/google-services.json` |
 
 Commit both. Firebase config files are not secrets — they ship inside the app —
@@ -44,13 +46,16 @@ and the team needs the same staging target.
 to set and no scheme to remember.
 
 - **iOS** — the "Select the Firebase config" build phase overwrites the bundled
-  `GoogleService-Info.plist` with the staging one when `$CONFIGURATION` is
-  `Debug` and that file exists. Until the file exists the phase is a no-op, so
-  the build keeps working.
+  `GoogleService-Info.plist` with the staging one from the app's folder when
+  `$CONFIGURATION` is `Debug` and that file exists. Until the file exists the
+  phase is a no-op, so the build keeps working. Staging gives each app its own
+  Google sign-in client, so set the target's `TIM_GOOGLE_URL_SCHEME` for the
+  Debug configuration to the staging plist's `REVERSED_CLIENT_ID`; the same
+  build phase fails the build until they match.
 - **Android** — the Google Services plugin prefers
-  `src/debug/google-services.json` over `app/google-services.json`. Nothing in
-  `build.gradle.kts` selects it; see the README in that directory for why this
-  is not done with product flavors.
+  `src/debug/google-services.json` over `app/google-services.json`, for both
+  flavors. Nothing in `build.gradle.kts` selects it; see the README in that
+  directory for why staging is not a product flavor.
 
 Both builds log which config they took, as `Firebase config: staging` in the
 Xcode build log and the project id in the Android manifest merger output.

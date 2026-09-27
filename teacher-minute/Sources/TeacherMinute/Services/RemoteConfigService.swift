@@ -24,8 +24,6 @@ enum RemoteConfigKey: String {
     /// this key, so the client reads a single key and falls back to the built-in
     /// per-platform defaults when the key is absent.
     case paymentMethods = "payment_methods"
-    case teacherDescription = "teacher_description"
-    case studentDescription = "student_description"
 }
 
 enum RemoteConfigLaunchError: LocalizedError {

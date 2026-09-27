@@ -54,11 +54,8 @@ struct CreateAccountView: View {
 	}
 	.navigationBarTitleDisplayMode(.inline)
 	.navigationTitle(viewModel.screenTitle)
-	.onChange(of: viewModel.navigateToChooseRole) { _, newValue in
-	  // Replace rather than push so the user cannot navigate back to the
-	  // sign-up form after their account has been created.
-	  if newValue { router.replace(with: .chooseRole) }
-	}
+	// `resume` replaces the path rather than pushing onto it, so the user
+	// cannot navigate back to the sign-up form once their account exists.
 	.onChange(of: viewModel.destination) { _, resume in
 	  guard let resume else { return }
 	  router.resume(resume)
@@ -335,7 +332,7 @@ struct CreateAccountView: View {
 	  Task { await viewModel.signup() }
 	} label: {
 	  ZStack {
-		Text(viewModel.continueToRoleSelectionLabel)
+		Text(viewModel.continueLabel)
 		  .font(.system(size: 17, weight: .bold))
 		  .foregroundStyle(viewModel.canSubmit ? theme.onAccentText : theme.secondaryText)
 		  .opacity(viewModel.isLoading ? 0 : 1)

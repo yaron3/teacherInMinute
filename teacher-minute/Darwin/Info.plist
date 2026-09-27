@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+		<!-- Which app this is: "student" for Instant Teacher, "teacher" for Pro
+		     Teacher. Each app target sets TIM_APP_ROLE; AppRole.swift reads it. -->
+		<key>TIMAppRole</key>
+		<string>$(TIM_APP_ROLE)</string>
 		<key>FirebaseCrashlyticsCollectionEnabled</key>
 		<true/>
 		<key>FirebaseAutomaticScreenReportingEnabled</key>
@@ -13,32 +17,34 @@
 		<key>UIImageRespectsSafeAreaInsets</key>
 		<true/>
 	</dict>
-	<key>NSCameraUsageDescription</key>
-	<string>TeacherMinute uses the camera for live video tutoring and identity verification selfies.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>TeacherMinute uses the microphone for live voice tutoring sessions.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>TeacherMinute lets you choose photos for your profile, lesson questions, and teacher verification documents.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>TeacherMinute may save images you create or receive during lessons to your photo library.</string>
+	<!-- The camera, microphone and photo-library purpose strings are set per
+	     app target (INFOPLIST_KEY_NS*UsageDescription), since each app names
+	     itself and only its own uses. -->
 	<key>CFBundleURLTypes</key>
 	<array>
+		<!-- Google Sign-In: the REVERSED_CLIENT_ID of the app's own
+		     GoogleService-Info.plist. The "Select the Firebase config" build
+		     phase fails the build if the two disagree. -->
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m</string>
+				<string>$(TIM_GOOGLE_URL_SCHEME)</string>
 			</array>
 		</dict>
+		<!-- The app's own scheme. Instant Teacher keeps "teacherminute", which
+		     the backend's card-payment return links open; Pro Teacher takes a
+		     different one so a payment return never lands in the wrong app when
+		     both are installed. -->
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>CFBundleURLName</key>
-			<string>TeacherMinute Payment Return</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>teacherminute</string>
+				<string>$(TIM_APP_URL_SCHEME)</string>
 			</array>
 		</dict>
 	</array>

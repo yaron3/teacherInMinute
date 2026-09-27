@@ -9,18 +9,20 @@ import Foundation
 
 #if !os(Android)
 import FirebaseFirestore
+import FirebaseAuth
 #else
 import SkipFirebaseFirestore
+import SkipFirebaseAuth
 #endif
 
 // MARK: - Completion state returned after login
 
 enum OnboardingResume: Equatable {
-  case chooseRole                     // no role set yet
   case teacherIdentityVerification    // teacher: docs not uploaded
   case teacherSubjects                // teacher: subjects not chosen
   case completeProfile(role: AuthRole)// profile fields missing
   case home(role: AuthRole)           // fully complete
+  case otherApp(role: AuthRole)       // the account's role is the other app's
 }
 
 @MainActor
@@ -126,16 +128,30 @@ final class UserService {
   }
 
   // MARK: - Determine where to resume onboarding
-  
+
+  /// Where a new account starts. The app decides the role now, not the user,
+  /// so this is what the old role screen's Continue did for this app's role:
+  /// a teacher verifies their identity first while `teacher_identity_onboarding`
+  /// is on, and otherwise goes straight to the profile, as a student does.
+  var onboardingStart: OnboardingResume {
+	let role = AuthRole.appRole
+	let verifiesIdentityFirst = role == .teacher
+	  && RemoteConfigService.shared.getBool("teacher_identity_onboarding", default: false)
+	return verifiesIdentityFirst ? .teacherIdentityVerification : .completeProfile(role: role)
+  }
+
   func resumeRoute(uid: String) async throws -> OnboardingResume {
 	guard let data = try await fetchRaw(uid: uid) else {
-	  return .chooseRole
+	  return onboardingStart
 	}
-	
+
+	// The role is saved with the profile, so an account without one has not
+	// finished onboarding yet: it starts over as this app's role.
 	let roleString = data["role"] as? String ?? ""
-	guard !roleString.isEmpty else { return .chooseRole }
+	guard !roleString.isEmpty else { return onboardingStart }
 	let role: AuthRole = roleString == "teacher" ? .teacher : .student
-	
+	guard role == AuthRole.appRole else { return .otherApp(role: role) }
+
 			let hasName  = !(data["fullName"] as? String ?? "").isEmpty
 			let hasPhone = !(data["phoneNumber"] as? String ?? "").isEmpty
 
@@ -169,6 +185,24 @@ final class UserService {
 		  let hasProfile = hasName
 	  if !hasProfile { return .completeProfile(role: .student) }
 	  return .home(role: .student)
+	}
+  }
+
+  /// Ends the session of an account that belongs to the other app.
+  ///
+  /// Only Firebase's session ends. `AuthService.signOut` would also mark the
+  /// account's teacher presence offline, and a teacher who opens the student
+  /// app by mistake may well be online in Pro Teacher at that moment.
+  func signOutOtherAppAccount(role: AuthRole) {
+	AnalyticsService.shared.logEvent(AnalyticsEvent.otherAppAccountRefused, parameters: [
+	  "account_role": role.rawValue,
+	  "app_role": AuthRole.appRole.rawValue,
+	])
+	do {
+	  try Auth.auth().signOut()
+	  logger.info("[Auth] signed out a \(role.rawValue) account, which belongs to \(role.appName)")
+	} catch {
+	  logger.error("[Auth] could not sign out a \(role.rawValue) account: \(error)")
 	}
   }
 }

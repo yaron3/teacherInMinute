@@ -17,7 +17,6 @@ import SkipFirebaseAuth
 enum AppRoute: Hashable {
   case createAccount
   case login
-  case chooseRole
   case teacherIdentityVerification
   case teacherSubjects
   case completeProfile(role: AuthRole)
@@ -98,8 +97,6 @@ final class AppRouter: @unchecked Sendable {
 
   func resume(_ resume: OnboardingResume) {
 	switch resume {
-	case .chooseRole:
-	  replace(with: .chooseRole)
 	case .teacherIdentityVerification:
 	  replace(with: .teacherIdentityVerification)
 	case .teacherSubjects:
@@ -108,6 +105,11 @@ final class AppRouter: @unchecked Sendable {
 	  replace(with: .completeProfile(role: role))
 	case .home(let role):
 	  enterMainTabs(role: role)
+	case .otherApp:
+	  // Nothing in this app is for that account. Whoever resolved this has
+	  // already signed it out (`UserService.signOutOtherAppAccount`) and said
+	  // which app it belongs to, so all that is left is the sign-in screen.
+	  signOut()
 	}
   }
 }

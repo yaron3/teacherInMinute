@@ -7977,6 +7977,28 @@
       },
       "valueType": "STRING"
     },
+    "this_teacher_account": {
+      "defaultValue": {
+        "value": "This is a teacher account. Please sign in to %@, our app for teachers."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זהו חשבון מורה. יש להתחבר אליו דרך %@, האפליקציה שלנו למורים."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "this_student_account": {
+      "defaultValue": {
+        "value": "This is a student account. Please sign in to %@, our app for students."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זהו חשבון תלמיד. יש להתחבר אליו דרך %@, האפליקציה שלנו לתלמידים."
+        }
+      },
+      "valueType": "STRING"
+    },
     "could_not_save_paypal_account": {
       "defaultValue": {
         "value": "Could not save your PayPal account. Please try again."

@@ -2,6 +2,26 @@
 
 This is a [Skip](https://skip.dev) dual-platform app project.
 
+## Two apps
+
+The project builds two apps from the same sources, one per role:
+
+| App | For | Xcode target and scheme | Android flavor | Bundle id and application id |
+| --- | --- | --- | --- | --- |
+| Instant Teacher | Students | `Instant Teacher` | `student` | `com.yaronj.student` |
+| Pro Teacher | Teachers | `Pro Teacher` | `teacher` | `com.yaronj.teacher` |
+
+Nobody picks a role when signing up: each app is built for one, which it reads
+at runtime (`AppRole.swift`) from `TIM_APP_ROLE` in its Xcode target or
+`BuildConfig.APP_ROLE` in its flavor. Signing in to one app with an account of
+the other role names the right app and signs back out.
+
+Each app is its own Firebase app. `Darwin/InstantTeacher/` and
+`Darwin/ProTeacher/` each hold that app's `GoogleService-Info.plist`, and
+`Android/app/google-services.json` lists both packages. A target's
+`TIM_GOOGLE_URL_SCHEME` build setting has to be the `REVERSED_CLIENT_ID` from
+its plist; the build fails with a note saying so when it is not.
+
 
 <!-- TODO: add iOS screenshots to fastlane metadata
 ## iPhone Screenshots
@@ -38,10 +58,12 @@ cp Android/app/keystore.properties.example Android/app/keystore.properties
 ```
 
 Edit `Android/app/keystore.properties` with the passwords used for the upload
-key, then build the signed Android App Bundle by running the Gradle task
-`:app:bundleRelease` from Android Studio.
+key, then build the signed Android App Bundles by running the Gradle task
+`:app:bundleRelease` from Android Studio, or `:app:bundleStudentRelease` /
+`:app:bundleTeacherRelease` for one app.
 
-The signed bundle is created at `Android/app/build/outputs/bundle/release/`.
+The signed bundles are created at `.build/Android/app/outputs/bundle/`, in
+`studentRelease/` (Instant Teacher) and `teacherRelease/` (Pro Teacher).
 `keystore.jks` and `keystore.properties` are intentionally ignored by Git.
 
 ## Running
@@ -55,10 +77,12 @@ The project can be opened and run in Xcode from
 `Project.xcworkspace`, which also enabled parallel
 development of any Skip libary dependencies.
 
-To run both the Swift and Kotlin apps simultaneously,
-launch the "TeacherMinute App" target from Xcode.
-A build phases runs the "Launch Android APK" script that
-will deploy the Skip app to a running Android emulator or connected device.
+To run both the Swift and Kotlin versions of an app simultaneously,
+launch its target from Xcode: "Instant Teacher" or "Pro Teacher".
+A build phase runs the "Run skip gradle" script that
+will deploy the same app's Android flavor to a running Android emulator or
+connected device, through the Gradle task `launchStudentDebug` or
+`launchTeacherDebug`.
 Logging output for the iOS app can be viewed in the Xcode console, and in
 Android Studio's logcat tab for the transpiled Kotlin app, or
 using `adb logcat` from a terminal.

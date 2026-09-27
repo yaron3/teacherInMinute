@@ -96,11 +96,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+                The app's own scheme, set per product flavor in build.gradle.kts:
+                "teacherminute" for Instant Teacher, whose card payments return
+                through it, and another for Pro Teacher.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="teacherminute" />
+                <data android:scheme="${appUrlScheme}" />
             </intent-filter>
             <!--
                 PayPal App Link return. Braintree v5 requires a verified https

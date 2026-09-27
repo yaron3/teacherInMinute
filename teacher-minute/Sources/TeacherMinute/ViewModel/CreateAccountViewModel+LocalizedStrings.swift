@@ -42,9 +42,7 @@ extension CreateAccountViewModel {
     }
 
     // MARK: Actions
-    var continueToRoleSelectionLabel: String {
-        LocalizationSupport.localized("Continue to Role Selection")
-    }
+    var continueLabel: String { LocalizationSupport.localized("Continue") }
     var orContinueWithLabel: String { LocalizationSupport.localized("Or continue with") }
     var googleLabel: String { LocalizationSupport.localized("Google") }
     var appleLabel: String { LocalizationSupport.localized("Apple") }

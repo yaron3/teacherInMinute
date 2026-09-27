@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- No Hebrew name yet, so Hebrew devices show this one too. -->
+    <string name="app_name">Pro Teacher</string>
+</resources>

@@ -62,7 +62,6 @@ final class CreateAccountViewModel {
   var agreedToTerms   = false
   var sendUpdates     = false
   var isLoading       = false
-  var navigateToChooseRole = false
 
   var destination: OnboardingResume?
 
@@ -160,7 +159,9 @@ final class CreateAccountViewModel {
 	  }
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpSuccess, parameters: ["method": "email"])
 	  sendVerificationEmail()
-	  navigateToChooseRole = true
+	  // A brand-new account has no profile yet, so it starts at the first
+	  // onboarding step for this app's role.
+	  destination = UserService.shared.onboardingStart
 	} catch {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": error.localizedDescription])
 	  AnalyticsService.shared.recordError(error, context: "signup")
@@ -248,6 +249,14 @@ final class CreateAccountViewModel {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpSuccess, parameters: ["method": method])
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
+	  // Signing up with Google or Apple can land on an existing account,
+	  // which may be the other app's.
+	  if case .otherApp(let role) = resume {
+		UserService.shared.signOutOtherAppAccount(role: role)
+		alertMessage = role.otherAppAccountMessage
+		showAlert = true
+		return
+	  }
 	  destination = resume
 	} catch {
 	  alertMessage = localizedAuthErrorMessage(error)

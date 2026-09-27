@@ -56,9 +56,6 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 						  case .login:
 							LoginView()
 							  .trackScreen(AnalyticsScreen.login)
-						  case .chooseRole:
-							ChooseRoleView()
-							  .trackScreen(AnalyticsScreen.chooseRole)
 						  case .teacherIdentityVerification:
 							TeacherIdentityVerificationView()
 							  .trackScreen(AnalyticsScreen.teacherIdentity)
@@ -135,6 +132,13 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 	guard let uid = Auth.auth().currentUser?.uid else { return }
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
+	  if case .otherApp(let role) = resume {
+		// Sign-in turns such an account away, but a session can outlive that
+		// check: resolving the route can fail after Firebase has signed in,
+		// and a role can change after the fact. Either way it ends here.
+		UserService.shared.signOutOtherAppAccount(role: role)
+		return
+	  }
 	  router.resume(resume)
 	  logger.info("[Auth] auto-login restored session uid=\(uid)")
 	} catch {
