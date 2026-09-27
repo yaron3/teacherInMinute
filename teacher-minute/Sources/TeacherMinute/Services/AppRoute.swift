@@ -8,6 +8,11 @@
 
 import SwiftUI
 import SkipFuse
+#if !os(Android)
+import FirebaseAuth
+#else
+import SkipFirebaseAuth
+#endif
 
 enum AppRoute: Hashable {
   case createAccount
@@ -30,6 +35,7 @@ enum RootScreen: Hashable {
 final class AppRouter: @unchecked Sendable {
   var rootScreen: RootScreen = .welcome
   var path = NavigationPath()
+  private var authListenerHandle: Any?
 
   func push(_ route: AppRoute) {
 	path.append(route)
@@ -68,6 +74,26 @@ final class AppRouter: @unchecked Sendable {
   func signOut() {
 	path = NavigationPath()
 	rootScreen = .welcome
+  }
+
+  /// Returns to sign-in whenever Firebase has no user while the tab bar is up.
+  ///
+  /// Log Out and Delete Account route there themselves. This is for a session
+  /// that ends without them — revoked, or its account deleted or disabled
+  /// elsewhere — which used to leave the signed-in screens running with nobody
+  /// behind them, every read they made refused.
+  ///
+  /// Registers once, however often it is called.
+  func followAuthState() {
+	guard authListenerHandle == nil else { return }
+	authListenerHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+	  guard user == nil else { return }
+	  Task { @MainActor [weak self] in
+		guard let self, case .mainTabs = self.rootScreen else { return }
+		logger.info("[Router] no signed-in user behind the tab bar; returning to sign-in")
+		self.signOut()
+	  }
+	}
   }
 
   func resume(_ resume: OnboardingResume) {
