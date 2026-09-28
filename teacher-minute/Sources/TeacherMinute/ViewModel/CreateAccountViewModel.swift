@@ -250,12 +250,10 @@ final class CreateAccountViewModel {
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
 	  // Signing up with Google or Apple can land on an existing account,
-	  // which may be the other app's.
+	  // which may be the other app's. It is signed back out, and its route
+	  // leads to the welcome screen, which says which app it belongs to.
 	  if case .otherApp(let role) = resume {
 		UserService.shared.signOutOtherAppAccount(role: role)
-		alertMessage = role.otherAppAccountMessage
-		showAlert = true
-		return
 	  }
 	  destination = resume
 	} catch {

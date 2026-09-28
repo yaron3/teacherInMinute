@@ -133,10 +133,14 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
 	  if case .otherApp(let role) = resume {
-		// Sign-in turns such an account away, but a session can outlive that
-		// check: resolving the route can fail after Firebase has signed in,
-		// and a role can change after the fact. Either way it ends here.
+		// Mostly a student whose app has just updated into Pro Teacher, still
+		// signed in from before the apps split. Sign-in turns such an account
+		// away too, but a session can outlive that check: resolving the route
+		// can fail after Firebase has signed in, and a role can change after
+		// the fact. Either way it ends here, and the welcome screen says which
+		// app the account belongs to.
 		UserService.shared.signOutOtherAppAccount(role: role)
+		router.resume(resume)
 		return
 	  }
 	  router.resume(resume)

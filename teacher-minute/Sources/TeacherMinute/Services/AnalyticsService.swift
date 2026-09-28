@@ -38,6 +38,8 @@ enum AnalyticsEvent {
     // Role / onboarding
     /// Someone signed in to one app with an account of the other role.
     static let otherAppAccountRefused  = "other_app_account_refused"
+    /// They took the welcome screen's link to the store page of their app.
+    static let otherAppDownloadOpened  = "other_app_download_opened"
     static let profileCompleted        = "profile_completed"
     static let teacherSubjectsSaved    = "teacher_subjects_saved"
     static let teacherIdentityUploaded = "teacher_identity_uploaded"

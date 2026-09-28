@@ -34,6 +34,9 @@ enum RootScreen: Hashable {
 final class AppRouter: @unchecked Sendable {
   var rootScreen: RootScreen = .welcome
   var path = NavigationPath()
+  /// The role of an account just turned away because it belongs to the other
+  /// app. The welcome screen says which app that is, then clears it.
+  var otherAppAccountRole: AuthRole?
   private var authListenerHandle: Any?
 
   func push(_ route: AppRoute) {
@@ -105,11 +108,12 @@ final class AppRouter: @unchecked Sendable {
 	  replace(with: .completeProfile(role: role))
 	case .home(let role):
 	  enterMainTabs(role: role)
-	case .otherApp:
-	  // Nothing in this app is for that account. Whoever resolved this has
-	  // already signed it out (`UserService.signOutOtherAppAccount`) and said
-	  // which app it belongs to, so all that is left is the sign-in screen.
+	case .otherApp(let role):
+	  // Nothing in this app is for that account, and whoever resolved this has
+	  // already signed it out (`UserService.signOutOtherAppAccount`). Back to
+	  // the welcome screen, which says which app the account belongs to.
 	  signOut()
+	  otherAppAccountRole = role
 	}
   }
 }

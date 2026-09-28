@@ -177,14 +177,12 @@ final class LoginViewModel {
   
   // MARK: - Helpers
 
-  /// Sends a signed-in user on to wherever their onboarding stands, unless the
-  /// account is the other app's: that one is signed straight back out and told
-  /// which app it belongs to.
+  /// Sends a signed-in user on to wherever their onboarding stands. An account
+  /// of the other app's role is signed straight back out first; its route
+  /// leads to the welcome screen, which says which app it belongs to.
   private func proceed(to resume: OnboardingResume) {
 	if case .otherApp(let role) = resume {
 	  UserService.shared.signOutOtherAppAccount(role: role)
-	  present(message: role.otherAppAccountMessage)
-	  return
 	}
 	destination = resume
   }

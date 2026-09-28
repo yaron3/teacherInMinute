@@ -21,7 +21,7 @@ extension AuthRole {
   ///
   /// Nobody picks a role at sign-up any more. A new account starts the
   /// onboarding for this role, and an account of the other role is pointed to
-  /// the other app (see `UserService.resumeRoute`).
+  /// the other app (see `UserService.resumeRoute` and `WelcomeViewModel`).
   static let appRole: AuthRole = {
     let setting = appRoleSetting()
     guard let role = AuthRole(rawValue: setting) else {
@@ -39,17 +39,6 @@ extension AuthRole {
     switch self {
     case .student: "Instant Teacher"
     case .teacher: "Pro Teacher"
-    }
-  }
-
-  /// What someone is told when they sign in with an account of this role to
-  /// the app built for the other one.
-  var otherAppAccountMessage: String {
-    switch self {
-    case .teacher:
-      String(format: LocalizationSupport.localized("This is a teacher account. Please sign in to %@, our app for teachers."), appName)
-    case .student:
-      String(format: LocalizationSupport.localized("This is a student account. Please sign in to %@, our app for students."), appName)
     }
   }
 }

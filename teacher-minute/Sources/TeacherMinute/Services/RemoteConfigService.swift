@@ -24,6 +24,10 @@ enum RemoteConfigKey: String {
     /// this key, so the client reads a single key and falls back to the built-in
     /// per-platform defaults when the key is absent.
     case paymentMethods = "payment_methods"
+    /// Instant Teacher's store page, which Pro Teacher offers a student
+    /// account. Google Play by default and the App Store under the `iOS`
+    /// condition; empty until the listing exists, which leaves the offer out.
+    case studentAppURL = "student_app_url"
 }
 
 enum RemoteConfigLaunchError: LocalizedError {

@@ -167,6 +167,11 @@ android {
     // shared Swift code which role it serves through BuildConfig.APP_ROLE — see
     // AndroidAppRole.kt and AppRole.swift.
     //
+    // Pro Teacher is the original app under a new name: it keeps
+    // com.yaronj.tim, so everyone who has the app installed updates into it.
+    // A student among them is sent to Instant Teacher, the new
+    // com.yaronj.student, by the dialog on the welcome screen.
+    //
     // appUrlScheme is the custom scheme in AndroidManifest.xml. Instant Teacher
     // keeps "teacherminute", which the backend's card-payment return links
     // open; Pro Teacher takes another, so those links have only one app to
@@ -192,7 +197,7 @@ android {
         }
         create("teacher") {
             dimension = "app"
-            applicationId = "com.yaronj.teacher"
+            applicationId = "com.yaronj.tim"
             buildConfigField("String", "APP_ROLE", "\"teacher\"")
             manifestPlaceholders["appUrlScheme"] = "proteacher"
             configure<CrashlyticsExtension> {

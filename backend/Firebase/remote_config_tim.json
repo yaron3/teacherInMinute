@@ -7988,13 +7988,46 @@
       },
       "valueType": "STRING"
     },
-    "this_student_account": {
+    "student_app_prompt_title": {
       "defaultValue": {
-        "value": "This is a student account. Please sign in to %@, our app for students."
+        "value": "Students have a new app"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "זהו חשבון תלמיד. יש להתחבר אליו דרך %@, האפליקציה שלנו לתלמידים."
+          "value": "לתלמידים יש אפליקציה חדשה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_app_prompt_message": {
+      "defaultValue": {
+        "value": "Pro Teacher is now our app for teachers only. To keep learning, download Instant Teacher, our new app for students, and sign in there with the same account."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מעכשיו Pro Teacher היא האפליקציה שלנו למורים בלבד. כדי להמשיך ללמוד, הורידו את Instant Teacher, האפליקציה החדשה שלנו לתלמידים, והתחברו אליה עם אותו החשבון."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_app_prompt_download": {
+      "defaultValue": {
+        "value": "Download Instant Teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "להורדת Instant Teacher"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "student_app_url": {
+      "defaultValue": {
+        "value": "https://play.google.com/store/apps/details?id=com.yaronj.student"
+      },
+      "conditionalValues": {
+        "iOS": {
+          "value": ""
         }
       },
       "valueType": "STRING"

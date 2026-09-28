@@ -9,12 +9,24 @@ The project builds two apps from the same sources, one per role:
 | App | For | Xcode target and scheme | Android flavor | Bundle id and application id |
 | --- | --- | --- | --- | --- |
 | Instant Teacher | Students | `Instant Teacher` | `student` | `com.yaronj.student` |
-| Pro Teacher | Teachers | `Pro Teacher` | `teacher` | `com.yaronj.teacher` |
+| Pro Teacher | Teachers | `Pro Teacher` | `teacher` | `com.yaronj.tim` |
+
+Pro Teacher is the original app renamed. It keeps the original id, Firebase
+apps and store listings, so every installed copy updates into it. Instant
+Teacher is new.
 
 Nobody picks a role when signing up: each app is built for one, which it reads
 at runtime (`AppRole.swift`) from `TIM_APP_ROLE` in its Xcode target or
-`BuildConfig.APP_ROLE` in its flavor. Signing in to one app with an account of
-the other role names the right app and signs back out.
+`BuildConfig.APP_ROLE` in its flavor. An account of the other role is signed
+back out and returned to the welcome screen, which says where it belongs:
+
+- A student in Pro Teacher — including every student whose app just updated
+  into it — is asked to download Instant Teacher. The dialog's copy is in
+  Remote Config (`student_app_prompt_title`, `student_app_prompt_message`,
+  `student_app_prompt_download`), and so is the store link, `student_app_url`:
+  Google Play by default and the App Store under the `iOS` condition. Without
+  a link the dialog shows only its message.
+- A teacher in Instant Teacher is told to sign in to Pro Teacher.
 
 Each app is its own Firebase app. `Darwin/InstantTeacher/` and
 `Darwin/ProTeacher/` each hold that app's `GoogleService-Info.plist`, and

@@ -12,7 +12,7 @@ the repository; the first section is the part only you can do.
    launch, and a missing one fails as a permission error rather than something
    that names the cause.
 3. Register two **iOS apps**, bundle ids `com.yaronj.student` (Instant
-   Teacher) and `com.yaronj.teacher` (Pro Teacher), and download each one's
+   Teacher) and `com.yaronj.tim` (Pro Teacher), and download each one's
    `GoogleService-Info.plist`.
 4. Register two **Android apps** with the same two packages and download
    `google-services.json`, which lists both.

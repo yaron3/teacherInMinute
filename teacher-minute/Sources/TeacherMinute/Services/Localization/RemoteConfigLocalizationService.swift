@@ -160,7 +160,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Signing in to the app built for the other role. Remote Config
         // carries these too; the fallback covers the time before it deploys.
         "This is a teacher account. Please sign in to %@, our app for teachers.": "זהו חשבון מורה. יש להתחבר אליו דרך %@, האפליקציה שלנו למורים.",
-        "This is a student account. Please sign in to %@, our app for students.": "זהו חשבון תלמיד. יש להתחבר אליו דרך %@, האפליקציה שלנו לתלמידים.",
+        "Students have a new app": "לתלמידים יש אפליקציה חדשה",
+        "Pro Teacher is now our app for teachers only. To keep learning, download Instant Teacher, our new app for students, and sign in there with the same account.":
+          "מעכשיו Pro Teacher היא האפליקציה שלנו למורים בלבד. כדי להמשיך ללמוד, הורידו את Instant Teacher, האפליקציה החדשה שלנו לתלמידים, והתחברו אליה עם אותו החשבון.",
+        "Download Instant Teacher": "להורדת Instant Teacher",
         "Save board to gallery?": "לשמור את הלוח לגלריה?",
         "The session ended. Do you want to save the board image to your device gallery?": "השיעור הסתיים. האם ברצונך לשמור את תמונת הלוח לגלריית המכשיר?",
         "The board will be saved to the chat. Do you also want to save it to your device gallery?": "הלוח יישמר בצ׳אט. האם ברצונך לשמור אותו גם לגלריית המכשיר?",
@@ -710,6 +713,14 @@ enum LocalizationKey {
 //		"Not uploaded yet": "not_uploaded_yet",
 		"Upload": "upload_action",
 		"Set date of birth": "set_date_of_birth",
+
+        // The dialog that sends a student in Pro Teacher to Instant Teacher.
+        // Named rather than generated, because this copy is meant to be edited
+        // in the Remote Config console, where the names are what you search by.
+        "Students have a new app": "student_app_prompt_title",
+        "Pro Teacher is now our app for teachers only. To keep learning, download Instant Teacher, our new app for students, and sign in there with the same account.":
+          "student_app_prompt_message",
+        "Download Instant Teacher": "student_app_prompt_download",
 
         // MARK: Keys Remote Config would reject
         //

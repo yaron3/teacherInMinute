@@ -3,7 +3,7 @@
 Put the staging project's `google-services.json` in this directory and debug
 builds of both apps will use it; release builds keep the production one in
 `app/`. The file has to list both packages, `com.yaronj.student` and
-`com.yaronj.teacher`, so register both apps in the staging project before
+`com.yaronj.tim`, so register both apps in the staging project before
 downloading it.
 
 Nothing in `build.gradle.kts` selects it. The Google Services plugin looks for
