@@ -14,10 +14,6 @@ struct AuthFlowScreens_Previews: PreviewProvider {
         }
 
         NavigationStack {
-            ChooseRoleView()
-        }
-
-        NavigationStack {
             TeacherIdentityVerificationView()
         }
 

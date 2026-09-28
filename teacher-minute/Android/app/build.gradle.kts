@@ -1,6 +1,15 @@
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.TaskAction
+import org.gradle.process.ExecOperations
+import java.io.ByteArrayOutputStream
 import java.util.Properties
+import javax.inject.Inject
 
 plugins {
     alias(libs.plugins.kotlin.compose)
@@ -151,6 +160,54 @@ android {
         // versionName = MARKETING_VERSION
     }
 
+    // Two apps from one codebase, the same pair as the Xcode targets: Instant
+    // Teacher for students and Pro Teacher for teachers. Each flavor has its
+    // own applicationId (replacing the one Skip sets from Skip.env), its own
+    // name (src/<flavor>/res/values/strings.xml) and Firebase app, and tells the
+    // shared Swift code which role it serves through BuildConfig.APP_ROLE — see
+    // AndroidAppRole.kt and AppRole.swift.
+    //
+    // Pro Teacher is the original app under a new name: it keeps
+    // com.yaronj.tim, so everyone who has the app installed updates into it.
+    // A student among them is sent to Instant Teacher, the new
+    // com.yaronj.student, by the dialog on the welcome screen.
+    //
+    // appUrlScheme is the custom scheme in AndroidManifest.xml. Instant Teacher
+    // keeps "teacherminute", which the backend's card-payment return links
+    // open; Pro Teacher takes another, so those links have only one app to
+    // open when both are installed. PayPal is a student concern too: only
+    // src/student/AndroidManifest.xml declares its return App Link.
+    //
+    // unstrippedNativeLibsDir is where the Crashlytics upload finds the .so
+    // files as Swift produced them, before AGP strips them. The path names the
+    // variant, so each flavor gives its own; the release build type below turns
+    // the upload on.
+    flavorDimensions += "app"
+    productFlavors {
+        create("student") {
+            dimension = "app"
+            applicationId = "com.yaronj.student"
+            buildConfigField("String", "APP_ROLE", "\"student\"")
+            manifestPlaceholders["appUrlScheme"] = "teacherminute"
+            configure<CrashlyticsExtension> {
+                unstrippedNativeLibsDir = layout.buildDirectory.dir(
+                    "intermediates/merged_native_libs/studentRelease/mergeStudentReleaseNativeLibs/out/lib"
+                )
+            }
+        }
+        create("teacher") {
+            dimension = "app"
+            applicationId = "com.yaronj.tim"
+            buildConfigField("String", "APP_ROLE", "\"teacher\"")
+            manifestPlaceholders["appUrlScheme"] = "proteacher"
+            configure<CrashlyticsExtension> {
+                unstrippedNativeLibsDir = layout.buildDirectory.dir(
+                    "intermediates/merged_native_libs/teacherRelease/mergeTeacherReleaseNativeLibs/out/lib"
+                )
+            }
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }
@@ -196,15 +253,13 @@ android {
                 debugSymbolLevel = "SYMBOL_TABLE"
             }
             // Turns the raw addresses in a native crash report back into Swift
-            // frames. The upload is a separate task, so a release build stays
-            // offline unless you ask for it:
-            //   ./gradlew :app:assembleRelease :app:uploadCrashlyticsSymbolFileRelease
+            // frames. The upload is a separate task per app, so a release build
+            // stays offline unless you ask for it:
+            //   ./gradlew :app:assembleStudentRelease :app:uploadCrashlyticsSymbolFileStudentRelease
+            //   ./gradlew :app:assembleTeacherRelease :app:uploadCrashlyticsSymbolFileTeacherRelease
+            // Each flavor above says where its libraries are.
             configure<CrashlyticsExtension> {
                 nativeSymbolUploadEnabled = true
-                // The .so files as Swift produced them, before AGP strips them.
-                unstrippedNativeLibsDir = layout.buildDirectory.dir(
-                    "intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib"
-                )
             }
             // proguard-android-optimize.txt rather than proguard-android.txt:
             // the two differ by the latter's -dontoptimize, and AGP 9 drops the
@@ -220,6 +275,83 @@ android {
                 "proguard-rules.pro"
             )
         }
+    }
+}
+
+// Installs and starts one app on every connected device, or only on
+// ANDROID_SERIAL's, as Skip's own launch task does.
+abstract class LaunchAppTask : DefaultTask() {
+    @get:Inject abstract val execOperations: ExecOperations
+
+    /** The activity to start, as `applicationId/fully.qualified.Activity`. */
+    @get:Input abstract val component: Property<String>
+
+    @get:Internal abstract val adb: RegularFileProperty
+
+    @TaskAction
+    fun launch() {
+        val adbPath = adb.get().asFile.absolutePath
+        val devicesOutput = ByteArrayOutputStream()
+        execOperations.exec {
+            commandLine(adbPath, "devices")
+            standardOutput = devicesOutput
+        }
+        val requestedSerial = System.getenv("ANDROID_SERIAL").orEmpty()
+        val serials = devicesOutput.toString("UTF-8").lines()
+            .filter { it.endsWith("\tdevice") }
+            .map { it.substringBefore('\t') }
+            .filter { requestedSerial.isEmpty() || it == requestedSerial }
+        if (serials.isEmpty()) {
+            throw GradleException("No connected Android devices or emulators were reported by `adb devices`.")
+        }
+        serials.forEach { serial ->
+            execOperations.exec {
+                commandLine(
+                    adbPath, "-s", serial, "shell", "am", "start",
+                    "-a", "android.intent.action.MAIN",
+                    "-c", "android.intent.category.LAUNCHER",
+                    "-n", component.get()
+                )
+            }
+        }
+    }
+}
+
+// Skip's launchDebug and launchRelease serve a single app: they depend on
+// installDebug, which the flavors replace with one install task per app, and
+// start the activity under Skip.env's identifier. These are the per-app
+// versions — launchStudentDebug, launchTeacherRelease and so on — which the
+// Xcode "Run skip gradle" phase calls for the target being built.
+androidComponents {
+    onVariants { variant ->
+        val variantName = variant.name.replaceFirstChar { it.uppercase() }
+        tasks.register<LaunchAppTask>("launch$variantName") {
+            group = "install"
+            description = "Installs and starts the ${variant.name} app on the connected devices."
+            dependsOn("checkDevices", "install$variantName")
+            component.set(variant.applicationId.zip(variant.namespace) { id, namespace ->
+                "$id/$namespace.MainActivity"
+            })
+            adb.set(sdkComponents.adb)
+        }
+    }
+}
+
+// Skip's own tasks cannot tell which app to launch. Rather than failing on a
+// missing installDebug, say what to run instead.
+tasks.configureEach {
+    val buildType = when (name) {
+        "launchDebug" -> "Debug"
+        "launchRelease" -> "Release"
+        else -> return@configureEach
+    }
+    setDependsOn(emptyList<Any>())
+    actions.clear()
+    doFirst {
+        throw GradleException(
+            "There are two apps: run launchStudent$buildType (Instant Teacher) " +
+                "or launchTeacher$buildType (Pro Teacher)."
+        )
     }
 }
 

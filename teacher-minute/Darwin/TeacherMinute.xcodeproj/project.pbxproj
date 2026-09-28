@@ -13,6 +13,12 @@
 		499CD43B2AC5B799001AE8D8 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
 		499CD4402AC5B799001AE8D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
 		4AB6CD562FAB8C5C003E7ADA /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */; };
+		5E2020AEA60A6DAC5EA83FAE /* TeacherMinute in Frameworks */ = {isa = PBXBuildFile; productRef = 5E94E40C6527C5A5F98AB3FE /* TeacherMinute */; };
+		5E24D2ADA3E031128E5FEED3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */; };
+		5E3168E37603BF7F871DB074 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
+		5E5A9614BA3E7D070A48925E /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
+		5E838A2B53C34E83324BF961 /* TeacherMinute in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 5E94E40C6527C5A5F98AB3FE /* TeacherMinute */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		5EB0790B0973E7889A7EF7BF /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5E23BBE8B39F09DD9D86A499 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,7 +27,7 @@
 			containerPortal = 49F90C202A52156200F06D93 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 499CD4382AC5B799001AE8D8;
-			remoteInfo = "TeacherMinute App";
+			remoteInfo = "Instant Teacher";
 		};
 /* End PBXContainerItemProxy section */
 
@@ -37,12 +43,23 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5E52FC399A9089190CF114D7 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				5E838A2B53C34E83324BF961 /* TeacherMinute in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		4900101C2BACEA710000DE33 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		493609562A6B7EAE00C401E2 /* TeacherMinute */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = TeacherMinute; path = ..; sourceTree = "<group>"; };
-		496BDBEB2B89A47800C09264 /* TeacherMinute.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeacherMinute.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		496BDBEB2B89A47800C09264 /* InstantTeacher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = InstantTeacher.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = ../Sources/TeacherMinute/Resources/Localizable.xcstrings; sourceTree = "<group>"; };
 		496EB72F2A6AE4DE00C1253A /* Skip.env */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Skip.env; path = ../Skip.env; sourceTree = "<group>"; };
 		496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = TeacherMinute.xcconfig; sourceTree = "<group>"; };
@@ -54,6 +71,8 @@
 		49F90C312A52156300F06D93 /* Entitlements.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Entitlements.plist; sourceTree = "<group>"; };
 		4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		4AC88531302E11E2001E0831 /* TeacherMinuteUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TeacherMinuteUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E23BBE8B39F09DD9D86A499 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		5E85B96AC664830687681C74 /* ProTeacher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ProTeacher.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -76,13 +95,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5E0D84890F74DA54B1734116 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E2020AEA60A6DAC5EA83FAE /* TeacherMinute in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		496BDBEC2B89A47800C09264 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				496BDBEB2B89A47800C09264 /* TeacherMinute.app */,
+				496BDBEB2B89A47800C09264 /* InstantTeacher.app */,
+				5E85B96AC664830687681C74 /* ProTeacher.app */,
 				4AC88531302E11E2001E0831 /* TeacherMinuteUITests.xctest */,
 			);
 			name = Products;
@@ -118,7 +146,8 @@
 				49F90C2B2A52156200F06D93 /* Main.swift */,
 				49F90C2F2A52156300F06D93 /* Assets.xcassets */,
 				49F90C312A52156300F06D93 /* Entitlements.plist */,
-				4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */,
+				5EECDD19DE7F30BADB9EFAF0 /* InstantTeacher */,
+				5E9687E6C4A5A48F00CBC885 /* ProTeacher */,
 				4900101C2BACEA710000DE33 /* Info.plist */,
 				4971EFA92FA4FEA50002D3F7 /* InfoPlist.xcstrings */,
 			);
@@ -132,12 +161,28 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		5E9687E6C4A5A48F00CBC885 /* ProTeacher */ = {
+			isa = PBXGroup;
+			children = (
+				5E23BBE8B39F09DD9D86A499 /* GoogleService-Info.plist */,
+			);
+			path = ProTeacher;
+			sourceTree = "<group>";
+		};
+		5EECDD19DE7F30BADB9EFAF0 /* InstantTeacher */ = {
+			isa = PBXGroup;
+			children = (
+				4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */,
+			);
+			path = InstantTeacher;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		499CD4382AC5B799001AE8D8 /* TeacherMinute App */ = {
+		499CD4382AC5B799001AE8D8 /* Instant Teacher */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "TeacherMinute App" */;
+			buildConfigurationList = 499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "Instant Teacher" */;
 			buildPhases = (
 				499CD43A2AC5B799001AE8D8 /* Sources */,
 				499CD43C2AC5B799001AE8D8 /* Frameworks */,
@@ -150,12 +195,12 @@
 			);
 			dependencies = (
 			);
-			name = "TeacherMinute App";
+			name = "Instant Teacher";
 			packageProductDependencies = (
 				491F27812DA55B72004926EE /* TeacherMinute */,
 			);
 			productName = App;
-			productReference = 496BDBEB2B89A47800C09264 /* TeacherMinute.app */;
+			productReference = 496BDBEB2B89A47800C09264 /* InstantTeacher.app */;
 			productType = "com.apple.product-type.application";
 		};
 		4AC88530302E11E2001E0831 /* TeacherMinuteUITests */ = {
@@ -180,6 +225,29 @@
 			productName = TeacherMinuteUITests;
 			productReference = 4AC88531302E11E2001E0831 /* TeacherMinuteUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		5E7FA322FCB3925E9804B604 /* Pro Teacher */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E296D3D311C148A05F44436 /* Build configuration list for PBXNativeTarget "Pro Teacher" */;
+			buildPhases = (
+				5E3EBE42B19C1CCEEB9C6F6E /* Sources */,
+				5E0D84890F74DA54B1734116 /* Frameworks */,
+				5E57BCE538F477DC132ED796 /* Resources */,
+				5EC3DC9F360E20044838B4BE /* Select the Firebase config */,
+				5EE85B93DECA006E2971267F /* Run skip gradle */,
+				5E52FC399A9089190CF114D7 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Pro Teacher";
+			packageProductDependencies = (
+				5E94E40C6527C5A5F98AB3FE /* TeacherMinute */,
+			);
+			productName = App;
+			productReference = 5E85B96AC664830687681C74 /* ProTeacher.app */;
+			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -213,7 +281,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				499CD4382AC5B799001AE8D8 /* TeacherMinute App */,
+				499CD4382AC5B799001AE8D8 /* Instant Teacher */,
+				5E7FA322FCB3925E9804B604 /* Pro Teacher */,
 				4AC88530302E11E2001E0831 /* TeacherMinuteUITests */,
 			);
 		};
@@ -237,28 +306,19 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5E57BCE538F477DC132ED796 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E3168E37603BF7F871DB074 /* Assets.xcassets in Resources */,
+				5EB0790B0973E7889A7EF7BF /* GoogleService-Info.plist in Resources */,
+				5E24D2ADA3E031128E5FEED3 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		4AB6CD602FAB8C5C003E7ADA /* Select the Firebase config */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Select the Firebase config";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = "/bin/sh -e";
-			shellScript = "# Debug builds run against staging when a staging config is present;\n# release builds always use production. Drop GoogleService-Info-Staging.plist\n# next to GoogleService-Info.plist to turn this on. With no staging file the\n# app keeps the production config it was built with.\nSTAGING=\"${SRCROOT}/GoogleService-Info-Staging.plist\"\nBUNDLED=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/GoogleService-Info.plist\"\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -f \"${STAGING}\" ]; then\n  cp \"${STAGING}\" \"${BUNDLED}\"\n  echo \"note: Firebase config: staging\"\nelse\n  echo \"note: Firebase config: production\"\nfi\n";
-		};
 		499CD4452AC5B869001AE8D8 /* Run skip gradle */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -276,7 +336,64 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = "/bin/sh -e";
-			shellScript = "if [ \"${SKIP_ZERO}\" != \"\" ]; then\n  echo \"note: skipping skip due to SKIP_ZERO\"\n  exit 0\nelif [ \"${ENABLE_PREVIEWS}\" = \"YES\" ]; then\n  echo \"note: skipping skip due to ENABLE_PREVIEWS\"\n  exit 0\nelif [ \"${ACTION}\" = \"install\" ]; then\n  echo \"note: skipping skip due to archive install\"\n  exit 0\nelif [ \"${SKIP_ACTION}\" = \"none\" ]; then\n  echo \"note: skipping skip due to SKIP_ACTION none\"\n  exit 0\nelse\n  SKIP_ACTION=\"${SKIP_ACTION:-launch}\"\nfi\nPATH=${BUILD_ROOT}/Release:${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\necho \"note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}\"\nskip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}\n";
+			shellScript = "if [ \"${SKIP_ZERO}\" != \"\" ]; then\n  echo \"note: skipping skip due to SKIP_ZERO\"\n  exit 0\nelif [ \"${ENABLE_PREVIEWS}\" = \"YES\" ]; then\n  echo \"note: skipping skip due to ENABLE_PREVIEWS\"\n  exit 0\nelif [ \"${ACTION}\" = \"install\" ]; then\n  echo \"note: skipping skip due to archive install\"\n  exit 0\nelif [ \"${SKIP_ACTION}\" = \"none\" ]; then\n  echo \"note: skipping skip due to SKIP_ACTION none\"\n  exit 0\nelse\n  SKIP_ACTION=\"${SKIP_ACTION:-launch}\"\nfi\n# Each app target builds the Android flavor of the same app (TIM_ANDROID_FLAVOR),\n# so the task is e.g. launchStudentDebug. Those launch tasks are defined in\n# Android/app/build.gradle.kts; \"build\" maps to assemble, which builds the APK.\nif [ \"${SKIP_ACTION}\" = \"build\" ]; then\n  GRADLE_TASK=\"assemble${TIM_ANDROID_FLAVOR}${CONFIGURATION:-Debug}\"\nelse\n  GRADLE_TASK=\"${SKIP_ACTION}${TIM_ANDROID_FLAVOR}${CONFIGURATION:-Debug}\"\nfi\nPATH=${BUILD_ROOT}/Release:${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\necho \"note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${GRADLE_TASK}\"\nskip gradle -p ../Android ${GRADLE_TASK}\n";
+		};
+		4AB6CD602FAB8C5C003E7ADA /* Select the Firebase config */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Select the Firebase config";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = "/bin/sh -e";
+			shellScript = "# Each app bundles the GoogleService-Info.plist in its own folder, named after\n# its PRODUCT_NAME: InstantTeacher/ or ProTeacher/. Debug builds run against\n# staging when that folder also holds GoogleService-Info-Staging.plist; release\n# builds always use production. With no staging file the app keeps the\n# production config it was built with.\nAPP_DIR=\"${SRCROOT}/${PRODUCT_NAME}\"\nSTAGING=\"${APP_DIR}/GoogleService-Info-Staging.plist\"\nBUNDLED=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/GoogleService-Info.plist\"\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -f \"${STAGING}\" ]; then\n  cp \"${STAGING}\" \"${BUNDLED}\"\n  echo \"note: Firebase config: staging\"\nelse\n  echo \"note: Firebase config: production\"\nfi\n# Google Sign-In raises an exception at sign-in unless Info.plist registers the\n# config's REVERSED_CLIENT_ID as a URL scheme. Info.plist takes that scheme from\n# TIM_GOOGLE_URL_SCHEME, so a config for a different OAuth client stops the\n# build here rather than crashing the app later.\nGOOGLE_SCHEME=$(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" \"${BUNDLED}\" 2>/dev/null || true)\nif [ -n \"${GOOGLE_SCHEME}\" ] && [ \"${GOOGLE_SCHEME}\" != \"${TIM_GOOGLE_URL_SCHEME}\" ]; then\n  echo \"error: ${TARGET_NAME} bundles a Firebase config whose Google client is ${GOOGLE_SCHEME}, but the target registers ${TIM_GOOGLE_URL_SCHEME}. Set TIM_GOOGLE_URL_SCHEME for ${TARGET_NAME} (${CONFIGURATION}) to the REVERSED_CLIENT_ID in that GoogleService-Info.plist.\"\n  exit 1\nfi\n";
+		};
+		5EC3DC9F360E20044838B4BE /* Select the Firebase config */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Select the Firebase config";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = "/bin/sh -e";
+			shellScript = "# Each app bundles the GoogleService-Info.plist in its own folder, named after\n# its PRODUCT_NAME: InstantTeacher/ or ProTeacher/. Debug builds run against\n# staging when that folder also holds GoogleService-Info-Staging.plist; release\n# builds always use production. With no staging file the app keeps the\n# production config it was built with.\nAPP_DIR=\"${SRCROOT}/${PRODUCT_NAME}\"\nSTAGING=\"${APP_DIR}/GoogleService-Info-Staging.plist\"\nBUNDLED=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/GoogleService-Info.plist\"\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -f \"${STAGING}\" ]; then\n  cp \"${STAGING}\" \"${BUNDLED}\"\n  echo \"note: Firebase config: staging\"\nelse\n  echo \"note: Firebase config: production\"\nfi\n# Google Sign-In raises an exception at sign-in unless Info.plist registers the\n# config's REVERSED_CLIENT_ID as a URL scheme. Info.plist takes that scheme from\n# TIM_GOOGLE_URL_SCHEME, so a config for a different OAuth client stops the\n# build here rather than crashing the app later.\nGOOGLE_SCHEME=$(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" \"${BUNDLED}\" 2>/dev/null || true)\nif [ -n \"${GOOGLE_SCHEME}\" ] && [ \"${GOOGLE_SCHEME}\" != \"${TIM_GOOGLE_URL_SCHEME}\" ]; then\n  echo \"error: ${TARGET_NAME} bundles a Firebase config whose Google client is ${GOOGLE_SCHEME}, but the target registers ${TIM_GOOGLE_URL_SCHEME}. Set TIM_GOOGLE_URL_SCHEME for ${TARGET_NAME} (${CONFIGURATION}) to the REVERSED_CLIENT_ID in that GoogleService-Info.plist.\"\n  exit 1\nfi\n";
+		};
+		5EE85B93DECA006E2971267F /* Run skip gradle */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run skip gradle";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = "/bin/sh -e";
+			shellScript = "if [ \"${SKIP_ZERO}\" != \"\" ]; then\n  echo \"note: skipping skip due to SKIP_ZERO\"\n  exit 0\nelif [ \"${ENABLE_PREVIEWS}\" = \"YES\" ]; then\n  echo \"note: skipping skip due to ENABLE_PREVIEWS\"\n  exit 0\nelif [ \"${ACTION}\" = \"install\" ]; then\n  echo \"note: skipping skip due to archive install\"\n  exit 0\nelif [ \"${SKIP_ACTION}\" = \"none\" ]; then\n  echo \"note: skipping skip due to SKIP_ACTION none\"\n  exit 0\nelse\n  SKIP_ACTION=\"${SKIP_ACTION:-launch}\"\nfi\n# Each app target builds the Android flavor of the same app (TIM_ANDROID_FLAVOR),\n# so the task is e.g. launchStudentDebug. Those launch tasks are defined in\n# Android/app/build.gradle.kts; \"build\" maps to assemble, which builds the APK.\nif [ \"${SKIP_ACTION}\" = \"build\" ]; then\n  GRADLE_TASK=\"assemble${TIM_ANDROID_FLAVOR}${CONFIGURATION:-Debug}\"\nelse\n  GRADLE_TASK=\"${SKIP_ACTION}${TIM_ANDROID_FLAVOR}${CONFIGURATION:-Debug}\"\nfi\nPATH=${BUILD_ROOT}/Release:${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\necho \"note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${GRADLE_TASK}\"\nskip gradle -p ../Android ${GRADLE_TASK}\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -296,12 +413,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5E3EBE42B19C1CCEEB9C6F6E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E5A9614BA3E7D070A48925E /* Main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		4AC88538302E11E2001E0831 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 499CD4382AC5B799001AE8D8 /* TeacherMinute App */;
+			target = 499CD4382AC5B799001AE8D8 /* Instant Teacher */;
 			targetProxy = 4AC88537302E11E2001E0831 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -317,16 +442,20 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Instant Teacher uses the camera for live video tutoring and identity verification selfies.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Instant Teacher uses the camera for live video tutoring and for photos of your questions.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Instant Teacher uses the microphone for live voice tutoring sessions.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Instant Teacher may save images you create or receive during lessons to your photo library.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Instant Teacher lets you choose photos for your profile, lesson questions, and teacher verification documents.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Instant Teacher lets you choose photos for your profile and your lesson questions.";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0.5;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.student;
+				PRODUCT_NAME = InstantTeacher;
+				TIM_ANDROID_FLAVOR = Student;
+				TIM_APP_ROLE = student;
+				TIM_APP_URL_SCHEME = teacherminute;
+				TIM_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.922632930084-783f3pcf4e6r9d0entjoveo3g2muejt3";
 			};
 			name = Debug;
 		};
@@ -340,16 +469,20 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Instant Teacher uses the camera for live video tutoring and identity verification selfies.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Instant Teacher uses the camera for live video tutoring and for photos of your questions.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Instant Teacher uses the microphone for live voice tutoring sessions.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Instant Teacher may save images you create or receive during lessons to your photo library.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Instant Teacher lets you choose photos for your profile, lesson questions, and teacher verification documents.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Instant Teacher lets you choose photos for your profile and your lesson questions.";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0.5;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.yaronj.tim;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = com.yaronj.tim;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.student;
+				PRODUCT_NAME = InstantTeacher;
+				TIM_ANDROID_FLAVOR = Student;
+				TIM_APP_ROLE = student;
+				TIM_APP_URL_SCHEME = teacherminute;
+				TIM_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.922632930084-783f3pcf4e6r9d0entjoveo3g2muejt3";
 			};
 			name = Release;
 		};
@@ -452,7 +585,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "TeacherMinute App";
+				TEST_TARGET_NAME = "Instant Teacher";
 			};
 			name = Debug;
 		};
@@ -511,15 +644,69 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "TeacherMinute App";
+				TEST_TARGET_NAME = "Instant Teacher";
 				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		5E11521E2E1926E3067FF865 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = 5WRH6356JL;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pro Teacher";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Pro Teacher uses the camera for live video tutoring and identity verification selfies.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Pro Teacher uses the microphone for live voice tutoring sessions.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Pro Teacher may save images you create or receive during lessons to your photo library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Pro Teacher lets you choose photos for your profile and your teacher verification documents.";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.tim;
+				PRODUCT_NAME = ProTeacher;
+				TIM_ANDROID_FLAVOR = Teacher;
+				TIM_APP_ROLE = teacher;
+				TIM_APP_URL_SCHEME = proteacher;
+				TIM_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m";
+			};
+			name = Debug;
+		};
+		5EB423AECAE2F03DFDACC7D5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = 5WRH6356JL;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pro Teacher";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Pro Teacher uses the camera for live video tutoring and identity verification selfies.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Pro Teacher uses the microphone for live voice tutoring sessions.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Pro Teacher may save images you create or receive during lessons to your photo library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Pro Teacher lets you choose photos for your profile and your teacher verification documents.";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.tim;
+				PRODUCT_NAME = ProTeacher;
+				TIM_ANDROID_FLAVOR = Teacher;
+				TIM_APP_ROLE = teacher;
+				TIM_APP_URL_SCHEME = proteacher;
+				TIM_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m";
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "TeacherMinute App" */ = {
+		499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "Instant Teacher" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				499CD4422AC5B799001AE8D8 /* Debug */,
@@ -546,10 +733,23 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		5E296D3D311C148A05F44436 /* Build configuration list for PBXNativeTarget "Pro Teacher" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E11521E2E1926E3067FF865 /* Debug */,
+				5EB423AECAE2F03DFDACC7D5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		491F27812DA55B72004926EE /* TeacherMinute */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TeacherMinute;
+		};
+		5E94E40C6527C5A5F98AB3FE /* TeacherMinute */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = TeacherMinute;
 		};

@@ -121,7 +121,6 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // stand in until the template is republished.
         "Log in to Teacher in a Minute to continue your\njourney.": "התחבר כדי להמשיך\nאת הדרך שלך.",
         "Tell us a bit about yourself to get started with\nTeacher in a Minute.": "ספר לנו קצת על עצמך כדי להתחיל עם\nTeacher in a Minute.",
-		"Choose your role": "בחר תפקיד",
         "Send me occasional updates and tips about\nTeacher in a Minute.": "שלחו לי מדי פעם עדכונים וטיפים על\nTeacher in a Minute.",
         "Help you anywhere": "",
         // Title of the photo-source dialog; its buttons already had Hebrew, so
@@ -158,6 +157,13 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "A network error occurred. Please try again.": "שגיאת רשת. בדוק את החיבור ונסה שוב.",
         "An unexpected error occurred. Please try again.": "אירעה שגיאה בלתי צפויה. נסה שוב.",
         "Could not retrieve user session. Please try again.": "לא ניתן לאחזר את פרטי המשתמש. נסה שוב.",
+        // Signing in to the app built for the other role. Remote Config
+        // carries these too; the fallback covers the time before it deploys.
+        "This is a teacher account. Please sign in to %@, our app for teachers.": "זהו חשבון מורה. יש להתחבר אליו דרך %@, האפליקציה שלנו למורים.",
+        "Students have a new app": "לתלמידים יש אפליקציה חדשה",
+        "Pro Teacher is now our app for teachers only. To keep learning, download Instant Teacher, our new app for students, and sign in there with the same account.":
+          "מעכשיו Pro Teacher היא האפליקציה שלנו למורים בלבד. כדי להמשיך ללמוד, הורידו את Instant Teacher, האפליקציה החדשה שלנו לתלמידים, והתחברו אליה עם אותו החשבון.",
+        "Download Instant Teacher": "להורדת Instant Teacher",
         "Save board to gallery?": "לשמור את הלוח לגלריה?",
         "The session ended. Do you want to save the board image to your device gallery?": "השיעור הסתיים. האם ברצונך לשמור את תמונת הלוח לגלריית המכשיר?",
         "The board will be saved to the chat. Do you also want to save it to your device gallery?": "הלוח יישמר בצ׳אט. האם ברצונך לשמור אותו גם לגלריית המכשיר?",
@@ -618,8 +624,6 @@ enum LocalizationKey {
         "Camera unavailable \u{2014} this lesson is audio only.": "camera_unavailable_audio_only",
         "Grade 8": "grade_8",
         "Grade 9": "grade_9",
-        "I am a Student": "student_a",
-        "I am a Teacher": "teacher_a",
         "Key 1": "key_1",
         "Key 2": "key_2",
         "LANGUAGE": "language_caps",
@@ -710,6 +714,14 @@ enum LocalizationKey {
 		"Upload": "upload_action",
 		"Set date of birth": "set_date_of_birth",
 
+        // The dialog that sends a student in Pro Teacher to Instant Teacher.
+        // Named rather than generated, because this copy is meant to be edited
+        // in the Remote Config console, where the names are what you search by.
+        "Students have a new app": "student_app_prompt_title",
+        "Pro Teacher is now our app for teachers only. To keep learning, download Instant Teacher, our new app for students, and sign in there with the same account.":
+          "student_app_prompt_message",
+        "Download Instant Teacher": "student_app_prompt_download",
+
         // MARK: Keys Remote Config would reject
         //
         // `generatedKey` drops words of two characters or fewer, so these three
@@ -765,8 +777,6 @@ enum LocalizationKey {
 
         // `all` holds the "All" subject filter.
         "all": "all_lower",
-        // `choose_your_role` holds the title-case navigation title.
-        "Choose your role": "choose_your_role_subtitle",
         // Three different save failures all reduced to `could_not_save`.
         "Could not save your PayPal account. Please try again.": "could_not_save_paypal_account",
         "Could not save your PayPal email. Please try again.": "could_not_save_paypal_email",

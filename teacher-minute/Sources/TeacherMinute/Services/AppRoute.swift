@@ -17,7 +17,6 @@ import SkipFirebaseAuth
 enum AppRoute: Hashable {
   case createAccount
   case login
-  case chooseRole
   case teacherIdentityVerification
   case teacherSubjects
   case completeProfile(role: AuthRole)
@@ -35,6 +34,9 @@ enum RootScreen: Hashable {
 final class AppRouter: @unchecked Sendable {
   var rootScreen: RootScreen = .welcome
   var path = NavigationPath()
+  /// The role of an account just turned away because it belongs to the other
+  /// app. The welcome screen says which app that is, then clears it.
+  var otherAppAccountRole: AuthRole?
   private var authListenerHandle: Any?
 
   func push(_ route: AppRoute) {
@@ -98,8 +100,6 @@ final class AppRouter: @unchecked Sendable {
 
   func resume(_ resume: OnboardingResume) {
 	switch resume {
-	case .chooseRole:
-	  replace(with: .chooseRole)
 	case .teacherIdentityVerification:
 	  replace(with: .teacherIdentityVerification)
 	case .teacherSubjects:
@@ -108,6 +108,12 @@ final class AppRouter: @unchecked Sendable {
 	  replace(with: .completeProfile(role: role))
 	case .home(let role):
 	  enterMainTabs(role: role)
+	case .otherApp(let role):
+	  // Nothing in this app is for that account, and whoever resolved this has
+	  // already signed it out (`UserService.signOutOtherAppAccount`). Back to
+	  // the welcome screen, which says which app the account belongs to.
+	  signOut()
+	  otherAppAccountRole = role
 	}
   }
 }

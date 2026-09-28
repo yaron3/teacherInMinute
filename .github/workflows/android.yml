@@ -60,7 +60,10 @@ jobs:
       # first run. No setup-java step: adding one would only supply the launcher
       # JVM, which the runner already has. If provisioning fails, that is the
       # place to look.
-      - name: Build the Android app
+      # assembleDebug builds both apps: the student and teacher flavors. The
+      # Google Services plugin fails either one whose package is missing from
+      # app/google-services.json, so that file has to list both.
+      - name: Build the Android apps
         working-directory: teacher-minute/Android
         run: ./gradlew assembleDebug --console=plain --stacktrace
 
@@ -78,31 +81,33 @@ jobs:
       # manifest depends on has to be in the dex. Type descriptors live in the
       # dex string pool as "Lteacher/minute/AndroidAppMain;", which grep -a finds
       # without needing build-tools or a dex parser.
-      - name: Verify the Application class reached the APK
+      - name: Verify the Application class reached each APK
         working-directory: teacher-minute/Android
         run: |
           set -euo pipefail
-          apk=$(find ../.build -name 'app-debug.apk' -print -quit)
-          if [ -z "$apk" ]; then
-            echo "::error::no app-debug.apk was produced"
-            exit 1
-          fi
-          echo "checking $apk"
-          rm -rf "$RUNNER_TEMP/dex" && mkdir -p "$RUNNER_TEMP/dex"
-          unzip -o -j "$apk" 'classes*.dex' -d "$RUNNER_TEMP/dex"
-          if ! grep -qa 'teacher/minute/AndroidAppMain' "$RUNNER_TEMP"/dex/*.dex; then
-            echo "::error::teacher.minute.AndroidAppMain is not in the APK — the app module's Kotlin was not compiled"
-            exit 1
-          fi
-          echo "AndroidAppMain present"
+          for flavor in student teacher; do
+            apk=$(find ../.build -name "app-${flavor}-debug.apk" -print -quit)
+            if [ -z "$apk" ]; then
+              echo "::error::no app-${flavor}-debug.apk was produced"
+              exit 1
+            fi
+            echo "checking $apk"
+            rm -rf "$RUNNER_TEMP/dex" && mkdir -p "$RUNNER_TEMP/dex"
+            unzip -o -j "$apk" 'classes*.dex' -d "$RUNNER_TEMP/dex"
+            if ! grep -qa 'teacher/minute/AndroidAppMain' "$RUNNER_TEMP"/dex/*.dex; then
+              echo "::error::teacher.minute.AndroidAppMain is not in the ${flavor} APK — the app module's Kotlin was not compiled"
+              exit 1
+            fi
+            echo "AndroidAppMain present in the ${flavor} APK"
+          done
 
       # Keeps the APK for a few days so a failure can be inspected without
       # reproducing the whole build locally.
-      - name: Upload the APK
+      - name: Upload the APKs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: teacher-minute/.build/**/app-debug.apk
+          name: app-debug-apks
+          path: teacher-minute/.build/**/app-*-debug.apk
           if-no-files-found: warn
           retention-days: 7

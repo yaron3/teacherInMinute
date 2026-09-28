@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Instant Teacher only; merged into src/main/AndroidManifest.xml.
+
+    Only students log in to PayPal (saving PayPal to pay with). Teachers just
+    type the PayPal address they are paid to, so Pro Teacher does not claim the
+    return link, and PayPal always comes back to this app.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name="teacher.minute.MainActivity">
+            <!--
+                PayPal App Link return. Braintree v5 requires a verified https
+                link for PayPal; a custom scheme alone is rejected. This host
+                must serve /.well-known/assetlinks.json with this app's package
+                and signing certificate fingerprints (see backend/Firebase/public),
+                and the URL must be registered in the Braintree Control Panel.
+                Keep in sync with APP_LINK_RETURN_URL in AndroidPayPalManager.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="teacher-in-a-moment.web.app"
+                    android:pathPrefix="/paypal" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

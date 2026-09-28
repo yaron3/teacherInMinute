@@ -83,7 +83,8 @@
         <!--
             launchMode="singleTask" is required by the Braintree PayPal browser
             switch: the App Link return must reach the existing activity through
-            onNewIntent rather than starting a second MainActivity on top.
+            onNewIntent rather than starting a second MainActivity on top. Only
+            Instant Teacher has that link (src/student/AndroidManifest.xml).
         -->
         <activity
             android:name=".MainActivity"
@@ -96,28 +97,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+                The app's own scheme, set per product flavor in build.gradle.kts:
+                "teacherminute" for Instant Teacher, whose card payments return
+                through it, and another for Pro Teacher.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="teacherminute" />
-            </intent-filter>
-            <!--
-                PayPal App Link return. Braintree v5 requires a verified https
-                link for PayPal; a custom scheme alone is rejected. This host
-                must serve /.well-known/assetlinks.json with this app's signing
-                certificate fingerprint (see backend/Firebase/public), and the
-                URL must be registered in the Braintree Control Panel.
-                Keep in sync with APP_LINK_RETURN_URL in AndroidPayPalManager.
-            -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="teacher-in-a-moment.web.app"
-                    android:pathPrefix="/paypal" />
+                <data android:scheme="${appUrlScheme}" />
             </intent-filter>
         </activity>
     </application>

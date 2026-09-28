@@ -1,16 +1,20 @@
 # Debug-build Firebase config
 
 Put the staging project's `google-services.json` in this directory and debug
-builds will use it; release builds keep the production one in `app/`.
+builds of both apps will use it; release builds keep the production one in
+`app/`. The file has to list both packages, `com.yaronj.student` and
+`com.yaronj.tim`, so register both apps in the staging project before
+downloading it.
 
 Nothing in `build.gradle.kts` selects it. The Google Services plugin looks for
 `src/<buildType>/google-services.json` before falling back to
-`app/google-services.json`, so the file's location is the whole mechanism.
+`app/google-services.json`, flavors or not, so the file's location is the
+whole mechanism.
 
-Product flavors would be the more usual way to do this, and they are the wrong
-way here: Xcode's "Run skip gradle" phase calls
-`skip gradle -p ../Android ${SKIP_ACTION}${CONFIGURATION}`, which resolves to
-task names like `launchDebug`. Adding a flavor renames those to
-`launchProdDebug` and the build phase stops finding them.
+Staging is not a product flavor. The flavors are the two apps, student and
+teacher, and Xcode's "Run skip gradle" phase names one of them in every task it
+runs (`launchStudentDebug`, `launchTeacherDebug`). A second flavor dimension
+would rename those again, to `launchStudentStagingDebug` and the like, and the
+build phase would stop finding them.
 
 See `STAGING.md` at the repository root.

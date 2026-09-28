@@ -11,7 +11,8 @@
 //             so there is nothing else in the app to wire up.
 //   Android — a browser switch back into the app via an App Link, handled by
 //             AndroidPayPalManager (see also the assetlinks.json served from
-//             Firebase Hosting and the intent-filter in AndroidManifest.xml).
+//             Firebase Hosting and the intent-filter in the student flavor's
+//             AndroidManifest.xml). Only Instant Teacher declares that link.
 
 #if canImport(UIKit)
 import UIKit

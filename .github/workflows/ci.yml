@@ -173,13 +173,16 @@ jobs:
       # and links; the Android half needs a JDK and Android SDK of its own and
       # belongs in its own job. Without it the phase fails applying Android
       # Gradle Plugin 8.13.2, long after every Swift file has already built.
+      # Both apps: Instant Teacher (students) and Pro Teacher (teachers). They
+      # share every file in the Swift package, so the second build reuses it
+      # and only compiles, links and packages its own app.
       - name: Build
         run: |
           set -o pipefail
           build() {
             xcodebuild build \
               -workspace teacher-minute/Project.xcworkspace \
-              -scheme "TeacherMinute App" \
+              -scheme "$1" \
               -destination 'generic/platform=iOS Simulator' \
               -configuration Debug \
               -skipPackagePluginValidation \
@@ -189,8 +192,10 @@ jobs:
           }
           # xcbeautify ships with the runner image, but don't fail the build if
           # a future image drops it — raw xcodebuild output is ugly, not broken.
-          if command -v xcbeautify >/dev/null; then
-            build | xcbeautify --renderer github-actions
-          else
-            build
-          fi
+          for scheme in "Instant Teacher" "Pro Teacher"; do
+            if command -v xcbeautify >/dev/null; then
+              build "$scheme" | xcbeautify --renderer github-actions
+            else
+              build "$scheme"
+            fi
+          done

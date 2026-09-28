@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "499CD4382AC5B799001AE8D8"
-               BuildableName = "TeacherMinute.app"
-               BlueprintName = "TeacherMinute App"
+               BlueprintIdentifier = "5E7FA322FCB3925E9804B604"
+               BuildableName = "ProTeacher.app"
+               BlueprintName = "Pro Teacher"
                ReferencedContainer = "container:TeacherMinute.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -29,19 +29,6 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
-      <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4AC88530302E11E2001E0831"
-               BuildableName = "TeacherMinuteUITests.xctest"
-               BlueprintName = "TeacherMinuteUITests"
-               ReferencedContainer = "container:TeacherMinute.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -57,9 +44,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "499CD4382AC5B799001AE8D8"
-            BuildableName = "TeacherMinute.app"
-            BlueprintName = "TeacherMinute App"
+            BlueprintIdentifier = "5E7FA322FCB3925E9804B604"
+            BuildableName = "ProTeacher.app"
+            BlueprintName = "Pro Teacher"
             ReferencedContainer = "container:TeacherMinute.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -80,9 +67,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "499CD4382AC5B799001AE8D8"
-            BuildableName = "TeacherMinute.app"
-            BlueprintName = "TeacherMinute App"
+            BlueprintIdentifier = "5E7FA322FCB3925E9804B604"
+            BuildableName = "ProTeacher.app"
+            BlueprintName = "Pro Teacher"
             ReferencedContainer = "container:TeacherMinute.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

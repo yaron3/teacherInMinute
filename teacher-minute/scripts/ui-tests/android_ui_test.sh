@@ -33,7 +33,8 @@
 
 set -euo pipefail
 
-PACKAGE="com.yaronj.tim"
+# The student app, Instant Teacher: the flow below is a student's.
+PACKAGE="com.yaronj.student"
 ACTIVITY="teacher.minute.MainActivity"
 EMAIL="${TIM_TEST_EMAIL:-s1@a.com}"
 PASSWORD="${TIM_TEST_PASSWORD:-123456}"

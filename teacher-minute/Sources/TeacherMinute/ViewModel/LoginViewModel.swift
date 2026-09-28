@@ -66,7 +66,7 @@ final class LoginViewModel {
 
 	  // 3. Resolve where in onboarding this user should go
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
-	  destination = resume
+	  proceed(to: resume)
 
 	} catch {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "email", "reason": error.localizedDescription])
@@ -93,7 +93,7 @@ final class LoginViewModel {
 			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
 			do {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
-			  self?.destination = resume
+			  self?.proceed(to: resume)
 			} catch {
 			  self?.present(message: localizedAuthErrorMessage(error))
 			}
@@ -117,7 +117,7 @@ final class LoginViewModel {
 		AnalyticsService.shared.setUser(uid: uid)
 		AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
 		let resume = try await UserService.shared.resumeRoute(uid: uid)
-		destination = resume
+		proceed(to: resume)
 	  } catch {
 		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 		present(message: localizedAuthErrorMessage(error))
@@ -142,7 +142,7 @@ final class LoginViewModel {
 			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "apple"])
 			do {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
-			  self?.destination = resume
+			  self?.proceed(to: resume)
 			} catch {
 			  self?.present(message: localizedAuthErrorMessage(error))
 			}
@@ -176,7 +176,17 @@ final class LoginViewModel {
   func back()            { /* TODO */ }
   
   // MARK: - Helpers
-  
+
+  /// Sends a signed-in user on to wherever their onboarding stands. An account
+  /// of the other app's role is signed straight back out first; its route
+  /// leads to the welcome screen, which says which app it belongs to.
+  private func proceed(to resume: OnboardingResume) {
+	if case .otherApp(let role) = resume {
+	  UserService.shared.signOutOtherAppAccount(role: role)
+	}
+	destination = resume
+  }
+
   private func present(message: String) {
 	alertMessage = message
 	showAlert    = true

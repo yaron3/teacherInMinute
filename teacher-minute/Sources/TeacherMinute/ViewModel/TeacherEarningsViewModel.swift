@@ -439,6 +439,12 @@ final class TeacherEarningsViewModel {
     /// Works on both platforms: iOS presents PayPal in an
     /// `ASWebAuthenticationSession`, Android switches out to the browser and
     /// back through an App Link. See PayPalVaultService.
+    ///
+    /// Not offered at the moment: the payout sheet's button for it is commented
+    /// out, and teachers only type their address. Pro Teacher does not declare
+    /// the PayPal App Link on Android (only src/student/AndroidManifest.xml
+    /// does), so bringing the button back needs that intent-filter in
+    /// src/teacher/AndroidManifest.xml as well.
     func connectPayPalPayoutAccount() async {
         guard !isConnectingPayPal else { return }
         isConnectingPayPal = true

@@ -44,3 +44,18 @@
 - iOS: expected to fail today. The invite push is data-only, with no `aps` alert, so iOS shows nothing. The push needs an alert first; then run the same check as Android.
 - Dead token: uninstall the app while online. Once FCM rejects the token as unregistered, the next invite sent to this teacher drops `fcmToken`, and the keep-alive watchdog takes them offline within about a minute. FCM can take a while to notice an uninstall.
 - Afterwards, turn the toggle off: closing the app no longer takes a teacher with a push token offline.
+
+## 11. Firebase setup for Instant Teacher (`com.yaronj.student`) — TO DO
+- Upload the APNs authentication key to the Instant Teacher iOS app (Firebase console → Project settings → Cloud Messaging). The key belongs to the Apple team, so the one Pro Teacher (`com.yaronj.tim`) already uses will do. Until then, students on iPhone get no push notifications.
+- Add the SHA-1 and SHA-256 fingerprints of the debug and upload keys to the Instant Teacher Android app, and the Play App Signing key's once the Play listing exists, then download `google-services.json` again. Google sign-in on Android fails without them (`ApiException` 10): the current file has no Android OAuth client for `com.yaronj.student`.
+- Delete the `com.yaronj.teacher` iOS and Android apps registered by mistake. Nothing uses them since Pro Teacher went back to `com.yaronj.tim`.
+
+## 12. Store listings — TO DO
+- App Store Connect: create Instant Teacher with bundle id `com.yaronj.student`. Its App ID needs Push Notifications, Sign in with Apple and Apple Pay (`merchant.com.yaronj.tim`), as in `Darwin/Entitlements.plist`. Rename the existing `com.yaronj.tim` listing to Pro Teacher. App Store names must be unique, so if that listing is still called Instant Teacher, rename it first.
+- Google Play Console: create Instant Teacher (`com.yaronj.student`) and rename the existing `com.yaronj.tim` listing to Pro Teacher.
+- Add Instant Teacher's Play App Signing SHA-256 to the `com.yaronj.student` entry in `backend/Firebase/public/.well-known/assetlinks.json` and deploy hosting (`firebase deploy --only hosting`), so PayPal's return link opens the app.
+
+## 13. Remote Config for the two apps — TO DO
+- Once Instant Teacher is on the App Store, set the `iOS` value of `student_app_url` in `backend/Firebase/remote_config_tim.json` to its App Store link (`https://apps.apple.com/app/id…`). The Google Play link is already the default.
+- Deploy the template from `backend/Firebase`: `firebase deploy --only remoteconfig`.
+- Release Instant Teacher in both stores before the Pro Teacher update, and deploy the template before that update ships (a device keeps its fetched config for up to an hour). Otherwise the dialog sends students to an app they cannot find.

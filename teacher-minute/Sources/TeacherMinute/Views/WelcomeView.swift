@@ -10,6 +10,7 @@ import SwiftUI
 struct WelcomeView: View {
   @State var viewModel = WelcomeViewModel()
   @Environment(\.appRouter) var router
+  @Environment(\.openURL) var openURL
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -24,6 +25,41 @@ struct WelcomeView: View {
 	  welcomeContent
 	}
 	.trackScreen(AnalyticsScreen.welcome)
+	.appDialog(
+	  otherAppNotice?.title ?? "",
+	  isPresented: showsOtherAppNotice,
+	  message: otherAppNotice?.message,
+	  actions: otherAppNoticeActions
+	)
+  }
+
+  // MARK: - An account for the other app
+
+  /// Set when sign-in or launch has just turned away an account that belongs
+  /// to the other app. At launch this screen is still under the splash, so
+  /// the notice appears as the splash fades.
+  private var otherAppNotice: OtherAppNotice? {
+	router.otherAppAccountRole.map { viewModel.otherAppNotice(for: $0) }
+  }
+
+  private var showsOtherAppNotice: Binding<Bool> {
+	Binding(
+	  get: { router.otherAppAccountRole != nil },
+	  set: { if !$0 { router.otherAppAccountRole = nil } }
+	)
+  }
+
+  private var otherAppNoticeActions: [AppDialogAction] {
+	guard let notice = otherAppNotice, let download = notice.download else {
+	  return [AppDialogAction(viewModel.okLabel)]
+	}
+	return [
+	  AppDialogAction(download.label) {
+		viewModel.downloadTapped(for: notice)
+		openURL(download.url)
+	  },
+	  AppDialogAction(viewModel.notNowLabel, kind: .cancel),
+	]
   }
 
   private var welcomeContent: some View {
