@@ -47,11 +47,14 @@ object AndroidPayPalManager {
 
     /**
      * Must match the App Link registered in the Braintree Control Panel and the
-     * autoVerify intent-filter in AndroidManifest.xml, and must be served by
-     * assetlinks.json at that host. Braintree v5 requires an https App Link for
-     * PayPal — a custom scheme alone is rejected.
+     * autoVerify intent-filter in src/student/AndroidManifest.xml, and must be
+     * served by assetlinks.json at that host. Braintree v5 requires an https App
+     * Link for PayPal — a custom scheme alone is rejected. Only Instant Teacher
+     * declares the link: teachers never log in to PayPal, they type the address
+     * they are paid to.
      */
     private const val APP_LINK_RETURN_URL = "https://teacher-in-a-moment.web.app/paypal"
+    /** The student flavor's appUrlScheme in build.gradle.kts. */
     private const val RETURN_URL_SCHEME = "teacherminute"
 
     private class PendingVault {

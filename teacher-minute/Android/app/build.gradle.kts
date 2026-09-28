@@ -170,7 +170,8 @@ android {
     // appUrlScheme is the custom scheme in AndroidManifest.xml. Instant Teacher
     // keeps "teacherminute", which the backend's card-payment return links
     // open; Pro Teacher takes another, so those links have only one app to
-    // open when both are installed.
+    // open when both are installed. PayPal is a student concern too: only
+    // src/student/AndroidManifest.xml declares its return App Link.
     //
     // unstrippedNativeLibsDir is where the Crashlytics upload finds the .so
     // files as Swift produced them, before AGP strips them. The path names the
