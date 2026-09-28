@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The window Android shows while the app starts, before Android 12 (which
+    draws its own). It is the art of LaunchSplashView at the same spot, so the
+    app takes over without a jump: the logo's top 249dp above the middle of the
+    screen, and the glow's centre 17.5dp left of the logo's, its top 38dp lower.
+
+    A layer with gravity="center" is centred in the window less its insets, so
+    an inset of 2x on one side moves the layer x towards the other.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#0F0F11"
+                android:endColor="#333160" />
+        </shape>
+    </item>
+    <!-- Centred 7dp left of and 41dp above the middle of the screen. -->
+    <item
+        android:width="340dp"
+        android:height="340dp"
+        android:bottom="82dp"
+        android:drawable="@drawable/splash_glow"
+        android:gravity="center"
+        android:right="14dp" />
+    <!-- Centred 10.5dp right of and 90dp above the middle of the screen. -->
+    <item
+        android:width="375dp"
+        android:height="318dp"
+        android:bottom="180dp"
+        android:drawable="@drawable/brand_logo"
+        android:gravity="center"
+        android:left="21dp" />
+</layer-list>

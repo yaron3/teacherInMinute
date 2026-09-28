@@ -74,7 +74,7 @@ struct WelcomeView: View {
             .lineSpacing(-4)
             .padding(.top, 12)
           
-          Image("sqaure-logo", bundle: .module)
+          Image("brand-logo", bundle: .module)
             .resizable()
             .scaledToFit()
             .padding(.top, 6)

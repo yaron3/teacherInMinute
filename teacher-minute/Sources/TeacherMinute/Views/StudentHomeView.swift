@@ -260,7 +260,7 @@ struct StudentHomeView: View {
       HStack(spacing: 12) {
 		SideMenuButton(size: 40)
 
-		Image("sqaure-logo", bundle: .module)
+		Image("brand-logo", bundle: .module)
 		  .resizable()
 		  .scaledToFit()
 		  .frame(width: 24, height: 24)

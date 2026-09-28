@@ -84,8 +84,9 @@ struct AppTheme {
     }
 
     /// Text and icons on a fill that is dark in both schemes — `accentStrong`,
-    /// `ctaBackground`, a video feed, or an accent→accentStrong gradient
-    /// (whose dark end stays dark in either scheme).
+    /// `ctaBackground`, the brand background, a video feed, or an
+    /// accent→accentStrong gradient (whose dark end stays dark in either
+    /// scheme).
     var onDarkFill: Color {
         adaptive(
             light: (255, 255, 255),
@@ -178,6 +179,36 @@ struct AppTheme {
         adaptive(
             light: (238, 236, 255),
             dark: (38, 34, 74)
+        )
+    }
+
+    // MARK: - Brand
+
+    // The launch splash is a brand screen, drawn dark in both schemes: its logo
+    // art and the glow behind it are made for a dark ground. Text on it takes
+    // `onDarkFill`.
+
+    /// Top of the brand background gradient.
+    var brandBackgroundTop: Color {
+        adaptive(
+            light: (15, 15, 17),
+            dark: (15, 15, 17)
+        )
+    }
+
+    /// Bottom of the brand background gradient.
+    var brandBackgroundBottom: Color {
+        adaptive(
+            light: (51, 49, 96),
+            dark: (51, 49, 96)
+        )
+    }
+
+    /// Highlighted words in text on the brand background.
+    var brandHighlightText: Color {
+        adaptive(
+            light: (84, 232, 246),
+            dark: (84, 232, 246)
         )
     }
 
@@ -482,6 +513,12 @@ private struct AppThemePreviewView: View {
                     ("accent", theme.accent),
                     ("accentStrong", theme.accentStrong),
                     ("accentBackground", theme.accentBackground)
+                ])
+
+                section("Brand", swatches: [
+                    ("brandBackgroundTop", theme.brandBackgroundTop),
+                    ("brandBackgroundBottom", theme.brandBackgroundBottom),
+                    ("brandHighlightText", theme.brandHighlightText)
                 ])
 
                 section("Lines & controls", swatches: [

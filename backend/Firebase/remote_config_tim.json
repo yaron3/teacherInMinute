@@ -5645,6 +5645,39 @@
       },
       "valueType": "STRING"
     },
+    "stuck": {
+      "defaultValue": {
+        "value": "Stuck?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נתקעת?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "human_teacher": {
+      "defaultValue": {
+        "value": "A human teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה אנושי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "within_seconds": {
+      "defaultValue": {
+        "value": "within 90 seconds"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תוך 90 שניות"
+        }
+      },
+      "valueType": "STRING"
+    },
     "please_enter_valid": {
       "defaultValue": {
         "value": "Please enter a valid email address."

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The theme of the window Android shows while the app starts. MainActivity
+        switches back to Theme.AppCompat.DayNight.NoActionBar in onCreate, so the
+        splash never shows through behind the app itself.
+    -->
+    <style name="Theme.TeacherMinute.Launch" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <!-- Clear bars with light icons over the dark art, as the app draws
+             them edge to edge once it takes over. -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

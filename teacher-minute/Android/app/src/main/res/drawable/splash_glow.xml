@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The glow behind the logo on the launch splash: splash-glow.svg in
+     Module.xcassets, as a vector drawable for the starting window. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="340dp"
+    android:height="340dp"
+    android:viewportWidth="340"
+    android:viewportHeight="340">
+    <path android:pathData="M0,170 A170,170 0 1,0 340,170 A170,170 0 1,0 0,170 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="170"
+                android:centerY="170"
+                android:gradientRadius="170">
+                <item android:offset="0.0577126" android:color="#FFFFFFFF" />
+                <item android:offset="0.913539" android:color="#14FFFFFF" />
+                <item android:offset="1" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

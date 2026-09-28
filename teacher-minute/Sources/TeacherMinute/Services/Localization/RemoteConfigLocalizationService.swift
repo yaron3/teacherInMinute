@@ -198,6 +198,11 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // Hero section
         "Hello, %@": "שלום, %@",
         "Teacher in a Moment": "מורה לרגע",
+        // Launch splash. It is on screen while Remote Config makes its first
+        // fetch, so on a fresh install these are what actually render.
+        "Stuck?": "נתקעת?",
+        "A human teacher": "מורה אנושי",
+        "within 90 seconds": "תוך 90 שניות",
         "When AI gets stuck, a human teacher connects in 90 seconds": "כש-AI נתקע – מורה אנושי ב-90 שניות",
         "%d teachers available now": "%d מורים פניים עכשיו",
         "90 sec avg to connect": "ממוצע 90 שנ' להתחברות",

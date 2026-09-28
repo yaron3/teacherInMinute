@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The launch screen iOS shows while the app starts. It draws the art of
+    LaunchSplashView (the in-app splash) at the same spot, so the app takes
+    over without a jump: the brand gradient edge to edge, and the logo with
+    its top 249pt above the middle of the screen (but never above the top),
+    with the glow behind it. No tagline: the launch screen cannot follow the
+    in-app language setting.
+-->
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="13122.16" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="13104.12"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="EHf-IW-A2E">
+            <objects>
+                <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
+                        <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" image="LaunchBackground" translatesAutoresizingMaskIntoConstraints="NO" id="Bg1-Lc-hS1" userLabel="Background">
+                                <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
+                            </imageView>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleToFill" image="LaunchGlow" translatesAutoresizingMaskIntoConstraints="NO" id="Gl1-Lc-hS2" userLabel="Glow">
+                                <rect key="frame" x="24" y="226" width="340" height="340"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="340" id="Gw1-Lc-cS1"/>
+                                    <constraint firstAttribute="height" constant="340" id="Gh1-Lc-cS2"/>
+                                </constraints>
+                            </imageView>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="Lg1-Lc-hS3" userLabel="Logo">
+                                <rect key="frame" x="24" y="188" width="375" height="318"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="375" id="Lw1-Lc-cS3"/>
+                                    <constraint firstAttribute="height" constant="318" id="Lh1-Lc-cS4"/>
+                                </constraints>
+                            </imageView>
+                        </subviews>
+                        <color key="backgroundColor" red="0.058823529411764705" green="0.058823529411764705" blue="0.066666666666666666" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="Bg1-Lc-hS1" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="Bt1-Lc-cS5"/>
+                            <constraint firstItem="Bg1-Lc-hS1" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="Bb1-Lc-cS6"/>
+                            <constraint firstItem="Bg1-Lc-hS1" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="Bl1-Lc-cS7"/>
+                            <constraint firstItem="Bg1-Lc-hS1" firstAttribute="trailing" secondItem="Ze5-6b-2t3" secondAttribute="trailing" id="Br1-Lc-cS8"/>
+                            <constraint firstItem="Lg1-Lc-hS3" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" constant="10.5" id="Lx1-Lc-cS9"/>
+                            <constraint firstItem="Lg1-Lc-hS3" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="-249" priority="999" id="Ly1-Lc-cT1"/>
+                            <constraint firstItem="Lg1-Lc-hS3" firstAttribute="top" relation="greaterThanOrEqual" secondItem="Ze5-6b-2t3" secondAttribute="top" id="Ly2-Lc-cT2"/>
+                            <constraint firstItem="Gl1-Lc-hS2" firstAttribute="centerX" secondItem="Lg1-Lc-hS3" secondAttribute="centerX" constant="-17.5" id="Gx1-Lc-cT3"/>
+                            <constraint firstItem="Gl1-Lc-hS2" firstAttribute="top" secondItem="Lg1-Lc-hS3" secondAttribute="top" constant="38" id="Gy1-Lc-cT4"/>
+                        </constraints>
+                        <viewLayoutGuide key="safeArea" id="tZ6-bH-Vph"/>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="53" y="375"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="LaunchBackground" width="2" height="1024"/>
+        <image name="LaunchGlow" width="340" height="340"/>
+        <image name="LaunchLogo" width="375" height="318"/>
+    </resources>
+</document>

@@ -78,6 +78,10 @@ open class MainActivity: AppCompatActivity {
     private var onboardingBackCallback: OnBackPressedCallback? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        // The manifest's Theme.TeacherMinute.Launch only dresses the window
+        // Android shows while the app starts; the app itself runs in the plain
+        // theme, so the splash drawable never shows through behind it.
+        setTheme(androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar)
         super.onCreate(savedInstanceState)
         currentActivity = this
         logger.info("starting activity")
