@@ -3,9 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m.apps.googleusercontent.com</string>
+	<string>922632930084-gppqjlp6vkuuea52t9dqqlvih2e3jqnl.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m</string>
+	<string>com.googleusercontent.apps.922632930084-gppqjlp6vkuuea52t9dqqlvih2e3jqnl</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>922632930084-1ivc7tpbb65kc2ah7ceeur7tmuses72n.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyDMGg3wGexjiNAIdPlHeXFRcxZABKbneM8</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.yaronj.tim</string>
+	<string>com.yaronj.teacher</string>
 	<key>PROJECT_ID</key>
 	<string>teacher-in-a-moment</string>
 	<key>STORAGE_BUCKET</key>
@@ -28,9 +30,9 @@
 	<true></true>
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:922632930084:ios:e87cc0d1e7afa01bfde9b1</string>
 	<key>DATABASE_URL</key>
 	<string>https://teacher-in-a-moment-default-rtdb.firebaseio.com</string>
-	<key>GOOGLE_APP_ID</key>
-	<string>1:922632930084:ios:621a96f2e9fca5f7fde9b1</string>
 </dict>
 </plist>

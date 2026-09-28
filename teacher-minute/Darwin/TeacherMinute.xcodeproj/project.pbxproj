@@ -13,12 +13,12 @@
 		499CD43B2AC5B799001AE8D8 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
 		499CD4402AC5B799001AE8D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
 		4AB6CD562FAB8C5C003E7ADA /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */; };
-		5E5A9614BA3E7D070A48925E /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
 		5E2020AEA60A6DAC5EA83FAE /* TeacherMinute in Frameworks */ = {isa = PBXBuildFile; productRef = 5E94E40C6527C5A5F98AB3FE /* TeacherMinute */; };
-		5E838A2B53C34E83324BF961 /* TeacherMinute in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 5E94E40C6527C5A5F98AB3FE /* TeacherMinute */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		5E3168E37603BF7F871DB074 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
-		5EB0790B0973E7889A7EF7BF /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5E23BBE8B39F09DD9D86A499 /* GoogleService-Info.plist */; };
 		5E24D2ADA3E031128E5FEED3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */; };
+		5E3168E37603BF7F871DB074 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
+		5E5A9614BA3E7D070A48925E /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
+		5E838A2B53C34E83324BF961 /* TeacherMinute in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 5E94E40C6527C5A5F98AB3FE /* TeacherMinute */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		5EB0790B0973E7889A7EF7BF /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5E23BBE8B39F09DD9D86A499 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -161,20 +161,20 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		5EECDD19DE7F30BADB9EFAF0 /* InstantTeacher */ = {
-			isa = PBXGroup;
-			children = (
-				4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */,
-			);
-			path = InstantTeacher;
-			sourceTree = "<group>";
-		};
 		5E9687E6C4A5A48F00CBC885 /* ProTeacher */ = {
 			isa = PBXGroup;
 			children = (
 				5E23BBE8B39F09DD9D86A499 /* GoogleService-Info.plist */,
 			);
 			path = ProTeacher;
+			sourceTree = "<group>";
+		};
+		5EECDD19DE7F30BADB9EFAF0 /* InstantTeacher */ = {
+			isa = PBXGroup;
+			children = (
+				4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */,
+			);
+			path = InstantTeacher;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -319,25 +319,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		4AB6CD602FAB8C5C003E7ADA /* Select the Firebase config */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Select the Firebase config";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = "/bin/sh -e";
-			shellScript = "# Each app bundles the GoogleService-Info.plist in its own folder, named after\n# its PRODUCT_NAME: InstantTeacher/ or ProTeacher/. Debug builds run against\n# staging when that folder also holds GoogleService-Info-Staging.plist; release\n# builds always use production. With no staging file the app keeps the\n# production config it was built with.\nAPP_DIR=\"${SRCROOT}/${PRODUCT_NAME}\"\nSTAGING=\"${APP_DIR}/GoogleService-Info-Staging.plist\"\nBUNDLED=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/GoogleService-Info.plist\"\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -f \"${STAGING}\" ]; then\n  cp \"${STAGING}\" \"${BUNDLED}\"\n  echo \"note: Firebase config: staging\"\nelse\n  echo \"note: Firebase config: production\"\nfi\n# Google Sign-In raises an exception at sign-in unless Info.plist registers the\n# config's REVERSED_CLIENT_ID as a URL scheme. Info.plist takes that scheme from\n# TIM_GOOGLE_URL_SCHEME, so a config for a different OAuth client stops the\n# build here rather than crashing the app later.\nGOOGLE_SCHEME=$(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" \"${BUNDLED}\" 2>/dev/null || true)\nif [ -n \"${GOOGLE_SCHEME}\" ] && [ \"${GOOGLE_SCHEME}\" != \"${TIM_GOOGLE_URL_SCHEME}\" ]; then\n  echo \"error: ${TARGET_NAME} bundles a Firebase config whose Google client is ${GOOGLE_SCHEME}, but the target registers ${TIM_GOOGLE_URL_SCHEME}. Set TIM_GOOGLE_URL_SCHEME for ${TARGET_NAME} (${CONFIGURATION}) to the REVERSED_CLIENT_ID in that GoogleService-Info.plist.\"\n  exit 1\nfi\n";
-		};
 		499CD4452AC5B869001AE8D8 /* Run skip gradle */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -356,6 +337,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = "/bin/sh -e";
 			shellScript = "if [ \"${SKIP_ZERO}\" != \"\" ]; then\n  echo \"note: skipping skip due to SKIP_ZERO\"\n  exit 0\nelif [ \"${ENABLE_PREVIEWS}\" = \"YES\" ]; then\n  echo \"note: skipping skip due to ENABLE_PREVIEWS\"\n  exit 0\nelif [ \"${ACTION}\" = \"install\" ]; then\n  echo \"note: skipping skip due to archive install\"\n  exit 0\nelif [ \"${SKIP_ACTION}\" = \"none\" ]; then\n  echo \"note: skipping skip due to SKIP_ACTION none\"\n  exit 0\nelse\n  SKIP_ACTION=\"${SKIP_ACTION:-launch}\"\nfi\n# Each app target builds the Android flavor of the same app (TIM_ANDROID_FLAVOR),\n# so the task is e.g. launchStudentDebug. Those launch tasks are defined in\n# Android/app/build.gradle.kts; \"build\" maps to assemble, which builds the APK.\nif [ \"${SKIP_ACTION}\" = \"build\" ]; then\n  GRADLE_TASK=\"assemble${TIM_ANDROID_FLAVOR}${CONFIGURATION:-Debug}\"\nelse\n  GRADLE_TASK=\"${SKIP_ACTION}${TIM_ANDROID_FLAVOR}${CONFIGURATION:-Debug}\"\nfi\nPATH=${BUILD_ROOT}/Release:${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin\necho \"note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${GRADLE_TASK}\"\nskip gradle -p ../Android ${GRADLE_TASK}\n";
+		};
+		4AB6CD602FAB8C5C003E7ADA /* Select the Firebase config */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Select the Firebase config";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = "/bin/sh -e";
+			shellScript = "# Each app bundles the GoogleService-Info.plist in its own folder, named after\n# its PRODUCT_NAME: InstantTeacher/ or ProTeacher/. Debug builds run against\n# staging when that folder also holds GoogleService-Info-Staging.plist; release\n# builds always use production. With no staging file the app keeps the\n# production config it was built with.\nAPP_DIR=\"${SRCROOT}/${PRODUCT_NAME}\"\nSTAGING=\"${APP_DIR}/GoogleService-Info-Staging.plist\"\nBUNDLED=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/GoogleService-Info.plist\"\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -f \"${STAGING}\" ]; then\n  cp \"${STAGING}\" \"${BUNDLED}\"\n  echo \"note: Firebase config: staging\"\nelse\n  echo \"note: Firebase config: production\"\nfi\n# Google Sign-In raises an exception at sign-in unless Info.plist registers the\n# config's REVERSED_CLIENT_ID as a URL scheme. Info.plist takes that scheme from\n# TIM_GOOGLE_URL_SCHEME, so a config for a different OAuth client stops the\n# build here rather than crashing the app later.\nGOOGLE_SCHEME=$(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" \"${BUNDLED}\" 2>/dev/null || true)\nif [ -n \"${GOOGLE_SCHEME}\" ] && [ \"${GOOGLE_SCHEME}\" != \"${TIM_GOOGLE_URL_SCHEME}\" ]; then\n  echo \"error: ${TARGET_NAME} bundles a Firebase config whose Google client is ${GOOGLE_SCHEME}, but the target registers ${TIM_GOOGLE_URL_SCHEME}. Set TIM_GOOGLE_URL_SCHEME for ${TARGET_NAME} (${CONFIGURATION}) to the REVERSED_CLIENT_ID in that GoogleService-Info.plist.\"\n  exit 1\nfi\n";
 		};
 		5EC3DC9F360E20044838B4BE /* Select the Firebase config */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -455,7 +455,7 @@
 				TIM_ANDROID_FLAVOR = Student;
 				TIM_APP_ROLE = student;
 				TIM_APP_URL_SCHEME = teacherminute;
-				TIM_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m";
+				TIM_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.922632930084-783f3pcf4e6r9d0entjoveo3g2muejt3";
 			};
 			name = Debug;
 		};
@@ -482,7 +482,7 @@
 				TIM_ANDROID_FLAVOR = Student;
 				TIM_APP_ROLE = student;
 				TIM_APP_URL_SCHEME = teacherminute;
-				TIM_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m";
+				TIM_GOOGLE_URL_SCHEME = "com.googleusercontent.apps.922632930084-783f3pcf4e6r9d0entjoveo3g2muejt3";
 			};
 			name = Release;
 		};
