@@ -2,12 +2,38 @@
 //  BrandSideMenuView.swift
 //  teacher-minute
 //
-//  Instant Teacher's menu, as the brand design draws it: a dark panel from the
-//  left edge with the sections, and the student's email and phone at its foot.
-//  Pro Teacher keeps `SideMenuView`.
+//  The app's navigation, as the brand design draws it: a dark panel from the
+//  left edge with the sections, and the user's email and phone at its foot.
+//  Home is the only screen on the root; every other section is picked from
+//  this menu or from the tab bar.
 //
 
 import SwiftUI
+
+// MARK: - Environment
+
+/// What a screen's menu button does. `MainTabView` supplies it to whichever
+/// section it is showing; outside that screen it is absent, and
+/// `BrandMenuButton` draws nothing.
+struct SideMenuAction: Sendable {
+  let accessibilityLabel: String
+  /// A dot on the button, for news waiting inside the menu (new lessons).
+  let showsBadge: Bool
+  let open: @MainActor @Sendable () -> Void
+}
+
+private struct SideMenuActionKey: EnvironmentKey {
+  static let defaultValue: SideMenuAction? = nil
+}
+
+extension EnvironmentValues {
+  var sideMenuAction: SideMenuAction? {
+    get { self[SideMenuActionKey.self] }
+    set { self[SideMenuActionKey.self] = newValue }
+  }
+}
+
+// MARK: - Menu
 
 struct BrandSideMenuView: View {
   let viewModel: MainTabViewModel
@@ -46,7 +72,7 @@ struct BrandSideMenuView: View {
       header
 
       VStack(spacing: 4) {
-        ForEach(viewModel.studentMenuItems, id: \.self) { item in
+        ForEach(viewModel.menuItems, id: \.self) { item in
           row(item)
         }
       }
@@ -108,7 +134,7 @@ struct BrandSideMenuView: View {
   }
 
   /// The icon, then the name. The row on screen is filled cyan.
-  func row(_ item: StudentMenuItem) -> some View {
+  func row(_ item: MenuItem) -> some View {
     let isSelected = viewModel.isSelected(item)
     let tint = isSelected ? theme.onBrandAction : theme.brandActionBackground
     return Button {
@@ -124,6 +150,10 @@ struct BrandSideMenuView: View {
           .lineLimit(1)
 
         Spacer(minLength: 0)
+
+        if viewModel.showsBadge(item) {
+          BrandBadgeDot()
+        }
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 12)
@@ -138,7 +168,7 @@ struct BrandSideMenuView: View {
 
   /// Each icon at the size the design gives it, in a 28pt box.
   @ViewBuilder
-  func icon(for item: StudentMenuItem, isSelected: Bool, tint: Color) -> some View {
+  func icon(for item: MenuItem, isSelected: Bool, tint: Color) -> some View {
     if let icon = item.brandIcon {
       menuIcon(icon.name, width: icon.size.width, height: icon.size.height, tint: tint)
     } else {
@@ -157,7 +187,7 @@ struct BrandSideMenuView: View {
       .frame(width: 28, height: 28)
   }
 
-  /// The student's email and phone, or for a student without an account, the
+  /// The user's email and phone, or for a student without an account, the
   /// way to log in to one.
   @ViewBuilder
   var footer: some View {

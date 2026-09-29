@@ -20,7 +20,6 @@ import SkipFirebaseAuth
 final class LoginViewModel {
   var emailOrPhone = ""
   var password     = ""
-  var isPasswordVisible = false
   var isLoading    = false
   
   // Alert

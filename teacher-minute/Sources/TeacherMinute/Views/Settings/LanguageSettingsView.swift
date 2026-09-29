@@ -26,25 +26,20 @@ struct LanguageSettingsView: View {
         let _ = localizationManager.dataFetched
 
         ZStack {
-            if AppTheme.isBrand {
-                brandPage
-            } else {
-                standardForm
-            }
+            page
 
             if localizationManager.isLoading {
                 theme.scrim.opacity(0.18).ignoresSafeArea()
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.primaryText)
+                    .tint(theme.onDarkFill)
             }
         }
     }
 
-    /// Instant Teacher's look: the languages as rows of a brand card, the
-    /// chosen one ticked.
-    var brandPage: some View {
+    /// The languages as rows of a brand card, the chosen one ticked.
+    var page: some View {
         BrandSubpage(
             label: viewModel.settingsTitle,
             title: viewModel.settingsPageTitle(service.localized("Language")),
@@ -94,36 +89,6 @@ struct LanguageSettingsView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("language_row_\(language.rawValue)")
-    }
-
-    var standardForm: some View {
-            Form {
-                Section(header: Text(service.localized("Language"))) {
-                    ForEach(SettingsLanguageChoice.allCases) { language in
-                        Button {
-                            viewModel.updateLanguage(language)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(localizedTitle(for: language))
-                                    if let subtitle = localizedSubtitle(for: language) {
-                                        Text(subtitle)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                Spacer()
-                                if viewModel.selectedLanguage == language {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(.tint)
-                                }
-                            }
-                        }
-                        .foregroundStyle(.primary)
-                    }
-                }
-            }
-            .disabled(localizationManager.isLoading)
     }
 
     // These read through the localization service rather than the view model so

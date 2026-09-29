@@ -20,20 +20,10 @@ struct PrivacyControlsSettingsView: View {
     }
 
     var body: some View {
+        // A plain stack around the page, which carries its modifiers; see
+        // `BrandTabScreen`.
         ZStack {
-            if AppTheme.isBrand {
-                brandPage
-            } else {
-                Form {
-                    Section(
-                        header: Text(viewModel.privacySectionTitle),
-                        footer: Text(viewModel.privacyFooterText)
-                    ) {
-                        Toggle(viewModel.showProfileImageLabel, isOn: $showProfileImage)
-                        Toggle(viewModel.allowMessagesOutsideCallsLabel, isOn: $allowTeacherMessagesOutsideCalls)
-                    }
-                }
-            }
+            page
         }
         .task { await loadShowProfileImage() }
         .onChange(of: showProfileImage) { _, newValue in
@@ -41,9 +31,9 @@ struct PrivacyControlsSettingsView: View {
         }
     }
 
-    /// Instant Teacher's look: the switches at the start of their rows, as on
-    /// the notification settings.
-    var brandPage: some View {
+    /// The switches at the start of their rows, as on the notification
+    /// settings.
+    var page: some View {
         BrandSubpage(
             label: viewModel.settingsTitle,
             title: viewModel.settingsPageTitle(SettingsDestination.privacyControls.title),

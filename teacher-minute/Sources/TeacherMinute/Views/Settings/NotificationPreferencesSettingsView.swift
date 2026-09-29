@@ -2,74 +2,123 @@
 //  NotificationPreferencesSettingsView.swift
 //  teacher-minute
 //
-//  Created by Yaron Jackoby on 06/05/2026.
+//  The notification settings, as Instant Teacher's design draws them: the
+//  system's permission, then the notifications the user chooses.
 //
 
 import SwiftUI
 
 struct NotificationPreferencesSettingsView: View {
-    let viewModel: any SettingsViewModeling
-    @AppStorage("notifyIncomingTeacherMessage") var notifyIncomingTeacherMessage = true
-    @AppStorage("notifyGeneralAnnouncements") var notifyGeneralAnnouncements = true
-    @State var notificationState: PermissionState = .notDetermined
-    @State var isRequesting = false
+  let viewModel: any SettingsViewModeling
+  @State var permission = NotificationSettingsViewModel()
+  @AppStorage("notifyIncomingTeacherMessage") var notifyIncomingTeacherMessage = true
+  @AppStorage("notifyGeneralAnnouncements") var notifyGeneralAnnouncements = true
+  @Environment(\.scenePhase) var scenePhase
 
-    var body: some View {
-        Form {
-            Section(header: Text(viewModel.systemPermissionSectionTitle)) {
-                HStack {
-                    Text(viewModel.pushNotificationsLabel)
-                    Spacer()
-                    Text(notificationState.subtitle)
-                        .foregroundStyle(.secondary)
-                }
-                actionButton
-            }
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
 
-            Section(header: Text(viewModel.notificationsSectionTitle)) {
-                Toggle(viewModel.incomingMessageNotificationLabel, isOn: $notifyIncomingTeacherMessage)
-                    .disabled(!notificationState.isGranted)
-                Toggle(viewModel.generalAnnouncementsNotificationLabel, isOn: $notifyGeneralAnnouncements)
-                    .disabled(!notificationState.isGranted)
-            }
-        }
-        .task {
-            notificationState = await PermissionService.shared.notificationStatus()
-            if notificationState == .notDetermined {
-                await requestNotifications()
-            }
-        }
+  var body: some View {
+    BrandSubpage(
+      label: viewModel.settingsTitle,
+      title: viewModel.notificationsHeaderTitle,
+      backLabel: viewModel.backLabel
+    ) {
+      VStack(alignment: .leading, spacing: 16) {
+        BrandPageHero(title: viewModel.notificationsSectionTitle, subtitle: viewModel.notificationsSubtitle)
+        card
+      }
+      // On a plain stack inside the page, not on `BrandSubpage`; see
+      // `BrandTabScreen`.
+      .task {
+        await permission.load()
+      }
+      .onChange(of: scenePhase) { _, phase in
+        guard phase == .active else { return }
+        Task { await permission.refresh() }
+      }
     }
+  }
 
-    @ViewBuilder
-    private var actionButton: some View {
-        switch notificationState {
-        case .notDetermined:
-            Button {
-                Task { await requestNotifications() }
-            } label: {
-                HStack {
-                    Text(viewModel.enableNotificationsLabel)
-                    Spacer()
-                    if isRequesting {
-                        ProgressView().scaleEffect(0.8)
-                    }
-                }
-            }
-            .disabled(isRequesting)
-        case .denied:
-            Button(viewModel.openSystemSettingsLabel) {
-                PermissionService.shared.openAppSettings()
-            }
-        case .granted:
-            EmptyView()
+  private var card: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 8) {
+        sectionTitle(viewModel.systemPermissionSectionTitle, size: 16)
+        toggleRow(
+          viewModel.pushNotificationsLabel,
+          size: 17,
+          isOn: permission.state.isGranted,
+          identifier: "push"
+        ) {
+          Task { await permission.toggleTapped() }
         }
-    }
+      }
 
-    private func requestNotifications() async {
-        isRequesting = true
-        defer { isRequesting = false }
-        let result = await PermissionService.shared.requestNotifications()
-        notificationState = result
+      BrandRule()
+
+      // Until the system lets notifications through, these choices have
+      // nothing to act on, and stay dimmed.
+      VStack(alignment: .leading, spacing: 8) {
+        sectionTitle(viewModel.notificationsSectionTitle, size: 17)
+        toggleRow(
+          viewModel.incomingMessageNotificationLabel,
+          size: 16,
+          isOn: notifyIncomingTeacherMessage,
+          isEnabled: permission.state.isGranted,
+          identifier: "incoming_message"
+        ) {
+          notifyIncomingTeacherMessage.toggle()
+        }
+        toggleRow(
+          viewModel.generalAnnouncementsNotificationLabel,
+          size: 16,
+          isOn: notifyGeneralAnnouncements,
+          isEnabled: permission.state.isGranted,
+          identifier: "general_announcements"
+        ) {
+          notifyGeneralAnnouncements.toggle()
+        }
+      }
     }
+    .brandCard()
+  }
+
+  /// The switch at the start, then what it turns on, as designed.
+  private func toggleRow(
+    _ title: String,
+    size: CGFloat,
+    isOn: Bool,
+    isEnabled: Bool = true,
+    identifier: String,
+    action: @escaping () -> Void
+  ) -> some View {
+    HStack(spacing: 12) {
+      BrandToggle(isOn: isOn, isEnabled: isEnabled, action: action)
+        .accessibilityIdentifier("notification_toggle_\(identifier)")
+      Text(title)
+        .font(.system(size: size))
+        .foregroundStyle(theme.onDarkFill)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .padding(.horizontal, 12)
+    .frame(minHeight: 52)
+  }
+
+  private func sectionTitle(_ title: String, size: CGFloat) -> some View {
+    Text(title)
+      .font(.system(size: size, weight: .bold))
+      .foregroundStyle(theme.brandSecondaryText)
+      .frame(maxWidth: .infinity, alignment: .leading)
+  }
 }
+
+#if os(iOS)
+#Preview {
+  NavigationStack {
+    NotificationPreferencesSettingsView(viewModel: MockSettingsViewModel(role: .student))
+  }
+}
+#endif

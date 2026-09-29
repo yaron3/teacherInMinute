@@ -10,47 +10,41 @@ struct NotificationMessagesView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
+        // A plain stack around the sheet, which carries its modifiers; see
+        // `BrandTabScreen`. `refreshable` reaches the sheet's scroll view
+        // through the environment.
+        ZStack {
+            BrandSheet(title: viewModel.screenTitle, closeLabel: viewModel.doneLabel) {
+                dismiss()
+            } content: {
                 if viewModel.isLoading {
                     VStack(spacing: 12) {
                         ProgressView()
-                            .tint(theme.accent)
+                            .tint(theme.onDarkFill)
                         Text(viewModel.loadingText)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(theme.secondaryText)
+                            .foregroundStyle(theme.brandSecondaryText)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 320)
                 } else if viewModel.isEmpty {
                     emptyState
                 } else {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        LazyVStack(spacing: 12) {
-                            ForEach(viewModel.messages) { message in
-                                NotificationMessageRow(message: message,
-                                                       dateText: viewModel.sentText(message.timestamp)) {
-                                    viewModel.delete(message)
-                                }
+                    LazyVStack(spacing: 12) {
+                        ForEach(viewModel.messages) { message in
+                            NotificationMessageRow(message: message,
+                                                   dateText: viewModel.sentText(message.timestamp)) {
+                                viewModel.delete(message)
                             }
                         }
-                        .padding(18)
                     }
                 }
             }
-            .background(Color(.systemBackground))
-            .navigationTitle(viewModel.screenTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(viewModel.doneLabel) { dismiss() }
-                }
-            }
-            .task {
-                await viewModel.loadMessages()
-            }
-            .refreshable {
-                await viewModel.loadMessages()
-            }
+        }
+        .task {
+            await viewModel.loadMessages()
+        }
+        .refreshable {
+            await viewModel.loadMessages()
         }
         .trackScreen(AnalyticsScreen.notificationMessages)
     }
@@ -58,28 +52,27 @@ struct NotificationMessagesView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Circle()
-                .fill(theme.cardBackground)
+                .fill(theme.accentBackground)
                 .frame(width: 74, height: 74)
                 .overlay {
-                    PlatformIcon(
-                        systemName: "bell.fill",
-                        size: 28,
-                        weight: .semibold,
-                        color: theme.secondaryText
-                    )
+                    Image(systemName: "bell")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(theme.brandActionBackground)
+                        .frame(width: 28, height: 28)
                 }
 
             Text(viewModel.emptyTitle)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(theme.primaryText)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(theme.onDarkFill)
 
             Text(viewModel.emptySubtitle)
-                .font(.system(size: 13))
-                .foregroundStyle(theme.secondaryText)
+                .font(.system(size: 15))
+                .foregroundStyle(theme.brandSecondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 320)
     }
 }
 

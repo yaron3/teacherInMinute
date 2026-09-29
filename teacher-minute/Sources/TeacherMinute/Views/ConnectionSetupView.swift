@@ -112,17 +112,9 @@ struct ConnectionSetupView: View {
       .padding(.bottom, 36)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    // The brand's ground, with the streaks the student's home has.
     .background {
-      if AppTheme.isBrand {
-        // Instant Teacher's ground, with the streaks its home has.
-        BrandScreenBackground(streaks: .home)
-      } else {
-        LinearGradient(
-          colors: [theme.cardBackground, theme.accentBackground, theme.cardBackground],
-          startPoint: .top,
-          endPoint: .bottom
-        )
-      }
+      BrandScreenBackground(streaks: .home)
     }
   }
 

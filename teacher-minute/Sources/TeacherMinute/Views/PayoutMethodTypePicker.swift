@@ -24,22 +24,18 @@ struct PayoutMethodTypePicker: View {
   }
 
   var body: some View {
-    HStack(spacing: 0) {
+    HStack(spacing: 8) {
       ForEach(types) { type in
         tab(type)
       }
     }
-    .padding(3)
-    .background(theme.cardBackground)
-    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
   }
 
+  /// As the brand's option rows draw a choice: the chosen one outlined and
+  /// named in cyan, the others in the muted outline.
   func tab(_ type: PayoutMethodType) -> some View {
     let isSelected = selected == type
-    // The selected tab sits on the saturated `accent` fill, so its label needs
-    // a colour that stays light in both schemes. `onAccentText` is not it: its
-    // light value is black, which leaves near-unreadable dark text on indigo.
-    let selectedForeground = theme.ctaForeground
+    let tint = isSelected ? theme.brandActionBackground : theme.onDarkFill
     return Button {
       onSelect(type)
     } label: {
@@ -48,19 +44,22 @@ struct PayoutMethodTypePicker: View {
           systemName: type.systemImage,
           size: 13,
           weight: .semibold,
-          color: isSelected ? selectedForeground : theme.secondaryText
+          color: tint
         )
         Text(type.displayName)
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(isSelected ? selectedForeground : theme.secondaryText)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(tint)
           .lineLimit(1)
           .minimumScaleFactor(0.8)
       }
-      .padding(.vertical, 10)
       .padding(.horizontal, 8)
       .frame(maxWidth: .infinity)
-      .background(isSelected ? theme.accent : Color.clear)
-      .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+      .frame(height: 44)
+      .overlay {
+        RoundedRectangle(cornerRadius: 10)
+          .stroke(isSelected ? theme.brandActionBackground : theme.brandOptionBorder, lineWidth: 1)
+      }
+      .tappableFrame()
     }
     .buttonStyle(.plain)
   }

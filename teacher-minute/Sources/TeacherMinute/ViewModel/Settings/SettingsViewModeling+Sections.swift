@@ -26,144 +26,16 @@ extension SettingsViewModeling {
         }
     }
 
-    var preferenceRows: [SettingsRow] {
-        var rows = [
+    /// The settings, as Instant Teacher's design lists them: Preferences,
+    /// Language, Notifications and Privacy Controls. App Permissions is not
+    /// among them, in either app: the profile holds those switches.
+    var primarySettingsRows: [SettingsRow] {
+        [
             SettingsRow(
                 title: LocalizationSupport.localized("Preferences"),
                 subtitle: role == .teacher
                     ? LocalizationSupport.localized("Availability on launch and currency")
                     : LocalizationSupport.localized("Default session type and currency"),
-                systemImage: "slider.horizontal.3",
-                iconColor: .primary,
-                isDestructive: false,
-                action: .appPreferences
-            ),
-            SettingsRow(
-                title: LocalizationSupport.localized("Language"),
-                subtitle: selectedLanguage.title,
-                systemImage: "globe",
-                iconColor: .primary,
-                isDestructive: false,
-                action: .language
-            ),
-            SettingsRow(
-                title: LocalizationSupport.localized("Notification Preferences"),
-                subtitle: nil,
-                systemImage: "bell.fill",
-                iconColor: .primary,
-                isDestructive: false,
-                action: .notifications
-            ),
-            SettingsRow(
-                title: LocalizationSupport.localized("App Permissions"),
-                subtitle: nil,
-                systemImage: "mic.fill",
-                iconColor: .primary,
-                isDestructive: false,
-                action: .mediaPermissions
-            ),
-            SettingsRow(
-                title: LocalizationSupport.localized("Privacy Controls"),
-                subtitle: nil,
-                systemImage: "shield.lefthalf.filled",
-                iconColor: .primary,
-                isDestructive: false,
-                action: .privacyControls
-            )
-        ]
-
-        #if DEBUG
-        rows.append(
-            SettingsRow(
-                title: LocalizationSupport.localized("Force Reload Remote Config"),
-                subtitle: LocalizationSupport.localized("Debug builds only"),
-                systemImage: "arrow.clockwise",
-                iconColor: .primary,
-                isDestructive: false,
-                action: .forceReloadRemoteConfig
-            )
-        )
-        rows.append(
-            SettingsRow(
-                title: LocalizationSupport.localized("Test Crashlytics Crash"),
-                subtitle: LocalizationSupport.localized("Debug builds only"),
-                systemImage: "exclamationmark.triangle.fill",
-                iconColor: .red,
-                isDestructive: true,
-                action: .testCrashlyticsCrash
-            )
-        )
-        #endif
-
-        return rows
-    }
-
-    var sections: [SettingsSection] {
-        [
-            role == .teacher ? SettingsSection(
-                title: LocalizationSupport.localized("PAYOUTS"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Teacher Payout Settings"),
-                        subtitle: LocalizationSupport.localized("Choose where your monthly payout is sent"),
-                        systemImage: "banknote.fill",
-                        iconColor: .purple,
-                        isDestructive: false,
-                        action: .teacherPayouts
-                    )
-                ]
-            ): SettingsSection(
-                title: LocalizationSupport.localized("PAYMENTS"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Payment History"),
-                        subtitle: LocalizationSupport.localized("View your lesson payment history"),
-                        systemImage: "creditcard.fill",
-                        iconColor: .pink,
-                        isDestructive: false,
-                        action: .studentPayments
-                    )
-                ]
-            ),
-            SettingsSection(
-                title: LocalizationSupport.localized("PREFERENCES"),
-                rows: preferenceRows
-            ),
-            SettingsSection(
-                title: LocalizationSupport.localized("ABOUT"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("About"),
-                        subtitle: nil,
-                        systemImage: "doc.text.fill",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .about
-                    )
-                ]
-            ),
-            SettingsSection(
-                title: LocalizationSupport.localized("ACCOUNT"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Account & Security"),
-                        subtitle: LocalizationSupport.localized("Password, logout and account removal"),
-                        systemImage: "lock.fill",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .accountSecurity
-                    )
-                ]
-            )
-        ]
-    }
-
-    /// Instant Teacher's settings, as its design lists them.
-    var studentSettingsRows: [SettingsRow] {
-        [
-            SettingsRow(
-                title: LocalizationSupport.localized("Preferences"),
-                subtitle: LocalizationSupport.localized("Default session type and currency"),
                 systemImage: "slider.horizontal.3",
                 iconColor: .primary,
                 action: .appPreferences
@@ -190,20 +62,27 @@ extension SettingsViewModeling {
         ]
     }
 
-    /// The rest of a student's settings, which the design leaves out: the
-    /// payments, the about pages, and the account, whose Log Out and Delete
-    /// Account must stay within reach. App Permissions is not among them: the
-    /// student's profile holds those switches. The icons are symbols SkipUI
-    /// draws on Android too.
-    var studentMoreSettingsRows: [SettingsRow] {
+    /// The rest of the settings, which the design leaves out, in a card of the
+    /// same style: the money — a student's payments, a teacher's payouts — the
+    /// about pages, and the account, whose Log Out and Delete Account must
+    /// stay within reach. The icons are symbols SkipUI draws on Android too.
+    var moreSettingsRows: [SettingsRow] {
         var rows = [
-            SettingsRow(
-                title: LocalizationSupport.localized("Payment History"),
-                subtitle: LocalizationSupport.localized("View your lesson payment history"),
-                systemImage: "cart",
-                iconColor: .primary,
-                action: .studentPayments
-            ),
+            role == .teacher
+                ? SettingsRow(
+                    title: LocalizationSupport.localized("Teacher Payout Settings"),
+                    subtitle: LocalizationSupport.localized("Choose where your monthly payout is sent"),
+                    systemImage: "banknote",
+                    iconColor: .primary,
+                    action: .teacherPayouts
+                )
+                : SettingsRow(
+                    title: LocalizationSupport.localized("Payment History"),
+                    subtitle: LocalizationSupport.localized("View your lesson payment history"),
+                    systemImage: "cart",
+                    iconColor: .primary,
+                    action: .studentPayments
+                ),
             SettingsRow(
                 title: LocalizationSupport.localized("About"),
                 systemImage: "info.circle",
@@ -324,8 +203,6 @@ extension SettingsViewModeling {
             navigationPath.append(.studentPayments)
         case .notifications:
             navigationPath.append(.notifications)
-        case .mediaPermissions:
-            navigationPath.append(.mediaPermissions)
         case .privacyControls:
             navigationPath.append(.privacyControls)
         case .language:

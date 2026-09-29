@@ -1,16 +1,16 @@
 //
-//  StudentSettingsView.swift
+//  SettingsRootView.swift
 //  teacher-minute
 //
-//  Instant Teacher's settings, as its design draws them: the design's four
+//  The settings, as Instant Teacher's design draws them: the design's four
 //  rows, then in a card of the same style the settings it leaves out. It is
-//  the root of `SettingsView`'s navigation stack for a student, and runs on
-//  the same view model, which routes a tapped row as it always has.
+//  the root of `SettingsView`'s navigation stack, in both apps, and runs on
+//  the same view model, which routes a tapped row.
 //
 
 import SwiftUI
 
-struct StudentSettingsView: View {
+struct SettingsRootView: View {
   let viewModel: any SettingsViewModeling
 
   @Environment(\.colorScheme) var colorScheme
@@ -47,8 +47,8 @@ struct StudentSettingsView: View {
   private var content: some View {
     VStack(alignment: .leading, spacing: 16) {
       BrandPageHero(title: viewModel.settingsTitle, subtitle: viewModel.settingsSubtitle)
-      rowsCard(viewModel.studentSettingsRows)
-      rowsCard(viewModel.studentMoreSettingsRows)
+      rowsCard(viewModel.primarySettingsRows)
+      rowsCard(viewModel.moreSettingsRows)
       Text(viewModel.appVersion)
         .font(.system(size: 13))
         .foregroundStyle(theme.brandSecondaryText)
@@ -67,9 +67,15 @@ struct StudentSettingsView: View {
 }
 
 #if os(iOS)
-#Preview {
+#Preview("Student") {
   NavigationStack {
-    StudentSettingsView(viewModel: MockSettingsViewModel(role: .student))
+    SettingsRootView(viewModel: MockSettingsViewModel(role: .student))
+  }
+}
+
+#Preview("Teacher") {
+  NavigationStack {
+    SettingsRootView(viewModel: MockSettingsViewModel(role: .teacher))
   }
 }
 #endif

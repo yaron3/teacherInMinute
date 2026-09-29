@@ -1,286 +1,236 @@
-//
-//  LoginView.swift
-//  teacher-minute
-//
-//  Created by Yaron Jackoby on 06/05/2026.
-//
-
-
 import SwiftUI
 
+/// The log-in screen, on the brand's dark ground, as the sign-up screen is.
 struct LoginView: View {
   @State var viewModel = LoginViewModel()
   @Environment(\.appRouter) var router
+
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
+    AppTheme(colorScheme: colorScheme)
   }
+
   var body: some View {
-	ZStack {
-	  theme.screenBackground
-		.ignoresSafeArea()
-	  
-	  ScrollView(.vertical, showsIndicators: false) {
-        VStack(alignment: .leading, spacing: 0) {
-//		Text(viewModel.screenTitle)
-//		  .font(.system(size: 32, weight: .bold))
-//		  .foregroundStyle(theme.primaryText)
-//		  .padding(.top, 28)
-		
-		Text(viewModel.subtitleText)
-		  .font(.system(size: 16, weight: .regular))
-		  .foregroundStyle(theme.secondaryText)
-		  .lineSpacing(6)
-		  .padding(.top, 10)
-		
-		formCard
-		  .padding(.top, 38)
-		
-		loginButton
-		  .padding(.top, 25)
-		
-		dividerTitle
-		  .padding(.top, 28)
-		
-		socialButtons
-		  .padding(.top, 25)
-		
-		Spacer()
-		
-		bottomSignUp
-		  .frame(maxWidth: .infinity)
-		  .padding(.bottom, 34)
-	  }
-	  .padding(.horizontal, 27)
-	  .padding(.top, 8)
-		  }
-	  
-	  // Full-screen loading overlay while checking Firestore
-	  if viewModel.isLoading {
-		theme.screenBackground.opacity(0.85).ignoresSafeArea()
-		VStack(spacing: 14) {
-		  ProgressView()
-			.progressViewStyle(.circular)
-			.scaleEffect(1.8)
-			.tint(theme.primaryText)
-		  Text(viewModel.signingInProgressText)
-			.font(.system(size: 15, weight: .medium))
-			.foregroundStyle(theme.primaryText)
-		}
-	  }
-	}
-	.navigationBarTitleDisplayMode(.inline)
-	// Push the resolved destination when login completes
-	.navigationTitle(viewModel.screenTitle)
-	.onChange(of: viewModel.destination) { _, resume in
-	  guard let resume else { return }
-	  router.resume(resume)
-	  viewModel.destination = nil
-	}
-	.appDialog(
-	  viewModel.signInErrorTitle,
-	  isPresented: $viewModel.showAlert,
-	  message: viewModel.alertMessage ?? viewModel.genericErrorMessage,
-	  actions: [AppDialogAction(viewModel.okLabel)]
-	)
-  }
-  
+    ZStack {
+      BrandScreenBackground()
 
-  
-  // MARK: - Form card (unchanged structure, UIKit types removed for Skip compat)
-  
-  var formCard: some View {
-	VStack(alignment: .leading, spacing: 22) {
-	  // Email field
-	  VStack(alignment: .leading, spacing: 9) {
-		Text(viewModel.emailFieldTitle)
-		  .font(.system(size: 14, weight: .semibold))
-		  .foregroundStyle(theme.primaryText)
-		
-		HStack(spacing: 13) {
-		  PlatformIcon(
-			systemName: "envelope",
-			size: 15,
-			color: theme.secondaryText
-		  )
-		  
-		  TextField(viewModel.emailPlaceholder, text: $viewModel.emailOrPhone)
-			.textFieldStyle(.plain)
-			.font(.system(size: 16))
-			.foregroundStyle(theme.primaryText)
-			.keyboardType(.emailAddress)
-			.textInputAutocapitalization(.never)
-			.autocorrectionDisabled()
-                .multilineTextAlignment(.leading)
-                .environment(\.layoutDirection, .leftToRight)
-			.accessibilityIdentifier("email_input")
-		}
-		.padding(.horizontal, 16)
-		.frame(height: 56)
-		.background(theme.fieldBackground)
-		.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-		.overlay {
-		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-			.stroke(theme.controlBorder, lineWidth: 1)
-		}
-	  }
-	  
-	  // Password field
-	  VStack(alignment: .leading, spacing: 9) {
-		Text(viewModel.passwordFieldTitle)
-		  .font(.system(size: 14, weight: .semibold))
-		  .foregroundStyle(theme.primaryText)
-		
-		HStack(spacing: 13) {
-		  PlatformIcon(
-			systemName: "lock.fill",
-			size: 15,
-			color: theme.secondaryText
-		  )
-		  
-		  Group {
-			if viewModel.isPasswordVisible {
-			  TextField(viewModel.passwordPlaceholder, text: $viewModel.password)
-			} else {
-			  SecureField(viewModel.passwordPlaceholder, text: $viewModel.password)
-				.accessibilityIdentifier("password_input")
-			}
-		  }
-		  .textFieldStyle(.plain)
-		  .font(.system(size: 16))
-		  .foregroundStyle(theme.primaryText)
-		  .textInputAutocapitalization(.never)
-		  .autocorrectionDisabled()
-		  
-		  Button {
-			viewModel.isPasswordVisible.toggle()
-		  } label: {
-			PlatformIcon(systemName: viewModel.isPasswordVisible ? "eye" : "eye.slash")
-			  .font(.system(size: 17))
-			  .foregroundStyle(theme.secondaryText)
-		  }
-		  .buttonStyle(.plain)
-		}
-		.padding(.horizontal, 16)
-		.frame(height: 56)
-		.background(theme.fieldBackground)
-		.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-		.overlay {
-		  RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-			.stroke(theme.controlBorder, lineWidth: 1)
-		}
-	  }
-	  
-	  Button {
-		viewModel.forgotPassword()
-	  } label: {
-		Text(viewModel.forgotPasswordLabel)
-		  .font(.system(size: 14, weight: .medium))
-		  .foregroundStyle(theme.accent)
-		  .frame(maxWidth: .infinity, alignment: .trailing)
-	  }
-	  .buttonStyle(.plain)
-	  .padding(.top, 2)
-	}
-	.padding(.horizontal, 24)
-	.padding(.top, 26)
-	.padding(.bottom, 24)
-	.background(theme.cardBackground)
-	.clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-  }
-  
-  var loginButton: some View {
-	Button {
-	  Task { await viewModel.login() }
-	} label: {
-	  HStack(spacing: 8) {
-		if viewModel.isLoading {
-		  ProgressView().tint(theme.onAccentText)
-		}
+      VStack(spacing: 0) {
+        header
+        ScrollView(showsIndicators: false) {
+          VStack(alignment: .leading, spacing: 16) {
+            hero
+            formCard
+          }
+          .padding(.horizontal, 20)
+          .padding(.top, 16)
+          .padding(.bottom, 20)
+        }
+        .scrollDismissesKeyboard(.interactively)
+      }
 
-		Text(viewModel.logInButtonLabel)
-		  .font(.system(size: 17, weight: .bold))
-	  }
-	  // Disabled state swaps to the raised gray rather than fading ink into the
-	  // background, which left the label unreadable.
-	  .foregroundStyle(viewModel.canSubmit ? theme.onAccentText : theme.secondaryText)
-	  .frame(maxWidth: .infinity)
-	  .frame(height: 54)
-	  .background(viewModel.canSubmit ? theme.accent : theme.cardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-	}
-	.buttonStyle(.plain)
-	.disabled(!viewModel.canSubmit)
+      if viewModel.isLoading {
+        theme.brandScrim.opacity(0.6).ignoresSafeArea()
+        VStack(spacing: 14) {
+          ProgressView()
+            .progressViewStyle(.circular)
+            .scaleEffect(1.6)
+            .tint(theme.onDarkFill)
+          Text(viewModel.signingInProgressText)
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(theme.onDarkFill)
+        }
+      }
+    }
+    .environment(\.colorScheme, .dark)
+    .toolbar(.hidden, for: .navigationBar)
+    .navigationBarBackButtonHidden(true)
+    .systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
+    .onChange(of: viewModel.destination) { _, resume in
+      guard let resume else { return }
+      router.resume(resume)
+      viewModel.destination = nil
+    }
+    .appDialog(
+      viewModel.signInErrorTitle,
+      isPresented: $viewModel.showAlert,
+      message: viewModel.alertMessage ?? viewModel.genericErrorMessage,
+      actions: [AppDialogAction(viewModel.okLabel)]
+    )
+    .trackScreen(AnalyticsScreen.login)
   }
-  
-  var dividerTitle: some View {
-	HStack(spacing: 17) {
-	  Rectangle()
-		.fill(theme.separator)
-		.frame(height: 1)
-	  
-	  Text(viewModel.orContinueWithLabel)
-		.font(.system(size: 14, weight: .regular))
-		.foregroundStyle(theme.secondaryText)
-		.lineLimit(1)
-	  
-	  Rectangle()
-		.fill(theme.separator)
-		.frame(height: 1)
-	}
-	.padding(.horizontal, 16)
+
+  // MARK: - Sections
+
+  /// The way back at the far end, as on the sign-up screen.
+  private var header: some View {
+    HStack(spacing: 12) {
+      Spacer(minLength: 0)
+      BrandBackButton(accessibilityLabel: viewModel.backLabel) {
+        router.pop()
+      }
+    }
+    .padding(.horizontal, 20)
+    .padding(.vertical, 12)
   }
-  
-  var socialButtons: some View {
-	HStack(spacing: 16) {
-	  socialButton(title: viewModel.googleLabel, systemImage: "google-logo") { viewModel.loginWithGoogle() }
-	  #if !os(Android)
-		  socialButton(title: viewModel.appleLabel,  systemImage: "apple.logo")    { viewModel.loginWithApple() }
+
+  private var hero: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(viewModel.screenTitle)
+        .font(.system(size: 34, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+      Text(viewModel.subtitleText)
+        .font(.system(size: 15))
+        .foregroundStyle(theme.brandSecondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var formCard: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      BrandTextField(
+        title: viewModel.emailFieldTitle,
+        placeholder: viewModel.emailPlaceholder,
+        text: $viewModel.emailOrPhone,
+        keyboardType: .emailAddress,
+        textContentType: .emailAddress,
+        autocapitalization: .never
+      )
+      .accessibilityIdentifier("email_input")
+
+      BrandTextField(
+        title: viewModel.passwordFieldTitle,
+        placeholder: viewModel.passwordPlaceholder,
+        text: $viewModel.password,
+        icon: "brand-lock",
+        isSecure: true,
+        textContentType: .password,
+        autocapitalization: .never
+      )
+      .accessibilityIdentifier("password_input")
+
+      Button {
+        viewModel.forgotPassword()
+      } label: {
+        Text(viewModel.forgotPasswordLabel)
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(theme.brandActionBackground)
+          .frame(maxWidth: .infinity, alignment: .trailing)
+      }
+      .buttonStyle(.plain)
+
+      BrandPrimaryButton(
+        title: viewModel.logInButtonLabel,
+        isLoading: viewModel.isLoading,
+        isEnabled: viewModel.canSubmit
+      ) {
+        Task { await viewModel.login() }
+      }
+
+      divider
+      socialButtons
+      signUpRow
+    }
+    .brandCard()
+  }
+
+  private var divider: some View {
+    HStack(spacing: 8) {
+      Rectangle()
+        .fill(theme.brandControlBorder)
+        .frame(height: 1)
+      Text(viewModel.orContinueWithLabel)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
+        .lineLimit(1)
+        .fixedSize()
+      Rectangle()
+        .fill(theme.brandControlBorder)
+        .frame(height: 1)
+    }
+  }
+
+  /// Apple on the left and Google on the right in both languages, as on the
+  /// sign-up screen. Sign in with Apple is iOS only.
+  private var socialButtons: some View {
+    HStack(spacing: 12) {
+#if !os(Android)
+      socialButton(label: viewModel.appleLabel, identifier: "log_in_apple") {
+        Image("brand-apple", bundle: .module)
+          .renderingMode(.template)
+          .resizable()
+          .foregroundStyle(theme.onDarkFill)
+          .frame(width: 18, height: 18)
+      } action: {
+        viewModel.loginWithApple()
+      }
 #endif
-	}
+      socialButton(label: viewModel.googleLabel, identifier: "log_in_google") {
+        // Google's own mark: its guidelines do not allow a recoloured one.
+        Image("google-logo", bundle: .module)
+          .resizable()
+          .scaledToFit()
+          .frame(width: 20, height: 20)
+      } action: {
+        viewModel.loginWithGoogle()
+      }
+    }
+    .environment(\.layoutDirection, .leftToRight)
   }
-  
-  func socialButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-	Button(action: action) {
-	  HStack(spacing: 9) {
-		PlatformIcon(systemName: systemImage).font(.system(size: 20, weight: .semibold))
-		Text(title).font(.system(size: 15, weight: .semibold))
-	  }
-	  .foregroundStyle(theme.primaryText)
-	  .frame(maxWidth: .infinity)
-	  .frame(height: 56)
-	  .background(theme.cardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-	  .overlay { RoundedRectangle(cornerRadius: flatRadius, style: .continuous).stroke(theme.controlBorder, lineWidth: 1) }
-	}
-	.buttonStyle(.plain)
+
+  private func socialButton<Icon: View>(
+    label: String,
+    identifier: String,
+    @ViewBuilder icon: () -> Icon,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button {
+      action()
+    } label: {
+      HStack(spacing: 8) {
+        icon()
+        Text(label)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(theme.onDarkFill)
+          .lineLimit(1)
+      }
+      .frame(maxWidth: .infinity)
+      .frame(height: 36)
+      .background(theme.brandBackgroundTop)
+      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .overlay {
+        RoundedRectangle(cornerRadius: 12)
+          .stroke(theme.brandControlBorder, lineWidth: 1)
+      }
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier(identifier)
   }
-  
-  var bottomSignUp: some View {
-	HStack(spacing: 4) {
-	  Text(viewModel.noAccountText)
-		.foregroundStyle(theme.secondaryText)
-	  
-	  Button {
-		router.push(.createAccount)
-	  } label: {
-		Text(viewModel.signUpLabel)
-		  .fontWeight(.semibold)
-		  .foregroundStyle(theme.accent)
-	  }
-	  .buttonStyle(.plain)
-	}
-	.font(.system(size: 14))
+
+  private var signUpRow: some View {
+    HStack(spacing: 4) {
+      Text(viewModel.noAccountText)
+        .foregroundStyle(theme.brandSecondaryText)
+      Button {
+        router.push(.createAccount)
+      } label: {
+        Text(viewModel.signUpLabel)
+          .fontWeight(.bold)
+          .foregroundStyle(theme.brandActionBackground)
+      }
+      .buttonStyle(.plain)
+    }
+    .font(.system(size: 14))
+    .frame(maxWidth: .infinity)
   }
 }
+
 #if os(iOS)
 struct LoginView_Previews: PreviewProvider {
-  
   static var previews: some View {
-	
-	LoginView()
-	
+    NavigationStack {
+      LoginView()
+    }
   }
-  
 }
 #endif

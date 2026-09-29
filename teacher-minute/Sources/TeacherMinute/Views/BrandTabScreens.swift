@@ -2,43 +2,48 @@
 //  BrandTabScreens.swift
 //  teacher-minute
 //
-//  What Instant Teacher's sections other than Home share: the tab bar along
-//  the bottom, the header with the way to the menu or back, and the controls
-//  their cards are built from.
+//  What the sections share, in both apps: the tab bar along the bottom (on
+//  every one but a student's Home), the header with the way to the menu or
+//  back, and the controls their cards are built from.
 //
 
 import SwiftUI
 
 // MARK: - Tab bar environment
 
-/// The tab bar's tabs, the one on screen, and what a tap does. `MainTabView`
-/// supplies it to the student's sections; without it `BrandTabBar` draws
-/// nothing.
-struct StudentTabBarAction: Sendable {
-  let items: [StudentMenuItem]
-  let selected: StudentMenuItem?
-  let select: @MainActor @Sendable (StudentMenuItem) -> Void
+/// The tab bar's tabs, the one on screen, what a tap does, and which tabs
+/// have news waiting. `MainTabView` supplies it to the sections; without it
+/// `BrandTabBar` draws nothing.
+struct TabBarAction: Sendable {
+  let items: [MenuItem]
+  let selected: MenuItem?
+  let badged: Set<MenuItem>
+  let select: @MainActor @Sendable (MenuItem) -> Void
 }
 
-private struct StudentTabBarActionKey: EnvironmentKey {
-  static let defaultValue: StudentTabBarAction? = nil
+private struct TabBarActionKey: EnvironmentKey {
+  static let defaultValue: TabBarAction? = nil
 }
 
 extension EnvironmentValues {
-  var studentTabBarAction: StudentTabBarAction? {
-    get { self[StudentTabBarActionKey.self] }
-    set { self[StudentTabBarActionKey.self] = newValue }
+  var tabBarAction: TabBarAction? {
+    get { self[TabBarActionKey.self] }
+    set { self[TabBarActionKey.self] = newValue }
   }
 }
 
-extension StudentMenuItem {
+extension MenuItem {
   /// The item's icon in the brand's set, at the size the design draws it in
-  /// its 28pt box. Help & Support has none: it keeps its system icon.
+  /// its 28pt box. Pro Teacher's Home and Earnings are drawn in the same
+  /// line style; its Lessons share Activity's. Help & Support has none: it
+  /// keeps its system icon.
   var brandIcon: (name: String, size: CGSize)? {
     switch self {
     case .ask: ("brand-menu-ask", CGSize(width: 28, height: 28))
     case .minutes: ("brand-menu-minutes", CGSize(width: 28, height: 28))
-    case .activity: ("brand-menu-activity", CGSize(width: 26, height: 28))
+    case .activity, .lessons: ("brand-menu-activity", CGSize(width: 26, height: 28))
+    case .home: ("brand-menu-home", CGSize(width: 24, height: 24))
+    case .earnings: ("brand-menu-earnings", CGSize(width: 24, height: 24))
     case .profile: ("brand-menu-profile", CGSize(width: 18, height: 18))
     case .settings: ("brand-menu-settings", CGSize(width: 23, height: 23))
     case .help: nil
@@ -48,8 +53,7 @@ extension StudentMenuItem {
 
 // MARK: - Screens
 
-/// A student section on the brand's dark ground: its content, then the tab
-/// bar.
+/// A section on the brand's dark ground: its content, then the tab bar.
 ///
 /// A screen's `.task`, `.onChange` and sheets go on a plain stack inside its
 /// content, not on this: on Android, SkipUI never ran a `.task` put on this
@@ -77,15 +81,18 @@ struct BrandTabScreen<Content: View>: View {
   }
 }
 
-/// A page pushed from a student section: the brand's ground without the tab
-/// bar, and the way back in its header. As with `BrandTabScreen`, a page's
-/// modifiers go on its content.
+/// A page pushed from a section, or a step of onboarding: the brand's
+/// ground without the tab bar, and the way back in its header. As with
+/// `BrandTabScreen`, a page's modifiers go on its content.
 struct BrandSubpage<Content: View>: View {
   let label: String
   let title: String
   let backLabel: String
   /// False for a page whose content scrolls itself, a web page's.
   var scrolls = true
+  /// What the back button does, when it is not to dismiss the page: an
+  /// onboarding step walks back through its own handler.
+  var onBack: (() -> Void)?
   let content: Content
 
   @Environment(\.dismiss) var dismiss
@@ -95,12 +102,14 @@ struct BrandSubpage<Content: View>: View {
     title: String,
     backLabel: String,
     scrolls: Bool = true,
+    onBack: (() -> Void)? = nil,
     @ViewBuilder content: () -> Content
   ) {
     self.label = label
     self.title = title
     self.backLabel = backLabel
     self.scrolls = scrolls
+    self.onBack = onBack
     self.content = content()
   }
 
@@ -110,7 +119,11 @@ struct BrandSubpage<Content: View>: View {
       VStack(spacing: 0) {
         BrandPageHeader(label: label, title: title) {
           BrandBackButton(accessibilityLabel: backLabel) {
-            dismiss()
+            if let onBack {
+              onBack()
+            } else {
+              dismiss()
+            }
           }
         }
         if scrolls {
@@ -301,10 +314,12 @@ struct BrandSettingsRows: View {
 
 // MARK: - Tab bar
 
-/// Ask, Minutes, Activity, Profile and Settings, in the language's order. The
-/// tab on screen stands in a cyan box that rises above the bar.
+/// The sections, in the language's order: Ask, Minutes, Activity, Profile and
+/// Settings for a student, Home, Lessons, Earnings, Profile and Settings for
+/// a teacher. The tab on screen stands in a cyan box that rises above the
+/// bar.
 struct BrandTabBar: View {
-  @Environment(\.studentTabBarAction) var action
+  @Environment(\.tabBarAction) var action
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
@@ -318,6 +333,12 @@ struct BrandTabBar: View {
             action.select(item)
           } label: {
             tab(item, isSelected: item == action.selected)
+              .overlay(alignment: .top) {
+                if action.badged.contains(item) {
+                  BrandBadgeDot()
+                    .offset(x: 16, y: 8)
+                }
+              }
               .frame(maxWidth: .infinity)
               .tappableFrame()
           }
@@ -336,7 +357,7 @@ struct BrandTabBar: View {
   }
 
   @ViewBuilder
-  func tab(_ item: StudentMenuItem, isSelected: Bool) -> some View {
+  func tab(_ item: MenuItem, isSelected: Bool) -> some View {
     if isSelected {
       VStack(spacing: 0) {
         icon(item, tint: theme.brandBackgroundTop)
@@ -357,7 +378,7 @@ struct BrandTabBar: View {
   }
 
   @ViewBuilder
-  func icon(_ item: StudentMenuItem, tint: Color) -> some View {
+  func icon(_ item: MenuItem, tint: Color) -> some View {
     if let icon = item.brandIcon {
       Image(icon.name, bundle: .module)
         .renderingMode(.template)
@@ -368,7 +389,7 @@ struct BrandTabBar: View {
     }
   }
 
-  func label(_ item: StudentMenuItem) -> some View {
+  func label(_ item: MenuItem) -> some View {
     Text(item.title)
       .font(.system(size: 15, weight: .medium))
       .foregroundStyle(theme.brandActionBackground)
@@ -420,7 +441,8 @@ struct BrandPageHeader<Accessory: View>: View {
   }
 }
 
-/// The square button that opens the side menu, in the brand's style.
+/// The square button that opens the side menu, in the brand's style, with a
+/// dot while news waits inside the menu.
 struct BrandMenuButton: View {
   @Environment(\.sideMenuAction) var action
   @Environment(\.colorScheme) var colorScheme
@@ -444,6 +466,13 @@ struct BrandMenuButton: View {
           .overlay {
             RoundedRectangle(cornerRadius: 10)
               .stroke(theme.brandControlBorder, lineWidth: 1)
+          }
+          // Inset rather than pushed past the edge, so nothing clips it.
+          .overlay(alignment: .topTrailing) {
+            if action.showsBadge {
+              BrandBadgeDot()
+                .padding(5)
+            }
           }
       }
       .buttonStyle(.plain)
@@ -532,6 +561,7 @@ struct BrandOptionPicker<Option: Hashable>: View {
           optionLabel(option, isSelected: option == selection)
         }
         .buttonStyle(.plain)
+        .accessibilitySelected(option == selection)
       }
     }
     .padding(.horizontal, 12)
@@ -557,6 +587,26 @@ struct BrandOptionPicker<Option: Hashable>: View {
         }
       }
       .tappableFrame()
+  }
+}
+
+extension View {
+  /// Marks a control as selected for assistive technology.
+  ///
+  /// The trait is only ever *added*: never hand `accessibilityAddTraits` an
+  /// empty `AccessibilityTraits` (`[]`, or `AccessibilityTraits()`). On
+  /// Android, SkipFuseUI declares `init() { self = [] }`, and `[]` routes
+  /// through `SetAlgebra`'s default array-literal init straight back into
+  /// `init()` — the recursion overflows the stack and kills the process
+  /// before the screen ever draws. iOS is unaffected, so the crash only
+  /// shows up on device.
+  @ViewBuilder
+  func accessibilitySelected(_ isSelected: Bool) -> some View {
+    if isSelected {
+      self.accessibilityAddTraits(.isSelected)
+    } else {
+      self
+    }
   }
 }
 
@@ -589,6 +639,21 @@ struct BrandForwardChevron: View {
       .foregroundStyle(theme.brandActionBackground)
       .frame(width: 24, height: 24)
       .scaleEffect(x: layoutDirection == .rightToLeft ? -1 : 1, y: 1)
+      .accessibilityHidden(true)
+  }
+}
+
+/// The dot that says news is waiting behind a control: new lessons.
+struct BrandBadgeDot: View {
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    Circle()
+      .fill(theme.danger)
+      .frame(width: 9, height: 9)
       .accessibilityHidden(true)
   }
 }

@@ -78,12 +78,17 @@ enum MainTab: Hashable, CaseIterable {
   }
 }
 
-/// A row of Instant Teacher's menu. Each shows a section, except Minutes,
-/// which opens the purchase screen over Home.
-enum StudentMenuItem: Hashable, CaseIterable {
+/// A row of the side menu, and a tab of the tab bar. Each shows a section,
+/// except Minutes, which opens the purchase screen over Home. Ask, Minutes
+/// and Activity are Instant Teacher's; Home, Lessons and Earnings, Pro
+/// Teacher's.
+enum MenuItem: Hashable, CaseIterable {
   case ask
   case minutes
   case activity
+  case home
+  case lessons
+  case earnings
   case profile
   case settings
   case help
@@ -91,8 +96,9 @@ enum StudentMenuItem: Hashable, CaseIterable {
   /// The section on screen after the row is picked.
   var tab: MainTab {
 	switch self {
-	  case .ask, .minutes: .home
-	  case .activity: .lessons
+	  case .ask, .minutes, .home: .home
+	  case .activity, .lessons: .lessons
+	  case .earnings: .earnings
 	  case .profile: .profile
 	  case .settings: .settings
 	  case .help: .help
@@ -104,7 +110,7 @@ enum StudentMenuItem: Hashable, CaseIterable {
 	  case .ask: LocalizationSupport.localized("Ask")
 	  case .minutes: LocalizationSupport.localized("Minutes")
 	  case .activity: LocalizationSupport.localized("Activity")
-	  case .profile, .settings, .help: tab.title
+	  case .home, .lessons, .earnings, .profile, .settings, .help: tab.title
 	}
   }
 
@@ -114,7 +120,7 @@ enum StudentMenuItem: Hashable, CaseIterable {
 	  case .ask: "ask"
 	  case .minutes: "minutes"
 	  case .activity: "activity"
-	  case .profile, .settings, .help: tab.identifier
+	  case .home, .lessons, .earnings, .profile, .settings, .help: tab.identifier
 	}
   }
 }
@@ -150,36 +156,30 @@ final class MainTabViewModel {
 
   /// Whether the side menu — the app's navigation — is open.
   var isSideMenuOpen = false
-  var isConfirmingLogOut = false
 
-  /// The menu's main sections, in order. Earnings is teacher-only.
-  var primaryMenuTabs: [MainTab] {
-	if userMode == .teacher {
-	  return [.home, .lessons, .earnings, .profile]
+  /// The menu, in order.
+  var menuItems: [MenuItem] {
+	tabItems + [.help]
+  }
+
+  /// The tabs along the bottom of the sections: the menu, less Help &
+  /// Support. A student's Home, the camera, has no tab bar.
+  var tabItems: [MenuItem] {
+	switch userMode {
+	  case .student: [.ask, .minutes, .activity, .profile, .settings]
+	  case .teacher: [.home, .lessons, .earnings, .profile, .settings]
 	}
-	return [.home, .lessons, .profile]
-  }
-
-  /// Listed below the divider, apart from the main sections.
-  var secondaryMenuTabs: [MainTab] {
-	[.settings, .help]
-  }
-
-  /// Instant Teacher's menu, in order.
-  var studentMenuItems: [StudentMenuItem] {
-	StudentMenuItem.allCases
-  }
-
-  /// The tabs along the bottom of every student section but Home: the menu,
-  /// less Help & Support.
-  var studentTabItems: [StudentMenuItem] {
-	[.ask, .minutes, .activity, .profile, .settings]
   }
 
   /// The tab for the section on screen, or nil for Help & Support, which has
   /// none.
-  var selectedStudentTab: StudentMenuItem? {
-	studentTabItems.first { isSelected($0) }
+  var selectedTabItem: MenuItem? {
+	tabItems.first { isSelected($0) }
+  }
+
+  /// Whether `item` leads to news waiting inside it: new lessons.
+  func showsBadge(_ item: MenuItem) -> Bool {
+	item.tab == .lessons && shouldShowLessonsBadge
   }
 
   /// Set by the menu's Minutes, for Home to open the purchase screen; Home
@@ -190,11 +190,6 @@ final class MainTabViewModel {
   /// to show in the menu, but may have one to log in to.
   var isAnonymousAccount: Bool {
 	Auth.auth().currentUser?.isAnonymous == true
-  }
-
-  /// Badge count for `tab` — only Lessons ever carries one; 0 means no badge.
-  func badgeCount(for tab: MainTab) -> Int {
-	tab == .lessons && shouldShowLessonsBadge ? 1 : 0
   }
 
   init(userMode: AppUserMode = .teacher) {
@@ -251,31 +246,13 @@ final class MainTabViewModel {
 
   /// Whether `item` is the row for the section on screen. Minutes never is:
   /// the purchase screen it opens is part of Home, which Ask stands for.
-  func isSelected(_ item: StudentMenuItem) -> Bool {
+  func isSelected(_ item: MenuItem) -> Bool {
 	item != .minutes && item.tab == selectedTab
   }
 
-  /// A row was picked from Instant Teacher's menu.
-  func select(_ item: StudentMenuItem) {
+  /// A row of the menu, or a tab, was picked.
+  func select(_ item: MenuItem) {
 	select(item.tab)
 	isPurchaseScreenRequested = item == .minutes
-  }
-
-  /// Log Out was tapped in the menu. It asks first, as Settings does.
-  func logOutTapped() {
-	isSideMenuOpen = false
-	isConfirmingLogOut = true
-  }
-
-  /// Signs out. The caller routes back to sign-in whatever the outcome, the
-  /// same as leaving onboarding does: a failed Firebase sign-out still must
-  /// not leave the user on a signed-in screen.
-  func logOut() {
-	isConfirmingLogOut = false
-	do {
-	  try AuthService().signOut()
-	} catch {
-	  logger.error("[SideMenu] sign out failed: \(error)")
-	}
   }
 }

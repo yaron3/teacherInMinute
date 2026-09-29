@@ -7,16 +7,10 @@
 
 import SwiftUI
 
-import SwiftUI
-
 struct SettingsView: View {
     @State var viewModel: any SettingsViewModeling
-    @Environment(\.appRouter) var router
     @Environment(\.openURL) var openURL
-    @Environment(\.colorScheme) var colorScheme
-    var theme: AppTheme {
-        AppTheme(colorScheme: colorScheme)
-    }
+
     init(role: AppUserMode, viewModel: (any SettingsViewModeling)?) {
         if let viewModel {
             self._viewModel = State(wrappedValue: viewModel)
@@ -27,9 +21,11 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack(path: navigationPath) {
-            settingsRoot
+            SettingsRootView(viewModel: viewModel)
                 .navigationDestination(for: SettingsDestination.self) { destination in
-                    destinationScreen(destination)
+                    destinationView(destination)
+                        .toolbar(.hidden, for: .navigationBar)
+                        .navigationBarBackButtonHidden(true)
                 }
         }
         .appDialog(
@@ -38,23 +34,6 @@ struct SettingsView: View {
             message: viewModel.alertMessage ?? "",
             actions: [AppDialogAction(viewModel.okLabel)]
         )
-        .alert(viewModel.deleteAccountTitle, isPresented: isShowingReauthPasswordPrompt) {
-            SecureField(viewModel.passwordPlaceholder, text: reauthPassword)
-            Button(viewModel.cancelLabel, role: .cancel) {
-                viewModel.reauthPassword = ""
-            }
-            Button(viewModel.deleteLabel, role: .destructive) {
-                let password = viewModel.reauthPassword
-                viewModel.reauthPassword = ""
-                Task {
-                    if await viewModel.completeAccountDeletion(withPassword: password) {
-                        router.signOut()
-                    }
-                }
-            }
-        } message: {
-            Text(viewModel.reauthPasswordMessage)
-        }
         .sheet(item: contactSupportPreview) { request in
             ContactSupportPreviewSheet(
                 viewModel: viewModel,
@@ -72,84 +51,7 @@ struct SettingsView: View {
         .trackScreen(AnalyticsScreen.settings)
     }
 
-    /// A student's settings are Instant Teacher's brand design; everyone
-    /// else's, the standard list.
-    @ViewBuilder
-    var settingsRoot: some View {
-        if viewModel.role == .student {
-            StudentSettingsView(viewModel: viewModel)
-        } else {
-            standardRoot
-        }
-    }
-
-    var standardRoot: some View {
-        VStack(spacing: 0) {
-#if os(Android)
-            SideMenuSectionHeader(title: viewModel.settingsTitle)
-#endif
-            ZStack {
-                List {
-                    ForEach(viewModel.sections) { section in
-                        SettingsSectionView(section: section) { row in
-                            viewModel.select(row)
-                        }
-                    }
-
-                    Section {
-                        Text(viewModel.appVersion)
-                            .font(.system(size: 13))
-                            .foregroundStyle(theme.secondaryText)
-                            .frame(maxWidth: .infinity)
-                            .listRowBackground(Color.clear)
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(theme.screenBackground)
-
-                loadingOverlay
-            }
-        }
-        .background(theme.screenBackground)
-#if os(Android)
-        // The title and menu button are drawn above the list instead; see
-        // SideMenuSectionHeader.
-        .toolbar(.hidden, for: .navigationBar)
-#else
-        .navigationTitle(viewModel.settingsTitle)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                SideMenuButton(size: 36)
-            }
-        }
-#endif
-    }
-
-    /// A student's pages are drawn in the brand's style, each with its own
-    /// header: Preferences and Notifications as their designs have them, the
-    /// others by the same views as everyone's, which take the brand's look in
-    /// Instant Teacher. Everyone else gets the standard pages.
-    @ViewBuilder
-    func destinationScreen(_ destination: SettingsDestination) -> some View {
-        if viewModel.role == .student {
-            switch destination {
-            case .appPreferences:
-                StudentPreferencesView(viewModel: viewModel)
-            case .notifications:
-                StudentNotificationsView(viewModel: viewModel)
-            default:
-                destinationView(destination)
-                    .toolbar(.hidden, for: .navigationBar)
-                    .navigationBarBackButtonHidden(true)
-            }
-        } else {
-            destinationView(destination)
-                .navigationTitle(destination.title)
-                .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-
+    /// Each page draws its own header, with the way back.
     @ViewBuilder
     func destinationView(_ destination: SettingsDestination) -> some View {
         switch destination {
@@ -169,25 +71,10 @@ struct SettingsView: View {
             StudentPaymentHistoryView(viewModel: viewModel)
         case .teacherPayouts:
             TeacherPayoutSettingsView()
-        case .changePassword:
-            ChangePasswordSettingsView(viewModel: viewModel)
         case .notifications:
             NotificationPreferencesSettingsView(viewModel: viewModel)
-        case .mediaPermissions:
-            MediaPermissionsSettingsView(viewModel: viewModel)
         case .privacyControls:
             PrivacyControlsSettingsView(viewModel: viewModel)
-        }
-    }
-
-    @ViewBuilder
-    var loadingOverlay: some View {
-        if viewModel.isLoading {
-            theme.scrim.opacity(0.18).ignoresSafeArea()
-            ProgressView()
-                .progressViewStyle(.circular)
-                .scaleEffect(1.4)
-                .tint(theme.primaryText)
         }
     }
 
@@ -198,14 +85,6 @@ struct SettingsView: View {
             viewModel.navigationPath
         } set: { path in
             viewModel.navigationPath = path
-        }
-    }
-
-    var reauthPassword: Binding<String> {
-        Binding {
-            viewModel.reauthPassword
-        } set: { password in
-            viewModel.reauthPassword = password
         }
     }
 
@@ -224,23 +103,11 @@ struct SettingsView: View {
             viewModel.showAlert = isPresented
         }
     }
-
-    /// Pro Teacher's prompt. Instant Teacher asks in its brand's dialog, on
-    /// Account & Security.
-    var isShowingReauthPasswordPrompt: Binding<Bool> {
-        Binding {
-            !AppTheme.isBrand && viewModel.showReauthPasswordPrompt
-        } set: { isPresented in
-            viewModel.showReauthPasswordPrompt = isPresented
-        }
-    }
-
 }
 
 #if os(iOS)
 #Preview ("teacher"){
   SettingsView(role: .teacher, viewModel: MockSettingsViewModel(role: .teacher))
-  
 }
 #Preview ("student"){
   SettingsView(role: .student, viewModel: MockSettingsViewModel(role: .student))

@@ -23,22 +23,12 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   @State  var router = AppRouter()
   @State var isLaunching = true
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
-  @AppStorage("appearanceMode") var appearanceMode = "system"
 
   /* SKIP @bridge */public init() {
     TeacherMinuteAppDelegate.shared.onInit()
   }
 
-  var preferredAppearanceColorScheme: ColorScheme? {
-    // Instant Teacher is drawn on the brand's dark ground throughout.
-    if AppTheme.isBrand { return .dark }
-    switch appearanceMode {
-    case "light": return .light
-    case "dark": return .dark
-    default: return nil
-    }
-  }
-  
+
       public var body: some View {
 			@Bindable var router = router
 			ZStack {
@@ -99,8 +89,9 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				.environment(\.appRouter, router)
             .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
             .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-            .preferredColorScheme(preferredAppearanceColorScheme)
-            .id("\(languagePreference)-\(appearanceMode)")
+            // Both apps are drawn on the brand's dark ground throughout.
+            .preferredColorScheme(.dark)
+            .id(languagePreference)
             .onAppear {
               LocalizationSupport.applyPlatformLayoutDirection(languagePreference: languagePreference)
             }
@@ -135,38 +126,16 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 	}
   }
 
-  /// Instant Teacher logs its students in on the brand's own screen, as it
-  /// signs them up; Pro Teacher keeps the standard one.
-  @ViewBuilder
   var loginScreen: some View {
-	if AuthRole.appRole == .student {
-	  StudentLoginView()
-	} else {
-	  LoginView()
-		.trackScreen(AnalyticsScreen.login)
-	}
+	LoginView()
   }
 
-  /// Instant Teacher signs its students up on the brand's own screens; Pro
-  /// Teacher keeps the standard ones. Both run on the same view models.
-  @ViewBuilder
   var createAccountScreen: some View {
-	if AuthRole.appRole == .student {
-	  StudentSignUpView()
-	} else {
-	  CreateAccountView()
-		.trackScreen(AnalyticsScreen.createAccount)
-	}
+	CreateAccountView()
   }
 
-  @ViewBuilder
   func completeProfileScreen(role: AuthRole) -> some View {
-	if role == .student {
-	  StudentCompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
-	} else {
-	  CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
-		.trackScreen(AnalyticsScreen.completeProfile)
-	}
+	CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
   }
 
   private func performLaunchSessionResume() async {

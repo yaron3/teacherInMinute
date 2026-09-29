@@ -309,7 +309,7 @@ struct StudentHomeView: View {
   var studentHero: some View {
     VStack(spacing: 0) {
       HStack(spacing: 12) {
-		SideMenuButton(size: 40)
+		BrandMenuButton()
 
 		Image("brand-logo", bundle: .module)
 		  .resizable()

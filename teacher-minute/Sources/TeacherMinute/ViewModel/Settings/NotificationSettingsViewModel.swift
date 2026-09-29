@@ -2,8 +2,8 @@
 //  NotificationSettingsViewModel.swift
 //  teacher-minute
 //
-//  The notification permission behind the switch on Instant Teacher's
-//  notification settings.
+//  The notification permission behind the switch on the notification
+//  settings.
 //
 
 import Foundation

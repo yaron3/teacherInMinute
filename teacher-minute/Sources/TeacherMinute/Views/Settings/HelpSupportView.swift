@@ -16,12 +16,10 @@ struct HelpSupportView: View {
     }
 
     var body: some View {
+        // A plain stack around the screen, which carries its modifiers; see
+        // `BrandTabScreen`.
         ZStack {
-            if AppTheme.isBrand {
-                brandScreen
-            } else {
-                standardScreen
-            }
+            screen
         }
         .appDialog(
             viewModel.alertTitle,
@@ -40,9 +38,9 @@ struct HelpSupportView: View {
         }
     }
 
-    /// Instant Teacher's look: a section like the others, with the tab bar,
-    /// and the contact form in a brand card.
-    var brandScreen: some View {
+    /// A section like the others, with the tab bar, and the contact form in a
+    /// brand card.
+    var screen: some View {
         BrandTabScreen {
             VStack(spacing: 0) {
                 BrandPageHeader(label: viewModel.helpSupportTitle, title: viewModel.helpSupportTitle) {
@@ -59,28 +57,6 @@ struct HelpSupportView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-        }
-    }
-
-    var standardScreen: some View {
-        NavigationStack {
-#if os(Android)
-            // The title and menu button are drawn above the form instead; see
-            // SideMenuSectionHeader.
-            VStack(spacing: 0) {
-                SideMenuSectionHeader(title: viewModel.helpSupportTitle)
-                ContactSupportView(viewModel: viewModel)
-            }
-            .toolbar(.hidden, for: .navigationBar)
-#else
-            ContactSupportView(viewModel: viewModel)
-                .navigationTitle(viewModel.helpSupportTitle)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        SideMenuButton(size: 36)
-                    }
-                }
-#endif
         }
     }
 

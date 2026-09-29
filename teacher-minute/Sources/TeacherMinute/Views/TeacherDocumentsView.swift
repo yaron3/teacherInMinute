@@ -25,61 +25,57 @@ struct TeacherDocumentsView: View {
   }
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: true) {
-      VStack(alignment: .leading, spacing: 16) {
-        Text(viewModel.introText)
-          .font(.system(size: 13))
-          .foregroundStyle(theme.secondaryText)
-          .lineSpacing(4)
-          .padding(.top, 8)
+    // A plain stack around the sheet, which carries its modifiers; see
+    // `BrandTabScreen`.
+    ZStack {
+      BrandSheet(title: viewModel.screenTitle, closeLabel: viewModel.closeLabel) {
+        dismiss()
+      } content: {
+        VStack(alignment: .leading, spacing: 16) {
+          Text(viewModel.introText)
+            .font(.system(size: 15))
+            .foregroundStyle(theme.brandSecondaryText)
+            .lineSpacing(4)
+            .fixedSize(horizontal: false, vertical: true)
 
-        if viewModel.isLoading {
-          loadingView
-        } else if let error = viewModel.errorMessage {
-          errorView(error)
-        } else {
-          if viewModel.hasDocuments {
-            ForEach(viewModel.documents) { document in
-              documentTile(document)
-            }
+          if viewModel.isLoading {
+            loadingView
+          } else if let error = viewModel.errorMessage {
+            errorView(error)
           } else {
-            emptyView
-          }
+            if viewModel.hasDocuments {
+              ForEach(viewModel.documents) { document in
+                documentTile(document)
+              }
+            } else {
+              emptyView
+            }
 
-          missingDocumentsSection
+            missingDocumentsSection
+          }
         }
-      }
-      .padding(.horizontal, 18)
-      .padding(.bottom, 24)
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    .background(Color(.systemBackground))
-    .navigationBarTitleDisplayMode(.inline)
-    .navigationTitle(viewModel.screenTitle)
-    .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button(viewModel.closeLabel) {
-          dismiss()
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
+    .toolbar(.hidden, for: .navigationBar)
     .task {
       await viewModel.load()
     }
 #if os(Android)
-    .confirmationDialog(
+    // The brand's dialog, as iOS's photo chooser is.
+    .appDialog(
       viewModel.addPhotoDialogTitle,
       isPresented: $showAndroidPhotoSourceDialog,
-      titleVisibility: .visible
-    ) {
-      Button(viewModel.takePhotoLabel) {
-        pickAndUploadAndroidImage(for: androidPickTarget, source: .camera)
-      }
-      Button(viewModel.chooseFromLibraryLabel) {
-        pickAndUploadAndroidImage(for: androidPickTarget, source: .gallery)
-      }
-      Button(viewModel.cancelLabel, role: .cancel) {}
-    }
+      actions: [
+        AppDialogAction(viewModel.takePhotoLabel) {
+          pickAndUploadAndroidImage(for: androidPickTarget, source: .camera)
+        },
+        AppDialogAction(viewModel.chooseFromLibraryLabel) {
+          pickAndUploadAndroidImage(for: androidPickTarget, source: .gallery)
+        },
+        AppDialogAction(viewModel.cancelLabel, kind: .cancel)
+      ]
+    )
 #endif
     .trackScreen(AnalyticsScreen.teacherDocuments)
   }
@@ -121,14 +117,15 @@ struct TeacherDocumentsView: View {
   var missingDocumentsSection: some View {
     if !viewModel.missingTargets.isEmpty {
       Text(viewModel.addMissingDocumentsTitle)
-        .font(.system(size: 16, weight: .bold))
-        .foregroundStyle(theme.primaryText)
+        .font(.system(size: 20, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
         .padding(.top, 12)
 
       Text(viewModel.addMissingDocumentsHint)
-        .font(.system(size: 12))
-        .foregroundStyle(theme.secondaryText)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
         .lineSpacing(4)
+        .fixedSize(horizontal: false, vertical: true)
 
 #if !os(Android)
       if viewModel.isMissing(.governmentIDFront) { uploadPicker(.governmentIDFront) }

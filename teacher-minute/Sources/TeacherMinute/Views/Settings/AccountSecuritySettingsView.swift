@@ -16,22 +16,14 @@ struct AccountSecuritySettingsView: View {
     }
     var body: some View {
         ZStack {
-            if AppTheme.isBrand {
-                BrandSubpage(
-                    label: viewModel.settingsTitle,
-                    title: viewModel.settingsPageTitle(SettingsDestination.accountSecurity.title),
-                    backLabel: viewModel.backLabel
-                ) {
-                    BrandPageHero(title: SettingsDestination.accountSecurity.title)
-                    BrandSettingsRows(rows: viewModel.accountSecuritySection.rows) { row in
-                        viewModel.select(row)
-                    }
-                }
-            } else {
-                List {
-                    SettingsSectionView(section: viewModel.accountSecuritySection) { row in
-                        viewModel.select(row)
-                    }
+            BrandSubpage(
+                label: viewModel.settingsTitle,
+                title: viewModel.settingsPageTitle(SettingsDestination.accountSecurity.title),
+                backLabel: viewModel.backLabel
+            ) {
+                BrandPageHero(title: SettingsDestination.accountSecurity.title)
+                BrandSettingsRows(rows: viewModel.accountSecuritySection.rows) { row in
+                    viewModel.select(row)
                 }
             }
 
@@ -40,7 +32,7 @@ struct AccountSecuritySettingsView: View {
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.primaryText)
+                    .tint(theme.onDarkFill)
             }
         }
         // Log Out and Delete Account are the only rows that raise a
@@ -66,12 +58,10 @@ struct AccountSecuritySettingsView: View {
             message: viewModel.alertMessage ?? "",
             actions: [AppDialogAction(viewModel.okLabel)]
         )
-        // And for the password Delete Account may ask for, in Instant
-        // Teacher's dialog. Pro Teacher asks in `SettingsView`'s system alert,
-        // which a pushed screen cannot cover.
+        // And for the password Delete Account may ask for.
         .appDialog(
             viewModel.deleteAccountTitle,
-            isPresented: isShowingBrandReauthPrompt,
+            isPresented: isShowingReauthPrompt,
             message: viewModel.reauthPasswordMessage,
             secureField: AppDialogSecureField(
                 placeholder: viewModel.passwordPlaceholder,
@@ -129,9 +119,9 @@ struct AccountSecuritySettingsView: View {
         }
     }
 
-    var isShowingBrandReauthPrompt: Binding<Bool> {
+    var isShowingReauthPrompt: Binding<Bool> {
         Binding {
-            AppTheme.isBrand && viewModel.showReauthPasswordPrompt
+            viewModel.showReauthPasswordPrompt
         } set: { isPresented in
             viewModel.showReauthPasswordPrompt = isPresented
         }
@@ -155,8 +145,7 @@ struct AccountSecuritySettingsView: View {
         }
     }
 
-    /// As `SettingsView`'s alert does it: the password is taken and cleared
-    /// before the deletion runs.
+    /// The password is taken and cleared before the deletion runs.
     private func completeAccountDeletion() {
         let password = viewModel.reauthPassword
         viewModel.reauthPassword = ""

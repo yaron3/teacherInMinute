@@ -32,19 +32,16 @@ struct TeacherPayoutMethodSheet: View {
   }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 20) {
-        Text(viewModel.payoutMethodTitle)
-          .font(.system(size: 22, weight: .bold))
-          .foregroundStyle(theme.primaryText)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.top, 24)
+    BrandSheet(title: viewModel.payoutMethodTitle, closeLabel: viewModel.cancelLabel) {
+      onCancel()
+    } content: {
+      Text(viewModel.payoutMethodSheetSubtitle)
+        .font(.system(size: 15))
+        .foregroundStyle(theme.brandSecondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
 
-        Text(viewModel.payoutMethodSheetSubtitle)
-          .font(.system(size: 14))
-          .foregroundStyle(theme.secondaryText)
-          .frame(maxWidth: .infinity, alignment: .leading)
-
+      VStack(alignment: .leading, spacing: 18) {
         typePicker
 
         fields
@@ -56,26 +53,17 @@ struct TeacherPayoutMethodSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
 
-        AuthPrimaryButton(
+        BrandPrimaryButton(
           title: viewModel.payoutSaveButtonLabel,
-          systemImage: "checkmark",
+          isLoading: isSaving,
           isEnabled: method.isComplete && !isSaving
         ) {
           onSave()
         }
         .padding(.top, 4)
-
-        Button(viewModel.cancelLabel) {
-          onCancel()
-        }
-        .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(theme.secondaryText)
-        .frame(maxWidth: .infinity)
-        .padding(.bottom, 24)
       }
-      .padding(.horizontal, 20)
+      .brandCard()
     }
-    .background(theme.screenBackground)
   }
 
   // MARK: - Type picker
@@ -132,8 +120,8 @@ struct TeacherPayoutMethodSheet: View {
   var bankPicker: some View {
     VStack(alignment: .leading, spacing: 10) {
       Text(viewModel.bankFieldTitle)
-        .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(theme.primaryText)
+        .font(.system(size: 16, weight: .bold))
+        .foregroundStyle(theme.brandSecondaryText)
 
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
@@ -145,11 +133,15 @@ struct TeacherPayoutMethodSheet: View {
             } label: {
               Text(bank.displayName)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isSelected ? theme.primaryText : theme.primaryText)
+                .foregroundStyle(isSelected ? theme.onBrandAction : theme.onDarkFill)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(isSelected ? theme.accent : theme.cardBackground)
+                .background(isSelected ? theme.brandActionBackground : theme.brandCardSurface)
                 .clipShape(Capsule())
+                .overlay {
+                  Capsule()
+                    .stroke(isSelected ? theme.brandActionBackground : theme.brandControlBorder, lineWidth: 1)
+                }
             }
             .buttonStyle(.plain)
           }
@@ -188,14 +180,14 @@ struct TeacherPayoutMethodSheet: View {
           onUseProfilePhone()
         } label: {
           HStack(spacing: 8) {
-            PlatformIcon(systemName: "arrow.down.doc", size: 14, weight: .semibold, color: theme.info)
+            PlatformIcon(systemName: "arrow.down.doc", size: 14, weight: .semibold, color: theme.brandActionBackground)
             Text(viewModel.useProfileNumberText(profilePhone))
               .font(.system(size: 13, weight: .semibold))
-              .foregroundStyle(theme.info)
+              .foregroundStyle(theme.brandActionBackground)
             Spacer()
           }
           .padding(12)
-          .background(theme.info.opacity(0.12))
+          .background(theme.brandActionBackground.opacity(0.12))
           .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -203,7 +195,7 @@ struct TeacherPayoutMethodSheet: View {
 
       Text(viewModel.bitPhoneHint)
         .font(.system(size: 13))
-        .foregroundStyle(theme.secondaryText)
+        .foregroundStyle(theme.brandSecondaryText)
     }
   }
 

@@ -19,16 +19,8 @@ struct ContactSupportPreviewSheet: View {
         AppTheme(colorScheme: colorScheme)
     }
 
+    /// What will be sent, in a brand card, then Send.
     var body: some View {
-        if AppTheme.isBrand {
-            brandSheet
-        } else {
-            standardSheet
-        }
-    }
-
-    /// Instant Teacher's look: what will be sent, in a brand card, then Send.
-    var brandSheet: some View {
         BrandSheet(title: viewModel.previewTitle, closeLabel: viewModel.cancelLabel) {
             guard !isSubmitting else { return }
             onCancel()
@@ -60,52 +52,6 @@ struct ContactSupportPreviewSheet: View {
 
             BrandPrimaryButton(title: viewModel.sendLabel, isLoading: isSubmitting) {
                 onSubmit()
-            }
-        }
-    }
-
-    var standardSheet: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(request.previewRows, id: \.0) { title, value in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(title)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(value)
-                                .font(.body)
-                                .foregroundStyle(.primary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                } header: {
-                    Text(viewModel.contactSupportPreviewSectionTitle)
-                }
-            }
-            .navigationTitle(viewModel.previewTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(viewModel.cancelLabel) {
-                        onCancel()
-                        dismiss()
-                    }
-                    .disabled(isSubmitting)
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        onSubmit()
-                    } label: {
-                        if isSubmitting {
-                            ProgressView()
-                        } else {
-                            Text(viewModel.sendLabel)
-                        }
-                    }
-                    .disabled(isSubmitting)
-                }
             }
         }
     }

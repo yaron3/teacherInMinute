@@ -30,9 +30,9 @@ struct AppDialogAction {
     /// Drives the button's appearance, and nothing else — dismissal is handled
     /// by the dialog for every kind, so `handler` only carries side effects.
     enum Kind {
-        /// Filled accent button. The action the dialog is steering toward.
+        /// Filled cyan button. The action the dialog is steering toward.
         case primary
-        /// Plain text button for backing out.
+        /// Outlined button for backing out.
         case cancel
         /// Filled danger button for irreversible actions.
         case destructive
@@ -75,80 +75,17 @@ struct AppDialogView: View {
         LocalizationSupport.layoutDirection
     }
 
-    /// Text hugs the reading edge, which is what makes Hebrew right-aligned.
-    var textAlignment: HorizontalAlignment {
-        layoutDirection == .rightToLeft ? .trailing : .leading
-    }
-
-    var frameAlignment: Alignment {
-        layoutDirection == .rightToLeft ? .trailing : .leading
-    }
-
     var body: some View {
-        Group {
-            if AppTheme.isBrand {
-                brandDialog
-            } else {
-                standardDialog
-            }
-        }
-        // Pushed down so nested text and controls flip too, not just the
-        // alignments computed above.
-        .environment(\.layoutDirection, layoutDirection)
-        .environment(\.locale, LocalizationSupport.currentLocale)
+        dialog
+            // Pushed down so nested text and controls flip too.
+            .environment(\.layoutDirection, layoutDirection)
+            .environment(\.locale, LocalizationSupport.currentLocale)
     }
 
-    var standardDialog: some View {
-        ZStack {
-            theme.scrim.opacity(0.35)
-                .ignoresSafeArea()
-
-            VStack(alignment: textAlignment, spacing: 14) {
-                Text(title)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(theme.primaryText)
-                    .frame(maxWidth: .infinity, alignment: frameAlignment)
-
-                if let message, !message.isEmpty {
-                    Text(message)
-                        .font(.system(size: 13))
-                        .foregroundStyle(theme.secondaryText)
-                        .frame(maxWidth: .infinity, alignment: frameAlignment)
-                }
-
-                if let secureField {
-                    SecureField(secureField.placeholder, text: secureField.text)
-                        .font(.system(size: 15))
-                        .foregroundStyle(theme.primaryText)
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 12)
-                        .frame(height: 44)
-                        .background(theme.fieldBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(theme.controlBorder, lineWidth: 1)
-                        }
-                }
-
-                VStack(spacing: 10) {
-                    ForEach(0..<actions.count, id: \.self) { index in
-                        actionButton(actions[index])
-                    }
-                }
-                .padding(.top, 2)
-            }
-            .padding(20)
-            .background(theme.screenBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .padding(.horizontal, 32)
-        }
-    }
-
-    /// Instant Teacher's dialogs, in the brand's modal style: a dark card
-    /// over the dimmed screen, its text centred, its choices the brand's
-    /// buttons — as the "not enough minutes" prompt draws them.
-    var brandDialog: some View {
+    /// The brand's modal style: a dark card over the dimmed screen, its text
+    /// centred, its choices the brand's buttons — as the "not enough minutes"
+    /// prompt draws them.
+    var dialog: some View {
         BrandModal {
             BrandModalText(title: title, message: message)
 
@@ -166,14 +103,16 @@ struct AppDialogView: View {
 
             VStack(spacing: 10) {
                 ForEach(0..<actions.count, id: \.self) { index in
-                    brandActionButton(actions[index])
+                    actionButton(actions[index])
                 }
             }
         }
     }
 
-    func brandActionButton(_ action: AppDialogAction) -> some View {
+    func actionButton(_ action: AppDialogAction) -> some View {
         Button {
+            // Dismiss first so a handler that presents something else is not
+            // fighting this dialog for the screen.
             onDismiss()
             action.handler()
         } label: {
@@ -185,41 +124,13 @@ struct AppDialogView: View {
                 .padding(.horizontal, 12)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
-                .background(brandFill(for: action.kind))
+                .background(fill(for: action.kind))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(action.kind == .cancel ? theme.brandActionBackground : Color.clear, lineWidth: 1)
                 }
                 .tappableFrame()
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(action.kind == .cancel ? "dialog_cancel_button" : "dialog_confirm_button")
-    }
-
-    func brandFill(for kind: AppDialogAction.Kind) -> Color {
-        switch kind {
-        case .primary: return theme.brandActionBackground
-        case .destructive: return theme.danger
-        case .cancel: return Color.clear
-        }
-    }
-
-    @ViewBuilder
-    func actionButton(_ action: AppDialogAction) -> some View {
-        Button {
-            // Dismiss first so a handler that presents something else is not
-            // fighting this dialog for the screen.
-            onDismiss()
-            action.handler()
-        } label: {
-            Text(action.title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(foreground(for: action.kind))
-                .frame(maxWidth: .infinity)
-                .frame(height: action.kind == .cancel ? 40 : 46)
-                .background(background(for: action.kind))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         // A dialog draws as an overlay on the screen that raised it, so its
@@ -230,16 +141,9 @@ struct AppDialogView: View {
         .accessibilityIdentifier(action.kind == .cancel ? "dialog_cancel_button" : "dialog_confirm_button")
     }
 
-    func foreground(for kind: AppDialogAction.Kind) -> Color {
+    func fill(for kind: AppDialogAction.Kind) -> Color {
         switch kind {
-        case .primary, .destructive: return theme.onAccentText
-        case .cancel: return theme.secondaryText
-        }
-    }
-
-    func background(for kind: AppDialogAction.Kind) -> Color {
-        switch kind {
-        case .primary: return theme.accent
+        case .primary: return theme.brandActionBackground
         case .destructive: return theme.danger
         case .cancel: return Color.clear
         }

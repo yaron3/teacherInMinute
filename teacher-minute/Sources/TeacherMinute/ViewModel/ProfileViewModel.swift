@@ -382,9 +382,9 @@ final class ProfileViewModel {
         }
     }
 
-    // A permission's switch in Instant Teacher's profile. Off, it asks for the
-    // permission, or sends the student to Settings once the system will no
-    // longer ask; on, it opens Settings, the only place to take one back.
+    // A permission's switch on the profile. Off, it asks for the permission,
+    // or sends the user to Settings once the system will no longer ask; on,
+    // it opens Settings, the only place to take one back.
 
     func microphoneToggleTapped() {
         if microphoneState.isGranted {

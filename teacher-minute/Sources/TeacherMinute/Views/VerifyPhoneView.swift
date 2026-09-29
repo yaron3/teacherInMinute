@@ -122,7 +122,7 @@ struct VerifyPhoneView: View {
             .padding(.bottom, 42)
         }
         .padding(.horizontal, 18)
-        .background(theme.screenBackground)
+        .screenGround()
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen(AnalyticsScreen.verifyPhone)
         .onAppear {

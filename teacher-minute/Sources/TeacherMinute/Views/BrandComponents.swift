@@ -359,17 +359,10 @@ struct BrandSecondaryButton: View {
 }
 
 extension View {
-  /// The ground a full screen stands on: the brand's gradient in Instant
-  /// Teacher, the screen's own colour in Pro Teacher — the system
-  /// background unless it says otherwise.
-  func screenGround(_ standard: Color = Color(.systemBackground)) -> some View {
+  /// The ground a full screen stands on: the brand's gradient.
+  func screenGround() -> some View {
     background {
-      if AppTheme.isBrand {
-        BrandScreenBackground()
-      } else {
-        standard
-          .ignoresSafeArea()
-      }
+      BrandScreenBackground()
     }
   }
 

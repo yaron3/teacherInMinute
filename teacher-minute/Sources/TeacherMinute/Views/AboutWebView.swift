@@ -13,9 +13,8 @@ import WebKit
 struct AboutWebView: View {
     let url: URL
     let title: String
-    /// The back button's name, for Instant Teacher's header.
+    /// The back button's name, for the header.
     let backLabel: String
-    @Environment(\.colorScheme) private var colorScheme
 
     init(url: URL, title: String = "About", backLabel: String = "") {
         self.url = url
@@ -23,23 +22,14 @@ struct AboutWebView: View {
         self.backLabel = backLabel
     }
 
+    /// The brand's header over the page, which is its own document: set on
+    /// white, as it is written to be read.
     var body: some View {
-        if AppTheme.isBrand {
-            // Instant Teacher's header over the page, which is its own
-            // document: set on white, as it is written to be read.
-            BrandSubpage(label: "", title: title, backLabel: backLabel, scrolls: false) {
-                WebContentView(url: url, colorScheme: .light)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .padding(.bottom, 20)
-                    .trackScreen(AnalyticsScreen.about)
-            }
-        } else {
-            WebContentView(url: url, colorScheme: colorScheme)
-                .background(Color(.systemBackground))
-                .ignoresSafeArea(edges: .bottom)
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
+        BrandSubpage(label: "", title: title, backLabel: backLabel, scrolls: false) {
+            WebContentView(url: url, colorScheme: .light)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .padding(.bottom, 20)
                 .trackScreen(AnalyticsScreen.about)
         }
     }
@@ -81,25 +71,17 @@ struct AboutWebView: View {
     }
 
     var body: some View {
-        if AppTheme.isBrand {
-            BrandSubpage(label: "", title: title, backLabel: backLabel) {
-                Link(destination: url) {
-                    Text("Open \(title)")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(theme.brandBackgroundTop)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(theme.brandActionBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .trackScreen(AnalyticsScreen.about)
+        BrandSubpage(label: "", title: title, backLabel: backLabel) {
+            Link(destination: url) {
+                Text("Open \(title)")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(theme.brandBackgroundTop)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(theme.brandActionBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-        } else {
-            Link("Open \(title)", destination: url)
-                .font(.system(size: 16, weight: .semibold))
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .trackScreen(AnalyticsScreen.about)
+            .trackScreen(AnalyticsScreen.about)
         }
     }
 }

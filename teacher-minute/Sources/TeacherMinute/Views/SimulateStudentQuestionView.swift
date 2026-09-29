@@ -63,7 +63,7 @@ struct SimulateStudentQuestionView: View {
       .padding(.horizontal, 20)
       .padding(.vertical, 24)
     }
-    .background(theme.screenBackground)
+    .screenGround()
   }
 
   // MARK: - Sections

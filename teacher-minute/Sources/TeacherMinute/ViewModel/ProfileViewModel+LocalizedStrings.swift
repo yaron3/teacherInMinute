@@ -70,7 +70,7 @@ extension ProfileViewModel {
     /// the placeholder `name` never flashes there.
     var menuDisplayName: String { isProfileLoaded ? name : "" }
 
-    /// The name on Instant Teacher's profile: blank until the profile loads,
+    /// The name on the profile: blank until the profile loads,
     /// then the user's name, or their role, translated, while they have none.
     var profileDisplayName: String {
         guard isProfileLoaded else { return "" }

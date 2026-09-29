@@ -17,12 +17,6 @@ import SwiftUI
 struct AppTheme {
     let colorScheme: ColorScheme
 
-    /// Whether this is Instant Teacher, which wears the brand design on every
-    /// screen: it runs dark (see `TeacherMinuteApp`), and the general tokens
-    /// below that the dark scheme alone would not bring to the brand take the
-    /// brand's colours instead. Pro Teacher keeps the adaptive palette.
-    static let isBrand = AuthRole.appRole == .student
-
     // MARK: - Helpers
 
     func adaptive(light: (Double, Double, Double), dark: (Double, Double, Double)) -> Color {
@@ -50,13 +44,7 @@ struct AppTheme {
     }
 
     /// Captions, secondary labels, placeholder icons.
-    var secondaryText: Color {
-        if Self.isBrand { return brandSecondaryText }
-        return adaptive(
-            light: (110, 110, 110),
-            dark: (160, 160, 160)
-        )
-    }
+    var secondaryText: Color { brandSecondaryText }
 
     /// Text drawn on a `primaryText` fill.
     var invertedText: Color {
@@ -121,22 +109,10 @@ struct AppTheme {
     }
 
     /// Cards, tiles and grouped panels sitting on `screenBackground`.
-    var cardBackground: Color {
-        if Self.isBrand { return brandPanelBackground }
-        return adaptive(
-            light: (242, 242, 244),
-            dark: (45, 45, 42)
-        )
-    }
+    var cardBackground: Color { brandPanelBackground }
 
     /// Text fields, search bars and other editable controls.
-    var fieldBackground: Color {
-        if Self.isBrand { return brandBackgroundTop }
-        return adaptive(
-            light: (242, 242, 244),
-            dark: (35, 35, 38)
-        )
-    }
+    var fieldBackground: Color { brandBackgroundTop }
 
     /// Dimming layer behind a modal or full-screen overlay. Always used with an
     /// opacity, and black in both schemes — it darkens, it never tints.
@@ -167,13 +143,7 @@ struct AppTheme {
     // MARK: - Accent
 
     /// Primary action fill, selected state, highlight.
-    var accent: Color {
-        if Self.isBrand { return brandActionBackground }
-        return adaptive(
-            light: (47, 53, 255),
-            dark: (100, 200, 255)
-        )
-    }
+    var accent: Color { brandActionBackground }
 
     /// Deeper accent for pressed/selected fills and accent gradients.
     var accentStrong: Color {
@@ -187,18 +157,16 @@ struct AppTheme {
     /// and icon tiles that must stay legible behind `accent` content.
     var accentBackground: Color {
         // The brand's cyan at 12% over its dark ground.
-        if Self.isBrand { return rgb((23, 41, 45)) }
-        return adaptive(
-            light: (238, 236, 255),
-            dark: (38, 34, 74)
-        )
+        rgb((23, 41, 45))
     }
 
     // MARK: - Brand
 
-    // The brand screens — the launch splash, the intro a signed-out student
-    // meets first, and the student's home — are drawn dark in both schemes:
-    // their art is made for a dark ground. Headlines on them take `onDarkFill`.
+    // Both apps are drawn on the brand's dark ground, whatever the system's
+    // appearance (see `TeacherMinuteApp`): its art is made for it. The general
+    // tokens above that dark alone would not bring to the brand — secondary
+    // text, cards, fields, the accent, rules and borders — are its colours.
+    // Headlines on it take `onDarkFill`.
 
     /// Top of the brand background gradient.
     var brandBackgroundTop: Color {
@@ -347,22 +315,10 @@ struct AppTheme {
     // MARK: - Lines & controls
 
     /// Hairline rule between rows and sections.
-    var separator: Color {
-        if Self.isBrand { return brandControlBorder }
-        return adaptive(
-            light: (228, 228, 231),
-            dark: (58, 58, 62)
-        )
-    }
+    var separator: Color { brandControlBorder }
 
     /// Outline around fields, chips and outlined tiles.
-    var controlBorder: Color {
-        if Self.isBrand { return brandControlBorder }
-        return adaptive(
-            light: (228, 228, 231),
-            dark: (85, 85, 88)
-        )
-    }
+    var controlBorder: Color { brandControlBorder }
 
     /// Fill for a control that is present but not actionable yet — a send
     /// button with nothing to send, a disabled toolbar item.

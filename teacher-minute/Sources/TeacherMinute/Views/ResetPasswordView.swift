@@ -61,7 +61,7 @@ struct ResetPasswordView: View {
             .padding(.bottom, 34)
         }
         .padding(.horizontal, 18)
-        .background(theme.screenBackground)
+        .screenGround()
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen(AnalyticsScreen.resetPassword)
     }

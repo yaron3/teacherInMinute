@@ -15,31 +15,23 @@ struct AboutSettingsView: View {
     }
     var body: some View {
         ZStack {
-            if AppTheme.isBrand {
-                // Instant Teacher's look. The EULA's address is fetched before
-                // it opens, so the page shows it is working meanwhile.
-                BrandSubpage(
-                    label: viewModel.settingsTitle,
-                    title: viewModel.settingsPageTitle(SettingsDestination.about.title),
-                    backLabel: viewModel.backLabel
-                ) {
-                    BrandPageHero(title: SettingsDestination.about.title)
-                    BrandSettingsRows(rows: viewModel.aboutSection.rows) { row in
-                        viewModel.select(row)
-                    }
+            BrandSubpage(
+                label: viewModel.settingsTitle,
+                title: viewModel.settingsPageTitle(SettingsDestination.about.title),
+                backLabel: viewModel.backLabel
+            ) {
+                BrandPageHero(title: SettingsDestination.about.title)
+                BrandSettingsRows(rows: viewModel.aboutSection.rows) { row in
+                    viewModel.select(row)
                 }
-                if viewModel.isLoading {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .scaleEffect(1.4)
-                        .tint(theme.onDarkFill)
-                }
-            } else {
-                List {
-                    SettingsSectionView(section: viewModel.aboutSection) { row in
-                        viewModel.select(row)
-                    }
-                }
+            }
+            // The EULA's address is fetched before it opens, so the page shows
+            // it is working meanwhile.
+            if viewModel.isLoading {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .scaleEffect(1.4)
+                    .tint(theme.onDarkFill)
             }
         }
         // A page pushed over Settings covers the dialog Settings raises, so
@@ -54,7 +46,7 @@ struct AboutSettingsView: View {
 
     var isShowingAlert: Binding<Bool> {
         Binding {
-            AppTheme.isBrand && viewModel.showAlert
+            viewModel.showAlert
         } set: { isPresented in
             viewModel.showAlert = isPresented
         }

@@ -36,35 +36,20 @@ struct MainTabView: View {
   
   var body: some View {
 	// The stack exists for the teacher's live session, which is pushed rather
-	// than laid over the sections. Its bar stays hidden for the sections that
-	// draw their own header. Settings and Help have none: their own stacks sit
-	// directly inside this one, so their titles and menu buttons come through
-	// this bar.
+	// than laid over the sections. Its bar stays hidden: every section draws
+	// its own header.
 	ZStack {
 	  NavigationStack {
 		tabLayers
-		  .toolbar(showsNavigationBar ? .visible : .hidden, for: .navigationBar)
+		  .toolbar(.hidden, for: .navigationBar)
 		  .navigationDestination(isPresented: isTeacherInLiveSession) {
 			teacherSessionScreen
 		  }
 	  }
-	  .blurredUnderMenu(viewModel.userMode == .student && viewModel.isSideMenuOpen)
+	  .blurredUnderMenu(viewModel.isSideMenuOpen)
 
-	  // Outside the stack so it covers the navigation bar Settings shows.
 	  sideMenu
 	}
-	.appDialog(
-	  viewModel.logOutLabel,
-	  isPresented: $viewModel.isConfirmingLogOut,
-	  message: viewModel.logOutConfirmMessage,
-	  actions: [
-		AppDialogAction(viewModel.cancelLabel, kind: .cancel),
-		AppDialogAction(viewModel.logOutConfirmLabel, kind: .destructive) {
-		  viewModel.logOut()
-		  router.signOut()
-		}
-	  ]
-	)
 	.appDialog(
 	  teacherDashboardViewModel?.studentCancelledTitle ?? "",
 	  isPresented: isStudentCancelledDialogPresented,
@@ -73,18 +58,10 @@ struct MainTabView: View {
 	)
   }
 
-  /// Instant Teacher's menu is the brand design's; Pro Teacher keeps its own.
-  @ViewBuilder
   var sideMenu: some View {
-	if viewModel.userMode == .student {
-	  BrandSideMenuView(viewModel: viewModel, profile: profileViewModel) {
-		viewModel.closeSideMenu()
-		router.startLogin()
-	  }
-	} else {
-	  SideMenuView(viewModel: viewModel, profile: profileViewModel) {
-		viewModel.logOutTapped()
-	  }
+	BrandSideMenuView(viewModel: viewModel, profile: profileViewModel) {
+	  viewModel.closeSideMenu()
+	  router.startLogin()
 	}
   }
 
@@ -114,9 +91,10 @@ struct MainTabView: View {
 	}
   }
 
-  /// Only the selected section is on screen; the side menu switches between
-  /// them. Each section places `SideMenuButton` in its own header, and the
-  /// button finds its action through the environment.
+  /// Only the selected section is on screen; the side menu and the tab bar
+  /// switch between them. Each section places `BrandMenuButton` in its own
+  /// header, and the button and the bar find their actions through the
+  /// environment.
   var tabLayers: some View {
 	ZStack {
 	  tabContent(viewModel.selectedTab)
@@ -127,7 +105,7 @@ struct MainTabView: View {
 		.id(viewModel.selectedTab)
 		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
 		.environment(\.sideMenuAction, sideMenuAction)
-		.environment(\.studentTabBarAction, studentTabBarAction)
+		.environment(\.tabBarAction, tabBarAction)
 
 	  teacherGlobalOverlay
 	}
@@ -138,7 +116,7 @@ struct MainTabView: View {
 	  // An arriving question or a starting lesson takes the whole screen.
 	  if isVisible { viewModel.closeSideMenu() }
 	}
-	.background(Color(.systemBackground))
+	.background { BrandScreenBackground() }
 	.navigationBarBackButtonHidden(true)
 	.task {
 	  print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
@@ -165,18 +143,6 @@ struct MainTabView: View {
 	}
   }
 
-  var showsNavigationBar: Bool {
-#if os(Android)
-	// Settings and Help draw their own header on Android; see
-	// SideMenuSectionHeader.
-	false
-#else
-	// A student's Settings and Help draw their own header, in Instant
-	// Teacher's look.
-	viewModel.userMode == .teacher && (viewModel.selectedTab == .settings || viewModel.selectedTab == .help)
-#endif
-  }
-
   var sideMenuAction: SideMenuAction {
 	SideMenuAction(
 	  accessibilityLabel: viewModel.openMenuLabel,
@@ -185,12 +151,12 @@ struct MainTabView: View {
 	)
   }
 
-  /// The tabs along the bottom of a student's sections, Home aside.
-  var studentTabBarAction: StudentTabBarAction? {
-	guard viewModel.userMode == .student else { return nil }
-	return StudentTabBarAction(
-	  items: viewModel.studentTabItems,
-	  selected: viewModel.selectedStudentTab,
+  /// The tabs along the bottom of the sections.
+  var tabBarAction: TabBarAction {
+	TabBarAction(
+	  items: viewModel.tabItems,
+	  selected: viewModel.selectedTabItem,
+	  badged: Set(viewModel.tabItems.filter { viewModel.showsBadge($0) }),
 	  select: { item in viewModel.select(item) }
 	)
   }
@@ -227,21 +193,14 @@ struct MainTabView: View {
 		TeacherEarningsView()
 
 	  case .profile:
-		if viewModel.userMode == .student {
-		  StudentProfileView(viewModel: profileViewModel)
-			.trackScreen(AnalyticsScreen.profile)
-		} else {
-		  ProfileView(viewModel: profileViewModel)
-			.trackScreen(AnalyticsScreen.profile)
-		}
-		
+		ProfileView(viewModel: profileViewModel)
+		  .trackScreen(AnalyticsScreen.profile)
+
 	  case .settings:
 		SettingsView(role: viewModel.userMode, viewModel: nil)
 		  .trackScreen(AnalyticsScreen.settings)
 
 	  case .help:
-		// In Instant Teacher, drawn as the student's other sections are, tab
-		// bar and all.
 		HelpSupportView(role: viewModel.userMode)
 	}
   }
@@ -332,7 +291,7 @@ struct TeacherLiveSessionScreen: View {
 }
 
 extension View {
-  /// Blurs what an open brand menu covers, as the design's scrim does: SwiftUI
+  /// Blurs what an open menu covers, as the design's scrim does: SwiftUI
   /// has no backdrop blur, so the content under the scrim is blurred itself.
   /// On iOS the blur animates with the menu alone, not with the section a
   /// menu tap swaps in at the same moment. Android blurs from API 31.

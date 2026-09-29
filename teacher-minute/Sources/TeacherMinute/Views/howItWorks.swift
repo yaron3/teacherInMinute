@@ -12,17 +12,17 @@ struct HowItWorksPanel: View {
   let steps: [HowItWorksStep]
   let theme: AppTheme
 
-  /// Accent per position. Every panel walks this same sequence and the
-  /// shorter ones stop early, so the student's four steps and the teacher's
-  /// three stay in step with each other.
+  /// Accent per position, from the brand's palette. Every panel walks this
+  /// same sequence and the shorter ones stop early, so the student's four
+  /// steps and the teacher's three stay in step with each other.
   private var tints: [Color] {
-    [theme.info, theme.warning, theme.penGreen, theme.positive]
+    [theme.brandActionBackground, theme.brandSuccess, theme.brandOptionBorder, theme.warning]
   }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 22) {
       Text(title)
-        .font(.system(size: 24, weight: .bold))
+        .font(.system(size: 20, weight: .bold))
         .foregroundStyle(theme.onDarkFill)
         .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -32,9 +32,7 @@ struct HowItWorksPanel: View {
         }
       }
     }
-    .padding(22)
-    .background(theme.accentStrong)
-    .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
+    .brandCard(padding: 22)
   }
 
   private func howItWorksStep(_ step: HowItWorksStep, number: Int, tint: Color) -> some View {
@@ -57,7 +55,7 @@ struct HowItWorksPanel: View {
 
         Text(step.subtitle)
           .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(theme.onDarkFill.opacity(0.6))
+          .foregroundStyle(theme.brandSecondaryText)
           .lineLimit(2)
           .minimumScaleFactor(0.82)
       }
