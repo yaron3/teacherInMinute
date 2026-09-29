@@ -3,7 +3,8 @@ import SwiftUI
 extension View {
   /// The icons the status and navigation bars draw over this screen: dark
   /// ones over a light ground, light ones over a dark one. When the screen
-  /// goes, the bars follow the app's colour scheme again.
+  /// goes, so does its request: the screen under it decides again, or else
+  /// the app's colour scheme.
   ///
   /// Android only. iOS already reads the screen under its status bar and
   /// home indicator.

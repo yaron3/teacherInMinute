@@ -20,6 +20,12 @@ enum QuestionHomeMode: Hashable {
   case text
 }
 
+/// Where the not-enough-minutes prompt sends the student.
+enum NotEnoughMinutesNextStep {
+  case createAccount
+  case buyMinutes
+}
+
 /// Where an attached photo came from, for analytics.
 enum QuestionPhotoSource: String {
   case camera
@@ -65,6 +71,80 @@ extension StudentHomeViewModeling {
     availableTeacherCount == 1
       ? LocalizationSupport.localized("teacher\nonline")
       : LocalizationSupport.localized("teachers\nonline")
+  }
+
+  // MARK: Question home — not enough minutes
+
+  var notEnoughMinutesTitle: String { LocalizationSupport.localized("Not enough minutes") }
+  var currentBalanceLabel: String { LocalizationSupport.localized("Current balance") }
+  var createAccountForMinutesLabel: String { LocalizationSupport.localized("Create a user account") }
+  var buyMinutesLabel: String { LocalizationSupport.localized("Buy minutes") }
+
+  /// A student who started without an account. Minutes come with one: a
+  /// verified address earns the welcome reward (functions/src/emailRewards.ts).
+  var isAnonymousAccount: Bool {
+    Auth.auth().currentUser?.isAnonymous == true
+  }
+
+  /// The free minutes a verified account earns, as the backend reads them:
+  /// the Remote Config value when it has a usable one, 30 when it has none.
+  var signUpRewardMinutes: Int {
+    let configured = RemoteConfigService.readString("email_reward_student_minutes")
+    guard let minutes = Double(configured), minutes.isFinite else { return 30 }
+    return max(0, Int(minutes))
+  }
+
+  /// Why the question cannot go out, and what would let it: an account for a
+  /// student who has none — with its free minutes, while there are any on
+  /// offer — or more minutes for one who has.
+  var notEnoughMinutesMessage: String {
+    guard isAnonymousAccount else {
+      return LocalizationSupport.localized("Load more minutes to send your question to a teacher.")
+    }
+    let reward = signUpRewardMinutes
+    guard reward > 0 else {
+      return LocalizationSupport.localized("Sign up to send your question to a teacher.")
+    }
+    return String(
+      format: LocalizationSupport.localized("Create an account to send your question to a teacher, and get %d free minutes."),
+      reward
+    )
+  }
+
+  var currentBalanceText: String {
+    remainingMinutes == 1
+      ? LocalizationSupport.localized("1 minute")
+      : String(format: LocalizationSupport.localized("%d minutes"), max(0, remainingMinutes))
+  }
+
+  var notEnoughMinutesPrimaryLabel: String {
+    isAnonymousAccount ? createAccountForMinutesLabel : buyMinutesLabel
+  }
+
+  /// What the prompt's main button leads to, logged as it is taken.
+  func notEnoughMinutesPrimaryTapped() -> NotEnoughMinutesNextStep {
+    let step: NotEnoughMinutesNextStep = isAnonymousAccount ? .createAccount : .buyMinutes
+    logNotEnoughMinutesAction(step == .createAccount ? "sign_up" : "buy")
+    return step
+  }
+
+  func notEnoughMinutesDismissed() {
+    logNotEnoughMinutesAction("dismiss")
+  }
+
+  func logNotEnoughMinutesShown() {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.notEnoughMinutesShown, parameters: [
+      "is_anonymous": isAnonymousAccount ? 1 : 0,
+      "remaining_minutes": remainingMinutes
+    ])
+  }
+
+  /// `action` is "sign_up", "buy" or "dismiss".
+  func logNotEnoughMinutesAction(_ action: String) {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.notEnoughMinutesAction, parameters: [
+      "action": action,
+      "is_anonymous": isAnonymousAccount ? 1 : 0
+    ])
   }
 
   // MARK: Question home — asking

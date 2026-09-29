@@ -54,6 +54,8 @@ enum AnalyticsEvent {
     static let askTeacherFailed    = "ask_teacher_failed"
     static let questionPhotoAttached = "question_photo_attached"
     static let questionPhotoFailed   = "question_photo_failed"
+    static let notEnoughMinutesShown = "not_enough_minutes_shown"
+    static let notEnoughMinutesAction = "not_enough_minutes_action"
     static let lessonTapped        = "lesson_tapped"
     static let lessonTappedWithDetails = "lesson_tapped_with_details"
     static let permissionStateOnAskTeacher = "permission_state_on_ask_teacher"

@@ -5865,6 +5865,94 @@
       },
       "valueType": "STRING"
     },
+    "not_enough_minutes": {
+      "defaultValue": {
+        "value": "Not enough minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין מספיק דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "create_account_send": {
+      "defaultValue": {
+        "value": "Create an account to send your question to a teacher, and get %d free minutes."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כדי לשלוח את השאלה למורה הרשם לאפליקציה ותקבל %d דקות בחינם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "sign_send_your": {
+      "defaultValue": {
+        "value": "Sign up to send your question to a teacher."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כדי לשלוח את השאלה למורה הרשם לאפליקציה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "load_more_minutes": {
+      "defaultValue": {
+        "value": "Load more minutes to send your question to a teacher."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כדי לשלוח את השאלה למורה צריך לטעון דקות נוספות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "current_balance": {
+      "defaultValue": {
+        "value": "Current balance"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "היתרה הנוכחית"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "create_user_account": {
+      "defaultValue": {
+        "value": "Create a user account"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ליצירת חשבון משתמש"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "buy_minutes": {
+      "defaultValue": {
+        "value": "Buy minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לקניית דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "minute": {
+      "defaultValue": {
+        "value": "1 minute"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "דקה אחת"
+        }
+      },
+      "valueType": "STRING"
+    },
     "please_enter_valid": {
       "defaultValue": {
         "value": "Please enter a valid email address."

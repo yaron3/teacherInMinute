@@ -1,6 +1,6 @@
 package teacher.minute
 
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 
 /**
  * The icons the status and navigation bars draw (`SystemBarIcons.swift`).
@@ -13,22 +13,30 @@ object AndroidSystemBars {
     /** A screen's request: dark icons, or light ones, for each bar. */
     internal data class Request(val owner: String, val darkStatusBar: Boolean, val darkNavigationBar: Boolean)
 
-    /** The latest request; null follows the theme. */
-    internal val request = mutableStateOf<Request?>(null)
+    /**
+     * Every screen on show that asked, oldest first; the newest decides. A
+     * modal asks on top of the screen under it, and when it goes, that
+     * screen's request applies again.
+     */
+    internal val requests = mutableStateListOf<Request>()
 
     @JvmStatic
     fun setDarkIcons(owner: String, statusBar: Boolean, navigationBar: Boolean) {
-        request.value = Request(owner, statusBar, navigationBar)
+        val request = Request(owner, statusBar, navigationBar)
+        val index = requests.indexOfFirst { it.owner == owner }
+        if (index >= 0) {
+            requests[index] = request
+        } else {
+            requests.add(request)
+        }
     }
 
     /**
-     * Only the screen that made the request can withdraw it: the next screen
-     * can appear before the last one has gone, and asked for its own already.
+     * Withdraws only this screen's request: the next screen can appear before
+     * the last one has gone, and has asked for its own already.
      */
     @JvmStatic
     fun followTheme(owner: String) {
-        if (request.value?.owner == owner) {
-            request.value = null
-        }
+        requests.removeAll { it.owner == owner }
     }
 }

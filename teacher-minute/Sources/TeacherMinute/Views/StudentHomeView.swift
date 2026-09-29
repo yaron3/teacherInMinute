@@ -24,6 +24,7 @@ struct StudentHomeView: View {
   @State var isChoosingMinutesPackage = false
   @State var emailReward = EmailRewardViewModel()
   @Environment(\.openURL) var openURL
+  @Environment(\.appRouter) var router
   @Environment(\.scenePhase) var scenePhase
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
@@ -167,6 +168,11 @@ struct StudentHomeView: View {
 	  checkoutPreparingOverlay
 		.zIndex(5)
 
+	  if showingLowBalanceAlert {
+		notEnoughMinutesPrompt
+		  .zIndex(8)
+	  }
+
 #if os(Android)
 	  if let result = viewModel.paymentReturnResult {
 		paymentReturnOverlay(result)
@@ -175,12 +181,6 @@ struct StudentHomeView: View {
 	  }
 #endif
 	}
-	.appDialog(
-	  viewModel.lowBalanceAlertTitle,
-	  isPresented: $showingLowBalanceAlert,
-	  message: viewModel.lowBalanceMessage,
-	  actions: [AppDialogAction(viewModel.okLabel)]
-	)
 	.emailRewardDialogs(emailReward)
 	.appDialog(
 	  viewModel.balanceLoadingTitle,
@@ -413,6 +413,27 @@ struct StudentHomeView: View {
       return false
     }
     return true
+  }
+
+  /// Out of minutes: an anonymous student is offered an account, which
+  /// brings free minutes with it; anyone else, the packages.
+  var notEnoughMinutesPrompt: some View {
+	NotEnoughMinutesPrompt(
+	  viewModel: viewModel,
+	  onPrimary: {
+		showingLowBalanceAlert = false
+		switch viewModel.notEnoughMinutesPrimaryTapped() {
+		case .createAccount:
+		  router.startRegistration()
+		case .buyMinutes:
+		  loadMinutesTapped()
+		}
+	  },
+	  onDismiss: {
+		viewModel.notEnoughMinutesDismissed()
+		showingLowBalanceAlert = false
+	  }
+	)
   }
 
   /// "Load minutes": the payment options are settled first behind the

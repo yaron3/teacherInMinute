@@ -278,6 +278,31 @@ struct AppTheme {
         )
     }
 
+    /// The dimmed screen behind a modal on a brand screen.
+    var brandScrim: Color {
+        adaptive(
+            light: (5, 5, 11),
+            dark: (5, 5, 11)
+        )
+        .opacity(0.8)
+    }
+
+    /// A modal card on a brand screen.
+    var brandModalBackground: Color {
+        adaptive(
+            light: (23, 22, 37),
+            dark: (23, 22, 37)
+        )
+    }
+
+    /// A box set into `brandModalBackground` — a figure the modal quotes.
+    var brandModalInset: Color {
+        adaptive(
+            light: (40, 38, 61),
+            dark: (40, 38, 61)
+        )
+    }
+
     // MARK: - Lines & controls
 
     /// Hairline rule between rows and sections.
@@ -592,7 +617,10 @@ private struct AppThemePreviewView: View {
                     ("brandCardBorder", theme.brandCardBorder),
                     ("brandControlBorder", theme.brandControlBorder),
                     ("brandPanelBackground", theme.brandPanelBackground),
-                    ("brandPanelDot", theme.brandPanelDot)
+                    ("brandPanelDot", theme.brandPanelDot),
+                    ("brandScrim", theme.brandScrim),
+                    ("brandModalBackground", theme.brandModalBackground),
+                    ("brandModalInset", theme.brandModalInset)
                 ])
 
                 section("Lines & controls", swatches: [

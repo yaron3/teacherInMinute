@@ -295,7 +295,7 @@ internal fun SyncSystemBarsWithTheme() {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     // A screen drawn dark in both schemes asks for its own icons; see
     // AndroidSystemBars.
-    val requested = AndroidSystemBars.request.value
+    val requested = AndroidSystemBars.requests.lastOrNull()
     val darkStatusIcons = requested?.darkStatusBar ?: !dark
     val darkNavigationIcons = requested?.darkNavigationBar ?: !dark
 
