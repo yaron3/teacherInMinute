@@ -125,8 +125,11 @@ struct UserProfileSummary {
     return nil
   }
   
+  /// The user's name, or their role while they have none: a student who
+  /// started without an account has no name until they make one.
   var displayName: String {
-	fullName.isEmpty ? LocalizationSupport.localized("Teacher") : fullName
+	guard fullName.isEmpty else { return fullName }
+	return role == .teacher ? LocalizationSupport.localized("Teacher") : LocalizationSupport.localized("Student")
   }
   
   /// How the user is introduced. A teacher is named by the subjects they

@@ -43,6 +43,9 @@ final class ProfileViewModel {
     var roleType: AuthRole
     var isLoading = false
     var isProfileLoaded = false
+    /// Whether the user has a name of their own. A student who started
+    /// without an account has none, and `name` holds their role instead.
+    var hasFullName = false
     var isEditing = false
     var isUploadingPhoto = false
     var errorMessage: String?
@@ -379,6 +382,61 @@ final class ProfileViewModel {
         }
     }
 
+    // A permission's switch in Instant Teacher's profile. Off, it asks for the
+    // permission, or sends the student to Settings once the system will no
+    // longer ask; on, it opens Settings, the only place to take one back.
+
+    func microphoneToggleTapped() {
+        if microphoneState.isGranted {
+            PermissionService.shared.openAppSettings()
+        } else {
+            requestMicrophonePermission()
+        }
+    }
+
+    func cameraToggleTapped() {
+        if cameraState.isGranted {
+            PermissionService.shared.openAppSettings()
+        } else {
+            requestCameraPermission()
+        }
+    }
+
+    /// Re-reads the permissions, which the student may have changed in
+    /// Settings while the app was in the background.
+    func refreshPermissionStates() async {
+        await refreshPermissions()
+    }
+
+#if os(Android)
+    /// Takes a new profile photo with the camera, or picks one from the
+    /// gallery, and uploads it.
+    func pickProfilePhoto(fromCamera: Bool) {
+        Task {
+            do {
+                if fromCamera {
+                    let state = await PermissionService.shared.resolveCapturePermission(for: .camera)
+                    cameraState = state
+                    guard state.isGranted else {
+                        errorMessage = cameraAccessRequiredMessage
+                        return
+                    }
+                }
+                let base64 = try await Task.detached(priority: .userInitiated) {
+                    if fromCamera {
+                        return try AndroidProfileImagePickerBridge.captureImageBase64()
+                    }
+                    return try AndroidProfileImagePickerBridge.pickImageBase64()
+                }.value
+                guard !base64.isEmpty, let data = Data(base64Encoded: base64) else { return }
+                uploadProfileImage(data: data)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+#endif
+
     func editGradeLevels() {
         editProfile()
     }
@@ -478,6 +536,7 @@ final class ProfileViewModel {
 
     private func apply(_ profile: UserProfileSummary) {
         name = profile.fullName.isEmpty ? (profile.role == .teacher ? "Teacher" : "Student") : profile.fullName
+        hasFullName = !profile.fullName.isEmpty
         role = profile.roleLabel
         memberSince = profile.memberSinceText
         email = profile.email
@@ -501,7 +560,9 @@ final class ProfileViewModel {
 
     private func rebuildContactRows() {
         var rows = [
-            Parameter(description: LocalizationSupport.localized("Full Name"), value: name, image: "person.fill"),
+            // Empty rather than the role standing in for a missing name, so the
+            // form asks for one instead of offering "Student" as a name.
+            Parameter(description: LocalizationSupport.localized("Full Name"), value: hasFullName ? name : "", image: "person.fill"),
             Parameter(description: LocalizationSupport.localized("Email"), value: email, image: "envelope.fill"),
             Parameter(description: LocalizationSupport.localized("Phone"), value: phoneNumber, image: "phone.fill")
         ]
@@ -520,6 +581,7 @@ final class ProfileViewModel {
             let description = row.description
             if description == "Full Name" || description == LocalizationSupport.localized("Full Name") {
                 name = value
+                hasFullName = !value.isEmpty
             } else if description == "Email" || description == LocalizationSupport.localized("Email") {
                 email = value
             } else if description == "Phone" || description == LocalizationSupport.localized("Phone") {

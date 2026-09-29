@@ -324,6 +324,14 @@ struct AppTheme {
         )
     }
 
+    /// The outline of an option not chosen, in a row of brand options.
+    var brandOptionBorder: Color {
+        adaptive(
+            light: (199, 197, 241),
+            dark: (199, 197, 241)
+        )
+    }
+
     // MARK: - Lines & controls
 
     /// Hairline rule between rows and sections.
@@ -644,7 +652,8 @@ private struct AppThemePreviewView: View {
                     ("brandModalInset", theme.brandModalInset),
                     ("brandCardSurface", theme.brandCardSurface),
                     ("brandDivider", theme.brandDivider),
-                    ("brandSuccess", theme.brandSuccess)
+                    ("brandSuccess", theme.brandSuccess),
+                    ("brandOptionBorder", theme.brandOptionBorder)
                 ])
 
                 section("Lines & controls", swatches: [

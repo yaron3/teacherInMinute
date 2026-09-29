@@ -111,6 +111,18 @@ extension SettingsViewModeling {
         LocalizationSupport.localized("Allow incoming messages from a teacher while not in a call")
     }
 
+    // MARK: Instant Teacher's settings
+    var settingsSubtitle: String {
+        LocalizationSupport.localized("Manage payments, preferences, notifications and device settings.")
+    }
+    var preferencesTitle: String { LocalizationSupport.localized("Preferences") }
+    var preferencesHeaderTitle: String { LocalizationSupport.localized("Settings: Preferences") }
+    var notificationsHeaderTitle: String { LocalizationSupport.localized("Settings: Notifications") }
+    var notificationsSubtitle: String {
+        LocalizationSupport.localized("Manage push notifications, system notifications and more settings.")
+    }
+    var backLabel: String { LocalizationSupport.localized("Back") }
+
     // MARK: Language
     var languageSectionTitle: String { LocalizationSupport.localized("Language") }
     var systemLanguageTitle: String { LocalizationSupport.localized("System Language") }

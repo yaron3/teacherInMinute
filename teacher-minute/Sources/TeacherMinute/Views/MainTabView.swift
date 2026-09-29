@@ -122,6 +122,7 @@ struct MainTabView: View {
 	  tabContent(viewModel.selectedTab)
 		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
 		.environment(\.sideMenuAction, sideMenuAction)
+		.environment(\.studentTabBarAction, studentTabBarAction)
 
 	  teacherGlobalOverlay
 	}
@@ -165,7 +166,9 @@ struct MainTabView: View {
 	// SideMenuSectionHeader.
 	false
 #else
-	viewModel.selectedTab == .settings || viewModel.selectedTab == .help
+	// A student's Settings draws its own header, as Instant Teacher's design
+	// has it.
+	(viewModel.selectedTab == .settings && viewModel.userMode == .teacher) || viewModel.selectedTab == .help
 #endif
   }
 
@@ -174,6 +177,16 @@ struct MainTabView: View {
 	  accessibilityLabel: viewModel.openMenuLabel,
 	  showsBadge: viewModel.shouldShowLessonsBadge,
 	  open: { viewModel.openSideMenu() }
+	)
+  }
+
+  /// The tabs along the bottom of a student's sections, Home aside.
+  var studentTabBarAction: StudentTabBarAction? {
+	guard viewModel.userMode == .student else { return nil }
+	return StudentTabBarAction(
+	  items: viewModel.studentTabItems,
+	  selected: viewModel.selectedStudentTab,
+	  select: { item in viewModel.select(item) }
 	)
   }
 
@@ -198,7 +211,7 @@ struct MainTabView: View {
 		
 	  case .lessons:
 		if viewModel.userMode == .student {
-		  StudentLessonHistoryView()
+		  StudentActivityView()
 			.trackScreen(AnalyticsScreen.studentLessonHistory)
 		} else {
 		  TeacherLessonHistoryView()
@@ -209,15 +222,37 @@ struct MainTabView: View {
 		TeacherEarningsView()
 
 	  case .profile:
-		ProfileView(viewModel: profileViewModel)
-		  .trackScreen(AnalyticsScreen.profile)
+		if viewModel.userMode == .student {
+		  StudentProfileView(viewModel: profileViewModel)
+			.trackScreen(AnalyticsScreen.profile)
+		} else {
+		  ProfileView(viewModel: profileViewModel)
+			.trackScreen(AnalyticsScreen.profile)
+		}
 		
 	  case .settings:
 		SettingsView(role: viewModel.userMode, viewModel: nil)
 		  .trackScreen(AnalyticsScreen.settings)
 
 	  case .help:
-		HelpSupportView(role: viewModel.userMode)
+		if viewModel.userMode == .student {
+		  studentHelp
+		} else {
+		  HelpSupportView(role: viewModel.userMode)
+		}
+	}
+  }
+
+  /// Help & Support as it was, above the tab bar every student section but
+  /// Home has. The bar sits on the brand's ground, as on the other sections.
+  var studentHelp: some View {
+	VStack(spacing: 0) {
+	  HelpSupportView(role: viewModel.userMode)
+	  BrandTabBar()
+		.environment(\.colorScheme, .dark)
+	}
+	.background {
+	  BrandScreenBackground(streaks: .tabs)
 	}
   }
   

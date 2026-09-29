@@ -158,6 +158,92 @@ extension SettingsViewModeling {
         ]
     }
 
+    /// Instant Teacher's settings, as its design lists them.
+    var studentSettingsRows: [SettingsRow] {
+        [
+            SettingsRow(
+                title: LocalizationSupport.localized("Preferences"),
+                subtitle: LocalizationSupport.localized("Default session type and currency"),
+                systemImage: "slider.horizontal.3",
+                iconColor: .primary,
+                action: .appPreferences
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("Language"),
+                subtitle: selectedLanguage.title,
+                systemImage: "globe",
+                iconColor: .primary,
+                action: .language
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("Notifications"),
+                systemImage: "bell",
+                iconColor: .primary,
+                action: .notifications
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("Privacy Controls"),
+                systemImage: "shield",
+                iconColor: .primary,
+                action: .privacyControls
+            )
+        ]
+    }
+
+    /// The rest of a student's settings, which the design leaves out: the
+    /// payments, the about pages, and the account, whose Log Out and Delete
+    /// Account must stay within reach. App Permissions is not among them: the
+    /// student's profile holds those switches. The icons are symbols SkipUI
+    /// draws on Android too.
+    var studentMoreSettingsRows: [SettingsRow] {
+        var rows = [
+            SettingsRow(
+                title: LocalizationSupport.localized("Payment History"),
+                subtitle: LocalizationSupport.localized("View your lesson payment history"),
+                systemImage: "cart",
+                iconColor: .primary,
+                action: .studentPayments
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("About"),
+                systemImage: "info.circle",
+                iconColor: .primary,
+                action: .about
+            ),
+            SettingsRow(
+                title: LocalizationSupport.localized("Account & Security"),
+                subtitle: LocalizationSupport.localized("Password, logout and account removal"),
+                systemImage: "lock",
+                iconColor: .primary,
+                action: .accountSecurity
+            )
+        ]
+
+        #if DEBUG
+        rows.append(
+            SettingsRow(
+                title: LocalizationSupport.localized("Force Reload Remote Config"),
+                subtitle: LocalizationSupport.localized("Debug builds only"),
+                systemImage: "arrow.clockwise.circle",
+                iconColor: .primary,
+                action: .forceReloadRemoteConfig
+            )
+        )
+        rows.append(
+            SettingsRow(
+                title: LocalizationSupport.localized("Test Crashlytics Crash"),
+                subtitle: LocalizationSupport.localized("Debug builds only"),
+                systemImage: "exclamationmark.triangle",
+                iconColor: .red,
+                isDestructive: true,
+                action: .testCrashlyticsCrash
+            )
+        )
+        #endif
+
+        return rows
+    }
+
     var accountSecuritySection: SettingsSection {
         SettingsSection(
             title: LocalizationSupport.localized("ACCOUNT & SECURITY"),

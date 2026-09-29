@@ -955,7 +955,7 @@ struct ProfileEditInfoRow: View {
 }
 
 #if os(Android)
-private enum AndroidProfileImagePickerBridge {
+enum AndroidProfileImagePickerBridge {
   private static let managerClass = try! JClass(name: "teacher/minute/AndroidImagePickerManager")
   private static let pickImageBase64Method = managerClass.getStaticMethodID(
     name: "pickImageBase64",

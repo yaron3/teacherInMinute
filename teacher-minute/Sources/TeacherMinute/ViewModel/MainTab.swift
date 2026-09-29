@@ -170,6 +170,18 @@ final class MainTabViewModel {
 	StudentMenuItem.allCases
   }
 
+  /// The tabs along the bottom of every student section but Home: the menu,
+  /// less Help & Support.
+  var studentTabItems: [StudentMenuItem] {
+	[.ask, .minutes, .activity, .profile, .settings]
+  }
+
+  /// The tab for the section on screen, or nil for Help & Support, which has
+  /// none.
+  var selectedStudentTab: StudentMenuItem? {
+	studentTabItems.first { isSelected($0) }
+  }
+
   /// Set by the menu's Minutes, for Home to open the purchase screen; Home
   /// clears it as it does.
   var isPurchaseScreenRequested = false

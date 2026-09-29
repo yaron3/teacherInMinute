@@ -30,6 +30,9 @@ struct LessonHistoryItem: Identifiable, Hashable {
     let transcriptPreview: String
     let hasAudio: Bool
     let questionPhotoUrls: [String]
+    /// How long the lesson ran, to the second. Only the student's activity
+    /// screen reads it, which counts minutes as they are billed.
+    var durationSeconds = 0
 }
 
 struct LessonDetails {
@@ -94,6 +97,8 @@ final class StudentLessonHistoryViewModel {
     func loadProfile() async {
         defer { isInitialLoading = false }
         guard let uid = Auth.auth().currentUser?.uid else { return }
+        logger.info("[StudentLessons] loading history")
+        defer { logger.info("[StudentLessons] history loaded lessons=\(self.lessons.count)") }
         do {
             if let profile = try await UserService.shared.fetchProfileSummary(uid: uid) {
                 studentName = profile.displayName
@@ -129,7 +134,21 @@ final class StudentLessonHistoryViewModel {
             ),
             transcriptPreview: LocalizationSupport.localized("Lesson transcript will appear here when available."),
             hasAudio: false,
-            questionPhotoUrls: lesson.questionPhotoUrls
+            questionPhotoUrls: lesson.questionPhotoUrls,
+            durationSeconds: lesson.durationSeconds
         )
+    }
+
+    // MARK: - Activity screen
+
+    /// The minutes each lesson was billed, added up: what the student's
+    /// lessons have used of their balance.
+    var learnedMinutes: Int {
+        lessons.reduce(0) { $0 + LessonFormatting.billedMinutes(seconds: $1.durationSeconds) }
+    }
+
+    /// The teachers the student has had a lesson with, counted once each.
+    var teachersCount: Int {
+        Set(lessons.map { $0.otherParticipant }).count
     }
 }

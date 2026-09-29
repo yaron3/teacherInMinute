@@ -27,51 +27,10 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack(path: navigationPath) {
-            VStack(spacing: 0) {
-#if os(Android)
-                SideMenuSectionHeader(title: viewModel.settingsTitle)
-#endif
-                ZStack {
-                    List {
-                        ForEach(viewModel.sections) { section in
-                            SettingsSectionView(section: section) { row in
-                                viewModel.select(row)
-                            }
-                        }
-
-                        Section {
-                            Text(viewModel.appVersion)
-                                .font(.system(size: 13))
-                                .foregroundStyle(theme.secondaryText)
-                                .frame(maxWidth: .infinity)
-                                .listRowBackground(Color.clear)
-                        }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .background(theme.screenBackground)
-
-                    loadingOverlay
+            settingsRoot
+                .navigationDestination(for: SettingsDestination.self) { destination in
+                    destinationScreen(destination)
                 }
-            }
-            .background(theme.screenBackground)
-#if os(Android)
-            // The title and menu button are drawn above the list instead; see
-            // SideMenuSectionHeader.
-            .toolbar(.hidden, for: .navigationBar)
-#else
-            .navigationTitle(viewModel.settingsTitle)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SideMenuButton(size: 36)
-                }
-            }
-#endif
-            .navigationDestination(for: SettingsDestination.self) { destination in
-                destinationView(destination)
-                    .navigationTitle(destination.title)
-                    .navigationBarTitleDisplayMode(.inline)
-            }
         }
         .appDialog(
             viewModel.alertTitle,
@@ -111,6 +70,75 @@ struct SettingsView: View {
             viewModel.consumeExternalURL()
         }
         .trackScreen(AnalyticsScreen.settings)
+    }
+
+    /// A student's settings are Instant Teacher's brand design; everyone
+    /// else's, the standard list.
+    @ViewBuilder
+    var settingsRoot: some View {
+        if viewModel.role == .student {
+            StudentSettingsView(viewModel: viewModel)
+        } else {
+            standardRoot
+        }
+    }
+
+    var standardRoot: some View {
+        VStack(spacing: 0) {
+#if os(Android)
+            SideMenuSectionHeader(title: viewModel.settingsTitle)
+#endif
+            ZStack {
+                List {
+                    ForEach(viewModel.sections) { section in
+                        SettingsSectionView(section: section) { row in
+                            viewModel.select(row)
+                        }
+                    }
+
+                    Section {
+                        Text(viewModel.appVersion)
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.secondaryText)
+                            .frame(maxWidth: .infinity)
+                            .listRowBackground(Color.clear)
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(theme.screenBackground)
+
+                loadingOverlay
+            }
+        }
+        .background(theme.screenBackground)
+#if os(Android)
+        // The title and menu button are drawn above the list instead; see
+        // SideMenuSectionHeader.
+        .toolbar(.hidden, for: .navigationBar)
+#else
+        .navigationTitle(viewModel.settingsTitle)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                SideMenuButton(size: 36)
+            }
+        }
+#endif
+    }
+
+    /// A student's preferences and notifications have designs of their own,
+    /// which draw their own header; every other page is the standard one.
+    @ViewBuilder
+    func destinationScreen(_ destination: SettingsDestination) -> some View {
+        if viewModel.role == .student && destination == .appPreferences {
+            StudentPreferencesView(viewModel: viewModel)
+        } else if viewModel.role == .student && destination == .notifications {
+            StudentNotificationsView(viewModel: viewModel)
+        } else {
+            destinationView(destination)
+                .navigationTitle(destination.title)
+                .navigationBarTitleDisplayMode(.inline)
+        }
     }
 
     @ViewBuilder

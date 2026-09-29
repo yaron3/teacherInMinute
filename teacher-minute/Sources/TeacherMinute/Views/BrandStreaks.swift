@@ -10,17 +10,29 @@ import SwiftUI
 /// version 12; older versions draw those streaks sharp.
 struct BrandStreaks: View {
   /// Which screens' streaks: the intro and home share one set, the purchase
-  /// screens another.
+  /// screens another, the student's tab screens a third, and the pages pushed
+  /// from them two of the tab screens' streaks.
   enum Arrangement {
     case home
     case purchase
+    case tabs
+    case subpage
+
+    /// The height of the frames the design places this set in. The tab
+    /// screens' frames also draw the status bar and Android's navigation bar.
+    var designHeight: CGFloat {
+      switch self {
+      case .home, .purchase: 874
+      case .tabs, .subpage: 878
+      }
+    }
   }
 
   var arrangement: Arrangement = .home
 
   private struct Streak {
     let name: String
-    /// The streak's centre in the design's 402×874 frame.
+    /// The streak's centre in the design's frame, 402 wide.
     let center: CGPoint
     /// The SVG's size.
     let size: CGSize
@@ -51,10 +63,28 @@ struct BrandStreaks: View {
            lineOffset: -1, angle: -18, isFlipped: false, blur: 0),
   ]
 
+  private static let tabStreaks = [
+    Streak(name: "brand-streak-01", center: CGPoint(x: 64.49, y: 991.907), size: CGSize(width: 863, height: 23.2),
+           lineOffset: -2.5, angle: 162.8, isFlipped: false, blur: 4.55),
+    Streak(name: "brand-streak-21", center: CGPoint(x: 293.518, y: 813.019), size: CGSize(width: 366.531, height: 7),
+           lineOffset: -3.5, angle: 162.2, isFlipped: false, blur: 0),
+    Streak(name: "brand-streak-04", center: CGPoint(x: -18.894, y: 944.238), size: CGSize(width: 940, height: 3),
+           lineOffset: -1.5, angle: 162, isFlipped: false, blur: 0),
+    Streak(name: "brand-streak-06", center: CGPoint(x: 205.706, y: 798.905), size: CGSize(width: 614.02, height: 22.4),
+           lineOffset: -1.5, angle: 162.6, isFlipped: false, blur: 4.85),
+    Streak(name: "brand-streak-07", center: CGPoint(x: -106.769, y: 831.583), size: CGSize(width: 1481.6, height: 31.6),
+           lineOffset: -5, angle: 162, isFlipped: false, blur: 5.4),
+    Streak(name: "brand-streak-16", center: CGPoint(x: 93.542, y: 1026.16), size: CGSize(width: 590, height: 3),
+           lineOffset: -1.5, angle: 162, isFlipped: false, blur: 0),
+  ]
+
   private var streaks: [Streak] {
     switch arrangement {
     case .home: return Self.homeStreaks
     case .purchase: return Self.purchaseStreaks
+    case .tabs: return Self.tabStreaks
+    case .subpage:
+      return Self.tabStreaks.filter { $0.name == "brand-streak-01" || $0.name == "brand-streak-16" }
     }
   }
 
@@ -73,7 +103,7 @@ struct BrandStreaks: View {
             .frame(width: 0, height: 0)
             .offset(
               x: streak.center.x * scale,
-              y: proxy.size.height - (874 - streak.center.y) * scale
+              y: proxy.size.height - (arrangement.designHeight - streak.center.y) * scale
             )
         }
       }

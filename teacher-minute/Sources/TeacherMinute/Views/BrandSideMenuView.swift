@@ -139,20 +139,11 @@ struct BrandSideMenuView: View {
   /// Each icon at the size the design gives it, in a 28pt box.
   @ViewBuilder
   func icon(for item: StudentMenuItem, isSelected: Bool, tint: Color) -> some View {
-    switch item {
-    case .ask:
-      menuIcon("brand-menu-ask", width: 28, height: 28, tint: tint)
-    case .minutes:
-      menuIcon("brand-menu-minutes", width: 28, height: 28, tint: tint)
-    case .activity:
-      menuIcon("brand-menu-activity", width: 26, height: 28, tint: tint)
-    case .profile:
-      menuIcon("brand-menu-profile", width: 18, height: 18, tint: tint)
-    case .settings:
-      menuIcon("brand-menu-settings", width: 23, height: 23, tint: tint)
-    case .help:
+    if let icon = item.brandIcon {
+      menuIcon(icon.name, width: icon.size.width, height: icon.size.height, tint: tint)
+    } else {
       // Help & Support is not in the design, and keeps the icon it had.
-      PlatformIcon(systemName: MainTab.help.systemImage(isSelected: isSelected), size: 22, color: tint)
+      PlatformIcon(systemName: item.tab.systemImage(isSelected: isSelected), size: 22, color: tint)
         .frame(width: 28, height: 28)
     }
   }

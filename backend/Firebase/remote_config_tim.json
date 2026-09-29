@@ -10733,6 +10733,94 @@
         }
       },
       "valueType": "STRING"
+    },
+    "recent_sessions": {
+      "defaultValue": {
+        "value": "Recent sessions"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מפגשים אחרונים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "all_your_recent": {
+      "defaultValue": {
+        "value": "All your recent sessions, with learning time, teacher and quick access to continue learning."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כל המפגשים האחרונים שלך, עם זמן למידה, מורה וגישה מהירה להמשך הלימוד."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "completed_label": {
+      "defaultValue": {
+        "value": "Completed"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הושלמו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teachers": {
+      "defaultValue": {
+        "value": "Teachers"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_account_details": {
+      "defaultValue": {
+        "value": "Your account details, contact details and device settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "פרטי החשבון, פרטי התקשרות והגדרות מכשיר שלך."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "settings_preferences": {
+      "defaultValue": {
+        "value": "Settings: Preferences"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הגדרות : העדפות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "settings_notifications": {
+      "defaultValue": {
+        "value": "Settings: Notifications"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הגדרות : התראות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "manage_push_notifications": {
+      "defaultValue": {
+        "value": "Manage push notifications, system notifications and more settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ניהול התראות פוש, התראות מערכת והגדרות נוספות."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

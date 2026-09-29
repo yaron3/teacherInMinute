@@ -63,9 +63,20 @@ extension ProfileViewModel {
 
     // MARK: Screen
     var profileScreenTitle: String { LocalizationSupport.localized("Profile") }
+    var profileSubtitle: String {
+        LocalizationSupport.localized("Your account details, contact details and device settings.")
+    }
     /// The name for the side menu's header — blank until the profile loads, so
     /// the placeholder `name` never flashes there.
     var menuDisplayName: String { isProfileLoaded ? name : "" }
+
+    /// The name on Instant Teacher's profile: blank until the profile loads,
+    /// then the user's name, or their role, translated, while they have none.
+    var profileDisplayName: String {
+        guard isProfileLoaded else { return "" }
+        guard !hasFullName else { return name }
+        return roleType == .teacher ? LocalizationSupport.localized("Teacher") : LocalizationSupport.localized("Student")
+    }
 
     // MARK: Edit profile
     var editProfileTitle: String { LocalizationSupport.localized("Edit Profile") }
