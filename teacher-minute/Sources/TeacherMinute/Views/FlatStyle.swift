@@ -57,6 +57,23 @@ struct FlatCard<Content: View>: View {
   }
 
   var body: some View {
+    if AppTheme.isBrand && filled == nil {
+      // Instant Teacher's card: see `brandCard()`.
+      content
+        .padding(padding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.brandCardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay {
+          RoundedRectangle(cornerRadius: 16)
+            .stroke(theme.brandControlBorder, lineWidth: 1)
+        }
+    } else {
+      standardCard
+    }
+  }
+
+  var standardCard: some View {
     content
       .padding(padding)
       .frame(maxWidth: .infinity, alignment: .leading)

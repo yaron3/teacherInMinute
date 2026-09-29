@@ -70,7 +70,7 @@ struct NotificationPermissionExplainerView: View {
             .padding(.bottom, 24)
         }
         .padding(.horizontal, 24)
-        .background(Color(.systemBackground))
+        .screenGround()
     }
 
     private func enable() async {

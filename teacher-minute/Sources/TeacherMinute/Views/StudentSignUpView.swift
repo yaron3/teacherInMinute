@@ -61,12 +61,12 @@ struct StudentSignUpView: View {
     )
     .sheet(isPresented: $viewModel.showingTerms) {
       if let url = viewModel.termsURL {
-        NavigationStack { AboutWebView(url: url, title: viewModel.eulaTitle) }
+        NavigationStack { AboutWebView(url: url, title: viewModel.eulaTitle, backLabel: viewModel.backLabel) }
       }
     }
     .sheet(isPresented: $viewModel.showingPrivacy) {
       if let url = viewModel.privacyURL {
-        NavigationStack { AboutWebView(url: url, title: viewModel.privacyPolicyTitle) }
+        NavigationStack { AboutWebView(url: url, title: viewModel.privacyPolicyTitle, backLabel: viewModel.backLabel) }
       }
     }
     .appDialog(

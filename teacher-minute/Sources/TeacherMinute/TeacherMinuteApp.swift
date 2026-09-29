@@ -30,6 +30,8 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   }
 
   var preferredAppearanceColorScheme: ColorScheme? {
+    // Instant Teacher is drawn on the brand's dark ground throughout.
+    if AppTheme.isBrand { return .dark }
     switch appearanceMode {
     case "light": return .light
     case "dark": return .dark
@@ -52,8 +54,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 						  case .createAccount:
 							createAccountScreen
 						  case .login:
-							LoginView()
-							  .trackScreen(AnalyticsScreen.login)
+							loginScreen
 						  case .teacherIdentityVerification:
 							TeacherIdentityVerificationView()
 							  .trackScreen(AnalyticsScreen.teacherIdentity)
@@ -131,6 +132,18 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 	} else {
 	  WelcomeView()
 		.trackScreen(AnalyticsScreen.welcome)
+	}
+  }
+
+  /// Instant Teacher logs its students in on the brand's own screen, as it
+  /// signs them up; Pro Teacher keeps the standard one.
+  @ViewBuilder
+  var loginScreen: some View {
+	if AuthRole.appRole == .student {
+	  StudentLoginView()
+	} else {
+	  LoginView()
+		.trackScreen(AnalyticsScreen.login)
 	}
   }
 

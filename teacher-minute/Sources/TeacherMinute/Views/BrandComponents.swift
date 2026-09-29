@@ -119,9 +119,9 @@ struct BrandPrimaryButton: View {
   }
 }
 
-/// A labelled text field: the label above, then a dark field with an icon at
-/// its leading end when there is one, and the error under it while the
-/// value is not valid.
+/// A labelled text field: the label above, unless it is empty, then a dark
+/// field with an icon at its leading end when there is one, and the error
+/// under it while the value is not valid.
 struct BrandTextField: View {
   let title: String
   let placeholder: String
@@ -141,10 +141,12 @@ struct BrandTextField: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text(title)
-        .font(.system(size: 16, weight: .bold))
-        .foregroundStyle(theme.brandSecondaryText)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      if !title.isEmpty {
+        Text(title)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(theme.brandSecondaryText)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
 
       HStack(spacing: 8) {
         if let icon {
@@ -233,7 +235,144 @@ struct BrandCheckbox: View {
   }
 }
 
+/// The brand's modal card, as the "not enough minutes" prompt draws it: dark,
+/// outlined, 354pt wide or the screen less its 24pt margins, centred over
+/// the dimmed screen.
+struct BrandModal<Content: View>: View {
+  let content: Content
+
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  init(@ViewBuilder content: () -> Content) {
+    self.content = content()
+  }
+
+  var body: some View {
+    GeometryReader { proxy in
+      ZStack {
+        theme.brandScrim.opacity(0.7)
+
+        VStack(spacing: 18) {
+          content
+        }
+        .padding(24)
+        // An explicit width: a maximum one lets the card's background spread
+        // across the screen on Android.
+        .frame(width: min(354, proxy.size.width - 48))
+        .background(theme.brandModalBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay {
+          RoundedRectangle(cornerRadius: 20)
+            .stroke(theme.brandControlBorder, lineWidth: 1)
+        }
+      }
+      .frame(width: proxy.size.width, height: proxy.size.height)
+    }
+    // The container's safe area, not the keyboard's: a modal with a field is
+    // centred above the keyboard, where its buttons can still be reached.
+    .ignoresSafeArea(.container)
+  }
+}
+
+/// A modal's title and message, centred.
+struct BrandModalText: View {
+  let title: String
+  var message: String?
+
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    VStack(spacing: 8) {
+      Text(title)
+        .font(.system(size: 22, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity)
+
+      if let message, !message.isEmpty {
+        Text(message)
+          .font(.system(size: 15))
+          .foregroundStyle(theme.brandSecondaryText)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity)
+      }
+    }
+    .multilineTextAlignment(.center)
+  }
+}
+
+/// The round badge at the top of a modal, as the prompt's timer: a symbol
+/// on the brand's cyan tint.
+struct BrandModalBadge: View {
+  let systemName: String
+
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    PlatformIcon(systemName: systemName, size: 24, color: theme.brandActionBackground)
+      .frame(width: 56, height: 56)
+      .background(theme.brandActionBackground.opacity(0.12))
+      .clipShape(Circle())
+      .accessibilityHidden(true)
+  }
+}
+
+/// The secondary choice beside a `BrandPrimaryButton`: outlined in cyan.
+struct BrandSecondaryButton: View {
+  let title: String
+  let action: () -> Void
+
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    Button {
+      action()
+    } label: {
+      Text(title)
+        .font(.system(size: 18, weight: .bold))
+        .foregroundStyle(theme.brandActionBackground)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
+        .overlay {
+          RoundedRectangle(cornerRadius: 8)
+            .stroke(theme.brandActionBackground, lineWidth: 1)
+        }
+        .tappableFrame()
+    }
+    .buttonStyle(.plain)
+  }
+}
+
 extension View {
+  /// The ground a full screen stands on: the brand's gradient in Instant
+  /// Teacher, the screen's own colour in Pro Teacher — the system
+  /// background unless it says otherwise.
+  func screenGround(_ standard: Color = Color(.systemBackground)) -> some View {
+    background {
+      if AppTheme.isBrand {
+        BrandScreenBackground()
+      } else {
+        standard
+          .ignoresSafeArea()
+      }
+    }
+  }
+
   /// The translucent card a brand screen's form sits in.
   func brandCard(cornerRadius: CGFloat = 16, padding: CGFloat = 16) -> some View {
     modifier(BrandCardModifier(cornerRadius: cornerRadius, padding: padding))

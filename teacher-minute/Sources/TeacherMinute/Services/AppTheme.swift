@@ -17,6 +17,12 @@ import SwiftUI
 struct AppTheme {
     let colorScheme: ColorScheme
 
+    /// Whether this is Instant Teacher, which wears the brand design on every
+    /// screen: it runs dark (see `TeacherMinuteApp`), and the general tokens
+    /// below that the dark scheme alone would not bring to the brand take the
+    /// brand's colours instead. Pro Teacher keeps the adaptive palette.
+    static let isBrand = AuthRole.appRole == .student
+
     // MARK: - Helpers
 
     func adaptive(light: (Double, Double, Double), dark: (Double, Double, Double)) -> Color {
@@ -45,7 +51,8 @@ struct AppTheme {
 
     /// Captions, secondary labels, placeholder icons.
     var secondaryText: Color {
-        adaptive(
+        if Self.isBrand { return brandSecondaryText }
+        return adaptive(
             light: (110, 110, 110),
             dark: (160, 160, 160)
         )
@@ -115,7 +122,8 @@ struct AppTheme {
 
     /// Cards, tiles and grouped panels sitting on `screenBackground`.
     var cardBackground: Color {
-        adaptive(
+        if Self.isBrand { return brandPanelBackground }
+        return adaptive(
             light: (242, 242, 244),
             dark: (45, 45, 42)
         )
@@ -123,7 +131,8 @@ struct AppTheme {
 
     /// Text fields, search bars and other editable controls.
     var fieldBackground: Color {
-        adaptive(
+        if Self.isBrand { return brandBackgroundTop }
+        return adaptive(
             light: (242, 242, 244),
             dark: (35, 35, 38)
         )
@@ -159,7 +168,8 @@ struct AppTheme {
 
     /// Primary action fill, selected state, highlight.
     var accent: Color {
-        adaptive(
+        if Self.isBrand { return brandActionBackground }
+        return adaptive(
             light: (47, 53, 255),
             dark: (100, 200, 255)
         )
@@ -176,7 +186,9 @@ struct AppTheme {
     /// Tinted surface for accent-on-surface treatments — accent chips, badges
     /// and icon tiles that must stay legible behind `accent` content.
     var accentBackground: Color {
-        adaptive(
+        // The brand's cyan at 12% over its dark ground.
+        if Self.isBrand { return rgb((23, 41, 45)) }
+        return adaptive(
             light: (238, 236, 255),
             dark: (38, 34, 74)
         )
@@ -336,7 +348,8 @@ struct AppTheme {
 
     /// Hairline rule between rows and sections.
     var separator: Color {
-        adaptive(
+        if Self.isBrand { return brandControlBorder }
+        return adaptive(
             light: (228, 228, 231),
             dark: (58, 58, 62)
         )
@@ -344,7 +357,8 @@ struct AppTheme {
 
     /// Outline around fields, chips and outlined tiles.
     var controlBorder: Color {
-        adaptive(
+        if Self.isBrand { return brandControlBorder }
+        return adaptive(
             light: (228, 228, 231),
             dark: (85, 85, 88)
         )

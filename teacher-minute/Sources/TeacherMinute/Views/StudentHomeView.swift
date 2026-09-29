@@ -1358,35 +1358,25 @@ struct SearchingOverlay: View {
   
   var body: some View {
 	ZStack {
-	  theme.screenBackground.ignoresSafeArea()
-	  
+	  BrandScreenBackground(streaks: .home)
+
 	  VStack(spacing: 28) {
 		avatarRing
-		
+
 		VStack(spacing: 8) {
 		  Text(searchingTitle)
-			.font(.system(size: 17, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
+			.font(.system(size: 24, weight: .bold))
+			.foregroundStyle(theme.onDarkFill)
 		  Text(searchingSubtitle)
-			.font(.system(size: 13))
-			.foregroundStyle(theme.secondaryText)
+			.font(.system(size: 15))
+			.foregroundStyle(theme.brandSecondaryText)
 			.multilineTextAlignment(.center)
 		}
-		
-		Button(action: onCancel) {
-		  Text(cancelLabel)
-			.font(.system(size: 14, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
-			.padding(.horizontal, 32)
-			.padding(.vertical, 12)
-			.background(theme.cardBackground)
-			.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-			.overlay {
-			  RoundedRectangle(cornerRadius: 10, style: .continuous)
-				.stroke(theme.controlBorder, lineWidth: 1)
-			}
+
+		BrandSecondaryButton(title: cancelLabel) {
+		  onCancel()
 		}
-		.buttonStyle(.plain)
+		.frame(width: 200)
 	  }
 	  .padding(32)
 	}
@@ -1399,6 +1389,7 @@ struct SearchingOverlay: View {
 		cycleIndex += 1
 	  }
 	}
+	.systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
   }
   
   private var avatarRing: some View {
@@ -1533,47 +1524,12 @@ struct NoMatchOverlay: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	ZStack {
-	  theme.scrim.opacity(0.6).ignoresSafeArea()
-	  
-	  VStack(spacing: 20) {
-		Circle()
-		  .fill(theme.cardBackground)
-		  .frame(width: 80, height: 80)
-		  .overlay {
-			PlatformIcon(
-			  systemName: "person.slash.fill",
-			  size: 36,
-			  color: theme.secondaryText
-			)
-		  }
-		
-		Text(title)
-		  .font(.system(size: 20, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-
-		Text(message)
-		  .font(.system(size: 13))
-		  .foregroundStyle(theme.secondaryText)
-		  .multilineTextAlignment(.center)
-
-		Button(action: onDismiss) {
-		  Text(okLabel)
-			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.onAccentText)
-			.frame(maxWidth: .infinity)
-			.frame(height: 48)
-			.background(theme.accent)
-			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-		}
-		.buttonStyle(.plain)
-		.padding(.horizontal, 32)
+	BrandModal {
+	  BrandModalBadge(systemName: "person.slash.fill")
+	  BrandModalText(title: title, message: message)
+	  BrandPrimaryButton(title: okLabel) {
+		onDismiss()
 	  }
-	  .padding(28)
-	  .frame(maxWidth: 340)
-	  .background(theme.cardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-	  .padding(.horizontal, 24)
 	}
   }
 }
@@ -1588,47 +1544,12 @@ struct ErrorOverlay: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	ZStack {
-	  theme.scrim.opacity(0.6).ignoresSafeArea()
-	  
-	  VStack(spacing: 20) {
-		Circle()
-		  .fill(theme.accent.opacity(0.18))
-		  .frame(width: 80, height: 80)
-		  .overlay {
-			PlatformIcon(
-			  systemName: "exclamationmark.triangle.fill",
-			  size: 34,
-			  color: theme.accent
-			)
-		  }
-		
-		Text(title)
-		  .font(.system(size: 20, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-
-		Text(message)
-		  .font(.system(size: 13))
-		  .foregroundStyle(theme.secondaryText)
-		  .multilineTextAlignment(.center)
-
-		Button(action: onDismiss) {
-		  Text(okLabel)
-			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.onAccentText)
-			.frame(maxWidth: .infinity)
-			.frame(height: 48)
-			.background(theme.accent)
-			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-		}
-		.buttonStyle(.plain)
-		.padding(.horizontal, 32)
+	BrandModal {
+	  BrandModalBadge(systemName: "exclamationmark.triangle.fill")
+	  BrandModalText(title: title, message: message)
+	  BrandPrimaryButton(title: okLabel) {
+		onDismiss()
 	  }
-	  .padding(28)
-	  .frame(maxWidth: 340)
-	  .background(theme.cardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-	  .padding(.horizontal, 24)
 	}
   }
 }

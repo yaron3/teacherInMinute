@@ -84,14 +84,23 @@ struct BrandSubpage<Content: View>: View {
   let label: String
   let title: String
   let backLabel: String
+  /// False for a page whose content scrolls itself, a web page's.
+  var scrolls = true
   let content: Content
 
   @Environment(\.dismiss) var dismiss
 
-  init(label: String, title: String, backLabel: String, @ViewBuilder content: () -> Content) {
+  init(
+    label: String,
+    title: String,
+    backLabel: String,
+    scrolls: Bool = true,
+    @ViewBuilder content: () -> Content
+  ) {
     self.label = label
     self.title = title
     self.backLabel = backLabel
+    self.scrolls = scrolls
     self.content = content()
   }
 
@@ -104,13 +113,22 @@ struct BrandSubpage<Content: View>: View {
             dismiss()
           }
         }
-        ScrollView(.vertical, showsIndicators: false) {
+        if scrolls {
+          ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 16) {
+              content
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 20)
+          }
+        } else {
           VStack(alignment: .leading, spacing: 16) {
             content
           }
           .padding(.horizontal, 20)
           .padding(.top, 16)
-          .padding(.bottom, 20)
+          .frame(maxHeight: .infinity, alignment: .top)
         }
       }
     }
@@ -118,6 +136,166 @@ struct BrandSubpage<Content: View>: View {
     .toolbar(.hidden, for: .navigationBar)
     .navigationBarBackButtonHidden(true)
     .systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
+  }
+}
+
+/// A sheet on the brand's ground: its title and the way out in a header,
+/// then its content. As with `BrandTabScreen`, a sheet's modifiers go on its
+/// content.
+struct BrandSheet<Content: View>: View {
+  let title: String
+  let closeLabel: String
+  let onClose: () -> Void
+  let content: Content
+
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  init(title: String, closeLabel: String, onClose: @escaping () -> Void, @ViewBuilder content: () -> Content) {
+    self.title = title
+    self.closeLabel = closeLabel
+    self.onClose = onClose
+    self.content = content()
+  }
+
+  var body: some View {
+    ZStack {
+      BrandScreenBackground()
+      VStack(spacing: 0) {
+        BrandPageHeader(label: "", title: title) {
+          Button {
+            onClose()
+          } label: {
+            Image("brand-close-circle", bundle: .module)
+              .renderingMode(.template)
+              .resizable()
+              .foregroundStyle(theme.onDarkFill)
+              .frame(width: 20, height: 20)
+              .frame(width: 44, height: 44)
+              .background(theme.brandCardSurface)
+              .clipShape(RoundedRectangle(cornerRadius: 10))
+              .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                  .stroke(theme.brandControlBorder, lineWidth: 1)
+              }
+          }
+          .buttonStyle(.plain)
+#if !os(Android)
+          // SkipUI has no string `accessibilityLabel`.
+          .accessibilityLabel(closeLabel)
+#endif
+          .accessibilityIdentifier("brand_sheet_close")
+        }
+        ScrollView(.vertical, showsIndicators: false) {
+          VStack(alignment: .leading, spacing: 16) {
+            content
+          }
+          .padding(.horizontal, 20)
+          .padding(.top, 8)
+          .padding(.bottom, 20)
+        }
+      }
+    }
+    .environment(\.colorScheme, .dark)
+  }
+}
+
+/// Settings rows in a brand card: the icon at the start, the name and what it
+/// holds, and, where the design draws one, the chevron.
+struct BrandSettingsRows: View {
+  let rows: [SettingsRow]
+  let select: (SettingsRow) -> Void
+
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      ForEach(rows) { row in
+        if row.id != rows.first?.id {
+          BrandRule()
+        }
+        rowButton(row)
+      }
+    }
+    .brandCard()
+  }
+
+  /// As designed, only Preferences and Notifications carry the chevron.
+  func rowButton(_ row: SettingsRow) -> some View {
+    Button {
+      select(row)
+    } label: {
+      HStack(spacing: 12) {
+        rowIcon(row)
+          .frame(width: 40, height: 40)
+
+        VStack(alignment: .leading, spacing: 4) {
+          Text(row.title)
+            .font(.system(size: 17, weight: .bold))
+            .foregroundStyle(row.isDestructive ? theme.danger : theme.onDarkFill)
+          if let subtitle = row.subtitle {
+            Text(subtitle)
+              .font(.system(size: 13))
+              .foregroundStyle(theme.brandSecondaryText)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        if row.action == .appPreferences || row.action == .notifications {
+          BrandForwardChevron()
+        }
+      }
+      .tappableFrame()
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("settings_row_\(row.action.id)")
+  }
+
+  /// The design's icon where it has one; otherwise a symbol SkipUI also draws
+  /// on Android.
+  @ViewBuilder
+  func rowIcon(_ row: SettingsRow) -> some View {
+    if let asset = Self.designedIcon(for: row.action) {
+      Image(asset, bundle: .module)
+        .renderingMode(.template)
+        .resizable()
+        .foregroundStyle(theme.onDarkFill)
+    } else {
+      Image(systemName: Self.symbol(for: row))
+        .resizable()
+        .scaledToFit()
+        .foregroundStyle(row.isDestructive ? theme.danger : theme.onDarkFill)
+        .frame(width: 18, height: 18)
+    }
+  }
+
+  static func designedIcon(for action: SettingsAction) -> String? {
+    switch action {
+    case .appPreferences: "brand-settings-preferences"
+    case .language: "brand-settings-language"
+    case .notifications: "brand-settings-notifications"
+    case .privacyControls: "brand-settings-privacy"
+    default: nil
+    }
+  }
+
+  static func symbol(for row: SettingsRow) -> String {
+    switch row.action {
+    case .studentPayments: "cart"
+    case .about: "info.circle"
+    case .accountSecurity, .privacyPolicy: "lock"
+    case .contactUs: "envelope"
+    case .eula: "list.bullet"
+    case .changePassword: "pencil"
+    case .logOut: "arrow.forward.square"
+    case .deleteAccount: "trash"
+    default: row.systemImage
+    }
   }
 }
 
@@ -223,10 +401,12 @@ struct BrandPageHeader<Accessory: View>: View {
   var body: some View {
     HStack(spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
-        Text(label)
-          .font(.system(size: 13))
-          .foregroundStyle(theme.brandSecondaryText)
-          .lineLimit(1)
+        if !label.isEmpty {
+          Text(label)
+            .font(.system(size: 13))
+            .foregroundStyle(theme.brandSecondaryText)
+            .lineLimit(1)
+        }
         Text(title)
           .font(.system(size: 17, weight: .bold))
           .foregroundStyle(theme.onDarkFill)
@@ -279,7 +459,7 @@ struct BrandMenuButton: View {
 /// A section's title, and a line on what it holds.
 struct BrandPageHero: View {
   let title: String
-  let subtitle: String
+  var subtitle: String?
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -292,11 +472,13 @@ struct BrandPageHero: View {
         .font(.system(size: 34, weight: .bold))
         .foregroundStyle(theme.onDarkFill)
         .designLineHeight(fontSize: 34)
-      Text(subtitle)
-        .font(.system(size: 15))
-        .foregroundStyle(theme.brandSecondaryText)
-        .fixedSize(horizontal: false, vertical: true)
-        .designLineHeight(fontSize: 15)
+      if let subtitle {
+        Text(subtitle)
+          .font(.system(size: 15))
+          .foregroundStyle(theme.brandSecondaryText)
+          .fixedSize(horizontal: false, vertical: true)
+          .designLineHeight(fontSize: 15)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }

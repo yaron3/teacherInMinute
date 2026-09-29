@@ -232,7 +232,7 @@ struct ChatSessionView: View {
         ratingPromptOverlay
       }
     }
-    .background(Color(.systemBackground))
+    .screenGround()
     .task {
       viewModel.onChatPausedUpdated = { _ in
         let newValue = viewModel.peerChatPaused()
@@ -605,7 +605,7 @@ struct ChatSessionView: View {
       }
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color(.systemBackground))
+    .screenGround()
     .zIndex(30)
   }
 

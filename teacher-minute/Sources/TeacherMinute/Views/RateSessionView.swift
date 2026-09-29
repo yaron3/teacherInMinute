@@ -222,7 +222,7 @@ struct RateSessionView: View {
       .padding(.horizontal, 18)
       .padding(.bottom, 24)
     }
-    .background(Color(.systemBackground))
+    .screenGround()
   }
 
   private func send() {

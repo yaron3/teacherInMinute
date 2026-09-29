@@ -480,7 +480,7 @@ struct LessonDetailView: View {
                 }
                 .padding(18)
             }
-            .background(Color(.systemBackground))
+            .screenGround()
             .navigationTitle(viewModel.lessonDetailTitle)
             .navigationBarTitleDisplayMode(.inline)
             .task {

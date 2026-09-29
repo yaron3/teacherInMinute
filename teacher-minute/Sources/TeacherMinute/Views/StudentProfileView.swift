@@ -27,6 +27,32 @@ struct StudentProfileView: View {
   }
 
   var body: some View {
+    // A plain stack around the screen, for the photo chooser below.
+    ZStack {
+      screen
+    }
+#if os(Android)
+    // The brand's dialog, as iOS's photo chooser is. Here rather than on the
+    // photo button or inside the screen: on Android an `appDialog` is an
+    // overlay, laid out within the view it is attached to, and this one must
+    // dim the tab bar too.
+    .appDialog(
+      viewModel.addPhotoDialogTitle,
+      isPresented: $isShowingPhotoSourceDialog,
+      actions: [
+        AppDialogAction(viewModel.takePhotoLabel) {
+          viewModel.pickProfilePhoto(fromCamera: true)
+        },
+        AppDialogAction(viewModel.chooseFromLibraryLabel) {
+          viewModel.pickProfilePhoto(fromCamera: false)
+        },
+        AppDialogAction(viewModel.cancelLabel, kind: .cancel)
+      ]
+    )
+#endif
+  }
+
+  private var screen: some View {
     BrandTabScreen {
       VStack(spacing: 0) {
         BrandPageHeader(label: viewModel.profileScreenTitle, title: viewModel.profileDisplayName) {
@@ -166,19 +192,6 @@ struct StudentProfileView: View {
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier("profile_photo_button")
-    .confirmationDialog(
-      viewModel.addPhotoDialogTitle,
-      isPresented: $isShowingPhotoSourceDialog,
-      titleVisibility: .visible
-    ) {
-      Button(viewModel.takePhotoLabel) {
-        viewModel.pickProfilePhoto(fromCamera: true)
-      }
-      Button(viewModel.chooseFromLibraryLabel) {
-        viewModel.pickProfilePhoto(fromCamera: false)
-      }
-      Button(viewModel.cancelLabel, role: .cancel) {}
-    }
 #endif
   }
 

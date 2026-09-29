@@ -40,4 +40,5 @@ extension LoginViewModel {
     var appleLabel: String { LocalizationSupport.localized("Apple") }
     var noAccountText: String { LocalizationSupport.localized("Don't have an account?") }
     var signUpLabel: String { LocalizationSupport.localized("Sign Up") }
+    var backLabel: String { LocalizationSupport.localized("Back") }
 }

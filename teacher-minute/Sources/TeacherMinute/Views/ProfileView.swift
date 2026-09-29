@@ -519,20 +519,56 @@ struct ProfileEditView: View {
   }
 
   var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
-	  VStack(alignment: .leading, spacing: 0) {
-        Text(viewModel.editProfileTitle)
-          .font(.system(size: 26, weight: .bold))
-          .foregroundStyle(theme.primaryText)
-          .padding(.top, 24)
+    if AppTheme.isBrand {
+      brandSheet
+    } else {
+      standardSheet
+    }
+  }
 
+  /// Instant Teacher's look: the same fields, as the brand's, in a brand card
+  /// on a brand sheet.
+  var brandSheet: some View {
+    ZStack {
+      BrandSheet(title: viewModel.editProfileTitle, closeLabel: viewModel.cancelLabel) {
+        viewModel.cancelProfileEditing()
+        dismiss()
+      } content: {
         Text(viewModel.editProfileSubtitle)
-          .font(.system(size: 13))
-          .foregroundStyle(theme.secondaryText)
-          .lineSpacing(5)
-          .multilineTextAlignment(.leading)
-          .padding(.top, 8)
+          .font(.system(size: 15))
+          .foregroundStyle(theme.brandSecondaryText)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
 
+        VStack(alignment: .leading, spacing: 16) {
+          fields
+
+          if let error = viewModel.errorMessage {
+            Text(error)
+              .font(.system(size: 12))
+              .foregroundStyle(theme.danger)
+          }
+
+          BrandPrimaryButton(
+            title: viewModel.saveButtonLabel,
+            isLoading: viewModel.isLoading,
+            isEnabled: viewModel.canSaveProfileEdits
+          ) {
+            viewModel.saveProfileEdits()
+          }
+        }
+        .brandCard()
+      }
+    }
+    .toolbar(.hidden, for: .navigationBar)
+    .onChange(of: viewModel.isEditing) { _, isEditing in
+      if !isEditing {
+        dismiss()
+      }
+    }
+  }
+
+  var fields: some View {
         VStack(spacing: 16) {
           ForEach($viewModel.contactRows, id: \.description) { $row in
             if viewModel.roleType == .student && row.description == viewModel.gradeFieldLabel {
@@ -567,6 +603,24 @@ struct ProfileEditView: View {
             )
           }
         }
+  }
+
+  var standardSheet: some View {
+    ScrollView(.vertical, showsIndicators: false) {
+	  VStack(alignment: .leading, spacing: 0) {
+        Text(viewModel.editProfileTitle)
+          .font(.system(size: 26, weight: .bold))
+          .foregroundStyle(theme.primaryText)
+          .padding(.top, 24)
+
+        Text(viewModel.editProfileSubtitle)
+          .font(.system(size: 13))
+          .foregroundStyle(theme.secondaryText)
+          .lineSpacing(5)
+          .multilineTextAlignment(.leading)
+          .padding(.top, 8)
+
+        fields
         .padding(.top, 28)
 
         if let error = viewModel.errorMessage {
@@ -681,10 +735,10 @@ struct ProfileDateOfBirthPicker: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: AppTheme.isBrand ? 8 : 10) {
       Text(title)
-        .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(theme.primaryText)
+        .font(.system(size: AppTheme.isBrand ? 16 : 15, weight: AppTheme.isBrand ? .bold : .semibold))
+        .foregroundStyle(AppTheme.isBrand ? theme.brandSecondaryText : theme.primaryText)
 
       if let currentDate = date {
         HStack {
@@ -710,12 +764,12 @@ struct ProfileDateOfBirthPicker: View {
           }
           .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
+        .padding(.horizontal, AppTheme.isBrand ? 12 : 16)
+        .frame(height: AppTheme.isBrand ? 52 : 56)
         .background(theme.fieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.isBrand ? 12 : 15, style: .continuous))
         .overlay {
-          RoundedRectangle(cornerRadius: 15, style: .continuous)
+          RoundedRectangle(cornerRadius: AppTheme.isBrand ? 12 : 15, style: .continuous)
             .stroke(theme.controlBorder, lineWidth: 1)
         }
       } else {
@@ -729,19 +783,29 @@ struct ProfileDateOfBirthPicker: View {
 
             Spacer()
 
-            PlatformIcon(
-              systemName: "calendar",
-              size: 14,
-              weight: .semibold,
-              color: theme.secondaryText
-            )
+            if AppTheme.isBrand {
+              // A symbol SkipUI draws as a Material icon; PlatformIcon puts an
+              // emoji here on Android.
+              Image(systemName: "calendar")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(theme.secondaryText)
+                .frame(width: 18, height: 18)
+            } else {
+              PlatformIcon(
+                systemName: "calendar",
+                size: 14,
+                weight: .semibold,
+                color: theme.secondaryText
+              )
+            }
           }
-          .padding(.horizontal, 16)
-          .frame(height: 56)
+          .padding(.horizontal, AppTheme.isBrand ? 12 : 16)
+          .frame(height: AppTheme.isBrand ? 52 : 56)
           .background(theme.fieldBackground)
-          .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+          .clipShape(RoundedRectangle(cornerRadius: AppTheme.isBrand ? 12 : 15, style: .continuous))
           .overlay {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
+            RoundedRectangle(cornerRadius: AppTheme.isBrand ? 12 : 15, style: .continuous)
               .stroke(theme.controlBorder, lineWidth: 1)
           }
         }
@@ -762,10 +826,10 @@ struct ProfileGradePicker: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: AppTheme.isBrand ? 8 : 10) {
       Text(title)
-        .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(theme.primaryText)
+        .font(.system(size: AppTheme.isBrand ? 16 : 15, weight: AppTheme.isBrand ? .bold : .semibold))
+        .foregroundStyle(AppTheme.isBrand ? theme.brandSecondaryText : theme.primaryText)
 
       Menu {
         ForEach(grades, id: \.self) { grade in
@@ -781,19 +845,29 @@ struct ProfileGradePicker: View {
 
           Spacer()
 
-          PlatformIcon(
-            systemName: "chevron.down",
-            size: 12,
-            weight: .semibold,
-            color: theme.secondaryText
-          )
+          if AppTheme.isBrand {
+            // A symbol SkipUI draws as a Material icon; PlatformIcon puts an
+            // emoji here on Android.
+            Image(systemName: "chevron.down")
+              .resizable()
+              .scaledToFit()
+              .foregroundStyle(theme.secondaryText)
+              .frame(width: 16, height: 16)
+          } else {
+            PlatformIcon(
+              systemName: "chevron.down",
+              size: 12,
+              weight: .semibold,
+              color: theme.secondaryText
+            )
+          }
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
+        .padding(.horizontal, AppTheme.isBrand ? 12 : 16)
+        .frame(height: AppTheme.isBrand ? 52 : 56)
         .background(theme.fieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.isBrand ? 12 : 15, style: .continuous))
         .overlay {
-          RoundedRectangle(cornerRadius: 15, style: .continuous)
+          RoundedRectangle(cornerRadius: AppTheme.isBrand ? 12 : 15, style: .continuous)
             .stroke(theme.controlBorder, lineWidth: 1)
         }
       }

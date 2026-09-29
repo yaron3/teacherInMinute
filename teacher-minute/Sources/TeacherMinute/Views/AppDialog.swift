@@ -49,11 +49,19 @@ struct AppDialogAction {
     }
 }
 
+/// A password field in an `appDialog`, drawn under the message, for a prompt
+/// that must ask for one.
+struct AppDialogSecureField {
+    let placeholder: String
+    let text: Binding<String>
+}
+
 struct AppDialogView: View {
     let title: String
     let message: String?
     let actions: [AppDialogAction]
     let onDismiss: () -> Void
+    var secureField: AppDialogSecureField? = nil
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -77,6 +85,20 @@ struct AppDialogView: View {
     }
 
     var body: some View {
+        Group {
+            if AppTheme.isBrand {
+                brandDialog
+            } else {
+                standardDialog
+            }
+        }
+        // Pushed down so nested text and controls flip too, not just the
+        // alignments computed above.
+        .environment(\.layoutDirection, layoutDirection)
+        .environment(\.locale, LocalizationSupport.currentLocale)
+    }
+
+    var standardDialog: some View {
         ZStack {
             theme.scrim.opacity(0.35)
                 .ignoresSafeArea()
@@ -94,6 +116,21 @@ struct AppDialogView: View {
                         .frame(maxWidth: .infinity, alignment: frameAlignment)
                 }
 
+                if let secureField {
+                    SecureField(secureField.placeholder, text: secureField.text)
+                        .font(.system(size: 15))
+                        .foregroundStyle(theme.primaryText)
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 12)
+                        .frame(height: 44)
+                        .background(theme.fieldBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(theme.controlBorder, lineWidth: 1)
+                        }
+                }
+
                 VStack(spacing: 10) {
                     ForEach(0..<actions.count, id: \.self) { index in
                         actionButton(actions[index])
@@ -106,10 +143,66 @@ struct AppDialogView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.horizontal, 32)
         }
-        // Pushed down so nested text and controls flip too, not just the
-        // alignments computed above.
-        .environment(\.layoutDirection, layoutDirection)
-        .environment(\.locale, LocalizationSupport.currentLocale)
+    }
+
+    /// Instant Teacher's dialogs, in the brand's modal style: a dark card
+    /// over the dimmed screen, its text centred, its choices the brand's
+    /// buttons — as the "not enough minutes" prompt draws them.
+    var brandDialog: some View {
+        BrandModal {
+            BrandModalText(title: title, message: message)
+
+            if let secureField {
+                BrandTextField(
+                    title: "",
+                    placeholder: secureField.placeholder,
+                    text: secureField.text,
+                    icon: "brand-lock",
+                    isSecure: true,
+                    textContentType: .password,
+                    autocapitalization: .never
+                )
+            }
+
+            VStack(spacing: 10) {
+                ForEach(0..<actions.count, id: \.self) { index in
+                    brandActionButton(actions[index])
+                }
+            }
+        }
+    }
+
+    func brandActionButton(_ action: AppDialogAction) -> some View {
+        Button {
+            onDismiss()
+            action.handler()
+        } label: {
+            Text(action.title)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(action.kind == .cancel ? theme.brandActionBackground : theme.brandBackgroundTop)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(brandFill(for: action.kind))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(action.kind == .cancel ? theme.brandActionBackground : Color.clear, lineWidth: 1)
+                }
+                .tappableFrame()
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(action.kind == .cancel ? "dialog_cancel_button" : "dialog_confirm_button")
+    }
+
+    func brandFill(for kind: AppDialogAction.Kind) -> Color {
+        switch kind {
+        case .primary: return theme.brandActionBackground
+        case .destructive: return theme.danger
+        case .cancel: return Color.clear
+        }
     }
 
     @ViewBuilder
@@ -163,10 +256,12 @@ extension View {
     ///   full-screen presentation escapes those bounds. Leave `false` when
     ///   attaching at a screen root, where the overlay already fills the screen
     ///   and avoids stacking another presentation onto the view.
+    /// - Parameter secureField: a password field to draw under the message.
     func appDialog(
         _ title: String,
         isPresented: Binding<Bool>,
         message: String? = nil,
+        secureField: AppDialogSecureField? = nil,
         actions: [AppDialogAction],
         coversScreen: Bool = false
     ) -> some View {
@@ -174,7 +269,8 @@ extension View {
             title: title,
             message: message,
             actions: actions.isEmpty ? [AppDialogAction.dismissFallback] : actions,
-            onDismiss: { isPresented.wrappedValue = false }
+            onDismiss: { isPresented.wrappedValue = false },
+            secureField: secureField
         )
 #if os(Android)
         // Skip marks `presentationBackground` unavailable, so a cover here could

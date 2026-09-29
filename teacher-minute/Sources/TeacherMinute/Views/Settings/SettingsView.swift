@@ -126,14 +126,23 @@ struct SettingsView: View {
 #endif
     }
 
-    /// A student's preferences and notifications have designs of their own,
-    /// which draw their own header; every other page is the standard one.
+    /// A student's pages are drawn in the brand's style, each with its own
+    /// header: Preferences and Notifications as their designs have them, the
+    /// others by the same views as everyone's, which take the brand's look in
+    /// Instant Teacher. Everyone else gets the standard pages.
     @ViewBuilder
     func destinationScreen(_ destination: SettingsDestination) -> some View {
-        if viewModel.role == .student && destination == .appPreferences {
-            StudentPreferencesView(viewModel: viewModel)
-        } else if viewModel.role == .student && destination == .notifications {
-            StudentNotificationsView(viewModel: viewModel)
+        if viewModel.role == .student {
+            switch destination {
+            case .appPreferences:
+                StudentPreferencesView(viewModel: viewModel)
+            case .notifications:
+                StudentNotificationsView(viewModel: viewModel)
+            default:
+                destinationView(destination)
+                    .toolbar(.hidden, for: .navigationBar)
+                    .navigationBarBackButtonHidden(true)
+            }
         } else {
             destinationView(destination)
                 .navigationTitle(destination.title)
@@ -155,7 +164,7 @@ struct SettingsView: View {
         case .contactUs:
             ContactSupportView(viewModel: viewModel)
         case .webPage(let title, let url):
-            AboutWebView(url: url, title: title)
+            AboutWebView(url: url, title: title, backLabel: viewModel.backLabel)
         case .studentPayments:
             StudentPaymentHistoryView(viewModel: viewModel)
         case .teacherPayouts:
@@ -216,9 +225,11 @@ struct SettingsView: View {
         }
     }
 
+    /// Pro Teacher's prompt. Instant Teacher asks in its brand's dialog, on
+    /// Account & Security.
     var isShowingReauthPasswordPrompt: Binding<Bool> {
         Binding {
-            viewModel.showReauthPasswordPrompt
+            !AppTheme.isBrand && viewModel.showReauthPasswordPrompt
         } set: { isPresented in
             viewModel.showReauthPasswordPrompt = isPresented
         }

@@ -122,6 +122,12 @@ extension SettingsViewModeling {
         LocalizationSupport.localized("Manage push notifications, system notifications and more settings.")
     }
     var backLabel: String { LocalizationSupport.localized("Back") }
+    var closeLabel: String { LocalizationSupport.localized("Close") }
+
+    /// A settings page's header, "Settings : About".
+    func settingsPageTitle(_ page: String) -> String {
+        String(format: LocalizationSupport.localized("Settings: %@"), page)
+    }
 
     // MARK: Language
     var languageSectionTitle: String { LocalizationSupport.localized("Language") }

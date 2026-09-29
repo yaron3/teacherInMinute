@@ -14,20 +14,79 @@ struct PrivacyControlsSettingsView: View {
 
     private let authService = AuthService()
 
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
+
     var body: some View {
-        Form {
-            Section(
-                header: Text(viewModel.privacySectionTitle),
-                footer: Text(viewModel.privacyFooterText)
-            ) {
-                Toggle(viewModel.showProfileImageLabel, isOn: $showProfileImage)
-                Toggle(viewModel.allowMessagesOutsideCallsLabel, isOn: $allowTeacherMessagesOutsideCalls)
+        ZStack {
+            if AppTheme.isBrand {
+                brandPage
+            } else {
+                Form {
+                    Section(
+                        header: Text(viewModel.privacySectionTitle),
+                        footer: Text(viewModel.privacyFooterText)
+                    ) {
+                        Toggle(viewModel.showProfileImageLabel, isOn: $showProfileImage)
+                        Toggle(viewModel.allowMessagesOutsideCallsLabel, isOn: $allowTeacherMessagesOutsideCalls)
+                    }
+                }
             }
         }
         .task { await loadShowProfileImage() }
         .onChange(of: showProfileImage) { _, newValue in
             Task { await persistShowProfileImage(newValue) }
         }
+    }
+
+    /// Instant Teacher's look: the switches at the start of their rows, as on
+    /// the notification settings.
+    var brandPage: some View {
+        BrandSubpage(
+            label: viewModel.settingsTitle,
+            title: viewModel.settingsPageTitle(SettingsDestination.privacyControls.title),
+            backLabel: viewModel.backLabel
+        ) {
+            BrandPageHero(title: SettingsDestination.privacyControls.title)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(viewModel.privacySectionTitle)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(theme.brandSecondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                brandToggleRow(viewModel.showProfileImageLabel, isOn: showProfileImage, identifier: "show_profile_image") {
+                    showProfileImage.toggle()
+                }
+                brandToggleRow(
+                    viewModel.allowMessagesOutsideCallsLabel,
+                    isOn: allowTeacherMessagesOutsideCalls,
+                    identifier: "messages_outside_calls"
+                ) {
+                    allowTeacherMessagesOutsideCalls.toggle()
+                }
+                Text(viewModel.privacyFooterText)
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.brandSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .brandCard()
+        }
+    }
+
+    func brandToggleRow(_ title: String, isOn: Bool, identifier: String, action: @escaping () -> Void) -> some View {
+        HStack(spacing: 12) {
+            BrandToggle(isOn: isOn, action: action)
+                .accessibilityIdentifier("privacy_toggle_\(identifier)")
+            Text(title)
+                .font(.system(size: 16))
+                .foregroundStyle(theme.onDarkFill)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 52)
     }
 
     // The "Show my profile image" preference must live on the user's profile so

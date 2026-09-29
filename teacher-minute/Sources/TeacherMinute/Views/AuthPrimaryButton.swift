@@ -19,6 +19,17 @@ struct AuthPrimaryButton: View {
 	AppTheme(colorScheme: colorScheme)
   }
     var body: some View {
+        if AppTheme.isBrand {
+            // Instant Teacher's call to action.
+            BrandPrimaryButton(title: title, isEnabled: isEnabled) {
+                action()
+            }
+        } else {
+            standardButton
+        }
+    }
+
+    var standardButton: some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Text(title)
@@ -84,6 +95,35 @@ struct AuthInputField: View {
     layoutDirection == .rightToLeft ? .trailing : .leading
   }
     var body: some View {
+        if AppTheme.isBrand {
+            // Instant Teacher's field, with the brand's icon where it has one.
+            BrandTextField(
+                title: title,
+                placeholder: placeholder,
+                text: $text,
+                icon: brandIcon,
+                isValid: isValid,
+                errorMessage: errorMessage ?? "",
+                keyboardType: keyboardType,
+                textContentType: textContentType,
+                autocapitalization: autocapitalization
+            )
+        } else {
+            standardField
+        }
+    }
+
+    /// The brand's icon for the field's symbol. The brand draws no others.
+    var brandIcon: String? {
+        switch systemImage {
+        case "person", "person.fill": "brand-user"
+        case "phone", "phone.fill": "brand-phone"
+        case "lock", "lock.fill": "brand-lock"
+        default: nil
+        }
+    }
+
+    var standardField: some View {
 	  VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 15, weight: .semibold))

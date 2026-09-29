@@ -10821,6 +10821,17 @@
         }
       },
       "valueType": "STRING"
+    },
+    "fmt_settings_page": {
+      "defaultValue": {
+        "value": "Settings: %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הגדרות : %@"
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

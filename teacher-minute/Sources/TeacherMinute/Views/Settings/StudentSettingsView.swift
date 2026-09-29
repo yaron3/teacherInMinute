@@ -60,74 +60,8 @@ struct StudentSettingsView: View {
   }
 
   private func rowsCard(_ rows: [SettingsRow]) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
-      ForEach(rows) { row in
-        if row.id != rows.first?.id {
-          BrandRule()
-        }
-        settingsRow(row)
-      }
-    }
-    .brandCard()
-  }
-
-  /// The icon at the start, then the name and what it holds. As designed,
-  /// only Preferences and Notifications carry the chevron.
-  private func settingsRow(_ row: SettingsRow) -> some View {
-    Button {
+    BrandSettingsRows(rows: rows) { row in
       viewModel.select(row)
-    } label: {
-      HStack(spacing: 12) {
-        rowIcon(row)
-          .frame(width: 40, height: 40)
-
-        VStack(alignment: .leading, spacing: 4) {
-          Text(row.title)
-            .font(.system(size: 17, weight: .bold))
-            .foregroundStyle(row.isDestructive ? theme.danger : theme.onDarkFill)
-          if let subtitle = row.subtitle {
-            Text(subtitle)
-              .font(.system(size: 13))
-              .foregroundStyle(theme.brandSecondaryText)
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-
-        if row.action == .appPreferences || row.action == .notifications {
-          BrandForwardChevron()
-        }
-      }
-      .tappableFrame()
-    }
-    .buttonStyle(.plain)
-    .accessibilityIdentifier("settings_row_\(row.action.id)")
-  }
-
-  /// The design's icon where it has one; a system symbol for the rows it
-  /// leaves out.
-  @ViewBuilder
-  private func rowIcon(_ row: SettingsRow) -> some View {
-    if let asset = designedIcon(for: row.action) {
-      Image(asset, bundle: .module)
-        .renderingMode(.template)
-        .resizable()
-        .foregroundStyle(theme.onDarkFill)
-    } else {
-      Image(systemName: row.systemImage)
-        .resizable()
-        .scaledToFit()
-        .foregroundStyle(row.isDestructive ? theme.danger : theme.onDarkFill)
-        .frame(width: 18, height: 18)
-    }
-  }
-
-  private func designedIcon(for action: SettingsAction) -> String? {
-    switch action {
-    case .appPreferences: "brand-settings-preferences"
-    case .language: "brand-settings-language"
-    case .notifications: "brand-settings-notifications"
-    case .privacyControls: "brand-settings-privacy"
-    default: nil
     }
   }
 }

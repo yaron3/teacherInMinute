@@ -106,7 +106,7 @@ struct PermissionsSetupView: View {
             .padding(.bottom, 24)
         }
         .padding(.horizontal, 18)
-        .background(theme.screenBackground)
+        .screenGround(theme.screenBackground)
         .navigationBarTitleDisplayMode(.inline)
         .onboardingBackHandling(viewModel: viewModel)
         .trackScreen(AnalyticsScreen.permissionsSetup)

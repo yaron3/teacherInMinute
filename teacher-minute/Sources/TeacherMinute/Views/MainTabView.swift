@@ -120,6 +120,11 @@ struct MainTabView: View {
   var tabLayers: some View {
 	ZStack {
 	  tabContent(viewModel.selectedTab)
+		// Each section starts afresh. On Android, SkipUI otherwise handed the
+		// state one section remembered to the next in its place: going from
+		// Profile to Settings, Settings' `onChange` of a URL was given a Bool
+		// Profile had kept, and the app aborted on the cast.
+		.id(viewModel.selectedTab)
 		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
 		.environment(\.sideMenuAction, sideMenuAction)
 		.environment(\.studentTabBarAction, studentTabBarAction)
@@ -166,9 +171,9 @@ struct MainTabView: View {
 	// SideMenuSectionHeader.
 	false
 #else
-	// A student's Settings draws its own header, as Instant Teacher's design
-	// has it.
-	(viewModel.selectedTab == .settings && viewModel.userMode == .teacher) || viewModel.selectedTab == .help
+	// A student's Settings and Help draw their own header, in Instant
+	// Teacher's look.
+	viewModel.userMode == .teacher && (viewModel.selectedTab == .settings || viewModel.selectedTab == .help)
 #endif
   }
 
@@ -235,24 +240,9 @@ struct MainTabView: View {
 		  .trackScreen(AnalyticsScreen.settings)
 
 	  case .help:
-		if viewModel.userMode == .student {
-		  studentHelp
-		} else {
-		  HelpSupportView(role: viewModel.userMode)
-		}
-	}
-  }
-
-  /// Help & Support as it was, above the tab bar every student section but
-  /// Home has. The bar sits on the brand's ground, as on the other sections.
-  var studentHelp: some View {
-	VStack(spacing: 0) {
-	  HelpSupportView(role: viewModel.userMode)
-	  BrandTabBar()
-		.environment(\.colorScheme, .dark)
-	}
-	.background {
-	  BrandScreenBackground(streaks: .tabs)
+		// In Instant Teacher, drawn as the student's other sections are, tab
+		// bar and all.
+		HelpSupportView(role: viewModel.userMode)
 	}
   }
   

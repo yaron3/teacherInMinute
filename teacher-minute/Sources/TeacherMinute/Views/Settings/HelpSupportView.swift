@@ -16,6 +16,53 @@ struct HelpSupportView: View {
     }
 
     var body: some View {
+        ZStack {
+            if AppTheme.isBrand {
+                brandScreen
+            } else {
+                standardScreen
+            }
+        }
+        .appDialog(
+            viewModel.alertTitle,
+            isPresented: isShowingAlert,
+            message: viewModel.alertMessage ?? "",
+            actions: [AppDialogAction(viewModel.okLabel)]
+        )
+        .sheet(item: contactSupportPreview) { request in
+            ContactSupportPreviewSheet(
+                viewModel: viewModel,
+                request: request,
+                isSubmitting: viewModel.isSubmittingContactSupport,
+                onCancel: { viewModel.cancelContactSupportPreview() },
+                onSubmit: { viewModel.submitContactSupport() }
+            )
+        }
+    }
+
+    /// Instant Teacher's look: a section like the others, with the tab bar,
+    /// and the contact form in a brand card.
+    var brandScreen: some View {
+        BrandTabScreen {
+            VStack(spacing: 0) {
+                BrandPageHeader(label: viewModel.helpSupportTitle, title: viewModel.helpSupportTitle) {
+                    BrandMenuButton()
+                }
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        BrandPageHero(title: viewModel.helpSupportTitle, subtitle: viewModel.contactSupportIntroText)
+                        ContactSupportView(viewModel: viewModel, embedded: true)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 20)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+        }
+    }
+
+    var standardScreen: some View {
         NavigationStack {
 #if os(Android)
             // The title and menu button are drawn above the form instead; see
@@ -34,21 +81,6 @@ struct HelpSupportView: View {
                     }
                 }
 #endif
-        }
-        .appDialog(
-            viewModel.alertTitle,
-            isPresented: isShowingAlert,
-            message: viewModel.alertMessage ?? "",
-            actions: [AppDialogAction(viewModel.okLabel)]
-        )
-        .sheet(item: contactSupportPreview) { request in
-            ContactSupportPreviewSheet(
-                viewModel: viewModel,
-                request: request,
-                isSubmitting: viewModel.isSubmittingContactSupport,
-                onCancel: { viewModel.cancelContactSupportPreview() },
-                onSubmit: { viewModel.submitContactSupport() }
-            )
         }
     }
 
