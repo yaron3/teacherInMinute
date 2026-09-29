@@ -78,6 +78,18 @@ extension ProfileViewModel {
         return roleType == .teacher ? LocalizationSupport.localized("Teacher") : LocalizationSupport.localized("Student")
     }
 
+    /// The line under the name: the role, or, for a student without an
+    /// account, that they are anonymous.
+    var profileRoleLine: String { isAnonymousAccount ? anonymousLabel : role }
+
+    // MARK: A student without an account
+    var anonymousLabel: String { LocalizationSupport.localized("Anonymous") }
+    var anonymousAccountTitle: String { LocalizationSupport.localized("You're using the app anonymously") }
+    var anonymousAccountText: String {
+        LocalizationSupport.localized("Create an account to keep your minutes and lessons, and to log in on any device.")
+    }
+    var createAccountLabel: String { LocalizationSupport.localized("Create a user account") }
+
     // MARK: Edit profile
     var editProfileTitle: String { LocalizationSupport.localized("Edit Profile") }
     var editProfileSubtitle: String {

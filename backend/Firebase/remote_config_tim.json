@@ -10832,6 +10832,39 @@
         }
       },
       "valueType": "STRING"
+    },
+    "anonymous": {
+      "defaultValue": {
+        "value": "Anonymous"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אנונימי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_using_the": {
+      "defaultValue": {
+        "value": "You're using the app anonymously"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אתה משתמש באפליקציה באופן אנונימי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "create_account_keep": {
+      "defaultValue": {
+        "value": "Create an account to keep your minutes and lessons, and to log in on any device."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צור חשבון כדי לשמור את הדקות והשיעורים שלך ולהתחבר מכל מכשיר."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

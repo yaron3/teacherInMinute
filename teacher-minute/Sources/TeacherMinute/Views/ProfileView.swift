@@ -35,6 +35,7 @@ struct ProfileView: View {
 #endif
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.scenePhase) var scenePhase
+  @Environment(\.appRouter) var router
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -136,6 +137,9 @@ struct ProfileView: View {
         loadError(error)
       }
       identityCard
+      if viewModel.isAnonymousAccount {
+        anonymousAccountCard
+      }
       contactCard
       if viewModel.shouldShowTeacherPaymentsMethod {
         payoutMethodCard
@@ -182,10 +186,11 @@ struct ProfileView: View {
           .foregroundStyle(theme.onDarkFill)
           .lineLimit(1)
           .minimumScaleFactor(0.7)
-        Text(viewModel.role)
+        Text(viewModel.profileRoleLine)
           .font(.system(size: 15))
           .foregroundStyle(theme.brandSecondaryText)
           .lineLimit(1)
+          .accessibilityIdentifier("profile_role_line")
         if viewModel.hasRating {
           HStack(spacing: 4) {
             Text(LessonFormatting.ratingText(viewModel.rating))
@@ -284,6 +289,30 @@ struct ProfileView: View {
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier(identifier)
+  }
+
+  // MARK: - A student without an account
+
+  /// That the student is using the app without an account, and the way to
+  /// make one: the sign-up form, which keeps them signed in anonymously until
+  /// it gives them their own account.
+  private var anonymousAccountCard: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(viewModel.anonymousAccountTitle)
+        .font(.system(size: 17, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text(viewModel.anonymousAccountText)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      BrandPrimaryButton(title: viewModel.createAccountLabel) {
+        router.startRegistration()
+      }
+      .accessibilityIdentifier("profile_create_account_button")
+    }
+    .brandCard()
   }
 
   // MARK: - Contact

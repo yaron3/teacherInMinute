@@ -841,6 +841,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Enter a valid email address.": "הזן כתובת אימייל תקינה.",
         "Min. 6 characters": "לפחות 6 תווים",
         "Must be at least 6 characters.": "חייב להכיל לפחות 6 תווים.",
+        // The profile of a student without an account.
+        "Anonymous": "אנונימי",
+        "You're using the app anonymously": "אתה משתמש באפליקציה באופן אנונימי",
+        "Create an account to keep your minutes and lessons, and to log in on any device.": "צור חשבון כדי לשמור את הדקות והשיעורים שלך ולהתחבר מכל מכשיר.",
     ]
 
     #if os(Android)

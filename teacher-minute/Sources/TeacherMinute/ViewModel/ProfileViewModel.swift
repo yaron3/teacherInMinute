@@ -91,6 +91,12 @@ final class ProfileViewModel {
     var shouldShowTeachingDetails: Bool {
         roleType == .teacher
     }
+
+    /// A student who started without an account and has not made one yet.
+    /// They stay signed in anonymously until sign-up gives them their own.
+    var isAnonymousAccount: Bool {
+        Auth.auth().currentUser?.isAnonymous == true
+    }
   
 	var shouldShowTeacherPaymentsMethod: Bool {
 		roleType == .teacher
