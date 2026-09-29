@@ -1,0 +1,31 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="142" height="147" viewBox="0 0 142 147" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Success emblem">
+<circle id="Outer glow" cx="71" cy="71" r="71" fill="url(#paint0_radial_0_43)"/>
+<g id="Success circle" filter="url(#filter0_d_0_43)">
+<circle cx="71" cy="71" r="46" fill="#54E8F6" fill-opacity="0.121569" shape-rendering="crispEdges"/>
+<circle cx="71" cy="71" r="45" stroke="#54E8F6" stroke-width="2" shape-rendering="crispEdges"/>
+</g>
+<g id="check">
+<path id="Vector" d="M84.332 63L66.0005 77.6656L57.668 70.9994" stroke="#54E8F6" stroke-width="3.2" stroke-linecap="round"/>
+</g>
+<circle id="Celebration dot" cx="20" cy="37" r="4" fill="#FF14A8"/>
+<circle id="Celebration dot_2" cx="125" cy="45" r="3" fill="#54E8F6"/>
+<circle id="Celebration dot_3" cx="112.5" cy="120.5" r="2.5" fill="#69F5D0"/>
+</g>
+<defs>
+<filter id="filter0_d_0_43" x="1" y="7" width="140" height="140" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="6"/>
+<feGaussianBlur stdDeviation="12"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.329412 0 0 0 0 0.909804 0 0 0 0 0.964706 0 0 0 0.301961 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_43"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_43" result="shape"/>
+</filter>
+<radialGradient id="paint0_radial_0_43" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(71 71) rotate(90) scale(71)">
+<stop stop-color="#54E8F6" stop-opacity="0.258824"/>
+<stop offset="1" stop-color="#54E8F6" stop-opacity="0"/>
+</radialGradient>
+</defs>
+</svg>

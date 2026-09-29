@@ -10,6 +10,12 @@ import SwiftUI
 import Observation
 import SkipFuse
 
+#if !os(Android)
+import FirebaseAuth
+#else
+import SkipFirebaseAuth
+#endif
+
 enum MainTab: Hashable, CaseIterable {
   case home
   case lessons
@@ -72,6 +78,47 @@ enum MainTab: Hashable, CaseIterable {
   }
 }
 
+/// A row of Instant Teacher's menu. Each shows a section, except Minutes,
+/// which opens the purchase screen over Home.
+enum StudentMenuItem: Hashable, CaseIterable {
+  case ask
+  case minutes
+  case activity
+  case profile
+  case settings
+  case help
+
+  /// The section on screen after the row is picked.
+  var tab: MainTab {
+	switch self {
+	  case .ask, .minutes: .home
+	  case .activity: .lessons
+	  case .profile: .profile
+	  case .settings: .settings
+	  case .help: .help
+	}
+  }
+
+  var title: String {
+	switch self {
+	  case .ask: LocalizationSupport.localized("Ask")
+	  case .minutes: LocalizationSupport.localized("Minutes")
+	  case .activity: LocalizationSupport.localized("Activity")
+	  case .profile, .settings, .help: tab.title
+	}
+  }
+
+  /// Stable, untranslated name for accessibility identifiers.
+  var identifier: String {
+	switch self {
+	  case .ask: "ask"
+	  case .minutes: "minutes"
+	  case .activity: "activity"
+	  case .profile, .settings, .help: tab.identifier
+	}
+  }
+}
+
 enum AppUserMode {
   case student
   case teacher
@@ -116,6 +163,21 @@ final class MainTabViewModel {
   /// Listed below the divider, apart from the main sections.
   var secondaryMenuTabs: [MainTab] {
 	[.settings, .help]
+  }
+
+  /// Instant Teacher's menu, in order.
+  var studentMenuItems: [StudentMenuItem] {
+	StudentMenuItem.allCases
+  }
+
+  /// Set by the menu's Minutes, for Home to open the purchase screen; Home
+  /// clears it as it does.
+  var isPurchaseScreenRequested = false
+
+  /// A student who has not made an account yet, and so has no email or phone
+  /// to show in the menu, but may have one to log in to.
+  var isAnonymousAccount: Bool {
+	Auth.auth().currentUser?.isAnonymous == true
   }
 
   /// Badge count for `tab` — only Lessons ever carries one; 0 means no badge.
@@ -173,6 +235,18 @@ final class MainTabViewModel {
 	if tab == .lessons {
 	  markLessonsTabEntered()
 	}
+  }
+
+  /// Whether `item` is the row for the section on screen. Minutes never is:
+  /// the purchase screen it opens is part of Home, which Ask stands for.
+  func isSelected(_ item: StudentMenuItem) -> Bool {
+	item != .minutes && item.tab == selectedTab
+  }
+
+  /// A row was picked from Instant Teacher's menu.
+  func select(_ item: StudentMenuItem) {
+	select(item.tab)
+	isPurchaseScreenRequested = item == .minutes
   }
 
   /// Log Out was tapped in the menu. It asks first, as Settings does.

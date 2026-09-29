@@ -147,6 +147,116 @@ extension StudentHomeViewModeling {
     ])
   }
 
+  // MARK: Buying minutes (MinutesPurchaseView)
+
+  var purchaseTitle: String { LocalizationSupport.localized("Purchase minutes") }
+  var purchaseSubtitle: String { LocalizationSupport.localized("Choose the package that fits your next question") }
+  var purchaseBackLabel: String { LocalizationSupport.localized("Back") }
+  var bestValueLabel: String { LocalizationSupport.localized("Best value") }
+  var paymentMethodTitle: String { LocalizationSupport.localized("Payment Method") }
+  var changePaymentMethodLabel: String { LocalizationSupport.localized("Change") }
+  var purchaseSummaryTitle: String { LocalizationSupport.localized("Purchase summary") }
+  var minutesPackageLabel: String { LocalizationSupport.localized("Minutes package") }
+  var totalToPayLabel: String { LocalizationSupport.localized("Total to pay") }
+  var securePaymentNote: String { LocalizationSupport.localized("Your payment is secure and encrypted") }
+
+  var purchaseBalanceText: String {
+    remainingMinutes == 1
+      ? LocalizationSupport.localized("Balance: 1 minute")
+      : String(format: LocalizationSupport.localized("Balance: %d minutes"), max(0, remainingMinutes))
+  }
+
+  /// The big figure on a package's card: its minutes, or the package's name
+  /// for one that grants a period of time instead.
+  func packageQuantityText(for option: PricingOption) -> String {
+    option.minutesGranted.map { "\($0)" } ?? localizedName(for: option)
+  }
+
+  func packageUnitText(for option: PricingOption) -> String {
+    if option.minutesGranted != nil {
+      return LocalizationSupport.localized("minutes")
+    }
+    return option.type.billingPeriodText.map { LocalizationSupport.localized($0) } ?? ""
+  }
+
+  /// What a minute comes to in the package, empty for one without minutes.
+  func perMinutePriceText(for option: PricingOption) -> String {
+    guard let minutes = option.minutesGranted, minutes > 0 else { return "" }
+    let cents = Int((Double(option.priceCents) / Double(minutes)).rounded())
+    let price = LessonFormatting.currencyText(cents: cents, currencyCode: option.currency)
+    return String(format: LocalizationSupport.localized("%@/min"), price)
+  }
+
+  func packageSummaryText(for option: PricingOption) -> String {
+    guard let minutes = option.minutesGranted else { return localizedName(for: option) }
+    return minutes == 1
+      ? LocalizationSupport.localized("1 minute")
+      : String(format: LocalizationSupport.localized("%d minutes"), minutes)
+  }
+
+  func payLabel(for option: PricingOption) -> String {
+    String(format: LocalizationSupport.localized("Pay %@"), option.priceText)
+  }
+
+  /// The chosen method's title: "Paying by PayPal", short enough for its
+  /// card, and a card payment in the app's own words.
+  func paymentMethodTitle(_ method: PaymentMethod) -> String {
+    method == .creditCard
+      ? method.displayName
+      : String(format: LocalizationSupport.localized("Paying by %@"), paymentMethodShortName(method))
+  }
+
+  /// The name in the method's box. Brand names stay as their owners write
+  /// them, in every language.
+  func paymentMethodShortName(_ method: PaymentMethod) -> String {
+    switch method {
+    case .applePay: return "Apple Pay"
+    case .googlePay: return "Google Pay"
+    case .paypal, .savedPayPal: return "PayPal"
+    case .bit: return "Bit"
+    case .creditCard: return LocalizationSupport.localized("Credit card")
+    }
+  }
+
+  func logPurchaseScreenShown() {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.purchaseScreenShown, parameters: [
+      "is_anonymous": isAnonymousAccount ? 1 : 0,
+      "remaining_minutes": remainingMinutes
+    ])
+  }
+
+  func logPurchaseStarted(_ option: PricingOption, method: PaymentMethod) {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.purchaseStarted, parameters: [
+      "pricing_option_id": option.id,
+      "payment_method": method.rawValue
+    ])
+  }
+
+  // MARK: Buying minutes — the confirmation (PurchaseSuccessView)
+
+  var minutesAddedTitle: String { LocalizationSupport.localized("Minutes added successfully") }
+  var minutesAddedMessage: String {
+    LocalizationSupport.localized("You can go back to your question and pick up exactly where you left off.")
+  }
+  var topUpDetailsTitle: String { LocalizationSupport.localized("Top-up details") }
+  var completedLabel: String { LocalizationSupport.localized("Payment completed") }
+  var updatedBalanceLabel: String { LocalizationSupport.localized("Updated balance") }
+  var minutesPurchasedLabel: String { LocalizationSupport.localized("Minutes purchased") }
+  var readyForNextQuestionText: String { LocalizationSupport.localized("All set for the next question") }
+  var backToQuestionLabel: String { LocalizationSupport.localized("Back to the question") }
+
+  /// The minutes bought, or the package's name for one without minutes.
+  func purchasedMinutesValue(_ summary: PurchaseSummary) -> String {
+    summary.minutes.map { "\($0)" } ?? LocalizationSupport.localized(summary.packageName)
+  }
+
+  func logPurchaseSuccessShown(_ summary: PurchaseSummary) {
+    AnalyticsService.shared.logEvent(AnalyticsEvent.purchaseSuccessShown, parameters: [
+      "minutes": summary.minutes ?? 0,
+      "remaining_minutes": remainingMinutes
+    ])
+  }
+
   // MARK: Question home — asking
 
   /// The home asks without a topic: any teacher online may take the question.

@@ -16,6 +16,10 @@ extension CompleteProfileViewModel {
     }
     var loadingText: String { LocalizationSupport.localized("Loading your profile…") }
     var continueLabel: String { LocalizationSupport.localized("Continue") }
+    /// Instant Teacher's profile step leads on to the free minutes a verified
+    /// account earns, and says so.
+    var continueToMinutesLabel: String { LocalizationSupport.localized("Continue to get minutes") }
+    var backLabel: String { LocalizationSupport.localized("Back") }
 
     // MARK: Name
     var fullNameFieldTitle: String { LocalizationSupport.localized("Full Name") }

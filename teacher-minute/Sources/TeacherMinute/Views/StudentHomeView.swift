@@ -22,6 +22,11 @@ struct StudentHomeView: View {
   /// package sets `pendingCheckoutOption`, and the same sheet moves on to
   /// paying for it.
   @State var isChoosingMinutesPackage = false
+  /// Buying minutes, over the home (`MinutesPurchaseView`).
+  @State var showsPurchaseScreen = false
+  /// Raised by the menu's Minutes, and cleared here as the purchase screen
+  /// opens for it.
+  @Binding var purchaseScreenRequested: Bool
   @State var emailReward = EmailRewardViewModel()
   @Environment(\.openURL) var openURL
   @Environment(\.appRouter) var router
@@ -31,8 +36,12 @@ struct StudentHomeView: View {
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
-  init(viewModel: any StudentHomeViewModeling = StudentHomeViewModel()) {
+  init(
+	viewModel: any StudentHomeViewModeling = StudentHomeViewModel(),
+	purchaseScreenRequested: Binding<Bool> = .constant(false)
+  ) {
 	self._viewModel = State(initialValue: viewModel)
+	self._purchaseScreenRequested = purchaseScreenRequested
   }
 
   var body: some View {
@@ -151,7 +160,13 @@ struct StudentHomeView: View {
 	  showingCouponAlert = viewModel.handleCouponStateChange()
 	}
 	.onChange(of: viewModel.purchaseSummary?.id) { _, id in
-	  showingPurchaseSummaryAlert = id != nil
+	  // The purchase screen confirms its own purchases, in full.
+	  showingPurchaseSummaryAlert = id != nil && !showsPurchaseScreen
+	}
+	// The menu's Minutes: on Home already, or Home opening for it.
+	.onAppear { openRequestedPurchaseScreen() }
+	.onChange(of: purchaseScreenRequested) { _, _ in
+	  openRequestedPurchaseScreen()
 	}
   }
 
@@ -160,10 +175,21 @@ struct StudentHomeView: View {
 	  StudentQuestionHomeView(
 		viewModel: viewModel,
 		mayAskTeacher: mayAskTeacher,
-		onLoadMinutes: loadMinutesTapped
+		onLoadMinutes: loadMinutesTapped,
+		isCovered: showsPurchaseScreen
 	  )
 
+	  if showsPurchaseScreen {
+		MinutesPurchaseView(viewModel: viewModel) {
+		  showsPurchaseScreen = false
+		}
+		// Under the checkout spinner, the search's error and the payment
+		// dialogs, which all have to show over it.
+		.zIndex(4)
+	  }
+
 	  searchStateOverlay
+		.zIndex(6)
 
 	  checkoutPreparingOverlay
 		.zIndex(5)
@@ -436,20 +462,22 @@ struct StudentHomeView: View {
 	)
   }
 
-  /// "Load minutes": the payment options are settled first behind the
-  /// spinner, as for a package card, so the sheet arrives complete. A single
-  /// package is not a choice, so that case goes straight to paying for it.
+  /// The purchase screen the menu's Minutes asked for, as "Load minutes"
+  /// opens it.
+  func openRequestedPurchaseScreen() {
+	guard purchaseScreenRequested else { return }
+	purchaseScreenRequested = false
+	loadMinutesTapped()
+  }
+
+  /// "Load minutes" and "Buy minutes": the purchase screen. The payment
+  /// options are settled first, behind the spinner, so it opens complete
+  /// rather than filling in a method at a time.
   func loadMinutesTapped() {
 	guard !viewModel.isPreparingCheckout else { return }
 	Task { @MainActor in
 	  await viewModel.preparePaymentOptions()
-	  let options = viewModel.pricingOptions
-	  if options.count == 1, let option = options.first {
-		viewModel.selectTier(option)
-		pendingCheckoutOption = option
-	  } else {
-		isChoosingMinutesPackage = !options.isEmpty
-	  }
+	  showsPurchaseScreen = !viewModel.pricingOptions.isEmpty
 	  viewModel.isPreparingCheckout = false
 	}
   }

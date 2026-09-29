@@ -5953,6 +5953,281 @@
       },
       "valueType": "STRING"
     },
+    "registration": {
+      "defaultValue": {
+        "value": "Registration"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הרשמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "registration_create_account": {
+      "defaultValue": {
+        "value": "Registration: Create an account"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הרשמה : יצירת חשבון"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "manage_payments_preferences": {
+      "defaultValue": {
+        "value": "Manage payments, preferences, notifications and device settings."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ניהול תשלומים, העדפות, התראות והגדרות מכשיר."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "back": {
+      "defaultValue": {
+        "value": "Back"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חזרה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "continue_get_minutes": {
+      "defaultValue": {
+        "value": "Continue to get minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המשך לקבלת דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "purchase_minutes": {
+      "defaultValue": {
+        "value": "Purchase minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "רכישת דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "choose_the_package": {
+      "defaultValue": {
+        "value": "Choose the package that fits your next question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בחרו את החבילה שמתאימה לשאלה הבאה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "balance_minutes": {
+      "defaultValue": {
+        "value": "Balance: %d minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "יתרה: %d דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "balance_minute": {
+      "defaultValue": {
+        "value": "Balance: 1 minute"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "יתרה: דקה אחת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "best_value": {
+      "defaultValue": {
+        "value": "Best value"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הכי משתלם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "credit_card": {
+      "defaultValue": {
+        "value": "Credit card"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כרטיס אשראי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "purchase_summary": {
+      "defaultValue": {
+        "value": "Purchase summary"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סיכום הרכישה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "minutes_package": {
+      "defaultValue": {
+        "value": "Minutes package"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חבילת דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "total_pay": {
+      "defaultValue": {
+        "value": "Total to pay"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סה״כ לתשלום"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pay": {
+      "defaultValue": {
+        "value": "Pay %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום %@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "paying": {
+      "defaultValue": {
+        "value": "Paying by %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תשלום ב־%@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_payment_secure": {
+      "defaultValue": {
+        "value": "Your payment is secure and encrypted"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התשלום מאובטח ומוצפן"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "minutes_added_successfully": {
+      "defaultValue": {
+        "value": "Minutes added successfully"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הדקות נוספו בהצלחה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_can_back": {
+      "defaultValue": {
+        "value": "You can go back to your question and pick up exactly where you left off."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אפשר לחזור לשאלה ולהמשיך בדיוק מהמקום שבו עצרת."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "top_details": {
+      "defaultValue": {
+        "value": "Top-up details"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "פרטי הטעינה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "payment_completed": {
+      "defaultValue": {
+        "value": "Payment completed"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הושלם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "updated_balance": {
+      "defaultValue": {
+        "value": "Updated balance"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "יתרה מעודכנת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "minutes_purchased": {
+      "defaultValue": {
+        "value": "Minutes purchased"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "דקות שנרכשו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "all_set_for": {
+      "defaultValue": {
+        "value": "All set for the next question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הכול מוכן לשאלה הבאה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "back_the_question": {
+      "defaultValue": {
+        "value": "Back to the question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חזרה לשאלה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "please_enter_valid": {
       "defaultValue": {
         "value": "Please enter a valid email address."
@@ -10411,6 +10686,50 @@
       "conditionalValues": {
         "Hebrew": {
           "value": "עזרה ותמיכה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "menu": {
+      "defaultValue": {
+        "value": "Menu"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תפריט"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "ask": {
+      "defaultValue": {
+        "value": "Ask"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לשאול"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "menu_minutes": {
+      "defaultValue": {
+        "value": "Minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "activity": {
+      "defaultValue": {
+        "value": "Activity"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "פעילות"
         }
       },
       "valueType": "STRING"

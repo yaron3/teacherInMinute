@@ -90,6 +90,16 @@ final class AppRouter: @unchecked Sendable {
 	rootScreen = .welcome
   }
 
+  /// Takes a student who started without an account to the login form, from
+  /// the menu. As with `startRegistration`, they stay signed in anonymously
+  /// until the form signs them into their own account.
+  func startLogin() {
+	var login = NavigationPath()
+	login.append(AppRoute.login)
+	path = login
+	rootScreen = .welcome
+  }
+
   /// Returns to sign-in whenever Firebase has no user while the tab bar is up.
   ///
   /// Log Out and Delete Account route there themselves. This is for a session

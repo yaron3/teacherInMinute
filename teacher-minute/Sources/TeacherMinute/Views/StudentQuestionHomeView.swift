@@ -15,6 +15,9 @@ struct StudentQuestionHomeView: View {
   /// Whether a question may go out now. Raises the alert that says why not.
   let mayAskTeacher: () -> Bool
   let onLoadMinutes: () -> Void
+  /// A screen stands over the home, and the camera is not what the student
+  /// is looking at.
+  var isCovered = false
 
   @State var mode: QuestionHomeMode = .photo
   @State var hasCamera = true
@@ -722,9 +725,10 @@ struct StudentQuestionHomeView: View {
   // MARK: - State
 
   /// The camera runs only while it is what the student is looking at: not
-  /// under the writing panel, a search, a lesson or another section.
+  /// under the writing panel, a search, a lesson, the purchase screen or
+  /// another section.
   var showsCamera: Bool {
-    guard mode == .photo, isOnScreen, hasCamera, cameraAccess.isGranted else { return false }
+    guard mode == .photo, isOnScreen, !isCovered, hasCamera, cameraAccess.isGranted else { return false }
     if case .idle = viewModel.searchState {
       return true
     }

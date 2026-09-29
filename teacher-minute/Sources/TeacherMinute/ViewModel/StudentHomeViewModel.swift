@@ -125,11 +125,15 @@ struct PurchaseSummary {
   let packageName: String
   let priceText: String
   let minutesText: String?
+  /// The minutes the package granted, or nil for one that grants time rather
+  /// than minutes.
+  let minutes: Int?
 
   init(option: PricingOption) {
     packageName = option.name
     priceText = option.priceText
     minutesText = option.minutesText
+    minutes = option.minutesGranted
   }
 }
 

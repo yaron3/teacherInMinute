@@ -48,11 +48,10 @@ struct MainTabView: View {
 			teacherSessionScreen
 		  }
 	  }
+	  .blurredUnderMenu(viewModel.userMode == .student && viewModel.isSideMenuOpen)
 
 	  // Outside the stack so it covers the navigation bar Settings shows.
-	  SideMenuView(viewModel: viewModel, profile: profileViewModel) {
-		viewModel.logOutTapped()
-	  }
+	  sideMenu
 	}
 	.appDialog(
 	  viewModel.logOutLabel,
@@ -72,6 +71,21 @@ struct MainTabView: View {
 	  message: teacherDashboardViewModel?.studentCancelledMessage,
 	  actions: [AppDialogAction(teacherDashboardViewModel?.okLabel ?? "")]
 	)
+  }
+
+  /// Instant Teacher's menu is the brand design's; Pro Teacher keeps its own.
+  @ViewBuilder
+  var sideMenu: some View {
+	if viewModel.userMode == .student {
+	  BrandSideMenuView(viewModel: viewModel, profile: profileViewModel) {
+		viewModel.closeSideMenu()
+		router.startLogin()
+	  }
+	} else {
+	  SideMenuView(viewModel: viewModel, profile: profileViewModel) {
+		viewModel.logOutTapped()
+	  }
+	}
   }
 
   /// The student cancelled while this teacher's accept was on its way. By then
@@ -168,7 +182,10 @@ struct MainTabView: View {
 	switch tab {
 	  case .home:
 		if viewModel.userMode == .student, let studentHomeViewModel {
-		  StudentHomeView(viewModel: studentHomeViewModel)
+		  StudentHomeView(
+			viewModel: studentHomeViewModel,
+			purchaseScreenRequested: $viewModel.isPurchaseScreenRequested
+		  )
 			.trackScreen(AnalyticsScreen.studentHome)
 		} else if let teacherDashboardViewModel {
 		  TeacherDashboardView(
@@ -286,6 +303,22 @@ struct TeacherLiveSessionScreen: View {
 	  AndroidBackNavigationBridge.setSessionBackBlocked(false)
 #endif
 	}
+  }
+}
+
+extension View {
+  /// Blurs what an open brand menu covers, as the design's scrim does: SwiftUI
+  /// has no backdrop blur, so the content under the scrim is blurred itself.
+  /// On iOS the blur animates with the menu alone, not with the section a
+  /// menu tap swaps in at the same moment. Android blurs from API 31.
+  func blurredUnderMenu(_ isBlurred: Bool) -> some View {
+#if os(Android)
+	blur(radius: isBlurred ? 6 : 0)
+#else
+	animation(.easeOut(duration: 0.25)) { content in
+	  content.blur(radius: isBlurred ? 6 : 0, opaque: true)
+	}
+#endif
   }
 }
 

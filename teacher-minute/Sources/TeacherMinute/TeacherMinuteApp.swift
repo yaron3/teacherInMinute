@@ -50,8 +50,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 					  .navigationDestination(for: AppRoute.self) { route in
 						switch route {
 						  case .createAccount:
-							CreateAccountView()
-							  .trackScreen(AnalyticsScreen.createAccount)
+							createAccountScreen
 						  case .login:
 							LoginView()
 							  .trackScreen(AnalyticsScreen.login)
@@ -62,8 +61,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 							TeacherSubjectsView()
 							  .trackScreen(AnalyticsScreen.teacherSubjects)
 						  case .completeProfile(let role):
-							CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
-							  .trackScreen(AnalyticsScreen.completeProfile)
+							completeProfileScreen(role: role)
 						  case .permissionsSetup(let role):
 							PermissionsSetupView(role: role)
 							  .trackScreen(AnalyticsScreen.permissionsSetup)
@@ -133,6 +131,28 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 	} else {
 	  WelcomeView()
 		.trackScreen(AnalyticsScreen.welcome)
+	}
+  }
+
+  /// Instant Teacher signs its students up on the brand's own screens; Pro
+  /// Teacher keeps the standard ones. Both run on the same view models.
+  @ViewBuilder
+  var createAccountScreen: some View {
+	if AuthRole.appRole == .student {
+	  StudentSignUpView()
+	} else {
+	  CreateAccountView()
+		.trackScreen(AnalyticsScreen.createAccount)
+	}
+  }
+
+  @ViewBuilder
+  func completeProfileScreen(role: AuthRole) -> some View {
+	if role == .student {
+	  StudentCompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
+	} else {
+	  CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
+		.trackScreen(AnalyticsScreen.completeProfile)
 	}
   }
 

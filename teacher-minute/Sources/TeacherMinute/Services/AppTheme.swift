@@ -295,6 +295,27 @@ struct AppTheme {
         )
     }
 
+    /// A card or field on a brand screen that sits on the gradient itself.
+    var brandCardSurface: Color {
+        Color.black.opacity(0.2)
+    }
+
+    /// A rule inside a brand card.
+    var brandDivider: Color {
+        adaptive(
+            light: (59, 56, 96),
+            dark: (59, 56, 96)
+        )
+    }
+
+    /// Something that went through — a completed purchase.
+    var brandSuccess: Color {
+        adaptive(
+            light: (105, 245, 208),
+            dark: (105, 245, 208)
+        )
+    }
+
     /// A box set into `brandModalBackground` — a figure the modal quotes.
     var brandModalInset: Color {
         adaptive(
@@ -620,7 +641,10 @@ private struct AppThemePreviewView: View {
                     ("brandPanelDot", theme.brandPanelDot),
                     ("brandScrim", theme.brandScrim),
                     ("brandModalBackground", theme.brandModalBackground),
-                    ("brandModalInset", theme.brandModalInset)
+                    ("brandModalInset", theme.brandModalInset),
+                    ("brandCardSurface", theme.brandCardSurface),
+                    ("brandDivider", theme.brandDivider),
+                    ("brandSuccess", theme.brandSuccess)
                 ])
 
                 section("Lines & controls", swatches: [
