@@ -40,6 +40,20 @@ final class UserService {
 	logger.info("Saved profile for uid: \(profile.uid)")
   }
   
+  /// The profile of a student who started without an account: the role, so
+  /// the app and backend treat them as a student, and nothing else. There is
+  /// no name, email or phone to save until they register.
+  func saveAnonymousStudentProfile(uid: String) async throws {
+	try await Firestore.firestore().collection("users").document(uid).setData([
+	  "uid": uid,
+	  "role": AuthRole.student.rawValue,
+	  "isAnonymous": true,
+	  "createdAt": ISO8601DateFormatter().string(from: Date()),
+	  "currency": LessonFormatting.defaultCurrencyCode,
+	], merge: true)
+	logger.info("Saved anonymous student profile for uid: \(uid)")
+  }
+
   // MARK: - Fetch raw Firestore document
   
   func fetchRaw(uid: String) async throws -> [String: Any]? {
@@ -141,6 +155,17 @@ final class UserService {
   }
 
   func resumeRoute(uid: String) async throws -> OnboardingResume {
+	// A student who started without an account has nothing to complete: they
+	// go home, where they can ask a question straight away. Only the student
+	// app offers that start, but an anonymous session is the student's either
+	// way. The profile is written again if the one written at the start was lost.
+	if Auth.auth().currentUser?.isAnonymous == true {
+	  if (try? await fetchRaw(uid: uid))?["role"] == nil {
+		try? await saveAnonymousStudentProfile(uid: uid)
+	  }
+	  return .home(role: .student)
+	}
+
 	guard let data = try await fetchRaw(uid: uid) else {
 	  return onboardingStart
 	}

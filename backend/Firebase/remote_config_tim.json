@@ -5678,6 +5678,193 @@
       },
       "valueType": "STRING"
     },
+    "when_can_explain": {
+      "defaultValue": {
+        "value": "When AI can't explain it, we have a human teacher who sees exactly where you got stuck"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כש-AI לא מצליח להסביר, יש לנו מורה אנושי שרואה בדיוק איפה נתקעת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "get_started": {
+      "defaultValue": {
+        "value": "Get started"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתחילים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "per_minute_fixed": {
+      "defaultValue": {
+        "value": "₪2 per minute • no fixed lessons"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "₪2 לדקה • בלי שיעורים קבועים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "photo": {
+      "defaultValue": {
+        "value": "Photo"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "attach_photo": {
+      "defaultValue": {
+        "value": "Attach photo"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צרף תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "snap_your_question": {
+      "defaultValue": {
+        "value": "Snap your\nquestion"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צלם את\nהשאלה שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "write_your_question": {
+      "defaultValue": {
+        "value": "Write your\nquestion"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תוכל להוסיף\nשאלה\nבכתב"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teacher_online": {
+      "defaultValue": {
+        "value": "teacher\nonline"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה\nזמין"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teachers_online": {
+      "defaultValue": {
+        "value": "teachers\nonline"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורים\nזמינים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "per_minute": {
+      "defaultValue": {
+        "value": "₪2\nper minute"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "₪2 לדקה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "choose_keyboard": {
+      "defaultValue": {
+        "value": "Choose keyboard"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בחר מקלדת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "delete_photo": {
+      "defaultValue": {
+        "value": "Delete photo"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מחק תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "load_minutes": {
+      "defaultValue": {
+        "value": "Load minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "טען דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "add_your_question": {
+      "defaultValue": {
+        "value": "Add your question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוסף את השאלה שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "take_photo_write": {
+      "defaultValue": {
+        "value": "Take a photo of it, or write at least 10 characters."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צלם אותה, או כתוב לפחות 10 תווים."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "photo_not_attached": {
+      "defaultValue": {
+        "value": "Photo not attached"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התמונה לא צורפה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "general_question": {
+      "defaultValue": {
+        "value": "General question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שאלה כללית"
+        }
+      },
+      "valueType": "STRING"
+    },
     "please_enter_valid": {
       "defaultValue": {
         "value": "Please enter a valid email address."

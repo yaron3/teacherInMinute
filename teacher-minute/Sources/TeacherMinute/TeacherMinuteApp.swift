@@ -46,8 +46,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				  MainTabView(userMode: AppUserMode(role: role))
 				case .welcome:
 				  NavigationStack(path: $router.path) {
-					WelcomeView()
-					  .trackScreen(AnalyticsScreen.welcome)
+					signedOutRoot
 					  .navigationDestination(for: AppRoute.self) { route in
 						switch route {
 						  case .createAccount:
@@ -122,6 +121,19 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				isLaunching = false
 			  }
 			}
+  }
+
+  /// The first screen of a signed-out session. A student starts from the intro,
+  /// without an account, and logs in to an existing one from the home screen's
+  /// menu; a teacher registers or signs in on the welcome screen.
+  @ViewBuilder
+  var signedOutRoot: some View {
+	if AuthRole.appRole == .student {
+	  StudentIntroView()
+	} else {
+	  WelcomeView()
+		.trackScreen(AnalyticsScreen.welcome)
+	}
   }
 
   private func performLaunchSessionResume() async {

@@ -371,8 +371,13 @@ extension TeacherDashboardViewModeling {
   }
 
   /// Topics are stored lowercased and localized by their capitalized form.
+  /// A question from the student's home has none: "any" puts it to every
+  /// teacher online.
   func localizedTopicName(_ topic: String) -> String {
-    LocalizationSupport.localized(topic.capitalized)
+    if topic == "any" {
+      return LocalizationSupport.localized("General question")
+    }
+    return LocalizationSupport.localized(topic.capitalized)
   }
 
 }

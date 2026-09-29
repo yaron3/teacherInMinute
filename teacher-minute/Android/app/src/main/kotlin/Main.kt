@@ -293,19 +293,24 @@ open class MainActivity: AppCompatActivity {
 @Composable
 internal fun SyncSystemBarsWithTheme() {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    // A screen drawn dark in both schemes asks for its own icons; see
+    // AndroidSystemBars.
+    val requested = AndroidSystemBars.request.value
+    val darkStatusIcons = requested?.darkStatusBar ?: !dark
+    val darkNavigationIcons = requested?.darkNavigationBar ?: !dark
 
     val transparent = AndroidColor.TRANSPARENT
-    val style = if (dark) {
-        SystemBarStyle.dark(transparent)
-    } else {
+    fun style(darkIcons: Boolean) = if (darkIcons) {
         SystemBarStyle.light(transparent, transparent)
+    } else {
+        SystemBarStyle.dark(transparent)
     }
 
     val activity = LocalContext.current as? ComponentActivity
-    DisposableEffect(style) {
+    DisposableEffect(darkStatusIcons, darkNavigationIcons) {
         activity?.enableEdgeToEdge(
-            statusBarStyle = style,
-            navigationBarStyle = style
+            statusBarStyle = style(darkStatusIcons),
+            navigationBarStyle = style(darkNavigationIcons)
         )
         onDispose { }
     }

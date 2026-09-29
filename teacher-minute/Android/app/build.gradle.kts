@@ -416,6 +416,11 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.1.1")
     implementation("io.livekit:livekit-android:2.25.3")
 
+    // The live camera behind the student's home — see AndroidQuestionCamera.
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+
     // Google Pay via Braintree — see AndroidGooglePayManager. Pulls in
     // braintree-core and play-services-wallet transitively.
     implementation("com.braintreepayments.api:google-pay:5.13.0")

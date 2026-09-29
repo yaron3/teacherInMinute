@@ -184,9 +184,9 @@ struct AppTheme {
 
     // MARK: - Brand
 
-    // The launch splash is a brand screen, drawn dark in both schemes: its logo
-    // art and the glow behind it are made for a dark ground. Text on it takes
-    // `onDarkFill`.
+    // The brand screens — the launch splash, the intro a signed-out student
+    // meets first, and the student's home — are drawn dark in both schemes:
+    // their art is made for a dark ground. Headlines on them take `onDarkFill`.
 
     /// Top of the brand background gradient.
     var brandBackgroundTop: Color {
@@ -209,6 +209,72 @@ struct AppTheme {
         adaptive(
             light: (84, 232, 246),
             dark: (84, 232, 246)
+        )
+    }
+
+    /// Supporting copy on the brand background — a pitch under a headline.
+    var brandSecondaryText: Color {
+        adaptive(
+            light: (179, 175, 202),
+            dark: (179, 175, 202)
+        )
+    }
+
+    /// Fine print on the brand background — prices, footnotes.
+    var brandMutedText: Color {
+        adaptive(
+            light: (166, 160, 187),
+            dark: (166, 160, 187)
+        )
+    }
+
+    /// The primary action on a brand screen. Its label takes `onBrandAction`.
+    var brandActionBackground: Color {
+        adaptive(
+            light: (84, 232, 246),
+            dark: (84, 232, 246)
+        )
+    }
+
+    /// Text, icons and outline on `brandActionBackground`.
+    var onBrandAction: Color {
+        adaptive(
+            light: (0, 0, 0),
+            dark: (0, 0, 0)
+        )
+    }
+
+    /// Outline of a card on the brand background.
+    var brandCardBorder: Color {
+        adaptive(
+            light: (84, 232, 246),
+            dark: (84, 232, 246)
+        )
+        .opacity(0.57)
+    }
+
+    /// Outline of a control on the brand background — a toggle, a menu
+    /// button, an option that is not chosen — and of the writing panel.
+    var brandControlBorder: Color {
+        adaptive(
+            light: (76, 73, 134),
+            dark: (76, 73, 134)
+        )
+    }
+
+    /// The writing panel on the student's home.
+    var brandPanelBackground: Color {
+        adaptive(
+            light: (32, 31, 47),
+            dark: (32, 31, 47)
+        )
+    }
+
+    /// The dot grid on `brandPanelBackground`.
+    var brandPanelDot: Color {
+        adaptive(
+            light: (43, 42, 60),
+            dark: (43, 42, 60)
         )
     }
 
@@ -518,7 +584,15 @@ private struct AppThemePreviewView: View {
                 section("Brand", swatches: [
                     ("brandBackgroundTop", theme.brandBackgroundTop),
                     ("brandBackgroundBottom", theme.brandBackgroundBottom),
-                    ("brandHighlightText", theme.brandHighlightText)
+                    ("brandHighlightText", theme.brandHighlightText),
+                    ("brandSecondaryText", theme.brandSecondaryText),
+                    ("brandMutedText", theme.brandMutedText),
+                    ("brandActionBackground", theme.brandActionBackground),
+                    ("onBrandAction", theme.onBrandAction),
+                    ("brandCardBorder", theme.brandCardBorder),
+                    ("brandControlBorder", theme.brandControlBorder),
+                    ("brandPanelBackground", theme.brandPanelBackground),
+                    ("brandPanelDot", theme.brandPanelDot)
                 ])
 
                 section("Lines & controls", swatches: [

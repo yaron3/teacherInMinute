@@ -18,6 +18,10 @@ struct StudentHomeView: View {
   @State var showsAskTeacher = false
   @State var showsNotificationExplainer = false
   @State var pendingCheckoutOption: PricingOption?
+  /// The package chooser is up, from the home's "Load minutes". Picking a
+  /// package sets `pendingCheckoutOption`, and the same sheet moves on to
+  /// paying for it.
+  @State var isChoosingMinutesPackage = false
   @State var emailReward = EmailRewardViewModel()
   @Environment(\.openURL) var openURL
   @Environment(\.scenePhase) var scenePhase
@@ -57,18 +61,35 @@ struct StudentHomeView: View {
 	.task {
 	  await viewModel.loadProfileIfNeeded()
 	}
-	.sheet(isPresented: isChoosingPaymentMethod) {
-	  if let option = pendingCheckoutOption {
-		PaymentMethodSheet(
-		  viewModel: viewModel,
-		  methods: viewModel.supportedPaymentMethods(for: option),
-		  theme: theme,
-		  savedPayPalEmail: viewModel.savedPayPalEmail
-		) { method in
-		  pendingCheckoutOption = nil
-		  Task { await viewModel.checkout(option, method: method) }
+	// One sheet for both steps of a purchase, as in a lesson: picking a
+	// package swaps the content rather than dismissing and presenting again.
+	.sheet(isPresented: isBuyingMinutes) {
+	  // A sheet starts from the system's direction, not the app's.
+	  Group {
+		if let option = pendingCheckoutOption {
+		  PaymentMethodSheet(
+			viewModel: viewModel,
+			methods: viewModel.supportedPaymentMethods(for: option),
+			theme: theme,
+			savedPayPalEmail: viewModel.savedPayPalEmail
+		  ) { method in
+			pendingCheckoutOption = nil
+			isChoosingMinutesPackage = false
+			Task { await viewModel.checkout(option, method: method) }
+		  }
+		} else {
+		  MinutesPackageSheet(
+			viewModel: viewModel,
+			options: viewModel.pricingOptions,
+			theme: theme
+		  ) { option in
+			viewModel.selectTier(option)
+			pendingCheckoutOption = option
+		  }
 		}
 	  }
+	  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+	  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
 	}
   }
 
@@ -135,7 +156,11 @@ struct StudentHomeView: View {
 
   var homeLayers: some View {
 	ZStack {
-	  homeScroll
+	  StudentQuestionHomeView(
+		viewModel: viewModel,
+		mayAskTeacher: mayAskTeacher,
+		onLoadMinutes: loadMinutesTapped
+	  )
 
 	  searchStateOverlay
 
@@ -371,13 +396,41 @@ struct StudentHomeView: View {
   /// everyone, and telling a student with minutes to go and buy more is worse
   /// than asking them to wait a moment.
   func askTeacherTapped() {
+    if mayAskTeacher() {
+      showsAskTeacher = true
+    }
+  }
+
+  /// Whether a question may go out now, raising the alert that says why not
+  /// when it may not.
+  func mayAskTeacher() -> Bool {
     if !viewModel.isProfileLoaded {
       showingBalanceLoadingAlert = true
-    } else if viewModel.canAskTeacher {
-      showsAskTeacher = true
-    } else {
-      showingLowBalanceAlert = true
+      return false
     }
+    if !viewModel.canAskTeacher {
+      showingLowBalanceAlert = true
+      return false
+    }
+    return true
+  }
+
+  /// "Load minutes": the payment options are settled first behind the
+  /// spinner, as for a package card, so the sheet arrives complete. A single
+  /// package is not a choice, so that case goes straight to paying for it.
+  func loadMinutesTapped() {
+	guard !viewModel.isPreparingCheckout else { return }
+	Task { @MainActor in
+	  await viewModel.preparePaymentOptions()
+	  let options = viewModel.pricingOptions
+	  if options.count == 1, let option = options.first {
+		viewModel.selectTier(option)
+		pendingCheckoutOption = option
+	  } else {
+		isChoosingMinutesPackage = !options.isEmpty
+	  }
+	  viewModel.isPreparingCheckout = false
+	}
   }
 
   var heroAskTeacherButtonContent: some View {
@@ -963,12 +1016,15 @@ struct StudentHomeView: View {
 	}
   }
 
-  var isChoosingPaymentMethod: Binding<Bool> {
+  var isBuyingMinutes: Binding<Bool> {
 	Binding(
-	  get: { pendingCheckoutOption != nil },
+	  get: { pendingCheckoutOption != nil || isChoosingMinutesPackage },
 	  set: { isPresented in
+		// Closing the sheet abandons the whole purchase, including a package
+		// chosen a moment ago.
 		if !isPresented {
 		  pendingCheckoutOption = nil
+		  isChoosingMinutesPackage = false
 		}
 	  }
 	)

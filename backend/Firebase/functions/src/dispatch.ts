@@ -6,7 +6,7 @@ import { onValueWritten } from "firebase-functions/v2/database";
 import { getFunctions } from "firebase-admin/functions";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
-import { rankTeachers } from "./scoring";
+import { ANY_TOPIC, rankTeachers } from "./scoring";
 import { sendInvitePush, sendNoMatchPush } from "./fcm";
 import {
   TeacherRecord,
@@ -234,7 +234,7 @@ async function tryInviteTeacherForQuestionWave(
       return { invited: false, reason: `invalid-wave-${wave ?? 0}` };
     }
 
-    if (!teacher.subjects?.includes(question.topic)) {
+    if (question.topic !== ANY_TOPIC && !teacher.subjects?.includes(question.topic)) {
       return { invited: false, reason: "topic-mismatch" };
     }
 

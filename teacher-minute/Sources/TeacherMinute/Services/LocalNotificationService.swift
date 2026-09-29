@@ -15,7 +15,10 @@ final class LocalNotificationService {
     private init() {}
 
     func scheduleTeacherQuestion(questionId: String, topic: String, text: String) {
-        let body = topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? text : topic
+        // "any" is the topic of a question put to every teacher, which names
+        // nothing the teacher could use; the question itself says more.
+        let named = topic == "any" ? "" : topic
+        let body = named.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? text : named
         scheduleIfBackground(
             identifier: "teacher-question-\(questionId)",
             title: LocalizationSupport.localized("New Question"),

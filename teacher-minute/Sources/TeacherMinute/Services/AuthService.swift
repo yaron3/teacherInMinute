@@ -145,6 +145,14 @@ final class AuthService {
 //  }
   
   
+  /// Signs a student in without an account, so they can ask a question before
+  /// registering. Returns the new account's uid.
+  func signInAnonymously() async throws -> String {
+    let result = try await Auth.auth().signInAnonymously()
+    logger.info("[Auth] anonymous sign-in uid=\(result.user.uid)")
+    return result.user.uid
+  }
+
   func createUser(email: String, password: String) async throws -> Bool{
       let result = try await Auth.auth().createUser(withEmail: email, password: password)
       logger.info("got result: \(result)")

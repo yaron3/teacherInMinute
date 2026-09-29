@@ -102,6 +102,9 @@ export interface ScoredTeacher {
   score: number;
 }
 
+// The topic of a question put to every online teacher, whatever they teach.
+export const ANY_TOPIC = "any";
+
 // Normalize a subject or topic string for matching:
 // strips a leading area prefix ("Math: " → ""), lowercases, removes non-alphanumeric.
 // "Math: Algebra" → "algebra", "algebra" → "algebra", "Trigonometry" → "trigonometry"
@@ -111,7 +114,8 @@ function normalizeSubject(s: string): string {
 }
 
 // Returns all eligible (online, not in a session, reachable, matching topic) teachers sorted
-// best-first. The dispatcher slices the result per wave, skipping alreadyInvited UIDs.
+// best-first — for ANY_TOPIC, every teacher who is otherwise eligible.
+// The dispatcher slices the result per wave, skipping alreadyInvited UIDs.
 export function rankTeachers(
   teachers: Record<string, TeacherRecord>,
   topic: string,
@@ -148,7 +152,7 @@ export function rankTeachers(
     }
     // RTDB can deserialize arrays as {0: "algebra", ...} objects when written by mobile SDKs.
     const subjects: string[] = Array.isArray(t.subjects) ? t.subjects : Object.values(t.subjects ?? {} as Record<string, string>);
-    const matches = subjects.some((s) => normalizeSubject(s) === normalizedTopic);
+    const matches = topic === ANY_TOPIC || subjects.some((s) => normalizeSubject(s) === normalizedTopic);
     if (!matches) {
       topicMismatch += 1;
       continue;

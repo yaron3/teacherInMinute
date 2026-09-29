@@ -2,7 +2,7 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { isTeacherBusy, isTeacherReachable, rankTeachers, scoreTeacher } from "../scoring";
+import { isTeacherBusy, isTeacherReachable, ANY_TOPIC, rankTeachers, scoreTeacher } from "../scoring";
 import { TeacherRecord } from "../types";
 
 const NOW = Date.now();
@@ -119,6 +119,18 @@ describe("who is considered at all", () => {
         algebra: teacher({ subjects: ["algebra"] }),
       })
     ).toEqual(["algebra"]);
+  });
+
+  test("a question for any topic goes to every teacher, whatever they teach", () => {
+    expect(
+      order(
+        {
+          algebra: teacher({ subjects: ["algebra"], ratingAvg: 3 }),
+          geometry: teacher({ subjects: ["geometry"], ratingAvg: 5 }),
+        },
+        ANY_TOPIC
+      )
+    ).toEqual(["geometry", "algebra"]);
   });
 
   test("subjects still match when they carry their area", () => {

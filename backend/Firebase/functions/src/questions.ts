@@ -26,7 +26,7 @@ import {
 } from "./dispatch";
 import { enqueueAbandonedLessonCheck } from "./lessons";
 import { markTeacherBusy, releaseTeacherBusy } from "./busy";
-import { isTeacherBusy } from "./scoring";
+import { ANY_TOPIC, isTeacherBusy } from "./scoring";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -116,7 +116,8 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     throw new HttpsError("invalid-argument", "Provide question text or attach at least one photo");
   }
 
-  const validTopics = ["algebra", "geometry", "trigonometry", "calculus", "statistics", "arithmetic"];
+  // ANY_TOPIC asks every online teacher, whatever they teach.
+  const validTopics = ["algebra", "geometry", "trigonometry", "calculus", "statistics", "arithmetic", ANY_TOPIC];
   if (!validTopics.includes(topic)) {
     throw new HttpsError("invalid-argument", `topic must be one of: ${validTopics.join(", ")}`);
   }
