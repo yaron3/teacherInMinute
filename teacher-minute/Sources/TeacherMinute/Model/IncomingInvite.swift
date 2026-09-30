@@ -8,6 +8,7 @@
 //     text      : String  (first 300 chars of the student's question)
 //     expiresAt : Double  (Unix ms — the 12s wave deadline)
 //     wave      : Int
+//     struggle  : String  (optional — why the student is stuck)
 
 import Foundation
 
@@ -30,6 +31,9 @@ struct IncomingInvite: Identifiable {
   let studentImageURL: String
   let pricePerMinuteCents: Int
   let conversationType: String
+  /// Why the student is stuck, once they have said: "cant_solve",
+  /// "different_results", "repeating_mistake" or "other". Empty until then.
+  let struggle: String
 
   var secondsRemaining: Double {
     (expiresAt - Date().timeIntervalSince1970 * 1000.0) / 1000.0
@@ -56,6 +60,9 @@ struct IncomingInvite: Identifiable {
   let studentImageURL: String
   let pricePerMinuteCents: Int
   let conversationType: String
+  /// Why the student is stuck, once they have said: "cant_solve",
+  /// "different_results", "repeating_mistake" or "other". Empty until then.
+  let struggle: String
 
   var secondsRemaining: Double {
     (expiresAt - Date().timeIntervalSince1970 * 1000) / 1000

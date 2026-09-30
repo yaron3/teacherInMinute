@@ -178,27 +178,9 @@ struct BrandSheet<Content: View>: View {
       BrandScreenBackground()
       VStack(spacing: 0) {
         BrandPageHeader(label: "", title: title) {
-          Button {
+          BrandCloseButton(accessibilityLabel: closeLabel) {
             onClose()
-          } label: {
-            Image("brand-close-circle", bundle: .module)
-              .renderingMode(.template)
-              .resizable()
-              .foregroundStyle(theme.onDarkFill)
-              .frame(width: 20, height: 20)
-              .frame(width: 44, height: 44)
-              .background(theme.brandCardSurface)
-              .clipShape(RoundedRectangle(cornerRadius: 10))
-              .overlay {
-                RoundedRectangle(cornerRadius: 10)
-                  .stroke(theme.brandControlBorder, lineWidth: 1)
-              }
           }
-          .buttonStyle(.plain)
-#if !os(Android)
-          // SkipUI has no string `accessibilityLabel`.
-          .accessibilityLabel(closeLabel)
-#endif
           .accessibilityIdentifier("brand_sheet_close")
         }
         ScrollView(.vertical, showsIndicators: false) {
@@ -212,6 +194,42 @@ struct BrandSheet<Content: View>: View {
       }
     }
     .environment(\.colorScheme, .dark)
+  }
+}
+
+/// The square close button of a brand sheet's header: a crossed circle on
+/// the card's surface.
+struct BrandCloseButton: View {
+  let accessibilityLabel: String
+  let action: () -> Void
+
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
+
+  var body: some View {
+    Button {
+      action()
+    } label: {
+      Image("brand-close-circle", bundle: .module)
+        .renderingMode(.template)
+        .resizable()
+        .foregroundStyle(theme.onDarkFill)
+        .frame(width: 20, height: 20)
+        .frame(width: 44, height: 44)
+        .background(theme.brandCardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay {
+          RoundedRectangle(cornerRadius: 10)
+            .stroke(theme.brandControlBorder, lineWidth: 1)
+        }
+    }
+    .buttonStyle(.plain)
+#if !os(Android)
+    // SkipUI has no string `accessibilityLabel`.
+    .accessibilityLabel(accessibilityLabel)
+#endif
   }
 }
 

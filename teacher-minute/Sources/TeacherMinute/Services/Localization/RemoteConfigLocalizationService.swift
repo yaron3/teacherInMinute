@@ -845,6 +845,38 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Anonymous": "אנונימי",
         "You're using the app anonymously": "אתה משתמש באפליקציה באופן אנונימי",
         "Create an account to keep your minutes and lessons, and to log in on any device.": "צור חשבון כדי לשמור את הדקות והשיעורים שלך ולהתחבר מכל מכשיר.",
+        // The student's search screens, and the teacher's card.
+        "Tell the teacher": "שתפו את המורה",
+        "My question is about:": "אני שואל שאלה בתחום:",
+        "I'm stuck because:": "אני מתקשה כי:",
+        "How would you like to start?": "איך תעדיף להתחיל?",
+        "Next": "הלאה",
+        "Trig": "טריגו",
+        "I can't solve it": "לא מצליח לפתור",
+        "I get a different answer each time": "כל פעם יוצאת תוצאה אחרת",
+        "I keep making the same mistake": "הטעות חוזרת על עצמה",
+        "Other": "אחר",
+        "Text only": "טקסט בלבד",
+        "Looking for\na teacher": "מחפש\nמורה זמין",
+        "Updating\ndetails": "מעדכן\nפרטים",
+        "Focusing\non geometry": "מתמקד\nבגאומטריה",
+        "Focusing\non algebra": "מתמקד\nבאלגברה",
+        "Focusing\non trig": "מתמקד\nבטריגו",
+        "Focusing\non calculus": "מתמקד\nבחדו״א",
+        "Math is so spoiled – how can it have so many problems?": "מתמטיקה היא כזאת מפונקת, לא יכול להיות שיש לה כל כך הרבה בעיות!",
+        "Check permission": "בדוק הרשאה",
+        "Check audio permission": "בדוק הרשאת אודיו",
+        "Check video permission": "בדוק הרשאת וידאו",
+        "Stuck because:": "מתקשה כי:",
+        "Can't solve it": "לא מצליח לפתור",
+        "Gets a different answer each time": "כל פעם יוצאת תוצאה אחרת",
+        "Keeps making the same mistake": "הטעות חוזרת על עצמה",
+        "Another reason": "סיבה אחרת",
+        "Geometry": "גאומטריה",
+        "Algebra": "אלגברה",
+        "Calculus": "חדו״א",
+        "Audio": "אודיו",
+        "Video": "וידאו",
     ]
 
     #if os(Android)
@@ -1080,6 +1112,14 @@ enum LocalizationKey {
         // to the same generated key, so one published value was serving both.
         // The string that matches the value already in the template keeps the
         // original key; the other one is moved here.
+
+        // The search's screens and the teacher's card. `how_would_you` holds
+        // the payout question; the student's "I'm stuck because:" and "I can't
+        // solve it" keep `stuck_because` and `can_solve`, and the card's
+        // wording for the teacher has its own.
+        "How would you like to start?": "how_would_you_start",
+        "Stuck because:": "stuck_because_teacher",
+        "Can't solve it": "cant_solve_teacher",
 
         // Verify-email reward banner. `verify_your_email` stays with the title,
         // `this_email_address` with "…already in use", and `verified` with the

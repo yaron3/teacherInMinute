@@ -536,6 +536,7 @@ struct TeacherDashboardView: View {
 		  hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
 		  voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 		  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
+		  struggle: viewModel.inviteStruggles[inviteID] ?? "",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
 			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
 			  viewModel: viewModel
@@ -689,6 +690,8 @@ struct TeacherDashboardView: View {
 	let hasVoiceMessage: Bool
 	let voiceMessageDurationSeconds: Int?
 	var conversationType: String = "text"
+	/// Why the student is stuck; empty until they have said.
+	var struggle: String = ""
 	var studentName: String = ""
 	var studentImageURL: String = ""
 	let viewModel: any TeacherDashboardViewModeling
@@ -750,6 +753,25 @@ struct TeacherDashboardView: View {
 		  now = Date().timeIntervalSince1970 * 1000.0
 		  try? await Task.sleep(nanoseconds: 1_000_000_000)
 		}
+	  }
+	}
+
+	private var struggleText: String {
+	  viewModel.inviteStruggleText(struggle)
+	}
+
+	/// What the student said on their search screens about why they are
+	/// stuck. It arrives while the card is up.
+	var struggleRow: some View {
+	  HStack(alignment: .firstTextBaseline, spacing: 6) {
+		Text(viewModel.stuckBecauseLabel)
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.secondaryText)
+		Text(struggleText)
+		  .font(.system(size: 13, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+		  .fixedSize(horizontal: false, vertical: true)
+		Spacer(minLength: 0)
 	  }
 	}
 
@@ -818,6 +840,10 @@ struct TeacherDashboardView: View {
 		  lineLimit: 6
 		)
 		.frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
+
+		if !struggleText.isEmpty {
+		  struggleRow
+		}
 
 		if !photoUrls.isEmpty {
 		  VStack(spacing: 10) {
@@ -923,6 +949,7 @@ struct TeacherIncomingQuestionOverlay: View {
 			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
 			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
+			struggle: viewModel.inviteStruggles[inviteID] ?? "",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
 			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
 			  viewModel: viewModel

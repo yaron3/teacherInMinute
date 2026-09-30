@@ -81,6 +81,7 @@ jest.mock("../stats", () => ({ recordQuestionConnected: jest.fn(async () => unde
 jest.mock("../questionLimits", () => ({
   getQuestionMaxLength: jest.fn(async () => 1024),
   getQuestionRateLimits: jest.fn(async () => ({ perMinute: 10, perHour: 100 })),
+  getSearchTimeoutSeconds: jest.fn(async () => 90),
 }));
 jest.mock("../rateLimit", () => ({
   checkQuestionAllowance: jest.fn(async () => ({ allowed: true })),
@@ -92,6 +93,7 @@ jest.mock("../lessons", () => ({
 
 import { evaluateWave, questionWatchdog } from "../dispatch";
 import { createQuestion, acceptInvite, cancelQuestion } from "../questions";
+import { getSearchTimeoutSeconds } from "../questionLimits";
 import { WAVE_SIZES, WAVE_TIMEOUT_SECONDS } from "../types";
 
 // ─── The virtual roster ──────────────────────────────────────────────────────
@@ -492,5 +494,56 @@ describe("a teacher in a session is busy", () => {
     const qid = await ask("student-maya");
 
     expect(pendingInWave(qid, 1)).toEqual(RANKED.slice(0, 3));
+  });
+});
+
+describe("how long a question searches", () => {
+  test("after the last wave it stays with its teachers until the search ends", async () => {
+    const qid = await ask("student-maya");
+
+    // Wave 3's evaluation, which used to declare the question unanswered.
+    await advanceTo(36);
+    expect(question(qid).status).toBe("searching");
+    expect(dashboardsShowing(qid)).toEqual(RANKED);
+
+    await advanceTo(89.9);
+    expect(question(qid).status).toBe("searching");
+
+    await advanceTo(90);
+    expect(question(qid).status).toBe("unanswered");
+    expect(dashboardsShowing(qid)).toEqual([]);
+  });
+
+  test("a teacher can still take it after the last wave", async () => {
+    const qid = await ask("student-maya");
+    await advanceTo(60);
+
+    await accept("teacher-jo", qid);
+
+    expect(question(qid)).toMatchObject({ status: "accepted", acceptedByTeacher: "teacher-jo" });
+  });
+
+  test("every invite runs until the search ends, whichever wave it came in", async () => {
+    const qid = await ask("student-maya");
+    await advanceTo(24);
+
+    for (const uid of RANKED) {
+      const invite = fakeFirestore.read(`questions/${qid}/invites/${uid}`) as {
+        expiresAt: { toMillis(): number };
+      };
+      expect(invite.expiresAt.toMillis()).toBe(START_MS + 90_000);
+      expect(fakeRtdb.read(`teacherInvites/${uid}/${qid}/expiresAt`)).toBe(START_MS + 90_000);
+    }
+  });
+
+  test("searches for as long as Remote Config says", async () => {
+    (getSearchTimeoutSeconds as jest.Mock).mockResolvedValueOnce(120);
+    const qid = await ask("student-maya");
+
+    await advanceTo(119.9);
+    expect(question(qid).status).toBe("searching");
+
+    await advanceTo(120);
+    expect(question(qid).status).toBe("unanswered");
   });
 });

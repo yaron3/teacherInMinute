@@ -6,6 +6,7 @@ const mockMint = jest.fn();
 const mockDispatchFirstWave = jest.fn();
 const mockQuestionMaxLength = jest.fn();
 const mockRateLimits = jest.fn();
+const mockSearchTimeoutSeconds = jest.fn();
 const mockCheckAllowance = jest.fn();
 
 jest.mock("firebase-admin", () => ({
@@ -25,7 +26,10 @@ jest.mock("firebase-admin", () => ({
 
 jest.mock("firebase-admin/firestore", () => ({
   FieldValue: { serverTimestamp: jest.fn() },
-  Timestamp: { now: jest.fn(() => "now") },
+  Timestamp: {
+    now: jest.fn(() => "now"),
+    fromMillis: jest.fn((millis: number) => ({ millis })),
+  },
 }));
 
 jest.mock("firebase-functions", () => ({
@@ -63,6 +67,7 @@ jest.mock("../stats", () => ({ recordQuestionConnected: jest.fn() }));
 jest.mock("../questionLimits", () => ({
   getQuestionMaxLength: () => mockQuestionMaxLength(),
   getQuestionRateLimits: () => mockRateLimits(),
+  getSearchTimeoutSeconds: () => mockSearchTimeoutSeconds(),
 }));
 
 jest.mock("../rateLimit", () => ({
@@ -126,6 +131,7 @@ describe("createQuestion", () => {
     mockMint.mockResolvedValue({ token: "student-token", expiresAt: new Date() });
     mockQuestionMaxLength.mockResolvedValue(1024);
     mockRateLimits.mockResolvedValue({ perMinute: 2, perHour: 5 });
+    mockSearchTimeoutSeconds.mockResolvedValue(90);
     mockCheckAllowance.mockResolvedValue({ allowed: true, kept: [] });
   });
 
@@ -280,6 +286,7 @@ describe("createQuestion", () => {
       await expect(ask(conversationType)).resolves.toEqual({
         questionId: "q-1",
         connectionFeeCents: 50,
+        searchTimeoutSeconds: 90,
         liveKitRoom: "lesson_q-1",
         liveKitToken: "student-token",
       });
@@ -291,8 +298,28 @@ describe("createQuestion", () => {
   test("still creates the question when the token cannot be minted", async () => {
     mockMint.mockRejectedValue(new Error("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set"));
 
-    await expect(ask("audio")).resolves.toEqual({ questionId: "q-1", connectionFeeCents: 50 });
+    await expect(ask("audio")).resolves.toEqual({
+      questionId: "q-1",
+      connectionFeeCents: 50,
+      searchTimeoutSeconds: 90,
+    });
     expect(mockQuestionSet).toHaveBeenCalled();
     expect(mockDispatchFirstWave).toHaveBeenCalled();
+  });
+
+  // One published length for both ends: the question stops searching then,
+  // and the app is told, so it gives up at the same moment.
+  test("searches for as long as Remote Config says, and tells the app", async () => {
+    mockSearchTimeoutSeconds.mockResolvedValue(120);
+    const now = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      await expect(ask("text")).resolves.toMatchObject({ searchTimeoutSeconds: 120 });
+      expect(mockQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({ searchEndsAt: { millis: now + 120_000 } })
+      );
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

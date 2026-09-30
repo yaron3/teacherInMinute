@@ -1123,12 +1123,9 @@ struct StudentHomeView: View {
         onDismiss: { viewModel.resetSearch() }
       )
     case .searching:
-      SearchingOverlay(
-        searchingTitle: viewModel.searchingTitle,
-        searchingSubtitle: viewModel.searchingSubtitle,
-        cancelLabel: viewModel.cancelLabel,
-        onCancel: { Task { await viewModel.cancelSearch() } }
-      )
+      SearchDetailsView(viewModel: viewModel) {
+        Task { await viewModel.cancelSearch() }
+      }
     case .matched:
       // The matched lesson is pushed instead — see `liveSessionScreen`.
       EmptyView()
@@ -1328,138 +1325,6 @@ enum ConversationTypeChipAccent {
 }
 
 // MARK: - State Overlays
-
-struct SearchingOverlay: View {
-  let searchingTitle: String
-  let searchingSubtitle: String
-  let cancelLabel: String
-  let avatarURLs: [URL?]
-  let onCancel: @MainActor @Sendable () -> Void
-
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-  
-  @State  var ringRotation = 0.0
-  @State  var cycleIndex = 0
-  
-  private let slotCount = 6
-  private let ringDiameter: CGFloat = 240
-  private let avatarSize: CGFloat = 60
-  
-  init(searchingTitle: String, searchingSubtitle: String, cancelLabel: String, avatarURLs: [URL?] = [], onCancel: @escaping @MainActor @Sendable () -> Void) {
-	self.searchingTitle = searchingTitle
-	self.searchingSubtitle = searchingSubtitle
-	self.cancelLabel = cancelLabel
-	self.avatarURLs = avatarURLs
-	self.onCancel = onCancel
-  }
-  
-  var body: some View {
-	ZStack {
-	  BrandScreenBackground(streaks: .home)
-
-	  VStack(spacing: 28) {
-		avatarRing
-
-		VStack(spacing: 8) {
-		  Text(searchingTitle)
-			.font(.system(size: 24, weight: .bold))
-			.foregroundStyle(theme.onDarkFill)
-		  Text(searchingSubtitle)
-			.font(.system(size: 15))
-			.foregroundStyle(theme.brandSecondaryText)
-			.multilineTextAlignment(.center)
-		}
-
-		BrandSecondaryButton(title: cancelLabel) {
-		  onCancel()
-		}
-		.frame(width: 200)
-	  }
-	  .padding(32)
-	}
-	.task {
-	  withAnimation(.linear(duration: 18).repeatForever(autoreverses: false)) {
-		ringRotation = 360
-	  }
-	  while !Task.isCancelled {
-		try? await Task.sleep(nanoseconds: 1_400_000_000)
-		cycleIndex += 1
-	  }
-	}
-	.systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
-  }
-  
-  private var avatarRing: some View {
-	ZStack {
-	  Circle()
-		.stroke(theme.accent.opacity(0.18), lineWidth: 1.5)
-		.frame(width: ringDiameter, height: ringDiameter)
-	  
-	  Circle()
-		.fill(theme.accent.opacity(0.08))
-		.frame(width: ringDiameter * 0.45, height: ringDiameter * 0.45)
-	  
-	  ForEach(0..<slotCount, id: \.self) { index in
-		avatarSlot(index: index)
-	  }
-	  .rotationEffect(.degrees(ringRotation))
-	}
-	.frame(width: ringDiameter, height: ringDiameter)
-  }
-  
-  @ViewBuilder
-  private func avatarSlot(index: Int) -> some View {
-	let angle = (Double(index) / Double(slotCount)) * 360.0 - 90.0
-	let radius = (ringDiameter - avatarSize) / 2
-	let x = cos(angle * .pi / 180) * Double(radius)
-	let y = sin(angle * .pi / 180) * Double(radius)
-	
-	avatarImage(for: index)
-	  .frame(width: avatarSize, height: avatarSize)
-	  .clipShape(Circle())
-	  .overlay {
-		Circle().stroke(theme.cardBackground, lineWidth: 3)
-	  }
-	  .shadow(color: theme.cardShadow.opacity(0.10), radius: 6, x: 0, y: 3)
-	  .rotationEffect(.degrees(-ringRotation))
-	  .offset(x: CGFloat(x), y: CGFloat(y))
-  }
-  
-  @ViewBuilder
-  private func avatarImage(for index: Int) -> some View {
-	if let url = currentURL(for: index) {
-	  AsyncImage(url: url) { image in
-		image
-		  .resizable()
-		  .scaledToFill()
-	  } placeholder: {
-		placeholderAvatar
-	  }
-	} else {
-	  placeholderAvatar
-	}
-  }
-  
-  private var placeholderAvatar: some View {
-	ZStack {
-	  Circle().fill(theme.accentBackground)
-	  PlatformIcon(
-		systemName: "person.crop.circle.fill",
-		size: avatarSize * 0.9,
-		color: theme.accentStrong
-	  )
-	}
-  }
-  
-  private func currentURL(for index: Int) -> URL? {
-	guard !avatarURLs.isEmpty else { return nil }
-	let urlIndex = (cycleIndex + index) % avatarURLs.count
-	return avatarURLs[urlIndex]
-  }
-}
 
 struct MatchedOverlay: View {
   let teacherFoundTitle: String

@@ -779,7 +779,7 @@
     },
     "subTaskMath": {
       "defaultValue": {
-        "value": "[\"Algebra\", \"Trigonometry\"]"
+        "value": "[\"Algebra\", \"Geometry\", \"Trigonometry\", \"Calculus\"]"
       },
       "valueType": "JSON"
     },
@@ -10865,6 +10865,299 @@
         }
       },
       "valueType": "STRING"
+    },
+    "tell_the_teacher": {
+      "defaultValue": {
+        "value": "Tell the teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שתפו את המורה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "question_about": {
+      "defaultValue": {
+        "value": "My question is about:"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אני שואל שאלה בתחום:"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "stuck_because": {
+      "defaultValue": {
+        "value": "I'm stuck because:"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אני מתקשה כי:"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "how_would_you_start": {
+      "defaultValue": {
+        "value": "How would you like to start?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "איך תעדיף להתחיל?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "next": {
+      "defaultValue": {
+        "value": "Next"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הלאה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "trig": {
+      "defaultValue": {
+        "value": "Trig"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "טריגו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "can_solve": {
+      "defaultValue": {
+        "value": "I can't solve it"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא מצליח לפתור"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "get_different_answer": {
+      "defaultValue": {
+        "value": "I get a different answer each time"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כל פעם יוצאת תוצאה אחרת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "keep_making_the": {
+      "defaultValue": {
+        "value": "I keep making the same mistake"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הטעות חוזרת על עצמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "other": {
+      "defaultValue": {
+        "value": "Other"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אחר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "text_only": {
+      "defaultValue": {
+        "value": "Text only"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "טקסט בלבד"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "looking_for_teacher": {
+      "defaultValue": {
+        "value": "Looking for\na teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מחפש\nמורה זמין"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "updating_details": {
+      "defaultValue": {
+        "value": "Updating\ndetails"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מעדכן\nפרטים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "focusing_geometry": {
+      "defaultValue": {
+        "value": "Focusing\non geometry"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתמקד\nבגאומטריה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "focusing_algebra": {
+      "defaultValue": {
+        "value": "Focusing\non algebra"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתמקד\nבאלגברה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "focusing_trig": {
+      "defaultValue": {
+        "value": "Focusing\non trig"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתמקד\nבטריגו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "focusing_calculus": {
+      "defaultValue": {
+        "value": "Focusing\non calculus"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתמקד\nבחדו״א"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "math_spoiled_how": {
+      "defaultValue": {
+        "value": "Math is so spoiled – how can it have so many problems?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתמטיקה היא כזאת מפונקת, לא יכול להיות שיש לה כל כך הרבה בעיות!"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "check_permission": {
+      "defaultValue": {
+        "value": "Check permission"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בדוק הרשאה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "check_audio_permission": {
+      "defaultValue": {
+        "value": "Check audio permission"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בדוק הרשאת אודיו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "check_video_permission": {
+      "defaultValue": {
+        "value": "Check video permission"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בדוק הרשאת וידאו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "stuck_because_teacher": {
+      "defaultValue": {
+        "value": "Stuck because:"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתקשה כי:"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "cant_solve_teacher": {
+      "defaultValue": {
+        "value": "Can't solve it"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא מצליח לפתור"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "gets_different_answer": {
+      "defaultValue": {
+        "value": "Gets a different answer each time"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כל פעם יוצאת תוצאה אחרת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "keeps_making_the": {
+      "defaultValue": {
+        "value": "Keeps making the same mistake"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הטעות חוזרת על עצמה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "another_reason": {
+      "defaultValue": {
+        "value": "Another reason"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סיבה אחרת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "question_search_timeout_seconds": {
+      "defaultValue": {
+        "value": "90"
+      },
+      "description": "How long a student's question is offered to teachers before the search gives up, in seconds (30-600).",
+      "valueType": "NUMBER"
     }
   },
   "version": {

@@ -39,6 +39,9 @@ protocol TeacherDashboardViewModeling: AnyObject {
   var inviteStudentNames: [String: String] { get set }
   var inviteStudentImageURLs: [String: String] { get set }
   var inviteConversationTypes: [String: String] { get set }
+  /// Why each invite's student is stuck, once they have said; see
+  /// `IncomingInvite.struggle`.
+  var inviteStruggles: [String: String] { get set }
   var activeCallRoom: String? { get set }
   var activeCallToken: String? { get set }
   var activeQuestionId: String? { get set }
@@ -358,6 +361,19 @@ extension TeacherDashboardViewModeling {
   var unnamedStudentLabel: String { LocalizationSupport.localized("Student") }
   var waitingNowLabel: String { LocalizationSupport.localized("Waiting now") }
   var questionSectionHeader: String { LocalizationSupport.localized("QUESTION") }
+  var stuckBecauseLabel: String { LocalizationSupport.localized("Stuck because:") }
+
+  /// Why the student is stuck, as they told it on their search screens, for
+  /// the teacher. Empty until they have.
+  func inviteStruggleText(_ struggle: String) -> String {
+    switch struggle {
+    case "cant_solve": return LocalizationSupport.localized("Can't solve it")
+    case "different_results": return LocalizationSupport.localized("Gets a different answer each time")
+    case "repeating_mistake": return LocalizationSupport.localized("Keeps making the same mistake")
+    case "other": return LocalizationSupport.localized("Another reason")
+    default: return ""
+    }
+  }
   var voiceMessageLabel: String { LocalizationSupport.localized("Voice Message") }
   var acceptQuestionLabel: String { LocalizationSupport.localized("Accept Question") }
   var declineLabel: String { LocalizationSupport.localized("Decline") }
@@ -411,6 +427,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var inviteStudentUids: [String: String] = [:]
   var invitePricePerMinuteCents: [String: Int] = [:]
   var inviteConversationTypes: [String: String] = [:]
+  var inviteStruggles: [String: String] = [:]
   var activeCallRoom: String? = nil
   var activeCallToken: String? = nil
   var activeCallStudentUid: String? = nil
@@ -641,6 +658,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 			"studentImageURL": $0.studentImageURL,
 			"pricePerMinuteCents": $0.pricePerMinuteCents,
 			"conversationType": $0.conversationType,
+			"struggle": $0.struggle,
 		  ]
 		}
 	  )
@@ -956,6 +974,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	var studentIds: [String: String] = [:]
 	var pricesPerMinute: [String: Int] = [:]
 	var conversationTypes: [String: String] = [:]
+	var struggles: [String: String] = [:]
 
 	for row in rows {
 	  guard let id = row["id"] as? String,
@@ -1010,6 +1029,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  ?? Self.intValue(row["costPerMinuteCents"])
 	  ?? 50
 	  conversationTypes[id] = (row["conversationType"] as? String) ?? "text"
+	  struggles[id] = (row["struggle"] as? String) ?? ""
 	}
 	
 	let newInviteIDs = Set(ids).subtracting(Set(inviteIDs))
@@ -1035,6 +1055,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	inviteStudentUids = studentIds
 	invitePricePerMinuteCents = pricesPerMinute
 	inviteConversationTypes = conversationTypes
+	inviteStruggles = struggles
   }
   
   // MARK: - Invite Actions
@@ -1671,6 +1692,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var inviteStudentNames: [String: String] = [:]
   var inviteStudentImageURLs: [String: String] = [:]
   var inviteConversationTypes: [String: String] = [:]
+  var inviteStruggles: [String: String] = [:]
   var activeCallRoom: String? = nil
   var activeCallToken: String? = nil
   var activeQuestionId: String? = nil
@@ -1774,6 +1796,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
       inviteStudentNames = [id: "Alex Kim"]
       inviteStudentImageURLs = [id: ""]
       inviteConversationTypes = [id: "text"]
+      inviteStruggles = [id: "different_results"]
       invitePhotoUrls = [id: []]
       inviteHasVoiceMessage = [id: false]
     }

@@ -329,6 +329,9 @@ struct BrandModalBadge: View {
 /// The secondary choice beside a `BrandPrimaryButton`: outlined in cyan.
 struct BrandSecondaryButton: View {
   let title: String
+  /// 56 where it stands under a primary button in a modal, as the design
+  /// draws it there.
+  var height: CGFloat = 52
   let action: () -> Void
 
   @Environment(\.colorScheme) var colorScheme
@@ -347,7 +350,7 @@ struct BrandSecondaryButton: View {
         .minimumScaleFactor(0.7)
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity)
-        .frame(height: 52)
+        .frame(height: height)
         .overlay {
           RoundedRectangle(cornerRadius: 8)
             .stroke(theme.brandActionBackground, lineWidth: 1)

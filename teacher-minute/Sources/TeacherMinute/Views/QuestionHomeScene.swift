@@ -179,12 +179,19 @@ struct SpeechBubble: View {
   var alignment: HorizontalAlignment = .center
   let textColor: Color
   let textDirection: LayoutDirection
+  /// The art turned over, its tail pointing down to the right: for a
+  /// character who stands to the bubble's right. The text stays as it is.
+  var mirrorsArt = false
+  /// Sets a line wider than `textWidth` smaller rather than let it run over
+  /// the bubble's edge: for copy written after the design, in any language.
+  var shrinksToFit = false
 
   var body: some View {
     ZStack(alignment: .topLeading) {
       Image(decorative: "home-speech-bubble", bundle: .module)
         .resizable()
         .frame(width: Self.size.width, height: Self.size.height)
+        .scaleEffect(x: mirrorsArt ? -1 : 1, y: 1)
 
       VStack(alignment: alignment, spacing: 0) {
         ForEach(0..<lines.count, id: \.self) { index in
@@ -208,12 +215,26 @@ struct SpeechBubble: View {
     }
   }
 
+  @ViewBuilder
   private func lineText(_ text: String, isBold: Bool) -> some View {
-    Text(text)
-      .font(.system(size: fontSize, weight: isBold ? .bold : .regular))
-      .foregroundStyle(textColor)
-      .lineLimit(1)
-      .fixedSize()
+    if shrinksToFit {
+      Text(text)
+        .font(.system(size: fontSize, weight: isBold ? .bold : .regular))
+        .foregroundStyle(textColor)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .frame(width: textWidth, alignment: alignment == .leading ? .leading : .center)
+        // Its own height, not the row's: the rows are set closer than a line
+        // is tall, and the scale factor would otherwise shrink every line to
+        // fit one.
+        .fixedSize(horizontal: false, vertical: true)
+    } else {
+      Text(text)
+        .font(.system(size: fontSize, weight: isBold ? .bold : .regular))
+        .foregroundStyle(textColor)
+        .lineLimit(1)
+        .fixedSize()
+    }
   }
 }
 

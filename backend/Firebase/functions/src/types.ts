@@ -17,7 +17,14 @@ export const HOT_PATH = { memory: "1GiB" as const };
 
 export const WAVE_SIZES = [3, 5, 10] as const;
 export const WAVE_TIMEOUT_SECONDS = 12;
+/** How long a question searches when nothing says otherwise: the default of
+ *  question_search_timeout_seconds (see ./questionLimits), and the life of a
+ *  question with no `searchEndsAt` of its own, such as a demo question. */
 export const INVITE_EXPIRY_SECONDS = 90;
+/** A subject narrows the teachers a question goes to only while at least this
+ *  many teachers who could take it now teach the subject. See subjectNarrows
+ *  in ./scoring. */
+export const MIN_SUBJECT_TEACHERS = 3;
 export const HARD_CAP_MINUTES = 30;
 
 // How long a teacher who accepted waits for the student to actually turn up
@@ -144,11 +151,35 @@ export type ConversationType = "text" | "audio" | "video";
 export const CONVERSATION_TYPES: ConversationType[] = ["text", "audio", "video"];
 export const DEFAULT_CONVERSATION_TYPE: ConversationType = "text";
 
+/** The subjects a question can be put in. ANY_TOPIC (see ./scoring) is the
+ *  other value a question can have: the camera home asks without one, and
+ *  the student names the subject while the search runs. */
+export const QUESTION_TOPICS = [
+  "algebra",
+  "geometry",
+  "trigonometry",
+  "calculus",
+  "statistics",
+  "arithmetic",
+] as const;
+
+/** Why the student is stuck, as they tell it while the search runs. Invited
+ *  teachers are shown it on the question's card. */
+export type QuestionStruggle = "cant_solve" | "different_results" | "repeating_mistake" | "other";
+export const QUESTION_STRUGGLES: QuestionStruggle[] = [
+  "cant_solve",
+  "different_results",
+  "repeating_mistake",
+  "other",
+];
+
 export interface QuestionDoc {
   studentUid: string;
   studentName?: string;       // snapshot of the student's name at question creation
   studentImageURL?: string;   // snapshot of the student's shared profile image (respects privacy setting)
-  topic: string;             // one of the six math sub-topics, or ANY_TOPIC
+  topic: string;             // one of QUESTION_TOPICS, or ANY_TOPIC
+  /** Why the student is stuck, once they have said. See updateQuestion. */
+  struggle?: QuestionStruggle;
   text: string;
   photoUrls: string[];
   voiceMemoUrl?: string;
@@ -156,6 +187,11 @@ export interface QuestionDoc {
   status: QuestionStatus;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  /** When the search gives up: `createdAt` plus the search timeout the
+   *  question was asked under. Every invite can be accepted until then, and
+   *  the watchdog ends the search then. Absent on a demo question, and on one
+   *  from before it, which search for INVITE_EXPIRY_SECONDS. */
+  searchEndsAt?: Timestamp;
   dispatchWave: number;      // wave currently being evaluated (1 | 2 | 3)
   alreadyInvited: string[];  // all teacher UIDs invited across all waves
   acceptedByTeacher?: string;

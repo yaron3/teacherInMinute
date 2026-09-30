@@ -52,6 +52,9 @@ enum AnalyticsEvent {
     static let askTeacherMatched   = "ask_teacher_matched"
     static let askTeacherNoMatch   = "ask_teacher_no_match"
     static let askTeacherFailed    = "ask_teacher_failed"
+    /// A detail chosen while the question is offered: its subject, why the
+    /// student is stuck, or how they would like to start.
+    static let askTeacherDetailChosen = "ask_teacher_detail_chosen"
     static let questionPhotoAttached = "question_photo_attached"
     static let questionPhotoFailed   = "question_photo_failed"
     static let notEnoughMinutesShown = "not_enough_minutes_shown"
