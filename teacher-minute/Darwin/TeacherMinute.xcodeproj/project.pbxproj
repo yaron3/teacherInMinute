@@ -12,15 +12,15 @@
 		496BDBEE2B8A7E9C00C09264 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */; };
 		499CD43B2AC5B799001AE8D8 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
 		499CD4402AC5B799001AE8D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
-		6FC6C709E04A8AF4D2A99EF8 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 3BE35A14FDFFE24327131BAC /* LaunchScreen.storyboard */; };
 		4AB6CD562FAB8C5C003E7ADA /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */; };
 		5E2020AEA60A6DAC5EA83FAE /* TeacherMinute in Frameworks */ = {isa = PBXBuildFile; productRef = 5E94E40C6527C5A5F98AB3FE /* TeacherMinute */; };
 		5E24D2ADA3E031128E5FEED3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */; };
 		5E3168E37603BF7F871DB074 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
 		5E5A9614BA3E7D070A48925E /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
 		5E838A2B53C34E83324BF961 /* TeacherMinute in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 5E94E40C6527C5A5F98AB3FE /* TeacherMinute */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		D8DF54ABE87D2F428683051D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 3BE35A14FDFFE24327131BAC /* LaunchScreen.storyboard */; };
 		5EB0790B0973E7889A7EF7BF /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5E23BBE8B39F09DD9D86A499 /* GoogleService-Info.plist */; };
+		6FC6C709E04A8AF4D2A99EF8 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 3BE35A14FDFFE24327131BAC /* LaunchScreen.storyboard */; };
+		D8DF54ABE87D2F428683051D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 3BE35A14FDFFE24327131BAC /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +59,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3BE35A14FDFFE24327131BAC /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		4900101C2BACEA710000DE33 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		493609562A6B7EAE00C401E2 /* TeacherMinute */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = TeacherMinute; path = ..; sourceTree = "<group>"; };
 		496BDBEB2B89A47800C09264 /* InstantTeacher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = InstantTeacher.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -70,7 +71,6 @@
 		499AB9082B0581F4005E8330 /* plugins */ = {isa = PBXFileReference; lastKnownFileType = folder; name = plugins; path = ../../Intermediates.noindex/BuildToolPluginIntermediates; sourceTree = BUILT_PRODUCTS_DIR; };
 		49F90C2B2A52156200F06D93 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Main.swift; path = Sources/Main.swift; sourceTree = SOURCE_ROOT; };
 		49F90C2F2A52156300F06D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		3BE35A14FDFFE24327131BAC /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		49F90C312A52156300F06D93 /* Entitlements.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Entitlements.plist; sourceTree = "<group>"; };
 		4AB6CD552FAB8C5C003E7ADA /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		4AC88531302E11E2001E0831 /* TeacherMinuteUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TeacherMinuteUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -442,7 +442,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
@@ -455,7 +455,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.student;
 				PRODUCT_NAME = InstantTeacher;
 				TIM_ANDROID_FLAVOR = Student;
@@ -469,7 +469,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
@@ -482,7 +482,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.student;
 				PRODUCT_NAME = InstantTeacher;
 				TIM_ANDROID_FLAVOR = Student;
@@ -659,7 +659,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Pro Teacher";
@@ -672,7 +672,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.tim;
 				PRODUCT_NAME = ProTeacher;
 				TIM_ANDROID_FLAVOR = Teacher;
@@ -686,7 +686,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Pro Teacher";
@@ -699,7 +699,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.tim;
 				PRODUCT_NAME = ProTeacher;
 				TIM_ANDROID_FLAVOR = Teacher;
