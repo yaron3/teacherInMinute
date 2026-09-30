@@ -3,6 +3,7 @@ admin.initializeApp();
 
 // Auth lifecycle
 export { onUserCreate } from "./users";
+export { deleteAccount } from "./accountDeletion";
 
 // Dispatch pipeline
 export { dispatchQuestion, evaluateWave, questionWatchdog, onTeacherStatusChange } from "./dispatch";
