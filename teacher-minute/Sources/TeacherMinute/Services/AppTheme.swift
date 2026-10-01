@@ -280,6 +280,31 @@ struct AppTheme {
         Color.black.opacity(0.2)
     }
 
+    /// The red of a control that closes or ends — the lesson's close button.
+    var brandDestructive: Color {
+        adaptive(
+            light: (255, 20, 71),
+            dark: (255, 20, 71)
+        )
+    }
+
+    /// The green of something that is on and working — a live participant, a
+    /// microphone that is open.
+    var brandLive: Color {
+        adaptive(
+            light: (83, 230, 183),
+            dark: (83, 230, 183)
+        )
+    }
+
+    /// The gold of something that is paused or off — a muted microphone.
+    var brandPaused: Color {
+        adaptive(
+            light: (231, 193, 82),
+            dark: (231, 193, 82)
+        )
+    }
+
     /// A rule inside a brand card.
     var brandDivider: Color {
         adaptive(
@@ -408,35 +433,26 @@ struct AppTheme {
 
     // MARK: - Chat bubbles
 
-    /// Messages sent by the current user.
-    var outgoingBubbleBackground: Color {
-        adaptive(
-            light: (67, 75, 214),
-            dark: (100, 100, 255)
-        )
-    }
+    /// Messages sent by the current user: the brand's cyan.
+    var outgoingBubbleBackground: Color { brandActionBackground }
 
-    var outgoingBubbleText: Color {
-        adaptive(
-            light: (255, 255, 255),
-            dark: (255, 255, 255)
-        )
-    }
+    var outgoingBubbleText: Color { onBrandAction }
+
+    /// The line round an outgoing bubble.
+    var outgoingBubbleBorder: Color { brandActionBackground.opacity(0.47) }
 
     /// Messages received from the other participant.
     var incomingBubbleBackground: Color {
         adaptive(
-            light: (200, 200, 214),
-            dark: (50, 50, 50)
+            light: (46, 43, 74),
+            dark: (46, 43, 74)
         )
     }
 
-    var incomingBubbleText: Color {
-        adaptive(
-            light: (0, 0, 0),
-            dark: (255, 255, 255)
-        )
-    }
+    var incomingBubbleText: Color { onDarkFill }
+
+    /// The line round an incoming bubble.
+    var incomingBubbleBorder: Color { brandControlBorder }
 
     // MARK: - Neutral badge
 

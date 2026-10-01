@@ -81,6 +81,8 @@ struct AndroidVideoFeed: View {
 struct AndroidSelfVideoPreview: View {
   let isCameraOff: Bool
   let theme: AppTheme
+  /// The preview's size. Corner-sized unless a caller lays it out itself.
+  var size = CGSize(width: 96, height: 132)
 
   @State var localComposer: AndroidJavaObject?
 
@@ -103,7 +105,7 @@ struct AndroidSelfVideoPreview: View {
           }
       }
     }
-    .frame(width: 96, height: 132)
+    .frame(width: size.width, height: size.height)
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 12, style: .continuous)

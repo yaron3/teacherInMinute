@@ -11158,6 +11158,39 @@
       },
       "description": "How long a student's question is offered to teachers before the search gives up, in seconds (30-600).",
       "valueType": "NUMBER"
+    },
+    "look_the_board": {
+      "defaultValue": {
+        "value": "Look at the board"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שימו לב ללוח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "media": {
+      "defaultValue": {
+        "value": "Media:"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מדיה:"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you": {
+      "defaultValue": {
+        "value": "You"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אתם"
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

@@ -36,6 +36,16 @@ struct SessionTypeUITestHarness: View {
         peerButton("text")
         peerButton("audio")
         peerButton("video")
+        Button {
+          viewModel.simulatePeerMediaState(MediaDeviceState(micMuted: true, cameraOff: true))
+        } label: {
+          Text(verbatim: "Peer: off")
+            .font(.system(size: 11, weight: .semibold))
+            .frame(maxWidth: .infinity)
+            .frame(height: 32)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("uitest_peer_media_off")
       }
       .padding(8)
       .background(AppTheme(colorScheme: colorScheme).cardBackground)

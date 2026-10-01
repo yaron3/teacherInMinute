@@ -126,6 +126,7 @@ final class ChatSessionService {
   private let boardViewportsRef: FirebaseDatabase.DatabaseReference
   private let chatPausedRef: FirebaseDatabase.DatabaseReference
   private let mediaPendingRef: FirebaseDatabase.DatabaseReference
+  private let mediaStateRef: FirebaseDatabase.DatabaseReference
   private let connectionSetupRef: FirebaseDatabase.DatabaseReference
   private let statusRef: FirebaseDatabase.DatabaseReference
   /// `lessonPresence/{qid}` — see `LessonPresenceReading`.
@@ -139,6 +140,7 @@ final class ChatSessionService {
   private var boardViewportsHandle: DatabaseHandle?
   private var chatPausedHandle: DatabaseHandle?
   private var mediaPendingHandle: DatabaseHandle?
+  private var mediaStateHandle: DatabaseHandle?
   private var connectionSetupHandle: DatabaseHandle?
   private var statusHandle: DatabaseHandle?
 #endif
@@ -154,6 +156,7 @@ final class ChatSessionService {
     self.boardViewportsRef = questionRef.child("board/viewports")
     self.chatPausedRef = questionRef.child("chatPaused")
     self.mediaPendingRef = questionRef.child("mediaPending")
+    self.mediaStateRef = questionRef.child("mediaState")
     self.connectionSetupRef = questionRef.child("connectionSetup")
     self.statusRef = questionRef.child("status")
     self.presenceRef = FirebaseDatabase.Database.database()
@@ -326,6 +329,19 @@ final class ChatSessionService {
 #endif
   }
 
+  func startMediaStateListening(onUpdate: @escaping ([String: MediaDeviceState]) -> Void) {
+#if !os(Android)
+    mediaStateHandle = mediaStateRef.observe(.value) { snapshot in
+      var states: [String: MediaDeviceState] = [:]
+      for child in snapshot.children {
+        guard let snap = child as? DataSnapshot, let bits = snap.value as? NSNumber else { continue }
+        states[snap.key] = MediaDeviceState(bits: bits.intValue)
+      }
+      onUpdate(states)
+    }
+#endif
+  }
+
   /// Follows both sides' `connectionSetup` entries, and the question's status:
   /// `onEnded` fires once the question is gone or has reached an end state.
   /// Separate from the lesson's own listeners, which only start once this side
@@ -393,6 +409,10 @@ final class ChatSessionService {
     if let mediaPendingHandle {
       mediaPendingRef.removeObserver(withHandle: mediaPendingHandle)
       self.mediaPendingHandle = nil
+    }
+    if let mediaStateHandle {
+      mediaStateRef.removeObserver(withHandle: mediaStateHandle)
+      self.mediaStateHandle = nil
     }
     if let presenceHandle {
       presenceRef.removeObserver(withHandle: presenceHandle)
@@ -598,6 +618,29 @@ final class ChatSessionService {
 #endif
   }
 
+  /// Tells the other side whether this one's microphone and camera are on.
+  func setMediaState(_ state: MediaDeviceState, role: String) async throws {
+    let trimmedRole = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let key = trimmedRole.isEmpty ? "participant" : trimmedRole
+
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.setMediaState(
+        questionId: self.questionId,
+        role: key,
+        state: state.bits
+      )
+    }.value
+#else
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      mediaStateRef.child(key).setValue(state.bits) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
   /// This side's `connectionSetup` entry, which the other side reads while the
   /// lesson connects. Nil removes it.
   func setConnectionSetupSignal(_ signal: ConnectionSetupSignal?, role: String) async throws {
@@ -773,6 +816,23 @@ final class ChatSessionService {
         states[key] = flag
       } else if let num = value as? NSNumber {
         states[key] = num.boolValue
+      }
+    }
+    return states
+  }
+
+  func fetchMediaState() async throws -> [String: MediaDeviceState] {
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchMediaState(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let rows = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return [:]
+    }
+    var states: [String: MediaDeviceState] = [:]
+    for (key, value) in rows {
+      if let num = value as? NSNumber {
+        states[key] = MediaDeviceState(bits: num.intValue)
       }
     }
     return states
@@ -1019,6 +1079,27 @@ final class ChatSessionService {
   }
 }
 
+/// One side's microphone and camera, as it tells the other. A side that has
+/// said nothing is taken to have both on.
+struct MediaDeviceState: Equatable, Sendable {
+  var micMuted = false
+  var cameraOff = false
+
+  init(micMuted: Bool = false, cameraOff: Bool = false) {
+    self.micMuted = micMuted
+    self.cameraOff = cameraOff
+  }
+
+  /// What goes over the wire: one number, so the same call carries it on both
+  /// platforms.
+  var bits: Int { (micMuted ? 1 : 0) | (cameraOff ? 2 : 0) }
+
+  init(bits: Int) {
+    self.micMuted = bits & 1 != 0
+    self.cameraOff = bits & 2 != 0
+  }
+}
+
 @MainActor
 protocol ChatSessionViewModeling: AnyObject {
   var questionId: String { get }
@@ -1082,6 +1163,10 @@ protocol ChatSessionViewModeling: AnyObject {
   func peerChatPaused() -> Bool
   func setSelfMediaPending(_ pending: Bool)
   func peerMediaPending() -> Bool
+  /// Tells the other side whether this one's microphone and camera are on.
+  func setSelfMediaState(_ state: MediaDeviceState)
+  /// The other side's microphone and camera. Nil until they have said.
+  func peerMediaState() -> MediaDeviceState?
   func endLesson() async
 
   // MARK: Presence
@@ -1205,14 +1290,21 @@ extension ChatSessionViewModeling {
 
   var hasMediaCredentials: Bool { !liveKitRoom.isEmpty && !liveKitToken.isEmpty }
 
+  /// This side's microphone and camera, as the other side is told them.
+  func publishMediaState() {
+    setSelfMediaState(MediaDeviceState(micMuted: isMicMuted, cameraOff: isCameraOff))
+  }
+
   func toggleMicrophone() {
     isMicMuted.toggle()
+    publishMediaState()
     let enabled = !isMicMuted
     Task { await setMicrophoneEnabled(enabled) }
   }
 
   func toggleCamera() {
     isCameraOff.toggle()
+    publishMediaState()
     let enabled = !isCameraOff
     Task { await setCameraEnabled(enabled) }
   }
@@ -1222,6 +1314,7 @@ extension ChatSessionViewModeling {
   func setCameraPaused(_ paused: Bool) {
     guard paused != isCameraOff else { return }
     isCameraOff = paused
+    publishMediaState()
     Task { await setCameraEnabled(!paused) }
   }
 
@@ -1229,6 +1322,7 @@ extension ChatSessionViewModeling {
   func resetMediaToggles() {
     isMicMuted = false
     isCameraOff = false
+    publishMediaState()
   }
 
   /// A mic or camera turned off while the room was still connecting had
@@ -1517,6 +1611,16 @@ extension ChatSessionViewModeling {
   var videoTabTitle: String { LocalizationSupport.localized("Video") }
   var imagesTabTitle: String { LocalizationSupport.localized("Images") }
 
+  // MARK: Lesson frame
+
+  var youLabel: String { LocalizationSupport.localized("You") }
+  var teacherRoleLabel: String { LocalizationSupport.localized("Teacher") }
+  var studentRoleLabel: String { LocalizationSupport.localized("Student") }
+  var mediaLabel: String { LocalizationSupport.localized("Media:") }
+  /// The mascot's nudge when the other side has drawn on the board and this
+  /// side is still reading the chat.
+  var lookAtBoardNotice: String { LocalizationSupport.localized("Look at the board") }
+
   // MARK: Session type
 
   var sessionTypeTitle: String { LocalizationSupport.localized("Session type") }
@@ -1630,6 +1734,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   var boardViewports: [String: BoardViewport] = [:]
   var chatPausedStates: [String: Bool] = [:]
   var mediaPendingStates: [String: Bool] = [:]
+  var mediaDeviceStates: [String: MediaDeviceState] = [:]
   var draft = ""
   var errorMessage: String?
   var isConnecting = true
@@ -1732,6 +1837,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private var didObserveActiveSession = false
   private var lastSentChatPaused: Bool?
   private var lastSentMediaPending: Bool?
+  private var lastSentMediaState: MediaDeviceState?
   private var lastSentBoardViewport: BoardViewport?
   private var isChatVisible = true
   private var isBoardVisible = false
@@ -1921,6 +2027,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           let viewports = try await service.fetchBoardViewports()
           let paused = try await service.fetchChatPaused()
           let mediaPending = try await service.fetchMediaPending()
+          // Optional, like the presence reading: it only colours a badge.
+          let mediaState = try? await service.fetchMediaState()
           guard !Task.isCancelled else { return }
           receiveMessages(rows)
           receiveBoardStrokes(strokes)
@@ -1929,6 +2037,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           mediaPendingStates = mediaPending
           onChatPausedUpdated?(paused)
           onMediaPendingUpdated?(mediaPending)
+          if let mediaState {
+            mediaDeviceStates = mediaState
+          }
           if let presence {
             receivePeerPresence(presence)
           }
@@ -1973,6 +2084,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     service.startMediaPendingListening { [weak self] states in
       self?.mediaPendingStates = states
       self?.onMediaPendingUpdated?(states)
+    }
+    service.startMediaStateListening { [weak self] states in
+      self?.mediaDeviceStates = states
     }
 #endif
   }
@@ -2245,6 +2359,30 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       return true
     }
     return false
+  }
+
+  /// Tells the other side whether this one's microphone and camera are on.
+  /// Nothing is written while it is what they already have.
+  func setSelfMediaState(_ state: MediaDeviceState) {
+    if (lastSentMediaState ?? MediaDeviceState()) == state { return }
+    lastSentMediaState = state
+    mediaDeviceStates[roleKey(role)] = state
+    Task {
+      do {
+        try await service.setMediaState(state, role: role)
+      } catch {
+        logger.error("[ChatSession] setMediaState failed: \(error.localizedDescription)")
+      }
+    }
+  }
+
+  /// The other side's microphone and camera. Nil until they have said.
+  func peerMediaState() -> MediaDeviceState? {
+    let selfKey = roleKey(role)
+    for (key, value) in mediaDeviceStates where key != selfKey {
+      return value
+    }
+    return nil
   }
 
   private func roleKey(_ role: String) -> String {
@@ -2950,6 +3088,14 @@ private enum AndroidChatBridge {
     name: "fetchMediaPendingJson",
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
   )!
+  private static let setMediaStateMethod = managerClass.getStaticMethodID(
+    name: "setMediaState",
+    sig: "(Ljava/lang/String;Ljava/lang/String;I)V"
+  )!
+  private static let fetchMediaStateMethod = managerClass.getStaticMethodID(
+    name: "fetchMediaStateJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
   private static let setConnectionSetupSignalMethod = managerClass.getStaticMethodID(
     name: "setConnectionSetupSignal",
     sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
@@ -3124,6 +3270,30 @@ private enum AndroidChatBridge {
         ]
       )
     }
+  }
+
+  static func setMediaState(questionId: String, role: String, state: Int) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setMediaStateMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          role.toJavaParameter(options: [.kotlincompat]),
+          Int32(state).toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func fetchMediaState(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchMediaStateMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
   }
 
   static func setConversationType(questionId: String, conversationType: String) throws {

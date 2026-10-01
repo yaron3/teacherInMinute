@@ -281,6 +281,42 @@ object AndroidChatManager {
     }
 
     /**
+     * Tells the other side whether this participant's microphone and camera
+     * are on: bit 1 is a muted microphone, bit 2 a camera that is off.
+     */
+    @JvmStatic
+    fun setMediaState(questionId: String, role: String, state: Int) {
+        val key = role.trim().lowercase().ifBlank { "participant" }
+        val ref = FirebaseDatabase.getInstance()
+            .getReference("questions")
+            .child(questionId)
+            .child("mediaState")
+            .child(key)
+        Tasks.await(ref.setValue(state), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    @JvmStatic
+    fun fetchMediaStateJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance()
+                .getReference("questions")
+                .child(questionId)
+                .child("mediaState")
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+
+        val rows = JSONObject()
+        for (child in snapshot.children) {
+            val key = child.key ?: continue
+            val value = child.getValue(Long::class.java) ?: continue
+            rows.put(key, value)
+        }
+        return rows.toString()
+    }
+
+    /**
      * Switches the lesson's medium — text, audio or video — for both
      * participants. The other side follows it from the session details.
      */
