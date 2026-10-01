@@ -33,7 +33,7 @@ struct QuestionHomeLayout {
 
   var menuTop: CGFloat { safeTop + 3 }
   var toggleTop: CGFloat { safeTop - 1 }
-  var toggleWidth: CGFloat { min(266, size.width - 110) }
+  var toggleWidth: CGFloat { max(0, min(266, size.width - 110)) }
 
   var panelTop: CGFloat { safeTop + 83 }
   var panelWidth: CGFloat { size.width - 52 }

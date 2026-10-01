@@ -309,13 +309,14 @@ struct StudentQuestionHomeView: View {
 
   /// Photo on the left and text on the right in both languages, as designed.
   func modeToggle(width: CGFloat) -> some View {
-    let segmentWidth = (width - 12) / 2
+    let toggleWidth = max(0, width)
+    let segmentWidth = max(0, (toggleWidth - 12) / 2)
     return HStack(spacing: 4) {
       modeSegment(.photo, icon: "home-camera", iconSize: 25, label: viewModel.photoModeLabel, width: segmentWidth)
       modeSegment(.text, icon: "home-message", iconSize: 24, label: viewModel.textModeLabel, width: segmentWidth)
     }
     .padding(4)
-    .frame(width: width, height: QuestionHomeLayout.toggleHeight)
+    .frame(width: toggleWidth, height: QuestionHomeLayout.toggleHeight)
     .background(theme.brandBackgroundTop)
     .clipShape(RoundedRectangle(cornerRadius: 14))
     .overlay {

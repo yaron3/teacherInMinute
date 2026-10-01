@@ -373,6 +373,21 @@ extension View {
   func brandCard(cornerRadius: CGFloat = 16, padding: CGFloat = 16) -> some View {
     modifier(BrandCardModifier(cornerRadius: cornerRadius, padding: padding))
   }
+
+  /// Lets a drag down a form put the keyboard away — on iOS only.
+  ///
+  /// SkipUI cannot tell a finger's drag from Compose's own scroll that brings a
+  /// newly focused field above the keyboard, so on Android it closed the
+  /// keyboard, and cleared focus, the moment a field low on the form was
+  /// tapped: the login password could not be typed into at all.
+  @ViewBuilder
+  func formScrollDismissesKeyboard() -> some View {
+#if os(Android)
+    self
+#else
+    scrollDismissesKeyboard(.interactively)
+#endif
+  }
 }
 
 struct BrandCardModifier: ViewModifier {
