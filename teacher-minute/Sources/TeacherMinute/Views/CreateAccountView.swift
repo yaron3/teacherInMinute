@@ -280,7 +280,7 @@ struct CreateAccountView: View {
     HStack(spacing: 12) {
 #if !os(Android)
       socialButton(label: viewModel.appleLabel, identifier: "sign_up_apple") {
-        Image("brand-apple", bundle: .module)
+        Image(systemName: "apple.logo")
           .renderingMode(.template)
           .resizable()
           .foregroundStyle(theme.onDarkFill)

@@ -156,7 +156,7 @@ struct LoginView: View {
     HStack(spacing: 12) {
 #if !os(Android)
       socialButton(label: viewModel.appleLabel, identifier: "log_in_apple") {
-        Image("brand-apple", bundle: .module)
+		Image(systemName: "apple.logo")
           .renderingMode(.template)
           .resizable()
           .foregroundStyle(theme.onDarkFill)

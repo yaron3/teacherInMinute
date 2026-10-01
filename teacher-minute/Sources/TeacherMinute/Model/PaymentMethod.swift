@@ -35,9 +35,9 @@ enum PaymentMethod: String, CaseIterable {
     /// backend supports it.
     static var availableForCurrentPlatform: [PaymentMethod] {
 #if os(Android)
-        [.paypal, .googlePay, .creditCard]
+	  [.googlePay, .paypal, .creditCard]
 #else
-        [.paypal, .applePay, .creditCard]
+        [.applePay, .paypal, .creditCard]
 #endif
     }
 
