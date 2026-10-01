@@ -27,7 +27,14 @@ struct MainTabView: View {
   
   init(userMode: AppUserMode = .teacher) {
 	self._viewModel = State(wrappedValue: MainTabViewModel(userMode: userMode))
-	self._teacherDashboardViewModel = State(wrappedValue: userMode == .teacher ? TeacherDashboardViewModel() : nil)
+	// Not built here. SwiftUI runs this initializer every time the parent is
+	// re-evaluated and keeps only the first `State`, but the discarded view
+	// models still ran their own initializer: each one signed up for auth
+	// changes, was told at once that the teacher was signed in, and wrote them
+	// offline. Going online was undone within milliseconds of the toggle, and
+	// came back only with the next keep-alive a minute later. The view model is
+	// created once, in `.task` below.
+	self._teacherDashboardViewModel = State(wrappedValue: nil)
 	self._profileViewModel = State(
 	  wrappedValue: ProfileViewModel(roleType: userMode == .teacher ? .teacher : .student)
 	)
@@ -119,6 +126,9 @@ struct MainTabView: View {
 	.background { BrandScreenBackground() }
 	.navigationBarBackButtonHidden(true)
 	.task {
+	  if viewModel.userMode == .teacher, teacherDashboardViewModel == nil {
+		teacherDashboardViewModel = TeacherDashboardViewModel()
+	  }
 	  print("[Push] MainTabView.task — calling registerCurrentDevice role=\(viewModel.userMode)")
 	  PushNotificationService.shared.registerCurrentDevice(role: viewModel.userMode)
 	  if let count = teacherDashboardViewModel?.lessonCount {
