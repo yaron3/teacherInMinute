@@ -2,12 +2,14 @@
 //  TeacherEarningsView.swift
 //  teacher-minute
 //
+//  The teacher's income and payments, on the brand's tab screen: this month
+//  and all time, the next payment, where payouts go, and each month's lessons.
+//
 
 import SwiftUI
 
 struct TeacherEarningsView: View {
     @State var viewModel = TeacherEarningsViewModel()
-    @State var selectedSegment: Int = 1
     @Environment(\.colorScheme) var colorScheme
 
     var theme: AppTheme {
@@ -15,70 +17,85 @@ struct TeacherEarningsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                headerTitle
-                    summaryCards
-                    if viewModel.hasPendingPayment {
-                        nextPaymentCard
-                    }
-                    payoutMethodCard
-                    if viewModel.hasEarningsData {
-                        monthSelectorRow
-                        if let selected = viewModel.selectedMonth {
-                            monthDetailCard(selected)
-                        }
-                    } else if viewModel.showsEmptyState {
-                        emptyState
-                    }
-                
+        BrandTabScreen {
+            VStack(spacing: 0) {
+                BrandPageHeader(label: "", title: viewModel.earningsScreenTitle) {
+                    BrandMenuButton()
+                }
+                ScrollView(.vertical, showsIndicators: false) {
+                    content
+                }
             }
-            .padding(20)
-        }
-        .background(theme.screenBackground)
-        .task {
-            viewModel.load()
-        }
-        .sheet(isPresented: $viewModel.isEditingPayoutMethod) {
-            TeacherPayoutMethodSheet(
-                viewModel: viewModel,
-                method: $viewModel.payoutMethodDraft,
-                availableTypes: viewModel.availablePayoutMethodTypes,
-                banks: viewModel.banks,
-                isSaving: viewModel.isSavingPayoutMethod,
-                errorMessage: viewModel.payoutMethodErrorMessage,
-                profilePhone: viewModel.profilePhone,
-                isConnectingPayPal: viewModel.isConnectingPayPal,
-                onUseProfilePhone: { viewModel.useProfilePhone() },
-                onConnectPayPal: { Task { await viewModel.connectPayPalPayoutAccount() } },
-                onSave: { Task { await viewModel.savePayoutMethod() } },
-                onCancel: { viewModel.cancelPayoutMethodEditing() }
+            // On a plain stack inside the screen, not on `BrandTabScreen`; see
+            // there.
+            .task {
+                viewModel.load()
+            }
+            .sheet(isPresented: $viewModel.isEditingPayoutMethod) {
+                TeacherPayoutMethodSheet(
+                    viewModel: viewModel,
+                    method: $viewModel.payoutMethodDraft,
+                    availableTypes: viewModel.availablePayoutMethodTypes,
+                    banks: viewModel.banks,
+                    isSaving: viewModel.isSavingPayoutMethod,
+                    errorMessage: viewModel.payoutMethodErrorMessage,
+                    profilePhone: viewModel.profilePhone,
+                    isConnectingPayPal: viewModel.isConnectingPayPal,
+                    onUseProfilePhone: { viewModel.useProfilePhone() },
+                    onConnectPayPal: { Task { await viewModel.connectPayPalPayoutAccount() } },
+                    onSave: { Task { await viewModel.savePayoutMethod() } },
+                    onCancel: { viewModel.cancelPayoutMethodEditing() }
+                )
+            }
+            .appDialog(
+                viewModel.updateProfileDialogTitle,
+                isPresented: $viewModel.isOfferingProfilePhoneUpdate,
+                message: viewModel.updateProfileDialogMessage,
+                actions: [
+                    AppDialogAction(viewModel.updateLabel, kind: .primary) {
+                        Task { await viewModel.confirmProfilePhoneUpdate() }
+                    },
+                    AppDialogAction(viewModel.notNowLabel, kind: .cancel) {
+                        viewModel.declineProfilePhoneUpdate()
+                    },
+                ]
             )
         }
-        .appDialog(
-            viewModel.updateProfileDialogTitle,
-            isPresented: $viewModel.isOfferingProfilePhoneUpdate,
-            message: viewModel.updateProfileDialogMessage,
-            actions: [
-                AppDialogAction(viewModel.updateLabel, kind: .primary) {
-                    Task { await viewModel.confirmProfilePhoneUpdate() }
-                },
-                AppDialogAction(viewModel.notNowLabel, kind: .cancel) {
-                    viewModel.declineProfilePhoneUpdate()
-                },
-            ]
-        )
+    }
+
+    // Split out of `body`, which the type checker would otherwise have to
+    // solve in one piece.
+    var content: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            BrandPageHero(title: viewModel.earningsScreenTitle)
+            summaryCards
+            if viewModel.hasPendingPayment {
+                nextPaymentCard
+            }
+            payoutMethodCard
+            if viewModel.hasEarningsData {
+                monthSelectorRow
+                if let selected = viewModel.selectedMonth {
+                    monthDetailCard(selected)
+                }
+            } else if viewModel.showsEmptyState {
+                emptyState
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 20)
     }
 
     // MARK: - Payout Method
 
     var payoutMethodCard: some View {
         FlatCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(viewModel.payoutMethodTitle)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(theme.primaryText)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(theme.onDarkFill)
                     Spacer()
                     if viewModel.showsPayoutMethodAction {
                         Button {
@@ -86,29 +103,24 @@ struct TeacherEarningsView: View {
                         } label: {
                             Text(viewModel.payoutMethodActionLabel)
                                 .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(theme.info)
+                                .foregroundStyle(theme.brandActionBackground)
                         }
                         .buttonStyle(.plain)
                     }
                 }
 
-                Divider()
+                BrandRule()
 
                 if let method = viewModel.payoutMethod {
                     HStack(spacing: 12) {
-                        FlatIconTile(
-                            systemName: method.type.systemImage,
-                            size: 40,
-                            tint: theme.accent,
-                            background: theme.screenBackground
-                        )
+                        FlatIconTile(systemName: method.type.systemImage, size: 40)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(method.type.displayName)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(theme.primaryText)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(theme.onDarkFill)
                             Text(viewModel.payoutMethodSummary)
                                 .font(.system(size: 13))
-                                .foregroundStyle(theme.secondaryText)
+                                .foregroundStyle(theme.brandSecondaryText)
                                 .lineLimit(1)
                         }
                         Spacer()
@@ -118,26 +130,21 @@ struct TeacherEarningsView: View {
                     // the card names it and asks for the details rather than
                     // telling the teacher they have no method at all.
                     HStack(spacing: 12) {
-                        FlatIconTile(
-                            systemName: pending.systemImage,
-                            size: 40,
-                            tint: theme.secondaryText,
-                            background: theme.screenBackground
-                        )
+                        FlatIconTile(systemName: pending.systemImage, size: 40, tint: theme.brandSecondaryText)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(pending.displayName)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(theme.primaryText)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(theme.onDarkFill)
                             Text(viewModel.completePayoutDetailsText)
                                 .font(.system(size: 13))
-                                .foregroundStyle(theme.secondaryText)
+                                .foregroundStyle(theme.brandSecondaryText)
                         }
                         Spacer()
                     }
                 } else {
                     Text(viewModel.noPayoutMethodText)
                         .font(.system(size: 14))
-                        .foregroundStyle(theme.secondaryText)
+                        .foregroundStyle(theme.brandSecondaryText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -148,57 +155,11 @@ struct TeacherEarningsView: View {
 
     var emptyState: some View {
         Text(viewModel.emptyStateText)
-            .font(.system(size: 14))
-            .foregroundStyle(theme.secondaryText)
+            .font(.system(size: 15))
+            .foregroundStyle(theme.brandSecondaryText)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.top, 30)
-    }
-
-    // MARK: - Header
-
-    var headerTitle: some View {
-        HStack(spacing: 12) {
-            SideMenuButton()
-            Text(viewModel.earningsScreenTitle)
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(theme.primaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    // MARK: - Segment Picker
-
-//    var segmentPicker: some View {
-//        HStack(spacing: 0) {
-//            segmentTab(title: LocalizationSupport.localized("Teacher Profile"), icon: "person.fill", index: 0)
-//            segmentTab(title: LocalizationSupport.localized("Monthly Summary"), icon: "chart.bar.fill", index: 1)
-//        }
-//        .background(theme.cardBackground)
-//        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-//    }
-
-    func segmentTab(title: String, icon: String, index: Int) -> some View {
-        let isSelected = selectedSegment == index
-        return Button {
-            selectedSegment = index
-        } label: {
-            HStack(spacing: 6) {
-                PlatformIcon(systemName: icon, size: 13, weight: .semibold, color: isSelected ? .white : theme.secondaryText)
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(isSelected ? .white : theme.secondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity)
-            .background(isSelected ? theme.accent : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .padding(3)
     }
 
     // MARK: - Summary Cards
@@ -209,51 +170,49 @@ struct TeacherEarningsView: View {
                 title: viewModel.currentMonthTitle,
                 amount: viewModel.currentMonthEarningsText,
                 subtitle: viewModel.currentMonthMinutesText,
-                background: theme.accent
+                tint: theme.brandActionBackground
             )
             summaryCard(
                 title: viewModel.totalIncomeTitle,
                 amount: viewModel.totalEarningsText,
                 subtitle: viewModel.totalMonthsActiveText,
-                background: theme.positive
+                tint: theme.brandSuccess
             )
         }
     }
 
-    func summaryCard(title: String, amount: String, subtitle: String, background: Color) -> some View {
+    func summaryCard(title: String, amount: String, subtitle: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(theme.brandSecondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(amount)
                 .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(tint)
                 // The loading placeholder is a word, not an amount, and would
                 // wrap instead of scaling without an explicit single line.
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             Text(subtitle)
                 .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(theme.brandSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .brandCard()
     }
 
     // MARK: - Next Payment Card
 
     var nextPaymentCard: some View {
         FlatCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text(viewModel.nextPaymentTitle)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(theme.primaryText)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(theme.onDarkFill)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Divider()
+                BrandRule()
 
                 paymentRow(icon: "banknote", value: viewModel.formattedEarnings(viewModel.nextPaymentCents))
                 paymentRow(icon: "calendar", value: viewModel.nextPaymentDate)
@@ -263,10 +222,10 @@ struct TeacherEarningsView: View {
                     HStack {
                         Text(method.type.displayName)
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(theme.onBrandAction)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 4)
-                            .background(theme.accent)
+                            .background(theme.brandActionBackground)
                             .clipShape(Capsule())
                         Spacer()
                     }
@@ -278,10 +237,10 @@ struct TeacherEarningsView: View {
     func paymentRow(icon: String, value: String) -> some View {
         HStack(spacing: 10) {
             Text(value)
-                .font(.system(size: 14))
-                .foregroundStyle(theme.primaryText)
+                .font(.system(size: 15))
+                .foregroundStyle(theme.onDarkFill)
             Spacer()
-            PlatformIcon(systemName: icon, size: 16, weight: .regular, color: theme.secondaryText)
+            PlatformIcon(systemName: icon, size: 16, weight: .regular, color: theme.brandActionBackground)
         }
     }
 
@@ -291,16 +250,21 @@ struct TeacherEarningsView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(viewModel.months) { month in
+                    let isSelected = viewModel.selectedMonthId == month.id
                     Button {
                         viewModel.selectedMonthId = month.id
                     } label: {
                         Text(month.shortName)
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(viewModel.selectedMonthId == month.id ? .white : theme.secondaryText)
+                            .foregroundStyle(isSelected ? theme.onBrandAction : theme.brandSecondaryText)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(viewModel.selectedMonthId == month.id ? theme.accent : theme.cardBackground)
+                            .background(isSelected ? theme.brandActionBackground : theme.brandCardSurface)
                             .clipShape(Capsule())
+                            .overlay {
+                                Capsule()
+                                    .stroke(isSelected ? theme.brandActionBackground : theme.brandControlBorder, lineWidth: 1)
+                            }
                     }
                     .buttonStyle(.plain)
                 }
@@ -317,41 +281,42 @@ struct TeacherEarningsView: View {
                     if month.isCurrentMonth {
                         Text(viewModel.inProgressLabel)
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(theme.onBrandAction)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(theme.positive)
+                            .background(theme.brandSuccess)
                             .clipShape(Capsule())
                     }
                     Spacer()
                     Text(month.displayName)
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(theme.primaryText)
+                        .foregroundStyle(theme.onDarkFill)
                 }
 
                 Text(viewModel.formattedEarnings(month.earningsCents))
                     .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(theme.primaryText)
+                    .foregroundStyle(theme.brandActionBackground)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(viewModel.monthSummaryText(minutes: month.minutesCount, lessons: month.lessonCount))
                     .font(.system(size: 13))
-                    .foregroundStyle(theme.secondaryText)
+                    .foregroundStyle(theme.brandSecondaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if !month.weeklyBreakdown.isEmpty {
-                    Divider().padding(.vertical, 4)
+                    BrandRule()
+                        .padding(.vertical, 4)
 
                     Text(viewModel.weeklyBreakdownTitle)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(theme.primaryText)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(theme.onDarkFill)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     VStack(spacing: 0) {
                         ForEach(month.weeklyBreakdown) { week in
                             weekRow(week)
                             if let lastId = month.weeklyBreakdown.last?.id, lastId != week.id {
-                                Divider()
+                                BrandRule()
                             }
                         }
                     }
@@ -366,22 +331,22 @@ struct TeacherEarningsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(LessonFormatting.minutesText(week.minutesCount))
                     .font(.system(size: 13))
-                    .foregroundStyle(theme.secondaryText)
+                    .foregroundStyle(theme.brandSecondaryText)
                 Text(viewModel.weekLessonsText(week.lessonCount))
                     .font(.system(size: 12))
-                    .foregroundStyle(theme.secondaryText)
+                    .foregroundStyle(theme.brandSecondaryText)
             }
             Spacer()
             VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.formattedEarnings(week.earningsCents))
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(theme.primaryText)
+                    .foregroundStyle(theme.onDarkFill)
                 Text(week.label)
                     .font(.system(size: 11))
-                    .foregroundStyle(theme.secondaryText)
+                    .foregroundStyle(theme.brandSecondaryText)
                     .multilineTextAlignment(.leading)
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 }

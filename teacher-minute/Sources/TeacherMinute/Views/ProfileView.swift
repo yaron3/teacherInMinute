@@ -13,6 +13,11 @@ import SwiftUI
 import SkipBridge
 #endif
 
+/// The profile, on the brand's tab screen: who the user is, how to reach them,
+/// and the device permissions a lesson needs. A teacher's also holds where
+/// their payouts go, the grades and subjects they teach, and their documents.
+/// It runs on the `ProfileViewModel` that `MainTabView` holds, and edits
+/// through `ProfileEditView`.
 struct ProfileView: View {
   /// `@Bindable`, not `@State`. MainTabView already owns this view model in its
   /// own `@State` and passes it down; wrapping it a second time here left the
@@ -25,514 +30,553 @@ struct ProfileView: View {
   @State var isShowingProfileEditor = false
   @State var isShowingSubjectEditor = false
   @State var isShowingDocuments = false
-  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
 #if os(Android)
-  @State var showAndroidPhotoSourceDialog = false
+  @State var isShowingPhotoSourceDialog = false
 #endif
+  @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
+  @Environment(\.scenePhase) var scenePhase
+  @Environment(\.appRouter) var router
+
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
+    AppTheme(colorScheme: colorScheme)
   }
+
   init(viewModel: ProfileViewModel = ProfileViewModel()) {
-	self.viewModel = viewModel
+    self.viewModel = viewModel
   }
+
   var body: some View {
-	ScrollView(.vertical, showsIndicators: false) {
-      // The profile renders straight away and fills in as the load lands, the
-      // way the home tabs do. Swapping the whole subtree on a loaded flag did
-      // not survive Skip: the load completed in tens of milliseconds and set
-      // `isProfileLoaded`, but the branch never re-evaluated on Android and the
-      // screen sat on "Loading profile..." indefinitely. Rendering one tree and
-      // letting the individual fields update removes the branch entirely.
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 12) {
-        SideMenuButton()
-        Text(viewModel.profileScreenTitle)
-          .font(.system(size: 26, weight: .bold))
-          .foregroundStyle(theme.primaryText)
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
-      .padding(.top, 16)
+    // A plain stack around the screen, for the photo chooser below.
+    ZStack {
+      screen
+    }
+#if os(Android)
+    // The brand's dialog, as iOS's photo chooser is. Here rather than on the
+    // photo button or inside the screen: on Android an `appDialog` is an
+    // overlay, laid out within the view it is attached to, and this one must
+    // dim the tab bar too.
+    .appDialog(
+      viewModel.addPhotoDialogTitle,
+      isPresented: $isShowingPhotoSourceDialog,
+      actions: [
+        AppDialogAction(viewModel.takePhotoLabel) {
+          viewModel.pickProfilePhoto(fromCamera: true)
+        },
+        AppDialogAction(viewModel.chooseFromLibraryLabel) {
+          viewModel.pickProfilePhoto(fromCamera: false)
+        },
+        AppDialogAction(viewModel.cancelLabel, kind: .cancel)
+      ]
+    )
+#endif
+  }
 
+  private var screen: some View {
+    BrandTabScreen {
+      VStack(spacing: 0) {
+        BrandPageHeader(label: viewModel.profileScreenTitle, title: viewModel.profileDisplayName) {
+          BrandMenuButton()
+        }
+        ScrollView(.vertical, showsIndicators: false) {
+          content
+        }
+      }
+      // On a plain stack inside the screen, not on `BrandTabScreen`; see
+      // there.
+      .task {
+        if !viewModel.hasDisplayableProfileData {
+          await viewModel.loadProfile()
+        }
+      }
+      .onChange(of: scenePhase) { _, phase in
+        guard phase == .active else { return }
+        Task { await viewModel.refreshPermissionStates() }
+      }
+      .sheet(isPresented: $isShowingProfileEditor, onDismiss: {
+        viewModel.cancelProfileEditing()
+      }) {
+        NavigationStack {
+          ProfileEditView(viewModel: viewModel)
+        }
+        .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+        .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+        .id(languagePreference)
+      }
+      .sheet(isPresented: $isShowingSubjectEditor, onDismiss: {
+        Task { await viewModel.loadProfile() }
+      }) {
+        NavigationStack {
+          TeacherSubjectsView(isEditing: true)
+        }
+        .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+        .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+        .id(languagePreference)
+      }
+      .sheet(isPresented: $isShowingDocuments, onDismiss: {
+        // Refresh the "Complete Your Documents" prompt after the teacher
+        // may have uploaded a missing document (bug #24).
+        Task { await viewModel.loadProfile() }
+      }) {
+        NavigationStack {
+          TeacherDocumentsView()
+        }
+        .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+        .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+        .id(languagePreference)
+      }
+    }
+  }
+
+  // Split out of `body`, which the type checker would otherwise have to solve
+  // in one piece.
+  private var content: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      BrandPageHero(title: viewModel.profileScreenTitle, subtitle: viewModel.profileSubtitle)
       if let error = viewModel.errorMessage {
-        profileLoadError(error)
+        loadError(error)
       }
-      FlatCard(padding: 0, outlined: true) {
-        VStack(spacing: 0) {
-          profileHeader
-            .padding(16)
-
-          FlatRule()
-
-          ProfileInfoRow(
-            parameter: .constant(Parameter(
-              description: viewModel.emailFieldLabel,
-              value: viewModel.email,
-              image: "envelope.fill"
-            )),
-            isEditing: false,
-          )
-          FlatRule()
-          ProfileInfoRow(
-            parameter: .constant(Parameter(
-              description: viewModel.phoneFieldLabel,
-              value: viewModel.phoneNumber,
-              image: "phone.fill"
-            )),
-            isEditing: false
-          )
-          FlatRule()
-//          ProfileInfoRow(
-//            parameter: .constant(Parameter(
-//              description: LocalizationSupport.localized("Username"),
-//              value: viewModel.username,
-//              image: "person.text.rectangle.fill"
-//            )),
-//            isEditing: false
-//          )
-        }
+      identityCard
+      if viewModel.isAnonymousAccount {
+        anonymousAccountCard
       }
-      .padding(.top, 20)
-	  if viewModel.shouldShowTeacherPaymentsMethod {
-		FlatSectionHeader("")
-		  .padding(.top, 32)
-		FlatCard {
-		  VStack {
-			HStack {
-			  Label(viewModel.paymentMethodLabel, systemImage: "creditcard")
-			  Spacer()
-			  Button(action: showProfileEditor) {
-				Text(viewModel.editLabel)
-				  .font(.system(size: 14, weight: .bold))
-				  .foregroundStyle(theme.primaryText)
-			  }
-			  .buttonStyle(.plain)
-			}
-			.padding(6)
-			
-			HStack {
-			  PlatformIcon(systemName: viewModel.payoutMethodSystemImage)
-			  VStack(alignment: .leading, spacing: 4) {
-				Text(viewModel.payoutMethodTitle)
-				  .font(.system(size: 14, weight: .bold))
-				  .foregroundStyle(theme.primaryText)
-				Text(viewModel.payoutMethodDetail)
-				  .font(.system(size: 13))
-				  .foregroundStyle(viewModel.hasPayoutMethod ? theme.primaryText : theme.secondaryText)
-			  }
-			  Spacer()
-			}
-		  }
-		}
-//		teachingCard(
-//		  title: LocalizationSupport.localized("Active accounts"),
-//		  chips: viewModel.paymentsMethdsLabels,
-//		  includeAdd: viewModel.paymentsMethdsLabels.isEmpty,
-//		  editAction: showProfileEditor,
-//		  addAction: showProfileEditor
-//		)
-
-	  }
+      contactCard
+      if viewModel.shouldShowTeacherPaymentsMethod {
+        payoutMethodCard
+      }
       if viewModel.shouldShowTeachingDetails {
-        FlatSectionHeader(viewModel.teachingDetailsSectionTitle)
-          .padding(.top, 32)
-
-        teachingCard(
-          title: viewModel.gradeLevelsTaughtTitle,
-          chips: viewModel.gradeLevelLabels,
-          includeAdd: viewModel.gradeLevels.isEmpty,
-          editAction: showProfileEditor,
-          addAction: showProfileEditor
-        )
-        .padding(.top, 14)
-
-        teachingCard(
-          title: viewModel.subjectsSectionTitle,
-          chips: viewModel.subjectsOrPlaceholder,
-          includeAdd: viewModel.subjects.isEmpty,
-          editAction: { isShowingSubjectEditor = true },
-          addAction: { isShowingSubjectEditor = true }
-        )
-        .padding(.top, 12)
-
-        documentsButton
-          .padding(.top, 12)
+        teachingDetails
       }
-
-      FlatSectionHeader(viewModel.devicePermissionsSectionTitle)
-        .padding(.top, 32)
-
-      FlatCard(padding: 0, outlined: true) {
-        VStack(spacing: 0) {
-          ProfilePermissionRow(
-            icon: "mic.fill",
-            title: viewModel.microphoneLabel,
-            state: viewModel.microphoneState,
-            iconColor: permissionColor(viewModel.microphoneState),
-            action: viewModel.requestMicrophonePermission
-          )
-
-          FlatRule()
-
-          ProfilePermissionRow(
-            icon: "camera.fill",
-            title: viewModel.cameraLabel,
-            state: viewModel.cameraState,
-            iconColor: permissionColor(viewModel.cameraState),
-            action: viewModel.requestCameraPermission
-          )
-
-          FlatRule()
-
-          ProfilePermissionRow(
-            icon: "bell.fill",
-            title: viewModel.notificationsLabel,
-            state: viewModel.notificationsState,
-            iconColor: permissionColor(viewModel.notificationsState),
-            action: viewModel.manageNotifications
-          )
-        }
-      }
-      .padding(.top, 14)
+      permissionsCard
     }
     .padding(.horizontal, 20)
-    .padding(.bottom, 40)
-	}
-    .background(theme.screenBackground)
-			.task {
-              await loadProfileForDisplay()
-			}
-            .sheet(isPresented: $isShowingProfileEditor, onDismiss: {
-              viewModel.cancelProfileEditing()
-            }) {
-              NavigationStack {
-                ProfileEditView(viewModel: viewModel)
-              }
-              .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-              .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-              .id(languagePreference)
-            }
-            .sheet(isPresented: $isShowingSubjectEditor, onDismiss: {
-              Task { await viewModel.loadProfile() }
-            }) {
-              NavigationStack {
-                TeacherSubjectsView(isEditing: true)
-              }
-              .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-              .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-              .id(languagePreference)
-            }
-            .sheet(isPresented: $isShowingDocuments, onDismiss: {
-              // Refresh the "Complete Your Documents" prompt after the teacher
-              // may have uploaded a missing document (bug #24).
-              Task { await viewModel.loadProfile() }
-            }) {
-              NavigationStack {
-                TeacherDocumentsView()
-              }
-              .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-              .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-              .id(languagePreference)
-            }
-	  .trackScreen(AnalyticsScreen.profile)
+    .padding(.top, 16)
+    .padding(.bottom, 20)
   }
-	  
-  /// Shown above the profile when a load failed, rather than in place of it.
-  /// A failure leaves the fields at their placeholder values, which is still a
-  /// usable screen — the tab bar and the retry stay reachable either way.
-  func profileLoadError(_ error: String) -> some View {
-    VStack(spacing: 12) {
-      Text(error)
-        .font(.system(size: 14, weight: .semibold))
-        .foregroundStyle(theme.danger)
 
+  /// Shown above the profile when a load failed, rather than in place of it:
+  /// the fields keep their placeholders, which is still a usable screen.
+  private func loadError(_ error: String) -> some View {
+    HStack(spacing: 12) {
+      Text(error)
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(theme.danger)
+        .frame(maxWidth: .infinity, alignment: .leading)
       Button {
         Task { await viewModel.loadProfile() }
       } label: {
         Text(viewModel.retryLabel)
           .font(.system(size: 14, weight: .bold))
-          .foregroundStyle(theme.primaryText)
+          .foregroundStyle(theme.brandActionBackground)
       }
       .buttonStyle(.plain)
     }
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, 16)
   }
 
-	  var profileHeader: some View {
-	HStack(alignment: .center, spacing: 16) {
-	  ZStack(alignment: .bottomTrailing) {
-		profilePhotoButton
-	  }
-	  VStack(alignment: .leading, spacing: 6) {
-		HStack(alignment: .center, spacing: 6) {
-		  Text(viewModel.name)
-			.font(.system(size: 22, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(2)
-			.minimumScaleFactor(0.7)
-		  Spacer()
-		  Button(action: showProfileEditor) {
-			PlatformIcon(systemName: "pencil", size: 14, weight: .semibold, color: theme.secondaryText)
-			  
-		  }
-		  .buttonStyle(.plain)
-		  
-		}
+  // MARK: - Identity
 
-		Text(viewModel.role)
-		  .font(.system(size: 14))
-		  .foregroundStyle(theme.secondaryText)
+  /// The photo at the start, then the name, the role and, for a rated
+  /// teacher, the rating. "Edit" at the far end keeps the details editable.
+  private var identityCard: some View {
+    HStack(spacing: 12) {
+      avatar
+      VStack(alignment: .leading, spacing: 4) {
+        Text(viewModel.profileDisplayName)
+          .font(.system(size: 22, weight: .bold))
+          .foregroundStyle(theme.onDarkFill)
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
+        Text(viewModel.profileRoleLine)
+          .font(.system(size: 15))
+          .foregroundStyle(theme.brandSecondaryText)
+          .lineLimit(1)
+          .accessibilityIdentifier("profile_role_line")
+        if viewModel.hasRating {
+          HStack(spacing: 4) {
+            Text(LessonFormatting.ratingText(viewModel.rating))
+              .font(.system(size: 13, weight: .semibold))
+              .foregroundStyle(theme.onDarkFill)
+            RatingStarsView(rating: viewModel.rating, size: 12)
+            Text(viewModel.reviewCountText)
+              .font(.system(size: 12))
+              .foregroundStyle(theme.brandSecondaryText)
+          }
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
 
-		if viewModel.hasRating {
-		  HStack(spacing: 4) {
-			Text(LessonFormatting.ratingText(viewModel.rating))
-			  .font(.system(size: 13, weight: .semibold))
-			  .foregroundStyle(theme.primaryText)
+      editButton(identifier: "profile_edit_button") {
+        showProfileEditor()
+      }
+    }
+    .brandCard()
+  }
 
-			RatingStarsView(rating: viewModel.rating, size: 12)
+  /// The photo, with the button that changes it overlapping its lower
+  /// outside corner.
+  private var avatar: some View {
+    ZStack(alignment: .bottomLeading) {
+      avatarCircle
+        .frame(width: 100, height: 86, alignment: .trailing)
+      photoButton
+    }
+    .frame(width: 100, height: 86)
+  }
 
-			Text(viewModel.reviewCountText)
-			  .font(.system(size: 12))
-			  .foregroundStyle(theme.secondaryText)
-		  }
-		}
-	  }
-
-	  
-
-
-	}
-	.frame(maxWidth: .infinity, alignment: .leading)
+  private var avatarCircle: some View {
+    ZStack {
+      Circle()
+        .fill(theme.onDarkFill)
+      if viewModel.profileImageURL.isEmpty {
+        Image(decorative: "brand-avatar-placeholder", bundle: .module)
+          .resizable()
+          .frame(width: 36, height: 36)
+      } else {
+        CachedRemoteImage(url: viewModel.profileImageURL, contentMode: .fill)
+          .frame(width: 86, height: 86)
+          .clipShape(Circle())
+      }
+    }
+    .frame(width: 86, height: 86)
   }
 
   @ViewBuilder
-  var profilePhotoButton: some View {
+  private var photoButton: some View {
 #if !os(Android)
     PhotoSourceButton(viewModel: viewModel, onImageData: { data in
       viewModel.uploadProfileImage(data: data)
     }) {
-      profilePhotoContent
+      captureBadge
     }
+    .accessibilityIdentifier("profile_photo_button")
 #else
     Button {
-      showAndroidPhotoSourceDialog = true
+      isShowingPhotoSourceDialog = true
     } label: {
-      profilePhotoContent
+      captureBadge
     }
     .buttonStyle(.plain)
-    .confirmationDialog(
-      viewModel.addPhotoDialogTitle,
-      isPresented: $showAndroidPhotoSourceDialog,
-      titleVisibility: .visible
-    ) {
-      Button(viewModel.takePhotoLabel) {
-        pickAndroidProfilePhoto(source: .camera)
-      }
-      Button(viewModel.chooseFromLibraryLabel) {
-        pickAndroidProfilePhoto(source: .gallery)
-      }
-      Button(viewModel.cancelLabel, role: .cancel) {}
-    }
+    .accessibilityIdentifier("profile_photo_button")
 #endif
   }
 
-  var profilePhotoContent: some View {
-    ZStack(alignment: .bottomTrailing) {
-      Group {
-        ProfileAvatarView(
-          imageURL: viewModel.profileImageURL,
-          size: 88,
-          fallbackSystemImage: "person.crop.circle.fill",
-          background: theme.accentBackground,
-          tint: theme.accentStrong,
-          initial: viewModel.nameInitial
-        )
-      }
-      .frame(width: 88, height: 88)
-      .clipShape(Circle())
-
+  private var captureBadge: some View {
+    ZStack {
       Circle()
-        .fill(theme.accent)
-        .frame(width: 30, height: 30)
-        .overlay {
-          if viewModel.isUploadingPhoto {
-            ProgressView()
-              .scaleEffect(0.7)
-              .tint(theme.onAccentText)
-          } else {
-            PlatformIcon(
-              systemName: "camera.fill",
-              size: 12,
-              weight: .bold,
-              color: theme.onAccentText
-            )
-          }
+        .fill(theme.brandActionBackground)
+      if viewModel.isUploadingPhoto {
+        ProgressView()
+          .scaleEffect(0.7)
+          .tint(theme.onBrandAction)
+      } else {
+        Image("brand-capture", bundle: .module)
+          .renderingMode(.template)
+          .resizable()
+          .foregroundStyle(theme.onBrandAction)
+          .frame(width: 24, height: 24)
+      }
+    }
+    .frame(width: 40, height: 40)
+  }
+
+  private func editButton(identifier: String, action: @escaping () -> Void) -> some View {
+    Button {
+      action()
+    } label: {
+      Text(viewModel.editLabel)
+        .font(.system(size: 14, weight: .bold))
+        .foregroundStyle(theme.brandActionBackground)
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier(identifier)
+  }
+
+  // MARK: - A student without an account
+
+  /// That the student is using the app without an account, and the way to
+  /// make one: the sign-up form, which keeps them signed in anonymously until
+  /// it gives them their own account.
+  private var anonymousAccountCard: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(viewModel.anonymousAccountTitle)
+        .font(.system(size: 17, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text(viewModel.anonymousAccountText)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      BrandPrimaryButton(title: viewModel.createAccountLabel) {
+        router.startRegistration()
+      }
+      .accessibilityIdentifier("profile_create_account_button")
+    }
+    .brandCard()
+  }
+
+  // MARK: - Contact
+
+  private var contactCard: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      contactRow(label: viewModel.emailFieldLabel, value: viewModel.email)
+      BrandRule()
+      contactRow(label: viewModel.phoneFieldLabel, value: viewModel.phoneNumber)
+    }
+    .brandCard()
+  }
+
+  private func contactRow(label: String, value: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(label)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
+      Text(value.isEmpty ? "-" : value)
+        .font(.system(size: 15, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  // MARK: - A teacher's
+
+  /// Where the teacher's payouts go.
+  private var payoutMethodCard: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(spacing: 12) {
+        Text(viewModel.paymentMethodLabel)
+          .font(.system(size: 17, weight: .bold))
+          .foregroundStyle(theme.onDarkFill)
+          .frame(maxWidth: .infinity, alignment: .leading)
+        editButton(identifier: "profile_payout_edit_button") {
+          showProfileEditor()
         }
+      }
+      HStack(spacing: 12) {
+        FlatIconTile(systemName: viewModel.payoutMethodSystemImage, size: 40)
+        VStack(alignment: .leading, spacing: 4) {
+          Text(viewModel.payoutMethodTitle)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(theme.onDarkFill)
+          Text(viewModel.payoutMethodDetail)
+            .font(.system(size: 13))
+            .foregroundStyle(viewModel.hasPayoutMethod ? theme.onDarkFill : theme.brandSecondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+    .brandCard()
+  }
+
+  /// The grades and subjects the teacher teaches, and their documents.
+  private var teachingDetails: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      FlatSectionHeader(viewModel.teachingDetailsSectionTitle)
+        .padding(.top, 8)
+
+      teachingCard(
+        title: viewModel.gradeLevelsTaughtTitle,
+        chips: viewModel.gradeLevelLabels,
+        includeAdd: viewModel.gradeLevels.isEmpty
+      ) {
+        showProfileEditor()
+      }
+
+      teachingCard(
+        title: viewModel.subjectsSectionTitle,
+        chips: viewModel.subjectsOrPlaceholder,
+        includeAdd: viewModel.subjects.isEmpty
+      ) {
+        isShowingSubjectEditor = true
+      }
+
+      documentsButton
     }
   }
 
-  var defaultProfileIcon: some View {
-    Circle()
-      .fill(theme.accentBackground)
-      .overlay {
-        PlatformIcon(
-          systemName: "person.crop.circle.fill",
-          size: 72,
-          color: theme.accentStrong
-        )
+  private func teachingCard(
+    title: String,
+    chips: [String],
+    includeAdd: Bool,
+    edit: @escaping () -> Void
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 14) {
+      HStack {
+        Text(title)
+          .font(.system(size: 15, weight: .bold))
+          .foregroundStyle(theme.brandSecondaryText)
+        Spacer()
+        editButton(identifier: "profile_teaching_edit_button") {
+          edit()
+        }
       }
+
+      ChipGrid(minimumItemWidth: 96, spacing: 8) {
+        ForEach(chips, id: \.self) { chip in
+          FlatChip(title: chip, outlined: true)
+        }
+
+        if includeAdd {
+          Button {
+            edit()
+          } label: {
+            FlatChip(title: viewModel.addChipLabel, outlined: true)
+          }
+          .buttonStyle(.plain)
+        }
+      }
+    }
+    .brandCard()
   }
-  
-  func permissionColor(_ state: PermissionState) -> Color {
-	switch state {
-	case .granted: return theme.positive
-	case .denied: return theme.danger
-	case .notDetermined: return theme.secondaryText
-	}
+
+  private var documentsButton: some View {
+    Button {
+      isShowingDocuments = true
+    } label: {
+      HStack(spacing: 14) {
+        FlatIconTile(systemName: viewModel.hasMissingDocuments ? "doc.badge.plus" : "doc.text.fill", size: 44)
+
+        VStack(alignment: .leading, spacing: 3) {
+          Text(viewModel.hasMissingDocuments
+               ? viewModel.completeDocumentsTitle
+               : viewModel.documentsUploadedTitle)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(theme.onDarkFill)
+
+          Text(viewModel.hasMissingDocuments
+               ? viewModel.uploadRemainingDocumentsSubtitle
+               : viewModel.viewUploadedDocumentsSubtitle)
+            .font(.system(size: 13))
+            .foregroundStyle(theme.brandSecondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        BrandForwardChevron()
+      }
+      .brandCard()
+      .tappableFrame()
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("profile_documents_button")
+  }
+
+  // MARK: - Permissions
+
+  private var permissionsCard: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(viewModel.devicePermissionsSectionTitle)
+        .font(.system(size: 24, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+      permissionRow(
+        title: viewModel.microphoneLabel,
+        state: viewModel.microphoneState,
+        identifier: "microphone"
+      ) {
+        viewModel.microphoneToggleTapped()
+      }
+      BrandRule()
+      permissionRow(
+        title: viewModel.cameraLabel,
+        state: viewModel.cameraState,
+        identifier: "camera"
+      ) {
+        viewModel.cameraToggleTapped()
+      }
+      BrandRule()
+      permissionRow(
+        title: viewModel.notificationsLabel,
+        state: viewModel.notificationsState,
+        identifier: "notifications"
+      ) {
+        viewModel.manageNotifications()
+      }
+    }
+    .brandCard()
+  }
+
+  /// The permission and its state, then its switch at the far end.
+  private func permissionRow(
+    title: String,
+    state: PermissionState,
+    identifier: String,
+    action: @escaping () -> Void
+  ) -> some View {
+    HStack(spacing: 12) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title)
+          .font(.system(size: 17, weight: .bold))
+          .foregroundStyle(theme.onDarkFill)
+        Text(state.subtitle)
+          .font(.system(size: 13))
+          .foregroundStyle(theme.brandActionBackground)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      BrandToggle(isOn: state.isGranted, action: action)
+        .accessibilityIdentifier("permission_toggle_\(identifier)")
+    }
   }
 
   private func showProfileEditor() {
     viewModel.editProfile()
     isShowingProfileEditor = true
   }
-
-  private func loadProfileForDisplay() async {
-    guard !viewModel.hasDisplayableProfileData else { return }
-    await viewModel.loadProfile()
-  }
-
-  var documentsButton: some View {
-	Button {
-	  isShowingDocuments = true
-	} label: {
-	  FlatCard {
-		HStack(spacing: 14) {
-		  FlatIconTile(systemName: viewModel.hasMissingDocuments ? "doc.badge.plus" : "doc.text.fill", size: 44, background: theme.screenBackground)
-
-		  VStack(alignment: .leading, spacing: 3) {
-			Text(viewModel.hasMissingDocuments
-				 ? viewModel.completeDocumentsTitle
-				 : viewModel.documentsUploadedTitle)
-			  .font(.system(size: 15, weight: .bold))
-			  .foregroundStyle(theme.primaryText)
-
-			Text(viewModel.hasMissingDocuments
-				 ? viewModel.uploadRemainingDocumentsSubtitle
-				 : viewModel.viewUploadedDocumentsSubtitle)
-			  .font(.system(size: 13))
-			  .foregroundStyle(theme.secondaryText)
-		  }
-
-		  Spacer()
-
-		  PlatformIcon(systemName: "chevron.right", size: 13, weight: .medium, color: theme.secondaryText)
-		}
-	  }
-	}
-	.buttonStyle(.plain)
-  }
-
-  func teachingCard(
-	title: String,
-	chips: [String],
-	includeAdd: Bool,
-	editAction: @escaping () -> Void,
-	addAction: @escaping () -> Void
-  ) -> some View {
-	FlatCard {
-	  VStack(alignment: .leading, spacing: 14) {
-		HStack {
-		  Text(title)
-			.font(.system(size: 13))
-			.foregroundStyle(theme.secondaryText)
-
-		  Spacer()
-
-		  Button(action: editAction) {
-			Text(viewModel.editLabel)
-			  .font(.system(size: 14, weight: .bold))
-			  .foregroundStyle(theme.primaryText)
-		  }
-		  .buttonStyle(.plain)
-		}
-
-		ChipGrid(minimumItemWidth: 96, spacing: 8) {
-		  ForEach(chips, id: \.self) { chip in
-			FlatChip(title: chip, outlined: true)
-		  }
-
-		  if includeAdd {
-			Button(action: addAction) {
-			  FlatChip(title: viewModel.addChipLabel, outlined: true)
-			}
-			.buttonStyle(.plain)
-		  }
-		}
-	  }
-	  }
-  }
-
-#if os(Android)
-  enum AndroidPhotoSource {
-    case camera
-    case gallery
-  }
-
-  private func pickAndroidProfilePhoto(source: AndroidPhotoSource) {
-    Task {
-      do {
-        if source == .camera {
-          let cameraState = await PermissionService.shared.resolveCapturePermission(for: .camera)
-          viewModel.cameraState = cameraState
-          guard cameraState.isGranted else {
-            viewModel.errorMessage = viewModel.cameraAccessRequiredMessage
-            return
-          }
-        }
-        let base64 = try await Task.detached(priority: .userInitiated) {
-          switch source {
-          case .camera:  return try AndroidProfileImagePickerBridge.captureImageBase64()
-          case .gallery: return try AndroidProfileImagePickerBridge.pickImageBase64()
-          }
-        }.value
-        guard !base64.isEmpty, let data = Data(base64Encoded: base64) else { return }
-        viewModel.uploadProfileImage(data: data)
-      } catch {
-        viewModel.errorMessage = error.localizedDescription
-      }
-    }
-  }
-#endif
 }
 
 struct ProfileEditView: View {
   @State var viewModel: ProfileViewModel
   @Environment(\.dismiss) var dismiss
   @Environment(\.colorScheme) var colorScheme
-  @Environment(\.layoutDirection) var layoutDirection
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
   }
-  var contentAlignment: HorizontalAlignment {
-    layoutDirection == .rightToLeft ? .trailing : .leading
+
+  /// The fields, as the brand's, in a brand card on a brand sheet.
+  var body: some View {
+    ZStack {
+      BrandSheet(title: viewModel.editProfileTitle, closeLabel: viewModel.cancelLabel) {
+        viewModel.cancelProfileEditing()
+        dismiss()
+      } content: {
+        Text(viewModel.editProfileSubtitle)
+          .font(.system(size: 15))
+          .foregroundStyle(theme.brandSecondaryText)
+          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
+
+        VStack(alignment: .leading, spacing: 16) {
+          fields
+
+          if let error = viewModel.errorMessage {
+            Text(error)
+              .font(.system(size: 12))
+              .foregroundStyle(theme.danger)
+          }
+
+          BrandPrimaryButton(
+            title: viewModel.saveButtonLabel,
+            isLoading: viewModel.isLoading,
+            isEnabled: viewModel.canSaveProfileEdits
+          ) {
+            viewModel.saveProfileEdits()
+          }
+        }
+        .brandCard()
+      }
+    }
+    .toolbar(.hidden, for: .navigationBar)
+    .onChange(of: viewModel.isEditing) { _, isEditing in
+      if !isEditing {
+        dismiss()
+      }
+    }
   }
 
-  var body: some View {
-    ScrollView(.vertical, showsIndicators: false) {
-	  VStack(alignment: .leading, spacing: 0) {
-        Text(viewModel.editProfileTitle)
-          .font(.system(size: 26, weight: .bold))
-          .foregroundStyle(theme.primaryText)
-          .padding(.top, 24)
-
-        Text(viewModel.editProfileSubtitle)
-          .font(.system(size: 13))
-          .foregroundStyle(theme.secondaryText)
-          .lineSpacing(5)
-          .multilineTextAlignment(.leading)
-          .padding(.top, 8)
-
+  var fields: some View {
         VStack(spacing: 16) {
           ForEach($viewModel.contactRows, id: \.description) { $row in
             if viewModel.roleType == .student && row.description == viewModel.gradeFieldLabel {
@@ -567,44 +611,6 @@ struct ProfileEditView: View {
             )
           }
         }
-        .padding(.top, 28)
-
-        if let error = viewModel.errorMessage {
-          Text(error)
-            .font(.system(size: 12))
-            .foregroundStyle(.red)
-            .padding(.top, 16)
-        }
-
-        AuthPrimaryButton(
-          title: viewModel.saveButtonLabel,
-          systemImage: "checkmark",
-          isEnabled: viewModel.canSaveProfileEdits
-        ) {
-          Task { @MainActor in
-            viewModel.saveProfileEdits()
-          }
-        }
-        .padding(.top, 28)
-        .padding(.bottom, 24)
-      }
-      .padding(.horizontal, 18)
-    }
-    .background(Color(.systemBackground))
-    .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button(viewModel.cancelLabel) {
-          viewModel.cancelProfileEditing()
-          dismiss()
-        }
-      }
-    }
-    .onChange(of: viewModel.isEditing) { _, isEditing in
-      if !isEditing {
-        dismiss()
-      }
-    }
   }
 }
 
@@ -681,10 +687,10 @@ struct ProfileDateOfBirthPicker: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 8) {
       Text(title)
-        .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(theme.primaryText)
+        .font(.system(size: 16, weight: .bold))
+        .foregroundStyle(theme.brandSecondaryText)
 
       if let currentDate = date {
         HStack {
@@ -710,12 +716,12 @@ struct ProfileDateOfBirthPicker: View {
           }
           .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
+        .padding(.horizontal, 12)
+        .frame(height: 52)
         .background(theme.fieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
-          RoundedRectangle(cornerRadius: 15, style: .continuous)
+          RoundedRectangle(cornerRadius: 12, style: .continuous)
             .stroke(theme.controlBorder, lineWidth: 1)
         }
       } else {
@@ -729,19 +735,20 @@ struct ProfileDateOfBirthPicker: View {
 
             Spacer()
 
-            PlatformIcon(
-              systemName: "calendar",
-              size: 14,
-              weight: .semibold,
-              color: theme.secondaryText
-            )
+            // A symbol SkipUI draws as a Material icon; PlatformIcon puts an
+            // emoji here on Android.
+            Image(systemName: "calendar")
+              .resizable()
+              .scaledToFit()
+              .foregroundStyle(theme.secondaryText)
+              .frame(width: 18, height: 18)
           }
-          .padding(.horizontal, 16)
-          .frame(height: 56)
+          .padding(.horizontal, 12)
+          .frame(height: 52)
           .background(theme.fieldBackground)
-          .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+          .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           .overlay {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
               .stroke(theme.controlBorder, lineWidth: 1)
           }
         }
@@ -762,10 +769,10 @@ struct ProfileGradePicker: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 8) {
       Text(title)
-        .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(theme.primaryText)
+        .font(.system(size: 16, weight: .bold))
+        .foregroundStyle(theme.brandSecondaryText)
 
       Menu {
         ForEach(grades, id: \.self) { grade in
@@ -781,19 +788,20 @@ struct ProfileGradePicker: View {
 
           Spacer()
 
-          PlatformIcon(
-            systemName: "chevron.down",
-            size: 12,
-            weight: .semibold,
-            color: theme.secondaryText
-          )
+          // A symbol SkipUI draws as a Material icon; PlatformIcon puts an
+          // emoji here on Android.
+          Image(systemName: "chevron.down")
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(theme.secondaryText)
+            .frame(width: 16, height: 16)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
+        .padding(.horizontal, 12)
+        .frame(height: 52)
         .background(theme.fieldBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
-          RoundedRectangle(cornerRadius: 15, style: .continuous)
+          RoundedRectangle(cornerRadius: 12, style: .continuous)
             .stroke(theme.controlBorder, lineWidth: 1)
         }
       }
@@ -955,7 +963,7 @@ struct ProfileEditInfoRow: View {
 }
 
 #if os(Android)
-private enum AndroidProfileImagePickerBridge {
+enum AndroidProfileImagePickerBridge {
   private static let managerClass = try! JClass(name: "teacher/minute/AndroidImagePickerManager")
   private static let pickImageBase64Method = managerClass.getStaticMethodID(
     name: "pickImageBase64",
@@ -987,83 +995,6 @@ private enum AndroidProfileImagePickerBridge {
   }
 }
 #endif
-
-struct ProfilePermissionRow: View {
-  let icon: String
-  let title: String
-  let state: PermissionState
-  let iconColor: Color
-  let action: () -> Void
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-  var body: some View {
-	HStack(spacing: 14) {
-	  FlatIconTile(systemName: icon, size: 44, tint: iconColor)
-
-	  VStack(alignment: .leading, spacing: 3) {
-		Text(title)
-		  .font(.system(size: 15, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-
-		Text(state.subtitle)
-		  .font(.system(size: 13))
-		  .foregroundStyle(iconColor)
-	  }
-
-	  Spacer()
-
-	  Button(action: action) {
-		Text(state.actionTitle)
-		  .font(.system(size: 14, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-	  }
-	  .buttonStyle(.plain)
-	}
-	.padding(.horizontal, 16)
-	.padding(.vertical, 14)
-  }
-}
-
-struct ProfileInfoRow: View {
-  @Binding var parameter: Parameter
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-  let isEditing: Bool
-  var body: some View {
-	HStack(spacing: 10) {
-	  FlatIconTile(systemName: parameter.image, size: 28)
-
-	  Text(parameter.description)
-		.font(.system(size: 13))
-		.foregroundStyle(theme.secondaryText)
-
-	  Spacer()
-
-	  if isEditing {
-		TextField(parameter.description, text: $parameter.value)
-		  .textFieldStyle(.plain)
-		  .font(.system(size: 15, weight: .semibold))
-		  .foregroundStyle(theme.primaryText)
-		  .lineLimit(1)
-		  .minimumScaleFactor(0.75)
-		  .multilineTextAlignment(.trailing)
-		  .environment(\.layoutDirection, .leftToRight)
-	  } else {
-		Text(parameter.value.isEmpty ? "-" : parameter.value)
-		  .font(.system(size: 15, weight: .semibold))
-		  .foregroundStyle(theme.primaryText)
-		  .lineLimit(1)
-		  .minimumScaleFactor(0.75)
-	  }
-	}
-	.padding(.horizontal, 16)
-	.padding(.vertical, 14)
-  }
-}
 
 #if !os(Android)
 #Preview("Teacher Profile") {

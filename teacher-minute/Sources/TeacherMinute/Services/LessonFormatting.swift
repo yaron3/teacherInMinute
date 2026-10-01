@@ -108,6 +108,14 @@ enum LessonFormatting {
   
   /// The lessons' own times, to the second, summed and shown in whole minutes:
   /// never rounded up.
+  /// The minutes a lesson of `seconds` is charged, counted as the backend's
+  /// `billedMinutes` counts them: nothing under 30 seconds, then whole
+  /// minutes, with a part-minute of more than 30 seconds counting as one.
+  static func billedMinutes(seconds: Int) -> Int {
+	guard seconds >= 30 else { return 0 }
+	return max(1, seconds / 60 + (seconds % 60 > 30 ? 1 : 0))
+  }
+
   static func totalDurationText(lessons: [HistoryLesson]) -> String {
 	let totalSeconds = lessons.reduce(0) { $0 + max(0, $1.durationSeconds) }
 	return minutesText(totalSeconds / 60)

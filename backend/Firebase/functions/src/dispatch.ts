@@ -6,7 +6,7 @@ import { onValueWritten } from "firebase-functions/v2/database";
 import { getFunctions } from "firebase-admin/functions";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
-import { rankTeachers } from "./scoring";
+import { rankTeachers, subjectNarrows, teachesTopic } from "./scoring";
 import { sendInvitePush, sendNoMatchPush } from "./fcm";
 import {
   TeacherRecord,
@@ -15,8 +15,10 @@ import {
   WAVE_SIZES,
   WAVE_TIMEOUT_SECONDS,
   INVITE_EXPIRY_SECONDS,
+  MIN_SUBJECT_TEACHERS,
   ConversationType,
   HOT_PATH,
+  QuestionStruggle,
 } from "./types";
 
 const db = admin.database();
@@ -78,6 +80,18 @@ async function archiveUnanswered(qid: string, alreadyInvited: string[]): Promise
   return true;
 }
 
+/** When a question's search ends: its own deadline, stamped by createQuestion
+ *  from question_search_timeout_seconds, or INVITE_EXPIRY_SECONDS from now for
+ *  one without, such as a demo question. Every invite runs until then. */
+function searchEndsAtMillis(question: Pick<QuestionDoc, "searchEndsAt">): number {
+  return question.searchEndsAt?.toMillis() ?? Date.now() + INVITE_EXPIRY_SECONDS * 1000;
+}
+
+/** Whole seconds from now until `millis`, at least one. */
+function secondsUntil(millis: number): number {
+  return Math.max(1, Math.ceil((millis - Date.now()) / 1000));
+}
+
 /** Only the teachers who could actually take a question right now.
  *
  *  Filtered by RTDB rather than here: the node holds every teacher who has ever
@@ -112,7 +126,7 @@ async function sendWave(
   if (batch.length === 0) return [];
 
   const now = Timestamp.now();
-  const expiresAtMillis = Date.now() + INVITE_EXPIRY_SECONDS * 1000;
+  const expiresAtMillis = searchEndsAtMillis(questionData);
   const expiresAt = Timestamp.fromMillis(expiresAtMillis);
 
   // The teacher's dashboard watches teacherInvites/{uid}/{qid}, so that write —
@@ -128,6 +142,7 @@ async function sendWave(
     expiresAt: expiresAtMillis,
     wave,
     conversationType: questionData.conversationType,
+    ...(questionData.struggle ? { struggle: questionData.struggle } : {}),
   };
 
   const rtdbDelivery = Promise.all(
@@ -173,7 +188,7 @@ async function sendWave(
         studentName: questionData.studentName || questionData.studentUid,
         questionText: questionData.text,
         wave,
-        ttlSeconds: INVITE_EXPIRY_SECONDS,
+        ttlSeconds: secondsUntil(expiresAtMillis),
       });
     })
   );
@@ -195,25 +210,36 @@ async function enqueueWaveEvaluation(qid: string, wave: number): Promise<void> {
   );
 }
 
-export async function enqueueQuestionWatchdog(qid: string): Promise<void> {
+/** Arms the watchdog for when the question's search ends; see
+ *  searchEndsAtMillis. */
+export async function enqueueQuestionWatchdog(
+  qid: string,
+  question: Pick<QuestionDoc, "searchEndsAt"> = {}
+): Promise<void> {
   const queue = getFunctions().taskQueue("questionWatchdog");
   await queue.enqueue(
     { questionId: qid },
-    { scheduleDelaySeconds: INVITE_EXPIRY_SECONDS }
+    { scheduleDelaySeconds: secondsUntil(searchEndsAtMillis(question)) }
   );
 }
 
 /** Adds one teacher to a question's wave if that wave still has room.
+ *
+ *  `teachers` is the online roster, with this teacher in it: whether the
+ *  question's subject narrows who may have it is decided on all of them (see
+ *  subjectNarrows).
  *
  *  `targetWave` defaults to the wave the question is on now. A replacement for a
  *  withdrawn invite passes the withdrawn invite's own wave instead, so the slot
  *  is refilled where it was lost even if the question has since moved on. */
 async function tryInviteTeacherForQuestionWave(
   teacherUid: string,
-  teacher: TeacherRecord,
+  teachers: Record<string, TeacherRecord>,
   qid: string,
   targetWave?: number
 ): Promise<boolean> {
+  const teacher = teachers[teacherUid];
+  if (!teacher) return false;
   const qRef = firestore.collection("questions").doc(qid);
   const inviteRef = qRef.collection("invites").doc(teacherUid);
 
@@ -234,7 +260,8 @@ async function tryInviteTeacherForQuestionWave(
       return { invited: false, reason: `invalid-wave-${wave ?? 0}` };
     }
 
-    if (!teacher.subjects?.includes(question.topic)) {
+    const narrow = subjectNarrows(teachers, question.topic);
+    if (narrow && !teachesTopic(teacher, question.topic)) {
       return { invited: false, reason: "topic-mismatch" };
     }
 
@@ -243,7 +270,7 @@ async function tryInviteTeacherForQuestionWave(
       return { invited: false, reason: "already-invited" };
     }
 
-    const ranked = rankTeachers({ [teacherUid]: teacher }, question.topic, alreadyInvited);
+    const ranked = rankTeachers({ [teacherUid]: teacher }, question.topic, alreadyInvited, narrow);
     if (ranked.length === 0) {
       return { invited: false, reason: "not-eligible-now" };
     }
@@ -260,7 +287,8 @@ async function tryInviteTeacherForQuestionWave(
     }
 
     const now = Timestamp.now();
-    const expiresAt = Timestamp.fromMillis(Date.now() + INVITE_EXPIRY_SECONDS * 1000);
+    const expiresAtMillis = searchEndsAtMillis(question);
+    const expiresAt = Timestamp.fromMillis(expiresAtMillis);
     const invite: DispatchInviteDoc = {
       teacherUid,
       questionId: qid,
@@ -288,6 +316,8 @@ async function tryInviteTeacherForQuestionWave(
       studentImageURL: question.studentImageURL ?? "",
       wave,
       conversationType: question.conversationType,
+      struggle: question.struggle,
+      expiresAtMillis,
     };
   });
 
@@ -309,6 +339,8 @@ async function tryInviteTeacherForQuestionWave(
     studentImageURL: string;
     wave: number;
     conversationType: ConversationType;
+    struggle?: QuestionStruggle;
+    expiresAtMillis: number;
   };
 
   await db.ref(`teacherInvites/${teacherUid}/${qid}`).set({
@@ -317,9 +349,10 @@ async function tryInviteTeacherForQuestionWave(
     photoUrls: invitePayload.photoUrls,
     studentName: invitePayload.studentName,
     studentImageURL: invitePayload.studentImageURL,
-    expiresAt: Date.now() + INVITE_EXPIRY_SECONDS * 1000,
+    expiresAt: invitePayload.expiresAtMillis,
     wave: invitePayload.wave,
     conversationType: invitePayload.conversationType,
+    ...(invitePayload.struggle ? { struggle: invitePayload.struggle } : {}),
   });
 
   if (teacher.fcmToken) {
@@ -331,7 +364,7 @@ async function tryInviteTeacherForQuestionWave(
       studentName: invitePayload.studentName || invitePayload.studentUid,
       questionText: invitePayload.text,
       wave: invitePayload.wave,
-      ttlSeconds: INVITE_EXPIRY_SECONDS,
+      ttlSeconds: secondsUntil(invitePayload.expiresAtMillis),
     });
   }
 
@@ -369,9 +402,10 @@ export async function backfillPendingQuestionsForTeacher(teacherUid: string): Pr
     return aCreated - bCreated;
   });
 
+  const teachers = { ...(await onlineTeachers()), [teacherUid]: teacher };
   let invitedCount = 0;
   for (const doc of orderedSearchingDocs) {
-    const invited = await tryInviteTeacherForQuestionWave(teacherUid, teacher, doc.id);
+    const invited = await tryInviteTeacherForQuestionWave(teacherUid, teachers, doc.id);
     if (invited) {
       invitedCount += 1;
       break;
@@ -443,7 +477,7 @@ export async function withdrawTeacherFromOtherQuestions(
       const ranked = rankTeachers(teachers, withdrawn.topic, exclude);
 
       for (const { uid } of ranked) {
-        if (await tryInviteTeacherForQuestionWave(uid, teachers[uid], qid, withdrawn.wave)) {
+        if (await tryInviteTeacherForQuestionWave(uid, teachers, qid, withdrawn.wave)) {
           logger.info(
             `[dispatch] qid=${qid} wave=${withdrawn.wave} slot of teacher=${teacherUid} refilled by teacher=${uid}`
           );
@@ -456,6 +490,101 @@ export async function withdrawTeacherFromOtherQuestions(
       );
     })
   );
+}
+
+// ─── applyQuestionDetails ────────────────────────────────────────────────────
+// The student names the subject, says why they are stuck and how they would
+// like to start while the search runs (see updateQuestion in ./questions).
+// Every teacher still holding the question sees the new details on its card.
+// A subject a teacher does not teach takes the question back from them, as an
+// accepted question does (see withdrawTeacherFromOtherQuestions above), and
+// their place in the wave goes to the best teacher who does teach it. Later
+// waves read the question as it now is, so they go only to such teachers too.
+// All of that only while at least MIN_SUBJECT_TEACHERS teachers who could take
+// the question teach the subject (see subjectNarrows): with fewer, nobody is
+// dropped, and later waves go to every teacher, those who teach it first.
+
+export interface QuestionDetails {
+  topic?: string;
+  struggle?: QuestionStruggle;
+  conversationType?: ConversationType;
+}
+
+/** Called once the question document already carries `details`. */
+export async function applyQuestionDetails(
+  qid: string,
+  details: QuestionDetails
+): Promise<{ withdrawn: string[]; refilled: string[] }> {
+  const qRef = firestore.collection("questions").doc(qid);
+  const pendingSnap = await qRef.collection("invites").where("response", "==", "pending").get();
+  const pending = pendingSnap.docs.map((doc) => doc.data() as DispatchInviteDoc);
+
+  // The teachers the question no longer fits: those who do not teach its
+  // new subject, while enough others do.
+  let dropped: DispatchInviteDoc[] = [];
+  const topic = details.topic;
+  if (topic !== undefined && pending.length > 0) {
+    if (subjectNarrows(await onlineTeachers(), topic)) {
+      const records = await Promise.all(
+        pending.map((invite) => db.ref(`teachers/${invite.teacherUid}`).once("value"))
+      );
+      dropped = pending.filter((_, index) => {
+        const teacher = records[index].val() as TeacherRecord | null;
+        return !teacher || !teachesTopic(teacher, topic);
+      });
+    } else {
+      logger.info(
+        `[dispatch] qid=${qid} fewer than ${MIN_SUBJECT_TEACHERS} available teachers teach topic=${topic}; keeping all ${pending.length} invited`
+      );
+    }
+  }
+  const droppedUids = new Set(dropped.map((invite) => invite.teacherUid));
+  const kept = pending.filter((invite) => !droppedUids.has(invite.teacherUid));
+
+  // Written through transactions that stand down on a missing node, so a
+  // card cleared meanwhile — the teacher declined, or the question was taken —
+  // is not brought back without its question.
+  const patchIfPresent = (current: unknown) =>
+    current && typeof current === "object"
+      ? { ...(current as Record<string, unknown>), ...details }
+      : undefined;
+  await Promise.all([
+    db.ref(`questions/${qid}`).transaction(patchIfPresent),
+    ...kept.map((invite) => db.ref(`teacherInvites/${invite.teacherUid}/${qid}`).transaction(patchIfPresent)),
+    ...(details.conversationType
+      ? kept.map((invite) =>
+        qRef.collection("invites").doc(invite.teacherUid).update({
+          conversationType: details.conversationType,
+        })
+      )
+      : []),
+  ]);
+
+  // One at a time, so a replacement found for one slot is already invited —
+  // and so excluded — when the next slot looks for its own.
+  const withdrawn: string[] = [];
+  const refilled: string[] = [];
+  for (const invite of dropped) {
+    const taken = await withdrawPendingInvite(invite.teacherUid, qid);
+    await db.ref(`teacherInvites/${invite.teacherUid}/${qid}`).remove();
+    if (!taken) continue;
+    withdrawn.push(invite.teacherUid);
+
+    const teachers = await onlineTeachers();
+    const exclude = new Set([...taken.alreadyInvited, invite.teacherUid]);
+    const ranked = rankTeachers(teachers, taken.topic, exclude);
+    for (const { uid } of ranked) {
+      if (await tryInviteTeacherForQuestionWave(uid, teachers, qid, taken.wave)) {
+        refilled.push(uid);
+        break;
+      }
+    }
+  }
+
+  logger.info(
+    `[dispatch] qid=${qid} details applied keys=${Object.keys(details).join(",")} kept=${kept.length} withdrawn=${withdrawn.length} refilled=${refilled.length}`
+  );
+  return { withdrawn, refilled };
 }
 
 // ─── dispatchQuestion — Firestore onCreate trigger ───────────────────────────
@@ -499,7 +628,7 @@ export async function dispatchFirstWave(qid: string, data: QuestionDoc): Promise
 
   await Promise.all([
     enqueueWaveEvaluation(qid, 1),
-    enqueueQuestionWatchdog(qid),
+    enqueueQuestionWatchdog(qid, data),
   ]);
 }
 
@@ -585,7 +714,7 @@ export const dispatchQuestion = onDocumentCreated(
 // ─── evaluateWave — Cloud Tasks handler ──────────────────────────────────────
 // FR-B-003, FR-B-005
 // Called WAVE_TIMEOUT_SECONDS after each wave. Fans out the next wave without
-// cancelling earlier invites — all teachers have INVITE_EXPIRY_SECONDS to accept.
+// cancelling earlier invites — every teacher can accept until the search ends.
 
 export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number }>(
   {
@@ -617,30 +746,19 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
       return;
     }
 
-    // Invites from this wave remain pending — teachers have INVITE_EXPIRY_SECONDS total to accept.
-    // Only fan out the next wave so more teachers are notified sooner.
+    // Invites from this wave remain pending — every teacher can accept until
+    // the search ends. Only fan out the next wave so more teachers are
+    // notified sooner.
     const nextWave = wave + 1;
 
-    // FR-B-005: after wave 3 with no acceptance, declare unanswered
+    // FR-B-005: after the last wave the question stays with the teachers who
+    // have it, and with any who come online (onTeacherStatusChange), until its
+    // search ends. The watchdog declares it unanswered then. It used to be
+    // declared unanswered here, 36 seconds in, whatever the search's length.
     if (nextWave > WAVE_SIZES.length) {
-      logger.warn(
-        `[evaluateWave] max waves reached qid=${qid} currentWave=${wave} nextWave=${nextWave}`
+      logger.info(
+        `[evaluateWave] last wave reached qid=${qid} currentWave=${wave}; waiting for the search to end`
       );
-      const archived = await archiveUnanswered(qid, data.alreadyInvited ?? []);
-      if (archived) {
-        logger.info(`[evaluateWave] qid=${qid} declared unanswered after wave ${wave}`);
-      } else {
-        logger.info(`[evaluateWave] qid=${qid} unanswered skipped after wave ${wave}`);
-      }
-
-      // Notify student
-      const studentFcmToken = await db
-        .ref(`users/${data.studentUid}/fcmToken`)
-        .once("value")
-        .then((s) => s.val() as string | null);
-      if (studentFcmToken) {
-        await sendNoMatchPush({ fcmToken: studentFcmToken, questionId: qid });
-      }
       return;
     }
 
@@ -650,11 +768,11 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
 
     if (invited.length === 0) {
       // No *new* eligible teachers for this wave — but earlier waves' invites
-      // are still pending and haven't hit INVITE_EXPIRY_SECONDS yet. Do NOT
-      // archive/delete them here; just stop fanning out further waves and let
-      // those invites run their course (accept, decline, or the watchdog at
-      // INVITE_EXPIRY_SECONDS). A teacher coming online later is still
-      // backfilled via onTeacherStatusChange.
+      // are still pending until the search ends. Do NOT archive/delete them
+      // here; just stop fanning out further waves and let those invites run
+      // their course (accept, decline, or the watchdog when the search ends).
+      // A teacher coming online later is still backfilled via
+      // onTeacherStatusChange.
       logger.info(
         `[evaluateWave] qid=${qid} no new teachers for wave=${nextWave}, leaving ${(data.alreadyInvited ?? []).length} pending invite(s) untouched`
       );
@@ -675,9 +793,10 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
 );
 
 // ─── questionWatchdog — Cloud Task ───────────────────────────────────────────
-// Enqueued at question creation with INVITE_EXPIRY_SECONDS delay (90s).
-// Fires regardless of wave outcome — absolute safety net ensuring no question
-// stays "searching" longer than 90 seconds.
+// Enqueued at question creation for when its search ends (`searchEndsAt`, from
+// question_search_timeout_seconds; INVITE_EXPIRY_SECONDS without one). Fires
+// regardless of wave outcome, and is what declares a question nobody took
+// unanswered.
 
 export const questionWatchdog = onTaskDispatched<{ questionId: string }>(
   {
@@ -701,7 +820,7 @@ export const questionWatchdog = onTaskDispatched<{ questionId: string }>(
       return;
     }
 
-    logger.warn(`[watchdog] qid=${qid} still searching after ${INVITE_EXPIRY_SECONDS}s — archiving`);
+    logger.warn(`[watchdog] qid=${qid} still searching when its search ended — archiving`);
     const archived = await archiveUnanswered(qid, data.alreadyInvited ?? []);
 
     if (archived) {

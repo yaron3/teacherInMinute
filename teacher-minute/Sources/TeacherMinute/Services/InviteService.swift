@@ -7,6 +7,7 @@
 //   text      : String
 //   expiresAt : Double  (Unix ms)
 //   wave      : Int
+//   struggle  : String  (optional)
 //
 // The backend writes this node when a wave invite is sent and removes it when:
 //   - the invite times out
@@ -61,6 +62,7 @@ final class InviteService {
           ?? Self.intValue(dict["costPerMinuteCents"])
           ?? 50
         let conversationType = (dict["conversationType"] as? String) ?? "text"
+        let struggle = (dict["struggle"] as? String) ?? ""
         let invite = IncomingInvite(
           id: snap.key,
           topic: topic,
@@ -74,7 +76,8 @@ final class InviteService {
           studentName: studentName,
           studentImageURL: studentImageURL,
           pricePerMinuteCents: pricePerMinuteCents,
-          conversationType: conversationType
+          conversationType: conversationType,
+          struggle: struggle
         )
         // Keep the invite visible for as long as the RTDB node exists. The
         // backend removes teacherInvites/{uid}/{qid} the moment the question is
@@ -161,6 +164,7 @@ final class InviteService {
           ?? Self.intValue(dict["costPerMinuteCents"])
           ?? 50
         let conversationType = (dict["conversationType"] as? String) ?? "text"
+        let struggle = (dict["struggle"] as? String) ?? ""
         logger.info("[InviteService] invite qid=\(snap.key) conversationType=\(conversationType) rawKeys=\(Array(dict.keys))")
         let invite = IncomingInvite(
           id: snap.key,
@@ -175,7 +179,8 @@ final class InviteService {
           studentName: studentName,
           studentImageURL: studentImageURL,
           pricePerMinuteCents: pricePerMinuteCents,
-          conversationType: conversationType
+          conversationType: conversationType,
+          struggle: struggle
         )
         // Keep the invite visible for as long as the RTDB node exists. The
         // backend removes teacherInvites/{uid}/{qid} the moment the question is

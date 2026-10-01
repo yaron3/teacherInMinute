@@ -20,7 +20,6 @@ struct TeacherDashboardView: View {
   @State var warningMessage: String?
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
-  @State var showsMessages = false
   @State var showsQuestionSimulator = false
   @State  var isDemoEnabled = DemoStudentService.isEnabled
   @State var emailReward = EmailRewardViewModel()
@@ -69,254 +68,215 @@ struct TeacherDashboardView: View {
 		viewModel.endCall()
 	  }
 	} else {
-	  VStack(spacing: 0) {
-		generalWarningHeader
-
-		ScrollView(.vertical, showsIndicators: false) {
-		  VStack(alignment: .leading, spacing: 0) {
-			FlatTopHeader(
-			  eyebrow: viewModel.teacherEyebrow,
-			  name: viewModel.teacherName,
-			  avatarImageURL: viewModel.teacherImageURL,
-			  avatarSystemImage: "person.crop.circle.fill",
-			  showNotificationBadge: false
-			)
-			.padding(.top, 16)
-
-			EmailRewardBanner(viewModel: emailReward, topPadding: 20)
-
-			statusToggleCard
-			  .padding(.top, 20)
-
-			if viewModel.isOnline {
-			  liveEarningsCard
-				.padding(.top, 28)
-
-			  onlineStatusCard
-				.padding(.top, 12)
-			  if viewModel.inviteIDs.count > 0 {
-				ZStack {
-				  liveQueue
-					.padding(.top, 28)
-					.disabled(viewModel.isAcceptingCalls)
-				  if viewModel.isAcceptingCalls {
-					ProgressView()
-				  }
-				}
-			  }
-			} else {
-			  teacherStatusCard
-				.padding(.top, 28)
-
-			  statsCards
-				.padding(.top, 28)
-
-			  ratingSection
-				.padding(.top, 16)
-
-			  readinessChecklist
-				.padding(.top, 28)
-
-			  howItWorksSection
-				.padding(.top, 28)
-			}
-
-			if isDemoEnabled {
-			  simulateQuestionCard
-				.padding(.top, 28)
+	  BrandTabScreen {
+		VStack(spacing: 0) {
+		  BrandPageHeader(label: viewModel.teacherEyebrow, title: viewModel.teacherName) {
+			HStack(spacing: 8) {
+			  BrandMessagesButton()
+			  BrandMenuButton()
 			}
 		  }
-		  .padding(.horizontal, 20)
-		  .padding(.bottom, 40)
-	  }
-	  .background(theme.screenBackground)
-	  }
-	  // Drawn over the whole screen, header included, so an arriving question
-	  // covers the warning rather than leaving a stripe above it.
-	  .overlay {
-		if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
-		  TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
-		}
-	  }
-	  .emailRewardDialogs(emailReward)
-	  .sheet(isPresented: $showsMessages) {
-		NotificationMessagesView()
-	  }
-	  .sheet(isPresented: Binding(get: { viewModel.showsSubjectEditor }, set: { viewModel.showsSubjectEditor = $0 }), onDismiss: {
-		viewModel.reloadSubjects()
-	  }) {
-		NavigationStack {
-		  TeacherSubjectsView(isEditing: true)
-		}
-	  }
-	  // After a teacher's first lesson (> 1 min) suggest completing the
-	  // optional verification documents — a one-time, dismissible prompt (bug #24).
-	  .sheet(isPresented: $showsDocumentsSuggestion) {
-		TeacherDocumentsSuggestionView(viewModel: viewModel) {
-		  viewModel.markDocumentsSuggestionShown()
-		  showsDocumentsSuggestion = false
-		  showsDocuments = true
-		} onDismiss: {
-		  viewModel.markDocumentsSuggestionShown()
-		  showsDocumentsSuggestion = false
-		}
-		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-		.id(languagePreference)
-	  }
-	  .sheet(isPresented: $showsDocuments) {
-		NavigationStack {
-		  TeacherDocumentsView()
-		}
-		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-		.id(languagePreference)
-	  }
-	  // Demo tool — sends this teacher a simulated question written by the
-	  // local AI model behind the demo-student service.
-	  .sheet(isPresented: $showsQuestionSimulator) {
-		SimulateStudentQuestionView { simulation in
-		  viewModel.startDemoSimulation(simulation)
-		} onClose: {
-		  showsQuestionSimulator = false
-		}
-		.environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
-		.environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-		.id(languagePreference)
-	  }
-	  .onAppear {
-		// Seeded without animation: a banner that is already true on the first
-		// frame should be there, not slide in.
-		warningMessage = viewModel.errorMessageGeneral
-		// The readiness rows report switches the OS owns, and the user can have
-		// changed one on the permissions screen without the app ever leaving the
-		// front — which is the one case `scenePhase` below does not catch. Asked
-		// here rather than on a navigation callback so it survives however the
-		// dashboard is reached; the side menu replaced the tab bar that used to
-		// carry it.
-		viewModel.refreshPermissions()
-		Task {
-		  if await viewModel.checkDocumentsSuggestion() {
-			showsDocumentsSuggestion = true
+
+		  generalWarningHeader
+
+		  ScrollView(.vertical, showsIndicators: false) {
+			content
 		  }
 		}
-	  }
-	  .task {
-		await RemoteConfigService.shared.ready()
-		isDemoEnabled = DemoStudentService.isEnabled
-	  }
-	  .appDialog(
-		LocalizationSupport.localized("Permission required"),
-		isPresented: Binding(
-		  get: { viewModel.permissionAlertMessage != nil },
-		  set: { if !$0 {
-			viewModel.permissionAlertMessage = nil
-			viewModel.permissionAlertQuestionId = nil
-		  } }
-		),
-		message: viewModel.permissionAlertMessage ?? "",
-		actions: [
-		  // The dialog clears the question before it runs a handler, so it is
-		  // taken now, as the buttons are built.
-		  AppDialogAction(LocalizationSupport.localized("Open Settings")) { [questionId = viewModel.permissionAlertQuestionId] in
-			viewModel.finishSetupInSettings(questionId: questionId)
-		  },
-		  AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel) {
-			if let qid = viewModel.permissionAlertQuestionId {
-			  viewModel.declineInvite(questionId: qid)
-			}
+		// On a plain stack inside the screen, not on `BrandTabScreen`; see
+		// there. Drawn over the whole screen, header included, so an arriving
+		// question covers the warning rather than leaving a stripe above it.
+		.overlay {
+		  if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
+			TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
 		  }
-		]
-	  )
-	  .onChange(of: viewModel.errorMessageGeneral) { _, message in
-		withAnimation(.easeInOut(duration: 0.25)) {
-		  warningMessage = message
 		}
-	  }
-	  .onChange(of: scenePhase) { _, phase in
-		if phase == .active {
+		.emailRewardDialogs(emailReward)
+		.sheet(isPresented: Binding(get: { viewModel.showsSubjectEditor }, set: { viewModel.showsSubjectEditor = $0 }), onDismiss: {
+		  viewModel.reloadSubjects()
+		}) {
+		  NavigationStack {
+			TeacherSubjectsView(isEditing: true)
+		  }
+		  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		  .id(languagePreference)
+		}
+		// After a teacher's first lesson (> 1 min) suggest completing the
+		// optional verification documents — a one-time, dismissible prompt (bug #24).
+		.sheet(isPresented: $showsDocumentsSuggestion) {
+		  TeacherDocumentsSuggestionView(viewModel: viewModel) {
+			viewModel.markDocumentsSuggestionShown()
+			showsDocumentsSuggestion = false
+			showsDocuments = true
+		  } onDismiss: {
+			viewModel.markDocumentsSuggestionShown()
+			showsDocumentsSuggestion = false
+		  }
+		  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		  .id(languagePreference)
+		}
+		.sheet(isPresented: $showsDocuments) {
+		  NavigationStack {
+			TeacherDocumentsView()
+		  }
+		  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		  .id(languagePreference)
+		}
+		// Demo tool — sends this teacher a simulated question written by the
+		// local AI model behind the demo-student service.
+		.sheet(isPresented: $showsQuestionSimulator) {
+		  SimulateStudentQuestionView { simulation in
+			viewModel.startDemoSimulation(simulation)
+		  } onClose: {
+			showsQuestionSimulator = false
+		  }
+		  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
+		  .id(languagePreference)
+		}
+		.onAppear {
+		  // Seeded without animation: a banner that is already true on the first
+		  // frame should be there, not slide in.
+		  warningMessage = viewModel.errorMessageGeneral
+		  // The readiness rows report switches the OS owns, and the user can have
+		  // changed one on the permissions screen without the app ever leaving the
+		  // front — which is the one case `scenePhase` below does not catch. Asked
+		  // here rather than on a navigation callback so it survives however the
+		  // dashboard is reached.
 		  viewModel.refreshPermissions()
-		  viewModel.appDidBecomeActive()
-		} else if phase == .background {
-		  // If notifications are disabled, an online teacher cannot be reached
-		  // in the background, so take them offline immediately.
-		  viewModel.enforceNotificationRequirement()
+		  Task {
+			if await viewModel.checkDocumentsSuggestion() {
+			  showsDocumentsSuggestion = true
+			}
+		  }
+		}
+		.task {
+		  await RemoteConfigService.shared.ready()
+		  isDemoEnabled = DemoStudentService.isEnabled
+		}
+		.appDialog(
+		  LocalizationSupport.localized("Permission required"),
+		  isPresented: Binding(
+			get: { viewModel.permissionAlertMessage != nil },
+			set: { if !$0 {
+			  viewModel.permissionAlertMessage = nil
+			  viewModel.permissionAlertQuestionId = nil
+			} }
+		  ),
+		  message: viewModel.permissionAlertMessage ?? "",
+		  actions: [
+			// The dialog clears the question before it runs a handler, so it is
+			// taken now, as the buttons are built.
+			AppDialogAction(LocalizationSupport.localized("Open Settings")) { [questionId = viewModel.permissionAlertQuestionId] in
+			  viewModel.finishSetupInSettings(questionId: questionId)
+			},
+			AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel) {
+			  if let qid = viewModel.permissionAlertQuestionId {
+				viewModel.declineInvite(questionId: qid)
+			  }
+			}
+		  ]
+		)
+		.onChange(of: viewModel.errorMessageGeneral) { _, message in
+		  withAnimation(.easeInOut(duration: 0.25)) {
+			warningMessage = message
+		  }
+		}
+		.onChange(of: scenePhase) { _, phase in
+		  if phase == .active {
+			viewModel.refreshPermissions()
+			viewModel.appDidBecomeActive()
+		  } else if phase == .background {
+			// If notifications are disabled, an online teacher cannot be reached
+			// in the background, so take them offline immediately.
+			viewModel.enforceNotificationRequirement()
+		  }
 		}
 	  }
 	  .trackScreen(AnalyticsScreen.teacherDashboard)
 	}
   }
 
-  var teacherHeader: some View {
-	HStack(alignment: .center, spacing: 14) {
-		ProfileAvatarView(
-		  imageURL: viewModel.teacherImageURL,
-		  size: 72,
-		  fallbackSystemImage: "person.crop.circle.fill",
-		  background: theme.cardBackground,
-		  tint: theme.primaryText
-		)
+  // Split out of `body`, which the type checker would otherwise have to solve
+  // in one piece.
+  var content: some View {
+	VStack(alignment: .leading, spacing: 0) {
+	  EmailRewardBanner(viewModel: emailReward, topPadding: 16)
 
-  
-	  VStack(alignment: .leading, spacing: 4) {
-		Text(viewModel.teacherDashboardTitle)
-		  .font(.system(size: 12, weight: .semibold))
-		  .foregroundStyle(theme.accent)
+	  statusToggleCard
+		.padding(.top, 16)
 
-		Text(viewModel.teacherName)
-		  .font(.system(size: 22, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-		  .multilineTextAlignment(.leading)
-	  }
-	  Spacer()
-	  Button {
-		showsMessages = true
-	  } label: {
-		ZStack {
-		  Circle()
-			.fill(theme.cardBackground)
-			.frame(width: 20, height: 20)
-			.overlay {
-			  Circle()
-				.stroke(theme.screenBackground, lineWidth: 2)
+	  if viewModel.isOnline {
+		liveEarningsCard
+		  .padding(.top, 28)
+
+		onlineStatusCard
+		  .padding(.top, 12)
+		if viewModel.inviteIDs.count > 0 {
+		  ZStack {
+			liveQueue
+			  .padding(.top, 28)
+			  .disabled(viewModel.isAcceptingCalls)
+			if viewModel.isAcceptingCalls {
+			  ProgressView()
+				.tint(theme.onDarkFill)
 			}
-		  PlatformIcon(systemName: "bell", size: 20, weight: .medium, color: theme.primaryText)
+		  }
 		}
-	  }
-	  .buttonStyle(.plain)
+	  } else {
+		teacherStatusCard
+		  .padding(.top, 28)
 
+		statsCards
+		  .padding(.top, 28)
+
+		ratingSection
+		  .padding(.top, 16)
+
+		readinessChecklist
+		  .padding(.top, 28)
+
+		howItWorksSection
+		  .padding(.top, 28)
+	  }
+
+	  if isDemoEnabled {
+		simulateQuestionCard
+		  .padding(.top, 28)
+	  }
 	}
+	.padding(.horizontal, 20)
+	.padding(.bottom, 40)
   }
 
   var statusToggleCard: some View {
 	HStack(spacing: 16) {
-
 	  VStack(alignment: .leading, spacing: 4) {
-		  Text(viewModel.statusToggleTitle)
-			.font(.system(size: 14, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
-		  
-		
+		Text(viewModel.statusToggleTitle)
+		  .font(.system(size: 17, weight: .bold))
+		  .foregroundStyle(theme.onDarkFill)
+
 		Text(viewModel.statusToggleSubtitle)
-		  .font(.system(size: 12))
-		  .foregroundStyle(theme.secondaryText)
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.brandSecondaryText)
 		  .frame(maxWidth: .infinity, alignment: .leading)
 	  }
-	  Spacer()
 
-	  // Reads the pending state too: going online waits on the notification
-	  // permission, and without this the switch springs back to off while the
+	  // Shows the pending state too: going online waits on the notification
+	  // permission, and without it the switch springs back to off while the
 	  // system dialog is up, which reads as the tap having been rejected.
-	  Toggle("", isOn: Binding(
-		get: { viewModel.isOnline || viewModel.isAwaitingOnlinePermission },
-		set: { _ in viewModel.toggleOnline() }
-	  ))
-	  .labelsHidden()
-	  .disabled(viewModel.isAwaitingOnlinePermission)
+	  BrandToggle(
+		isOn: viewModel.isOnline || viewModel.isAwaitingOnlinePermission,
+		isEnabled: !viewModel.isAwaitingOnlinePermission
+	  ) {
+		viewModel.toggleOnline()
+	  }
+	  .accessibilityIdentifier("availability_toggle")
 	}
-	.padding(16)
-	.background(theme.cardBackground)
-	.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+	.brandCard()
   }
 
   var statsCards: some View {
@@ -447,8 +407,7 @@ struct TeacherDashboardView: View {
 		  FlatIconTile(
 			systemName: viewModel.isVerified ? "checkmark.seal" : "clock",
 			size: 44,
-			tint: viewModel.isVerified ? theme.positive : theme.secondaryText,
-			background: theme.screenBackground
+			tint: viewModel.isVerified ? theme.positive : theme.secondaryText
 		  )
 
 		  VStack(alignment: .leading, spacing: 3) {
@@ -474,26 +433,6 @@ struct TeacherDashboardView: View {
 		  Spacer()
 		}
 	  }
-	}
-  }
-
-  var earningsSnapshot: some View {
-	VStack(alignment: .leading, spacing: 12) {
-	  FlatSectionHeader(viewModel.earningsSnapshotHeader)
-
-	  HStack(spacing: 12) {
-		EarningsCard(title: viewModel.earningsTodayTitle, amount: viewModel.formattedTodayEarnings, subtitle: viewModel.todayMinutesTutoredText)
-		  .frame(maxWidth: .infinity)
-		EarningsCard(title: viewModel.earningsThisWeekTitle, amount: viewModel.formattedWeekEarnings, subtitle: viewModel.weekChangeText ?? viewModel.weekMinutesTutoredText, subtitleColor: viewModel.weekChangeText != nil ? theme.positive : nil)
-		  .frame(maxWidth: .infinity)
-	  }
-
-	  EarningsCard(
-		title: viewModel.earningsAllTimeTitle,
-		amount: viewModel.totalMinutesText,
-		subtitle: viewModel.totalMinutesTutoredLabel
-	  )
-	  .frame(maxWidth: .infinity)
 	}
   }
 
@@ -536,7 +475,11 @@ struct TeacherDashboardView: View {
   var generalWarningHeader: some View {
 	if let warning = warningMessage, !warning.isEmpty {
 	  HStack(alignment: .top, spacing: 10) {
-		PlatformIcon(systemName: "exclamationmark.triangle.fill", size: 14, weight: .bold, color: theme.warning)
+		Image(systemName: "exclamationmark.triangle.fill")
+		  .resizable()
+		  .scaledToFit()
+		  .foregroundStyle(theme.warning)
+		  .frame(width: 14, height: 14)
 		  .padding(.top, 1)
 
 		Text(warning)
@@ -593,6 +536,7 @@ struct TeacherDashboardView: View {
 		  hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
 		  voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 		  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
+		  struggle: viewModel.inviteStruggles[inviteID] ?? "",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
 			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
 			  viewModel: viewModel
@@ -615,66 +559,6 @@ struct TeacherDashboardView: View {
 		}
 	  }
 	}
-  }
-
-  func incomingQuestionOverlay(inviteID: String) -> some View {
-	ZStack {
-	  theme.screenBackground
-
-	  ScrollView(.vertical, showsIndicators: false) {
-		VStack(spacing: 0) {
-		  LiveRequestCard(
-			id: inviteID,
-			topic: viewModel.inviteTopics[inviteID] ?? "",
-			text: viewModel.inviteTexts[inviteID] ?? "",
-			expiresAt: viewModel.inviteExpiresAt[inviteID] ?? 0.0,
-			wave: viewModel.inviteWaves[inviteID] ?? 1,
-			photoUrls: viewModel.invitePhotoUrls[inviteID] ?? [],
-			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
-			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
-			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
-			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
-			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
-			  viewModel: viewModel
-		  ) {
-			viewModel.logTeacherCallAnswered(
-			  questionId: inviteID,
-			  topic: viewModel.inviteTopics[inviteID] ?? "",
-			  wave: viewModel.inviteWaves[inviteID] ?? 1,
-			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
-			)
-			viewModel.acceptInvite(questionId: inviteID)
-		  } decline: {
-			viewModel.logTeacherCallDenied(
-			  questionId: inviteID,
-			  topic: viewModel.inviteTopics[inviteID] ?? "",
-			  wave: viewModel.inviteWaves[inviteID] ?? 1,
-			  conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text"
-			)
-			viewModel.declineInvite(questionId: inviteID)
-		  }
-		  .padding(.horizontal, 20)
-		  .padding(.top, 24)
-
-		  // `errorMessage`, not `errorMessageGeneral`: this line reports the
-		  // accept or decline that just failed. The standing "you are
-		  // unreachable" warning has the dashboard header now, and showing it
-		  // here as well would bury a failed accept under it.
-		  if let errorMessage = viewModel.errorMessage {
-			Text(errorMessage)
-			  .font(.system(size: 13, weight: .semibold))
-			  .foregroundStyle(theme.danger)
-			  .multilineTextAlignment(.center)
-			  .padding(.horizontal, 24)
-			  .padding(.top, 12)
-		  }
-
-		  Spacer(minLength: 32)
-		}
-		.frame(maxWidth: CGFloat.infinity)
-	  }
-	}
-	.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
   }
 
   /// The same panel the teacher saw when they chose the role. It answers "what
@@ -769,10 +653,7 @@ struct TeacherDashboardView: View {
 	  .frame(maxWidth: .infinity, alignment: .leading)
 	  .padding(.horizontal, 16)
 	  .padding(.vertical, 12)
-	  // An opaque background keeps the whole row tappable rather than just the
-	  // glyphs in it; `contentShape` is not available in Skip's SwiftUI. This
-	  // is the outlined card's own fill, so nothing looks different.
-	  .background(theme.screenBackground)
+	  .tappableFrame()
 	}
 	.buttonStyle(.plain)
   }
@@ -797,40 +678,6 @@ struct TeacherDashboardView: View {
 	.padding(.vertical, 12)
   }
 
-  struct EarningsCard: View {
-	@Environment(\.colorScheme) var colorScheme
-	var theme: AppTheme {
-	  AppTheme(colorScheme: colorScheme)
-	}
-	let title: String
-	let amount: String
-	let subtitle: String
-	var subtitleColor: Color?
-
-	var body: some View {
-	  FlatCard {
-		VStack(alignment: .leading, spacing: 6) {
-		  Text(title)
-			.font(.system(size: 13, weight: .semibold))
-			.foregroundStyle(theme.secondaryText)
-
-		  Text(amount)
-			.font(.system(size: 26, weight: .bold))
-			.foregroundStyle(theme.primaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.5)
-
-		  Text(subtitle)
-			.font(.system(size: 12))
-			.foregroundStyle(subtitleColor ?? theme.secondaryText)
-			.lineLimit(1)
-			.minimumScaleFactor(0.7)
-		}
-		.frame(maxWidth: .infinity, alignment: .leading)
-	  }
-	}
-  }
-
   // One bordered container split by hairlines, instead of nested rounded cards
   // floating on a gradient.
   struct LiveRequestCard: View {
@@ -843,6 +690,8 @@ struct TeacherDashboardView: View {
 	let hasVoiceMessage: Bool
 	let voiceMessageDurationSeconds: Int?
 	var conversationType: String = "text"
+	/// Why the student is stuck; empty until they have said.
+	var struggle: String = ""
 	var studentName: String = ""
 	var studentImageURL: String = ""
 	let viewModel: any TeacherDashboardViewModeling
@@ -904,6 +753,25 @@ struct TeacherDashboardView: View {
 		  now = Date().timeIntervalSince1970 * 1000.0
 		  try? await Task.sleep(nanoseconds: 1_000_000_000)
 		}
+	  }
+	}
+
+	private var struggleText: String {
+	  viewModel.inviteStruggleText(struggle)
+	}
+
+	/// What the student said on their search screens about why they are
+	/// stuck. It arrives while the card is up.
+	var struggleRow: some View {
+	  HStack(alignment: .firstTextBaseline, spacing: 6) {
+		Text(viewModel.stuckBecauseLabel)
+		  .font(.system(size: 13))
+		  .foregroundStyle(theme.secondaryText)
+		Text(struggleText)
+		  .font(.system(size: 13, weight: .bold))
+		  .foregroundStyle(theme.primaryText)
+		  .fixedSize(horizontal: false, vertical: true)
+		Spacer(minLength: 0)
 	  }
 	}
 
@@ -973,6 +841,10 @@ struct TeacherDashboardView: View {
 		)
 		.frame(maxWidth: CGFloat.infinity, alignment: Alignment.leading)
 
+		if !struggleText.isEmpty {
+		  struggleRow
+		}
+
 		if !photoUrls.isEmpty {
 		  VStack(spacing: 10) {
 			ForEach(photoUrls.prefix(4), id: \.self) { url in
@@ -1008,7 +880,7 @@ struct TeacherDashboardView: View {
 
 	var voiceMessageRow: some View {
 	  HStack(spacing: 12) {
-		FlatIconTile(systemName: "play.fill", size: 40, background: theme.screenBackground)
+		FlatIconTile(systemName: "play.fill", size: 40)
 
 		VStack(alignment: .leading, spacing: 1) {
 		  Text(viewModel.voiceMessageLabel)
@@ -1063,7 +935,7 @@ struct TeacherIncomingQuestionOverlay: View {
   }
   var body: some View {
 	ZStack {
-	  theme.screenBackground
+	  BrandScreenBackground()
 
 	  ScrollView(.vertical, showsIndicators: false) {
 		VStack(spacing: 0) {
@@ -1077,6 +949,7 @@ struct TeacherIncomingQuestionOverlay: View {
 			hasVoiceMessage: viewModel.inviteHasVoiceMessage[inviteID] ?? false,
 			voiceMessageDurationSeconds: viewModel.inviteVoiceMessageDurations[inviteID],
 			conversationType: viewModel.inviteConversationTypes[inviteID] ?? "text",
+			struggle: viewModel.inviteStruggles[inviteID] ?? "",
 			  studentName: viewModel.inviteStudentNames[inviteID] ?? "",
 			  studentImageURL: viewModel.inviteStudentImageURLs[inviteID] ?? "",
 			  viewModel: viewModel

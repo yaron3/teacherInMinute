@@ -26,6 +26,7 @@ extension LessonHistoryViewModeling {
 
     // MARK: Detail
     var lessonDetailTitle: String { LocalizationSupport.localized("Lesson") }
+    var closeLabel: String { LocalizationSupport.localized("Close") }
     var durationTitle: String { LocalizationSupport.localized("Duration") }
     var originalQuestionTitle: String { LocalizationSupport.localized("Original Question") }
     var summaryTitle: String { LocalizationSupport.localized("Summary") }

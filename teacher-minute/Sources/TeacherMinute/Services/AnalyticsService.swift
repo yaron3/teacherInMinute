@@ -27,6 +27,8 @@ enum AnalyticsEvent {
     static let loginStart        = "login_start"
     static let loginSuccess      = "login_success"
     static let loginFailure      = "login_failure"
+    static let anonymousStartSuccess = "anonymous_start_success"
+    static let anonymousStartFailure = "anonymous_start_failure"
     static let logout            = "logout"
     static let passwordResetSent = "password_reset_sent"
     static let emailVerificationSent = "email_verification_sent"
@@ -50,6 +52,16 @@ enum AnalyticsEvent {
     static let askTeacherMatched   = "ask_teacher_matched"
     static let askTeacherNoMatch   = "ask_teacher_no_match"
     static let askTeacherFailed    = "ask_teacher_failed"
+    /// A detail chosen while the question is offered: its subject, why the
+    /// student is stuck, or how they would like to start.
+    static let askTeacherDetailChosen = "ask_teacher_detail_chosen"
+    static let questionPhotoAttached = "question_photo_attached"
+    static let questionPhotoFailed   = "question_photo_failed"
+    static let notEnoughMinutesShown = "not_enough_minutes_shown"
+    static let notEnoughMinutesAction = "not_enough_minutes_action"
+    static let purchaseScreenShown   = "purchase_screen_shown"
+    static let purchaseStarted       = "purchase_started"
+    static let purchaseSuccessShown  = "purchase_success_shown"
     static let lessonTapped        = "lesson_tapped"
     static let lessonTappedWithDetails = "lesson_tapped_with_details"
     static let permissionStateOnAskTeacher = "permission_state_on_ask_teacher"
@@ -100,6 +112,7 @@ enum AnalyticsEvent {
 /// Names for `screen_view` tracking. Used as the `screen_name` parameter.
 enum AnalyticsScreen {
     static let welcome           = "welcome"
+    static let studentIntro      = "student_intro"
     static let login             = "login"
     static let createAccount     = "create_account"
     static let resetPassword     = "reset_password"

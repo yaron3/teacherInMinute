@@ -48,4 +48,12 @@ extension CreateAccountViewModel {
     var appleLabel: String { LocalizationSupport.localized("Apple") }
     var alreadyHaveAccountText: String { LocalizationSupport.localized("Already have an account?") }
     var logInLabel: String { LocalizationSupport.localized("Log In") }
+
+    // MARK: The sign-up header
+    var signUpStepLabel: String { LocalizationSupport.localized("Registration") }
+    var signUpStepTitle: String { LocalizationSupport.localized("Registration: Create an account") }
+    var signUpSubtitle: String {
+        LocalizationSupport.localized("Manage payments, preferences, notifications and device settings.")
+    }
+    var backLabel: String { LocalizationSupport.localized("Back") }
 }

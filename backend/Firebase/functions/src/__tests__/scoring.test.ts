@@ -2,7 +2,14 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { isTeacherBusy, isTeacherReachable, rankTeachers, scoreTeacher } from "../scoring";
+import {
+  isTeacherBusy,
+  isTeacherReachable,
+  ANY_TOPIC,
+  rankTeachers,
+  scoreTeacher,
+  subjectNarrows,
+} from "../scoring";
 import { TeacherRecord } from "../types";
 
 const NOW = Date.now();
@@ -112,13 +119,27 @@ describe("who is considered at all", () => {
     ).toEqual(["online"]);
   });
 
-  test("a teacher who does not cover the topic is skipped", () => {
+  test("a teacher who does not cover the topic is skipped while three others do", () => {
     expect(
       order({
         geometry: teacher({ subjects: ["geometry"], ratingAvg: 5 }),
-        algebra: teacher({ subjects: ["algebra"] }),
+        algebra_1: teacher({ subjects: ["algebra"], ratingAvg: 4 }),
+        algebra_2: teacher({ subjects: ["algebra"], ratingAvg: 3 }),
+        algebra_3: teacher({ subjects: ["algebra"], ratingAvg: 2 }),
       })
-    ).toEqual(["algebra"]);
+    ).toEqual(["algebra_1", "algebra_2", "algebra_3"]);
+  });
+
+  test("a question for any topic goes to every teacher, whatever they teach", () => {
+    expect(
+      order(
+        {
+          algebra: teacher({ subjects: ["algebra"], ratingAvg: 3 }),
+          geometry: teacher({ subjects: ["geometry"], ratingAvg: 5 }),
+        },
+        ANY_TOPIC
+      )
+    ).toEqual(["geometry", "algebra"]);
   });
 
   test("subjects still match when they carry their area", () => {
@@ -133,6 +154,63 @@ describe("who is considered at all", () => {
     );
 
     expect(ranked.map((t) => t.uid)).toEqual(["fresh"]);
+  });
+});
+
+describe("a subject taught by fewer than three teachers", () => {
+  // A subject that would leave the student two teachers or fewer narrows
+  // nothing: everyone stays in, those who teach it first.
+  test("does not narrow the question, but puts its teachers first", () => {
+    expect(
+      order({
+        geometry_star: teacher({ subjects: ["geometry"], ratingAvg: 5 }),
+        algebra_1: teacher({ subjects: ["algebra"], ratingAvg: 2 }),
+        algebra_2: teacher({ subjects: ["algebra"], ratingAvg: 3 }),
+        trig: teacher({ subjects: ["trigonometry"], ratingAvg: 4 }),
+      })
+    ).toEqual(["algebra_2", "algebra_1", "geometry_star", "trig"]);
+  });
+
+  test("is three: exactly three narrows, two do not", () => {
+    const three = {
+      a: teacher(),
+      b: teacher(),
+      c: teacher(),
+      other: teacher({ subjects: ["geometry"] }),
+    };
+    expect(subjectNarrows(three, "algebra")).toBe(true);
+    expect(order(three)).toEqual(expect.not.arrayContaining(["other"]));
+
+    const two = { a: teacher(), b: teacher(), other: teacher({ subjects: ["geometry"] }) };
+    expect(subjectNarrows(two, "algebra")).toBe(false);
+    expect(order(two)).toContain("other");
+  });
+
+  test("counts only teachers who could take the question now", () => {
+    expect(
+      subjectNarrows(
+        {
+          online: teacher(),
+          offline: teacher({ status: "offline" }),
+          busy: teacher({ busy: { questionId: "q-9", since: NOW } }),
+          another_online: teacher(),
+        },
+        "algebra"
+      )
+    ).toBe(false);
+  });
+
+  test("counts teachers already invited: they hold the question", () => {
+    const ranked = rankTeachers(
+      { invited_1: teacher(), invited_2: teacher(), fresh: teacher(), other: teacher({ subjects: ["geometry"] }) },
+      "algebra",
+      new Set(["invited_1", "invited_2"])
+    );
+    expect(ranked.map((t) => t.uid)).toEqual(["fresh"]);
+  });
+
+  test("never applies to a question for any topic", () => {
+    expect(subjectNarrows({ a: teacher(), b: teacher(), c: teacher() }, ANY_TOPIC)).toBe(false);
   });
 });
 

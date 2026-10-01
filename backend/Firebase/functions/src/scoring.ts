@@ -1,5 +1,10 @@
 import { logger } from "firebase-functions";
-import { BUSY_STALE_AFTER_MINUTES, KEEPALIVE_TIMEOUT_SECONDS, TeacherRecord } from "./types";
+import {
+  BUSY_STALE_AFTER_MINUTES,
+  KEEPALIVE_TIMEOUT_SECONDS,
+  MIN_SUBJECT_TEACHERS,
+  TeacherRecord,
+} from "./types";
 
 // FR-B-002: score = 0.6·(ratingAvg/5) + 0.25·acceptRate + 0.15·recencyFactor
 // recencyFactor = exp(-hoursAgo / 24)  →  1.0 when just active, decays to ~0 after 72h
@@ -102,6 +107,9 @@ export interface ScoredTeacher {
   score: number;
 }
 
+// The topic of a question put to every online teacher, whatever they teach.
+export const ANY_TOPIC = "any";
+
 // Normalize a subject or topic string for matching:
 // strips a leading area prefix ("Math: " → ""), lowercases, removes non-alphanumeric.
 // "Math: Algebra" → "algebra", "algebra" → "algebra", "Trigonometry" → "trigonometry"
@@ -110,15 +118,53 @@ function normalizeSubject(s: string): string {
   return afterColon.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// Returns all eligible (online, not in a session, reachable, matching topic) teachers sorted
-// best-first. The dispatcher slices the result per wave, skipping alreadyInvited UIDs.
+/** Whether the teacher teaches `topic` — every teacher does for ANY_TOPIC. */
+export function teachesTopic(teacher: TeacherRecord, topic: string): boolean {
+  if (topic === ANY_TOPIC) return true;
+  // RTDB can deserialize arrays as {0: "algebra", ...} objects when written by mobile SDKs.
+  const subjects: string[] = Array.isArray(teacher.subjects)
+    ? teacher.subjects
+    : Object.values(teacher.subjects ?? ({} as Record<string, string>));
+  const normalizedTopic = normalizeSubject(topic);
+  return subjects.some((s) => typeof s === "string" && normalizeSubject(s) === normalizedTopic);
+}
+
+/** Whether a question on `topic` goes only to teachers who teach it: true
+ *  while at least MIN_SUBJECT_TEACHERS teachers who could take a question now
+ *  — online, not in a session, reachable — teach it, invited already or not.
+ *  With fewer, a subject would leave the student almost nobody, so it does not
+ *  narrow the question at all. Never for ANY_TOPIC. */
+export function subjectNarrows(
+  teachers: Record<string, TeacherRecord>,
+  topic: string,
+  now = Date.now()
+): boolean {
+  if (topic === ANY_TOPIC) return false;
+  let teaching = 0;
+  for (const t of Object.values(teachers)) {
+    if (t.status !== "online" || isTeacherBusy(t, now) || !isTeacherReachable(t, now)) continue;
+    if (!teachesTopic(t, topic)) continue;
+    teaching += 1;
+    if (teaching >= MIN_SUBJECT_TEACHERS) return true;
+  }
+  return false;
+}
+
+// Returns all eligible (online, not in a session, reachable) teachers sorted
+// best-first. While the subject narrows the question (see subjectNarrows), only
+// those who teach it are eligible; otherwise every teacher is, and those who
+// teach it come first. The dispatcher slices the result per wave, skipping
+// alreadyInvited UIDs.
+//
+// `narrow` is worked out from `teachers` unless the caller passes it: pass it
+// when `teachers` is not the whole online roster.
 export function rankTeachers(
   teachers: Record<string, TeacherRecord>,
   topic: string,
-  exclude: Set<string>
+  exclude: Set<string>,
+  narrow = subjectNarrows(teachers, topic)
 ): ScoredTeacher[] {
-  const candidates: Array<ScoredTeacher & { lastActiveAt: number }> = [];
-  const normalizedTopic = normalizeSubject(topic);
+  const candidates: Array<ScoredTeacher & { lastActiveAt: number; teaches: boolean }> = [];
 
   // Counted rather than logged one line at a time: this runs on the dispatch
   // path, and a line per rejected teacher meant dozens of Cloud Logging writes
@@ -146,10 +192,8 @@ export function rankTeachers(
       unreachable += 1;
       continue;
     }
-    // RTDB can deserialize arrays as {0: "algebra", ...} objects when written by mobile SDKs.
-    const subjects: string[] = Array.isArray(t.subjects) ? t.subjects : Object.values(t.subjects ?? {} as Record<string, string>);
-    const matches = subjects.some((s) => normalizeSubject(s) === normalizedTopic);
-    if (!matches) {
+    const teaches = teachesTopic(t, topic);
+    if (narrow && !teaches) {
       topicMismatch += 1;
       continue;
     }
@@ -158,11 +202,12 @@ export function rankTeachers(
       uid,
       score: scoreTeacher(t),
       lastActiveAt: finite(t.lastActiveAt) ?? 0,
+      teaches,
     });
   }
 
   logger.info(
-    `[scoring] ranked topic=${topic} considered=${Object.keys(teachers).length} excluded=${exclude.size} skippedOffline=${offline} skippedBusy=${busy} skippedUnreachable=${unreachable} skippedTopic=${topicMismatch} eligible=${candidates.length}`
+    `[scoring] ranked topic=${topic} narrow=${narrow} considered=${Object.keys(teachers).length} excluded=${exclude.size} skippedOffline=${offline} skippedBusy=${busy} skippedUnreachable=${unreachable} skippedTopic=${topicMismatch} eligible=${candidates.length}`
   );
 
   // Unrated teachers all score alike, so ties are ordinary rather than rare.
@@ -171,6 +216,7 @@ export function rankTeachers(
   // in, and the same teachers would take wave 1 every time.
   return candidates
     .sort((a, b) => {
+      if (a.teaches !== b.teaches) return a.teaches ? -1 : 1;
       if (b.score !== a.score) return b.score - a.score;
       if (b.lastActiveAt !== a.lastActiveAt) return b.lastActiveAt - a.lastActiveAt;
       return a.uid.localeCompare(b.uid);

@@ -7,63 +7,104 @@
 
 import SwiftUI
 
+/// A student's purchases of minutes, month by month, in the brand's look —
+/// Instant Teacher is the only app with student payments.
 struct StudentPaymentHistoryView: View {
     let viewModel: any SettingsViewModeling
     @State  var monthSections: [PaymentHistoryMonthSection] = []
     @State  var isLoading = true
     private let authService = AuthService()
 
+    @Environment(\.colorScheme) var colorScheme
+    var theme: AppTheme {
+        AppTheme(colorScheme: colorScheme)
+    }
+
     var body: some View {
-        Group {
-            if isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if monthSections.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "creditcard")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.secondary)
-                    Text(viewModel.noPaymentsTitle)
-                        .font(.headline)
-                    Text(viewModel.noPaymentsSubtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(monthSections) { section in
-                        Section {
-                            ForEach(section.entries) { entry in
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(entry.title)
-                                            .font(.system(size: 14, weight: .medium))
-                                            .lineLimit(1)
-                                        Text(entry.dateText)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Text(entry.amountText)
-                                        .font(.system(size: 14, weight: .semibold))
-                                }
-                            }
-                        } header: {
-                            HStack {
-                                Text(section.title)
-                                Spacer()
-                                Text(section.totalText)
-                                    .fontWeight(.semibold)
-                            }
-                        }
-                    }
-                }
+        ZStack {
+            BrandSubpage(
+                label: viewModel.settingsTitle,
+                title: viewModel.settingsPageTitle(SettingsDestination.studentPayments.title),
+                backLabel: viewModel.backLabel
+            ) {
+                BrandPageHero(title: SettingsDestination.studentPayments.title)
+                content
             }
         }
         .task { await load() }
+    }
+
+    @ViewBuilder
+    var content: some View {
+        if isLoading {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .scaleEffect(1.4)
+                .tint(theme.onDarkFill)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+        } else if monthSections.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "cart")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(theme.brandActionBackground)
+                    .frame(width: 36, height: 36)
+                Text(viewModel.noPaymentsTitle)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(theme.onDarkFill)
+                Text(viewModel.noPaymentsSubtitle)
+                    .font(.system(size: 15))
+                    .foregroundStyle(theme.brandSecondaryText)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+            .brandCard()
+        } else {
+            ForEach(monthSections) { section in
+                monthCard(section)
+            }
+        }
+    }
+
+    /// A month's total above the card of its purchases.
+    func monthCard(_ section: PaymentHistoryMonthSection) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Text(section.title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(theme.brandSecondaryText)
+                Spacer(minLength: 0)
+                Text(section.totalText)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(theme.onDarkFill)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(section.entries) { entry in
+                    if entry.id != section.entries.first?.id {
+                        BrandRule()
+                    }
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(entry.title)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(theme.onDarkFill)
+                                .lineLimit(1)
+                            Text(entry.dateText)
+                                .font(.system(size: 13))
+                                .foregroundStyle(theme.brandSecondaryText)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(entry.amountText)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(theme.brandActionBackground)
+                    }
+                }
+            }
+            .brandCard()
+        }
     }
 
     private func load() async {

@@ -16,24 +16,10 @@ struct HelpSupportView: View {
     }
 
     var body: some View {
-        NavigationStack {
-#if os(Android)
-            // The title and menu button are drawn above the form instead; see
-            // SideMenuSectionHeader.
-            VStack(spacing: 0) {
-                SideMenuSectionHeader(title: viewModel.helpSupportTitle)
-                ContactSupportView(viewModel: viewModel)
-            }
-            .toolbar(.hidden, for: .navigationBar)
-#else
-            ContactSupportView(viewModel: viewModel)
-                .navigationTitle(viewModel.helpSupportTitle)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        SideMenuButton(size: 36)
-                    }
-                }
-#endif
+        // A plain stack around the screen, which carries its modifiers; see
+        // `BrandTabScreen`.
+        ZStack {
+            screen
         }
         .appDialog(
             viewModel.alertTitle,
@@ -49,6 +35,28 @@ struct HelpSupportView: View {
                 onCancel: { viewModel.cancelContactSupportPreview() },
                 onSubmit: { viewModel.submitContactSupport() }
             )
+        }
+    }
+
+    /// A section like the others, with the tab bar, and the contact form in a
+    /// brand card.
+    var screen: some View {
+        BrandTabScreen {
+            VStack(spacing: 0) {
+                BrandPageHeader(label: viewModel.helpSupportTitle, title: viewModel.helpSupportTitle) {
+                    BrandMenuButton()
+                }
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        BrandPageHero(title: viewModel.helpSupportTitle, subtitle: viewModel.contactSupportIntroText)
+                        ContactSupportView(viewModel: viewModel, embedded: true)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 20)
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
         }
     }
 

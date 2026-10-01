@@ -44,12 +44,7 @@ struct AppTheme {
     }
 
     /// Captions, secondary labels, placeholder icons.
-    var secondaryText: Color {
-        adaptive(
-            light: (110, 110, 110),
-            dark: (160, 160, 160)
-        )
-    }
+    var secondaryText: Color { brandSecondaryText }
 
     /// Text drawn on a `primaryText` fill.
     var invertedText: Color {
@@ -84,8 +79,9 @@ struct AppTheme {
     }
 
     /// Text and icons on a fill that is dark in both schemes — `accentStrong`,
-    /// `ctaBackground`, a video feed, or an accent→accentStrong gradient
-    /// (whose dark end stays dark in either scheme).
+    /// `ctaBackground`, the brand background, a video feed, or an
+    /// accent→accentStrong gradient (whose dark end stays dark in either
+    /// scheme).
     var onDarkFill: Color {
         adaptive(
             light: (255, 255, 255),
@@ -113,20 +109,10 @@ struct AppTheme {
     }
 
     /// Cards, tiles and grouped panels sitting on `screenBackground`.
-    var cardBackground: Color {
-        adaptive(
-            light: (242, 242, 244),
-            dark: (45, 45, 42)
-        )
-    }
+    var cardBackground: Color { brandPanelBackground }
 
     /// Text fields, search bars and other editable controls.
-    var fieldBackground: Color {
-        adaptive(
-            light: (242, 242, 244),
-            dark: (35, 35, 38)
-        )
-    }
+    var fieldBackground: Color { brandBackgroundTop }
 
     /// Dimming layer behind a modal or full-screen overlay. Always used with an
     /// opacity, and black in both schemes — it darkens, it never tints.
@@ -157,12 +143,7 @@ struct AppTheme {
     // MARK: - Accent
 
     /// Primary action fill, selected state, highlight.
-    var accent: Color {
-        adaptive(
-            light: (47, 53, 255),
-            dark: (100, 200, 255)
-        )
-    }
+    var accent: Color { brandActionBackground }
 
     /// Deeper accent for pressed/selected fills and accent gradients.
     var accentStrong: Color {
@@ -175,29 +156,169 @@ struct AppTheme {
     /// Tinted surface for accent-on-surface treatments — accent chips, badges
     /// and icon tiles that must stay legible behind `accent` content.
     var accentBackground: Color {
+        // The brand's cyan at 12% over its dark ground.
+        rgb((23, 41, 45))
+    }
+
+    // MARK: - Brand
+
+    // Both apps are drawn on the brand's dark ground, whatever the system's
+    // appearance (see `TeacherMinuteApp`): its art is made for it. The general
+    // tokens above that dark alone would not bring to the brand — secondary
+    // text, cards, fields, the accent, rules and borders — are its colours.
+    // Headlines on it take `onDarkFill`.
+
+    /// Top of the brand background gradient.
+    var brandBackgroundTop: Color {
         adaptive(
-            light: (238, 236, 255),
-            dark: (38, 34, 74)
+            light: (15, 15, 17),
+            dark: (15, 15, 17)
+        )
+    }
+
+    /// Bottom of the brand background gradient.
+    var brandBackgroundBottom: Color {
+        adaptive(
+            light: (51, 49, 96),
+            dark: (51, 49, 96)
+        )
+    }
+
+    /// Highlighted words in text on the brand background.
+    var brandHighlightText: Color {
+        adaptive(
+            light: (84, 232, 246),
+            dark: (84, 232, 246)
+        )
+    }
+
+    /// Supporting copy on the brand background — a pitch under a headline.
+    var brandSecondaryText: Color {
+        adaptive(
+            light: (179, 175, 202),
+            dark: (179, 175, 202)
+        )
+    }
+
+    /// Fine print on the brand background — prices, footnotes.
+    var brandMutedText: Color {
+        adaptive(
+            light: (166, 160, 187),
+            dark: (166, 160, 187)
+        )
+    }
+
+    /// The primary action on a brand screen. Its label takes `onBrandAction`.
+    var brandActionBackground: Color {
+        adaptive(
+            light: (84, 232, 246),
+            dark: (84, 232, 246)
+        )
+    }
+
+    /// Text, icons and outline on `brandActionBackground`.
+    var onBrandAction: Color {
+        adaptive(
+            light: (0, 0, 0),
+            dark: (0, 0, 0)
+        )
+    }
+
+    /// Outline of a card on the brand background.
+    var brandCardBorder: Color {
+        adaptive(
+            light: (84, 232, 246),
+            dark: (84, 232, 246)
+        )
+        .opacity(0.57)
+    }
+
+    /// Outline of a control on the brand background — a toggle, a menu
+    /// button, an option that is not chosen — and of the writing panel.
+    var brandControlBorder: Color {
+        adaptive(
+            light: (76, 73, 134),
+            dark: (76, 73, 134)
+        )
+    }
+
+    /// The writing panel on the student's home.
+    var brandPanelBackground: Color {
+        adaptive(
+            light: (32, 31, 47),
+            dark: (32, 31, 47)
+        )
+    }
+
+    /// The dot grid on `brandPanelBackground`.
+    var brandPanelDot: Color {
+        adaptive(
+            light: (43, 42, 60),
+            dark: (43, 42, 60)
+        )
+    }
+
+    /// The dimmed screen behind a modal on a brand screen.
+    var brandScrim: Color {
+        adaptive(
+            light: (5, 5, 11),
+            dark: (5, 5, 11)
+        )
+        .opacity(0.8)
+    }
+
+    /// A modal card on a brand screen.
+    var brandModalBackground: Color {
+        adaptive(
+            light: (23, 22, 37),
+            dark: (23, 22, 37)
+        )
+    }
+
+    /// A card or field on a brand screen that sits on the gradient itself.
+    var brandCardSurface: Color {
+        Color.black.opacity(0.2)
+    }
+
+    /// A rule inside a brand card.
+    var brandDivider: Color {
+        adaptive(
+            light: (59, 56, 96),
+            dark: (59, 56, 96)
+        )
+    }
+
+    /// Something that went through — a completed purchase.
+    var brandSuccess: Color {
+        adaptive(
+            light: (105, 245, 208),
+            dark: (105, 245, 208)
+        )
+    }
+
+    /// A box set into `brandModalBackground` — a figure the modal quotes.
+    var brandModalInset: Color {
+        adaptive(
+            light: (40, 38, 61),
+            dark: (40, 38, 61)
+        )
+    }
+
+    /// The outline of an option not chosen, in a row of brand options.
+    var brandOptionBorder: Color {
+        adaptive(
+            light: (199, 197, 241),
+            dark: (199, 197, 241)
         )
     }
 
     // MARK: - Lines & controls
 
     /// Hairline rule between rows and sections.
-    var separator: Color {
-        adaptive(
-            light: (228, 228, 231),
-            dark: (58, 58, 62)
-        )
-    }
+    var separator: Color { brandControlBorder }
 
     /// Outline around fields, chips and outlined tiles.
-    var controlBorder: Color {
-        adaptive(
-            light: (228, 228, 231),
-            dark: (85, 85, 88)
-        )
-    }
+    var controlBorder: Color { brandControlBorder }
 
     /// Fill for a control that is present but not actionable yet — a send
     /// button with nothing to send, a disabled toolbar item.
@@ -482,6 +603,27 @@ private struct AppThemePreviewView: View {
                     ("accent", theme.accent),
                     ("accentStrong", theme.accentStrong),
                     ("accentBackground", theme.accentBackground)
+                ])
+
+                section("Brand", swatches: [
+                    ("brandBackgroundTop", theme.brandBackgroundTop),
+                    ("brandBackgroundBottom", theme.brandBackgroundBottom),
+                    ("brandHighlightText", theme.brandHighlightText),
+                    ("brandSecondaryText", theme.brandSecondaryText),
+                    ("brandMutedText", theme.brandMutedText),
+                    ("brandActionBackground", theme.brandActionBackground),
+                    ("onBrandAction", theme.onBrandAction),
+                    ("brandCardBorder", theme.brandCardBorder),
+                    ("brandControlBorder", theme.brandControlBorder),
+                    ("brandPanelBackground", theme.brandPanelBackground),
+                    ("brandPanelDot", theme.brandPanelDot),
+                    ("brandScrim", theme.brandScrim),
+                    ("brandModalBackground", theme.brandModalBackground),
+                    ("brandModalInset", theme.brandModalInset),
+                    ("brandCardSurface", theme.brandCardSurface),
+                    ("brandDivider", theme.brandDivider),
+                    ("brandSuccess", theme.brandSuccess),
+                    ("brandOptionBorder", theme.brandOptionBorder)
                 ])
 
                 section("Lines & controls", swatches: [

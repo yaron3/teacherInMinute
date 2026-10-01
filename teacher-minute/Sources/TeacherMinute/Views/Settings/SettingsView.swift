@@ -7,16 +7,10 @@
 
 import SwiftUI
 
-import SwiftUI
-
 struct SettingsView: View {
     @State var viewModel: any SettingsViewModeling
-    @Environment(\.appRouter) var router
     @Environment(\.openURL) var openURL
-    @Environment(\.colorScheme) var colorScheme
-    var theme: AppTheme {
-        AppTheme(colorScheme: colorScheme)
-    }
+
     init(role: AppUserMode, viewModel: (any SettingsViewModeling)?) {
         if let viewModel {
             self._viewModel = State(wrappedValue: viewModel)
@@ -27,51 +21,12 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack(path: navigationPath) {
-            VStack(spacing: 0) {
-#if os(Android)
-                SideMenuSectionHeader(title: viewModel.settingsTitle)
-#endif
-                ZStack {
-                    List {
-                        ForEach(viewModel.sections) { section in
-                            SettingsSectionView(section: section) { row in
-                                viewModel.select(row)
-                            }
-                        }
-
-                        Section {
-                            Text(viewModel.appVersion)
-                                .font(.system(size: 13))
-                                .foregroundStyle(theme.secondaryText)
-                                .frame(maxWidth: .infinity)
-                                .listRowBackground(Color.clear)
-                        }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .background(theme.screenBackground)
-
-                    loadingOverlay
+            SettingsRootView(viewModel: viewModel)
+                .navigationDestination(for: SettingsDestination.self) { destination in
+                    destinationView(destination)
+                        .toolbar(.hidden, for: .navigationBar)
+                        .navigationBarBackButtonHidden(true)
                 }
-            }
-            .background(theme.screenBackground)
-#if os(Android)
-            // The title and menu button are drawn above the list instead; see
-            // SideMenuSectionHeader.
-            .toolbar(.hidden, for: .navigationBar)
-#else
-            .navigationTitle(viewModel.settingsTitle)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SideMenuButton(size: 36)
-                }
-            }
-#endif
-            .navigationDestination(for: SettingsDestination.self) { destination in
-                destinationView(destination)
-                    .navigationTitle(destination.title)
-                    .navigationBarTitleDisplayMode(.inline)
-            }
         }
         .appDialog(
             viewModel.alertTitle,
@@ -79,23 +34,6 @@ struct SettingsView: View {
             message: viewModel.alertMessage ?? "",
             actions: [AppDialogAction(viewModel.okLabel)]
         )
-        .alert(viewModel.deleteAccountTitle, isPresented: isShowingReauthPasswordPrompt) {
-            SecureField(viewModel.passwordPlaceholder, text: reauthPassword)
-            Button(viewModel.cancelLabel, role: .cancel) {
-                viewModel.reauthPassword = ""
-            }
-            Button(viewModel.deleteLabel, role: .destructive) {
-                let password = viewModel.reauthPassword
-                viewModel.reauthPassword = ""
-                Task {
-                    if await viewModel.completeAccountDeletion(withPassword: password) {
-                        router.signOut()
-                    }
-                }
-            }
-        } message: {
-            Text(viewModel.reauthPasswordMessage)
-        }
         .sheet(item: contactSupportPreview) { request in
             ContactSupportPreviewSheet(
                 viewModel: viewModel,
@@ -113,6 +51,7 @@ struct SettingsView: View {
         .trackScreen(AnalyticsScreen.settings)
     }
 
+    /// Each page draws its own header, with the way back.
     @ViewBuilder
     func destinationView(_ destination: SettingsDestination) -> some View {
         switch destination {
@@ -127,30 +66,15 @@ struct SettingsView: View {
         case .contactUs:
             ContactSupportView(viewModel: viewModel)
         case .webPage(let title, let url):
-            AboutWebView(url: url, title: title)
+            AboutWebView(url: url, title: title, backLabel: viewModel.backLabel)
         case .studentPayments:
             StudentPaymentHistoryView(viewModel: viewModel)
         case .teacherPayouts:
             TeacherPayoutSettingsView()
-        case .changePassword:
-            ChangePasswordSettingsView(viewModel: viewModel)
         case .notifications:
             NotificationPreferencesSettingsView(viewModel: viewModel)
-        case .mediaPermissions:
-            MediaPermissionsSettingsView(viewModel: viewModel)
         case .privacyControls:
             PrivacyControlsSettingsView(viewModel: viewModel)
-        }
-    }
-
-    @ViewBuilder
-    var loadingOverlay: some View {
-        if viewModel.isLoading {
-            theme.scrim.opacity(0.18).ignoresSafeArea()
-            ProgressView()
-                .progressViewStyle(.circular)
-                .scaleEffect(1.4)
-                .tint(theme.primaryText)
         }
     }
 
@@ -161,14 +85,6 @@ struct SettingsView: View {
             viewModel.navigationPath
         } set: { path in
             viewModel.navigationPath = path
-        }
-    }
-
-    var reauthPassword: Binding<String> {
-        Binding {
-            viewModel.reauthPassword
-        } set: { password in
-            viewModel.reauthPassword = password
         }
     }
 
@@ -187,21 +103,11 @@ struct SettingsView: View {
             viewModel.showAlert = isPresented
         }
     }
-
-    var isShowingReauthPasswordPrompt: Binding<Bool> {
-        Binding {
-            viewModel.showReauthPasswordPrompt
-        } set: { isPresented in
-            viewModel.showReauthPasswordPrompt = isPresented
-        }
-    }
-
 }
 
 #if os(iOS)
 #Preview ("teacher"){
   SettingsView(role: .teacher, viewModel: MockSettingsViewModel(role: .teacher))
-  
 }
 #Preview ("student"){
   SettingsView(role: .student, viewModel: MockSettingsViewModel(role: .student))

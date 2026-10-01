@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        From Android 12 the system draws the starting window itself, as the app
+        icon on a plain colour, and never shows splash_background. The colour is
+        the top of the brand gradient, which LaunchSplashView then takes over.
+    -->
+    <style name="Theme.TeacherMinute.Launch" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowSplashScreenBackground">#0F0F11</item>
+    </style>
+</resources>

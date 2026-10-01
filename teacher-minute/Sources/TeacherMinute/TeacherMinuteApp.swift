@@ -23,20 +23,12 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
   @State  var router = AppRouter()
   @State var isLaunching = true
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
-  @AppStorage("appearanceMode") var appearanceMode = "system"
 
   /* SKIP @bridge */public init() {
     TeacherMinuteAppDelegate.shared.onInit()
   }
 
-  var preferredAppearanceColorScheme: ColorScheme? {
-    switch appearanceMode {
-    case "light": return .light
-    case "dark": return .dark
-    default: return nil
-    }
-  }
-  
+
       public var body: some View {
 			@Bindable var router = router
 			ZStack {
@@ -46,16 +38,13 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				  MainTabView(userMode: AppUserMode(role: role))
 				case .welcome:
 				  NavigationStack(path: $router.path) {
-					WelcomeView()
-					  .trackScreen(AnalyticsScreen.welcome)
+					signedOutRoot
 					  .navigationDestination(for: AppRoute.self) { route in
 						switch route {
 						  case .createAccount:
-							CreateAccountView()
-							  .trackScreen(AnalyticsScreen.createAccount)
+							createAccountScreen
 						  case .login:
-							LoginView()
-							  .trackScreen(AnalyticsScreen.login)
+							loginScreen
 						  case .teacherIdentityVerification:
 							TeacherIdentityVerificationView()
 							  .trackScreen(AnalyticsScreen.teacherIdentity)
@@ -63,8 +52,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 							TeacherSubjectsView()
 							  .trackScreen(AnalyticsScreen.teacherSubjects)
 						  case .completeProfile(let role):
-							CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
-							  .trackScreen(AnalyticsScreen.completeProfile)
+							completeProfileScreen(role: role)
 						  case .permissionsSetup(let role):
 							PermissionsSetupView(role: role)
 							  .trackScreen(AnalyticsScreen.permissionsSetup)
@@ -101,8 +89,9 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				.environment(\.appRouter, router)
             .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
             .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
-            .preferredColorScheme(preferredAppearanceColorScheme)
-            .id("\(languagePreference)-\(appearanceMode)")
+            // Both apps are drawn on the brand's dark ground throughout.
+            .preferredColorScheme(.dark)
+            .id(languagePreference)
             .onAppear {
               LocalizationSupport.applyPlatformLayoutDirection(languagePreference: languagePreference)
             }
@@ -122,6 +111,31 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 				isLaunching = false
 			  }
 			}
+  }
+
+  /// The first screen of a signed-out session. A student starts from the intro,
+  /// without an account, and logs in to an existing one from the home screen's
+  /// menu; a teacher registers or signs in on the welcome screen.
+  @ViewBuilder
+  var signedOutRoot: some View {
+	if AuthRole.appRole == .student {
+	  StudentIntroView()
+	} else {
+	  WelcomeView()
+		.trackScreen(AnalyticsScreen.welcome)
+	}
+  }
+
+  var loginScreen: some View {
+	LoginView()
+  }
+
+  var createAccountScreen: some View {
+	CreateAccountView()
+  }
+
+  func completeProfileScreen(role: AuthRole) -> some View {
+	CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
   }
 
   private func performLaunchSessionResume() async {

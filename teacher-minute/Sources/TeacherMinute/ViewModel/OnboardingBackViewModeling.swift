@@ -18,6 +18,8 @@ extension OnboardingBackViewModeling {
     }
     var onboardingBackCancelLabel: String { LocalizationSupport.localized("Cancel") }
     var onboardingBackConfirmLabel: String { LocalizationSupport.localized("Log Out") }
+    /// The name of the back button in a step's header.
+    var onboardingBackLabel: String { LocalizationSupport.localized("Back") }
 }
 
 extension TeacherSubjectsViewModel: OnboardingBackViewModeling {}

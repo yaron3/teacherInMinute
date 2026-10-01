@@ -78,6 +78,28 @@ final class AppRouter: @unchecked Sendable {
 	rootScreen = .welcome
   }
 
+  /// Takes a student who started without an account to sign-up: the welcome
+  /// stack, with the account form on top. They stay signed in anonymously
+  /// until the form signs them into an account of their own, so backing out
+  /// and tapping "Get started" returns them to the same one; the form's "Log
+  /// in" is there for a student who has an account already.
+  func startRegistration() {
+	var registration = NavigationPath()
+	registration.append(AppRoute.createAccount)
+	path = registration
+	rootScreen = .welcome
+  }
+
+  /// Takes a student who started without an account to the login form, from
+  /// the menu. As with `startRegistration`, they stay signed in anonymously
+  /// until the form signs them into their own account.
+  func startLogin() {
+	var login = NavigationPath()
+	login.append(AppRoute.login)
+	path = login
+	rootScreen = .welcome
+  }
+
   /// Returns to sign-in whenever Firebase has no user while the tab bar is up.
   ///
   /// Log Out and Delete Account route there themselves. This is for a session

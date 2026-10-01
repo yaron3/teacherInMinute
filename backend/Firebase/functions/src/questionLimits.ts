@@ -5,6 +5,7 @@
 // so a Remote Config outage never blocks questions.
 
 import { readRcNumber } from "./remoteConfig";
+import { INVITE_EXPIRY_SECONDS } from "./types";
 
 /** Remote Config key holding the longest accepted question text. */
 export const QUESTION_MAX_LENGTH_RC_KEY = "question_max_length";
@@ -50,4 +51,26 @@ export async function getQuestionRateLimits(): Promise<QuestionRateLimits> {
     readAllowance(QUESTIONS_PER_HOUR_RC_KEY, DEFAULT_QUESTIONS_PER_HOUR),
   ]);
   return { perMinute, perHour };
+}
+
+// ─── How long a question searches ────────────────────────────────────────────
+
+/** Remote Config key holding how long a question is offered to teachers before
+ *  the search gives up, in seconds. The app reads it too, for a backend that
+ *  does not return it. */
+export const SEARCH_TIMEOUT_RC_KEY = "question_search_timeout_seconds";
+
+export const DEFAULT_SEARCH_TIMEOUT_SECONDS = INVITE_EXPIRY_SECONDS;
+
+/** A published value is held to these: long enough for the waves to go out,
+ *  short enough that the student's LiveKit token, minted as they ask and good
+ *  for an hour, still covers the search and a whole lesson. */
+export const MIN_SEARCH_TIMEOUT_SECONDS = 30;
+export const MAX_SEARCH_TIMEOUT_SECONDS = 600;
+
+/** How long a new question searches, in whole seconds. */
+export async function getSearchTimeoutSeconds(): Promise<number> {
+  const fromRc = await readRcNumber(SEARCH_TIMEOUT_RC_KEY);
+  if (fromRc === undefined || !Number.isFinite(fromRc)) return DEFAULT_SEARCH_TIMEOUT_SECONDS;
+  return Math.min(MAX_SEARCH_TIMEOUT_SECONDS, Math.max(MIN_SEARCH_TIMEOUT_SECONDS, Math.round(fromRc)));
 }

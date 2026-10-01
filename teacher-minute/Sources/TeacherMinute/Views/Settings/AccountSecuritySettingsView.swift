@@ -16,8 +16,13 @@ struct AccountSecuritySettingsView: View {
     }
     var body: some View {
         ZStack {
-            List {
-                SettingsSectionView(section: viewModel.accountSecuritySection) { row in
+            BrandSubpage(
+                label: viewModel.settingsTitle,
+                title: viewModel.settingsPageTitle(SettingsDestination.accountSecurity.title),
+                backLabel: viewModel.backLabel
+            ) {
+                BrandPageHero(title: SettingsDestination.accountSecurity.title)
+                BrandSettingsRows(rows: viewModel.accountSecuritySection.rows) { row in
                     viewModel.select(row)
                 }
             }
@@ -27,7 +32,7 @@ struct AccountSecuritySettingsView: View {
                 ProgressView()
                     .progressViewStyle(.circular)
                     .scaleEffect(1.4)
-                    .tint(theme.primaryText)
+                    .tint(theme.onDarkFill)
             }
         }
         // Log Out and Delete Account are the only rows that raise a
@@ -52,6 +57,24 @@ struct AccountSecuritySettingsView: View {
             isPresented: isShowingAlert,
             message: viewModel.alertMessage ?? "",
             actions: [AppDialogAction(viewModel.okLabel)]
+        )
+        // And for the password Delete Account may ask for.
+        .appDialog(
+            viewModel.deleteAccountTitle,
+            isPresented: isShowingReauthPrompt,
+            message: viewModel.reauthPasswordMessage,
+            secureField: AppDialogSecureField(
+                placeholder: viewModel.passwordPlaceholder,
+                text: reauthPassword
+            ),
+            actions: [
+                AppDialogAction(viewModel.cancelLabel, kind: .cancel) {
+                    viewModel.reauthPassword = ""
+                },
+                AppDialogAction(viewModel.deleteLabel, kind: .destructive) {
+                    completeAccountDeletion()
+                }
+            ]
         )
     }
 
@@ -96,11 +119,38 @@ struct AccountSecuritySettingsView: View {
         }
     }
 
+    var isShowingReauthPrompt: Binding<Bool> {
+        Binding {
+            viewModel.showReauthPasswordPrompt
+        } set: { isPresented in
+            viewModel.showReauthPasswordPrompt = isPresented
+        }
+    }
+
+    var reauthPassword: Binding<String> {
+        Binding {
+            viewModel.reauthPassword
+        } set: { password in
+            viewModel.reauthPassword = password
+        }
+    }
+
     private func confirm(_ confirmation: SettingsConfirmation) {
         viewModel.activeConfirmation = nil
 
         Task {
             if await viewModel.confirm(confirmation) {
+                router.signOut()
+            }
+        }
+    }
+
+    /// The password is taken and cleared before the deletion runs.
+    private func completeAccountDeletion() {
+        let password = viewModel.reauthPassword
+        viewModel.reauthPassword = ""
+        Task {
+            if await viewModel.completeAccountDeletion(withPassword: password) {
                 router.signOut()
             }
         }

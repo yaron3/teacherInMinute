@@ -26,8 +26,11 @@ extension SettingsViewModeling {
         }
     }
 
-    var preferenceRows: [SettingsRow] {
-        var rows = [
+    /// The settings, as Instant Teacher's design lists them: Preferences,
+    /// Language, Notifications and Privacy Controls. App Permissions is not
+    /// among them, in either app: the profile holds those switches.
+    var primarySettingsRows: [SettingsRow] {
+        [
             SettingsRow(
                 title: LocalizationSupport.localized("Preferences"),
                 subtitle: role == .teacher
@@ -35,7 +38,6 @@ extension SettingsViewModeling {
                     : LocalizationSupport.localized("Default session type and currency"),
                 systemImage: "slider.horizontal.3",
                 iconColor: .primary,
-                isDestructive: false,
                 action: .appPreferences
             ),
             SettingsRow(
@@ -43,32 +45,56 @@ extension SettingsViewModeling {
                 subtitle: selectedLanguage.title,
                 systemImage: "globe",
                 iconColor: .primary,
-                isDestructive: false,
                 action: .language
             ),
             SettingsRow(
-                title: LocalizationSupport.localized("Notification Preferences"),
-                subtitle: nil,
-                systemImage: "bell.fill",
+                title: LocalizationSupport.localized("Notifications"),
+                systemImage: "bell",
                 iconColor: .primary,
-                isDestructive: false,
                 action: .notifications
             ),
             SettingsRow(
-                title: LocalizationSupport.localized("App Permissions"),
-                subtitle: nil,
-                systemImage: "mic.fill",
+                title: LocalizationSupport.localized("Privacy Controls"),
+                systemImage: "shield",
                 iconColor: .primary,
-                isDestructive: false,
-                action: .mediaPermissions
+                action: .privacyControls
+            )
+        ]
+    }
+
+    /// The rest of the settings, which the design leaves out, in a card of the
+    /// same style: the money — a student's payments, a teacher's payouts — the
+    /// about pages, and the account, whose Log Out and Delete Account must
+    /// stay within reach. The icons are symbols SkipUI draws on Android too.
+    var moreSettingsRows: [SettingsRow] {
+        var rows = [
+            role == .teacher
+                ? SettingsRow(
+                    title: LocalizationSupport.localized("Teacher Payout Settings"),
+                    subtitle: LocalizationSupport.localized("Choose where your monthly payout is sent"),
+                    systemImage: "banknote",
+                    iconColor: .primary,
+                    action: .teacherPayouts
+                )
+                : SettingsRow(
+                    title: LocalizationSupport.localized("Payment History"),
+                    subtitle: LocalizationSupport.localized("View your lesson payment history"),
+                    systemImage: "cart",
+                    iconColor: .primary,
+                    action: .studentPayments
+                ),
+            SettingsRow(
+                title: LocalizationSupport.localized("About"),
+                systemImage: "info.circle",
+                iconColor: .primary,
+                action: .about
             ),
             SettingsRow(
-                title: LocalizationSupport.localized("Privacy Controls"),
-                subtitle: nil,
-                systemImage: "shield.lefthalf.filled",
+                title: LocalizationSupport.localized("Account & Security"),
+                subtitle: LocalizationSupport.localized("Password, logout and account removal"),
+                systemImage: "lock",
                 iconColor: .primary,
-                isDestructive: false,
-                action: .privacyControls
+                action: .accountSecurity
             )
         ]
 
@@ -77,9 +103,8 @@ extension SettingsViewModeling {
             SettingsRow(
                 title: LocalizationSupport.localized("Force Reload Remote Config"),
                 subtitle: LocalizationSupport.localized("Debug builds only"),
-                systemImage: "arrow.clockwise",
+                systemImage: "arrow.clockwise.circle",
                 iconColor: .primary,
-                isDestructive: false,
                 action: .forceReloadRemoteConfig
             )
         )
@@ -87,7 +112,7 @@ extension SettingsViewModeling {
             SettingsRow(
                 title: LocalizationSupport.localized("Test Crashlytics Crash"),
                 subtitle: LocalizationSupport.localized("Debug builds only"),
-                systemImage: "exclamationmark.triangle.fill",
+                systemImage: "exclamationmark.triangle",
                 iconColor: .red,
                 isDestructive: true,
                 action: .testCrashlyticsCrash
@@ -96,66 +121,6 @@ extension SettingsViewModeling {
         #endif
 
         return rows
-    }
-
-    var sections: [SettingsSection] {
-        [
-            role == .teacher ? SettingsSection(
-                title: LocalizationSupport.localized("PAYOUTS"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Teacher Payout Settings"),
-                        subtitle: LocalizationSupport.localized("Choose where your monthly payout is sent"),
-                        systemImage: "banknote.fill",
-                        iconColor: .purple,
-                        isDestructive: false,
-                        action: .teacherPayouts
-                    )
-                ]
-            ): SettingsSection(
-                title: LocalizationSupport.localized("PAYMENTS"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Payment History"),
-                        subtitle: LocalizationSupport.localized("View your lesson payment history"),
-                        systemImage: "creditcard.fill",
-                        iconColor: .pink,
-                        isDestructive: false,
-                        action: .studentPayments
-                    )
-                ]
-            ),
-            SettingsSection(
-                title: LocalizationSupport.localized("PREFERENCES"),
-                rows: preferenceRows
-            ),
-            SettingsSection(
-                title: LocalizationSupport.localized("ABOUT"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("About"),
-                        subtitle: nil,
-                        systemImage: "doc.text.fill",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .about
-                    )
-                ]
-            ),
-            SettingsSection(
-                title: LocalizationSupport.localized("ACCOUNT"),
-                rows: [
-                    SettingsRow(
-                        title: LocalizationSupport.localized("Account & Security"),
-                        subtitle: LocalizationSupport.localized("Password, logout and account removal"),
-                        systemImage: "lock.fill",
-                        iconColor: .primary,
-                        isDestructive: false,
-                        action: .accountSecurity
-                    )
-                ]
-            )
-        ]
     }
 
     var accountSecuritySection: SettingsSection {
@@ -238,8 +203,6 @@ extension SettingsViewModeling {
             navigationPath.append(.studentPayments)
         case .notifications:
             navigationPath.append(.notifications)
-        case .mediaPermissions:
-            navigationPath.append(.mediaPermissions)
         case .privacyControls:
             navigationPath.append(.privacyControls)
         case .language:

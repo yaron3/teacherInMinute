@@ -3,12 +3,20 @@ admin.initializeApp();
 
 // Auth lifecycle
 export { onUserCreate } from "./users";
+export { deleteAccount } from "./accountDeletion";
 
 // Dispatch pipeline
 export { dispatchQuestion, evaluateWave, questionWatchdog, onTeacherStatusChange } from "./dispatch";
 
 // Question lifecycle (all callable — FR-B-010)
-export { createQuestion, cancelQuestion, acceptInvite, declineInvite, getQuestionStatus } from "./questions";
+export {
+  createQuestion,
+  updateQuestion,
+  cancelQuestion,
+  acceptInvite,
+  declineInvite,
+  getQuestionStatus,
+} from "./questions";
 
 // Lesson lifecycle (all callable — FR-B-010)
 export {

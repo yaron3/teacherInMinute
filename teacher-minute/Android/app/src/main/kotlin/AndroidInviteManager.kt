@@ -148,6 +148,8 @@ object AndroidInviteManager {
                 ?: child.child("costPerMinuteCents").value.asIntOrNull()
                 ?: 50
             val conversationType = child.child("conversationType").getValue(String::class.java) ?: "text"
+            // Why the student is stuck, once they have said on their search screens.
+            val struggle = child.child("struggle").getValue(String::class.java) ?: ""
 
             if (topic == null || text == null) {
                 Log.w(
@@ -176,6 +178,7 @@ object AndroidInviteManager {
                     .put("studentImageURL", studentImageURL)
                     .put("pricePerMinuteCents", pricePerMinuteCents)
                     .put("conversationType", conversationType)
+                    .put("struggle", struggle)
             )
         }
 

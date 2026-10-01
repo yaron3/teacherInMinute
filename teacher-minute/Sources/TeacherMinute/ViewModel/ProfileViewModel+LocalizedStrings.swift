@@ -63,9 +63,32 @@ extension ProfileViewModel {
 
     // MARK: Screen
     var profileScreenTitle: String { LocalizationSupport.localized("Profile") }
+    var profileSubtitle: String {
+        LocalizationSupport.localized("Your account details, contact details and device settings.")
+    }
     /// The name for the side menu's header — blank until the profile loads, so
     /// the placeholder `name` never flashes there.
     var menuDisplayName: String { isProfileLoaded ? name : "" }
+
+    /// The name on the profile: blank until the profile loads,
+    /// then the user's name, or their role, translated, while they have none.
+    var profileDisplayName: String {
+        guard isProfileLoaded else { return "" }
+        guard !hasFullName else { return name }
+        return roleType == .teacher ? LocalizationSupport.localized("Teacher") : LocalizationSupport.localized("Student")
+    }
+
+    /// The line under the name: the role, or, for a student without an
+    /// account, that they are anonymous.
+    var profileRoleLine: String { isAnonymousAccount ? anonymousLabel : role }
+
+    // MARK: A student without an account
+    var anonymousLabel: String { LocalizationSupport.localized("Anonymous") }
+    var anonymousAccountTitle: String { LocalizationSupport.localized("You're using the app anonymously") }
+    var anonymousAccountText: String {
+        LocalizationSupport.localized("Create an account to keep your minutes and lessons, and to log in on any device.")
+    }
+    var createAccountLabel: String { LocalizationSupport.localized("Create a user account") }
 
     // MARK: Edit profile
     var editProfileTitle: String { LocalizationSupport.localized("Edit Profile") }

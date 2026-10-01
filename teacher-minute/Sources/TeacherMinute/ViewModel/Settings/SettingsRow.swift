@@ -37,11 +37,12 @@ struct SettingsRow: Identifiable {
         case .accountSecurity:
 		self.destination = .accountSecurity
         case .appPreferences:  self.destination = .appPreferences
-        case .changePassword:  self.destination = .changePassword
+        case .changePassword:
+            // Sends a reset email rather than opening a page.
+            self.destination = nil
         case .teacherPayouts:  self.destination = .teacherPayouts
         case .studentPayments: self.destination = .studentPayments
         case .notifications:   self.destination = .notifications
-        case .mediaPermissions: self.destination = .mediaPermissions
         case .privacyControls: self.destination = .privacyControls
         case .language:        self.destination = .language
         case .about:           self.destination = .about

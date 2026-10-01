@@ -1,184 +1,187 @@
-//
-//  CompleteProfileView.swift
-//  teacher-minute
-//
-//  Created by Yaron Jackoby on 06/05/2026.
-//
-
-
 import SwiftUI
 
+/// The profile step of sign-up, on the brand's dark ground: the name, a phone
+/// number — optional for a student — and, for a teacher, where their payouts
+/// should go; then on to the permissions or home.
 struct CompleteProfileView: View {
-    @State var viewModel: CompleteProfileViewModel
-    @Environment(\.appRouter) var router
-    @Environment(\.colorScheme) var colorScheme
-    var theme: AppTheme {
-        AppTheme(colorScheme: colorScheme)
-    }
-    init(viewModel: CompleteProfileViewModel = CompleteProfileViewModel(role: .student)) {
-        self._viewModel = State(wrappedValue: viewModel)
-    }
+  @State var viewModel: CompleteProfileViewModel
+  @Environment(\.appRouter) var router
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+  @Environment(\.colorScheme) var colorScheme
+  var theme: AppTheme {
+    AppTheme(colorScheme: colorScheme)
+  }
 
-                Text(viewModel.introText)
-                    .font(.system(size: 13))
-                    .foregroundStyle(theme.secondaryText)
-                    .lineSpacing(5)
-                    .padding(.top, 10)
+  init(viewModel: CompleteProfileViewModel = CompleteProfileViewModel(role: .student)) {
+    self._viewModel = State(wrappedValue: viewModel)
+  }
 
-                AuthInputField(
-                    title: viewModel.fullNameFieldTitle,
-                    placeholder: viewModel.fullNamePlaceholder,
-                    systemImage: "person",
-                    text: $viewModel.fullName,
-                    textContentType: .name,
-                    autocapitalization: .words
-                )
-                .padding(.top, 28)
+  var body: some View {
+    ZStack {
+      BrandScreenBackground()
 
-                AuthInputField(
-                    title: viewModel.phoneFieldTitle(isOptional: viewModel.role == .student),
-                    placeholder: viewModel.phonePlaceholder,
-                    systemImage: "phone",
-                    text: $viewModel.phoneNumber,
-                    keyboardType: .phonePad,
-                    textContentType: .telephoneNumber,
-                    isValid: !viewModel.showsPhoneError,
-                    errorMessage: viewModel.phoneErrorMessage
-                )
-                .padding(.top, 20)
+      VStack(spacing: 0) {
+        header
+        ScrollView(showsIndicators: false) {
+          VStack(alignment: .leading, spacing: 16) {
+            Text(viewModel.introText)
+              .font(.system(size: 15))
+              .foregroundStyle(theme.brandSecondaryText)
+              .fixedSize(horizontal: false, vertical: true)
+              .frame(maxWidth: .infinity, alignment: .leading)
 
-                if viewModel.role == .student {
-//                    gradePicker
-//                        .padding(.top, 20)
-                } else {
-                    payoutMethodSection
-                        .padding(.top, 20)
-                }
-
-                Spacer()
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red)
-                        .padding(.bottom, 8)
-                }
-
-                AuthPrimaryButton(
-                    title: viewModel.continueLabel,
-                    systemImage: "arrow.right",
-                    isEnabled: viewModel.canContinue
-                ) {
-                    viewModel.continueFlow()
-                }
-                .padding(.bottom, 24)
-            }
-            .padding(.horizontal, 18)
-            .background(theme.screenBackground)
-            .navigationBarTitleDisplayMode(.inline)
-            .onboardingBackHandling(viewModel: viewModel)
-            .onAppear {
-                viewModel.onContinue = {
-                    if viewModel.shouldShowPermissionsOnContinue && PermissionsSetupStore.shouldShowForCurrentUser() {
-                        // Pushed, not replaced: the permissions step is part of
-                        // the same walk-backwards flow, and replacing here wiped
-                        // every earlier step out of the stack.
-                        router.push(.permissionsSetup(role: viewModel.role))
-                    } else {
-                        router.enterMainTabs(role: viewModel.role)
-                    }
-                }
-                viewModel.checkAndAutoAdvance()
-            }
-            .navigationTitle(viewModel.screenTitle)
-            .overlay {
-                if viewModel.isCheckingCompletion {
-                    ZStack {
-                        theme.scrim.opacity(0.25).ignoresSafeArea()
-                        VStack(spacing: 12) {
-                            ProgressView().progressViewStyle(.circular).scaleEffect(1.6).tint(theme.primaryText)
-                            Text(viewModel.loadingText)
-                                .font(.system(size: 14, weight: .medium)).foregroundStyle(theme.primaryText)
-                        }
-                    }
-                }
-            }
-            .appDialog(
-                viewModel.payoutMissingDialogTitle,
-                isPresented: $viewModel.showMissingPayoutInfoConfirmation,
-                message: viewModel.payoutMissingDialogMessage,
-                actions: [
-                    AppDialogAction(viewModel.addNowLabel, kind: .cancel),
-                    AppDialogAction(viewModel.continueAnywayLabel) {
-                        viewModel.continueWithoutPayoutInfo()
-                    }
-                ]
-            )
-            .trackScreen(AnalyticsScreen.completeProfile)
+            formCard
+          }
+          .padding(.horizontal, 20)
+          .padding(.top, 16)
+          .padding(.bottom, 20)
         }
-    }
+        .formScrollDismissesKeyboard()
+      }
 
-    /// Which destination the teacher would like — the choice only, with no
-    /// account details: those are typed later into the payout form, which opens
-    /// on whichever tab is picked here.
-    var payoutMethodSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(viewModel.payoutMethodSectionTitle)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(theme.primaryText)
-
-            PayoutMethodTypePicker(
-                types: viewModel.availablePayoutMethodTypes,
-                selected: viewModel.payoutMethodType,
-                onSelect: { type in viewModel.selectPayoutMethodType(type) }
-            )
-
-            Text(viewModel.payoutMethodSectionHint)
-                .font(.system(size: 12))
-                .foregroundStyle(theme.secondaryText)
+      if viewModel.isCheckingCompletion {
+        ZStack {
+          theme.brandScrim.opacity(0.4).ignoresSafeArea()
+          VStack(spacing: 12) {
+            ProgressView()
+              .progressViewStyle(.circular)
+              .scaleEffect(1.6)
+              .tint(theme.onDarkFill)
+            Text(viewModel.loadingText)
+              .font(.system(size: 14, weight: .medium))
+              .foregroundStyle(theme.onDarkFill)
+          }
         }
+      }
     }
-
-    var gradePicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(viewModel.gradeSectionTitle)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(theme.primaryText)
-
-            Menu {
-                ForEach(viewModel.grades, id: \.self) { grade in
-                    Button(grade) {
-                        viewModel.grade = grade
-                    }
-                }
-            } label: {
-                HStack {
-                    Text(viewModel.gradeSelectionLabel)
-                        .font(.system(size: 15))
-                        .foregroundStyle(viewModel.grade.isEmpty ? theme.secondaryText : theme.primaryText)
-
-                    Spacer()
-
-                    PlatformIcon(
-                        systemName: "chevron.down",
-                        size: 12,
-                        weight: .semibold,
-                        color: theme.secondaryText
-                    )
-                }
-                .padding(.horizontal, 16)
-                .frame(height: 56)
-                .background(theme.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-                        .stroke(theme.controlBorder, lineWidth: 1)
-                }
-            }
+    .environment(\.colorScheme, .dark)
+    // The header draws the back button. It walks onboarding backwards through
+    // the same handler as Android's system back, which asks before a first
+    // step's back signs the account out.
+    .onboardingBackHandling(viewModel: viewModel)
+    .toolbar(.hidden, for: .navigationBar)
+    .navigationBarBackButtonHidden(true)
+    .systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
+    .onAppear {
+      viewModel.onContinue = {
+        if viewModel.shouldShowPermissionsOnContinue && PermissionsSetupStore.shouldShowForCurrentUser() {
+          // Pushed, not replaced: the permissions step is part of the same
+          // walk-backwards flow, and replacing here wiped every earlier step
+          // out of the stack.
+          router.push(.permissionsSetup(role: viewModel.role))
+        } else {
+          router.enterMainTabs(role: viewModel.role)
         }
+      }
+      viewModel.checkAndAutoAdvance()
     }
+    .appDialog(
+      viewModel.payoutMissingDialogTitle,
+      isPresented: $viewModel.showMissingPayoutInfoConfirmation,
+      message: viewModel.payoutMissingDialogMessage,
+      actions: [
+        AppDialogAction(viewModel.addNowLabel, kind: .cancel),
+        AppDialogAction(viewModel.continueAnywayLabel) {
+          viewModel.continueWithoutPayoutInfo()
+        }
+      ]
+    )
+    .trackScreen(AnalyticsScreen.completeProfile)
+  }
+
+  /// The title, then the way back, as designed: the back button at the far
+  /// end from where the text starts.
+  private var header: some View {
+    HStack(spacing: 12) {
+      Text(viewModel.screenTitle)
+        .font(.system(size: 34, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+      Spacer(minLength: 0)
+      BrandBackButton(accessibilityLabel: viewModel.backLabel) {
+        OnboardingBackCoordinator.shared.handleBack()
+      }
+    }
+    .padding(.horizontal, 20)
+    .frame(height: 76)
+  }
+
+  private var formCard: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      BrandTextField(
+        title: viewModel.fullNameFieldTitle,
+        placeholder: viewModel.fullNamePlaceholder,
+        text: $viewModel.fullName,
+        icon: "brand-user",
+        textContentType: .name,
+        autocapitalization: .words
+      )
+
+      BrandTextField(
+        title: viewModel.phoneFieldTitle(isOptional: viewModel.role == .student),
+        placeholder: viewModel.phonePlaceholder,
+        text: $viewModel.phoneNumber,
+        icon: "brand-phone",
+        isValid: !viewModel.showsPhoneError,
+        errorMessage: viewModel.phoneErrorMessage,
+        keyboardType: .phonePad,
+        textContentType: .telephoneNumber,
+        autocapitalization: .never
+      )
+
+      if viewModel.role == .teacher {
+        payoutMethodSection
+      }
+
+      if let error = viewModel.errorMessage {
+        Text(error)
+          .font(.system(size: 12))
+          .foregroundStyle(theme.danger)
+      }
+
+      // A student's step leads on to the free minutes a verified account
+      // earns, and says so.
+      BrandPrimaryButton(
+        title: viewModel.role == .student ? viewModel.continueToMinutesLabel : viewModel.continueLabel,
+        isLoading: viewModel.isLoading,
+        isEnabled: viewModel.canContinue
+      ) {
+        viewModel.continueFlow()
+      }
+    }
+    .brandCard()
+  }
+
+  /// Which destination the teacher would like — the choice only, with no
+  /// account details: those are typed later into the payout form, which opens
+  /// on whichever tab is picked here.
+  private var payoutMethodSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(viewModel.payoutMethodSectionTitle)
+        .font(.system(size: 16, weight: .bold))
+        .foregroundStyle(theme.brandSecondaryText)
+
+      PayoutMethodTypePicker(
+        types: viewModel.availablePayoutMethodTypes,
+        selected: viewModel.payoutMethodType,
+        onSelect: { type in viewModel.selectPayoutMethodType(type) }
+      )
+
+      Text(viewModel.payoutMethodSectionHint)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
 }
+
+#if os(iOS)
+struct CompleteProfileView_Previews: PreviewProvider {
+  static var previews: some View {
+    NavigationStack {
+      CompleteProfileView()
+    }
+  }
+}
+#endif

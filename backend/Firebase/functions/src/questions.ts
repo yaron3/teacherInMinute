@@ -13,23 +13,31 @@ import {
   CONVERSATION_TYPES,
   DEFAULT_CONVERSATION_TYPE,
   HOT_PATH,
+  QUESTION_STRUGGLES,
+  QUESTION_TOPICS,
+  QuestionStruggle,
 } from "./types";
 import { getConnectionFeeCents } from "./pricing";
-import { getQuestionMaxLength, getQuestionRateLimits } from "./questionLimits";
+import { getQuestionMaxLength, getQuestionRateLimits, getSearchTimeoutSeconds } from "./questionLimits";
 import { checkQuestionAllowance, recordSessionStart } from "./rateLimit";
 import { isOwnQuestionImageUrl } from "./storageUrls";
 import { recordQuestionConnected } from "./stats";
 import {
+  applyQuestionDetails,
   dispatchFirstWave,
   enqueueQuestionWatchdog,
+  QuestionDetails,
   withdrawTeacherFromOtherQuestions,
 } from "./dispatch";
 import { enqueueAbandonedLessonCheck } from "./lessons";
 import { markTeacherBusy, releaseTeacherBusy } from "./busy";
-import { isTeacherBusy } from "./scoring";
+import { ANY_TOPIC, isTeacherBusy } from "./scoring";
 
 const db = admin.database();
 const firestore = admin.firestore();
+
+// ANY_TOPIC asks every online teacher, whatever they teach.
+const VALID_TOPICS: string[] = [...QUESTION_TOPICS, ANY_TOPIC];
 
 type LiveQuestionStatus = "searching" | "accepted" | "in_progress";
 
@@ -116,9 +124,8 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     throw new HttpsError("invalid-argument", "Provide question text or attach at least one photo");
   }
 
-  const validTopics = ["algebra", "geometry", "trigonometry", "calculus", "statistics", "arithmetic"];
-  if (!validTopics.includes(topic)) {
-    throw new HttpsError("invalid-argument", `topic must be one of: ${validTopics.join(", ")}`);
+  if (!VALID_TOPICS.includes(topic)) {
+    throw new HttpsError("invalid-argument", `topic must be one of: ${VALID_TOPICS.join(", ")}`);
   }
 
   if (hasText && text.trim().length < 10 && !hasPhoto) {
@@ -139,12 +146,14 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
   }
 
   // The limits and the student's balance are independent reads, so they
-  // overlap rather than queueing up on the ask path. Both limits come from one
-  // cached Remote Config template, so this is a single fetch, usually cached.
-  const [studentSnap, maxQuestionLength, rateLimits] = await Promise.all([
+  // overlap rather than queueing up on the ask path. The limits and the search
+  // timeout come from one cached Remote Config template, so this is a single
+  // fetch, usually cached.
+  const [studentSnap, maxQuestionLength, rateLimits, searchTimeoutSeconds] = await Promise.all([
     firestore.collection("users").doc(uid).get(),
     getQuestionMaxLength(),
     getQuestionRateLimits(),
+    getSearchTimeoutSeconds(),
   ]);
 
   // Measured after trimming, so the limit counts what is stored rather than
@@ -216,8 +225,9 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
   // dispatch below, and handed back with the question id. Minting it only once
   // a teacher accepted put a getQuestionStatus call — on a function that may be
   // cold — between "a teacher accepted" and the student connecting. The search
-  // gives up within a minute and a lesson is capped at 30, both well inside the
-  // token's 60. getQuestionStatus stays the fallback, so a failed mint costs
+  // gives up within ten minutes at most (see getSearchTimeoutSeconds) and a
+  // lesson is capped at 30, both inside the token's 60. getQuestionStatus stays
+  // the fallback, so a failed mint costs
   // that round trip back, never the question. A text question gets one too:
   // either side may switch the lesson to audio or video once it is running.
   const studentMedia: Promise<{ liveKitRoom: string; liveKitToken: string } | null> =
@@ -241,6 +251,7 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     status: "searching",
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
+    searchEndsAt: Timestamp.fromMillis(Date.now() + searchTimeoutSeconds * 1000),
     // Born claiming wave 1, because this function dispatches it below rather
     // than waiting for the onCreate trigger. The trigger sees the 1 and stands
     // down; if the dispatch throws we reset it to 0 and hand the question back.
@@ -294,7 +305,7 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     // landed, which would leave nobody to pick the question up. dispatchFirstWave
     // arms the watchdog itself, but it never got that far, so arm it here: a
     // question that no one recovers must still stop searching rather than hang.
-    await enqueueQuestionWatchdog(qid).catch((watchdogError) => {
+    await enqueueQuestionWatchdog(qid, question).catch((watchdogError) => {
       logger.error(`[questions] failed arming watchdog qid=${qid}`, watchdogError);
     });
   }
@@ -304,7 +315,14 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     getConnectionFeeCents(),
     studentMedia,
   ]);
-  return { questionId: qid, connectionFeeCents, ...(studentMediaCredentials ?? {}) };
+  // The app gives up on its side when the question's search ends, so it is
+  // told how long that is rather than keeping its own count.
+  return {
+    questionId: qid,
+    connectionFeeCents,
+    searchTimeoutSeconds,
+    ...(studentMediaCredentials ?? {}),
+  };
 });
 
 // ─── cancelQuestion ───────────────────────────────────────────────────────────
@@ -361,6 +379,76 @@ export const cancelQuestion = onCall(HOT_PATH, async (req) => {
 
   logger.info(`[questions] cancelled qid=${questionId} by student=${uid}`);
   return { success: true };
+});
+
+// ─── updateQuestion ───────────────────────────────────────────────────────────
+// The student fills in their question while the search runs: its subject, why
+// they are stuck, and how they would like to start. Each is optional, and only
+// a question still searching takes them — once a teacher has it, the lesson
+// is under way. See applyQuestionDetails in ./dispatch for what the teachers
+// holding it are shown, and who stops holding it.
+
+export const updateQuestion = onCall(HOT_PATH, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+
+  const { questionId, topic, struggle, conversationType } = req.data as {
+    questionId?: string;
+    topic?: string;
+    struggle?: string;
+    conversationType?: string;
+  };
+  if (!questionId) throw new HttpsError("invalid-argument", "questionId required");
+
+  const details: QuestionDetails = {};
+  if (topic !== undefined) {
+    if (!VALID_TOPICS.includes(topic)) {
+      throw new HttpsError("invalid-argument", `topic must be one of: ${VALID_TOPICS.join(", ")}`);
+    }
+    details.topic = topic;
+  }
+  if (struggle !== undefined) {
+    if (!QUESTION_STRUGGLES.includes(struggle as QuestionStruggle)) {
+      throw new HttpsError("invalid-argument", `struggle must be one of: ${QUESTION_STRUGGLES.join(", ")}`);
+    }
+    details.struggle = struggle as QuestionStruggle;
+  }
+  if (conversationType !== undefined) {
+    if (!CONVERSATION_TYPES.includes(conversationType as ConversationType)) {
+      throw new HttpsError(
+        "invalid-argument",
+        `conversationType must be one of: ${CONVERSATION_TYPES.join(", ")}`
+      );
+    }
+    details.conversationType = conversationType as ConversationType;
+  }
+  if (Object.keys(details).length === 0) {
+    throw new HttpsError("invalid-argument", "Nothing to update");
+  }
+
+  const qRef = firestore.collection("questions").doc(questionId);
+  const status = await firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(qRef);
+    if (!snap.exists) throw new HttpsError("not-found", "Question not found");
+
+    const data = snap.data() as QuestionDoc;
+    if (data.studentUid !== uid) throw new HttpsError("permission-denied", "Not your question");
+    if (data.status !== "searching") return data.status;
+
+    tx.update(qRef, { ...details, updatedAt: FieldValue.serverTimestamp() });
+    return data.status;
+  });
+
+  if (status !== "searching") {
+    logger.info(`[questions] updateQuestion skipped qid=${questionId} status=${status}`);
+    return { updated: false, status };
+  }
+
+  const { withdrawn, refilled } = await applyQuestionDetails(questionId, details);
+  logger.info(
+    `[questions] updateQuestion qid=${questionId} keys=${Object.keys(details).join(",")} withdrawn=${withdrawn.length} refilled=${refilled.length}`
+  );
+  return { updated: true, status };
 });
 
 // ─── acceptInvite ─────────────────────────────────────────────────────────────

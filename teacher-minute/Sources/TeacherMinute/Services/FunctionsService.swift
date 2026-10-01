@@ -132,6 +132,9 @@ struct CreateQuestionResult {
   /// Absent for a text question, and from a backend that predates this.
   let liveKitRoom: String?
   let liveKitToken: String?
+  /// How long the backend keeps the question searching, in seconds, from
+  /// `question_search_timeout_seconds`. Absent from a backend that predates it.
+  var searchTimeoutSeconds: Int? = nil
 }
 
 struct QuestionStatusResult {
@@ -321,7 +324,8 @@ final class FunctionsService {
     return CreateQuestionResult(
       questionId: questionId,
       liveKitRoom: result["liveKitRoom"] as? String,
-      liveKitToken: result["liveKitToken"] as? String
+      liveKitToken: result["liveKitToken"] as? String,
+      searchTimeoutSeconds: Self.intValue(result["searchTimeoutSeconds"])
     )
   }
 
@@ -357,6 +361,27 @@ final class FunctionsService {
 
   func cancelQuestion(questionId: String) async throws {
     _ = try await call(function: "cancelQuestion", data: ["questionId": questionId])
+  }
+
+  /// What the student adds to a question while it is still being offered:
+  /// its subject, why they are stuck, and how they would like to start. Only
+  /// the details passed are sent. False when a teacher already has the
+  /// question, which then keeps what it was asked with.
+  @discardableResult
+  func updateQuestion(
+    questionId: String,
+    topic: String? = nil,
+    struggle: String? = nil,
+    conversationType: String? = nil
+  ) async throws -> Bool {
+    var data: [String: Any] = ["questionId": questionId]
+    if let topic { data["topic"] = topic }
+    if let struggle { data["struggle"] = struggle }
+    if let conversationType { data["conversationType"] = conversationType }
+    let result = try await call(function: "updateQuestion", data: data)
+    return (result["updated"] as? Bool)
+      ?? (result["updated"] as? NSNumber)?.boolValue
+      ?? false
   }
 
   /// `comment` is the student's optional written feedback. The backend trims it

@@ -29,18 +29,18 @@ struct NotificationPermissionExplainerView: View {
                 .fill(theme.accentBackground)
                 .frame(width: 78, height: 78)
                 .overlay {
-                    PlatformIcon(systemName: "bell.badge.fill", size: 34, weight: .semibold, color: theme.accent)
+                    PlatformIcon(systemName: "bell.badge.fill", size: 34, weight: .semibold, color: theme.brandActionBackground)
                 }
-                .shadow(color: theme.accent.opacity(0.12), radius: 24, x: 0, y: 12)
 
             Text(viewModel.notificationExplainerTitle)
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(theme.primaryText)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(theme.onDarkFill)
+                .multilineTextAlignment(.center)
                 .padding(.top, 28)
 
             Text(viewModel.notificationExplainerText)
-                .font(.system(size: 14))
-                .foregroundStyle(theme.secondaryText)
+                .font(.system(size: 15))
+                .foregroundStyle(theme.brandSecondaryText)
                 .lineSpacing(6)
                 .multilineTextAlignment(.center)
                 .padding(.top, 12)
@@ -50,7 +50,6 @@ struct NotificationPermissionExplainerView: View {
 
             AuthPrimaryButton(
                 title: viewModel.enableNotificationsButtonLabel(isRequesting: isRequesting),
-                systemImage: "bell.fill",
                 isEnabled: !isRequesting
             ) {
                 Task { await enable() }
@@ -60,8 +59,8 @@ struct NotificationPermissionExplainerView: View {
                 onFinish()
             } label: {
                 Text(viewModel.notNowLabel)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.secondaryText)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(theme.brandActionBackground)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
@@ -70,7 +69,8 @@ struct NotificationPermissionExplainerView: View {
             .padding(.bottom, 24)
         }
         .padding(.horizontal, 24)
-        .background(Color(.systemBackground))
+        .screenGround()
+        .environment(\.colorScheme, .dark)
     }
 
     private func enable() async {

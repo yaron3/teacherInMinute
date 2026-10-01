@@ -167,7 +167,7 @@ final class AskQuestionFlowUITests: XCTestCase {
         // The side menu, which replaced the tab bar. A student's has no
         // Earnings section.
         openSideMenu()
-        for section in ["home", "lessons", "profile", "settings", "help"] {
+        for section in ["ask", "minutes", "activity", "profile", "settings", "help"] {
             XCTAssertTrue(
                 app.buttons["side_menu_item_\(section)"].exists,
                 "the \(section) section is missing from the side menu"
@@ -182,7 +182,7 @@ final class AskQuestionFlowUITests: XCTestCase {
             "the side menu's close button was never tappable"
         )
         XCTAssertTrue(
-            waitForDisappearance(app.buttons["side_menu_item_home"]),
+            waitForDisappearance(app.buttons["side_menu_item_ask"]),
             "the side menu did not close"
         )
     }
@@ -200,7 +200,7 @@ final class AskQuestionFlowUITests: XCTestCase {
             "the side-menu button was never tappable"
         )
         XCTAssertTrue(
-            app.buttons["side_menu_log_out"].waitForExistence(timeout: 10),
+            app.buttons["side_menu_close"].waitForExistence(timeout: 10),
             "the side menu did not open"
         )
     }

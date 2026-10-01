@@ -75,12 +75,15 @@ struct EmailRewardBanner: View {
             Task { await viewModel.resendTapped() }
           } label: {
             Text(viewModel.resendLabel)
-              .font(.system(size: 14, weight: .semibold))
-              .foregroundStyle(theme.accent)
+              .font(.system(size: 14, weight: .bold))
+              .foregroundStyle(theme.brandActionBackground)
               .frame(maxWidth: .infinity)
               .frame(height: 40)
-              .background(theme.cardBackground)
-              .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+              .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                  .stroke(theme.brandActionBackground, lineWidth: 1)
+              }
+              .tappableFrame()
           }
           .buttonStyle(.plain)
 
@@ -88,12 +91,12 @@ struct EmailRewardBanner: View {
             Task { await viewModel.checkVerificationTapped() }
           } label: {
             Text(viewModel.checkVerificationLabel)
-              .font(.system(size: 14, weight: .semibold))
-              .foregroundStyle(theme.onAccentText)
+              .font(.system(size: 14, weight: .bold))
+              .foregroundStyle(theme.onBrandAction)
               .frame(maxWidth: .infinity)
               .frame(height: 40)
-              .background(theme.accent)
-              .clipShape(RoundedRectangle(cornerRadius: flatRadiusSmall, style: .continuous))
+              .background(theme.brandActionBackground)
+              .clipShape(RoundedRectangle(cornerRadius: 8))
           }
           .buttonStyle(.plain)
         }

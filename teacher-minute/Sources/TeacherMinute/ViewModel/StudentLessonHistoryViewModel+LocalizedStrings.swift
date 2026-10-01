@@ -15,4 +15,20 @@ extension StudentLessonHistoryViewModel {
 
     /// Students see what a lesson cost them, teachers what they earned.
     var costLabel: String { LocalizationSupport.localized("Cost") }
+
+    // MARK: Instant Teacher's activity screen
+    var recentSessionsLabel: String { LocalizationSupport.localized("Recent sessions") }
+    var activityTitle: String { LocalizationSupport.localized("Activity") }
+    var activitySubtitle: String {
+        LocalizationSupport.localized("All your recent sessions, with learning time, teacher and quick access to continue learning.")
+    }
+    var completedStatLabel: String { LocalizationSupport.localized("Completed") }
+    var minutesStatLabel: String { LocalizationSupport.localized("Minutes") }
+    var teachersStatLabel: String { LocalizationSupport.localized("Teachers") }
+    var learnedMinutesText: String { LessonFormatting.minutesText(learnedMinutes) }
+
+    /// A lesson's length as it was billed, in whole minutes.
+    func minutesText(for lesson: LessonHistoryItem) -> String {
+        LessonFormatting.minutesText(LessonFormatting.billedMinutes(seconds: lesson.durationSeconds))
+    }
 }

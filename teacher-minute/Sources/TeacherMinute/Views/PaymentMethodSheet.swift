@@ -18,12 +18,13 @@ struct PaymentMethodSheet: View {
 
   @Environment(\.dismiss) var dismiss
 
+  /// On the brand's modal ground: only Instant Teacher's students buy minutes.
   var body: some View {
     VStack(spacing: 16) {
       Text(viewModel.choosePaymentMethodTitle)
-        .font(.headline)
-        .foregroundStyle(theme.primaryText)
-        .padding(.top, 20)
+        .font(.system(size: 20, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+        .padding(.top, 24)
 
       VStack(spacing: 12) {
         ForEach(methods, id: \.self) { method in
@@ -32,14 +33,21 @@ struct PaymentMethodSheet: View {
       }
       .padding(.horizontal, 20)
 
-      Button(viewModel.cancelLabel) {
+      Button {
         dismiss()
+      } label: {
+        Text(viewModel.cancelLabel)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(theme.brandActionBackground)
       }
-      .foregroundStyle(theme.secondaryText)
+      .buttonStyle(.plain)
       .padding(.top, 4)
 
       Spacer()
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(theme.brandModalBackground.ignoresSafeArea())
+    .environment(\.colorScheme, .dark)
     .presentationDetents([.medium])
   }
 

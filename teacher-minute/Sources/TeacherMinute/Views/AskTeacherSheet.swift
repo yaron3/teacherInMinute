@@ -856,7 +856,7 @@ struct AskTeacherSheet: View {
 }
 
 #if os(Android)
-private enum AndroidAskTeacherImagePickerBridge {
+enum AndroidAskTeacherImagePickerBridge {
   private static let managerClass = try! JClass(name: "teacher/minute/AndroidImagePickerManager")
   private static let pickImageBase64Method = managerClass.getStaticMethodID(
     name: "pickImageBase64",

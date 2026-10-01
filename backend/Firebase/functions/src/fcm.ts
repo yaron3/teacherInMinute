@@ -1,5 +1,6 @@
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
+import { ANY_TOPIC } from "./scoring";
 
 /** What FCM answers for a token that will never deliver again — the app was
  *  uninstalled, or the token was replaced. */
@@ -50,7 +51,9 @@ export async function sendInvitePush(params: {
     data: {
       type: "incoming_question",
       questionId,
-      topic,
+      // A question for any teacher has no topic to name in the notification,
+      // which then reads "<student> needs help".
+      topic: topic === ANY_TOPIC ? "" : topic,
       studentName,
       questionText: questionText.slice(0, 300),
       wave: String(wave),

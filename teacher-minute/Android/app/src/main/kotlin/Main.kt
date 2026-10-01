@@ -78,6 +78,10 @@ open class MainActivity: AppCompatActivity {
     private var onboardingBackCallback: OnBackPressedCallback? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        // The manifest's Theme.TeacherMinute.Launch only dresses the window
+        // Android shows while the app starts; the app itself runs in the plain
+        // theme, so the splash drawable never shows through behind it.
+        setTheme(androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar)
         super.onCreate(savedInstanceState)
         currentActivity = this
         logger.info("starting activity")
@@ -289,19 +293,24 @@ open class MainActivity: AppCompatActivity {
 @Composable
 internal fun SyncSystemBarsWithTheme() {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    // A screen drawn dark in both schemes asks for its own icons; see
+    // AndroidSystemBars.
+    val requested = AndroidSystemBars.requests.lastOrNull()
+    val darkStatusIcons = requested?.darkStatusBar ?: !dark
+    val darkNavigationIcons = requested?.darkNavigationBar ?: !dark
 
     val transparent = AndroidColor.TRANSPARENT
-    val style = if (dark) {
-        SystemBarStyle.dark(transparent)
-    } else {
+    fun style(darkIcons: Boolean) = if (darkIcons) {
         SystemBarStyle.light(transparent, transparent)
+    } else {
+        SystemBarStyle.dark(transparent)
     }
 
     val activity = LocalContext.current as? ComponentActivity
-    DisposableEffect(style) {
+    DisposableEffect(darkStatusIcons, darkNavigationIcons) {
         activity?.enableEdgeToEdge(
-            statusBarStyle = style,
-            navigationBarStyle = style
+            statusBarStyle = style(darkStatusIcons),
+            navigationBarStyle = style(darkNavigationIcons)
         )
         onDispose { }
     }

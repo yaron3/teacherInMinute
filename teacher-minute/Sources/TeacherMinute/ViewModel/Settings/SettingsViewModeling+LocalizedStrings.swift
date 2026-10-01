@@ -50,12 +50,6 @@ extension SettingsViewModeling {
     var noPaymentsTitle: String { LocalizationSupport.localized("No payments yet") }
     var noPaymentsSubtitle: String { LocalizationSupport.localized("Your lesson payments will appear here.") }
 
-    // MARK: Change password
-    var changePasswordIntroText: String {
-        LocalizationSupport.localized("Send a password reset email to the email address on this account.")
-    }
-    var sendResetEmailLabel: String { LocalizationSupport.localized("Send Reset Email") }
-
     // MARK: Notification preferences
     var systemPermissionSectionTitle: String { LocalizationSupport.localized("System Permission") }
     var pushNotificationsLabel: String { LocalizationSupport.localized("Push Notifications") }
@@ -67,19 +61,6 @@ extension SettingsViewModeling {
     }
     var generalAnnouncementsNotificationLabel: String {
         LocalizationSupport.localized("Notify me about general announcements")
-    }
-    var enableNotificationsLabel: String { LocalizationSupport.localized("Enable Notifications") }
-    var openSystemSettingsLabel: String { LocalizationSupport.localized("Open System Settings") }
-
-    // MARK: Media permissions
-    var mediaPermissionsSectionTitle: String { LocalizationSupport.localized("System Permissions") }
-    var microphonePermissionLabel: String { LocalizationSupport.localized("Microphone") }
-    var microphonePermissionCaption: String {
-        LocalizationSupport.localized("Required for audio and video sessions")
-    }
-    var cameraPermissionLabel: String { LocalizationSupport.localized("Camera") }
-    var cameraPermissionCaption: String {
-        LocalizationSupport.localized("Required for video sessions and taking photos")
     }
 
     // MARK: App preferences
@@ -109,6 +90,24 @@ extension SettingsViewModeling {
     var showProfileImageLabel: String { LocalizationSupport.localized("Show my profile image") }
     var allowMessagesOutsideCallsLabel: String {
         LocalizationSupport.localized("Allow incoming messages from a teacher while not in a call")
+    }
+
+    // MARK: The settings' pages
+    var settingsSubtitle: String {
+        LocalizationSupport.localized("Manage payments, preferences, notifications and device settings.")
+    }
+    var preferencesTitle: String { LocalizationSupport.localized("Preferences") }
+    var preferencesHeaderTitle: String { LocalizationSupport.localized("Settings: Preferences") }
+    var notificationsHeaderTitle: String { LocalizationSupport.localized("Settings: Notifications") }
+    var notificationsSubtitle: String {
+        LocalizationSupport.localized("Manage push notifications, system notifications and more settings.")
+    }
+    var backLabel: String { LocalizationSupport.localized("Back") }
+    var closeLabel: String { LocalizationSupport.localized("Close") }
+
+    /// A settings page's header, "Settings : About".
+    func settingsPageTitle(_ page: String) -> String {
+        String(format: LocalizationSupport.localized("Settings: %@"), page)
     }
 
     // MARK: Language

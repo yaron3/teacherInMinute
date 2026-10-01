@@ -27,150 +27,133 @@ struct TeacherIdentityVerificationView: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	ZStack {
-	  ScrollView {
-		VStack(alignment: .leading, spacing: 0) {
-		  Text(viewModel.stepIndicatorText)
-			.font(.system(size: 13, weight: .medium))
-			.foregroundStyle(theme.secondaryText)
-			.frame(maxWidth: .infinity)
-		  
+    // A plain stack around the page, which carries its modifiers; see
+    // `BrandTabScreen`.
+    ZStack {
+      BrandSubpage(
+        label: viewModel.stepIndicatorText,
+        title: viewModel.screenTitle,
+        backLabel: viewModel.onboardingBackLabel,
+        onBack: { OnboardingBackCoordinator.shared.handleBack() }
+      ) {
+        content
+      }
 
-		  
-//		  Text(LocalizationSupport.localized("To maintain a high-quality learning environment,\nwe need to verify your teaching credentials and\nidentity."))
-//			.font(.system(size: 13))
-//			.foregroundStyle(theme.secondaryText)
-//			.lineSpacing(5)
-//			.padding(.top, 8)
-		  
-		 // verificationStatus
-		//	.padding(.top, 20)
-		  
-		  sectionTitle(viewModel.governmentIDSectionTitle)
-			.padding(.top, 22)
-		  
-		  Text(RemoteConfigService.getLocalizedString(for: .teacherIdGovIdDescription, fallback: viewModel.governmentIDDescriptionFallback))
-			.font(.system(size: 11))
-			.foregroundStyle(theme.secondaryText)
-			.lineSpacing(4)
-			.padding(.top, 8)
-		  
-		  HStack(spacing: 12) {
-#if !os(Android)
-			let hasFront      = viewModel.hasGovernmentIDFront
-			let frontSpinning = viewModel.isUploading(for: .governmentIDFront)
-			PhotoSourceButton(viewModel: viewModel, onImageData: { data in
-			  viewModel.handlePickedImage(data, for: .governmentIDFront)
-			}) {
-			  IDUploadBox(
-				title: viewModel.frontSideLabel,
-				isCompleted: hasFront,
-				isUploading: frontSpinning,
-				isMandatory: false,
-				uploadingLabel: viewModel.uploadingLabel,
-				requiredLabel: viewModel.requiredLowercaseLabel,
-				action: {}
-			  )
-			}
-#else
-				Button {
-				  androidPickTarget = .governmentIDFront
-				  showAndroidPhotoSourceDialog = true
-				} label: {
-				  idFrontPickerLabel
-				}
-				.buttonStyle(.plain)
-#endif
-		  }
-		  .padding(.top, 12)
-		  
-		  privacyBox
-			.padding(.top, 24)
-		  
-		  termsCheckbox
-			.padding(.top, 22)
-		  
-		  if let err = viewModel.uploadError {
-			Text(err)
-			  .font(.system(size: 12))
-			  .foregroundStyle(.red)
-			  .padding(.top, 8)
-		  }
-		  
-		  // Hint when terms not accepted or front side missing
-		  if !viewModel.canSubmit && viewModel.uploadingTarget == nil {
-			Text(viewModel.submitBlockedHint)
-			.font(.system(size: 11))
-			.foregroundStyle(theme.primaryText)
-			.padding(.top, 8)
-		  }
-		  
-		  AuthPrimaryButton(
-			title: viewModel.submitForReviewLabel,
-			systemImage: "arrow.right",
-			isEnabled: viewModel.canSubmit
-		  ) {
-			Task { @MainActor in
-			  viewModel.submitForReview()
-			}
-		  }
-		  .padding(.top, 24)
-		  .padding(.bottom, 24)
-		  
-		  AuthPrimaryButton(
-			title: viewModel.continueUploadLaterLabel,
-			systemImage: "arrow.right",
-			isEnabled: true
-		  ) {
-			Task { @MainActor in
-			  viewModel.onSubmit?()
-			}
-		  }
-		  .padding(.top, 24)
-		}
-		.padding(.horizontal, 18)
-	  }
-	  .background(Color(.systemBackground))
-	  
-	  // Full-screen spinner while checking Firestore on appear
-	  if viewModel.isCheckingCompletion {
-		theme.scrim.opacity(0.25).ignoresSafeArea()
-		VStack(spacing: 14) {
-		  ProgressView()
-			.progressViewStyle(.circular)
-			.scaleEffect(1.8)
-			.tint(theme.primaryText)
-		  Text(viewModel.checkingLabel)
-			.font(.system(size: 14, weight: .medium))
-			.foregroundStyle(theme.primaryText)
-		}
-	  }
-	}
-	.navigationBarTitleDisplayMode(.inline)
-	.onboardingBackHandling(viewModel: viewModel)
-	.onAppear {
-	  viewModel.onSubmit = { router.push(.teacherSubjects) }
-	  viewModel.checkAndAutoAdvance()
-	}
-	.navigationTitle(viewModel.screenTitle)
+      // Full-screen spinner while checking Firestore on appear
+      if viewModel.isCheckingCompletion {
+        theme.brandScrim.opacity(0.4).ignoresSafeArea()
+        VStack(spacing: 14) {
+          ProgressView()
+            .progressViewStyle(.circular)
+            .scaleEffect(1.8)
+            .tint(theme.onDarkFill)
+          Text(viewModel.checkingLabel)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(theme.onDarkFill)
+        }
+      }
+    }
+    .environment(\.colorScheme, .dark)
+    .onboardingBackHandling(viewModel: viewModel)
+    .toolbar(.hidden, for: .navigationBar)
+    .onAppear {
+      viewModel.onSubmit = { router.push(.teacherSubjects) }
+      viewModel.checkAndAutoAdvance()
+    }
 #if os(Android)
-	.confirmationDialog(
-	  viewModel.addPhotoDialogTitle,
-	  isPresented: $showAndroidPhotoSourceDialog,
-	  titleVisibility: .visible
-	) {
-	  Button(viewModel.takePhotoLabel) {
-		pickAndUploadAndroidImage(for: androidPickTarget, source: .camera)
-	  }
-	  Button(viewModel.chooseFromLibraryLabel) {
-		pickAndUploadAndroidImage(for: androidPickTarget, source: .gallery)
-	  }
-	  Button(viewModel.cancelLabel, role: .cancel) {}
-	}
+    // The brand's dialog, as iOS's photo chooser is.
+    .appDialog(
+      viewModel.addPhotoDialogTitle,
+      isPresented: $showAndroidPhotoSourceDialog,
+      actions: [
+        AppDialogAction(viewModel.takePhotoLabel) {
+          pickAndUploadAndroidImage(for: androidPickTarget, source: .camera)
+        },
+        AppDialogAction(viewModel.chooseFromLibraryLabel) {
+          pickAndUploadAndroidImage(for: androidPickTarget, source: .gallery)
+        },
+        AppDialogAction(viewModel.cancelLabel, kind: .cancel)
+      ]
+    )
 #endif
-	.trackScreen(AnalyticsScreen.teacherIdentity)
+    .trackScreen(AnalyticsScreen.teacherIdentity)
   }
-  
+
+  // Split out of `body`, which the type checker would otherwise have to solve
+  // in one piece.
+  @ViewBuilder
+  var content: some View {
+    BrandPageHero(title: viewModel.screenTitle)
+
+    VStack(alignment: .leading, spacing: 12) {
+      sectionTitle(viewModel.governmentIDSectionTitle)
+
+      Text(RemoteConfigService.getLocalizedString(for: .teacherIdGovIdDescription, fallback: viewModel.governmentIDDescriptionFallback))
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
+        .lineSpacing(4)
+        .fixedSize(horizontal: false, vertical: true)
+
+#if !os(Android)
+      PhotoSourceButton(viewModel: viewModel, onImageData: { data in
+        viewModel.handlePickedImage(data, for: .governmentIDFront)
+      }) {
+        IDUploadBox(
+          title: viewModel.frontSideLabel,
+          isCompleted: viewModel.hasGovernmentIDFront,
+          isUploading: viewModel.isUploading(for: .governmentIDFront),
+          isMandatory: false,
+          uploadingLabel: viewModel.uploadingLabel,
+          requiredLabel: viewModel.requiredLowercaseLabel,
+          action: {}
+        )
+      }
+#else
+      Button {
+        androidPickTarget = .governmentIDFront
+        showAndroidPhotoSourceDialog = true
+      } label: {
+        idFrontPickerLabel
+      }
+      .buttonStyle(.plain)
+#endif
+    }
+    .brandCard()
+
+    privacyBox
+
+    termsCheckbox
+
+    if let err = viewModel.uploadError {
+      Text(err)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.danger)
+    }
+
+    // Hint when terms not accepted or front side missing
+    if !viewModel.canSubmit && viewModel.uploadingTarget == nil {
+      Text(viewModel.submitBlockedHint)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
+    }
+
+    AuthPrimaryButton(
+      title: viewModel.submitForReviewLabel,
+      isEnabled: viewModel.canSubmit
+    ) {
+      Task { @MainActor in
+        viewModel.submitForReview()
+      }
+    }
+    .padding(.top, 8)
+
+    BrandSecondaryButton(title: viewModel.continueUploadLaterLabel) {
+      Task { @MainActor in
+        viewModel.onSubmit?()
+      }
+    }
+  }
+
   // MARK: - Picker label helpers (Android / preview)
   var credentialsPickerLabel: some View {
 	UploadLargeBox(
@@ -280,52 +263,47 @@ struct TeacherIdentityVerificationView: View {
   }
   
   var privacyBox: some View {
-	HStack(alignment: .top, spacing: 12) {
-	  PlatformIcon(
-		systemName: "shield.lefthalf.filled",
-		size: 18,
-		weight: .semibold,
-		color: theme.accent
-	  )
-	  VStack(alignment: .leading, spacing: 6) {
-		Text(viewModel.privacyTitle)
-		  .font(.system(size: 13, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-		Text(viewModel.privacyText)
-		  .font(.system(size: 11))
-		  .foregroundStyle(theme.secondaryText)
-		  .lineSpacing(4)
-	  }
-	  Spacer()
-	}
-	.padding(16)
-	.background(theme.accentBackground.opacity(0.45))
-	.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    HStack(alignment: .top, spacing: 8) {
+      // The artwork is drawn for the settings rows' 40pt box, padding and all.
+      Image("brand-settings-privacy", bundle: .module)
+        .renderingMode(.template)
+        .resizable()
+        .foregroundStyle(theme.brandActionBackground)
+        .frame(width: 40, height: 40)
+        // Level with the title's line rather than below it.
+        .offset(y: -10)
+      VStack(alignment: .leading, spacing: 6) {
+        Text(viewModel.privacyTitle)
+          .font(.system(size: 15, weight: .bold))
+          .foregroundStyle(theme.onDarkFill)
+        Text(viewModel.privacyText)
+          .font(.system(size: 13))
+          .foregroundStyle(theme.brandSecondaryText)
+          .lineSpacing(4)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .brandCard()
   }
   
+  /// The sentence, then its box at the far end, as the sign-up's consents.
   var termsCheckbox: some View {
-	Button {
-	  viewModel.acceptedTerms.toggle()
-	} label: {
-	  HStack(alignment: .top, spacing: 10) {
-		PlatformIcon(systemName: viewModel.acceptedTerms ? "checkmark.square.fill" : "square")
-		  .font(.system(size: 18))
-		  .foregroundStyle(viewModel.acceptedTerms ? theme.accent : theme.secondaryText)
-		Text(viewModel.confirmDocumentsText)
-		  .font(.system(size: 11))
-		  .foregroundStyle(theme.secondaryText)
-		  .lineSpacing(4)
-		  .multilineTextAlignment(.leading)
-		Spacer()
-	  }
-	}
-	.buttonStyle(.plain)
+    HStack(alignment: .top, spacing: 8) {
+      Text(viewModel.confirmDocumentsText)
+        .font(.system(size: 13))
+        .foregroundStyle(theme.brandSecondaryText)
+        .lineSpacing(3)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      BrandCheckbox(isOn: $viewModel.acceptedTerms)
+    }
   }
-  
+
   func sectionTitle(_ title: String) -> some View {
-	Text(title)
-	  .font(.system(size: 15, weight: .bold))
-	  .foregroundStyle(theme.primaryText)
+    Text(title)
+      .font(.system(size: 17, weight: .bold))
+      .foregroundStyle(theme.onDarkFill)
   }
 }
 

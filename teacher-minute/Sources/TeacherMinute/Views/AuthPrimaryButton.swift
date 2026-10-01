@@ -4,172 +4,128 @@
 //
 //  Created by Yaron Jackoby on 06/05/2026.
 //
-
+//  The form controls of the sign-in and onboarding steps, in the brand's
+//  style: the call to action, the field, the header icon and the subject
+//  chip.
+//
 
 import SwiftUI
 
+/// The brand's call to action.
 struct AuthPrimaryButton: View {
-    let title: String
-    var systemImage: String?
-    var isEnabled = true
-    let action: @MainActor () -> Void
+  let title: String
+  var isEnabled = true
+  let action: @MainActor () -> Void
 
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Text(title)
-
-                if let systemImage {
-				  PlatformIcon(systemName: systemImage, size: 20, weight: .bold , color: isEnabled ? theme.onAccentText : theme.secondaryText)
-                }
-            }
-            .font(.system(size: 17, weight: .bold))
-            // Disabled drops the accent fill for a pale card, which the
-            // on-accent colour is not readable against.
-            .foregroundStyle(isEnabled ? theme.onAccentText : theme.secondaryText)
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(isEnabled ? theme.accent : theme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
+  var body: some View {
+    BrandPrimaryButton(title: title, isEnabled: isEnabled) {
+      action()
     }
+  }
 }
 
+/// The icon at the top of a form step, in a tinted square.
 struct AuthIconHeader: View {
-    let systemImage: String
+  let systemImage: String
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
+    AppTheme(colorScheme: colorScheme)
   }
-    var body: some View {
-        RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-            .fill(theme.cardBackground)
-            .frame(width: 56, height: 56)
-            .overlay {
-                PlatformIcon(systemName: systemImage, size: 26, weight: .semibold, color: theme.primaryText)
-            }
-    }
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: 12)
+      .fill(theme.brandActionBackground.opacity(0.12))
+      .frame(width: 56, height: 56)
+      .overlay {
+        RoundedRectangle(cornerRadius: 12)
+          .stroke(theme.brandControlBorder, lineWidth: 1)
+      }
+      .overlay {
+        PlatformIcon(systemName: systemImage, size: 26, weight: .semibold, color: theme.brandActionBackground)
+      }
+  }
 }
 
+/// A labelled field: the brand's, with its icon where it has one.
 struct AuthInputField: View {
-    let title: String
-    let placeholder: String
-    let systemImage: String
-    @Binding var text: String
+  let title: String
+  let placeholder: String
+  let systemImage: String
+  @Binding var text: String
 
-    var keyboardType: UIKeyboardType = .default
-    var textContentType: UITextContentType?
-    var autocapitalization: TextInputAutocapitalization = .never
-    /// False draws the field in the danger colour and shows `errorMessage`
-    /// under it. Callers own the wording and decide when to start complaining —
-    /// typically only once the field is non-empty, so it stays quiet while the
-    /// number is still being typed.
-    var isValid = true
-    var errorMessage: String?
-  @Environment(\.colorScheme) var colorScheme
-  @Environment(\.layoutDirection) var layoutDirection
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
+  var keyboardType: UIKeyboardType = .default
+  var textContentType: UITextContentType?
+  var autocapitalization: TextInputAutocapitalization = .never
+  /// False draws the field in the danger colour and shows `errorMessage`
+  /// under it. Callers own the wording and decide when to start complaining —
+  /// typically only once the field is non-empty, so it stays quiet while the
+  /// number is still being typed.
+  var isValid = true
+  var errorMessage: String?
+
+  var body: some View {
+    BrandTextField(
+      title: title,
+      placeholder: placeholder,
+      text: $text,
+      icon: brandIcon,
+      isValid: isValid,
+      errorMessage: errorMessage ?? "",
+      keyboardType: keyboardType,
+      textContentType: textContentType,
+      autocapitalization: autocapitalization
+    )
   }
-  var contentAlignment: HorizontalAlignment {
-    layoutDirection == .rightToLeft ? .trailing : .leading
+
+  /// The brand's icon for the field's symbol. The brand draws no others.
+  var brandIcon: String? {
+    switch systemImage {
+    case "person", "person.fill": "brand-user"
+    case "phone", "phone.fill": "brand-phone"
+    case "lock", "lock.fill": "brand-lock"
+    default: nil
+    }
   }
-  var textAlignment: TextAlignment {
-    layoutDirection == .rightToLeft ? .trailing : .leading
-  }
-    var body: some View {
-	  VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(theme.primaryText)
-
-            HStack(spacing: 12) {
-                if layoutDirection == .leftToRight {
-                    fieldIcon
-                    inputField
-                } else {
-                    inputField
-                    fieldIcon
-                }
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 56)
-            .background(
-                RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-                    .fill(theme.cardBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: flatRadius, style: .continuous)
-                            .stroke(theme.danger.opacity(isValid ? 0 : 0.5), lineWidth: 1.5)
-                    )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: flatRadius, style: .continuous))
-
-            if !isValid, let errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 11))
-                    .foregroundStyle(theme.danger)
-                    .padding(.horizontal, 4)
-            }
-        }
-    }
-
-    var fieldIcon: some View {
-        PlatformIcon(systemName: systemImage)
-            .font(.system(size: 18))
-            .foregroundStyle(isValid ? theme.secondaryText : theme.danger.opacity(0.8))
-    }
-
-    var inputField: some View {
-        TextField(placeholder, text: $text)
-            .textFieldStyle(.plain)
-            .font(.system(size: 17))
-            .foregroundStyle(theme.primaryText)
-            .keyboardType(keyboardType)
-            .textContentType(textContentType)
-            .textInputAutocapitalization(autocapitalization)
-            .autocorrectionDisabled()
-            .multilineTextAlignment(textAlignment)
-            .tint(theme.accent)
-    }
 }
 
+/// A subject to teach: outlined, or filled cyan when chosen.
 struct SubjectChip: View {
-    let subject: SubjectOption
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
+  let subject: SubjectOption
+  let title: String
+  let isSelected: Bool
+  let action: () -> Void
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
+    AppTheme(colorScheme: colorScheme)
   }
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                PlatformIcon(systemName: subject.systemImage, size: 14, weight: .semibold)
 
-                Text(title)
-                    .font(.system(size: 15, weight: .medium))
-            }
-            // Selected chips fill with ink, so the label has to invert.
-            .foregroundStyle(isSelected ? theme.onAccentText : theme.primaryText)
-            .padding(.horizontal, 14)
-            .frame(height: 36)
-            .background(isSelected ? theme.accent : theme.screenBackground)
-            .clipShape(Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(isSelected ? theme.accent : theme.separator, lineWidth: flatHairline)
-            }
-        }
-        .buttonStyle(.plain)
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 7) {
+        PlatformIcon(
+          systemName: subject.systemImage,
+          size: 14,
+          weight: .semibold,
+          color: isSelected ? theme.onBrandAction : theme.brandActionBackground
+        )
+
+        Text(title)
+          .font(.system(size: 15, weight: .medium))
+      }
+      .foregroundStyle(isSelected ? theme.onBrandAction : theme.onDarkFill)
+      .padding(.horizontal, 14)
+      .frame(height: 36)
+      .background(isSelected ? theme.brandActionBackground : theme.brandCardSurface)
+      .clipShape(Capsule())
+      .overlay {
+        Capsule()
+          .stroke(isSelected ? theme.brandActionBackground : theme.brandControlBorder, lineWidth: flatHairline)
+      }
     }
+    .buttonStyle(.plain)
+  }
 }
+
 #if os(iOS)
 #Preview {
   SubjectChip(subject: SubjectOption(title: "test", systemImage: "test"),

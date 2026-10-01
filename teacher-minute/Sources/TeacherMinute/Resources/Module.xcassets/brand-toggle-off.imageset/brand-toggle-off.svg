@@ -1,0 +1,7 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="48" height="28" viewBox="0 0 48 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Toggle / Permission">
+<rect x="0.5" y="0.5" width="47" height="27" rx="13.5" fill="black" fill-opacity="0.2"/>
+<rect x="0.5" y="0.5" width="47" height="27" rx="13.5" stroke="#54E8F6"/>
+<circle id="Thumb" cx="14" cy="14" r="9.5" fill="#54E8F6" fill-opacity="0.24" stroke="#4C4986"/>
+</g>
+</svg>

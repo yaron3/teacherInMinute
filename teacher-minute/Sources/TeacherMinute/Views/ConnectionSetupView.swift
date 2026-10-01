@@ -112,13 +112,10 @@ struct ConnectionSetupView: View {
       .padding(.bottom, 36)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(
-      LinearGradient(
-        colors: [theme.cardBackground, theme.accentBackground, theme.cardBackground],
-        startPoint: .top,
-        endPoint: .bottom
-      )
-    )
+    // The brand's ground, with the streaks the student's home has.
+    .background {
+      BrandScreenBackground(streaks: .home)
+    }
   }
 
   var timeoutOverlay: some View {

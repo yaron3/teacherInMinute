@@ -18,16 +18,30 @@ struct StudentHomeView: View {
   @State var showsAskTeacher = false
   @State var showsNotificationExplainer = false
   @State var pendingCheckoutOption: PricingOption?
+  /// The package chooser is up, from the home's "Load minutes". Picking a
+  /// package sets `pendingCheckoutOption`, and the same sheet moves on to
+  /// paying for it.
+  @State var isChoosingMinutesPackage = false
+  /// Buying minutes, over the home (`MinutesPurchaseView`).
+  @State var showsPurchaseScreen = false
+  /// Raised by the menu's Minutes, and cleared here as the purchase screen
+  /// opens for it.
+  @Binding var purchaseScreenRequested: Bool
   @State var emailReward = EmailRewardViewModel()
   @Environment(\.openURL) var openURL
+  @Environment(\.appRouter) var router
   @Environment(\.scenePhase) var scenePhase
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
-  init(viewModel: any StudentHomeViewModeling = StudentHomeViewModel()) {
+  init(
+	viewModel: any StudentHomeViewModeling = StudentHomeViewModel(),
+	purchaseScreenRequested: Binding<Bool> = .constant(false)
+  ) {
 	self._viewModel = State(initialValue: viewModel)
+	self._purchaseScreenRequested = purchaseScreenRequested
   }
 
   var body: some View {
@@ -57,18 +71,35 @@ struct StudentHomeView: View {
 	.task {
 	  await viewModel.loadProfileIfNeeded()
 	}
-	.sheet(isPresented: isChoosingPaymentMethod) {
-	  if let option = pendingCheckoutOption {
-		PaymentMethodSheet(
-		  viewModel: viewModel,
-		  methods: viewModel.supportedPaymentMethods(for: option),
-		  theme: theme,
-		  savedPayPalEmail: viewModel.savedPayPalEmail
-		) { method in
-		  pendingCheckoutOption = nil
-		  Task { await viewModel.checkout(option, method: method) }
+	// One sheet for both steps of a purchase, as in a lesson: picking a
+	// package swaps the content rather than dismissing and presenting again.
+	.sheet(isPresented: isBuyingMinutes) {
+	  // A sheet starts from the system's direction, not the app's.
+	  Group {
+		if let option = pendingCheckoutOption {
+		  PaymentMethodSheet(
+			viewModel: viewModel,
+			methods: viewModel.supportedPaymentMethods(for: option),
+			theme: theme,
+			savedPayPalEmail: viewModel.savedPayPalEmail
+		  ) { method in
+			pendingCheckoutOption = nil
+			isChoosingMinutesPackage = false
+			Task { await viewModel.checkout(option, method: method) }
+		  }
+		} else {
+		  MinutesPackageSheet(
+			viewModel: viewModel,
+			options: viewModel.pricingOptions,
+			theme: theme
+		  ) { option in
+			viewModel.selectTier(option)
+			pendingCheckoutOption = option
+		  }
 		}
 	  }
+	  .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
+	  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
 	}
   }
 
@@ -129,18 +160,44 @@ struct StudentHomeView: View {
 	  showingCouponAlert = viewModel.handleCouponStateChange()
 	}
 	.onChange(of: viewModel.purchaseSummary?.id) { _, id in
-	  showingPurchaseSummaryAlert = id != nil
+	  // The purchase screen confirms its own purchases, in full.
+	  showingPurchaseSummaryAlert = id != nil && !showsPurchaseScreen
+	}
+	// The menu's Minutes: on Home already, or Home opening for it.
+	.onAppear { openRequestedPurchaseScreen() }
+	.onChange(of: purchaseScreenRequested) { _, _ in
+	  openRequestedPurchaseScreen()
 	}
   }
 
   var homeLayers: some View {
 	ZStack {
-	  homeScroll
+	  StudentQuestionHomeView(
+		viewModel: viewModel,
+		mayAskTeacher: mayAskTeacher,
+		onLoadMinutes: loadMinutesTapped,
+		isCovered: showsPurchaseScreen
+	  )
+
+	  if showsPurchaseScreen {
+		MinutesPurchaseView(viewModel: viewModel) {
+		  showsPurchaseScreen = false
+		}
+		// Under the checkout spinner, the search's error and the payment
+		// dialogs, which all have to show over it.
+		.zIndex(4)
+	  }
 
 	  searchStateOverlay
+		.zIndex(6)
 
 	  checkoutPreparingOverlay
 		.zIndex(5)
+
+	  if showingLowBalanceAlert {
+		notEnoughMinutesPrompt
+		  .zIndex(8)
+	  }
 
 #if os(Android)
 	  if let result = viewModel.paymentReturnResult {
@@ -150,12 +207,6 @@ struct StudentHomeView: View {
 	  }
 #endif
 	}
-	.appDialog(
-	  viewModel.lowBalanceAlertTitle,
-	  isPresented: $showingLowBalanceAlert,
-	  message: viewModel.lowBalanceMessage,
-	  actions: [AppDialogAction(viewModel.okLabel)]
-	)
 	.emailRewardDialogs(emailReward)
 	.appDialog(
 	  viewModel.balanceLoadingTitle,
@@ -258,9 +309,9 @@ struct StudentHomeView: View {
   var studentHero: some View {
     VStack(spacing: 0) {
       HStack(spacing: 12) {
-		SideMenuButton(size: 40)
+		BrandMenuButton()
 
-		Image("sqaure-logo", bundle: .module)
+		Image("brand-logo", bundle: .module)
 		  .resizable()
 		  .scaledToFit()
 		  .frame(width: 24, height: 24)
@@ -371,13 +422,64 @@ struct StudentHomeView: View {
   /// everyone, and telling a student with minutes to go and buy more is worse
   /// than asking them to wait a moment.
   func askTeacherTapped() {
+    if mayAskTeacher() {
+      showsAskTeacher = true
+    }
+  }
+
+  /// Whether a question may go out now, raising the alert that says why not
+  /// when it may not.
+  func mayAskTeacher() -> Bool {
     if !viewModel.isProfileLoaded {
       showingBalanceLoadingAlert = true
-    } else if viewModel.canAskTeacher {
-      showsAskTeacher = true
-    } else {
-      showingLowBalanceAlert = true
+      return false
     }
+    if !viewModel.canAskTeacher {
+      showingLowBalanceAlert = true
+      return false
+    }
+    return true
+  }
+
+  /// Out of minutes: an anonymous student is offered an account, which
+  /// brings free minutes with it; anyone else, the packages.
+  var notEnoughMinutesPrompt: some View {
+	NotEnoughMinutesPrompt(
+	  viewModel: viewModel,
+	  onPrimary: {
+		showingLowBalanceAlert = false
+		switch viewModel.notEnoughMinutesPrimaryTapped() {
+		case .createAccount:
+		  router.startRegistration()
+		case .buyMinutes:
+		  loadMinutesTapped()
+		}
+	  },
+	  onDismiss: {
+		viewModel.notEnoughMinutesDismissed()
+		showingLowBalanceAlert = false
+	  }
+	)
+  }
+
+  /// The purchase screen the menu's Minutes asked for, as "Load minutes"
+  /// opens it.
+  func openRequestedPurchaseScreen() {
+	guard purchaseScreenRequested else { return }
+	purchaseScreenRequested = false
+	loadMinutesTapped()
+  }
+
+  /// "Load minutes" and "Buy minutes": the purchase screen. The payment
+  /// options are settled first, behind the spinner, so it opens complete
+  /// rather than filling in a method at a time.
+  func loadMinutesTapped() {
+	guard !viewModel.isPreparingCheckout else { return }
+	Task { @MainActor in
+	  await viewModel.preparePaymentOptions()
+	  showsPurchaseScreen = !viewModel.pricingOptions.isEmpty
+	  viewModel.isPreparingCheckout = false
+	}
   }
 
   var heroAskTeacherButtonContent: some View {
@@ -963,12 +1065,15 @@ struct StudentHomeView: View {
 	}
   }
 
-  var isChoosingPaymentMethod: Binding<Bool> {
+  var isBuyingMinutes: Binding<Bool> {
 	Binding(
-	  get: { pendingCheckoutOption != nil },
+	  get: { pendingCheckoutOption != nil || isChoosingMinutesPackage },
 	  set: { isPresented in
+		// Closing the sheet abandons the whole purchase, including a package
+		// chosen a moment ago.
 		if !isPresented {
 		  pendingCheckoutOption = nil
+		  isChoosingMinutesPackage = false
 		}
 	  }
 	)
@@ -1018,12 +1123,9 @@ struct StudentHomeView: View {
         onDismiss: { viewModel.resetSearch() }
       )
     case .searching:
-      SearchingOverlay(
-        searchingTitle: viewModel.searchingTitle,
-        searchingSubtitle: viewModel.searchingSubtitle,
-        cancelLabel: viewModel.cancelLabel,
-        onCancel: { Task { await viewModel.cancelSearch() } }
-      )
+      SearchDetailsView(viewModel: viewModel) {
+        Task { await viewModel.cancelSearch() }
+      }
     case .matched:
       // The matched lesson is pushed instead — see `liveSessionScreen`.
       EmptyView()
@@ -1224,147 +1326,6 @@ enum ConversationTypeChipAccent {
 
 // MARK: - State Overlays
 
-struct SearchingOverlay: View {
-  let searchingTitle: String
-  let searchingSubtitle: String
-  let cancelLabel: String
-  let avatarURLs: [URL?]
-  let onCancel: @MainActor @Sendable () -> Void
-
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-	AppTheme(colorScheme: colorScheme)
-  }
-  
-  @State  var ringRotation = 0.0
-  @State  var cycleIndex = 0
-  
-  private let slotCount = 6
-  private let ringDiameter: CGFloat = 240
-  private let avatarSize: CGFloat = 60
-  
-  init(searchingTitle: String, searchingSubtitle: String, cancelLabel: String, avatarURLs: [URL?] = [], onCancel: @escaping @MainActor @Sendable () -> Void) {
-	self.searchingTitle = searchingTitle
-	self.searchingSubtitle = searchingSubtitle
-	self.cancelLabel = cancelLabel
-	self.avatarURLs = avatarURLs
-	self.onCancel = onCancel
-  }
-  
-  var body: some View {
-	ZStack {
-	  theme.screenBackground.ignoresSafeArea()
-	  
-	  VStack(spacing: 28) {
-		avatarRing
-		
-		VStack(spacing: 8) {
-		  Text(searchingTitle)
-			.font(.system(size: 17, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
-		  Text(searchingSubtitle)
-			.font(.system(size: 13))
-			.foregroundStyle(theme.secondaryText)
-			.multilineTextAlignment(.center)
-		}
-		
-		Button(action: onCancel) {
-		  Text(cancelLabel)
-			.font(.system(size: 14, weight: .semibold))
-			.foregroundStyle(theme.primaryText)
-			.padding(.horizontal, 32)
-			.padding(.vertical, 12)
-			.background(theme.cardBackground)
-			.clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-			.overlay {
-			  RoundedRectangle(cornerRadius: 10, style: .continuous)
-				.stroke(theme.controlBorder, lineWidth: 1)
-			}
-		}
-		.buttonStyle(.plain)
-	  }
-	  .padding(32)
-	}
-	.task {
-	  withAnimation(.linear(duration: 18).repeatForever(autoreverses: false)) {
-		ringRotation = 360
-	  }
-	  while !Task.isCancelled {
-		try? await Task.sleep(nanoseconds: 1_400_000_000)
-		cycleIndex += 1
-	  }
-	}
-  }
-  
-  private var avatarRing: some View {
-	ZStack {
-	  Circle()
-		.stroke(theme.accent.opacity(0.18), lineWidth: 1.5)
-		.frame(width: ringDiameter, height: ringDiameter)
-	  
-	  Circle()
-		.fill(theme.accent.opacity(0.08))
-		.frame(width: ringDiameter * 0.45, height: ringDiameter * 0.45)
-	  
-	  ForEach(0..<slotCount, id: \.self) { index in
-		avatarSlot(index: index)
-	  }
-	  .rotationEffect(.degrees(ringRotation))
-	}
-	.frame(width: ringDiameter, height: ringDiameter)
-  }
-  
-  @ViewBuilder
-  private func avatarSlot(index: Int) -> some View {
-	let angle = (Double(index) / Double(slotCount)) * 360.0 - 90.0
-	let radius = (ringDiameter - avatarSize) / 2
-	let x = cos(angle * .pi / 180) * Double(radius)
-	let y = sin(angle * .pi / 180) * Double(radius)
-	
-	avatarImage(for: index)
-	  .frame(width: avatarSize, height: avatarSize)
-	  .clipShape(Circle())
-	  .overlay {
-		Circle().stroke(theme.cardBackground, lineWidth: 3)
-	  }
-	  .shadow(color: theme.cardShadow.opacity(0.10), radius: 6, x: 0, y: 3)
-	  .rotationEffect(.degrees(-ringRotation))
-	  .offset(x: CGFloat(x), y: CGFloat(y))
-  }
-  
-  @ViewBuilder
-  private func avatarImage(for index: Int) -> some View {
-	if let url = currentURL(for: index) {
-	  AsyncImage(url: url) { image in
-		image
-		  .resizable()
-		  .scaledToFill()
-	  } placeholder: {
-		placeholderAvatar
-	  }
-	} else {
-	  placeholderAvatar
-	}
-  }
-  
-  private var placeholderAvatar: some View {
-	ZStack {
-	  Circle().fill(theme.accentBackground)
-	  PlatformIcon(
-		systemName: "person.crop.circle.fill",
-		size: avatarSize * 0.9,
-		color: theme.accentStrong
-	  )
-	}
-  }
-  
-  private func currentURL(for index: Int) -> URL? {
-	guard !avatarURLs.isEmpty else { return nil }
-	let urlIndex = (cycleIndex + index) % avatarURLs.count
-	return avatarURLs[urlIndex]
-  }
-}
-
 struct MatchedOverlay: View {
   let teacherFoundTitle: String
   let sessionReadyText: String
@@ -1428,47 +1389,12 @@ struct NoMatchOverlay: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	ZStack {
-	  theme.scrim.opacity(0.6).ignoresSafeArea()
-	  
-	  VStack(spacing: 20) {
-		Circle()
-		  .fill(theme.cardBackground)
-		  .frame(width: 80, height: 80)
-		  .overlay {
-			PlatformIcon(
-			  systemName: "person.slash.fill",
-			  size: 36,
-			  color: theme.secondaryText
-			)
-		  }
-		
-		Text(title)
-		  .font(.system(size: 20, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-
-		Text(message)
-		  .font(.system(size: 13))
-		  .foregroundStyle(theme.secondaryText)
-		  .multilineTextAlignment(.center)
-
-		Button(action: onDismiss) {
-		  Text(okLabel)
-			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.onAccentText)
-			.frame(maxWidth: .infinity)
-			.frame(height: 48)
-			.background(theme.accent)
-			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-		}
-		.buttonStyle(.plain)
-		.padding(.horizontal, 32)
+	BrandModal {
+	  BrandModalBadge(systemName: "person.slash.fill")
+	  BrandModalText(title: title, message: message)
+	  BrandPrimaryButton(title: okLabel) {
+		onDismiss()
 	  }
-	  .padding(28)
-	  .frame(maxWidth: 340)
-	  .background(theme.cardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-	  .padding(.horizontal, 24)
 	}
   }
 }
@@ -1483,47 +1409,12 @@ struct ErrorOverlay: View {
 	AppTheme(colorScheme: colorScheme)
   }
   var body: some View {
-	ZStack {
-	  theme.scrim.opacity(0.6).ignoresSafeArea()
-	  
-	  VStack(spacing: 20) {
-		Circle()
-		  .fill(theme.accent.opacity(0.18))
-		  .frame(width: 80, height: 80)
-		  .overlay {
-			PlatformIcon(
-			  systemName: "exclamationmark.triangle.fill",
-			  size: 34,
-			  color: theme.accent
-			)
-		  }
-		
-		Text(title)
-		  .font(.system(size: 20, weight: .bold))
-		  .foregroundStyle(theme.primaryText)
-
-		Text(message)
-		  .font(.system(size: 13))
-		  .foregroundStyle(theme.secondaryText)
-		  .multilineTextAlignment(.center)
-
-		Button(action: onDismiss) {
-		  Text(okLabel)
-			.font(.system(size: 15, weight: .semibold))
-			.foregroundStyle(theme.onAccentText)
-			.frame(maxWidth: .infinity)
-			.frame(height: 48)
-			.background(theme.accent)
-			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-		}
-		.buttonStyle(.plain)
-		.padding(.horizontal, 32)
+	BrandModal {
+	  BrandModalBadge(systemName: "exclamationmark.triangle.fill")
+	  BrandModalText(title: title, message: message)
+	  BrandPrimaryButton(title: okLabel) {
+		onDismiss()
 	  }
-	  .padding(28)
-	  .frame(maxWidth: 340)
-	  .background(theme.cardBackground)
-	  .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-	  .padding(.horizontal, 24)
 	}
   }
 }

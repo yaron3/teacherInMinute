@@ -32,6 +32,15 @@ struct StudentLiveSessionDestination {
   let liveKitToken: String
 }
 
+/// Details chosen on the search's screens that the backend has not been sent.
+private struct UnsentSearchDetails {
+  var topic: String?
+  var struggle: String?
+  var conversationType: String?
+
+  var isEmpty: Bool { topic == nil && struggle == nil && conversationType == nil }
+}
+
 // MARK: - Supporting Models
 
 /// Pricing tier type. Firestore stores the raw string in the `type` field.
@@ -125,11 +134,15 @@ struct PurchaseSummary {
   let packageName: String
   let priceText: String
   let minutesText: String?
+  /// The minutes the package granted, or nil for one that grants time rather
+  /// than minutes.
+  let minutes: Int?
 
   init(option: PricingOption) {
     packageName = option.name
     priceText = option.priceText
     minutesText = option.minutesText
+    minutes = option.minutesGranted
   }
 }
 
@@ -139,6 +152,8 @@ struct PurchaseSummary {
 protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   var name: String { get set }
   var searchState: StudentSearchState { get set }
+  /// What the student has added to the question on the search's screens.
+  var searchDetails: SearchDetails { get set }
   var activeQuestionText: String { get set }
   var activeConversationType: String { get set }
   var selectedPricePerMinuteCents: Int { get set }
@@ -188,6 +203,9 @@ protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   /// it — on Android the task is scoped to the composable, so the question was
   /// simply never sent and nothing appeared to say so.
   func submitQuestion(topic: String, text: String, photoUrls: [String], conversationType: String)
+  /// Tells the teachers the question is offered to what the student chose on
+  /// the search's screens. A nil detail is left as it was.
+  func sendSearchDetails(topic: String?, struggle: String?, conversationType: String?)
   func cancelSearch() async
   func resetSearch()
   func selectTier(_ option: PricingOption)
@@ -543,8 +561,6 @@ extension StudentHomeViewModeling {
 
   // MARK: Overlay & card labels
 
-  var searchingTitle: String { LocalizationSupport.localized("Searching for a teacher\u{2026}") }
-  var searchingSubtitle: String { LocalizationSupport.localized("This usually takes under 30 seconds.") }
   var cancelLabel: String { LocalizationSupport.localized("Cancel") }
   var teacherFoundTitle: String { LocalizationSupport.localized("Teacher Found!") }
   var doneLabel: String { LocalizationSupport.localized("Done") }
@@ -632,6 +648,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   var name = ""
   var searchState: StudentSearchState = .idle
+  var searchDetails = SearchDetails()
   var activeQuestionText = ""
   var activeConversationType = "text"
   var selectedPricePerMinuteCents = 50
@@ -704,6 +721,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// The question this student last asked, along with the LiveKit credentials
   /// minted for it, so an accepted lesson does not have to ask for them again.
   private var createdQuestion: CreateQuestionResult?
+  /// Details chosen on the search's screens that have not gone out yet: held
+  /// while the question is still being created, and while an earlier update
+  /// is in flight, so they go out in order, one call at a time.
+  private var unsentSearchDetails = UnsentSearchDetails()
+  private var isSendingSearchDetails = false
+  /// The conversation type the backend holds for the question: the one it
+  /// was asked with, then whatever an update last confirmed.
+  private var confirmedConversationType = "text"
   private var onlineTeachersStore: OnlineTeachersStore?
   /// Subject keys (e.g. "math", "physics") enabled via Remote Config
   /// (`enable_<key>`). "math" is the only one on by default; every other
@@ -758,6 +783,9 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
 	logger.info("TeacherMinute askTeacher submit topic=\(topic) textLength=\(text.count)")
     activeConversationType = conversationType
+    confirmedConversationType = conversationType
+    searchDetails = SearchDetails()
+    unsentSearchDetails = UnsentSearchDetails()
     searchState = .searching(questionId: "")
 
     // `onlineTeachers` is kept current by a live listener on the same presence
@@ -783,6 +811,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       createdQuestion = result
       searchState = .searching(questionId: result.questionId)
       startPolling(questionId: result.questionId)
+      // Whatever the student chose while the question was being created.
+      flushSearchDetails()
     } catch let err as FunctionsError {
       if case .serverError(_, _, let details) = err,
          details?.reason == ServerErrorDetails.rateLimited {
@@ -825,6 +855,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     pollingTask?.cancel()
     pollingTask = nil
     QuestionStatusStore.stopListening()
+    unsentSearchDetails = UnsentSearchDetails()
     if !qid.isEmpty {
       try? await FunctionsService.shared.cancelQuestion(questionId: qid)
     }
@@ -835,7 +866,56 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     pollingTask?.cancel()
     pollingTask = nil
     QuestionStatusStore.stopListening()
+    unsentSearchDetails = UnsentSearchDetails()
     searchState = .idle
+  }
+
+  func sendSearchDetails(topic: String?, struggle: String?, conversationType: String?) {
+    if let topic { unsentSearchDetails.topic = topic }
+    if let struggle { unsentSearchDetails.struggle = struggle }
+    if let conversationType { unsentSearchDetails.conversationType = conversationType }
+    flushSearchDetails()
+  }
+
+  /// Sends what is waiting, once the question exists and nothing else is in
+  /// flight. Whatever is chosen meanwhile goes in the next call.
+  private func flushSearchDetails() {
+    guard !isSendingSearchDetails, !unsentSearchDetails.isEmpty,
+          case .searching(let questionId) = searchState, !questionId.isEmpty else { return }
+    let details = unsentSearchDetails
+    unsentSearchDetails = UnsentSearchDetails()
+    isSendingSearchDetails = true
+    Task { [weak self] in
+      var updated = false
+      do {
+        updated = try await FunctionsService.shared.updateQuestion(
+          questionId: questionId,
+          topic: details.topic,
+          struggle: details.struggle,
+          conversationType: details.conversationType
+        )
+        logger.info("TeacherMinute updateQuestion questionId=\(questionId) updated=\(updated)")
+      } catch {
+        // The search carries on with what the question already had.
+        logger.error("TeacherMinute updateQuestion failed questionId=\(questionId) error=\(error)")
+      }
+      guard let self else { return }
+      self.isSendingSearchDetails = false
+      self.settleConversationType(details.conversationType, updated: updated, questionId: questionId)
+      self.flushSearchDetails()
+    }
+  }
+
+  /// A start the backend did not take is undone here too, so the student's
+  /// side of the lesson matches what the teacher who takes it was offered.
+  /// One chosen since stays: it is on its way.
+  private func settleConversationType(_ conversationType: String?, updated: Bool, questionId: String) {
+    guard let conversationType else { return }
+    if updated {
+      confirmedConversationType = conversationType
+    } else if unsentSearchDetails.conversationType == nil, createdQuestion?.questionId == questionId {
+      activeConversationType = confirmedConversationType
+    }
   }
 
   func selectTier(_ option: PricingOption) {
@@ -1423,7 +1503,19 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   // MARK: - Polling
 
-  private static let noTeacherTimeoutSeconds: Double = 60
+  /// How long a question searches before the student is told no teacher took
+  /// it: the length the backend gave the question as it created it, so both
+  /// ends give up together; for a backend that does not say, the published
+  /// `question_search_timeout_seconds`, held to what the backend accepts.
+  private func searchTimeoutSeconds(for questionId: String) -> Double {
+    if let created = createdQuestion, created.questionId == questionId,
+       let seconds = created.searchTimeoutSeconds, seconds > 0 {
+      return Double(seconds)
+    }
+    guard let published = Double(RemoteConfigService.readString("question_search_timeout_seconds")),
+          published.isFinite else { return 90 }
+    return min(600, max(30, published.rounded()))
+  }
 
   /// How often the wait loop consults the listener's cache. This is a memory
   /// read, not a network call, so it can be frequent — what it replaces is a
@@ -1437,6 +1529,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   private func startPolling(questionId: String) {
     pollingTask?.cancel()
     let startedAt = Date().timeIntervalSince1970
+    let timeoutSeconds = searchTimeoutSeconds(for: questionId)
     QuestionStatusStore.startListening(questionId: questionId)
 
     pollingTask = Task {
@@ -1552,7 +1645,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
         }
 
         let elapsed = Date().timeIntervalSince1970 - startedAt
-        if elapsed >= Self.noTeacherTimeoutSeconds {
+        if elapsed >= timeoutSeconds {
           logger.info("TeacherMinute questionStatus timed out after \(Int(elapsed))s questionId=\(questionId); transitioning to noMatch")
           AnalyticsService.shared.logEvent(AnalyticsEvent.askTeacherNoMatch, parameters: [
             "question_id": questionId,
@@ -1718,6 +1811,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var name: String
   var searchState: StudentSearchState
+  var searchDetails = SearchDetails()
   var activeQuestionText: String
   var activeConversationType: String = "text"
   var selectedPricePerMinuteCents: Int
@@ -1822,8 +1916,11 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   func askTeacher(topic: String, text: String, photoUrls: [String], conversationType: String) async {
     activeQuestionText = text
     activeConversationType = conversationType
+    searchDetails = SearchDetails()
     searchState = .searching(questionId: "mock-question")
   }
+
+  func sendSearchDetails(topic: String?, struggle: String?, conversationType: String?) {}
 
   func cancelSearch() async {
     searchState = .idle
