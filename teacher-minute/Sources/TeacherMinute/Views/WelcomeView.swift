@@ -97,7 +97,7 @@ struct WelcomeView: View {
     HStack(spacing: 12) {
       Image("AppIcon", bundle: .module)
         .resizable()
-        .frame(width: 30, height: 30)
+        .frame(width: 40, height: 40)
         .clipShape(RoundedRectangle(cornerRadius: 7))
       Text(viewModel.appName)
         .font(.system(size: 16, weight: .semibold))
