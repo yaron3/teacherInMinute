@@ -170,6 +170,7 @@ final class SessionTypeSwitchUITests: XCTestCase {
 
     @MainActor
     private func assertAudioSession() {
+        openMediaPill()
         XCTAssertTrue(button("session_mic_toggle").waitForExistence(timeout: 10), "an audio session has no microphone control")
         XCTAssertTrue(waitForDisappearance(button("session_camera_toggle")), "an audio session shows the camera")
         XCTAssertTrue(waitForDisappearance(button("session_tab_video")), "an audio session has a Video tab")
@@ -177,9 +178,23 @@ final class SessionTypeSwitchUITests: XCTestCase {
 
     @MainActor
     private func assertVideoSession() {
+        openMediaPill()
         XCTAssertTrue(button("session_camera_toggle").waitForExistence(timeout: 10), "a video session has no camera control")
         XCTAssertTrue(button("session_mic_toggle").exists, "a video session has no microphone control")
-        XCTAssertTrue(button("session_tab_video").exists, "a video session has no Video tab")
+        // The cameras float over the board rather than filling a tab of their own.
+        XCTAssertFalse(button("session_tab_video").exists, "a video session still has a Video tab")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["session_video_panel"].waitForExistence(timeout: 10),
+            "a video session shows no camera panel"
+        )
+    }
+
+    /// The microphone and camera buttons grow from the media button, and fold
+    /// away again whenever the session's type changes.
+    @MainActor
+    private func openMediaPill() {
+        if button("session_mic_toggle").exists { return }
+        XCTAssertTrue(tapWhenHittable(button("session_media_options")), "could not open the media buttons")
     }
 
     // MARK: - Helpers

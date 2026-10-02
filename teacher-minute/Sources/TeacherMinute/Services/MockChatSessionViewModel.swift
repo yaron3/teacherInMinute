@@ -23,6 +23,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var boardViewports: [String: BoardViewport] = [:]
   var chatPausedStates: [String: Bool] = [:]
   var mediaPendingStates: [String: Bool] = [:]
+  var mediaDeviceStates: [String: MediaDeviceState] = [:]
   var errorMessage: String?
   var isConnecting: Bool
   private(set) var isInSetup: Bool
@@ -163,6 +164,12 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   func simulatePeerConversationType(_ conversationType: String) {
     sharedConversationType = conversationType
     onSessionDetailsUpdated?()
+  }
+
+  /// Plays the other participant muting their microphone or turning off their
+  /// camera.
+  func simulatePeerMediaState(_ state: MediaDeviceState) {
+    mediaDeviceStates["peer"] = state
   }
 
   // MARK: Connecting
@@ -306,6 +313,19 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
       return true
     }
     return false
+  }
+
+  func setSelfMediaState(_ state: MediaDeviceState) {
+    let key = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    mediaDeviceStates[key.isEmpty ? "participant" : key] = state
+  }
+
+  func peerMediaState() -> MediaDeviceState? {
+    let selfKey = role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    for (key, value) in mediaDeviceStates where key != selfKey {
+      return value
+    }
+    return nil
   }
 
   func endLesson() async {

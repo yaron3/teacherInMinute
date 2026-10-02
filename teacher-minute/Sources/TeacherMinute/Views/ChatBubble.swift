@@ -18,6 +18,8 @@ struct ChatBubble: View {
     HStack(alignment: .bottom, spacing: 8) {
       if message.isMine { Spacer(minLength: hasFormulaContent ? 0 : 54) }
 
+      // Only the other side's messages carry a face: the bubble's colour and
+      // edge already say which are yours.
       if !message.isMine {
         avatar
       }
@@ -28,32 +30,56 @@ struct ChatBubble: View {
             .frame(minWidth: 160, maxWidth: 300, minHeight: Self.formulaHeight(Self.latexContent(message.text)))
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
-            .background(theme.cardBackground)
+            .background(theme.brandModalBackground)
             .overlay(
               RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(message.isMine ? theme.accent : theme.controlBorder.opacity(0.5), lineWidth: 1.5)
+                .stroke(message.isMine ? theme.brandActionBackground : theme.controlBorder.opacity(0.5), lineWidth: 1.5)
             )
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+          timeLabel
         } else {
-          formattedContent
-            .frame(maxWidth: contentMaxWidth, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(message.isMine ? theme.outgoingBubbleBackground : theme.incomingBubbleBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+          textBubble
         }
-
-        Text(timeText)
-          .font(.system(size: 9, weight: .medium))
-          .foregroundStyle(theme.secondaryText)
-      }
-
-      if message.isMine {
-        avatar
       }
 
       if !message.isMine { Spacer(minLength: hasFormulaContent ? 0 : 54) }
     }
+  }
+
+  /// Text and its time in one bubble, with the corner at the bottom edge side
+  /// squared off a little as the design draws it.
+  private var textBubble: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      formattedContent
+        .frame(maxWidth: contentMaxWidth, alignment: .leading)
+      timeLabel
+    }
+    .padding(.horizontal, 12)
+    .padding(.top, 10)
+    .padding(.bottom, 8)
+    .background(message.isMine ? theme.outgoingBubbleBackground : theme.incomingBubbleBackground)
+    .clipShape(bubbleShape)
+    .overlay {
+      bubbleShape
+        .stroke(message.isMine ? theme.outgoingBubbleBorder : theme.incomingBubbleBorder, lineWidth: 1)
+    }
+  }
+
+  private var bubbleShape: UnevenRoundedRectangle {
+    UnevenRoundedRectangle(
+      topLeadingRadius: 15,
+      bottomLeadingRadius: message.isMine ? 15 : 4,
+      bottomTrailingRadius: message.isMine ? 4 : 15,
+      topTrailingRadius: 15,
+      style: .continuous
+    )
+  }
+
+  private var timeLabel: some View {
+    Text(timeText)
+      .font(.system(size: 10, weight: .regular))
+      .foregroundStyle(message.isMine ? theme.outgoingBubbleText.opacity(0.65) : theme.brandMutedText)
   }
 
   private var hasFormulaContent: Bool {
@@ -67,17 +93,19 @@ struct ChatBubble: View {
   var avatar: some View {
     ProfileAvatarView(
       imageURL: avatarImageURL,
-      size: 24,
+      size: 32,
       fallbackSystemImage: "person.crop.circle.fill",
-      background: message.isMine ? theme.accentBackground : theme.positiveBackground,
-      tint: message.isMine ? theme.accentStrong : theme.positive
+      background: theme.accentBackground,
+      tint: theme.brandActionBackground
     )
   }
 
   private var formattedContent: some View {
     FormulaAwareText(
       text: message.text,
-      textColor: message.isMine ? theme.outgoingBubbleText : theme.incomingBubbleText
+      textColor: message.isMine ? theme.outgoingBubbleText : theme.incomingBubbleText,
+      font: .system(size: 14, weight: message.isMine ? .semibold : .medium),
+      lineSpacing: 3
     )
   }
 

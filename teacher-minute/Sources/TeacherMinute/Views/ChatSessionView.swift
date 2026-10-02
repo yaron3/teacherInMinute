@@ -37,7 +37,6 @@ struct ChatSessionView: View {
   enum TAB_TYPE: String {
 	case CHAT
 	case BOARD
-	case VIDEO
 	case IMAGES
   }
   @State var viewModel: any ChatSessionViewModeling
@@ -56,6 +55,8 @@ struct ChatSessionView: View {
   /// audio carries on connecting behind the lesson.
   @State var mediaPhase: MediaConnectionPhase = .idle
   @State var peerAwaitingAudio = false
+  /// The other side's microphone and camera, as they told the session.
+  @State var peerMediaState: MediaDeviceState?
   @State var liveKitRevision = 0
   @State var peerChatPaused = false
   @State var teacherPreviewOffset: CGSize = .zero
@@ -90,11 +91,9 @@ struct ChatSessionView: View {
   @State var peerAwaitedPermission: CapturePermissionKind?
   @State var isPeerFinishingSetup = false
   @State var inputBarHeight: CGFloat = 0
-  /// Whether the scrolling chat layout still has its tab strip on screen.
-  /// The strip scrolls away with the rest of the chrome, and a badge that
-  /// scrolls away with it stops telling anyone anything — so once it is gone
-  /// `unreadTabIndicator` stands in for it.
-  @State var isSessionTabStripVisible = true
+  /// Whether the pill of microphone and camera buttons has grown from the
+  /// media button at the bottom of the lesson.
+  @State var isMediaPillExpanded = false
   @FocusState var isMessageFieldFocused: Bool
   let title: String
   /// Opens the minutes picker without leaving the session. Absent for the
@@ -147,7 +146,7 @@ struct ChatSessionView: View {
     viewModel.onFinishingSetupInSettings = onFinishingSetupInSettings
     self._viewModel = State(initialValue: viewModel)
     self._conversationType = State(initialValue: conversationType)
-	self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
+	self._selectedTab = State(initialValue: conversationType == "video" ? .BOARD : .CHAT)
     self.title = title
     self.onBuyMinutes = onBuyMinutes
     self.onClose = onClose
@@ -156,7 +155,7 @@ struct ChatSessionView: View {
   init(viewModel: any ChatSessionViewModeling, title: String, conversationType: String = "text", liveKitRoom: String = "", liveKitToken: String = "", onBuyMinutes: (@MainActor @Sendable () -> Void)? = nil, onClose: @escaping @MainActor @Sendable () -> Void) {
     self._viewModel = State(initialValue: viewModel)
     self._conversationType = State(initialValue: conversationType)
-    self._selectedTab = State(initialValue: conversationType == "video" ? .VIDEO : .CHAT)
+    self._selectedTab = State(initialValue: conversationType == "video" ? .BOARD : .CHAT)
     if !liveKitRoom.isEmpty, !liveKitToken.isEmpty {
       viewModel.liveKitRoom = liveKitRoom
       viewModel.liveKitToken = liveKitToken
@@ -290,6 +289,9 @@ struct ChatSessionView: View {
         refreshPeerSetup()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
       }
+    }
+    .onChange(of: conversationType) { _, _ in
+      isMediaPillExpanded = false
     }
     .onChange(of: viewModel.incomingFormulaCount) { _, _ in
       // A formula from the other side needs the room the keyboard takes.
@@ -955,193 +957,120 @@ struct ChatSessionView: View {
   }
 
   @ViewBuilder var sessionBody: some View {
-    if selectedTab == .CHAT && !isBoardMaximized && !hasVideo {
-      scrollingChatLayout
+    if isBoardMaximized {
+      // The board takes the whole screen, frame and all.
+      whiteboard
+        .background(theme.cardBackground)
     } else {
-      standardSessionBody
+      switch selectedTab {
+      case .CHAT:
+        scrollingChatLayout
+      case .BOARD:
+        boardLayout
+      case .IMAGES:
+        imagesLayout
+      }
     }
   }
 
-  /// The chat tab as one scrolling column.
+  /// The chat as one scrolling column inside the lesson's frame.
   ///
-  /// The header, the pinned question and the tabs used to be fixed chrome above
-  /// a thread that was the only thing able to scroll, so on a short viewport —
-  /// a small phone with the keyboard up — the composer was pushed off the
-  /// bottom with no way to reach it. Everything above the composer now scrolls
-  /// together, and the composer stays pinned where it can always be tapped.
+  /// The question and the thread scroll together, with the composer pinned
+  /// below them where it can always be tapped: a short viewport with the
+  /// keyboard up used to push a pinned composer off the screen, so the frame's
+  /// bottom bar steps aside for the keyboard instead.
   var scrollingChatLayout: some View {
-    VStack(spacing: 0) {
-      ScrollViewReader { proxy in
-        ScrollView(.vertical, showsIndicators: false) {
-          // One lazy stack for the whole tab, messages included. It has to be
-          // the scroll view's direct content and the bubbles have to be its
-          // direct items: on Android the lazy stack is the scrolling
-          // LazyColumn, and only it registers the ids that `scrollTo` resolves
-          // against — inside a plain stack the scroll-to-newest call is a
-          // silent no-op, which is why chat did not follow new messages there.
-          LazyVStack(spacing: 0) {
-            Color.clear
-              .frame(height: 0)
-              .id(Self.chatInitialScrollID)
+    sessionFrame(showsBottomBar: !isChatKeyboardUp) {
+      VStack(spacing: 0) {
+        ScrollViewReader { proxy in
+          ScrollView(.vertical, showsIndicators: false) {
+            // One lazy stack for the whole tab, messages included. It has to be
+            // the scroll view's direct content and the bubbles have to be its
+            // direct items: on Android the lazy stack is the scrolling
+            // LazyColumn, and only it registers the ids that `scrollTo` resolves
+            // against — inside a plain stack the scroll-to-newest call is a
+            // silent no-op, which is why chat did not follow new messages there.
+            LazyVStack(spacing: 0) {
+              Color.clear
+                .frame(height: 0)
+                .id(Self.chatInitialScrollID)
 
-            header
+              originalQuestionCard
 
-            sessionTypePicker
+              if viewModel.messages.count == 0 {
+                sessionNotice
 
-            sessionConditionNotice
+                ChatThreadEmptyNotice(viewModel: viewModel)
+              }
 
-            sessionStats
-
-            // The lazy stack drops what scrolls out of it, so composition is
-            // the signal: the strip is on screen exactly while it is composed.
-            sessionTabs
-              .onAppear { isSessionTabStripVisible = true }
-              .onDisappear { isSessionTabStripVisible = false }
-
-            if let errorMessage = viewModel.errorMessage {
-              Text(errorMessage)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(theme.accentBackground)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 6)
-            }
-
-            if viewModel.messages.count == 0 {
-              sessionNotice
-
-              ChatThreadEmptyNotice(viewModel: viewModel)
-            }
-
-            ForEach(viewModel.messages) { message in
-              ChatThreadRow(message: message, now: displayDate, viewModel: viewModel)
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .id(message.id)
-            }
+              ForEach(viewModel.messages) { message in
+                ChatThreadRow(message: message, now: displayDate, viewModel: viewModel)
+                  .padding(.horizontal, 12)
+                  .padding(.top, 8)
+                  .id(message.id)
+              }
 
 #if os(Android)
-            inputBar(scrollProxy: proxy)
-              .padding(.top, 8)
-              .id(Self.chatComposerScrollID)
-#else
-            if composerMode == .algebra {
               inputBar(scrollProxy: proxy)
                 .padding(.top, 8)
                 .id(Self.chatComposerScrollID)
-
-            }
-#endif
-
-            Color.clear
-              .frame(height: 0)
-              .id(Self.chatBottomScrollID)
-          }
-#if os(Android)
-          .padding(.bottom, 10)
 #else
-          .padding(.bottom, 10)
+              if composerMode == .algebra {
+                inputBar(scrollProxy: proxy)
+                  .padding(.top, 8)
+                  .id(Self.chatComposerScrollID)
+
+              }
 #endif
-        }
-        // Claims the space the composer does not take, so the composer is
-        // never the thing that overflows.
-        .frame(maxHeight: .infinity)
-        .onChange(of: viewModel.messages.count) { _, _ in
-          if let last = viewModel.messages.last {
-            withAnimation(.easeOut(duration: 0.2)) {
-              proxy.scrollTo(last.id, anchor: .bottom)
+
+              Color.clear
+                .frame(height: 0)
+                .id(Self.chatBottomScrollID)
+            }
+            .padding(.bottom, 10)
+          }
+          // Claims the space the composer does not take, so the composer is
+          // never the thing that overflows.
+          .frame(maxHeight: .infinity)
+          .onChange(of: viewModel.messages.count) { _, _ in
+            if let last = viewModel.messages.last {
+              withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(last.id, anchor: .bottom)
+              }
+            }
+          }
+          .onChange(of: composerMode) { _, mode in
+            scrollChatForKeyboardMode(mode, proxy: proxy)
+          }
+          .onChange(of: isMessageFieldFocused) { _, focused in
+            if focused {
+              scrollChatForKeyboardMode(.regular, proxy: proxy)
             }
           }
         }
-        .onChange(of: composerMode) { _, mode in
-          scrollChatForKeyboardMode(mode, proxy: proxy)
-        }
-        .onChange(of: isMessageFieldFocused) { _, focused in
-          if focused {
-            scrollChatForKeyboardMode(.regular, proxy: proxy)
-          }
-        }
-      }
 
-    }
-    .overlay(alignment: .top) {
-      unreadTabIndicator
-    }
 #if !os(Android)
-    .safeAreaInset(edge: .bottom) {
-      if composerMode == .regular {
-        inputBar()
-          .background(Color.black.opacity(0.15))
+        if composerMode == .regular {
+          inputBar()
+        }
+#endif
+      }
+      .overlay(alignment: .bottomTrailing) {
+        // Your own camera, while the chat is open in a video lesson.
+        if hasVideo && !peerChatPaused {
+          draggableSelfPreview
+            .padding(12)
+        }
       }
     }
-#endif
   }
 
-
-  var standardSessionBody: some View {
-    VStack(spacing: 0) {
-      if !isBoardMaximized {
-        header
-
-        sessionTypePicker
-
-        sessionConditionNotice
-
-        sessionStats
-
-       // originalQuestionBanner
-
-        sessionTabs
-
-        if let errorMessage = viewModel.errorMessage {
-          Text(errorMessage)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(theme.accentBackground)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.top, 6)
-        }
-      }
-
-      Group {
-        if isBoardMaximized {
-          whiteboard
-        } else if hasVideo && isCompact {
-          compactVideoSessionLayout
-		} else if selectedTab == .CHAT {
-          VStack(spacing: 0) {
-			if viewModel.messages.count == 0 {
-			  sessionNotice
-			}
-            ChatThreadView(messages: viewModel.messages, now: displayDate, viewModel: viewModel)
-          }
-		} else if selectedTab == .VIDEO {
-          videoFeed
-        } else if selectedTab == .IMAGES {
-          questionImagesGallery
-        } else {
-          whiteboard
-        }
-      }
-      .frame(maxHeight: .infinity)
-
-#if os(Android)
-      if selectedTab == .CHAT && !isBoardMaximized {
-        inputBar()
-      }
-
-#endif
-    }
-    .background(theme.cardBackground)
-#if !os(Android)
-    .safeAreaInset(edge: .bottom) {
-      if selectedTab == .CHAT && !isBoardMaximized {
-        inputBar()
-          .background(.ultraThinMaterial)
-      }
-    }
-#endif
+  /// Whether the math pad is up. The system keyboard is left to lift the
+  /// composer and the bar together; the pad is tall enough to need the room.
+  var isChatKeyboardUp: Bool {
+    composerMode == .algebra
   }
+
 
   var whiteboard: some View {
     WhiteboardView(
@@ -1203,154 +1132,6 @@ struct ChatSessionView: View {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
           .stroke(theme.controlBorder, lineWidth: 1)
       }
-  }
-
-  var videoFeed: some View {
-#if !os(Android)
-    let remoteTrack = viewModel.remoteCameraVideoTrack
-    let localTrack = viewModel.localCameraVideoTrack
-    return RoundedRectangle(cornerRadius: 18, style: .continuous)
-      .fill(theme.videoBackground)
-      .overlay {
-        ZStack {
-          if let remoteTrack {
-            SwiftUIVideoView(remoteTrack, layoutMode: .fit)
-              .id(ObjectIdentifier(remoteTrack))
-              .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-          } else {
-            videoPlaceholder(
-              icon: "video.fill",
-              text: viewModel.waitingForVideoText
-            )
-          }
-          if isStudent {
-            VStack {
-              Spacer()
-              HStack {
-                Spacer()
-                localPreview(localTrack: localTrack)
-              }
-            }
-            .padding(12)
-          }
-        }
-      }
-      .padding(16)
-      .id(liveKitRevision)
-#else
-    return AndroidVideoFeed(
-      isStudent: isStudent,
-      isCameraOff: viewModel.isCameraOff,
-      theme: theme,
-      waitingForVideoText: viewModel.waitingForVideoText
-    )
-    .padding(16)
-#endif
-  }
-
-  @ViewBuilder
-  var compactVideoSessionLayout: some View {
-    if selectedTab == .CHAT {
-      ZStack(alignment: .bottomTrailing) {
-        VStack(spacing: 0) {
-          if viewModel.messages.count == 0 {
-            sessionNotice
-          }
-          ChatThreadView(messages: viewModel.messages, now: displayDate, viewModel: viewModel)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-        if !peerChatPaused {
-          draggableSelfPreview
-            .padding(12)
-        }
-      }
-    } else if selectedTab == .VIDEO {
-      compactBottomVideoStrip
-        .frame(maxHeight: .infinity)
-    } else {
-      VStack(spacing: 0) {
-        whiteboard
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-        compactBottomVideoStrip
-          .frame(height: 220)
-      }
-    }
-  }
-
-  @ViewBuilder
-  var compactBottomVideoStrip: some View {
-#if !os(Android)
-    let remoteTrack = viewModel.remoteCameraVideoTrack
-    let localTrack = viewModel.localCameraVideoTrack
-    ZStack(alignment: .bottomTrailing) {
-      VStack(spacing: 0) {
-        Spacer(minLength: 0)
-        if selfChatPaused && peerChatPaused {
-          peerPausedPanel
-        } else if let remoteTrack {
-          SwiftUIVideoView(remoteTrack, layoutMode: .fit)
-            .id(ObjectIdentifier(remoteTrack))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        } else {
-          videoPlaceholder(
-            icon: "video.fill",
-            text: viewModel.waitingForVideoText
-          )
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-      }
-      if isStudent && !(selfChatPaused && peerChatPaused) {
-        localPreview(localTrack: localTrack)
-          .padding(10)
-      }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .padding(.horizontal, 12)
-    .padding(.bottom, 8)
-    .id(liveKitRevision)
-#else
-    if selfChatPaused && peerChatPaused {
-      peerPausedPanel
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
-    } else {
-      AndroidVideoFeed(
-        isStudent: isStudent,
-        isCameraOff: viewModel.isCameraOff,
-        theme: theme,
-        waitingForVideoText: viewModel.waitingForVideoText
-      )
-      .padding(.horizontal, 12)
-      .padding(.bottom, 8)
-    }
-#endif
-  }
-
-  var peerPausedPanel: some View {
-    RoundedRectangle(cornerRadius: 18, style: .continuous)
-      .fill(theme.videoBackground.opacity(0.85))
-      .overlay {
-        VStack(spacing: 10) {
-          PlatformIcon(
-            systemName: "video.slash.fill",
-            size: 30,
-            weight: .semibold,
-            color: theme.onDarkFill.opacity(0.9)
-          )
-          Text(peerPausedMessage)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(theme.onDarkFill)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 18)
-        }
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-
-  var peerPausedMessage: String {
-    viewModel.peerPausedMessage
   }
 
   @ViewBuilder
@@ -1435,52 +1216,39 @@ struct ChatSessionView: View {
   }
 #endif
 
-  func headerToggle(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      PlatformIcon(
-        systemName: systemName,
-        size: 13,
-        weight: .bold,
-        color: isActive ? theme.primaryText : theme.primaryText
-      )
-      .frame(width: 34, height: 34)
-      .background(isActive ? theme.accentBackground : theme.cardBackground)
-      .clipShape(Circle())
-    }
-    .buttonStyle(.plain)
-  }
-
-  var videoBadge: some View {
-    HStack(spacing: 4) {
-      PlatformIcon(systemName: "video.fill", size: 10, weight: .bold, color: theme.onBrightFill)
-      Text(viewModel.videoLabel)
-        .font(.system(size: 11, weight: .bold))
-        .foregroundStyle(theme.onBrightFill)
-    }
-    .padding(.horizontal, 10)
-    .frame(height: 26)
-    .background(theme.info)
-    .clipShape(Capsule())
-  }
-
   func inputBar(scrollProxy: ScrollViewProxy? = nil) -> some View {
     VStack(spacing: 8) {
-      composerModeToggle(scrollProxy: scrollProxy)
-
       if composerMode == .algebra {
+        composerModeToggle(scrollProxy: scrollProxy)
+          .padding(.horizontal, 16)
+          .padding(.top, 8)
+
         MathEquationEditorView { latex in
           sendFormula(latex)
         }
         .environment(\.layoutDirection, .leftToRight)
+        .padding(.horizontal, 12)
       } else {
-        MessageComposer(placeholder: viewModel.messagePlaceholder,
-                        isFocused: $isMessageFieldFocused) { text in
-          sendComposed(text)
-        }
+        SessionMessageComposer(
+          placeholder: viewModel.messagePlaceholder,
+          isFocused: $isMessageFieldFocused,
+          onSend: { text in sendComposed(text) },
+          onMath: {
+            composerMode = .algebra
+            // The math keys are the keyboard in this mode. Dropping the focus
+            // state is not enough to send the system one away on Android —
+            // SkipUI's `.focused(_:)` only ever requests focus — so the pad
+            // would sit on top of a keyboard that never left.
+            isMessageFieldFocused = false
+            SoftKeyboard.dismiss()
+            if let scrollProxy {
+              scrollChatForKeyboardMode(.algebra, proxy: scrollProxy)
+            }
+          }
+        )
       }
     }
-    .padding(.horizontal, 12)
-    .padding(.bottom, 10)
+    .padding(.bottom, composerMode == .algebra ? 10 : 0)
   }
 
   func composerModeToggle(scrollProxy: ScrollViewProxy? = nil) -> some View {
@@ -1573,100 +1341,6 @@ struct ChatSessionView: View {
     return name.isEmpty ? title : name
   }
 
-  var header: some View {
-    HStack(spacing: 12) {
-      ProfileAvatarView(
-        imageURL: viewModel.participantImageURL,
-        size: 40,
-        fallbackSystemImage: "person.crop.circle.fill",
-        background: theme.accentBackground,
-        tint: theme.accent
-      )
-        .overlay(alignment: .bottomTrailing) {
-          Circle()
-            .fill(theme.positive)
-            .frame(width: 10, height: 10)
-            .overlay {
-              Circle().stroke(theme.screenBackground, lineWidth: 2)
-            }
-        }
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text(participantName)
-          .font(.system(size: 15, weight: .bold))
-          .foregroundStyle(theme.primaryText)
-        Button {
-          isSessionTypePickerVisible.toggle()
-        } label: {
-          HStack(spacing: 6) {
-            Text(connectionModeText)
-              .font(.system(size: 11, weight: .medium))
-              .foregroundStyle(hasVideo ? theme.info : theme.positive)
-            Text(viewModel.changeSessionTypeLabel)
-              .font(.system(size: 11, weight: .bold))
-              .foregroundStyle(theme.accent)
-          }
-        }
-        .buttonStyle(.plain)
-        .disabled(isEndingSession)
-        .accessibilityIdentifier("session_type_change")
-      }
-
-      Spacer()
-
-      if hasVideo {
-        if isStudent {
-          headerToggle(
-            systemName: viewModel.isMicMuted ? "mic.slash.fill" : "mic.fill",
-            isActive: viewModel.isMicMuted
-          ) {
-            viewModel.toggleMicrophone()
-          }
-          .accessibilityIdentifier("session_mic_toggle")
-          headerToggle(
-            systemName: viewModel.isCameraOff ? "video.slash.fill" : "video.fill",
-            isActive: viewModel.isCameraOff
-          ) {
-            viewModel.toggleCamera()
-          }
-          .accessibilityIdentifier("session_camera_toggle")
-        } else {
-          videoBadge
-        }
-      } else if hasAudio {
-        headerToggle(
-          systemName: viewModel.isMicMuted ? "mic.slash.fill" : "mic.fill",
-          isActive: viewModel.isMicMuted
-        ) {
-          viewModel.toggleMicrophone()
-        }
-        .accessibilityIdentifier("session_mic_toggle")
-      }
-
-      Button {
-        requestEndSession()
-      } label: {
-        Text(isEndingSession ? viewModel.endingLabel : viewModel.endLabel)
-          .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(theme.onAccentText)
-          .padding(.horizontal, 12)
-          .frame(height: 32)
-          .background(theme.danger)
-          .clipShape(Capsule())
-      }
-      .buttonStyle(.plain)
-      .disabled(isEndingSession)
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 8)
-    .background(theme.cardBackground)
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(theme.controlBorder)
-        .frame(height: 1)
-      }
-  }
-
   /// A line under the header for a session that is running, but not in the way
   /// it was asked for. This side's own audio comes first — not connected at all
   /// outranks connected badly — then the other side's, and a camera that never
@@ -1737,6 +1411,7 @@ struct ChatSessionView: View {
     didFallBackToAudioOnly = viewModel.mediaDidFallBackToAudioOnly
     mediaQuality = viewModel.mediaQuality()
     peerAwaitingAudio = viewModel.peerMediaPending()
+    peerMediaState = viewModel.peerMediaState()
 
     let phase = viewModel.mediaConnectionPhase
     if phase != mediaPhase {
@@ -1888,11 +1563,7 @@ struct ChatSessionView: View {
       didFallBackToAudioOnly = false
       peerAwaitingAudio = false
       viewModel.setSelfMediaPending(false)
-      if selectedTab == .VIDEO {
-        selectSessionTab(.CHAT)
-      } else {
-        applyVideoPauseState()
-      }
+      applyVideoPauseState()
       await viewModel.switchMedia(to: target)
       return
     }
@@ -1904,9 +1575,8 @@ struct ChatSessionView: View {
     }
 
     if target.requiresCamera {
-      selectSessionTab(.VIDEO)
-    } else if selectedTab == .VIDEO {
-      selectSessionTab(.CHAT)
+      // The cameras float over the board.
+      selectSessionTab(.BOARD)
     } else {
       applyVideoPauseState()
     }
@@ -1917,77 +1587,6 @@ struct ChatSessionView: View {
     mediaPhase = .connecting
   }
 
-  var sessionStats: some View {
-    HStack(spacing: 0) {
-	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.warning)
-		.padding(.top, 2)
-		.padding(.trailing, 8)
-	  VStack(alignment: .leading, spacing: 0) {
-		Text(viewModel.originalQuestionLabel)
-		  .font(.system(size: 10, weight: .bold))
-		  .foregroundStyle(theme.warning)
-            FormulaAwareText(
-              text: viewModel.originalQuestion,
-              textColor: theme.primaryText,
-              font: .system(size: 12, weight: .medium),
-              lineSpacing: 3,
-              formulaMinWidth: 160,
-              formulaMaxWidth: 260
-            )
-              .frame(maxWidth: .infinity, alignment: .leading)
-	  }
-	  .frame(maxWidth: .infinity, alignment: .leading)
-	  Spacer(minLength: 2)
-      VStack(alignment: .trailing, spacing: 2) {
-        Text(viewModel.sessionTimeLabel)
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(theme.secondaryText)
-        Text(viewModel.sessionTimeText(at: sessionFrozenDate ?? displayDate))
-          .font(.system(size: 28, weight: .heavy, design: .monospaced))
-          .lineLimit(1)
-          .minimumScaleFactor(0.85)
-          .frame(width: 92, alignment: .trailing)
-          .foregroundStyle(theme.primaryText)
-        Text(viewModel.minutesLabel)
-          .font(.system(size: 10, weight: .medium))
-          .foregroundStyle(theme.secondaryText)
-      }
-      .frame(width: 92, alignment: .trailing)
-	  
-	  
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 16)
-  }
-
-  var originalQuestionBanner: some View {
-    HStack(alignment: .top, spacing: 10) {
-	  PlatformIcon(systemName: "pin.fill", size: 12, weight: .bold, color: theme.warning)
-        .padding(.top, 2)
-      VStack(alignment: .leading, spacing: 5) {
-        Text(viewModel.originalQuestionLabel)
-          .font(.system(size: 10, weight: .bold))
-          .foregroundStyle(theme.warning)
-        FormulaAwareText(
-          text: viewModel.originalQuestion,
-          textColor: theme.primaryText,
-          font: .system(size: 12, weight: .medium),
-          lineSpacing: 3,
-          formulaMinWidth: 160,
-          formulaMaxWidth: 260
-        )
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      Spacer(minLength: 0)
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
-    .background(theme.warningBackground)
-    .overlay(alignment: .bottom) {
-      Rectangle().fill(theme.warningBorder).frame(height: 1)
-    }
-  }
-
   func selectSessionTab(_ tab: TAB_TYPE) {
     selectedTab = tab
     viewModel.sessionTabChanged(showsChat: tab == .CHAT, showsBoard: tab == .BOARD)
@@ -1996,8 +1595,6 @@ struct ChatSessionView: View {
     case .CHAT:
       isMessageFieldFocused = composerMode == .regular
     case .BOARD:
-      dismissChatInput()
-    case .VIDEO:
       dismissChatInput()
     case .IMAGES:
       dismissChatInput()
@@ -2026,111 +1623,6 @@ struct ChatSessionView: View {
     // Was iOS-only, which left the keyboard up on Android whenever the session
     // wanted the composer out of the way.
     SoftKeyboard.dismiss()
-  }
-
-  /// The tabs in the order the strip lays them out. `unreadTabIndicator` walks
-  /// this list so its mark lands in the same slot as the badge it stands for,
-  /// so the two must keep agreeing about which tabs are present.
-  var sessionTabIds: [TAB_TYPE] {
-    var ids: [TAB_TYPE] = [.CHAT, .BOARD]
-    if hasVideo { ids.append(.VIDEO) }
-    if !viewModel.questionPhotoUrls.isEmpty { ids.append(.IMAGES) }
-    return ids
-  }
-
-  func sessionTabHasUnread(_ id: TAB_TYPE) -> Bool {
-    switch id {
-    case .CHAT: return viewModel.hasUnreadChat
-    case .BOARD: return viewModel.hasUnreadBoard
-    case .VIDEO, .IMAGES: return false
-    }
-  }
-
-  /// Stands in for a badge whose tab has scrolled out of reach: a red rule at
-  /// the top of the screen, in the slot the tab itself occupies. Laying it out
-  /// as the same row of equal shares as the strip keeps the mark over its own
-  /// tab under either reading direction — with the board second it sits right
-  /// of centre in English and left of centre in Hebrew, matching the strip.
-  @ViewBuilder var unreadTabIndicator: some View {
-    if !isSessionTabStripVisible, sessionTabIds.contains(where: { sessionTabHasUnread($0) }) {
-      HStack(spacing: 0) {
-        ForEach(sessionTabIds, id: \.self) { id in
-          Rectangle()
-            .fill(sessionTabHasUnread(id) ? theme.danger : Color.clear)
-            .frame(maxWidth: .infinity)
-        }
-      }
-      .frame(height: 3)
-    }
-  }
-
-  var sessionTabs: some View {
-    HStack(spacing: 0) {
-	  tabButton(id: .CHAT, title: viewModel.chatTabTitle, icon: "bubble.left.fill", showsBadge: viewModel.hasUnreadChat)
-		.background(selectedTab == .CHAT ? theme.accentBackground : Color.clear)
-	  tabButton(id: .BOARD, title: viewModel.boardTabTitle, icon: "pencil.and.list.clipboard", showsBadge: viewModel.hasUnreadBoard)
-		.background(selectedTab == .BOARD ? theme.accentBackground : Color.clear)
-      if hasVideo {
-		tabButton(id: .VIDEO, title: viewModel.videoTabTitle, icon: "video.fill", showsBadge: false)
-		  .background(selectedTab == .VIDEO ? theme.accentBackground : Color.clear)
-      }
-      if !viewModel.questionPhotoUrls.isEmpty {
-        tabButton(id: .IMAGES, title: viewModel.imagesTabTitle, icon: "photo.fill", showsBadge: false)
-		  .background(selectedTab == .IMAGES ? theme.accentBackground : Color.clear)
-      }
-    }
-    .frame(height: 40)
-    .background(theme.cardBackground)
-    .overlay(alignment: .bottom) {
-      Rectangle().fill(theme.controlBorder).frame(height: 1)
-    }
-  }
-
-  func tabButton(id: TAB_TYPE, title: String, icon: String, showsBadge: Bool) -> some View {
-    Button {
-      selectSessionTab(id)
-    } label: {
-      VStack(spacing: 8) {
-        HStack(spacing: 6) {
-          ZStack(alignment: .topTrailing) {
-            PlatformIcon(
-              systemName: icon,
-              size: 12,
-              weight: .semibold,
-              color: selectedTab == id ? theme.primaryText : theme.secondaryText
-            )
-            if showsBadge {
-              Circle()
-                .fill(theme.danger)
-                .overlay {
-                  Circle().stroke(theme.cardBackground, lineWidth: 2)
-                }
-                .frame(width: 14, height: 14)
-                .offset(x: 8, y: -6)
-            }
-          }
-          Text(title)
-            .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(showsBadge ? .white : (selectedTab == id ? theme.primaryText : theme.secondaryText))
-            .padding(.horizontal, showsBadge ? 18 : 0)
-            .padding(.vertical, showsBadge ? 3 : 0)
-            .background {
-              if showsBadge {
-                Capsule().fill(theme.danger)
-				  .frame(height: 28)
-              }
-            }
-        }
-        Rectangle()
-          .fill(selectedTab == id ? theme.accentBackground : Color.clear)
-          .frame(height: 2)
-      }
-    }
-	
-    .buttonStyle(.plain)
-    .accessibilityIdentifier("session_tab_\(id.rawValue.lowercased())")
-    .frame(maxWidth: .infinity)
-	
   }
 
   var sessionNotice: some View {

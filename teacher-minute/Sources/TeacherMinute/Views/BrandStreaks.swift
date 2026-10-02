@@ -17,12 +17,14 @@ struct BrandStreaks: View {
     case purchase
     case tabs
     case subpage
+    /// The lesson screen: the home's two soft streaks, without its thin ones.
+    case session
 
     /// The height of the frames the design places this set in. The tab
     /// screens' frames also draw the status bar and Android's navigation bar.
     var designHeight: CGFloat {
       switch self {
-      case .home, .purchase: 874
+      case .home, .purchase, .session: 874
       case .tabs, .subpage: 878
       }
     }
@@ -81,6 +83,8 @@ struct BrandStreaks: View {
   private var streaks: [Streak] {
     switch arrangement {
     case .home: return Self.homeStreaks
+    case .session:
+      return Self.homeStreaks.filter { $0.name == "brand-streak-06" || $0.name == "brand-streak-07" }
     case .purchase: return Self.purchaseStreaks
     case .tabs: return Self.tabStreaks
     case .subpage:
