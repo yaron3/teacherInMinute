@@ -55,7 +55,7 @@ struct HelpSupportView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 20)
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .formScrollDismissesKeyboard()
             }
         }
     }
