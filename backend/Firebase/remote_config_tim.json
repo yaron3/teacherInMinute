@@ -5931,6 +5931,17 @@
       },
       "valueType": "STRING"
     },
+    "create_account_log": {
+      "defaultValue": {
+        "value": "Create an account or log in to buy minutes."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צור חשבון או התחבר כדי לקנות דקות."
+        }
+      },
+      "valueType": "STRING"
+    },
     "buy_minutes": {
       "defaultValue": {
         "value": "Buy minutes"
