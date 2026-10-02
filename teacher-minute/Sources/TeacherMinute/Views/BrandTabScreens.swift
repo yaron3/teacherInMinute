@@ -60,14 +60,16 @@ extension MenuItem {
 /// container, while the same `.task` on a stack inside it did.
 struct BrandTabScreen<Content: View>: View {
   let content: Content
+  let showsGlow: Bool
 
-  init(@ViewBuilder content: () -> Content) {
+  init(showsGlow: Bool = false, @ViewBuilder content: () -> Content) {
+    self.showsGlow = showsGlow
     self.content = content()
   }
 
   var body: some View {
     ZStack {
-      BrandScreenBackground(streaks: .tabs)
+      BrandScreenBackground(streaks: .tabs, showsGlow: showsGlow)
       VStack(spacing: 0) {
         VStack(spacing: 0) {
           content

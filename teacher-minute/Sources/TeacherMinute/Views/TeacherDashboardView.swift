@@ -68,7 +68,7 @@ struct TeacherDashboardView: View {
 		viewModel.endCall()
 	  }
 	} else {
-	  BrandTabScreen {
+	  BrandTabScreen(showsGlow: true) {
 		VStack(spacing: 0) {
 		  BrandPageHeader(label: viewModel.teacherEyebrow, title: viewModel.teacherName) {
 			HStack(spacing: 8) {

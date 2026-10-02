@@ -6,6 +6,8 @@ import SwiftUI
 /// The brand gradient, with a set of streaks across the bottom when asked.
 struct BrandScreenBackground: View {
   var streaks: BrandStreaks.Arrangement?
+  /// The design's cyan haze, in the bottom right corner in either language.
+  var showsGlow = true
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -21,6 +23,15 @@ struct BrandScreenBackground: View {
       )
       if let streaks {
         BrandStreaks(arrangement: streaks)
+      }
+      if showsGlow {
+        Image(decorative: "brand-ambient-glow", bundle: .module)
+          .resizable()
+          .frame(width: 180, height: 180)
+          .offset(x: 58, y: 10)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+          .environment(\.layoutDirection, .leftToRight)
+          .allowsHitTesting(false)
       }
     }
     .ignoresSafeArea()

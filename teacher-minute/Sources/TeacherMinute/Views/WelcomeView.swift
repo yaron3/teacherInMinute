@@ -41,11 +41,19 @@ struct WelcomeView: View {
             .font(.system(size: 35, weight: .bold))
             .foregroundStyle(theme.onDarkFill)
             .padding(.top, 24)
-
-          Image("brand-logo", bundle: .module)
-            .resizable()
-            .scaledToFit()
-            .padding(.top, 6)
+		  ZStack(alignment: .top) {
+			Image(decorative: "splash-glow", bundle: .module)
+			  .resizable()
+			  .frame(width: 340, height: 340)
+			  .offset(x: -7, y: 38)
+			
+			Image(decorative: "brand-logo", bundle: .module)
+			  .resizable()
+			  .scaledToFit()
+			  .frame(width: 375, height: 318)
+			  .offset(x: 10.5)
+			  .padding(.top, 6)
+		  }
 
           Text(viewModel.subheadline)
             .font(.system(size: 16))
