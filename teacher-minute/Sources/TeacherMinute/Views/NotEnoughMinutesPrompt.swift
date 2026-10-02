@@ -5,8 +5,13 @@ import SwiftUI
 /// and the free minutes it earns; anyone else, the packages.
 struct NotEnoughMinutesPrompt: View {
   let viewModel: any StudentHomeViewModeling
+  /// Replaces the usual message, when the prompt stands in for something
+  /// other than a question that cannot go out.
+  var message: String?
   /// Create an account, or buy minutes: whichever the prompt offers.
   let onPrimary: () -> Void
+  /// Log in to an existing account; offered only to a student without one.
+  let onLogIn: () -> Void
   let onDismiss: () -> Void
 
   @Environment(\.colorScheme) var colorScheme
@@ -48,7 +53,7 @@ struct NotEnoughMinutesPrompt: View {
           .foregroundStyle(theme.onDarkFill)
           .frame(maxWidth: .infinity, minHeight: 30)
 
-        Text(viewModel.notEnoughMinutesMessage)
+        Text(message ?? viewModel.notEnoughMinutesMessage)
           .font(.system(size: 15))
           .foregroundStyle(theme.brandSecondaryText)
           .lineSpacing(messageLineSpacing)
@@ -62,6 +67,9 @@ struct NotEnoughMinutesPrompt: View {
 
       VStack(spacing: 10) {
         primaryButton
+        if viewModel.isAnonymousAccount {
+          logInButton
+        }
         dismissButton
       }
     }
@@ -154,6 +162,27 @@ struct NotEnoughMinutesPrompt: View {
       .fixedSize()
   }
 
+  private var logInButton: some View {
+    Button {
+      onLogIn()
+    } label: {
+      Text(viewModel.alreadyHaveAccountLabel)
+        .font(.system(size: 18, weight: .bold))
+        .foregroundStyle(theme.brandActionBackground)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .frame(maxWidth: .infinity)
+        .frame(height: 56)
+        .tappableFrame()
+        .overlay {
+          RoundedRectangle(cornerRadius: 8)
+            .stroke(theme.brandActionBackground, lineWidth: 1)
+        }
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("not_enough_minutes_log_in")
+  }
+
   private var dismissButton: some View {
     Button {
       onDismiss()
@@ -178,7 +207,7 @@ struct NotEnoughMinutesPrompt: View {
 #if os(iOS)
 struct NotEnoughMinutesPrompt_Previews: PreviewProvider {
   static var previews: some View {
-    NotEnoughMinutesPrompt(viewModel: MockStudentHomeViewModel(), onPrimary: {}, onDismiss: {})
+    NotEnoughMinutesPrompt(viewModel: MockStudentHomeViewModel(), onPrimary: {}, onLogIn: {}, onDismiss: {})
   }
 }
 #endif

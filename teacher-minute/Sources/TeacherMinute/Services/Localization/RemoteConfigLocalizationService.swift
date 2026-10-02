@@ -231,6 +231,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Load more minutes to send your question to a teacher.": "כדי לשלוח את השאלה למורה צריך לטעון דקות נוספות.",
         "Current balance": "היתרה הנוכחית",
         "Create a user account": "ליצירת חשבון משתמש",
+        "Create an account or log in to buy minutes.": "צור חשבון או התחבר כדי לקנות דקות.",
         "Buy minutes": "לקניית דקות",
         "1 minute": "דקה אחת",
         "Registration": "הרשמה",

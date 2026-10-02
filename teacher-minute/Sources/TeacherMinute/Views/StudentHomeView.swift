@@ -10,6 +10,8 @@ import SwiftUI
 struct StudentHomeView: View {
   @State var viewModel: any StudentHomeViewModeling
   @State var showingLowBalanceAlert = false
+  /// An anonymous student asked to buy minutes: an account comes first.
+  @State var showingAccountForPurchase = false
   /// Raised when the ask button is tapped before the profile — and with
   /// it the balance — has arrived.
   @State var showingBalanceLoadingAlert = false
@@ -194,7 +196,7 @@ struct StudentHomeView: View {
 	  checkoutPreparingOverlay
 		.zIndex(5)
 
-	  if showingLowBalanceAlert {
+	  if showingLowBalanceAlert || showingAccountForPurchase {
 		notEnoughMinutesPrompt
 		  .zIndex(8)
 	  }
@@ -446,8 +448,10 @@ struct StudentHomeView: View {
   var notEnoughMinutesPrompt: some View {
 	NotEnoughMinutesPrompt(
 	  viewModel: viewModel,
+	  message: showingAccountForPurchase ? viewModel.accountForPurchaseMessage : nil,
 	  onPrimary: {
 		showingLowBalanceAlert = false
+		showingAccountForPurchase = false
 		switch viewModel.notEnoughMinutesPrimaryTapped() {
 		case .createAccount:
 		  router.startRegistration()
@@ -455,9 +459,16 @@ struct StudentHomeView: View {
 		  loadMinutesTapped()
 		}
 	  },
+	  onLogIn: {
+		showingLowBalanceAlert = false
+		showingAccountForPurchase = false
+		viewModel.notEnoughMinutesLogInTapped()
+		router.startLogin()
+	  },
 	  onDismiss: {
 		viewModel.notEnoughMinutesDismissed()
 		showingLowBalanceAlert = false
+		showingAccountForPurchase = false
 	  }
 	)
   }
@@ -475,6 +486,10 @@ struct StudentHomeView: View {
   /// rather than filling in a method at a time.
   func loadMinutesTapped() {
 	guard !viewModel.isPreparingCheckout else { return }
+	guard !viewModel.isAnonymousAccount else {
+	  showingAccountForPurchase = true
+	  return
+	}
 	Task { @MainActor in
 	  await viewModel.preparePaymentOptions()
 	  showsPurchaseScreen = !viewModel.pricingOptions.isEmpty

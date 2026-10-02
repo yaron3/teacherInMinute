@@ -79,6 +79,7 @@ extension StudentHomeViewModeling {
   var currentBalanceLabel: String { LocalizationSupport.localized("Current balance") }
   var createAccountForMinutesLabel: String { LocalizationSupport.localized("Create a user account") }
   var buyMinutesLabel: String { LocalizationSupport.localized("Buy minutes") }
+  var alreadyHaveAccountLabel: String { LocalizationSupport.localized("Already have an account?") }
 
   /// A student who started without an account. Minutes come with one: a
   /// verified address earns the welcome reward (functions/src/emailRewards.ts).
@@ -111,6 +112,12 @@ extension StudentHomeViewModeling {
     )
   }
 
+  /// Why an anonymous student who asked to buy minutes is offered an account
+  /// first: purchases belong to one.
+  var accountForPurchaseMessage: String {
+    LocalizationSupport.localized("Create an account or log in to buy minutes.")
+  }
+
   var currentBalanceText: String {
     remainingMinutes == 1
       ? LocalizationSupport.localized("1 minute")
@@ -126,6 +133,11 @@ extension StudentHomeViewModeling {
     let step: NotEnoughMinutesNextStep = isAnonymousAccount ? .createAccount : .buyMinutes
     logNotEnoughMinutesAction(step == .createAccount ? "sign_up" : "buy")
     return step
+  }
+
+  /// An anonymous student who already has an account asks for the login form.
+  func notEnoughMinutesLogInTapped() {
+    logNotEnoughMinutesAction("log_in")
   }
 
   func notEnoughMinutesDismissed() {
