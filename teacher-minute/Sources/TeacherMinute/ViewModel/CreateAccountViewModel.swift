@@ -175,7 +175,7 @@ final class CreateAccountViewModel {
   func sendVerificationEmail() {
 	Task { @MainActor in
 	  do {
-		try await authService.sendEmailVerification()
+		try await FunctionsService.shared.sendVerificationEmail()
 		AnalyticsService.shared.logEvent(AnalyticsEvent.emailVerificationSent, parameters: ["source": "signup"])
 	  } catch {
 		AnalyticsService.shared.recordError(error, context: "signup_email_verification")

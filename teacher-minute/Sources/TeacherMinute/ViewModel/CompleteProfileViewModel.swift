@@ -22,6 +22,19 @@ final class CompleteProfileViewModel {
   var fullName = ""
   var phoneNumber = ""
   var grade = ""
+  /// The address a student's verification link goes to. Shown, and editable,
+  /// only while the account's own address is unverified, so that coming back
+  /// from the verify step is where a mistyped address gets corrected.
+  var email = ""
+  var showsEmailField = false
+  /// The address the last link went to, so continuing again without editing
+  /// it does not send another.
+  private var linkedEmail = ""
+  /// The saved-profile check runs once. Coming back to this step from the
+  /// verify step re-appears the screen, and by then the profile has been
+  /// saved, so checking again would skip straight past the form the student
+  /// came back to edit.
+  private var hasCheckedCompletion = false
 
   /// How the teacher would like to be paid, or `nil` while they have not said.
   /// Only the choice is collected here — no account numbers — and it is kept
@@ -62,9 +75,30 @@ final class CompleteProfileViewModel {
 	LocalizationSupport.localized("Enter a valid phone number.")
   }
 
+  var trimmedEmail: String {
+	email.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  var isEmailValid: Bool {
+	!showsEmailField || trimmedEmail.isEmail
+  }
+
+  var showsEmailError: Bool {
+	!trimmedEmail.isEmpty && !isEmailValid
+  }
+
+  var emailErrorMessage: String {
+	LocalizationSupport.localized("Please enter a valid email address.")
+  }
+
+  /// A student whose address is still unverified is asked to verify it next.
+  var needsEmailVerification: Bool {
+	showsEmailField && shouldShowPermissionsOnContinue
+  }
+
   var canContinue: Bool {
 	let hasName = !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-	return !isLoading && hasName && isPhoneValid
+	return !isLoading && hasName && isPhoneValid && isEmailValid
   }
 
   /// Tapping the chosen destination again clears it — picking one now is
@@ -80,6 +114,8 @@ final class CompleteProfileViewModel {
   // MARK: - Auto-advance
   
   func checkAndAutoAdvance() {
+	guard !hasCheckedCompletion else { return }
+	hasCheckedCompletion = true
 	Task {
 	  defer { isCheckingCompletion = false }
 	  guard let uid = Auth.auth().currentUser?.uid else { return }
@@ -118,6 +154,12 @@ final class CompleteProfileViewModel {
 			}
 			if phoneNumber.isEmpty && hasPhone {
 			  phoneNumber = savedPhone
+			}
+			if role == .student && email.isEmpty && AuthService().hasUnverifiedEmail {
+			  email = Auth.auth().currentUser?.email ?? ""
+			  // Signing up already sent a link to this address.
+			  linkedEmail = email
+			  showsEmailField = true
 			}
 			if grade.isEmpty {
 			  let savedGrade = data["grade"] as? String ?? ""
@@ -177,6 +219,20 @@ final class CompleteProfileViewModel {
 		  isLoading = false
 		  return
 		}
+
+		if showsEmailField && trimmedEmail.lowercased() != linkedEmail.lowercased() {
+		  do {
+			try await FunctionsService.shared.sendVerificationEmail(email: trimmedEmail)
+			AnalyticsService.shared.logEvent(AnalyticsEvent.emailVerificationSent, parameters: ["source": "profile_email_change"])
+			linkedEmail = trimmedEmail
+		  } catch {
+			AnalyticsService.shared.recordError(error, context: "profile_email_change")
+			errorMessage = emailChangeErrorMessage(for: error)
+			isLoading = false
+			return
+		  }
+		}
+		email = trimmedEmail
 
 		let profile = UserProfile(
 		  uid:         user.uid,

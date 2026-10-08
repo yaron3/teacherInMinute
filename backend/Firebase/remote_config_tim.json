@@ -1329,6 +1329,13 @@
       },
       "valueType": "STRING"
     },
+    "launch_splash_min_seconds": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "description": "Shortest time, in seconds, the launch splash stays on screen. 0 turns the minimum off.",
+      "valueType": "NUMBER"
+    },
     "price_per_minute_usd": {
       "defaultValue": {
         "value": "0.5"
@@ -6037,6 +6044,20 @@
       },
       "valueType": "STRING"
     },
+    "first_minutes_the": {
+      "defaultValue": {
+        "value": "First 60 minutes up to the next 100 subscribers"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "60 דקות חינם עד 100 המנויים הבאים"
+        },
+        "HebrewApp": {
+          "value": "60 דקות חינם עד 100 המנויים הבאים"
+        }
+      },
+      "valueType": "STRING"
+    },
     "teacher_connects_within": {
       "defaultValue": {
         "value": "Teacher connects within 90 sec"
@@ -7185,6 +7206,48 @@
         },
         "HebrewApp": {
           "value": "תוך 90 שניות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "available_question": {
+      "defaultValue": {
+        "value": "Available?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זמין?"
+        },
+        "HebrewApp": {
+          "value": "זמין?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "students_are_waiting": {
+      "defaultValue": {
+        "value": "Students are waiting"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תלמידים מחכים"
+        },
+        "HebrewApp": {
+          "value": "תלמידים מחכים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "answer_quickly": {
+      "defaultValue": {
+        "value": "Answer quickly"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ענה מהר"
+        },
+        "HebrewApp": {
+          "value": "ענה מהר"
         }
       },
       "valueType": "STRING"
@@ -12455,6 +12518,13 @@
       "description": "Free minutes a student gets once for verifying their email (0 turns it off).",
       "valueType": "NUMBER"
     },
+    "email_reward_student_slots": {
+      "defaultValue": {
+        "value": "100"
+      },
+      "description": "How many students in all get the email-verification minutes. Once that many have been rewarded (count in Firestore emailRewardPromotion/student.granted), the promotion has ended. Raise it to extend the promotion.",
+      "valueType": "NUMBER"
+    },
     "email_reward_teacher_share": {
       "defaultValue": {
         "value": "1"
@@ -12633,6 +12703,272 @@
         },
         "HebrewApp": {
           "value": "המייל עדיין לא אומת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "change_email_phone": {
+      "defaultValue": {
+        "value": "Change email or phone"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שינוי מייל או טלפון"
+        },
+        "HebrewApp": {
+          "value": "שינוי מייל או טלפון"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "email_address_changed": {
+      "defaultValue": {
+        "value": "Email address changed"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כתובת המייל שונתה"
+        },
+        "HebrewApp": {
+          "value": "כתובת המייל שונתה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "please_log_again": {
+      "defaultValue": {
+        "value": "Please log in again with your new email address."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "יש להתחבר שוב עם כתובת המייל החדשה."
+        },
+        "HebrewApp": {
+          "value": "יש להתחבר שוב עם כתובת המייל החדשה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "sent_verification_link": {
+      "defaultValue": {
+        "value": "We sent a verification link to"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שלחנו קישור אימות אל"
+        },
+        "HebrewApp": {
+          "value": "שלחנו קישור אימות אל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "another_account_already": {
+      "defaultValue": {
+        "value": "Another account already uses this email address."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חשבון אחר כבר משתמש בכתובת המייל הזו."
+        },
+        "HebrewApp": {
+          "value": "חשבון אחר כבר משתמש בכתובת המייל הזו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "couldn_verify_your": {
+      "defaultValue": {
+        "value": "Couldn't verify your email"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא הצלחנו לאמת את המייל"
+        },
+        "HebrewApp": {
+          "value": "לא הצלחנו לאמת את המייל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "email_address_use": {
+      "defaultValue": {
+        "value": "Email address in use"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כתובת המייל בשימוש"
+        },
+        "HebrewApp": {
+          "value": "כתובת המייל בשימוש"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "email_verified": {
+      "defaultValue": {
+        "value": "Email verified"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המייל אומת"
+        },
+        "HebrewApp": {
+          "value": "המייל אומת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "link_expired": {
+      "defaultValue": {
+        "value": "Link expired"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "פג תוקף הקישור"
+        },
+        "HebrewApp": {
+          "value": "פג תוקף הקישור"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "link_not_valid": {
+      "defaultValue": {
+        "value": "Link not valid"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הקישור אינו תקף"
+        },
+        "HebrewApp": {
+          "value": "הקישור אינו תקף"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "something_went_wrong": {
+      "defaultValue": {
+        "value": "Something went wrong. Please try again later."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "משהו השתבש. נסה שוב מאוחר יותר."
+        },
+        "HebrewApp": {
+          "value": "משהו השתבש. נסה שוב מאוחר יותר."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "verification_link_expired": {
+      "defaultValue": {
+        "value": "This verification link has expired. Ask for a new one in the app."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "פג תוקפו של קישור האימות. אפשר לבקש קישור חדש באפליקציה."
+        },
+        "HebrewApp": {
+          "value": "פג תוקפו של קישור האימות. אפשר לבקש קישור חדש באפליקציה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "verification_link_invalid": {
+      "defaultValue": {
+        "value": "This verification link is not valid. Ask for a new one in the app."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "קישור האימות אינו תקף. אפשר לבקש קישור חדש באפליקציה."
+        },
+        "HebrewApp": {
+          "value": "קישור האימות אינו תקף. אפשר לבקש קישור חדש באפליקציה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "too_many_emails": {
+      "defaultValue": {
+        "value": "Too many emails sent. Please try again in a few minutes."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נשלחו יותר מדי מיילים. נסה שוב בעוד כמה דקות."
+        },
+        "HebrewApp": {
+          "value": "נשלחו יותר מדי מיילים. נסה שוב בעוד כמה דקות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_welcome_reward": {
+      "defaultValue": {
+        "value": "Your welcome reward was already added to your account."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מתנת ההצטרפות כבר נוספה לחשבון שלך."
+        },
+        "HebrewApp": {
+          "value": "מתנת ההצטרפות כבר נוספה לחשבון שלך."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "email_verified_thanks": {
+      "defaultValue": {
+        "value": "Thanks for verifying your email."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תודה שאימתת את המייל."
+        },
+        "HebrewApp": {
+          "value": "תודה שאימתת את המייל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "email_verified_promotion_ended": {
+      "defaultValue": {
+        "value": "Thanks for verifying your email. The free-minutes promotion has ended."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תודה שאימתת את המייל. מבצע הדקות החינמיות הסתיים."
+        },
+        "HebrewApp": {
+          "value": "תודה שאימתת את המייל. מבצע הדקות החינמיות הסתיים."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "tap_the_link": {
+      "defaultValue": {
+        "value": "Tap the link in the email on this phone. It brings you straight back to the app."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הקש על הקישור שבמייל בטלפון הזה. הוא יחזיר אותך ישירות לאפליקציה."
+        },
+        "HebrewApp": {
+          "value": "הקש על הקישור שבמייל בטלפון הזה. הוא יחזיר אותך ישירות לאפליקציה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "sent_new_link": {
+      "defaultValue": {
+        "value": "We sent a new link to %@. Tap it on this phone to finish."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שלחנו קישור חדש אל %@. הקש עליו בטלפון הזה כדי לסיים."
+        },
+        "HebrewApp": {
+          "value": "שלחנו קישור חדש אל %@. הקש עליו בטלפון הזה כדי לסיים."
         }
       },
       "valueType": "STRING"

@@ -20,6 +20,8 @@ enum AppRoute: Hashable {
   case teacherIdentityVerification
   case teacherSubjects
   case completeProfile(role: AuthRole)
+  /// The student's address the verification link went to.
+  case verifyEmail(email: String)
   case permissionsSetup(role: AuthRole)
   case studentHome
   case teacherDashboard

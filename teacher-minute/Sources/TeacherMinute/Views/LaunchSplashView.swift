@@ -4,7 +4,7 @@ import SkipBridge
 #endif
 
 struct LaunchSplashView: View {
-  @State var viewModel = LaunchSplashViewModel()
+  @State var viewModel: any LaunchSplashViewModeling = makeLaunchSplashViewModel()
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -81,7 +81,7 @@ struct LaunchSplashView: View {
 
   private var tagline: some View {
     VStack(spacing: 0) {
-      taglineLine(viewModel.stuckQuestion, color: theme.onDarkFill)
+      taglineLine(viewModel.question, color: theme.onDarkFill)
 
       // The highlighted phrase shares a line with the rest of the sentence
       // when it fits, as it does in Hebrew. The English sentence is longer and
@@ -103,11 +103,11 @@ struct LaunchSplashView: View {
   }
 
   private var humanTeacherHighlight: some View {
-    taglineLine(viewModel.humanTeacherHighlight, color: theme.brandHighlightText)
+    taglineLine(viewModel.highlight, color: theme.brandHighlightText)
   }
 
   private var responseTimePromise: some View {
-    taglineLine(viewModel.responseTimePromise, color: theme.onDarkFill)
+    taglineLine(viewModel.promise, color: theme.onDarkFill)
   }
 
   /// A line of the tagline, at least as tall as a line of Noto Sans Hebrew,

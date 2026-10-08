@@ -30,6 +30,7 @@ final class StudentIntroViewModel {
   var pitch: String {
     LocalizationSupport.localized("When AI can't explain it, we have a human teacher who sees exactly where you got stuck")
   }
+  var promotionText: String { LocalizationSupport.localized("First 60 minutes up to the next 100 subscribers") }
   var startLabel: String { LocalizationSupport.localized("Get started") }
   var priceLine: String { LocalizationSupport.localized("₪2 per minute • no fixed lessons") }
   var startErrorTitle: String { LocalizationSupport.localized("Sign In Error") }

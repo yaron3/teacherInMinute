@@ -40,11 +40,11 @@ final class EmailRewardViewModel {
   }
 
   /// Checks quietly for a reward. Federated sign-ins are rewarded here with no
-  /// action at all; an email account is rewarded on the first check after its
-  /// link was followed.
+  /// action at all. An email account is rewarded by the link itself, which
+  /// opens the app with the outcome; this check then just drops the offer.
   func refresh() async {
     guard !isWorking, !isSettled else { return }
-    await claim(explicit: false)
+    await claim()
   }
 
   /// Nothing further can change for this session. A teacher's bonus is never
@@ -54,16 +54,11 @@ final class EmailRewardViewModel {
     switch reward.status {
     case .claimedByOtherAccount:
       return true
-    case .granted, .alreadyGranted:
+    case .granted, .alreadyGranted, .promotionEnded:
       return reward.role == "student"
     case .notVerified, .notEligible, .unavailable:
       return false
     }
-  }
-
-  func checkVerificationTapped() async {
-    guard !isWorking else { return }
-    await claim(explicit: true)
   }
 
   func resendTapped() async {
@@ -71,7 +66,7 @@ final class EmailRewardViewModel {
     isWorking = true
     defer { isWorking = false }
     do {
-      try await authService.sendEmailVerification()
+      try await FunctionsService.shared.sendVerificationEmail()
       AnalyticsService.shared.logEvent(AnalyticsEvent.emailVerificationSent, parameters: ["source": "banner"])
       dialog = EmailRewardDialog(title: emailSentTitle, message: linkSentMessage)
     } catch {
@@ -84,7 +79,7 @@ final class EmailRewardViewModel {
     dialog = nil
   }
 
-  func claim(explicit: Bool) async {
+  func claim() async {
     isWorking = true
     defer { isWorking = false }
     let result: EmailRewardStatus
@@ -92,9 +87,6 @@ final class EmailRewardViewModel {
       result = try await FunctionsService.shared.claimEmailReward()
     } catch {
       logger.info("[EmailReward] claim failed: \(error.localizedDescription)")
-      if explicit {
-        dialog = EmailRewardDialog(title: verifyEmailTitle, message: checkFailedMessage)
-      }
       return
     }
     reward = result
@@ -104,16 +96,9 @@ final class EmailRewardViewModel {
       AnalyticsService.shared.logEvent(AnalyticsEvent.emailRewardGranted, parameters: ["role": result.role ?? ""])
       grantVersion += 1
       dialog = grantedDialog(for: result)
-    case .notVerified:
-      if explicit {
-        dialog = EmailRewardDialog(title: notVerifiedTitle, message: notVerifiedMessage)
-      }
     case .claimedByOtherAccount:
       AnalyticsService.shared.logEvent(AnalyticsEvent.emailRewardRejected, parameters: ["reason": result.status.rawValue])
-      if explicit {
-        dialog = EmailRewardDialog(title: verifyEmailTitle, message: alreadyClaimedMessage)
-      }
-    case .alreadyGranted, .notEligible, .unavailable:
+    case .notVerified, .alreadyGranted, .notEligible, .unavailable, .promotionEnded:
       break
     }
   }

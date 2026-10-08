@@ -213,6 +213,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Stuck?": "נתקעת?",
         "A human teacher": "מורה אנושי",
         "within 90 seconds": "תוך 90 שניות",
+        // The teacher app's splash.
+        "Available?": "זמין?",
+        "Students are waiting": "תלמידים מחכים",
+        "Answer quickly": "ענה מהר",
         // The intro a signed-out student meets first. Remote Config carries
         // these too; the fallback covers the time before it deploys.
         "When AI can't explain it, we have a human teacher who sees exactly where you got stuck":
@@ -1165,6 +1169,13 @@ enum LocalizationKey {
         // The string that matches the value already in the template keeps the
         // original key; the other one is moved here.
 
+        // The verification link's results. `thanks_for_verifying` holds the
+        // student's reward message; the two link-error messages share a prefix.
+        "Thanks for verifying your email.": "email_verified_thanks",
+        "Thanks for verifying your email. The free-minutes promotion has ended.": "email_verified_promotion_ended",
+        "This verification link has expired. Ask for a new one in the app.": "verification_link_expired",
+        "This verification link is not valid. Ask for a new one in the app.": "verification_link_invalid",
+
         // The photo picker's camera alert title; `camera_access_required`
         // holds the full sentence the profile and verification screens use.
         "Camera access required": "camera_access_required_title",
@@ -1245,6 +1256,8 @@ enum LocalizationKey {
         // `unexpected_error_occurred` holds the shorter sentence.
         "An unexpected error occurred. Please try again.": "unexpected_error_try_again",
         // `upload_clear_photo` holds the math-problem prompt.
+        // `available` holds the teacher dashboard's status label.
+        "Available?": "available_question",
     ]
 
     /// Deterministic three-word snake-case slug for any source string that

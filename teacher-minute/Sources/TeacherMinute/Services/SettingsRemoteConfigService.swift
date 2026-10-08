@@ -28,6 +28,7 @@ final class SettingsRemoteConfigService {
         static let payPalPayoutEnabled = "enable_paypal_payout"
         static let contactSupportTitleMaxLength = "contact_support_title_max_length"
         static let contactSupportDescriptionMaxLength = "contact_support_description_max_length"
+        static let launchSplashMinimumSeconds = "launch_splash_min_seconds"
     }
 
     private let defaultSupportEmail = "support@tim.app"
@@ -35,6 +36,7 @@ final class SettingsRemoteConfigService {
     private let defaultPricePerMinuteByCurrency: [String: Double] = ["ILS": 2.0, "USD": 0.5]
     private let defaultContactSupportTitleMaxLength = 50
     private let defaultContactSupportDescriptionMaxLength = 1024
+    private let defaultLaunchSplashMinimumSeconds = 2.0
     
     private init() {}
     
@@ -124,6 +126,18 @@ final class SettingsRemoteConfigService {
         return limit > 0 ? limit : defaultContactSupportDescriptionMaxLength
     }
     
+    /// The shortest time the launch splash stays on screen. A launch that takes
+    /// longer is not held back further. Source: Remote Config
+    /// `launch_splash_min_seconds` (default 2); `0` turns the minimum off.
+    func fetchLaunchSplashMinimumSeconds() async -> Double {
+        await RemoteConfigService.shared.ready()
+        let rawValue = RemoteConfigService.shared.getString(Key.launchSplashMinimumSeconds)
+        guard let seconds = Double(rawValue) else {
+            return defaultLaunchSplashMinimumSeconds
+        }
+        return max(seconds, 0)
+    }
+
     private func fetchURL(forKey key: String, missingError: SettingsError) async throws -> URL {
         await RemoteConfigService.shared.ready()
         guard let url = RemoteConfigService.shared.getURL(key) else {
