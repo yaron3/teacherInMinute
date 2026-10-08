@@ -2768,11 +2768,11 @@
     },
     "payment_methods": {
       "defaultValue": {
-        "value": "paypal,google_pay"
+        "value": "google_pay,paypal"
       },
       "conditionalValues": {
         "iOS": {
-          "value": "paypal,apple_pay"
+          "value": "apple_pay,paypal"
         }
       },
       "valueType": "STRING"
