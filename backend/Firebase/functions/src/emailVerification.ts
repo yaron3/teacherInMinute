@@ -74,6 +74,31 @@ function languageOf(raw: unknown): Language {
   return raw === "he" ? "he" : "en";
 }
 
+/**
+ * The page language for a request whose link carries none (an unknown or
+ * mangled token): Hebrew only when the browser prefers it over English, by
+ * its `Accept-Language` q-values. English when it says nothing — Express's
+ * `acceptsLanguages("he")` answers yes to a request with no header at all.
+ */
+export function languageFromHeader(header: unknown): Language {
+  if (typeof header !== "string") return "en";
+  let best: Language = "en";
+  let bestQ = -1;
+  for (const part of header.split(",")) {
+    const [tag, ...params] = part.trim().toLowerCase().split(";");
+    const base = tag.split("-")[0];
+    // "iw" is the old code for Hebrew, still sent by some Android browsers.
+    if (base !== "en" && base !== "he" && base !== "iw") continue;
+    const qParam = params.map((p) => p.trim()).find((p) => p.startsWith("q="));
+    const q = qParam ? Number(qParam.slice(2)) : 1;
+    // Strictly greater: on a tie the language listed first wins.
+    if (!Number.isFinite(q) || q <= bestQ) continue;
+    best = base === "en" ? "en" : "he";
+    bestQ = q;
+  }
+  return best;
+}
+
 function roleOf(raw: unknown): RewardRole {
   return raw === "teacher" ? "teacher" : "student";
 }
@@ -279,7 +304,7 @@ export const verifyEmailLink = onRequest(async (req, res) => {
   const link = ref ? (await ref.get()).data() : undefined;
 
   const role = roleOf(link?.role);
-  const language = languageOf(link?.language ?? (req.acceptsLanguages("he") ? "he" : "en"));
+  const language = link ? languageOf(link.language) : languageFromHeader(req.get("accept-language"));
   const answer = (status: LinkStatus, claim?: ClaimResponse) => {
     res.set("Cache-Control", "no-store");
     res.status(200).send(buildLandingPage(status, appDeepLink(role, status, claim), language));
