@@ -61,7 +61,15 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         let key = LocalizationKey.key(for: english)
         let value = RemoteConfigService.readString(key)
         let fallback = Self.localFallback(for: english, languageCode: languageCode)
-        let shouldUseFallback = value.isEmpty || (languageCode != "en" && value == english)
+        // A served value counts as untranslated when it is the source itself,
+        // or, in Hebrew, when it has no Hebrew in it at all. The second case is
+        // Remote Config serving its English default for a string whose default
+        // was reworded away from the source, which the first check misses. That
+        // still happens whenever a fetch goes out before the `user_language`
+        // property has reached it (see Localization.md), or offline.
+        let isUntranslated = (languageCode != "en" && value == english)
+            || (languageCode == "he" && fallback != nil && !Self.containsHebrew(value))
+        let shouldUseFallback = value.isEmpty || isUntranslated
         let resolvedValue = shouldUseFallback ? (fallback ?? english) : value
         LocalizationCache.shared.set(resolvedValue, forKey: cacheKey)
         #if os(Android)
@@ -75,6 +83,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
     /// Drops cached strings so newly activated Remote Config values take effect.
     static func invalidateCache() {
         LocalizationCache.shared.removeAll()
+    }
+
+    private static func containsHebrew(_ value: String) -> Bool {
+        value.unicodeScalars.contains { (0x0590...0x05FF).contains($0.value) }
     }
 
     private static func localFallback(for english: String, languageCode: String) -> String? {
@@ -116,12 +128,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "%@%d%% vs last week": "%@%d%% מהשבוע שעבר",
         "Updating\u{2026}": "מתעדכן\u{2026}",
         "Since %@": "החל מ-%@",
-        // Onboarding copy, rebranded from the old "Math Connect" placeholder.
-        // The published Remote Config values still carry the old name, so these
-        // stand in until the template is republished.
-        "Log in to Teacher in a Minute to continue your\njourney.": "התחבר כדי להמשיך\nאת הדרך שלך.",
-        "Tell us a bit about yourself to get started with\nTeacher in a Minute.": "ספר לנו קצת על עצמך כדי להתחיל עם\nTeacher in a Minute.",
-        "Send me occasional updates and tips about\nTeacher in a Minute.": "שלחו לי מדי פעם עדכונים וטיפים על\nTeacher in a Minute.",
+        // Onboarding copy that names the app; `%@` is `AuthRole.appName`.
+        "Log in to %@ to continue your journey.": "התחבר ל־%@ כדי להמשיך את הדרך שלך.",
+        "Tell us a bit about yourself to get started with\n%@.": "ספר לנו קצת על עצמך כדי להתחיל עם\n%@.",
+        "Send me occasional updates and tips about\n%@.": "שלחו לי מדי פעם עדכונים וטיפים על\n%@.",
         "Help you anywhere": "",
         // Title of the photo-source dialog; its buttons already had Hebrew, so
         // only the heading was showing through in English.
@@ -671,6 +681,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Required for video sessions and taking photos": "נדרש לשיעורי סרטון ולצילום תמונות",
         "Camera access required": "נדרשת גישה למצלמה",
         "Enable camera access in Settings to take photos.": "אפשרו גישה למצלמה בהגדרות כדי לצלם תמונות.",
+        "Video and audio access are required for a video session.": "נדרשות הרשאות מצלמה ומיקרופון לשיעור וידאו.",
         "Complete now": "להשלים עכשיו",
         "Complete your verification": "השלימו את האימות שלכם",
         "Continue - upload later": "המשך - העלאה מאוחר יותר",
@@ -876,6 +887,37 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Geometry": "גאומטריה",
         "Algebra": "אלגברה",
         "Calculus": "חדו״א",
+        // The rest of the subject catalog (`subjects` / `subTask*` in Remote
+        // Config). Remote Config has Hebrew for all of these; these cover the
+        // times it serves English to a Hebrew app (offline, or a fetch that
+        // beat the `user_language` property), when a teacher saw "Math",
+        // "Trigonometry" and "מורה לMath" among Hebrew copy.
+        "Math": "מתמטיקה",
+        "Trigonometry": "טריגונומטריה",
+        "Statistics": "סטטיסטיקה",
+        "General Math": "מתמטיקה כללית",
+        "Physics": "פיזיקה",
+        "Mechanics": "מכניקה",
+        "Electricity": "חשמל",
+        "Waves": "גלים",
+        "Computer Science": "מדעי המחשב",
+        "Programming": "תכנות",
+        // A teacher's saved subtopics are their lowercased catalog keys
+        // (`SubjectOption.key`), and the profile translates those directly.
+        "algebra": "אלגברה",
+        "geometry": "גאומטריה",
+        "trigonometry": "טריגונומטריה",
+        "calculus": "חדו״א",
+        "statistics": "סטטיסטיקה",
+        "mechanics": "מכניקה",
+        "all": "הכל",
+        // Counts on the subject picker and the lesson history.
+        "Choose subjects": "בחר מקצועות",
+        "1 subject": "מקצוע אחד",
+        "%d subjects": "%d מקצועות",
+        "1 subtopic": "תת-נושא אחד",
+        "%d subtopics": "%d תתי-נושאים",
+        "%d taught": "%d שיעורים שלימדת",
         "Audio": "אודיו",
         "Video": "וידאו",
     ]
@@ -1097,6 +1139,15 @@ enum LocalizationKey {
           "student_app_prompt_message",
         "Download Instant Teacher": "student_app_prompt_download",
 
+        // Copy that names the app, which `%@` fills with `AuthRole.appName`.
+        // The older keys for these hold "Instant Teacher" itself, which is the
+        // wrong app in Pro Teacher. New keys rather than new values: an
+        // installed build reads the old key without formatting it, and would
+        // show a literal "%@".
+        "Log in to %@ to continue your journey.": "login_subtitle_app_name",
+        "Send me occasional updates and tips about\n%@.": "marketing_opt_in_app_name",
+        "Tell us a bit about yourself to get started with\n%@.": "complete_profile_intro_app_name",
+
         // MARK: Keys Remote Config would reject
         //
         // `generatedKey` drops words of two characters or fewer, so these three
@@ -1113,6 +1164,10 @@ enum LocalizationKey {
         // to the same generated key, so one published value was serving both.
         // The string that matches the value already in the template keeps the
         // original key; the other one is moved here.
+
+        // The photo picker's camera alert title; `camera_access_required`
+        // holds the full sentence the profile and verification screens use.
+        "Camera access required": "camera_access_required_title",
 
         // The search's screens and the teacher's card. `how_would_you` holds
         // the payout question; the student's "I'm stuck because:" and "I can't

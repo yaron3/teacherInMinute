@@ -207,14 +207,26 @@ and on every language change (`LocalizationManager.applyRemoteConfigLanguageSign
 and the Firebase SDK ships it in the fetch request's `analyticsUserProperties`
 field — that's how Firebase decides which conditional value to serve.
 
-> ⚠️ **The condition must key off the user property, not `device.language`.**
+> ⚠️ **The condition must key off the user property, not only `device.language`.**
 > A `device.language in ['he']` condition looks equivalent but is not: the
 > Android SDK builds that field from
 > `context.getResources().getConfiguration().locale` at fetch time, so it
 > reports the *device* locale and an in-app language switch never reaches it
-> reliably. `backend/Firebase/remote_config_tim.json` still ships the old
-> `device.language` condition — migrating it to `user_language` is the
-> outstanding piece of work.
+> reliably.
+>
+> `backend/Firebase/remote_config_tim.json` therefore carries **two** Hebrew
+> conditions (since template version 111, 2026-10-04):
+>
+> | Condition | Expression | Who it serves |
+> |---|---|---|
+> | `Hebrew` | `device.language in ['he']` | Builds from before 2026-08-12, which never send `user_language` |
+> | `HebrewApp` | `app.userProperty['user_language'].exactlyMatches(['he'])` | Every build since, whatever the device language |
+>
+> Remote Config has no `||`, so the two must carry **the same value** on
+> every parameter. `backend/Firebase/check-localization.py` fails if they
+> drift — an edit made in the console to one of them only reaches half the
+> users. Once builds older than August 2026 are gone, `Hebrew` can be
+> deleted.
 
 > ⚠️ `RemoteConfigService.configureRemoteConfig` sets
 > `minimumFetchInterval = 3600`, which is why `refresh()` calls
@@ -247,8 +259,11 @@ field — that's how Firebase decides which conditional value to serve.
    read poorly, add an explicit `"My new English text.": "my_new_text"`
    mapping. Otherwise the auto-generator handles it.
 3. Add the same key to the Remote Config template with the English default
-   plus one conditional value per supported language.
-4. Publish the template — no app update required.
+   plus one conditional value per supported language — for Hebrew, the same
+   value under both `Hebrew` and `HebrewApp`.
+4. Run `python3 backend/Firebase/check-localization.py`, then publish the
+   template (`firebase deploy --only remoteconfig` from `backend/Firebase`) —
+   no app update required.
 
 ---
 

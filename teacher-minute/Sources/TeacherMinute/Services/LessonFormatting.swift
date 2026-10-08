@@ -25,8 +25,11 @@ enum LessonFormatting {
 	  return LocalizationSupport.localized("Yesterday")
 	}
 	
+	// In the app's language, not the device's: a fixed "MMM d" with no locale
+	// rendered "Sep 4" on a Hebrew screen whenever the device was in English.
 	let formatter = DateFormatter()
-	formatter.dateFormat = "MMM d"
+	formatter.locale = LocalizationSupport.currentLocale
+	formatter.setLocalizedDateFormatFromTemplate("d MMM")
 	return formatter.string(from: date)
   }
   

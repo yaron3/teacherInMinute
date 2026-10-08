@@ -12,7 +12,7 @@ extension LoginViewModel {
     // MARK: Screen chrome
     var screenTitle: String { LocalizationSupport.localized("Welcome Back") }
     var subtitleText: String {
-        LocalizationSupport.localized("Log in to Teacher in a Minute to continue your journey.")
+        String(format: LocalizationSupport.localized("Log in to %@ to continue your journey."), AuthRole.appRole.appName)
     }
 
     // MARK: Errors

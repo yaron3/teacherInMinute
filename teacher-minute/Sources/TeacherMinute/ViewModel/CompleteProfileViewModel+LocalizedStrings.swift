@@ -12,7 +12,7 @@ extension CompleteProfileViewModel {
     // MARK: Screen chrome
     var screenTitle: String { LocalizationSupport.localized("Complete your profile") }
     var introText: String {
-        LocalizationSupport.localized("Tell us a bit about yourself to get started with\nTeacher in a Minute.")
+        String(format: LocalizationSupport.localized("Tell us a bit about yourself to get started with\n%@."), AuthRole.appRole.appName)
     }
     var loadingText: String { LocalizationSupport.localized("Loading your profile…") }
     var continueLabel: String { LocalizationSupport.localized("Continue") }
