@@ -14,6 +14,16 @@
       "name": "HebrewApp",
       "expression": "app.userProperty['user_language'].exactlyMatches(['he'])",
       "tagColor": "CYAN"
+    },
+    {
+      "name": "Android Teacher - Hebrew",
+      "expression": "app.id == '1:922632930084:android:9d52fa48bd34879bfde9b1' && device.language in ['he', 'iw']",
+      "tagColor": "ORANGE"
+    },
+    {
+      "name": "iOS - Teacher - Hebrew",
+      "expression": "app.id == '1:922632930084:ios:621a96f2e9fca5f7fde9b1' && device.language in ['he', 'iw']",
+      "tagColor": "ORANGE"
     }
   ],
   "parameters": {
@@ -271,7 +281,7 @@
     },
     "you_employee_handle": {
       "defaultValue": {
-        "value": "You're an employee — we handle all the bureaucracy!.\nSelf-employed ● Freelance ● Receipts"
+        "value": "You're an employee - we handle all the bureaucracy!.Self-employed ● Freelance ● Receipts"
       },
       "conditionalValues": {
         "Hebrew": {
@@ -419,6 +429,12 @@
         },
         "HebrewApp": {
           "value": "מורים מאומתים"
+        },
+        "Android Teacher - Hebrew": {
+          "value": "סטודנטים ממתינים"
+        },
+        "iOS - Teacher - Hebrew": {
+          "value": "סטודנטים ממתינים"
         }
       },
       "valueType": "STRING"
