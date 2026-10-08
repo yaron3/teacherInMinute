@@ -125,6 +125,7 @@ final class ChatSessionService {
   private let boardRef: FirebaseDatabase.DatabaseReference
   private let boardViewportsRef: FirebaseDatabase.DatabaseReference
   private let chatPausedRef: FirebaseDatabase.DatabaseReference
+  private let boardPermissionRef: FirebaseDatabase.DatabaseReference
   private let mediaPendingRef: FirebaseDatabase.DatabaseReference
   private let mediaStateRef: FirebaseDatabase.DatabaseReference
   private let connectionSetupRef: FirebaseDatabase.DatabaseReference
@@ -139,6 +140,7 @@ final class ChatSessionService {
   private var boardHandle: DatabaseHandle?
   private var boardViewportsHandle: DatabaseHandle?
   private var chatPausedHandle: DatabaseHandle?
+  private var boardPermissionHandle: DatabaseHandle?
   private var mediaPendingHandle: DatabaseHandle?
   private var mediaStateHandle: DatabaseHandle?
   private var connectionSetupHandle: DatabaseHandle?
@@ -155,6 +157,7 @@ final class ChatSessionService {
     self.boardRef = questionRef.child("board/strokes")
     self.boardViewportsRef = questionRef.child("board/viewports")
     self.chatPausedRef = questionRef.child("chatPaused")
+    self.boardPermissionRef = questionRef.child("boardPermission")
     self.mediaPendingRef = questionRef.child("mediaPending")
     self.mediaStateRef = questionRef.child("mediaState")
     self.connectionSetupRef = questionRef.child("connectionSetup")
@@ -312,6 +315,16 @@ final class ChatSessionService {
 #endif
   }
 
+  /// The student's leave to draw — see `BoardDrawPermission`. Nil while
+  /// nothing has been asked.
+  func startBoardPermissionListening(onUpdate: @escaping (BoardDrawPermission?) -> Void) {
+#if !os(Android)
+    boardPermissionHandle = boardPermissionRef.observe(.value) { snapshot in
+      onUpdate((snapshot.value as? [String: Any]).flatMap(BoardDrawPermission.init(dictionary:)))
+    }
+#endif
+  }
+
   func startMediaPendingListening(onUpdate: @escaping ([String: Bool]) -> Void) {
 #if !os(Android)
     mediaPendingHandle = mediaPendingRef.observe(.value) { snapshot in
@@ -405,6 +418,10 @@ final class ChatSessionService {
     if let chatPausedHandle {
       chatPausedRef.removeObserver(withHandle: chatPausedHandle)
       self.chatPausedHandle = nil
+    }
+    if let boardPermissionHandle {
+      boardPermissionRef.removeObserver(withHandle: boardPermissionHandle)
+      self.boardPermissionHandle = nil
     }
     if let mediaPendingHandle {
       mediaPendingRef.removeObserver(withHandle: mediaPendingHandle)
@@ -589,6 +606,31 @@ final class ChatSessionService {
 #else
     try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
       chatPausedRef.child(key).setValue(paused) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
+  /// The student asks with `.requested`; the teacher answers under the same id.
+  func setBoardPermission(_ permission: BoardDrawPermission) async throws {
+#if os(Android)
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.setBoardPermission(
+        questionId: self.questionId,
+        status: permission.status.rawValue,
+        requestId: permission.requestId
+      )
+    }.value
+#else
+    let payload: [String: Any] = [
+      "status": permission.status.rawValue,
+      "requestId": permission.requestId,
+      "updatedAt": FirebaseDatabase.ServerValue.timestamp()
+    ]
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      boardPermissionRef.setValue(payload) { error, _ in
         if let error { cont.resume(throwing: error); return }
         cont.resume(returning: ())
       }
@@ -800,6 +842,17 @@ final class ChatSessionService {
       }
     }
     return states
+  }
+
+  func fetchBoardPermission() async throws -> BoardDrawPermission? {
+    let json = try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.fetchBoardPermission(questionId: self.questionId)
+    }.value
+    guard let data = json.data(using: .utf8),
+          let row = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return nil
+    }
+    return BoardDrawPermission(dictionary: row)
   }
 
   func fetchMediaPending() async throws -> [String: Bool] {
@@ -1169,6 +1222,30 @@ protocol ChatSessionViewModeling: AnyObject {
   func peerMediaState() -> MediaDeviceState?
   func endLesson() async
 
+  // MARK: Drawing permission
+  //
+  // The student draws only with the teacher's leave, asked for and answered
+  // through `BoardDrawPermission`. A grant lasts until the student has gone
+  // `boardDrawWindowSeconds` without drawing.
+
+  /// Whether this side may start a stroke now. Always true for the teacher.
+  var canDrawOnBoard: Bool { get }
+  /// Seconds without drawing after which the student's leave runs out.
+  var boardDrawWindowSeconds: Double { get }
+  /// Where the student's own ask stands.
+  var boardDrawRequestState: BoardDrawRequestState { get }
+  /// The teacher turned the student's ask down, and the student has not yet
+  /// been told.
+  var isBoardDrawDeclined: Bool { get }
+  /// The student has asked to draw, and this teacher has not answered.
+  var hasPendingBoardDrawRequest: Bool { get }
+  /// Student: asks the teacher for leave to draw.
+  func requestBoardDrawPermission()
+  /// Teacher: answers the student's ask.
+  func answerBoardDrawRequest(approve: Bool)
+  /// Student: has read that the ask was declined.
+  func acknowledgeBoardDrawDeclined()
+
   // MARK: Presence
   //
   // The lesson ends with the first side to go — left, or lost its connection
@@ -1287,6 +1364,15 @@ extension ChatSessionViewModeling {
   func publishConversationType(_ conversationType: String) async -> String? { nil }
 
   func fetchMediaCredentials() async -> MediaCredentials? { nil }
+
+  var canDrawOnBoard: Bool { true }
+  var boardDrawWindowSeconds: Double { 60 }
+  var boardDrawRequestState: BoardDrawRequestState { .none }
+  var isBoardDrawDeclined: Bool { false }
+  var hasPendingBoardDrawRequest: Bool { false }
+  func requestBoardDrawPermission() {}
+  func answerBoardDrawRequest(approve: Bool) {}
+  func acknowledgeBoardDrawDeclined() {}
 
   var hasMediaCredentials: Bool { !liveKitRoom.isEmpty && !liveKitToken.isEmpty }
 
@@ -1491,6 +1577,31 @@ extension ChatSessionViewModeling {
   var dismissLabel: String { LocalizationSupport.localized("Dismiss") }
   var boardHintText: String { LocalizationSupport.localized("Use your finger to write or sketch.") }
   var seeOtherSideLabel: String { LocalizationSupport.localized("See the other side") }
+
+  // MARK: Drawing permission
+
+  var askToDrawTitle: String { LocalizationSupport.localized("Ask to draw on the board?") }
+  var askToDrawMessage: String {
+    LocalizationSupport.localized("Your teacher needs to approve before you can draw.")
+  }
+  var askToDrawLabel: String { LocalizationSupport.localized("Ask the teacher") }
+  var awaitingDrawApprovalTitle: String { LocalizationSupport.localized("Waiting for your teacher") }
+  var awaitingDrawApprovalMessage: String {
+    LocalizationSupport.localized("You can draw as soon as your teacher approves.")
+  }
+  var drawDeclinedTitle: String { LocalizationSupport.localized("Your teacher declined") }
+  var drawDeclinedMessage: String {
+    LocalizationSupport.localized("You can't draw on the board right now.")
+  }
+  var drawRequestTitle: String { LocalizationSupport.localized("The student asks to draw on the board") }
+  var drawRequestMessage: String {
+    String(
+      format: LocalizationSupport.localized("If you approve, it lasts until they stop drawing for %d seconds."),
+      Int(boardDrawWindowSeconds)
+    )
+  }
+  var approveLabel: String { LocalizationSupport.localized("Approve") }
+  var declineLabel: String { LocalizationSupport.localized("Decline") }
 
   // MARK: Rate the session
 
@@ -1842,6 +1953,23 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private var isChatVisible = true
   private var isBoardVisible = false
 
+  // Drawing permission — see the protocol and `BoardDrawPermission`.
+  private(set) var boardDrawRequestState: BoardDrawRequestState = .none
+  private(set) var isBoardDrawDeclined = false
+  private var pendingBoardDrawRequestId: String?
+  var hasPendingBoardDrawRequest: Bool { pendingBoardDrawRequestId != nil }
+  /// The node as last read, so an unchanged reading is not acted on twice.
+  private var boardPermission: BoardDrawPermission?
+  private var hasReadBoardPermission = false
+  /// Student: the ask this side has out, and the last grant it acted on.
+  private var ownBoardDrawRequestId: String?
+  private var lastGrantedBoardRequestId: String?
+  /// Student: when the current leave runs out. Pushed on by every stroke.
+  private var boardDrawAllowedUntil: Date?
+  /// Teacher: asks already answered here, so a late reading of one does not
+  /// raise it again.
+  private var answeredBoardRequestIds: Set<String> = []
+
   /// What this side makes of the other one while the lesson runs — see
   /// `PeerPresenceTracker`.
   private(set) var peerPresence = PeerPresenceTracker()
@@ -2026,6 +2154,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           let strokes = try await service.fetchBoardStrokes()
           let viewports = try await service.fetchBoardViewports()
           let paused = try await service.fetchChatPaused()
+          // Optional: a failed read leaves the last one standing.
+          let boardPermission = try? await service.fetchBoardPermission()
           let mediaPending = try await service.fetchMediaPending()
           // Optional, like the presence reading: it only colours a badge.
           let mediaState = try? await service.fetchMediaState()
@@ -2034,6 +2164,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           receiveBoardStrokes(strokes)
           receiveBoardViewports(viewports)
           chatPausedStates = paused
+          if let boardPermission {
+            receiveBoardPermission(boardPermission)
+          }
           mediaPendingStates = mediaPending
           onChatPausedUpdated?(paused)
           onMediaPendingUpdated?(mediaPending)
@@ -2080,6 +2213,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     service.startChatPausedListening { [weak self] states in
       self?.chatPausedStates = states
       self?.onChatPausedUpdated?(states)
+    }
+    service.startBoardPermissionListening { [weak self] permission in
+      self?.receiveBoardPermission(permission)
     }
     service.startMediaPendingListening { [weak self] states in
       self?.mediaPendingStates = states
@@ -2270,6 +2406,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     guard !points.isEmpty else { return }
     guard !hasReportedLessonEnd else { return }
     errorMessage = nil
+    if !isTeacherRole, boardDrawAllowedUntil != nil {
+      boardDrawAllowedUntil = Date().addingTimeInterval(boardDrawWindowSeconds)
+    }
     boardStrokes.append(localStroke(points: points))
     Task {
       do {
@@ -2277,6 +2416,105 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       } catch {
         errorMessage = error.localizedDescription
 		logger.error("[ChatSession] Board stroke send failed: \(error.localizedDescription)")
+      }
+    }
+  }
+
+  // MARK: Drawing permission
+
+  static let defaultBoardDrawWindowSeconds: Double = 60
+
+  /// `board_draw_permission_seconds` in Remote Config, or a minute when it is
+  /// missing or not a positive number.
+  var boardDrawWindowSeconds: Double {
+    let configured = RemoteConfigService.shared.getNumber(RemoteConfigKey.boardDrawPermissionSeconds.rawValue)
+    return configured > 0 ? configured : Self.defaultBoardDrawWindowSeconds
+  }
+
+  var canDrawOnBoard: Bool {
+    if isTeacherRole { return true }
+    guard let boardDrawAllowedUntil else { return false }
+    return boardDrawAllowedUntil > Date()
+  }
+
+  func requestBoardDrawPermission() {
+    guard !isTeacherRole, boardDrawRequestState != .pending, !hasReportedLessonEnd else { return }
+    let requestId = UUID().uuidString
+    ownBoardDrawRequestId = requestId
+    boardDrawRequestState = .pending
+    Task {
+      do {
+        try await service.setBoardPermission(BoardDrawPermission(status: .requested, requestId: requestId))
+      } catch {
+        if ownBoardDrawRequestId == requestId {
+          ownBoardDrawRequestId = nil
+          boardDrawRequestState = .none
+        }
+        errorMessage = error.localizedDescription
+        logger.error("[ChatSession] Board draw request failed: \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func answerBoardDrawRequest(approve: Bool) {
+    guard let requestId = pendingBoardDrawRequestId else { return }
+    pendingBoardDrawRequestId = nil
+    answeredBoardRequestIds.insert(requestId)
+    guard !hasReportedLessonEnd else { return }
+    Task {
+      do {
+        try await service.setBoardPermission(
+          BoardDrawPermission(status: approve ? .granted : .declined, requestId: requestId)
+        )
+      } catch {
+        errorMessage = error.localizedDescription
+        logger.error("[ChatSession] Board draw answer failed approve=\(approve): \(error.localizedDescription)")
+      }
+    }
+  }
+
+  func acknowledgeBoardDrawDeclined() {
+    isBoardDrawDeclined = false
+  }
+
+  private func receiveBoardPermission(_ permission: BoardDrawPermission?) {
+    let isFirstReading = !hasReadBoardPermission
+    hasReadBoardPermission = true
+    guard permission != boardPermission else { return }
+    boardPermission = permission
+    guard let permission else { return }
+
+    if isTeacherRole {
+      if permission.status == .requested, !answeredBoardRequestIds.contains(permission.requestId) {
+        pendingBoardDrawRequestId = permission.requestId
+      } else if pendingBoardDrawRequestId == permission.requestId {
+        pendingBoardDrawRequestId = nil
+      }
+      return
+    }
+
+    switch permission.status {
+    case .requested:
+      break
+    case .granted:
+      // A grant already standing when this side joined belongs to an earlier
+      // stretch of the lesson — most likely long run out — so it is not
+      // restarted here.
+      if isFirstReading {
+        lastGrantedBoardRequestId = permission.requestId
+      } else if lastGrantedBoardRequestId != permission.requestId {
+        lastGrantedBoardRequestId = permission.requestId
+        boardDrawAllowedUntil = Date().addingTimeInterval(boardDrawWindowSeconds)
+      }
+      if permission.requestId == ownBoardDrawRequestId {
+        ownBoardDrawRequestId = nil
+        boardDrawRequestState = .none
+      }
+    case .declined:
+      if permission.requestId == ownBoardDrawRequestId {
+        ownBoardDrawRequestId = nil
+        boardDrawRequestState = .none
+        isBoardDrawDeclined = true
       }
     }
   }
@@ -3084,6 +3322,14 @@ private enum AndroidChatBridge {
     name: "setConversationType",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
   )!
+  private static let setBoardPermissionMethod = managerClass.getStaticMethodID(
+    name: "setBoardPermission",
+    sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
+  )!
+  private static let fetchBoardPermissionMethod = managerClass.getStaticMethodID(
+    name: "fetchBoardPermissionJson",
+    sig: "(Ljava/lang/String;)Ljava/lang/String;"
+  )!
   private static let fetchMediaPendingMethod = managerClass.getStaticMethodID(
     name: "fetchMediaPendingJson",
     sig: "(Ljava/lang/String;)Ljava/lang/String;"
@@ -3307,6 +3553,30 @@ private enum AndroidChatBridge {
         ]
       )
     }
+  }
+
+  static func setBoardPermission(questionId: String, status: String, requestId: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: setBoardPermissionMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          status.toJavaParameter(options: [.kotlincompat]),
+          requestId.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func fetchBoardPermission(questionId: String) throws -> String {
+    try jniContext {
+      try managerClass.callStatic(
+        method: fetchBoardPermissionMethod,
+        options: [.kotlincompat],
+        args: [questionId.toJavaParameter(options: [.kotlincompat])]
+      )
+    } as String
   }
 
   static func fetchMediaPending(questionId: String) throws -> String {

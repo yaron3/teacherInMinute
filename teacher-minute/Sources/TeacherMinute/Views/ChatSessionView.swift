@@ -331,6 +331,35 @@ struct ChatSessionView: View {
       message: viewModel.peerSetupMessage(for: peerSetupPrompt ?? .cancelled),
       actions: peerSetupActions
     )
+    // The student's ask to draw, and the answer to it. Raised here rather than
+    // on the board, so it reaches whichever tab is showing. The dialog drops
+    // its binding before running the tapped action, so only the actions
+    // answer: the request stays up until one of them is chosen.
+    .appDialog(
+      viewModel.drawRequestTitle,
+      isPresented: Binding(
+        get: { viewModel.hasPendingBoardDrawRequest },
+        set: { _ in }
+      ),
+      message: viewModel.drawRequestMessage,
+      actions: [
+        AppDialogAction(viewModel.approveLabel) {
+          viewModel.answerBoardDrawRequest(approve: true)
+        },
+        AppDialogAction(viewModel.declineLabel, kind: .cancel) {
+          viewModel.answerBoardDrawRequest(approve: false)
+        }
+      ]
+    )
+    .appDialog(
+      viewModel.drawDeclinedTitle,
+      isPresented: Binding(
+        get: { viewModel.isBoardDrawDeclined },
+        set: { if !$0 { viewModel.acknowledgeBoardDrawDeclined() } }
+      ),
+      message: viewModel.drawDeclinedMessage,
+      actions: [AppDialogAction(viewModel.okLabel)]
+    )
   }
 
   /// Built from the prompt as it stands, like `peerUpgradeActions`: the dialog
