@@ -1,9 +1,6 @@
 package teacher.minute
 
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.util.Base64
 import android.util.Size
 import android.util.Log
@@ -28,7 +25,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import skip.ui.ComposeContext
 import skip.ui.ComposeView
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -182,35 +178,11 @@ object AndroidQuestionCamera {
     private fun encode(image: ImageProxy): String {
         val buffer = image.planes[0].buffer
         val jpeg = ByteArray(buffer.remaining()).also { buffer.get(it) }
-
-        // Decoded at the smallest power-of-two reduction that still covers
-        // MAX_DIMENSION, then scaled the rest of the way, so a 12MP frame is
-        // never held in memory at full size.
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, bounds)
-        var sampleSize = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sampleSize * 2) >= MAX_DIMENSION) {
-            sampleSize *= 2
-        }
-        val decoded = BitmapFactory.decodeByteArray(
-            jpeg, 0, jpeg.size,
-            BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        ) ?: throw IllegalStateException("Could not read the photo")
-
-        val longest = maxOf(decoded.width, decoded.height)
-        val scale = if (longest > MAX_DIMENSION) MAX_DIMENSION.toFloat() / longest else 1f
-        val matrix = Matrix().apply {
-            postScale(scale, scale)
-            // The sensor's frame is stored as the sensor sees it; the rotation
-            // turns it the way the student held the phone.
-            postRotate(image.imageInfo.rotationDegrees.toFloat())
-        }
-        val upright = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
-
-        val stream = ByteArrayOutputStream()
-        upright.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream)
-        if (upright !== decoded) upright.recycle()
-        decoded.recycle()
-        return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+        // The sensor's frame is stored as the sensor sees it; the rotation
+        // turns it the way the student held the phone.
+        val upright = AndroidPhotoScaler.scaledJpeg(
+            jpeg, MAX_DIMENSION, JPEG_QUALITY, rotationDegrees = image.imageInfo.rotationDegrees
+        )
+        return Base64.encodeToString(upright, Base64.NO_WRAP)
     }
 }

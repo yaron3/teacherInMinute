@@ -16,10 +16,17 @@ object AndroidImagePickerManager {
     private const val PICK_IMAGE_REQUEST = 7104
     private const val CAPTURE_IMAGE_REQUEST = 7105
     private const val TIMEOUT_SECONDS = 300L
+    private const val JPEG_QUALITY = 85
 
+    /**
+     * [maxDimension] is the longer side the image is scaled to before it is
+     * returned, or 0 to return it as it is. Documents and ID photos keep
+     * every pixel; a question's photo only needs to read on a phone.
+     */
     private data class PendingPick(
+        val maxDimension: Int = 0,
         val latch: CountDownLatch = CountDownLatch(1),
-        @Volatile var resultBase64: String = "",
+        @Volatile var resultBytes: ByteArray? = null,
         @Volatile var error: Throwable? = null
     )
 
@@ -28,11 +35,15 @@ object AndroidImagePickerManager {
     @Volatile private var pendingCaptureUri: Uri? = null
 
     @JvmStatic
-    fun pickImageBase64(): String {
-        Log.i(TAG, "pickImageBase64 requested")
+    fun pickImageBase64(): String = pickImageBase64(0)
+
+    /** A picked image as an upright JPEG, no larger than [maxDimension]. */
+    @JvmStatic
+    fun pickImageBase64(maxDimension: Int): String {
+        Log.i(TAG, "pickImageBase64 requested maxDimension=$maxDimension")
         val activity = MainActivity.currentActivity
             ?: throw IllegalStateException("No active Android activity")
-        val request = beginPick()
+        val request = beginPick(maxDimension)
 
         activity.runOnUiThread {
             try {
@@ -59,11 +70,15 @@ object AndroidImagePickerManager {
     /// base64-encoded JPEG. Complements `pickImageBase64` (gallery) so the user
     /// can either take a picture or choose an existing one.
     @JvmStatic
-    fun captureImageBase64(): String {
-        Log.i(TAG, "captureImageBase64 requested")
+    fun captureImageBase64(): String = captureImageBase64(0)
+
+    /** A captured photo as an upright JPEG, no larger than [maxDimension]. */
+    @JvmStatic
+    fun captureImageBase64(maxDimension: Int): String {
+        Log.i(TAG, "captureImageBase64 requested maxDimension=$maxDimension")
         val activity = MainActivity.currentActivity
             ?: throw IllegalStateException("No active Android activity")
-        val request = beginPick()
+        val request = beginPick(maxDimension)
 
         activity.runOnUiThread {
             try {
@@ -95,8 +110,8 @@ object AndroidImagePickerManager {
         return awaitResult(request, "captureImageBase64")
     }
 
-    private fun beginPick(): PendingPick {
-        val request = PendingPick()
+    private fun beginPick(maxDimension: Int): PendingPick {
+        val request = PendingPick(maxDimension = maxDimension)
         synchronized(lock) {
             if (pendingPick != null) {
                 throw IllegalStateException("An image picker is already open")
@@ -113,8 +128,17 @@ object AndroidImagePickerManager {
         }
 
         request.error?.let { throw it }
-        Log.i(TAG, "$label completed base64Length=${request.resultBase64.length}")
-        return request.resultBase64
+        // Scaled and encoded here, on the caller's background thread, rather
+        // than in the activity result, which arrives on the main thread.
+        val picked = request.resultBytes ?: return ""
+        val bytes = if (request.maxDimension > 0) {
+            AndroidPhotoScaler.scaledJpeg(picked, request.maxDimension, JPEG_QUALITY)
+        } else {
+            picked
+        }
+        val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+        Log.i(TAG, "$label completed bytes=${picked.size} -> ${bytes.size}")
+        return base64
     }
 
     fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
@@ -128,7 +152,7 @@ object AndroidImagePickerManager {
         if (resultCode != Activity.RESULT_OK) {
             Log.i(TAG, "Image picker cancelled")
             pendingCaptureUri = null
-            completePending(resultBase64 = "")
+            completePending()
             return true
         }
 
@@ -147,7 +171,7 @@ object AndroidImagePickerManager {
             val bytes = activity.contentResolver.openInputStream(uri)?.use { stream ->
                 stream.readBytes()
             } ?: throw IllegalStateException("Could not read selected image")
-            completePending(resultBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP))
+            completePending(resultBytes = bytes)
             Log.i(TAG, "Selected image bytes=${bytes.size}")
         } catch (error: Throwable) {
             Log.e(TAG, "Failed to read selected image", error)
@@ -157,13 +181,13 @@ object AndroidImagePickerManager {
         return true
     }
 
-    private fun completePending(resultBase64: String = "", error: Throwable? = null) {
+    private fun completePending(resultBytes: ByteArray? = null, error: Throwable? = null) {
         val request = synchronized(lock) {
             val current = pendingPick
             pendingPick = null
             current
         }
-        request?.resultBase64 = resultBase64
+        request?.resultBytes = resultBytes
         request?.error = error
         request?.latch?.countDown()
     }
