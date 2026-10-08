@@ -58,6 +58,13 @@ enum LocalizationSupport {
 
     private static var systemLanguageCode: String {
         #if os(Android)
+        // Native `Locale.current` does not follow the device language on
+        // Android (it read English on an Android 14 device set to Hebrew), so
+        // ask Android for it. Remote Config's device-language condition still
+        // saw Hebrew there, which served Hebrew text in a left-to-right layout.
+        if let code = androidSystemLanguageCode {
+            return code
+        }
         if let code = normalizedSupportedLanguageCode(for: Locale.current.identifier) {
             return code
         }
@@ -83,6 +90,14 @@ enum LocalizationSupport {
         #endif
         return "en"
     }
+
+    #if os(Android)
+    /// Read once: every localized string resolves the language, and a JNI
+    /// round trip per string is not worth tracking a mid-session change of
+    /// the device language.
+    private static let androidSystemLanguageCode: String? = AndroidLocaleBridge.systemLanguageTag()
+        .flatMap { normalizedSupportedLanguageCode(for: $0) }
+    #endif
 
     private static func normalizedSupportedLanguageCode(for identifier: String) -> String? {
         let languageCode = Locale(identifier: identifier).language.languageCode?.identifier ?? identifier
