@@ -31,6 +31,9 @@ struct StudentQuestionHomeView: View {
   /// join the question only as it is sent, as on the ask sheet.
   @State var attachedFormulas: [String] = []
   @State var photoURL: String?
+  /// The attached photo's bytes, kept with a question held through sign-up so
+  /// it can be uploaded again under the new account.
+  @State var photoData: Data?
   @State var isTakingPhoto = false
   @State var isUploadingPhoto = false
   @State var isSubmitting = false
@@ -76,6 +79,7 @@ struct StudentQuestionHomeView: View {
       hasCamera = QuestionCamera.isAvailable
       cameraAccess = viewModel.questionCameraAccess
       requestCameraIfNeeded()
+      restoreHeldQuestion()
     }
     .onDisappear {
       isOnScreen = false
@@ -523,6 +527,7 @@ struct StudentQuestionHomeView: View {
     } else if let photoURL {
       Button {
         self.photoURL = nil
+        photoData = nil
       } label: {
         CachedRemoteImage(url: photoURL, contentMode: .fill)
           .frame(width: 67, height: 60)
@@ -810,6 +815,7 @@ struct StudentQuestionHomeView: View {
     isUploadingPhoto = true
     do {
       photoURL = try await viewModel.uploadQuestionPhoto(data, source: source)
+      photoData = data
     } catch {
       photoErrorMessage = error.localizedDescription
     }
@@ -872,7 +878,12 @@ struct StudentQuestionHomeView: View {
       showsEmptyQuestionAlert = true
       return
     }
-    guard mayAskTeacher() else { return }
+    guard mayAskTeacher() else {
+      // Out of minutes: the student may now register or log in for some,
+      // which replaces this screen. Keep the question for when they are back.
+      viewModel.holdQuestionDraft(currentDraft, photoData: photoData)
+      return
+    }
     isSubmitting = true
     Task {
       let error = await viewModel.submitQuestionWithPermissions(
@@ -886,11 +897,42 @@ struct StudentQuestionHomeView: View {
     }
   }
 
+  var currentDraft: QuestionDraft {
+    QuestionDraft(
+      text: questionText,
+      formulas: attachedFormulas,
+      pendingFormula: pendingFormulaLatex,
+      photoURL: photoURL
+    )
+  }
+
+  /// Puts back the question the student was sending before they registered
+  /// or logged in for minutes, so it need not be asked again.
+  func restoreHeldQuestion() {
+    guard let held = viewModel.takeQuestionDraft() else { return }
+    questionText = held.draft.text
+    attachedFormulas = held.draft.formulas
+    pendingFormulaLatex = held.draft.pendingFormula
+    select(.text)
+    guard let url = held.draft.photoURL else { return }
+    isUploadingPhoto = true
+    Task {
+      photoURL = await viewModel.questionPhotoForCurrentAccount(url: url, photoData: held.photoData)
+      photoData = photoURL == nil ? nil : held.photoData
+      if photoURL == nil {
+        photoErrorMessage = viewModel.heldPhotoLostMessage
+      }
+      isUploadingPhoto = false
+    }
+  }
+
   func clearQuestion() {
+    viewModel.discardQuestionDraft()
     questionText = ""
     attachedFormulas = []
     pendingFormulaLatex = ""
     photoURL = nil
+    photoData = nil
     keyboardMode = .regular
     mode = .photo
   }

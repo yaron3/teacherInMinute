@@ -30,6 +30,9 @@ enum NotEnoughMinutesNextStep {
 enum QuestionPhotoSource: String {
   case camera
   case library
+  /// Uploaded again under the account a student registered or logged in to,
+  /// from the question they had been sending.
+  case restoredDraft = "restored_draft"
 }
 
 extension StudentHomeViewModeling {
@@ -132,6 +135,11 @@ extension StudentHomeViewModeling {
   func notEnoughMinutesPrimaryTapped() -> NotEnoughMinutesNextStep {
     let step: NotEnoughMinutesNextStep = isAnonymousAccount ? .createAccount : .buyMinutes
     logNotEnoughMinutesAction(step == .createAccount ? "sign_up" : "buy")
+    // Buying keeps the student on the home, question and all; only leaving
+    // for sign-up needs the question kept elsewhere.
+    if step == .buyMinutes {
+      discardQuestionDraft()
+    }
     return step
   }
 
@@ -142,6 +150,48 @@ extension StudentHomeViewModeling {
 
   func notEnoughMinutesDismissed() {
     logNotEnoughMinutesAction("dismiss")
+    discardQuestionDraft()
+  }
+
+  // MARK: The question kept through sign-up
+
+  /// The question could not go out for want of minutes. It is kept in case
+  /// the student registers or logs in to get some — that replaces the whole
+  /// home — and dropped if they answer the prompt any other way.
+  func holdQuestionDraft(_ draft: QuestionDraft, photoData: Data?) {
+    QuestionDraftStore.shared.hold(draft, photoData: photoData)
+  }
+
+  func discardQuestionDraft() {
+    QuestionDraftStore.shared.discard()
+  }
+
+  var heldPhotoLostMessage: String {
+    LocalizationSupport.localized("Your question is back, but its photo could not be kept. Please attach it again.")
+  }
+
+  /// The question kept from before the student registered or logged in, if
+  /// any. Taking it drops it, so it is restored once.
+  func takeQuestionDraft() -> (draft: QuestionDraft, photoData: Data?)? {
+    guard let held = QuestionDraftStore.shared.take() else { return nil }
+    AnalyticsService.shared.logEvent(AnalyticsEvent.questionDraftRestored, parameters: [
+      "has_photo": held.draft.photoURL != nil ? 1 : 0
+    ])
+    return held
+  }
+
+  /// A kept question's photo, under this account: as it was if it is already
+  /// in this account's folder, else uploaded again from its bytes. A new
+  /// account has a new uid, and the backend accepts only photos in the
+  /// asker's own folder. Nil when it cannot be carried over.
+  func questionPhotoForCurrentAccount(url: String, photoData: Data?) async -> String? {
+    guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else { return nil }
+    let path = url.removingPercentEncoding ?? url
+    if path.contains("questionImages/\(uid)/") {
+      return url
+    }
+    guard let photoData else { return nil }
+    return try? await uploadQuestionPhoto(photoData, source: .restoredDraft)
   }
 
   func logNotEnoughMinutesShown() {

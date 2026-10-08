@@ -59,6 +59,7 @@ enum AnalyticsEvent {
     /// student is stuck, or how they would like to start.
     static let askTeacherDetailChosen = "ask_teacher_detail_chosen"
     static let questionPhotoAttached = "question_photo_attached"
+    static let questionDraftRestored = "question_draft_restored"
     static let questionPhotoFailed   = "question_photo_failed"
     static let notEnoughMinutesShown = "not_enough_minutes_shown"
     static let notEnoughMinutesAction = "not_enough_minutes_action"
