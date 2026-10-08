@@ -224,8 +224,9 @@ extension StudentHomeViewModeling {
     }
   }
 
-  /// The character's bubble: an ellipsis, then what the search is doing — its
-  /// lines broken by hand, as the bubble sets them closer than a paragraph.
+  /// The character's bubble: what the search is doing, under the animated
+  /// dots the scene puts above it — its lines broken by hand, as the bubble
+  /// sets them closer than a paragraph.
   var searchBubbleLines: [String] {
     let text: String
     switch searchDetails.step {
@@ -237,7 +238,7 @@ extension StudentHomeViewModeling {
     case .start, .waiting:
       text = LocalizationSupport.localized("Updating\ndetails")
     }
-    return ["..."] + text.components(separatedBy: "\n")
+    return text.components(separatedBy: "\n")
   }
 
   /// Each its own sentence: Hebrew joins the subject to its preposition.

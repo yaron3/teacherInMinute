@@ -95,6 +95,18 @@ struct SearchDetailsLayout {
   var waitingSceneCenter: CGPoint {
     CGPoint(x: centerX, y: cardTop + Self.waitingSceneSize.height / 2 * waitingScale)
   }
+
+  /// The dots that say the search is still going, in the waiting card's
+  /// bottom right, clear of the teacher, who stands on the left. On the right
+  /// in Hebrew too: the art is not mirrored, so neither is the space it
+  /// leaves.
+  static let waitingDotsSize = CGSize(width: 60, height: 20)
+  var waitingDotsOrigin: CGPoint {
+    CGPoint(
+      x: cardLeading + cardWidth - 20 - Self.waitingDotsSize.width,
+      y: cardTop + waitingCardHeight - 20 - Self.waitingDotsSize.height
+    )
+  }
 }
 
 /// Replaces the search's old spinner. Shown for as long as the question is
@@ -290,6 +302,13 @@ struct SearchDetailsView: View {
       .scaleEffect(layout.waitingScale)
       .frame(width: 0, height: 0)
       .offset(x: layout.waitingSceneCenter.x, y: layout.waitingSceneCenter.y)
+
+      LottieLoopView(name: "search-waiting-dots")
+        .frame(
+          width: SearchDetailsLayout.waitingDotsSize.width,
+          height: SearchDetailsLayout.waitingDotsSize.height
+        )
+        .offset(x: layout.waitingDotsOrigin.x, y: layout.waitingDotsOrigin.y)
     }
   }
 
@@ -358,7 +377,6 @@ struct SearchCharacterScene: View {
 
       SpeechBubble(
         lines: bubbleLines,
-        boldsFirstLine: true,
         textCenterX: 60.5,
         textTop: 36.5,
         // As wide as the bubble is inside where its last line falls, less
@@ -367,7 +385,8 @@ struct SearchCharacterScene: View {
         textColor: textColor,
         textDirection: textDirection,
         mirrorsArt: true,
-        shrinksToFit: true
+        shrinksToFit: true,
+        animationAbove: "search-bubble-dots"
       )
       .offset(x: 82, y: 59.5)
     }
