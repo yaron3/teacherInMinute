@@ -1,6 +1,7 @@
 import Foundation
 #if os(iOS)
 @preconcurrency import AVFoundation
+import ImageIO
 import UIKit
 #elseif os(Android)
 import SkipBridge
@@ -14,8 +15,10 @@ import SkipBridge
 /// and stops when it leaves — the text tab, a lesson, another section — so it
 /// is never held under a video lesson that needs it.
 enum QuestionCamera {
-  /// The longer side of an uploaded photo.
-  static let maxDimension: CGFloat = 2048
+  /// The longer side of an uploaded photo: enough to read a page of sums
+  /// across a phone's screen, and a fraction of a full frame to capture,
+  /// encode and upload.
+  static let maxDimension: CGFloat = 1600
 
   enum CaptureError: LocalizedError {
     /// There is no preview running to take the photo with.
@@ -58,23 +61,53 @@ enum QuestionCamera {
 #endif
   }
 
+#if !os(iOS)
+  /// The photo in a file of its own, for `LocalPhotoThumbnail` to draw. The
+  /// last one is cleared first, and each takes a new name, so the image
+  /// loader never shows a cached earlier photo in its place.
+  static func previewFile(for data: Data) -> URL? {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("QuestionPhotoPreview", isDirectory: true)
+    try? FileManager.default.removeItem(at: directory)
+    do {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let file = directory.appendingPathComponent("\(UUID().uuidString).jpg")
+      try data.write(to: file)
+      return file
+    } catch {
+      logger.error("[QuestionCamera] could not write the photo's preview: \(error.localizedDescription)")
+      return nil
+    }
+  }
+#endif
+
 #if os(iOS)
   /// A photo as it is uploaded: an upright JPEG no larger than `maxDimension`
   /// on its longer side, whatever it arrived as — the camera's full-size
   /// capture, or a HEIC from the library.
   static func preparedForUpload(_ data: Data) throws -> Data {
-    guard let image = UIImage(data: data) else { throw CaptureError.unreadable }
-    let longest = max(image.size.width, image.size.height)
-    let scale = min(1, maxDimension / longest)
-    let size = CGSize(width: (image.size.width * scale).rounded(), height: (image.size.height * scale).rounded())
-    let format = UIGraphicsImageRendererFormat()
-    format.scale = 1
-    // Drawing also bakes in the orientation the photo was taken in.
-    let resized = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-      image.draw(in: CGRect(origin: .zero, size: size))
+    guard let image = downsampled(data, maxPixelSize: maxDimension),
+          let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.8) else {
+      throw CaptureError.unreadable
     }
-    guard let jpeg = resized.jpegData(compressionQuality: 0.8) else { throw CaptureError.unreadable }
     return jpeg
+  }
+
+  /// The photo no larger than `maxPixelSize` on its longer side, upright.
+  ///
+  /// ImageIO decodes it at that size, never at the camera's full one, which
+  /// takes a fraction of the time and memory of decoding and redrawing it.
+  static func downsampled(_ data: Data, maxPixelSize: CGFloat) -> CGImage? {
+    guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else {
+      return nil
+    }
+    return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      // Bakes in the orientation the photo was taken in.
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceShouldCacheImmediately: true,
+      kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+    ] as CFDictionary)
   }
 #endif
 }
@@ -135,6 +168,14 @@ final class QuestionCameraSession: @unchecked Sendable {
     }
     if session.canAddOutput(photoOutput) {
       session.addOutput(photoOutput)
+      // Photos are uploaded at `maxDimension` on their longer side, so the
+      // camera's smallest size that still covers it is all it need take.
+      if let dimensions = Self.device?.activeFormat.supportedMaxPhotoDimensions
+        .filter({ CGFloat(max($0.width, $0.height)) >= QuestionCamera.maxDimension })
+        .min(by: { $0.width * $0.height < $1.width * $1.height }) {
+        photoOutput.maxPhotoDimensions = dimensions
+      }
+      photoOutput.maxPhotoQualityPrioritization = .speed
     }
     session.commitConfiguration()
   }
@@ -159,7 +200,12 @@ final class QuestionCameraSession: @unchecked Sendable {
            connection.isVideoRotationAngleSupported(90) {
           connection.videoRotationAngle = 90
         }
-        photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: capture)
+        let settings = AVCapturePhotoSettings()
+        settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
+        // The student is waiting to see it, and a page of sums at
+        // `maxDimension` reads as well without the extra processing.
+        settings.photoQualityPrioritization = .speed
+        photoOutput.capturePhoto(with: settings, delegate: capture)
       }
     }
     return try QuestionCamera.preparedForUpload(photo)

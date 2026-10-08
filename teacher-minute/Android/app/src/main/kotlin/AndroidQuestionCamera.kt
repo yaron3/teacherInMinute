@@ -5,12 +5,16 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.util.Base64
+import android.util.Size
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,8 +45,12 @@ import java.util.concurrent.atomic.AtomicReference
  */
 object AndroidQuestionCamera {
     private const val TAG = "QuestionCamera"
-    /** The longer side of an uploaded photo, as on iOS. */
-    private const val MAX_DIMENSION = 2048
+    /**
+     * The longer side of an uploaded photo, as on iOS: enough to read a page
+     * of sums across a phone's screen, and a fraction of a full frame to
+     * capture, encode and upload.
+     */
+    private const val MAX_DIMENSION = 1600
     private const val JPEG_QUALITY = 85
     private const val CAPTURE_TIMEOUT_SECONDS = 20L
 
@@ -83,6 +91,20 @@ object AndroidQuestionCamera {
             val preview = Preview.Builder().build()
             val capture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                // A frame near the size it is uploaded at, rather than the
+                // sensor's full 12MP or more that `encode` would only shrink.
+                // Sizes are in the sensor's landscape orientation.
+                .setResolutionSelector(
+                    ResolutionSelector.Builder()
+                        .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                        .setResolutionStrategy(
+                            ResolutionStrategy(
+                                Size(MAX_DIMENSION, MAX_DIMENSION * 3 / 4),
+                                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                            )
+                        )
+                        .build()
+                )
                 .build()
             val providerFuture = ProcessCameraProvider.getInstance(androidContext)
             var isDisposed = false

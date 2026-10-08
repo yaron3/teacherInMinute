@@ -31,8 +31,9 @@ struct StudentQuestionHomeView: View {
   /// join the question only as it is sent, as on the ask sheet.
   @State var attachedFormulas: [String] = []
   @State var photoURL: String?
-  /// The attached photo's bytes, kept with a question held through sign-up so
-  /// it can be uploaded again under the new account.
+  /// The attached photo's bytes: its thumbnail, from the moment it is taken
+  /// rather than once it has uploaded, and kept with a question held through
+  /// sign-up so it can be uploaded again under the new account.
   @State var photoData: Data?
   @State var isTakingPhoto = false
   @State var isUploadingPhoto = false
@@ -501,7 +502,7 @@ struct StudentQuestionHomeView: View {
 
   var photoSlot: some View {
     VStack(spacing: 14) {
-      Text(photoURL == nil ? viewModel.attachPhotoLabel : viewModel.deletePhotoLabel)
+      Text(hasPhoto ? viewModel.deletePhotoLabel : viewModel.attachPhotoLabel)
         .font(.system(size: 14))
         .foregroundStyle(theme.brandSecondaryText)
         .lineLimit(1)
@@ -513,25 +514,26 @@ struct StudentQuestionHomeView: View {
     .frame(width: 84, height: 85)
   }
 
-  /// The attached photo, which a tap takes off the question; while there is
-  /// none, a way back to the camera.
+  var hasPhoto: Bool {
+    photoData != nil || photoURL != nil
+  }
+
+  /// The attached photo, which a tap takes off the question once it has
+  /// uploaded; while there is none, a way back to the camera.
   @ViewBuilder
   var photoThumbnail: some View {
     if isUploadingPhoto {
-      RoundedRectangle(cornerRadius: 4)
-        .fill(theme.brandBackgroundTop)
+      photoImage
         .overlay {
           ProgressView()
             .tint(theme.brandActionBackground)
         }
-    } else if let photoURL {
+    } else if photoURL != nil {
       Button {
         self.photoURL = nil
         photoData = nil
       } label: {
-        CachedRemoteImage(url: photoURL, contentMode: .fill)
-          .frame(width: 67, height: 60)
-          .clipShape(RoundedRectangle(cornerRadius: 4))
+        photoImage
           .overlay {
             icon("home-delete-photo", size: 24, color: theme.onBrandAction)
           }
@@ -551,6 +553,22 @@ struct StudentQuestionHomeView: View {
       }
       .buttonStyle(.plain)
     }
+  }
+
+  /// The photo from its own bytes when the screen has them, which it does
+  /// from the moment it is taken; from its URL otherwise.
+  var photoImage: some View {
+    ZStack {
+      RoundedRectangle(cornerRadius: 4)
+        .fill(theme.brandBackgroundTop)
+      if let photoData {
+        LocalPhotoThumbnail(data: photoData, maxPointSize: 67)
+      } else if let photoURL {
+        CachedRemoteImage(url: photoURL, contentMode: .fill)
+      }
+    }
+    .frame(width: 67, height: 60)
+    .clipShape(RoundedRectangle(cornerRadius: 4))
   }
 
   /// The committed formulas, rendered, each with the `×` that takes it back
@@ -811,12 +829,14 @@ struct StudentQuestionHomeView: View {
     await attachPhoto(data, source: .camera)
   }
 
+  /// Shows the photo at once, and uploads it under its thumbnail.
   func attachPhoto(_ data: Data, source: QuestionPhotoSource) async {
+    photoData = data
     isUploadingPhoto = true
     do {
       photoURL = try await viewModel.uploadQuestionPhoto(data, source: source)
-      photoData = data
     } catch {
+      photoData = nil
       photoErrorMessage = error.localizedDescription
     }
     isUploadingPhoto = false
@@ -915,6 +935,7 @@ struct StudentQuestionHomeView: View {
     pendingFormulaLatex = held.draft.pendingFormula
     select(.text)
     guard let url = held.draft.photoURL else { return }
+    photoData = held.photoData
     isUploadingPhoto = true
     Task {
       photoURL = await viewModel.questionPhotoForCurrentAccount(url: url, photoData: held.photoData)
