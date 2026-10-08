@@ -38,7 +38,7 @@ extension CreateAccountViewModel {
 
     // MARK: Marketing opt-in
     var marketingOptInText: String {
-        LocalizationSupport.localized("Send me occasional updates and tips about\nTeacher in a Minute.")
+        String(format: LocalizationSupport.localized("Send me occasional updates and tips about\n%@."), AuthRole.appRole.appName)
     }
 
     // MARK: Actions

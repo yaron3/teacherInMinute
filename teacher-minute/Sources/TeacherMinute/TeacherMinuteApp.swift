@@ -22,6 +22,7 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 /* SKIP @bridge */public struct TeacherMinuteRootView : View {
   @State  var router = AppRouter()
   @State var isLaunching = true
+  @State var emailLink = EmailVerificationLinkViewModel.shared
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = SettingsLanguageChoice.system.rawValue
 
   /* SKIP @bridge */public init() {
@@ -53,6 +54,8 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 							  .trackScreen(AnalyticsScreen.teacherSubjects)
 						  case .completeProfile(let role):
 							completeProfileScreen(role: role)
+						  case .verifyEmail(let email):
+							VerifyEmailView(email: email)
 						  case .permissionsSetup(let role):
 							PermissionsSetupView(role: role)
 							  .trackScreen(AnalyticsScreen.permissionsSetup)
@@ -100,13 +103,30 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
             }
             .onOpenURL { url in
               logger.info("[PaymentReturn] root onOpenURL received \(url.absoluteString)")
-              PaymentReturnStore.shared.handle(url: url)
+              // Both share the app's scheme; a verification result is not a
+              // payment return.
+              if !emailLink.handle(url: url) {
+                PaymentReturnStore.shared.handle(url: url)
+              }
             }
+            // Over whatever screen is up: the link can be opened at any point,
+            // with the app in the background on any tab.
+            .appDialog(
+              emailLink.dialog?.title ?? "",
+              isPresented: Binding(
+                get: { emailLink.dialog != nil },
+                set: { if !$0 { emailLink.dismissDialog() } }
+              ),
+              message: emailLink.dialog?.message,
+              actions: [AppDialogAction(emailLink.okLabel)]
+            )
 					.task {
 				  logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
+				  let splashShownAt = Date()
 				  let remoteConfigReady = await RemoteConfigService.shared.readyForLaunch()
 				  logger.info("[RemoteConfig] launch gate finished ready=\(remoteConfigReady)")
 				  await performLaunchSessionResume()
+				  await holdSplashForMinimumDuration(since: splashShownAt)
 				  withAnimation(.easeOut(duration: 0.25)) {
 				isLaunching = false
 			  }
@@ -136,6 +156,15 @@ let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinut
 
   func completeProfileScreen(role: AuthRole) -> some View {
 	CompleteProfileView(viewModel: CompleteProfileViewModel(role: role))
+  }
+
+  /// Keeps the splash up until it has been on screen for the Remote Config
+  /// minimum. A launch that already took that long dismisses it at once.
+  private func holdSplashForMinimumDuration(since shownAt: Date) async {
+	let minimumSeconds = await SettingsRemoteConfigService.shared.fetchLaunchSplashMinimumSeconds()
+	let remainingSeconds = minimumSeconds - Date().timeIntervalSince(shownAt)
+	guard remainingSeconds > 0 else { return }
+	try? await Task.sleep(nanoseconds: UInt64(remainingSeconds * 1_000_000_000))
   }
 
   private func performLaunchSessionResume() async {

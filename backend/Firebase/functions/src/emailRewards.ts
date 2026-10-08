@@ -33,12 +33,18 @@ import { readRcNumber } from "./remoteConfig";
 const firestore = admin.firestore();
 
 export const EMAIL_REWARD_CLAIMS_COLLECTION = "emailRewardClaims";
+/** `emailRewardPromotion/student.granted` counts the students rewarded so far,
+ *  against the `email_reward_student_slots` cap in Remote Config. Server-only:
+ *  the catch-all in firestore.rules denies it to clients. */
+export const EMAIL_REWARD_PROMOTION_COLLECTION = "emailRewardPromotion";
 /** Purchase document the student grant is recorded under. */
 export const STUDENT_REWARD_PURCHASE_ID = "email_verification_reward";
 
-const DEFAULT_STUDENT_MINUTES = 30;
+const DEFAULT_STUDENT_MINUTES = 60;
 const DEFAULT_TEACHER_SHARE = 1;
 const DEFAULT_TEACHER_BONUS_MINUTES = 300;
+/** How many students the promotion is for, when Remote Config does not say. */
+const DEFAULT_STUDENT_SLOTS = 100;
 
 export type RewardRole = "student" | "teacher";
 
@@ -94,6 +100,9 @@ export function emailClaimId(canonicalEmail: string): string {
 
 export interface EmailRewardOffer {
   studentMinutes: number;
+  /** How many students the free minutes are for in all; once that many have
+   *  been rewarded, the promotion has ended. */
+  studentSlots: number;
   teacherShare: number;
   teacherBonusMinutes: number;
 }
@@ -101,13 +110,15 @@ export interface EmailRewardOffer {
 /** Setting a value to 0 in Remote Config switches that reward off without a
  *  deploy: nothing is claimed, so it can be switched back on later. */
 export async function getEmailRewardOffer(): Promise<EmailRewardOffer> {
-  const [studentMinutes, teacherShare, teacherBonusMinutes] = await Promise.all([
+  const [studentMinutes, studentSlots, teacherShare, teacherBonusMinutes] = await Promise.all([
     readRcNumber("email_reward_student_minutes"),
+    readRcNumber("email_reward_student_slots"),
     readRcNumber("email_reward_teacher_share"),
     readRcNumber("email_reward_teacher_minutes"),
   ]);
   return {
     studentMinutes: wholeMinutes(studentMinutes, DEFAULT_STUDENT_MINUTES),
+    studentSlots: wholeMinutes(studentSlots, DEFAULT_STUDENT_SLOTS),
     teacherShare:
       teacherShare !== undefined && teacherShare > 0 && teacherShare <= 1
         ? teacherShare
@@ -123,6 +134,12 @@ function wholeMinutes(value: number | undefined, fallback: number): number {
 
 function offerIsActive(role: RewardRole, offer: EmailRewardOffer): boolean {
   return role === "student" ? offer.studentMinutes > 0 : offer.teacherBonusMinutes > 0;
+}
+
+/** Students the promotion can still reward: the cap less those rewarded. */
+export function studentSlotsRemaining(offer: EmailRewardOffer, granted: unknown): number {
+  const used = Math.max(0, Math.floor(Number(granted) || 0));
+  return Math.max(0, offer.studentSlots - used);
 }
 
 // ─── Teacher bonus on the user document ──────────────────────────────────────
@@ -163,7 +180,20 @@ export type ClaimStatus =
   /** No role chosen yet, or no email on the account. */
   | "not_eligible"
   /** The reward is switched off in Remote Config. */
-  | "unavailable";
+  | "unavailable"
+  /** Every student slot of the promotion has been taken. */
+  | "promotion_ended";
+
+export type ClaimResponse = {
+  status: ClaimStatus;
+  role: RewardRole | null;
+  studentMinutes: number;
+  studentSlotsRemaining: number;
+  teacherShare: number;
+  teacherBonusMinutes: number;
+  teacherBonusMinutesRemaining: number;
+  minutesAdded?: number;
+};
 
 /**
  * Claims the welcome reward for the caller's current role, if they have earned
@@ -177,20 +207,29 @@ export type ClaimStatus =
 export const claimEmailReward = onCall(async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+  return claimEmailRewardFor(uid);
+});
 
+/** The claim itself, for the callable and for the email link, which verifies
+ *  the address on the server and claims in the same request. */
+export async function claimEmailRewardFor(uid: string): Promise<ClaimResponse> {
   const userRef = firestore.collection("users").doc(uid);
-  const [authUser, userSnap, offer] = await Promise.all([
+  const promotionRef = firestore.collection(EMAIL_REWARD_PROMOTION_COLLECTION).doc("student");
+  const [authUser, userSnap, offer, promotionSnap] = await Promise.all([
     admin.auth().getUser(uid),
     userRef.get(),
     getEmailRewardOffer(),
+    promotionRef.get(),
   ]);
+  const slotsLeft = studentSlotsRemaining(offer, promotionSnap.data()?.granted);
 
   const role = userSnap.data()?.role;
   const email = normalizeEmail(authUser.email);
-  const respond = (status: ClaimStatus, extra: Record<string, unknown> = {}) => ({
+  const respond = (status: ClaimStatus, extra: Partial<ClaimResponse> = {}): ClaimResponse => ({
     status,
     role: role === "student" || role === "teacher" ? role : null,
     studentMinutes: offer.studentMinutes,
+    studentSlotsRemaining: slotsLeft,
     teacherShare: offer.teacherShare,
     teacherBonusMinutes: offer.teacherBonusMinutes,
     teacherBonusMinutesRemaining:
@@ -207,6 +246,11 @@ export const claimEmailReward = onCall(async (req) => {
   if (!offerIsActive(role, offer)) {
     return respond("unavailable");
   }
+  // Said before "not verified", so the app stops offering minutes nobody can
+  // still get.
+  if (role === "student" && slotsLeft <= 0) {
+    return respond("promotion_ended");
+  }
   if (!provenEmailsFor(authUser).has(email)) {
     return respond("not_verified");
   }
@@ -216,18 +260,28 @@ export const claimEmailReward = onCall(async (req) => {
   const claimRef = firestore.collection(EMAIL_REWARD_CLAIMS_COLLECTION).doc(emailClaimId(canonical));
 
   const status = await firestore.runTransaction(async (tx): Promise<ClaimStatus> => {
-    const [claimSnap, freshUser] = await Promise.all([tx.get(claimRef), tx.get(userRef)]);
+    const [claimSnap, freshUser, freshPromotion] = await Promise.all([
+      tx.get(claimRef),
+      tx.get(userRef),
+      tx.get(promotionRef),
+    ]);
     const existing = claimSnap.data()?.[role] as { uid?: string } | undefined;
     if (existing) {
       return existing.uid === uid ? "already_granted" : "claimed_by_other_account";
     }
     if (freshUser.data()?.emailRewards?.[role]) return "already_granted";
+    // Read again inside the transaction: two students claiming the last slot
+    // at once must not both get it.
+    if (role === "student" && studentSlotsRemaining(offer, freshPromotion.data()?.granted) <= 0) {
+      return "promotion_ended";
+    }
 
     const now = Timestamp.now();
     tx.set(claimRef, { [role]: { uid, claimedAt: now } }, { merge: true });
 
     if (role === "student") {
       const minutes = offer.studentMinutes;
+      tx.set(promotionRef, { granted: FieldValue.increment(1), updatedAt: now }, { merge: true });
       tx.set(
         userRef,
         {
@@ -273,9 +327,12 @@ export const claimEmailReward = onCall(async (req) => {
 
   logger.info(`[emailRewards] claim uid=${uid} role=${role} status=${status}`);
 
-  if (status !== "granted") return respond(status);
+  if (status !== "granted") {
+    return respond(status, status === "promotion_ended" ? { studentSlotsRemaining: 0 } : {});
+  }
   return respond(status, {
     minutesAdded: role === "student" ? offer.studentMinutes : 0,
+    studentSlotsRemaining: role === "student" ? Math.max(0, slotsLeft - 1) : slotsLeft,
     teacherBonusMinutesRemaining: role === "teacher" ? offer.teacherBonusMinutes : 0,
   });
-});
+}

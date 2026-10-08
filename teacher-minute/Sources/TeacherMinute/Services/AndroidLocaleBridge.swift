@@ -13,6 +13,29 @@ enum AndroidLocaleBridge {
         sig: "(Ljava/lang/String;)Ljava/lang/String;"
     )!
 
+    private static let systemLanguageTagMethod = managerClass.getStaticMethodID(
+        name: "systemLanguageTag",
+        sig: "()Ljava/lang/String;"
+    )!
+
+    /// The device language from Android Settings, e.g. `he-IL`, or `nil` when
+    /// it cannot be read. See `AndroidLocaleManager.systemLanguageTag`.
+    static func systemLanguageTag() -> String? {
+        jniContext {
+            do {
+                let tag = try managerClass.callStatic(
+                    method: systemLanguageTagMethod,
+                    options: [.kotlincompat],
+                    args: []
+                ) as String
+                return tag.isEmpty ? nil : tag
+            } catch {
+                logger.error("[Localization][Android] failed to read system language tag: \(error)")
+                return nil
+            }
+        }
+    }
+
     static func applyLanguageCode(_ languageCode: String) {
         jniContext {
             do {

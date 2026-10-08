@@ -10,7 +10,7 @@ import SwiftUI
 extension SettingsViewModeling {
 
     var appVersion: String {
-        let appName = LocalizationSupport.localized("Teacher in a Minute App")
+        let appName = AuthRole.appRole.appName
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
 

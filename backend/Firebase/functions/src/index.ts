@@ -62,6 +62,10 @@ export {
 
 // Welcome reward for a verified email, once per real mailbox
 export { claimEmailReward } from "./emailRewards";
+export { sendVerificationEmail, verifyEmailLink } from "./emailVerification";
+
+// Contact Us messages are emailed to the recipients in support-config.json
+export { onContactRequestCreated } from "./contactSupport";
 
 // Shared email checking — used by the payout form and available to signup
 export { validateEmailAddress } from "./emailValidation";

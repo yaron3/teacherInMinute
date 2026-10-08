@@ -10,20 +10,15 @@ import Foundation
 extension EmailRewardViewModel {
   var verifyEmailTitle: String { LocalizationSupport.localized("Verify your email") }
   var resendLabel: String { LocalizationSupport.localized("Resend email") }
-  var checkVerificationLabel: String { LocalizationSupport.localized("I've verified") }
+  var tapLinkHint: String {
+    LocalizationSupport.localized("Tap the link in the email on this phone. It brings you straight back to the app.")
+  }
   var emailSentTitle: String { LocalizationSupport.localized("Email sent") }
   var linkSentFormat: String {
-    LocalizationSupport.localized("We sent a link to %@. Open it, then come back and tap \u{201C}I've verified\u{201D}.")
+    LocalizationSupport.localized("We sent a new link to %@. Tap it on this phone to finish.")
   }
   var sendFailedMessage: String {
     LocalizationSupport.localized("Couldn't send the email. Please try again later.")
-  }
-  var checkFailedMessage: String {
-    LocalizationSupport.localized("Couldn't check your email right now. Please try again.")
-  }
-  var notVerifiedTitle: String { LocalizationSupport.localized("Not verified yet") }
-  var notVerifiedMessage: String {
-    LocalizationSupport.localized("Open the link we emailed you, then tap \u{201C}I've verified\u{201D} again.")
   }
   var alreadyClaimedMessage: String {
     LocalizationSupport.localized("This email address has already received its welcome reward.")

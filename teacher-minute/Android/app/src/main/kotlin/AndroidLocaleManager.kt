@@ -75,6 +75,20 @@ object AndroidLocaleManager {
         }
     }
 
+    /// The device's own language, as set in Android Settings.
+    ///
+    /// Read from `Resources.getSystem()` because the app's own configuration
+    /// and `Locale.getDefault()` are overwritten by `applyLanguageCode` (and
+    /// on Android 13+ `setApplicationLocales` persists that override across
+    /// launches), so neither reports the device language once the app has
+    /// applied one. The native Swift `Locale.current` does not track it
+    /// either — it resolved to English on an Android 14 device set to Hebrew.
+    @JvmStatic
+    fun systemLanguageTag(): String {
+        val systemLocales = android.content.res.Resources.getSystem().configuration.locales
+        return if (systemLocales.isEmpty) "" else systemLocales.get(0).toLanguageTag()
+    }
+
     private fun deviceLanguageTag(): String {
         val contextLocale = appContext
             ?.resources

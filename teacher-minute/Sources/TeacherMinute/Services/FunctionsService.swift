@@ -214,12 +214,16 @@ struct EmailRewardStatus {
     case claimedByOtherAccount = "claimed_by_other_account"
     case notEligible = "not_eligible"
     case unavailable
+    /// Every student slot of the promotion has been taken.
+    case promotionEnded = "promotion_ended"
   }
 
   let status: Status
   /// "student" or "teacher"; nil before a role is chosen.
   let role: String?
   let studentMinutes: Int
+  /// Students the promotion can still reward.
+  let studentSlotsRemaining: Int
   let teacherSharePercent: Int
   let teacherBonusMinutes: Int
   let teacherBonusMinutesRemaining: Int
@@ -433,10 +437,28 @@ final class FunctionsService {
       status: status,
       role: result["role"] as? String,
       studentMinutes: Self.intValue(result["studentMinutes"]) ?? 0,
+      studentSlotsRemaining: Self.intValue(result["studentSlotsRemaining"]) ?? 0,
       teacherSharePercent: Int(((Self.doubleValue(result["teacherShare"]) ?? 0) * 100).rounded()),
       teacherBonusMinutes: Self.intValue(result["teacherBonusMinutes"]) ?? 0,
       teacherBonusMinutesRemaining: Self.intValue(result["teacherBonusMinutesRemaining"]) ?? 0
     )
+  }
+
+  /// Emails the signed-in user a link that verifies `email` — the account's own
+  /// address when nil — and opens the app with the outcome
+  /// (functions/src/emailVerification.ts). A different address replaces the
+  /// account's once the link is followed.
+  func sendVerificationEmail(email: String? = nil) async throws {
+    var data: [String: Any] = [
+      "language": LocalizationSupport.currentLanguageCode == "he" ? "he" : "en",
+      // Which app the link should open. Sent rather than read from the
+      // profile, which a brand-new account has not saved yet.
+      "app": AuthRole.appRole.rawValue,
+    ]
+    if let email {
+      data["email"] = email
+    }
+    _ = try await call(function: "sendVerificationEmail", data: data)
   }
 
   func createCheckoutSession(pricingOptionID: String, paymentMethod: PaymentMethod = .paypal) async throws -> CheckoutSessionResult {

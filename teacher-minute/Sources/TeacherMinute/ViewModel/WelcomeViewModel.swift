@@ -33,7 +33,9 @@ struct OtherAppNotice {
 @Observable
 @MainActor
 final class WelcomeViewModel {
-    var appName: String { LocalizationSupport.localized("Teacher in a Minute") }
+    /// This build's own name. The Remote Config value of "Teacher in a Minute"
+    /// is "Instant Teacher", which is wrong in Pro Teacher.
+    var appName: String { AuthRole.appRole.appName }
     var headline: String { LocalizationSupport.localized("Help you anywhere") }
     var subheadline: String {
         LocalizationSupport.localized("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise.")

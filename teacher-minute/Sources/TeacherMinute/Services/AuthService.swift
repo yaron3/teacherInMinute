@@ -86,6 +86,27 @@ final class AuthService {
 #endif
     try await user.sendEmailVerification()
   }
+
+  /// True for an account whose email nobody has vouched for yet — an
+  /// email/password sign-up that has not followed its link. Google and Apple
+  /// accounts arrive verified.
+  var hasUnverifiedEmail: Bool {
+    guard let user = Auth.auth().currentUser, !user.isAnonymous, user.email != nil else {
+      return false
+    }
+    return !user.isEmailVerified
+  }
+
+  /// Re-reads the account from Firebase and says whether `email` is now its
+  /// verified address.
+  func isEmailVerified(_ email: String) async throws -> Bool {
+    guard let user = Auth.auth().currentUser else {
+      throw SettingsError.missingUser
+    }
+    try await user.reload()
+    guard let refreshed = Auth.auth().currentUser, refreshed.isEmailVerified else { return false }
+    return refreshed.email?.lowercased() == email.lowercased()
+  }
   
   
 //  func signInWithGoogle()  async throws -> Bool{

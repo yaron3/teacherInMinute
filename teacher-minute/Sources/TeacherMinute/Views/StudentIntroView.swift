@@ -87,7 +87,20 @@ struct StudentIntroView: View {
         .padding(.leading, 58)
         .padding(.trailing, 31)
         .padding(.top, 12)
-
+	  
+      if let promotion = viewModel.promotionText {
+        Text(promotion)
+          .font(.system(size: 16, weight: .bold))
+          .foregroundStyle(theme.brandHighlightText)
+          .multilineTextAlignment(.leading)
+          .lineSpacing(pitchLineSpacing)
+          .padding(.vertical, pitchLineSpacing / 2)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.leading, 58)
+          .padding(.trailing, 31)
+          .padding(.top, 12)
+      }
+	  
       startButton
         .padding(.top, 28)
 

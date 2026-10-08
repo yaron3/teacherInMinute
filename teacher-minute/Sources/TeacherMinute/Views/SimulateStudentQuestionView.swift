@@ -50,7 +50,7 @@ struct SimulateStudentQuestionView: View {
           viewModel.selectDifficulty(option)
         }
         chipSection(
-          title: LocalizationSupport.localized("Session Type"),
+          title: LocalizationSupport.localized("Session type"),
           options: DemoStudentSimulation.conversationTypes,
           selected: viewModel.simulation.conversationType
         ) { option in

@@ -15,6 +15,8 @@ Three things have to hold, and none of them are visible at a call site:
 4.  No two distinct source strings resolve to the same key. `generatedKey`
     reduces a string to three words, so collisions are easy to create by
     accident, and one published value then serves two unrelated strings.
+5.  Every parameter's `Hebrew` and `HebrewApp` values match — they are one
+    translation behind two conditions, because conditions cannot be OR'd.
 
 Run from anywhere:
 
@@ -245,6 +247,18 @@ def main():
         failures.append(f"{len(collisions)} key collision(s) — add an entry to LocalizationKey.exactKeys:")
         for k, v in sorted(collisions.items()):
             failures.append(f"    {k}: " + " | ".join(repr(x) for x in v))
+
+    # Remote Config conditions cannot be OR'd, so "the device or the app is in
+    # Hebrew" is two conditions carrying the same value: `Hebrew`
+    # (device.language, the only signal builds before 2026-08 send) and
+    # `HebrewApp` (the `user_language` user property, which follows an in-app
+    # switch). A value set on only one of them reaches only half the users.
+    split = sorted(k for k, p in params.items()
+                   if (p.get("conditionalValues") or {}).get("Hebrew")
+                   != (p.get("conditionalValues") or {}).get("HebrewApp"))
+    if split:
+        failures.append(f"{len(split)} parameter(s) whose Hebrew and HebrewApp values differ — set both:")
+        failures += [f"    {k}" for k in split]
 
     duplicates = []
 

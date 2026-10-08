@@ -64,7 +64,9 @@ struct CompleteProfileView: View {
     .systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
     .onAppear {
       viewModel.onContinue = {
-        if viewModel.shouldShowPermissionsOnContinue && PermissionsSetupStore.shouldShowForCurrentUser() {
+        if viewModel.needsEmailVerification {
+          router.push(.verifyEmail(email: viewModel.email))
+        } else if viewModel.shouldShowPermissionsOnContinue && PermissionsSetupStore.shouldShowForCurrentUser() {
           // Pushed, not replaced: the permissions step is part of the same
           // walk-backwards flow, and replacing here wiped every earlier step
           // out of the stack.
@@ -117,6 +119,20 @@ struct CompleteProfileView: View {
         textContentType: .name,
         autocapitalization: .words
       )
+
+      if viewModel.showsEmailField {
+        BrandTextField(
+          title: viewModel.emailFieldTitle,
+          placeholder: viewModel.emailPlaceholder,
+          text: $viewModel.email,
+          icon: "brand-mail",
+          isValid: !viewModel.showsEmailError,
+          errorMessage: viewModel.emailErrorMessage,
+          keyboardType: .emailAddress,
+          textContentType: .emailAddress,
+          autocapitalization: .never
+        )
+      }
 
       BrandTextField(
         title: viewModel.phoneFieldTitle(isOptional: viewModel.role == .student),

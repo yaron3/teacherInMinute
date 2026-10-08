@@ -19,6 +19,7 @@ struct EmailRewardBanner: View {
   var topPadding: CGFloat = 0
 
   @Environment(\.scenePhase) var scenePhase
+  @State var emailLink = EmailVerificationLinkViewModel.shared
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
@@ -40,6 +41,14 @@ struct EmailRewardBanner: View {
       }
       .onChange(of: viewModel.grantVersion) { _, _ in
         onGranted()
+      }
+      // The link credited the reward on the server: drop the offer and
+      // re-read the balance.
+      .onChange(of: emailLink.verifiedVersion) { _, _ in
+        Task {
+          await viewModel.refresh()
+          onGranted()
+        }
       }
   }
 
@@ -66,40 +75,27 @@ struct EmailRewardBanner: View {
             Text(offer)
               .font(.system(size: 13))
               .foregroundStyle(theme.secondaryText)
+            Text(viewModel.tapLinkHint)
+              .font(.system(size: 13))
+              .foregroundStyle(theme.secondaryText)
           }
           .frame(maxWidth: .infinity, alignment: .leading)
         }
 
-        HStack(spacing: 10) {
-          Button {
-            Task { await viewModel.resendTapped() }
-          } label: {
-            Text(viewModel.resendLabel)
-              .font(.system(size: 14, weight: .bold))
-              .foregroundStyle(theme.brandActionBackground)
-              .frame(maxWidth: .infinity)
-              .frame(height: 40)
-              .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                  .stroke(theme.brandActionBackground, lineWidth: 1)
-              }
-              .tappableFrame()
-          }
-          .buttonStyle(.plain)
-
-          Button {
-            Task { await viewModel.checkVerificationTapped() }
-          } label: {
-            Text(viewModel.checkVerificationLabel)
-              .font(.system(size: 14, weight: .bold))
-              .foregroundStyle(theme.onBrandAction)
-              .frame(maxWidth: .infinity)
-              .frame(height: 40)
-              .background(theme.brandActionBackground)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
-          }
-          .buttonStyle(.plain)
+        // No "I've verified": the link itself opens the app and credits the
+        // reward, and the banner drops its offer when it comes back.
+        Button {
+          Task { await viewModel.resendTapped() }
+        } label: {
+          Text(viewModel.resendLabel)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(theme.onBrandAction)
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .background(theme.brandActionBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+        .buttonStyle(.plain)
         .disabled(viewModel.isWorking)
         .opacity(viewModel.isWorking ? 0.6 : 1)
       }

@@ -12,7 +12,7 @@ extension CompleteProfileViewModel {
     // MARK: Screen chrome
     var screenTitle: String { LocalizationSupport.localized("Complete your profile") }
     var introText: String {
-        LocalizationSupport.localized("Tell us a bit about yourself to get started with\nTeacher in a Minute.")
+        String(format: LocalizationSupport.localized("Tell us a bit about yourself to get started with\n%@."), AuthRole.appRole.appName)
     }
     var loadingText: String { LocalizationSupport.localized("Loading your profile…") }
     var continueLabel: String { LocalizationSupport.localized("Continue") }
@@ -24,6 +24,27 @@ extension CompleteProfileViewModel {
     // MARK: Name
     var fullNameFieldTitle: String { LocalizationSupport.localized("Full Name") }
     var fullNamePlaceholder: String { LocalizationSupport.localized("place holder name") }
+
+    // MARK: Email
+    var emailFieldTitle: String { LocalizationSupport.localized("Email") }
+    var emailPlaceholder: String { LocalizationSupport.localized("Enter your email") }
+
+    /// Why the link to a changed address could not be sent.
+    func emailChangeErrorMessage(for error: Error) -> String {
+        guard case .serverError(_, let status, _) = error as? FunctionsError else {
+            return LocalizationSupport.localized("Couldn't send the email. Please try again later.")
+        }
+        switch status {
+        case "ALREADY_EXISTS":
+            return LocalizationSupport.localized("This email address is already in use.")
+        case "INVALID_ARGUMENT":
+            return LocalizationSupport.localized("Please enter a valid email address.")
+        case "RESOURCE_EXHAUSTED":
+            return LocalizationSupport.localized("Too many emails sent. Please try again in a few minutes.")
+        default:
+            return LocalizationSupport.localized("Couldn't send the email. Please try again later.")
+        }
+    }
 
     // MARK: Phone
     var phoneRequiredFieldTitle: String { LocalizationSupport.localized("Phone Number") }
