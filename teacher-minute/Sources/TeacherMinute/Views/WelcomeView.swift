@@ -61,7 +61,12 @@ struct WelcomeView: View {
             .lineSpacing(7)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 36)
-
+		  Text(viewModel.subheadline2)
+			.font(.system(size: 14))
+			.foregroundStyle(theme.brandSecondaryText)
+			.lineSpacing(7)
+			.fixedSize(horizontal: false, vertical: true)
+			.padding(.top, 36)
           badges
             .padding(.top, 44)
 

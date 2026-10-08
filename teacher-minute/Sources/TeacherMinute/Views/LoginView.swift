@@ -4,6 +4,11 @@ import SwiftUI
 struct LoginView: View {
   @State var viewModel = LoginViewModel()
   @Environment(\.appRouter) var router
+  @FocusState var focusedField: Field?
+
+  enum Field: Hashable {
+    case email, password
+  }
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -96,6 +101,9 @@ struct LoginView: View {
         textContentType: .emailAddress,
         autocapitalization: .never
       )
+      .focused($focusedField, equals: .email)
+      .submitLabel(.next)
+      .onSubmit { focusedField = .password }
       .accessibilityIdentifier("email_input")
 
       BrandTextField(
@@ -107,6 +115,8 @@ struct LoginView: View {
         textContentType: .password,
         autocapitalization: .never
       )
+      .focused($focusedField, equals: .password)
+      .submitLabel(.done)
       .accessibilityIdentifier("password_input")
 
       Button {

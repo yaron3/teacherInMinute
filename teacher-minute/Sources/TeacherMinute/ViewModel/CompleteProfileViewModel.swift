@@ -52,7 +52,7 @@ final class CompleteProfileViewModel {
   var shouldShowPermissionsOnContinue = true
   var onContinue: (() -> Void)?
   
-  let grades: [String] = (1...12).map { LocalizationSupport.localized("Grade \($0)") } + [LocalizationSupport.localized("College"), LocalizationSupport.localized("Adult Learner")]
+  let grades: [String] = ProfileViewModel.schoolGrades.map { LocalizationSupport.localized("Grade \($0)") } + [LocalizationSupport.localized("College"), LocalizationSupport.localized("Adult Learner")]
   
   /// Phone is optional for students and required for teachers, but a number
   /// that was typed has to be a real one either way — a teacher's is what the
