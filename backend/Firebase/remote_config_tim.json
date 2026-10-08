@@ -12973,6 +12973,20 @@
       },
       "valueType": "STRING"
     },
+    "your_question_back": {
+      "defaultValue": {
+        "value": "Your question is back, but its photo could not be kept. Please attach it again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השאלה שלך חזרה, אבל לא הצלחנו לשמור את התמונה. צרף אותה שוב."
+        },
+        "HebrewApp": {
+          "value": "השאלה שלך חזרה, אבל לא הצלחנו לשמור את התמונה. צרף אותה שוב."
+        }
+      },
+      "valueType": "STRING"
+    },
     "open_the_link": {
       "defaultValue": {
         "value": "Open the link we emailed you, then tap “I've verified” again."
