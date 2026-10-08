@@ -6,6 +6,7 @@ import {
   appDeepLink,
   buildLandingPage,
   buildVerificationEmail,
+  languageFromHeader,
   linkStatusForClaim,
   throttleSends,
   tokenId,
@@ -133,5 +134,29 @@ describe("pages and mail", () => {
   it("stores tokens hashed", () => {
     expect(tokenId("abc")).toMatch(/^[0-9a-f]{64}$/);
     expect(tokenId("abc")).not.toContain("abc");
+  });
+});
+
+describe("languageFromHeader", () => {
+  it("is English when the browser says nothing", () => {
+    expect(languageFromHeader(undefined)).toBe("en");
+    expect(languageFromHeader("")).toBe("en");
+  });
+
+  it("is Hebrew when the browser prefers it", () => {
+    expect(languageFromHeader("he-IL,he;q=0.9,en-US;q=0.8")).toBe("he");
+    expect(languageFromHeader("iw")).toBe("he");
+    expect(languageFromHeader("en;q=0.5, he;q=0.8")).toBe("he");
+  });
+
+  it("is English when the browser prefers it or names neither", () => {
+    expect(languageFromHeader("en-US,en;q=0.9,he;q=0.8")).toBe("en");
+    expect(languageFromHeader("fr-FR,de;q=0.9")).toBe("en");
+    expect(languageFromHeader("*")).toBe("en");
+  });
+
+  it("lets the first listed win a tie", () => {
+    expect(languageFromHeader("he, en")).toBe("he");
+    expect(languageFromHeader("en, he")).toBe("en");
   });
 });
