@@ -329,6 +329,43 @@ object AndroidChatManager {
         Tasks.await(ref.setValue(conversationType), TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
+    /**
+     * The student's leave to draw on the board: the student writes
+     * `requested`, the teacher answers `granted` or `declined` under the same
+     * request id. See `BoardDrawPermission` on the Swift side.
+     */
+    @JvmStatic
+    fun setBoardPermission(questionId: String, status: String, requestId: String) {
+        val ref = FirebaseDatabase.getInstance()
+            .getReference("questions")
+            .child(questionId)
+            .child("boardPermission")
+        val payload = mapOf(
+            "status" to status,
+            "requestId" to requestId,
+            "updatedAt" to ServerValue.TIMESTAMP
+        )
+        Tasks.await(ref.setValue(payload), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    @JvmStatic
+    fun fetchBoardPermissionJson(questionId: String): String {
+        val snapshot = Tasks.await(
+            FirebaseDatabase.getInstance()
+                .getReference("questions")
+                .child(questionId)
+                .child("boardPermission")
+                .get(),
+            TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        )
+
+        val row = JSONObject()
+        snapshot.child("status").getValue(String::class.java)?.let { row.put("status", it) }
+        snapshot.child("requestId").getValue(String::class.java)?.let { row.put("requestId", it) }
+        return row.toString()
+    }
+
     @JvmStatic
     fun fetchMediaPendingJson(questionId: String): String {
         val snapshot = Tasks.await(

@@ -14,6 +14,16 @@
       "name": "HebrewApp",
       "expression": "app.userProperty['user_language'].exactlyMatches(['he'])",
       "tagColor": "CYAN"
+    },
+    {
+      "name": "Android Teacher - Hebrew",
+      "expression": "app.id == '1:922632930084:android:9d52fa48bd34879bfde9b1' && device.language in ['he', 'iw']",
+      "tagColor": "ORANGE"
+    },
+    {
+      "name": "iOS - Teacher - Hebrew",
+      "expression": "app.id == '1:922632930084:ios:621a96f2e9fca5f7fde9b1' && device.language in ['he', 'iw']",
+      "tagColor": "ORANGE"
     }
   ],
   "parameters": {
@@ -261,10 +271,24 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "התחבר מיידית למורים מאומתים\nלמתמטיקה לקבלת עזרה לפי דרישה, או שתף\nאת המומחיות שלך."
+          "value": "יש לך כמה דקות, יש לך הכנסה - 120 ש״ח ל 60 דקות"
         },
         "HebrewApp": {
-          "value": "התחבר מיידית למורים מאומתים\nלמתמטיקה לקבלת עזרה לפי דרישה, או שתף\nאת המומחיות שלך."
+          "value": "יש לך כמה דקות, יש לך הכנסה - 120 ש״ח ל 60 דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_employee_handle": {
+      "defaultValue": {
+        "value": "You're an employee - we handle all the bureaucracy!.Self-employed ● Freelance ● Receipts"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אתה שכיר, כל הבירוקטיה עלינו!\nעצמאי ● פרילנס ● קבלות"
+        },
+        "HebrewApp": {
+          "value": "אתה שכיר, כל הבירוקטיה עלינו!\nעצמאי ● פרילנס ● קבלות"
         }
       },
       "valueType": "STRING"
@@ -405,6 +429,12 @@
         },
         "HebrewApp": {
           "value": "מורים מאומתים"
+        },
+        "Android Teacher - Hebrew": {
+          "value": "סטודנטים ממתינים"
+        },
+        "iOS - Teacher - Hebrew": {
+          "value": "סטודנטים ממתינים"
         }
       },
       "valueType": "STRING"
@@ -14608,6 +14638,180 @@
         },
         "HebrewApp": {
           "value": "אתם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "approve": {
+      "defaultValue": {
+        "value": "Approve"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אשר"
+        },
+        "HebrewApp": {
+          "value": "אשר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "ask_the_teacher": {
+      "defaultValue": {
+        "value": "Ask the teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בקש מהמורה"
+        },
+        "HebrewApp": {
+          "value": "בקש מהמורה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "ask_draw_the": {
+      "defaultValue": {
+        "value": "Ask to draw on the board?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לבקש לצייר על הלוח?"
+        },
+        "HebrewApp": {
+          "value": "לבקש לצייר על הלוח?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_approve_lasts": {
+      "defaultValue": {
+        "value": "If you approve, it lasts until they stop drawing for %d seconds."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אם תאשר, ההרשאה תקפה עד שהתלמיד יפסיק לצייר למשך %d שניות."
+        },
+        "HebrewApp": {
+          "value": "אם תאשר, ההרשאה תקפה עד שהתלמיד יפסיק לצייר למשך %d שניות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_student_asks": {
+      "defaultValue": {
+        "value": "The student asks to draw on the board"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד מבקש לצייר על הלוח"
+        },
+        "HebrewApp": {
+          "value": "התלמיד מבקש לצייר על הלוח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_can_draw": {
+      "defaultValue": {
+        "value": "You can draw as soon as your teacher approves."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תוכל לצייר ברגע שהמורה יאשר."
+        },
+        "HebrewApp": {
+          "value": "תוכל לצייר ברגע שהמורה יאשר."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "cannot_draw_board_now": {
+      "defaultValue": {
+        "value": "You can't draw on the board right now."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אי אפשר לצייר על הלוח כרגע."
+        },
+        "HebrewApp": {
+          "value": "אי אפשר לצייר על הלוח כרגע."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_teacher_declined": {
+      "defaultValue": {
+        "value": "Your teacher declined"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה דחה את הבקשה"
+        },
+        "HebrewApp": {
+          "value": "המורה דחה את הבקשה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_teacher_needs": {
+      "defaultValue": {
+        "value": "Your teacher needs to approve before you can draw."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה צריך לאשר לפני שתוכל לצייר."
+        },
+        "HebrewApp": {
+          "value": "המורה צריך לאשר לפני שתוכל לצייר."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "board_draw_permission_seconds": {
+      "defaultValue": {
+        "value": "60"
+      },
+      "valueType": "NUMBER"
+    },
+    "per_week": {
+      "defaultValue": {
+        "value": "per week"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לשבוע"
+        },
+        "HebrewApp": {
+          "value": "לשבוע"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "per_month": {
+      "defaultValue": {
+        "value": "per month"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לחודש"
+        },
+        "HebrewApp": {
+          "value": "לחודש"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "per_year": {
+      "defaultValue": {
+        "value": "per year"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לשנה"
+        },
+        "HebrewApp": {
+          "value": "לשנה"
         }
       },
       "valueType": "STRING"

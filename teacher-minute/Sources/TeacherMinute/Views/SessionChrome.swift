@@ -58,7 +58,7 @@ struct SessionTabToggle: View {
           .resizable()
           .frame(width: 24, height: 24)
         Text(item.title)
-          .font(.system(size: 15, weight: .medium))
+          .font(.system(size: 17, weight: .medium))
           .lineLimit(1)
           .minimumScaleFactor(0.7)
       }
@@ -67,6 +67,14 @@ struct SessionTabToggle: View {
       .frame(height: 52)
       .background(isSelected ? theme.brandActionBackground : Color.clear)
       .clipShape(RoundedRectangle(cornerRadius: 10))
+      // Something new on a pane that isn't showing: a red ring around the
+      // whole segment, as well as the dot, so it can't be missed.
+      .overlay {
+        if item.showsBadge && !isSelected {
+          RoundedRectangle(cornerRadius: 10)
+            .stroke(theme.brandDestructive, lineWidth: 2)
+        }
+      }
       .overlay(alignment: .leading) {
         if item.showsBadge {
           Circle()

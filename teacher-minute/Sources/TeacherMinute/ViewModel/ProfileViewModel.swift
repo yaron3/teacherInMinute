@@ -84,7 +84,7 @@ final class ProfileViewModel {
   }
 
   var availableStudentGrades: [String] {
-	(1...12).map { LocalizationSupport.localized("Grade \($0)") }
+	Self.schoolGrades.map { LocalizationSupport.localized("Grade \($0)") }
 	  + [LocalizationSupport.localized("College"), LocalizationSupport.localized("Adult Learner")]
   }
 
@@ -97,26 +97,18 @@ final class ProfileViewModel {
     var isAnonymousAccount: Bool {
         Auth.auth().currentUser?.isAnonymous == true
     }
-  
-	var shouldShowTeacherPaymentsMethod: Bool {
-		roleType == .teacher
-	}
-  var shouldShowStudentPaymentsMethod: Bool {
-	roleType == .student
-  }
+
     /// Canonical grade values, as stored on the profile. Selection and saving
-    /// both key off these, so they stay English in every language.
+    /// both key off these, so they stay English in every language. Grades
+    /// saved before the app stopped offering them are left out.
     var gradeLevels: [String] {
-        teacherGradeLevels(from: grade)
+        teacherGradeLevels(from: grade).filter { Self.availableTeachingGrades.contains($0) }
     }
 
     /// The same grades, translated for display only.
     var gradeLevelLabels: [String] {
         gradeLevels.map(LocalizationSupport.localizedGradeLabel)
     }
-  var paymentsMethdsLabels: [String] {
-	[LocalizationSupport.localized("PayPal")]
-  }
     var selectedTeachingGrades: Set<String> {
         get {
             Set(gradeLevels)
@@ -128,34 +120,14 @@ final class ProfileViewModel {
         }
     }
 
-    static let availableTeachingGrades: [String] = (1...12).map { "Grade \($0)" }
+    /// The school grades the app offers, to teachers and students alike.
+    static let schoolGrades: ClosedRange<Int> = 8...12
+
+    static let availableTeachingGrades: [String] = schoolGrades.map { "Grade \($0)" }
 
     var hasRating: Bool { reviewCount > 0 && rating > 0 }
 
     var reviewCountText: String { LessonFormatting.reviewCountText(reviewCount) }
-
-    // MARK: - Payout method (teachers)
-
-    /// Where this teacher's payout is sent, loaded from their own user
-    /// document. `nil` until it loads, and while none has been set up.
-    var payoutMethod: TeacherPayoutMethod?
-
-    var hasPayoutMethod: Bool { payoutMethod != nil }
-
-    /// The method's name — "Bit", "PayPal", "Bank Account".
-    var payoutMethodTitle: String {
-        payoutMethod?.type.displayName ?? LocalizationSupport.localized("Not set up yet")
-    }
-
-    /// The masked destination, e.g. a Bit phone number or a bank account's
-    /// last 4 digits.
-    var payoutMethodDetail: String {
-        payoutMethod?.displaySummary ?? LocalizationSupport.localized("Add where your payouts should be sent")
-    }
-
-    var payoutMethodSystemImage: String {
-        payoutMethod?.type.systemImage ?? "creditcard"
-    }
 
     var subjectsOrPlaceholder: [String] {
         subjects.isEmpty ? ["No subjects added yet"] : subjects
@@ -206,7 +178,6 @@ final class ProfileViewModel {
                 let docs = (try? await repository.fetchUploadedDocuments(uid: uid)) ?? []
                 hasMissingDocuments = TeacherDocumentsPromptStore.hasMissingDocuments(docs)
                 await loadTeacherRating(uid: uid)
-                await loadPayoutMethod(uid: uid)
             } else {
                 // Comes from the profile document already fetched above — no
                 // second round trip just to read one field.
@@ -232,15 +203,6 @@ final class ProfileViewModel {
         } catch {
             logger.error("[Profile] failed loading teacher rating: \(error.localizedDescription)")
             AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.loadTeacherRating")
-        }
-    }
-
-    private func loadPayoutMethod(uid: String) async {
-        do {
-            payoutMethod = try await repository.fetchPayoutMethod(uid: uid)
-        } catch {
-            logger.error("[Profile] failed loading payout method: \(error.localizedDescription)")
-            AnalyticsService.shared.recordPermissionIfNeeded(error, context: "Profile.loadPayoutMethod")
         }
     }
 

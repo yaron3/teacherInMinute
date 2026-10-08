@@ -80,6 +80,9 @@ struct WhiteboardView: View {
   @State var clearDialogReason: ClearDialogReason = .local
   @State var localClearInitiated = false
   @State var pendingClearSnapshot: [BoardStroke] = []
+  @State var isAskToDrawPresented = false
+  /// The gesture under way began without leave to draw, so none of it draws.
+  @State var isDrawGestureBlocked = false
   
   @Environment(\.horizontalSizeClass) var hSizeClass
   @Environment(\.colorScheme) var colorScheme
@@ -154,6 +157,37 @@ struct WhiteboardView: View {
 		}
 	  ]
 	}
+  }
+
+  /// Asked when the student tries to draw without leave: whether to ask the
+  /// teacher, or, with an ask already out, that it is still waiting.
+  var askToDrawTitle: String {
+	viewModel.boardDrawRequestState == .pending ? viewModel.awaitingDrawApprovalTitle : viewModel.askToDrawTitle
+  }
+
+  var askToDrawMessage: String {
+	viewModel.boardDrawRequestState == .pending ? viewModel.awaitingDrawApprovalMessage : viewModel.askToDrawMessage
+  }
+
+  var askToDrawActions: [AppDialogAction] {
+	if viewModel.boardDrawRequestState == .pending {
+	  return [AppDialogAction(viewModel.okLabel)]
+	}
+	return [
+	  AppDialogAction(viewModel.askToDrawLabel) {
+		viewModel.requestBoardDrawPermission()
+	  },
+	  AppDialogAction(viewModel.cancelLabel, kind: .cancel)
+	]
+  }
+
+  /// A stroke starts only with leave to draw. Without it the student is asked
+  /// whether to request it, and the rest of the gesture draws nothing.
+  func mayStartStroke() -> Bool {
+	guard !viewModel.canDrawOnBoard else { return true }
+	isDrawGestureBlocked = true
+	isAskToDrawPresented = true
+	return false
   }
 
   func usesScrollableViewport(viewSize: CGSize) -> Bool {
@@ -252,6 +286,12 @@ struct WhiteboardView: View {
 	  clearDialogTitle,
 	  isPresented: $isClearDialogPresented,
 	  actions: clearDialogActions
+	)
+	.appDialog(
+	  askToDrawTitle,
+	  isPresented: $isAskToDrawPresented,
+	  message: askToDrawMessage,
+	  actions: askToDrawActions
 	)
 	.onChange(of: strokes) { oldStrokes, newStrokes in
 	  if !oldStrokes.isEmpty && newStrokes.isEmpty {
@@ -543,6 +583,7 @@ struct WhiteboardView: View {
 	  allowPanZoom: usesScrollableViewport(viewSize: viewSize),
 	  isMoveMode: isMoveMode,
 	  onDrawBegin: { viewPoint in
+		guard mayStartStroke() else { return }
 		let logical = viewToLogical(viewPoint, viewSize: viewSize)
 		if selectedTool == .pen {
 		  activeStroke = [logical]
@@ -552,6 +593,7 @@ struct WhiteboardView: View {
 		}
 	  },
 	  onDrawChanged: { viewPoint in
+		guard !isDrawGestureBlocked else { return }
 		let logical = viewToLogical(viewPoint, viewSize: viewSize)
 		if selectedTool == .pen {
 		  activeStroke = activeStroke + [logical]
@@ -560,6 +602,10 @@ struct WhiteboardView: View {
 		}
 	  },
 	  onDrawEnded: {
+		guard !isDrawGestureBlocked else {
+		  isDrawGestureBlocked = false
+		  return
+		}
 		let completed = activeStroke
 		activeStroke.removeAll()
 		shapeStartLogical = nil
@@ -567,6 +613,7 @@ struct WhiteboardView: View {
 		onStrokeFinished(completed)
 	  },
 	  onDrawCancelled: {
+		isDrawGestureBlocked = false
 		activeStroke.removeAll()
 		shapeStartLogical = nil
 	  },
@@ -593,6 +640,10 @@ struct WhiteboardView: View {
 			  return
 			}
 
+			guard !isDrawGestureBlocked else { return }
+			let isStarting = selectedTool == .pen ? activeStroke.isEmpty : shapeStartLogical == nil
+			if isStarting && !mayStartStroke() { return }
+
 			let clamped = CGPoint(
 			  x: min(max(value.location.x, 0), viewSize.width),
 			  y: min(max(value.location.y, 0), viewSize.height)
@@ -616,6 +667,10 @@ struct WhiteboardView: View {
 		  .onEnded { _ in
 			lastMoveDragTranslation = .zero
 			guard !isMoveMode else {
+			  return
+			}
+			guard !isDrawGestureBlocked else {
+			  isDrawGestureBlocked = false
 			  return
 			}
 

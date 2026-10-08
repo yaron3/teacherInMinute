@@ -6,6 +6,11 @@ import SwiftUI
 struct CompleteProfileView: View {
   @State var viewModel: CompleteProfileViewModel
   @Environment(\.appRouter) var router
+  @FocusState var focusedField: Field?
+
+  enum Field: Hashable {
+    case fullName, email, phone
+  }
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -119,6 +124,9 @@ struct CompleteProfileView: View {
         textContentType: .name,
         autocapitalization: .words
       )
+      .focused($focusedField, equals: .fullName)
+      .submitLabel(.next)
+      .onSubmit { focusedField = viewModel.showsEmailField ? .email : .phone }
 
       if viewModel.showsEmailField {
         BrandTextField(
@@ -132,6 +140,9 @@ struct CompleteProfileView: View {
           textContentType: .emailAddress,
           autocapitalization: .never
         )
+        .focused($focusedField, equals: .email)
+        .submitLabel(.next)
+        .onSubmit { focusedField = .phone }
       }
 
       BrandTextField(
@@ -145,6 +156,8 @@ struct CompleteProfileView: View {
         textContentType: .telephoneNumber,
         autocapitalization: .never
       )
+      .focused($focusedField, equals: .phone)
+      .submitLabel(.done)
 
       if viewModel.role == .teacher {
         payoutMethodSection

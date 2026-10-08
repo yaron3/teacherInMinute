@@ -34,7 +34,6 @@ extension ProfileViewModel {
     var saveButtonLabel: String { isLoading ? savingLabel : saveChangesLabel }
 
     // MARK: Sections
-    var paymentMethodLabel: String { LocalizationSupport.localized("Payment Method") }
     var teachingDetailsSectionTitle: String { LocalizationSupport.localized("Teaching Details") }
     var gradeLevelsTaughtTitle: String { LocalizationSupport.localized("Grade Levels Taught") }
     var subjectsSectionTitle: String { LocalizationSupport.localized("Subjects") }

@@ -1180,6 +1180,10 @@ enum LocalizationKey {
         // holds the full sentence the profile and verification screens use.
         "Camera access required": "camera_access_required_title",
 
+        // The board's drawing permission. `you_can_draw` holds the student's
+        // wait for approval; the decline's follow-up moves here.
+        "You can't draw on the board right now.": "cannot_draw_board_now",
+
         // The search's screens and the teacher's card. `how_would_you` holds
         // the payout question; the student's "I'm stuck because:" and "I can't
         // solve it" keep `stuck_because` and `can_solve`, and the card's

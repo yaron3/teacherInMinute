@@ -141,9 +141,6 @@ struct ProfileView: View {
         anonymousAccountCard
       }
       contactCard
-      if viewModel.shouldShowTeacherPaymentsMethod {
-        payoutMethodCard
-      }
       if viewModel.shouldShowTeachingDetails {
         teachingDetails
       }
@@ -341,34 +338,6 @@ struct ProfileView: View {
   }
 
   // MARK: - A teacher's
-
-  /// Where the teacher's payouts go.
-  private var payoutMethodCard: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack(spacing: 12) {
-        Text(viewModel.paymentMethodLabel)
-          .font(.system(size: 17, weight: .bold))
-          .foregroundStyle(theme.onDarkFill)
-          .frame(maxWidth: .infinity, alignment: .leading)
-        editButton(identifier: "profile_payout_edit_button") {
-          showProfileEditor()
-        }
-      }
-      HStack(spacing: 12) {
-        FlatIconTile(systemName: viewModel.payoutMethodSystemImage, size: 40)
-        VStack(alignment: .leading, spacing: 4) {
-          Text(viewModel.payoutMethodTitle)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(theme.onDarkFill)
-          Text(viewModel.payoutMethodDetail)
-            .font(.system(size: 13))
-            .foregroundStyle(viewModel.hasPayoutMethod ? theme.onDarkFill : theme.brandSecondaryText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-      }
-    }
-    .brandCard()
-  }
 
   /// The grades and subjects the teacher teaches, and their documents.
   private var teachingDetails: some View {

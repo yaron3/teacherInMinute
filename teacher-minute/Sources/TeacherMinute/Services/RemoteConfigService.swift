@@ -28,6 +28,9 @@ enum RemoteConfigKey: String {
     /// account. Google Play by default and the App Store under the `iOS`
     /// condition; empty until the listing exists, which leaves the offer out.
     case studentAppURL = "student_app_url"
+    /// How many seconds a student's leave to draw on the board lasts after
+    /// their last stroke. A number; 60 when missing.
+    case boardDrawPermissionSeconds = "board_draw_permission_seconds"
 }
 
 enum RemoteConfigLaunchError: LocalizedError {

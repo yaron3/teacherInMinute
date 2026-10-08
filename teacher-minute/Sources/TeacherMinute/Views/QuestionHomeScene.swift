@@ -36,8 +36,8 @@ struct QuestionHomeLayout {
   var toggleWidth: CGFloat { max(0, min(266, size.width - 110)) }
 
   var panelTop: CGFloat { safeTop + 83 }
-  var panelWidth: CGFloat { size.width - 52 }
-  var panelLeading: CGFloat { (size.width - panelWidth) / 2 - 2 }
+  var panelWidth: CGFloat { max(0,size.width - 52) }
+  var panelLeading: CGFloat { max(0, (size.width - panelWidth) / 2 - 2) }
   /// The panel's height with no keyboard up.
   var restingPanelHeight: CGFloat {
     let room = size.height - safeTop - 176 - Self.sceneVisibleHeight * widthScale

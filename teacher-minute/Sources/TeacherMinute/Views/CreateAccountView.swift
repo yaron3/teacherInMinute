@@ -125,6 +125,8 @@ struct CreateAccountView: View {
         autocapitalization: .never
       )
       .focused($focusedField, equals: .email)
+      .submitLabel(.next)
+      .onSubmit { focusedField = .password }
 
       BrandTextField(
         title: viewModel.passwordFieldTitle,
@@ -137,6 +139,8 @@ struct CreateAccountView: View {
         autocapitalization: .never
       )
       .focused($focusedField, equals: .password)
+      .submitLabel(.next)
+      .onSubmit { focusedField = .confirmPassword }
 
       BrandTextField(
         title: viewModel.confirmPasswordFieldTitle,
@@ -151,6 +155,7 @@ struct CreateAccountView: View {
         autocapitalization: .never
       )
       .focused($focusedField, equals: .confirmPassword)
+      .submitLabel(.done)
 
       consentRow(isOn: $viewModel.agreedToTerms) {
         agreementText
