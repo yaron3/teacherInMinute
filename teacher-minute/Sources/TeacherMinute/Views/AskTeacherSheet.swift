@@ -856,23 +856,30 @@ struct AskTeacherSheet: View {
 }
 
 #if os(Android)
+/// The photo picker for a question's photo, which comes back no larger than
+/// the camera's own (`QuestionCamera.maxDimension`): a gallery's original can
+/// be several megabytes, all of it to upload before the question can go.
 enum AndroidAskTeacherImagePickerBridge {
   private static let managerClass = try! JClass(name: "teacher/minute/AndroidImagePickerManager")
   private static let pickImageBase64Method = managerClass.getStaticMethodID(
     name: "pickImageBase64",
-    sig: "()Ljava/lang/String;"
+    sig: "(I)Ljava/lang/String;"
   )!
   private static let captureImageBase64Method = managerClass.getStaticMethodID(
     name: "captureImageBase64",
-    sig: "()Ljava/lang/String;"
+    sig: "(I)Ljava/lang/String;"
   )!
+
+  private static var maxDimension: Int32 {
+    Int32(QuestionCamera.maxDimension)
+  }
 
   static func pickImageBase64() throws -> String {
     try jniContext {
       try managerClass.callStatic(
         method: pickImageBase64Method,
         options: [.kotlincompat],
-        args: []
+        args: [maxDimension.toJavaParameter(options: [.kotlincompat])]
       )
     }
   }
@@ -882,7 +889,7 @@ enum AndroidAskTeacherImagePickerBridge {
       try managerClass.callStatic(
         method: captureImageBase64Method,
         options: [.kotlincompat],
-        args: []
+        args: [maxDimension.toJavaParameter(options: [.kotlincompat])]
       )
     }
   }

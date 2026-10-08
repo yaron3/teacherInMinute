@@ -430,4 +430,8 @@ dependencies {
     // switch, so it also needs the App Link intent-filter in AndroidManifest
     // and the assetlinks.json served from Firebase Hosting.
     implementation("com.braintreepayments.api:paypal:5.13.0")
+
+    // Lottie animations — see AndroidLottieView. iOS draws the same files
+    // with lottie-ios.
+    implementation("com.airbnb.android:lottie-compose:6.7.1")
 }

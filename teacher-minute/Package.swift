@@ -34,6 +34,9 @@ let package = Package(
         // Firebase moves to nanopb 0.4.
         .package(url: "https://github.com/livekit/client-sdk-swift.git", "2.0.0" ..< "2.17.0"),
         .package(url: "https://github.com/braintree/braintree_ios", from: "7.9.0"),
+        // Lottie animations on iOS; Android draws the same files with
+        // lottie-compose (Android/app/build.gradle.kts).
+        .package(url: "https://github.com/airbnb/lottie-spm.git", from: "4.6.0"),
     ],
     targets: [
         .target(
@@ -54,6 +57,7 @@ let package = Package(
                 .product(name: "BraintreeCore", package: "braintree_ios", condition: .when(platforms: [.iOS])),
                 .product(name: "BraintreeApplePay", package: "braintree_ios", condition: .when(platforms: [.iOS])),
                 .product(name: "BraintreePayPal", package: "braintree_ios", condition: .when(platforms: [.iOS])),
+                .product(name: "Lottie", package: "lottie-spm", condition: .when(platforms: [.iOS])),
             ],
             // KaTeX is copied rather than processed: its stylesheet reaches the
             // font files by relative path, which only survives if the folder

@@ -185,6 +185,9 @@ struct SpeechBubble: View {
   /// Sets a line wider than `textWidth` smaller rather than let it run over
   /// the bubble's edge: for copy written after the design, in any language.
   var shrinksToFit = false
+  /// A Lottie animation in Resources set as a row above the lines, in the
+  /// space one line takes.
+  var animationAbove: String? = nil
 
   var body: some View {
     ZStack(alignment: .topLeading) {
@@ -194,6 +197,12 @@ struct SpeechBubble: View {
         .scaleEffect(x: mirrorsArt ? -1 : 1, y: 1)
 
       VStack(alignment: alignment, spacing: 0) {
+        if let animationAbove {
+          // The animation's own 3:1, as tall as a row.
+          let height = lineHeight ?? fontSize
+          LottieLoopView(name: animationAbove)
+            .frame(width: height * 3, height: height)
+        }
         ForEach(0..<lines.count, id: \.self) { index in
           line(lines[index], isBold: weight == .bold || (boldsFirstLine && index == 0))
         }
