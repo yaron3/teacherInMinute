@@ -40,7 +40,7 @@ export const EMAIL_REWARD_PROMOTION_COLLECTION = "emailRewardPromotion";
 /** Purchase document the student grant is recorded under. */
 export const STUDENT_REWARD_PURCHASE_ID = "email_verification_reward";
 
-const DEFAULT_STUDENT_MINUTES = 30;
+const DEFAULT_STUDENT_MINUTES = 60;
 const DEFAULT_TEACHER_SHARE = 1;
 const DEFAULT_TEACHER_BONUS_MINUTES = 300;
 /** How many students the promotion is for, when Remote Config does not say. */

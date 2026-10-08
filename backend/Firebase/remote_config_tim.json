@@ -6046,14 +6046,14 @@
     },
     "first_minutes_the": {
       "defaultValue": {
-        "value": "First 60 minutes up to the next 100 subscribers"
+        "value": "First %d minutes up to the next %d subscribers"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "60 דקות חינם עד 100 המנויים הבאים"
+          "value": "%d דקות חינם עד %d המנויים הבאים"
         },
         "HebrewApp": {
-          "value": "60 דקות חינם עד 100 המנויים הבאים"
+          "value": "%d דקות חינם עד %d המנויים הבאים"
         }
       },
       "valueType": "STRING"
@@ -12513,7 +12513,7 @@
     },
     "email_reward_student_minutes": {
       "defaultValue": {
-        "value": "30"
+        "value": "60"
       },
       "description": "Free minutes a student gets once for verifying their email (0 turns it off).",
       "valueType": "NUMBER"
