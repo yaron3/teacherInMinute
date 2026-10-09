@@ -442,7 +442,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
@@ -458,6 +458,9 @@
 				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.student;
 				PRODUCT_NAME = InstantTeacher;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
 				TIM_ANDROID_FLAVOR = Student;
 				TIM_APP_ROLE = student;
 				TIM_APP_URL_SCHEME = teacherminute;
@@ -469,7 +472,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
@@ -485,6 +488,9 @@
 				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.student;
 				PRODUCT_NAME = InstantTeacher;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
 				TIM_ANDROID_FLAVOR = Student;
 				TIM_APP_ROLE = student;
 				TIM_APP_URL_SCHEME = teacherminute;
@@ -675,6 +681,9 @@
 				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.tim;
 				PRODUCT_NAME = ProTeacher;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
 				TIM_ANDROID_FLAVOR = Teacher;
 				TIM_APP_ROLE = teacher;
 				TIM_APP_URL_SCHEME = proteacher;
@@ -702,6 +711,9 @@
 				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.tim;
 				PRODUCT_NAME = ProTeacher;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
 				TIM_ANDROID_FLAVOR = Teacher;
 				TIM_APP_ROLE = teacher;
 				TIM_APP_URL_SCHEME = proteacher;

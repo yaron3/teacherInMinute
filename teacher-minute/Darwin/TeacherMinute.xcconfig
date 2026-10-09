@@ -32,10 +32,10 @@ SUPPORTS_MACCATALYST = NO
 SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
 
 // iPhone + iPad
-TARGETED_DEVICE_FAMILY = 1,2
+// TARGETED_DEVICE_FAMILY = 1,2
 
-// iPhone only
-// TARGETED_DEVICE_FAMILY = 1
+// iPhone only (until there is an iPad-specific design)
+TARGETED_DEVICE_FAMILY = 1
 
 // the name of the product module; this can be anything, but cannot conflict with any Swift module names
 PRODUCT_MODULE_NAME = $(PRODUCT_NAME:c99extidentifier)App
