@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>מורה ברגע · Teacher in a Minute — עזרה במתמטיקה כשצריך</title>
-  <meta name="description" content="מורה ברגע מחברת תלמידים למורי מתמטיקה מוסמכים תוך דקות, בתשלום לפי דקה בלבד. Teacher in a Minute connects students with certified math teachers in minutes, billed by the minute.">
-  <meta name="color-scheme" content="light dark">
+  <title>מורה לרגע · Instant Teacher — מורה אנושי תוך דקה וחצי</title>
+  <meta name="description" content="מורה לרגע מחברת תלמידים למורה אנושי למתמטיקה תוך דקה וחצי, ב-2₪ לדקה וללא שיעורים קבועים. Instant Teacher connects students with a human math teacher within 90 seconds, at ₪2 per minute. Teachers use Pro Teacher.">
+  <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#08080C" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#0D0C1A" media="(prefers-color-scheme: dark)">
 
   <!-- Applied before first paint so a stored choice never flashes the other
        scheme. No stored choice means the system decides. -->
@@ -25,19 +25,19 @@
   <link rel="apple-touch-icon" href="favicon.png">
 
   <meta property="og:type" content="website">
-  <meta property="og:title" content="מורה ברגע · Teacher in a Minute">
-  <meta property="og:description" content="עזרה כשצריך, ממורה שזמין עכשיו — תשלום לפי דקה.">
-  <meta property="og:image" content="logo.png">
+  <meta property="og:title" content="מורה לרגע · Instant Teacher">
+  <meta property="og:description" content="נתקעתם? מורה אנושי תוך דקה וחצי — 2₪ לדקה, בלי שיעורים קבועים.">
+  <meta property="og:image" content="screens/student-he-01.jpg">
   <meta name="twitter:card" content="summary_large_image">
-  
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
   <!-- Font Integration -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  
+
   <!-- Phosphor Icons for Modern UI elements -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
@@ -64,7 +64,9 @@
               sky: 'rgb(var(--sky) / <alpha-value>)',
               amber: 'rgb(var(--amber) / <alpha-value>)',
               accent: 'rgb(var(--accent) / <alpha-value>)',
-              accentStrong: 'rgb(var(--accent-strong) / <alpha-value>)'
+              accentStrong: 'rgb(var(--accent-strong) / <alpha-value>)',
+              onAccent: 'rgb(var(--on-accent) / <alpha-value>)',
+              violet: 'rgb(var(--violet) / <alpha-value>)'
             }
           }
         }
@@ -72,65 +74,75 @@
     }
   </script>
   <style>
-    /* Light is the base scheme; the dark values below override it, first
-       for people whose system asks for dark, then for an explicit choice
-       made with the header toggle. */
+    /* The app's own palette: deep violet-navy surfaces, the cyan #54E8F6
+       for actions, magenta and teal light streaks. Dark is the look the
+       app ships with; light is kept for people whose system asks for it,
+       with the cyan deepened to teal so it still reads on white. */
     :root {
       --surface-0: 255 255 255;
-      --surface-1: 245 245 247;
+      --surface-1: 245 244 250;
       --surface-2: 255 255 255;
-      --line: 226 226 232;
-      --text-1: 10 10 15;
-      --text-2: 63 63 70;
-      --text-3: 113 113 122;
-      --accent: 67 64 214;
-      --accent-strong: 55 52 190;
-      --sky: 30 111 217;
-      --amber: 194 98 14;
-      --bezel-a: #E6E6EC;
-      --bezel-b: #C8C8D2;
-      --device-shadow: 0 20px 45px -22px rgba(15, 15, 30, .45);
-      --aura-opacity: .5;
+      --line: 224 222 236;
+      --text-1: 13 12 26;
+      --text-2: 58 56 80;
+      --text-3: 104 101 128;
+      --accent: 21 121 125;
+      --accent-strong: 15 96 100;
+      --on-accent: 255 255 255;
+      --sky: 21 121 125;
+      --amber: 196 0 127;
+      --violet: 76 73 134;
+      --bezel-a: #2A2840;
+      --bezel-b: #14131F;
+      --device-shadow: 0 24px 50px -24px rgba(30, 20, 70, .55);
+      --glow-opacity: .35;
+      --streak-opacity: .25;
       color-scheme: light;
     }
 
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
-        --surface-0: 8 8 12;
-        --surface-1: 16 16 22;
-        --surface-2: 23 23 31;
-        --line: 38 38 47;
+        --surface-0: 13 12 26;
+        --surface-1: 20 19 39;
+        --surface-2: 27 26 51;
+        --line: 44 42 74;
         --text-1: 255 255 255;
-        --text-2: 212 212 216;
-        --text-3: 161 161 170;
-        --accent: 91 91 245;
-        --accent-strong: 67 64 214;
-        --sky: 46 134 240;
-        --amber: 245 146 30;
-        --bezel-a: #2A2A34;
-        --bezel-b: #14141A;
-        --device-shadow: 0 24px 60px -20px rgba(0, 0, 0, .9);
-        --aura-opacity: 1;
+        --text-2: 214 212 230;
+        --text-3: 179 175 202;
+        --accent: 84 232 246;
+        --accent-strong: 39 220 227;
+        --on-accent: 10 10 18;
+        --sky: 84 232 246;
+        --amber: 255 20 168;
+        --violet: 120 116 210;
+        --bezel-a: #2E2C48;
+        --bezel-b: #12111E;
+        --device-shadow: 0 30px 70px -24px rgba(0, 0, 0, .9);
+        --glow-opacity: 1;
+        --streak-opacity: .7;
         color-scheme: dark;
       }
     }
 
     :root[data-theme="dark"] {
-      --surface-0: 8 8 12;
-      --surface-1: 16 16 22;
-      --surface-2: 23 23 31;
-      --line: 38 38 47;
+      --surface-0: 13 12 26;
+      --surface-1: 20 19 39;
+      --surface-2: 27 26 51;
+      --line: 44 42 74;
       --text-1: 255 255 255;
-      --text-2: 212 212 216;
-      --text-3: 161 161 170;
-      --accent: 91 91 245;
-      --accent-strong: 67 64 214;
-      --sky: 46 134 240;
-      --amber: 245 146 30;
-      --bezel-a: #2A2A34;
-      --bezel-b: #14141A;
-      --device-shadow: 0 24px 60px -20px rgba(0, 0, 0, .9);
-      --aura-opacity: 1;
+      --text-2: 214 212 230;
+      --text-3: 179 175 202;
+      --accent: 84 232 246;
+      --accent-strong: 39 220 227;
+      --on-accent: 10 10 18;
+      --sky: 84 232 246;
+      --amber: 255 20 168;
+      --violet: 120 116 210;
+      --bezel-a: #2E2C48;
+      --bezel-b: #12111E;
+      --device-shadow: 0 30px 70px -24px rgba(0, 0, 0, .9);
+      --glow-opacity: 1;
+      --streak-opacity: .7;
       color-scheme: dark;
     }
 
@@ -150,14 +162,33 @@
       :root:not([data-theme="light"]) .theme-icon-dark { display: none; }
       :root:not([data-theme="light"]) .theme-icon-light { display: inline-block; }
     }
-    .gradient-text {
-      background: linear-gradient(135deg, rgb(var(--accent)) 0%, rgb(var(--sky)) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .accent-text { color: rgb(var(--accent)); }
+
+    /* The violet wash and the two diagonal light streaks that sit behind
+       every screen of the app, scaled up for the page. */
+    .stage { position: relative; isolation: isolate; overflow: hidden; }
+    .stage::before {
+      content: "";
+      position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background:
+        radial-gradient(55% 60% at 85% 20%, rgba(76, 73, 134, .55) 0%, transparent 70%),
+        radial-gradient(45% 50% at 10% 85%, rgba(76, 73, 134, .40) 0%, transparent 70%);
+      opacity: var(--glow-opacity);
+    }
+    .stage::after {
+      content: "";
+      position: absolute; left: -10%; right: -10%; bottom: 6%; height: 40%;
+      z-index: -1; pointer-events: none;
+      background:
+        linear-gradient(-14deg, transparent 48.6%, rgba(255, 20, 168, .55) 49.6%, transparent 50.6%),
+        linear-gradient(-14deg, transparent 58.6%, rgba(52, 125, 142, .7) 59.6%, transparent 60.6%);
+      filter: blur(1px);
+      opacity: var(--streak-opacity);
     }
 
-    /* Screenshot frame: a thin dark bezel so a light app screen keeps its
-       edges on the dark page, with the phone's own rounded corners. */
+    /* Screenshot frame: a thin dark bezel with the phone's own rounded
+       corners. Every capture is dark, so the bezel stays dark in both
+       page themes. */
     .device {
       border-radius: 2rem;
       padding: 6px;
@@ -168,30 +199,35 @@
       border-radius: 1.6rem;
       display: block;
       width: 100%;
+      height: auto;
     }
-    /* A screenshot pair shows whichever half matches the page theme.
-       Specificity has to clear `.device img`, hence the qualified selectors. */
-    .device img.shot-dark { display: none; }
-    :root[data-theme="dark"] .device img.shot-light { display: none; }
-    :root[data-theme="dark"] .device img.shot-dark { display: block; }
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) .device img.shot-light { display: none; }
-      :root:not([data-theme="light"]) .device img.shot-dark { display: block; }
-    }
-
     .device-lift {
       transition: transform .3s ease;
     }
     .device-lift:hover {
       transform: translateY(-6px);
     }
-    /* Ambient wash behind the hero devices. */
+    /* Cyan halo behind the hero devices, like the app's camera button. */
     .aura {
-      background: radial-gradient(60% 50% at 50% 40%, rgba(91, 91, 245, .35) 0%, rgba(46, 134, 240, .12) 45%, transparent 75%);
-      filter: blur(28px);
-      opacity: var(--aura-opacity);
+      background: radial-gradient(50% 45% at 50% 45%, rgba(84, 232, 246, .22) 0%, rgba(76, 73, 134, .35) 45%, transparent 75%);
+      filter: blur(30px);
+      opacity: var(--glow-opacity);
     }
-    
+
+    /* Pill tag, as on the store screenshots ("FOR STUDENTS"). */
+    .pill {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .3rem .8rem; border-radius: 999px;
+      font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: rgb(var(--text-2));
+      background: rgb(var(--violet) / .18);
+      border: 1px solid rgb(var(--violet) / .55);
+    }
+    .eyebrow {
+      font-size: .72rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+      color: rgb(var(--text-3));
+    }
+
     /* Multilingual display logic */
     html[dir="rtl"] .lang-en { display: none !important; }
     html[dir="ltr"] .lang-he { display: none !important; }
@@ -218,29 +254,29 @@
     <div class="max-w-6xl mx-auto flex items-center justify-between">
       <div class="flex items-center gap-3">
         <a href="#" class="flex items-center gap-3">
-          <img src="logo-mark.png" alt="מורה ברגע" class="h-10 w-auto drop-shadow-[0_4px_12px_rgba(46,134,240,.35)]">
+          <img src="logo-mark.png" alt="מורה לרגע" class="h-10 w-auto drop-shadow-[0_4px_12px_rgba(84,232,246,.3)]">
           <div>
-            <span class="font-extrabold text-lg tracking-wide text-brand-strong block leading-tight lang-he">מורה ברגע</span>
-            <span class="font-extrabold text-lg tracking-wide text-brand-strong block leading-tight lang-en">Teacher in a Minute</span>
-            <span class="text-[10px] text-brand-sky font-semibold lang-he">עזרה כשצריך, ממורה שזמין עכשיו</span>
-            <span class="text-[10px] text-brand-sky font-semibold lang-en">Help right when you need it</span>
+            <span class="font-extrabold text-lg tracking-wide text-brand-strong block leading-tight lang-he">מורה לרגע</span>
+            <span class="font-extrabold text-lg tracking-wide text-brand-strong block leading-tight lang-en">Instant Teacher</span>
+            <span class="text-[10px] text-brand-accent font-semibold lang-he">מורה אנושי תוך דקה וחצי</span>
+            <span class="text-[10px] text-brand-accent font-semibold lang-en">A human teacher within 90 seconds</span>
           </div>
         </a>
       </div>
-      
+
       <nav class="hidden md:flex items-center gap-6">
-        <a href="#about" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">על האפליקציה</a>
-        <a href="#about" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">About</a>
-        
-        <a href="#screens" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">צילומי מסך</a>
-        <a href="#screens" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Screenshots</a>
-        
+        <a href="#students" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">לתלמידים</a>
+        <a href="#students" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">For students</a>
+
+        <a href="#teachers" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">למורים</a>
+        <a href="#teachers" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">For teachers</a>
+
         <a href="#privacy" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">מדיניות פרטיות</a>
         <a href="#privacy" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Privacy Policy</a>
 
         <a href="#eula" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">תנאי שימוש</a>
         <a href="#eula" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Terms (EULA)</a>
-        
+
         <a href="#contact" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">צור קשר</a>
         <a href="#contact" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Contact</a>
       </nav>
@@ -255,7 +291,7 @@
 
         <!-- Language Switcher Button -->
         <button onclick="toggleLanguage()" class="bg-brand-card hover:bg-brand-line text-brand-body hover:text-brand-strong text-xs px-3 py-2 rounded-xl border border-brand-line transition flex items-center gap-2">
-          <i class="ph-bold ph-translate text-sm text-brand-amber"></i>
+          <i class="ph-bold ph-translate text-sm text-brand-accent"></i>
           <span class="lang-he font-semibold">English</span>
           <span class="lang-en font-semibold">עברית</span>
         </button>
@@ -265,56 +301,46 @@
 
   <!-- MAIN LANDING EXPERIENCE VIEW -->
   <main id="view-landing" class="flex-grow">
-    <!-- About/Hero Section -->
-    <section id="about" class="relative overflow-hidden py-16 md:py-24 px-4">
-      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-brand-accent/10 via-transparent to-transparent pointer-events-none"></div>
-      
+    <!-- Hero: the Instant Teacher welcome screen, in words and on the phone -->
+    <section id="about" class="stage py-16 md:py-24 px-4">
       <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
         <!-- Text Column -->
         <div class="lg:col-span-7 space-y-6 text-center lg:text-start">
           <!-- Hebrew Hero Intro -->
           <div class="lang-he space-y-6">
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-amber/10 border border-brand-amber/30 text-brand-amber text-xs font-bold">
-              <i class="ph-bold ph-sparkle"></i>
-              <span>מענה ממוקד תוך דקות ספורות בלבד!</span>
-            </div>
-            
+            <p class="eyebrow">מורה לרגע · לתלמידים</p>
             <h1 class="text-4xl md:text-6xl font-black text-brand-strong leading-tight">
-              מורה למתמטיקה <br class="hidden md:inline">
-              <span class="gradient-text">בדיוק כשצריך.</span>
+              נתקעתם?<br>
+              <span class="accent-text">מורה אנושי</span> תוך דקה וחצי
             </h1>
-            
             <p class="text-lg text-brand-textGray max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              נתקעתם בשיעורי הבית? צריכים הכנה מהירה למבחן? <span class="text-brand-strong font-semibold">מורה ברגע</span> מחברת אתכם באופן מיידי למורים מוסמכים למתמטיקה בעלי רישיון הוראה. משלמים רק על הזמן שלמדתם בפועל – לפי דקה!
+              כשה-AI לא מצליח להסביר, יש לנו מורה אנושי שרואה בדיוק איפה נתקעתם. מצלמים או כותבים את השאלה, ומורה למתמטיקה מצטרף — <span class="text-brand-strong font-semibold">2₪ לדקה, בלי שיעורים קבועים.</span>
             </p>
           </div>
 
           <!-- English Hero Intro -->
           <div class="lang-en space-y-6">
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-amber/10 border border-brand-amber/30 text-brand-amber text-xs font-bold">
-              <i class="ph-bold ph-sparkle"></i>
-              <span>Get answered in minutes!</span>
-            </div>
-            
+            <p class="eyebrow">Instant Teacher · For students</p>
             <h1 class="text-4xl md:text-6xl font-black text-brand-strong leading-tight">
-              A Math Teacher <br class="hidden md:inline">
-              <span class="gradient-text">Right when you need it.</span>
+              Stuck?<br>
+              <span class="accent-text">A human teacher</span> within 90 seconds
             </h1>
-            
             <p class="text-lg text-brand-textGray max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              Stuck on homework? Need a quick pre-exam prep session? <span class="text-brand-strong font-semibold">Teacher in a Minute</span> connects you instantly with certified math teachers. Pay only for the minutes you actually learn!
+              When AI can't explain it, we have a human teacher who sees exactly where you got stuck. Snap or type your question and a math teacher joins — <span class="text-brand-strong font-semibold">₪2 per minute, no fixed lessons.</span>
             </p>
           </div>
 
-          <div class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-4">
-            <a href="#" class="flex items-center gap-3 bg-brand-strong hover:opacity-90 text-brand-black px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
+          <!-- Instant Teacher store buttons. The App Store link for Instant
+               Teacher is not known yet; replace "#" once the listing is live. -->
+          <div class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
+            <a href="#" class="flex items-center gap-3 bg-brand-accent hover:bg-brand-accentStrong text-brand-onAccent px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
               <i class="ph-bold ph-app-store-logo text-2xl"></i>
               <div class="text-left">
-                <span class="text-[10px] block font-medium opacity-70">Download on the</span>
+                <span class="text-[10px] block font-semibold opacity-75">Download on the</span>
                 <span class="text-sm block font-bold leading-tight -mt-0.5 font-sans">App Store</span>
               </div>
             </a>
-            <a href="#" class="flex items-center gap-3 bg-brand-card hover:bg-brand-line text-brand-strong border border-brand-line px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
+            <a href="https://play.google.com/store/apps/details?id=com.yaronj.student" class="flex items-center gap-3 bg-brand-card hover:bg-brand-line text-brand-strong border border-brand-line px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
               <i class="ph-bold ph-google-play-logo text-2xl"></i>
               <div class="text-left font-sans">
                 <span class="text-[10px] block font-medium text-brand-textGray">GET IT ON</span>
@@ -322,53 +348,57 @@
               </div>
             </a>
           </div>
+          <p class="text-sm text-brand-textGray">
+            <span class="lang-he">מלמדים? <a href="#teachers" class="text-brand-accent font-bold hover:underline">הכירו את Pro Teacher ←</a></span>
+            <span class="lang-en">Do you teach? <a href="#teachers" class="text-brand-accent font-bold hover:underline">Meet Pro Teacher →</a></span>
+          </p>
 
           <!-- Feature Badges -->
-          <div class="grid grid-cols-2 md:grid-cols-3 gap-4 pt-8 border-t border-brand-line max-w-lg mx-auto lg:mx-0 text-right lg:text-start">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4 pt-8 border-t border-brand-line max-w-lg mx-auto lg:mx-0 text-start">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-amber">
-                <i class="ph-bold ph-clock-countdown text-xl"></i>
+              <div class="w-10 h-10 shrink-0 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-accent">
+                <i class="ph-bold ph-timer text-xl"></i>
               </div>
               <div>
                 <h4 class="font-bold text-sm text-brand-strong">
-                  <span class="lang-he">תמחור לפי דקה</span>
-                  <span class="lang-en">By-the-minute</span>
+                  <span class="lang-he">תוך דקה וחצי</span>
+                  <span class="lang-en">Within 90 seconds</span>
                 </h4>
                 <p class="text-xs text-brand-textGray">
-                  <span class="lang-he">ללא התחייבות חודשית</span>
-                  <span class="lang-en">No subscription</span>
+                  <span class="lang-he">מורה זמין עכשיו</span>
+                  <span class="lang-en">A teacher online now</span>
                 </p>
               </div>
             </div>
-            
+
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-accent">
-                <i class="ph-bold ph-certificate text-xl"></i>
+              <div class="w-10 h-10 shrink-0 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-accent">
+                <i class="ph-bold ph-coins text-xl"></i>
               </div>
               <div>
                 <h4 class="font-bold text-sm text-brand-strong">
-                  <span class="lang-he">מורים מוסמכים</span>
-                  <span class="lang-en">Certified Teachers</span>
+                  <span class="lang-he">2₪ לדקה</span>
+                  <span class="lang-en">₪2 per minute</span>
                 </h4>
                 <p class="text-xs text-brand-textGray">
-                  <span class="lang-he">בעלי רישיון הוראה</span>
-                  <span class="lang-en">Licensed instructors</span>
+                  <span class="lang-he">בלי שיעורים קבועים</span>
+                  <span class="lang-en">No fixed lessons</span>
                 </p>
               </div>
             </div>
 
             <div class="flex items-center gap-3 col-span-2 md:col-span-1">
-              <div class="w-10 h-10 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-sky">
-                <i class="ph-bold ph-shield-check text-xl"></i>
+              <div class="w-10 h-10 shrink-0 rounded-xl bg-brand-card border border-brand-line flex items-center justify-center text-brand-accent">
+                <i class="ph-bold ph-seal-check text-xl"></i>
               </div>
               <div>
                 <h4 class="font-bold text-sm text-brand-strong">
-                  <span class="lang-he">סביבה מוגנת</span>
-                  <span class="lang-en">Safe Space</span>
+                  <span class="lang-he">מורים מאומתים</span>
+                  <span class="lang-en">Verified teachers</span>
                 </h4>
                 <p class="text-xs text-brand-textGray">
-                  <span class="lang-he">פיקוח מלא והתאמה לילדים</span>
-                  <span class="lang-en">Fully supervised for kids</span>
+                  <span class="lang-he">מכיתה ח' ומעלה</span>
+                  <span class="lang-en">Grade 8 and up</span>
                 </p>
               </div>
             </div>
@@ -377,150 +407,239 @@
 
         <!-- Phone Screenshots Column -->
         <div class="lg:col-span-5 flex flex-row items-center justify-center gap-4 md:gap-6 relative">
-          <!-- Ambient wash under the devices -->
           <div class="aura absolute inset-0 pointer-events-none"></div>
 
           <div class="w-1/2 max-w-[240px] device-lift z-10">
-            <p class="text-xs text-center text-brand-textGray mb-2 font-medium">
-              <span class="lang-he">מסך הפתיחה</span>
-              <span class="lang-en">Getting started</span>
-            </p>
             <div class="device">
-              <img src="screen-welcome.jpg" alt="מסך הפתיחה של מורה ברגע" loading="lazy" width="620" height="1347">
+              <img src="screens/student-he-01.jpg" class="lang-he" alt="מסך הפתיחה של מורה לרגע — מורה אנושי תוך דקה וחצי" width="600" height="1298">
+              <img src="screens/student-en-01.jpg" class="lang-en" alt="Instant Teacher welcome screen — a human teacher within 90 seconds" width="600" height="1298">
             </div>
           </div>
 
-          <div class="w-1/2 max-w-[240px] mt-8 device-lift z-10">
-            <p class="text-xs text-center text-brand-textGray mb-2 font-medium">
-              <span class="lang-he">מסך הבית והתמחור</span>
-              <span class="lang-en">Home & pricing</span>
-            </p>
+          <div class="w-1/2 max-w-[240px] mt-16 device-lift z-10">
             <div class="device">
-              <img src="screen-home.png" class="shot-light" alt="מסך הבית עם חבילות דקות" loading="lazy" width="620" height="1347">
-              <img src="screen-home-dark.png" class="shot-dark" alt="מסך הבית במצב כהה" loading="lazy" width="620" height="1347">
+              <img src="screens/student-he-03.jpg" class="lang-he" alt="כתיבת שאלה עם מקלדת מתמטית" width="600" height="1298">
+              <img src="screens/student-en-03.jpg" class="lang-en" alt="Typing a question with the math keyboard" width="600" height="1298">
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Screenshot gallery -->
-    <section id="screens" class="py-16 md:py-20 px-4 border-t border-brand-line/70">
+    <!-- How it works -->
+    <section class="py-14 px-4 border-t border-brand-line/70 bg-brand-dark/60">
+      <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
+        <div class="rounded-2xl border border-brand-line bg-brand-card p-6 space-y-3">
+          <div class="w-11 h-11 rounded-xl bg-brand-accent text-brand-onAccent flex items-center justify-center text-xl"><i class="ph-bold ph-camera"></i></div>
+          <h3 class="font-extrabold text-brand-strong text-lg">
+            <span class="lang-he">1. מצלמים או כותבים</span>
+            <span class="lang-en">1. Snap it or type it</span>
+          </h3>
+          <p class="text-sm text-brand-textGray">
+            <span class="lang-he">צילום של השאלה מהדף, או הקלדה עם מקלדת מתמטית.</span>
+            <span class="lang-en">A photo of the question from the page, or type it with the math keyboard.</span>
+          </p>
+        </div>
+        <div class="rounded-2xl border border-brand-line bg-brand-card p-6 space-y-3">
+          <div class="w-11 h-11 rounded-xl bg-brand-accent text-brand-onAccent flex items-center justify-center text-xl"><i class="ph-bold ph-chalkboard-teacher"></i></div>
+          <h3 class="font-extrabold text-brand-strong text-lg">
+            <span class="lang-he">2. מורה מצטרף</span>
+            <span class="lang-en">2. A teacher joins</span>
+          </h3>
+          <p class="text-sm text-brand-textGray">
+            <span class="lang-he">מורה אנושי שזמין עכשיו מצטרף תוך דקה וחצי, עם קול ולוח משותף.</span>
+            <span class="lang-en">A human teacher who is online now joins within 90 seconds, with voice and a shared whiteboard.</span>
+          </p>
+        </div>
+        <div class="rounded-2xl border border-brand-line bg-brand-card p-6 space-y-3">
+          <div class="w-11 h-11 rounded-xl bg-brand-accent text-brand-onAccent flex items-center justify-center text-xl"><i class="ph-bold ph-clock-countdown"></i></div>
+          <h3 class="font-extrabold text-brand-strong text-lg">
+            <span class="lang-he">3. משלמים לפי דקה</span>
+            <span class="lang-en">3. Pay by the minute</span>
+          </h3>
+          <p class="text-sm text-brand-textGray">
+            <span class="lang-he">2₪ לדקה מתוך חבילת דקות. בלי מנוי ובלי שיעורים קבועים.</span>
+            <span class="lang-en">₪2 per minute from a minutes pack. No subscription, no fixed lessons.</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Instant Teacher gallery -->
+    <section id="students" class="stage py-16 md:py-20 px-4 border-t border-brand-line/70">
       <div class="max-w-6xl mx-auto space-y-10">
         <div class="text-center space-y-3">
-          <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-accent/10 border border-brand-accent/30 text-brand-accent text-xs font-bold">
-            <i class="ph-bold ph-device-mobile"></i>
-            <span class="lang-he">מתוך האפליקציה</span>
-            <span class="lang-en">Inside the app</span>
-          </span>
+          <p class="eyebrow">
+            <span class="lang-he">מורה לרגע</span>
+            <span class="lang-en">Instant Teacher</span>
+          </p>
           <h2 class="text-2xl md:text-4xl font-black text-brand-strong">
             <span class="lang-he">מהשאלה ועד המורה — בכמה הקשות</span>
             <span class="lang-en">From question to teacher in a few taps</span>
           </h2>
-          <p class="text-brand-textGray text-sm md:text-base max-w-2xl mx-auto">
-            <span class="lang-he">בוחרים נושא וסוג שיעור, שולחים את השאלה, ומורה זמין מצטרף. בסוף השיעור משלמים רק על הדקות שנוצלו. המסכים כאן מוצגים במצב התצוגה שבחרתם.</span>
-            <span class="lang-en">Pick a topic and a session type, send the question, and an available teacher joins. You pay only for the minutes you used. The screens below follow the theme you are viewing in.</span>
-          </p>
+          <span class="pill">
+            <span class="lang-he">לתלמידים</span>
+            <span class="lang-en">For students</span>
+          </span>
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5 md:gap-6">
           <figure class="space-y-3 device-lift">
             <div class="device">
-              <img src="screen-welcome.jpg" alt="מסך פתיחה — עזרה מכל מקום" loading="lazy" width="620" height="1347">
+              <img src="screens/student-he-01.jpg" class="lang-he" alt="מסך הפתיחה" loading="lazy" width="600" height="1298">
+              <img src="screens/student-en-01.jpg" class="lang-en" alt="Welcome screen" loading="lazy" width="600" height="1298">
             </div>
-            <figcaption class="text-center">
-              <span class="block text-sm font-bold text-brand-strong lang-he">עזרה מכל מקום</span>
-              <span class="block text-sm font-bold text-brand-strong lang-en">Help from anywhere</span>
-              <span class="block text-xs text-brand-textGray lang-he">מורים מאומתים, סביבה מוגנת</span>
-              <span class="block text-xs text-brand-textGray lang-en">Verified teachers, safe space</span>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">מורה אנושי תוך דקה וחצי</span>
+              <span class="lang-en">A human teacher within 90 seconds</span>
             </figcaption>
           </figure>
 
           <figure class="space-y-3 device-lift">
             <div class="device">
-              <img src="screen-home.png" class="shot-light" alt="מסך הבית — יתרת דקות וחבילות" loading="lazy" width="620" height="1347">
-              <img src="screen-home-dark.png" class="shot-dark" alt="מסך הבית במצב כהה — יתרת דקות וחבילות" loading="lazy" width="620" height="1347">
+              <img src="screens/student-he-02.jpg" class="lang-he" alt="שליחת שאלה בצילום" loading="lazy" width="600" height="1298">
+              <img src="screens/student-en-02.jpg" class="lang-en" alt="Asking with a photo" loading="lazy" width="600" height="1298">
             </div>
-            <figcaption class="text-center">
-              <span class="block text-sm font-bold text-brand-strong lang-he">יתרה וחבילות דקות</span>
-              <span class="block text-sm font-bold text-brand-strong lang-en">Balance & minute packs</span>
-              <span class="block text-xs text-brand-textGray lang-he">רואים בדיוק כמה נשאר</span>
-              <span class="block text-xs text-brand-textGray lang-en">See exactly what is left</span>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">מצלמים את השאלה ומקבלים עזרה</span>
+              <span class="lang-en">Snap your question and get help</span>
             </figcaption>
           </figure>
 
           <figure class="space-y-3 device-lift">
             <div class="device">
-              <img src="screen-pay.png" class="shot-light" alt="בחירת אמצעי תשלום" loading="lazy" width="620" height="1347">
-              <img src="screen-pay-dark.png" class="shot-dark" alt="בחירת אמצעי תשלום במצב כהה" loading="lazy" width="620" height="1347">
+              <img src="screens/student-he-03.jpg" class="lang-he" alt="כתיבת שאלה עם מקלדת מתמטית" loading="lazy" width="600" height="1298">
+              <img src="screens/student-en-03.jpg" class="lang-en" alt="Typing a question with the math keyboard" loading="lazy" width="600" height="1298">
             </div>
-            <figcaption class="text-center">
-              <span class="block text-sm font-bold text-brand-strong lang-he">תשלום נוח ומאובטח</span>
-              <span class="block text-sm font-bold text-brand-strong lang-en">Simple, secure checkout</span>
-              <span class="block text-xs text-brand-textGray lang-he">PayPal, ביט, Apple Pay וכרטיס אשראי</span>
-              <span class="block text-xs text-brand-textGray lang-en">PayPal, Bit, Apple Pay & card</span>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">או כותבים אותה, גם עם מקלדת מתמטית</span>
+              <span class="lang-en">Or type it, with a math keyboard</span>
             </figcaption>
           </figure>
 
           <figure class="space-y-3 device-lift">
             <div class="device">
-              <img src="screen-teacher.png" alt="לוח המורה — מצב מקוון ותור חי" loading="lazy" width="620" height="1347">
+              <img src="screens/student-he-04.jpg" class="lang-he" alt="רכישת דקות" loading="lazy" width="600" height="1298">
+              <img src="screens/student-en-04.jpg" class="lang-en" alt="Purchasing minutes" loading="lazy" width="600" height="1298">
             </div>
-            <figcaption class="text-center">
-              <span class="block text-sm font-bold text-brand-strong lang-he">גם צד המורה</span>
-              <span class="block text-sm font-bold text-brand-strong lang-en">The teacher side too</span>
-              <span class="block text-xs text-brand-textGray lang-he">מתחברים, מקבלים שאלות, מרוויחים</span>
-              <span class="block text-xs text-brand-textGray lang-en">Go online, take questions, earn</span>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">משלמים רק על הדקות שמנצלים</span>
+              <span class="lang-en">Pay only for the minutes you use</span>
+            </figcaption>
+          </figure>
+
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screens/student-he-05.jpg" class="lang-he" alt="פעילות — השיעורים האחרונים" loading="lazy" width="600" height="1298">
+              <img src="screens/student-en-05.jpg" class="lang-en" alt="Activity — recent sessions" loading="lazy" width="600" height="1298">
+            </div>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">כל השיעורים שלכם במקום אחד</span>
+              <span class="lang-en">Every session in one place</span>
             </figcaption>
           </figure>
         </div>
+      </div>
+    </section>
 
-        <!-- Both schemes at once, so the point lands whichever theme the
-             visitor is reading the page in. -->
-        <div class="rounded-3xl border border-brand-line bg-brand-dark p-6 md:p-10 grid md:grid-cols-2 gap-8 md:gap-10 items-center">
-          <div class="space-y-3 text-center md:text-start">
-            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-sky/10 border border-brand-sky/30 text-brand-sky text-xs font-bold">
-              <i class="ph-bold ph-circle-half"></i>
-              <span class="lang-he">בהיר וכהה</span>
-              <span class="lang-en">Light & dark</span>
+    <!-- Pro Teacher gallery -->
+    <section id="teachers" class="stage py-16 md:py-20 px-4 border-t border-brand-line/70 bg-brand-dark/60">
+      <div class="max-w-6xl mx-auto space-y-10">
+        <div class="grid lg:grid-cols-12 gap-8 items-end">
+          <div class="lg:col-span-7 space-y-4 text-center lg:text-start">
+            <p class="eyebrow">Pro Teacher</p>
+            <h2 class="text-2xl md:text-4xl font-black text-brand-strong">
+              <span class="lang-he">מלמדים <span class="accent-text">מתי שנוח לכם</span></span>
+              <span class="lang-en">Teach <span class="accent-text">whenever you are free</span></span>
+            </h2>
+            <span class="pill">
+              <span class="lang-he">למורים</span>
+              <span class="lang-en">For teachers</span>
             </span>
-            <h3 class="text-xl md:text-2xl font-black text-brand-strong">
-              <span class="lang-he">מתאימה את עצמה למכשיר שלכם</span>
-              <span class="lang-en">It follows your device</span>
-            </h3>
-            <p class="text-brand-textGray text-sm">
-              <span class="lang-he">האפליקציה עוברת למצב בהיר או כהה יחד עם ההגדרות של המכשיר — אותם מסכים, אותה קריאוּת, גם בלילה. גם האתר הזה.</span>
-              <span class="lang-en">The app switches between light and dark with your system settings — same screens, same readability, late at night too. This site does the same.</span>
+            <p class="text-brand-textGray text-sm md:text-base max-w-xl mx-auto lg:mx-0">
+              <span class="lang-he">מורים מתחברים דרך אפליקציה נפרדת, Pro Teacher. מדליקים זמינות, מקבלים שאלות בנושאים שבחרתם, ורואים כל שיעור וכל תשלום.</span>
+              <span class="lang-en">Teachers use a separate app, Pro Teacher. Switch yourself available, get questions in the subjects you chose, and see every lesson and every payment.</span>
             </p>
           </div>
-
-          <div class="flex flex-row items-center justify-center gap-4 md:gap-6">
-            <figure class="w-1/2 max-w-[190px] space-y-2">
-              <div class="device">
-                <img src="screen-login.png" alt="מסך התחברות במצב בהיר" loading="lazy" width="620" height="1347">
+          <div class="lg:col-span-5 flex flex-wrap items-center justify-center lg:justify-end gap-4">
+            <a href="https://apps.apple.com/us/app/teacher-in-a-minute/id6771022216" class="flex items-center gap-3 bg-brand-accent hover:bg-brand-accentStrong text-brand-onAccent px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
+              <i class="ph-bold ph-app-store-logo text-2xl"></i>
+              <div class="text-left">
+                <span class="text-[10px] block font-semibold opacity-75">Download on the</span>
+                <span class="text-sm block font-bold leading-tight -mt-0.5 font-sans">App Store</span>
               </div>
-              <figcaption class="text-center text-xs font-semibold text-brand-textGray">
-                <span class="lang-he">בהיר</span>
-                <span class="lang-en">Light</span>
-              </figcaption>
-            </figure>
-
-            <figure class="w-1/2 max-w-[190px] space-y-2">
-              <div class="device">
-                <img src="screen-login-dark.png" alt="מסך התחברות במצב כהה" loading="lazy" width="620" height="1347">
+            </a>
+            <a href="https://play.google.com/store/apps/details?id=com.yaronj.tim" class="flex items-center gap-3 bg-brand-card hover:bg-brand-line text-brand-strong border border-brand-line px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
+              <i class="ph-bold ph-google-play-logo text-2xl"></i>
+              <div class="text-left font-sans">
+                <span class="text-[10px] block font-medium text-brand-textGray">GET IT ON</span>
+                <span class="text-sm block font-bold leading-tight -mt-0.5">Google Play</span>
               </div>
-              <figcaption class="text-center text-xs font-semibold text-brand-textGray">
-                <span class="lang-he">כהה</span>
-                <span class="lang-en">Dark</span>
-              </figcaption>
-            </figure>
+            </a>
           </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5 md:gap-6">
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screens/teacher-he-01.jpg" class="lang-he" alt="מסך הבית של המורה" loading="lazy" width="600" height="1304">
+              <img src="screens/teacher-en-01.jpg" class="lang-en" alt="Teacher home screen" loading="lazy" width="600" height="1304">
+            </div>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">מלמדים מתי שנוח לכם</span>
+              <span class="lang-en">Teach whenever you are free</span>
+            </figcaption>
+          </figure>
+
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screens/teacher-he-02.jpg" class="lang-he" alt="עריכת מקצועות" loading="lazy" width="600" height="1304">
+              <img src="screens/teacher-en-02.jpg" class="lang-en" alt="Edit subjects" loading="lazy" width="600" height="1304">
+            </div>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">מלמדים בדיוק את מה שאתם יודעים</span>
+              <span class="lang-en">Teach exactly what you know</span>
+            </figcaption>
+          </figure>
+
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screens/teacher-he-03.jpg" class="lang-he" alt="שיעורים קודמים" loading="lazy" width="600" height="1304">
+              <img src="screens/teacher-en-03.jpg" class="lang-en" alt="Past lessons" loading="lazy" width="600" height="1304">
+            </div>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">כל השיעורים במבט אחד</span>
+              <span class="lang-en">Every lesson at a glance</span>
+            </figcaption>
+          </figure>
+
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screens/teacher-he-04.jpg" class="lang-he" alt="הכנסות ותשלומים" loading="lazy" width="600" height="1304">
+              <img src="screens/teacher-en-04.jpg" class="lang-en" alt="Income and payments" loading="lazy" width="600" height="1304">
+            </div>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">רואים את ההכנסות בבירור</span>
+              <span class="lang-en">See your earnings clearly</span>
+            </figcaption>
+          </figure>
+
+          <figure class="space-y-3 device-lift">
+            <div class="device">
+              <img src="screens/teacher-he-05.jpg" class="lang-he" alt="פרופיל המורה" loading="lazy" width="600" height="1304">
+              <img src="screens/teacher-en-05.jpg" class="lang-en" alt="Teacher profile" loading="lazy" width="600" height="1304">
+            </div>
+            <figcaption class="text-center text-sm font-bold text-brand-strong">
+              <span class="lang-he">פרופיל שתלמידים סומכים עליו</span>
+              <span class="lang-en">A profile students can trust</span>
+            </figcaption>
+          </figure>
         </div>
       </div>
     </section>
 
     <!-- Support / Call to Action inside landing -->
-    <section class="py-12 bg-brand-dark/40 text-center px-4">
+    <section class="py-12 text-center px-4 border-t border-brand-line/70">
       <div class="max-w-4xl mx-auto space-y-4">
         <h2 class="text-xl md:text-2xl font-extrabold text-brand-strong">
           <span class="lang-he">זמינים גם לעיון במסמכים משפטיים</span>
@@ -801,8 +920,8 @@
       <span class="lang-en">Need Help or Support?</span>
     </h2>
     <p class="text-brand-textGray text-sm max-w-lg mx-auto">
-      <span class="lang-he">צוות התמיכה של מורה ברגע זמין עבורכם לכל שאלה, משוב או בקשה לבירור יתרת הדקות שלכם. פנו אלינו ונשמח לעזור!</span>
-      <span class="lang-en">The Teacher in Minute support team is available for any questions, feedback, or inquiries regarding your prepaid minute balances. Contact us today!</span>
+      <span class="lang-he">צוות התמיכה של מורה לרגע ו-Pro Teacher זמין עבורכם לכל שאלה, משוב או בקשה לבירור יתרת הדקות שלכם. פנו אלינו ונשמח לעזור!</span>
+      <span class="lang-en">The Instant Teacher and Pro Teacher support team is available for any questions, feedback, or inquiries regarding your prepaid minute balances. Contact us today!</span>
     </p>
     
     <div class="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2">
@@ -821,7 +940,7 @@
   <footer class="bg-brand-black border-t border-brand-line/70 py-8 px-4 text-center">
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-brand-textGray">
       <div class="flex items-center gap-3">
-        <img src="logo.png" alt="מורה ברגע" class="h-12 w-auto opacity-90">
+        <img src="logo.png" alt="מורה לרגע" class="h-12 w-auto opacity-90">
       </div>
       <p>
         <span class="lang-he">© 2026 Teacher in Minute. כל הזכויות שמורות.</span>
@@ -901,15 +1020,15 @@
 
       if (hash === '#privacy') {
         viewPrivacy.classList.remove('hidden');
-        document.title = "מדיניות פרטיות · מורה ברגע";
+        document.title = "מדיניות פרטיות · מורה לרגע";
         window.scrollTo(0, 0);
       } else if (hash === '#eula') {
         viewEula.classList.remove('hidden');
-        document.title = "תנאי שימוש · מורה ברגע";
+        document.title = "תנאי שימוש · מורה לרגע";
         window.scrollTo(0, 0);
       } else {
         viewLanding.classList.remove('hidden');
-        document.title = "מורה ברגע · Teacher in a Minute";
+        document.title = "מורה לרגע · Instant Teacher";
       }
     }
 
