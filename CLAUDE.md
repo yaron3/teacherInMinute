@@ -48,6 +48,12 @@ Every screenshot is exactly one of these sizes, **RGB, no alpha**:
 |----------|-----------|-------------------------------------|
 | 1206 × 2622 | 2622 × 1206 | iPhone 17 Pro (or 16 Pro, 17) |
 | 1179 × 2556 | 2556 × 1179 | iPhone 16 (or 15 Pro, 15) |
+| 2064 × 2752 | 2752 × 2064 | iPad Pro 13-inch (M5 or M4) |
+| 2048 × 2732 | 2732 × 2048 | iPad Pro 12.9-inch (6th generation) |
+
+The first two rows are the iPhone sets, the last two the 13-inch iPad sets; an
+iPad set follows the same matrix and role rules as an iPhone set and lives in
+its own set directory.
 
 No other size. One size per set — a set with mixed sizes fails upload — and App
 Store Connect rejects alpha channels. Screenshots are portrait unless asked
@@ -65,7 +71,8 @@ xcrun simctl create "TIM 6.3in" com.apple.CoreSimulator.SimDeviceType.iPhone-17-
 ```
 
 `xcrun simctl io <udid> screenshot out.png` then yields exactly 1206 × 2622.
-For 1179 × 2556 use `com.apple.CoreSimulator.SimDeviceType.iPhone-16`.
+For 1179 × 2556 use `com.apple.CoreSimulator.SimDeviceType.iPhone-16`; for the
+iPad 2064 × 2752 use `com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-12GB`.
 
 Do **not** rescale from another device size. Nearby iPhone aspect ratios are
 close but not equal, so rescaling stretches the image slightly and softens every
@@ -75,9 +82,15 @@ live lesson (one teacher, one student) — create both at the same device type.
 
 ### Per-image settings
 
-- **Language** is an app setting, not a device setting: `settings.language.preference`
-  = `english` | `hebrew` in the app's `UserDefaults` plist, or Settings → Language
-  in-app. Leave the simulator's own language alone.
+- **Language** is an app setting, not a device setting. Leave the simulator's own
+  language alone. Writing `settings.language.preference` = `english` | `hebrew`
+  with `defaults write` is enough before the first launch, but switching an
+  existing install that way is not: it skips `LocalizationManager`, so the
+  `user_language` Analytics property (which Remote Config's `HebrewApp`
+  condition reads) keeps its old value and the screens show the other
+  language's strings. Switch in the app instead — Settings → Language, pick the
+  other language and then the one you want — and check a screen before
+  capturing.
 - **Appearance**: `xcrun simctl ui <udid> appearance light|dark`, with the app's
   `appearanceMode` left on `system` so the capture is what a real user sees.
 - **Status bar**: always override before capturing.
