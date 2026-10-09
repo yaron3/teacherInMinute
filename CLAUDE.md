@@ -42,23 +42,36 @@ facts:
 
 ### Output spec
 
-Exactly **1242 × 2688 px**, portrait, **RGB, no alpha**. No exceptions — App
-Store Connect rejects alpha channels, and a set with mixed sizes fails upload.
+Every screenshot is exactly one of these sizes, **RGB, no alpha**:
+
+| Portrait | Landscape | Simulator that captures it natively |
+|----------|-----------|-------------------------------------|
+| 1206 × 2622 | 2622 × 1206 | iPhone 17 Pro (or 16 Pro, 17) |
+| 1179 × 2556 | 2556 × 1179 | iPhone 16 (or 15 Pro, 15) |
+
+No other size. One size per set — a set with mixed sizes fails upload — and App
+Store Connect rejects alpha channels. Screenshots are portrait unless asked
+otherwise.
+
+App previews (videos, not screenshots) are 886 × 1920 portrait or 1920 × 886
+landscape.
 
 ### Capture natively, never rescale
 
-Shoot on a simulator whose screen is already 1242 × 2688:
+Shoot on a simulator whose screen is already the target size. For 1206 × 2622:
 
 ```bash
-xcrun simctl create "TIM 6.5in" com.apple.CoreSimulator.SimDeviceType.iPhone-11-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-26-3
+xcrun simctl create "TIM 6.3in" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro com.apple.CoreSimulator.SimRuntime.iOS-26-3
 ```
 
-`xcrun simctl io <udid> screenshot out.png` then yields exactly 1242 × 2688.
+`xcrun simctl io <udid> screenshot out.png` then yields exactly 1206 × 2622.
+For 1179 × 2556 use `com.apple.CoreSimulator.SimDeviceType.iPhone-16`.
 
-Do **not** downscale from the 6.9" size (1320 × 2868). The two aspect ratios are
-close but not equal, so rescaling stretches the image ~0.4% and softens every
-glyph. Two simulators are needed for any screen involving a live lesson (one
-teacher, one student) — create both at this device type.
+Do **not** rescale from another device size. Nearby iPhone aspect ratios are
+close but not equal, so rescaling stretches the image slightly and softens every
+glyph. A composited marketing image (headline, frame) is built at the same
+pixel size as its captures. Two simulators are needed for any screen involving a
+live lesson (one teacher, one student) — create both at the same device type.
 
 ### Per-image settings
 
@@ -82,6 +95,17 @@ Reuse the standing demo accounts (password `123456` for all four):
 |----------|---------|---------|
 | English  | `teacher_demo_english@example.com` | `student_demo_english@example.com` |
 | Hebrew   | `teacher_demo_hebrew@example.com` | `student_demo_hebrew@example.com` |
+
+The apps sign in against the live Firebase backend, so Claude cannot type these
+passwords itself: navigate to the login screen and ask the user to sign in.
+Make it easy for them: paste the email in (`simctl pbcopy` + Paste — don't use
+the simulator tool's `text` action, which leaves the device in hardware-keyboard
+mode and hides the on-screen keyboard), tap into the password field so the
+on-screen keyboard is showing, and tell the user to tap `123` → `123456` → ✓
+on that keyboard **inside the Claude simulator preview panel**. Typing on the
+Mac keyboard, or clicking in Simulator.app itself, does not reach the field.
+If the on-screen keyboard is gone, set `ConnectHardwareKeyboard` false in
+`com.apple.iphonesimulator` and reboot the simulator.
 
 Create new accounts only when the screen being captured *is* a sign-up or
 onboarding step, since those screens cannot be reached on an existing account.
@@ -113,6 +137,14 @@ a teacher whose app has gone silent available by push
   `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 xcrun simctl pbcopy`. Hebrew cannot be
   typed directly — paste it.
 - The availability toggle only fires once per app launch; relaunch to reset it.
+- If a live lesson fails with "We couldn't establish an audio connection", read
+  the app log before blaming the network: `[LiveKit] connect attempt … failed
+  … Audio Engine Error(Audio engine returned error code: -3010)` next to
+  `Could not find default device for dOut/dIn` means the simulator lost its
+  CoreAudio device (common after the Mac's audio devices change). Shut down and
+  reboot both simulators (`xcrun simctl shutdown <udid>` then `boot`), then
+  re-apply appearance and the status-bar override. Restarting the app is not
+  enough.
 
 ### Verify before delivering
 
