@@ -1640,6 +1640,12 @@ extension ChatSessionViewModeling {
   // MARK: End-session button (header)
 
   var endLabel: String { LocalizationSupport.localized("End") }
+  func reportOrBlockLabel(teacherName: String) -> String {
+    let name = teacherName.trimmingCharacters(in: .whitespacesAndNewlines)
+    return name.isEmpty
+      ? LocalizationSupport.localized("Report or block teacher")
+      : String(format: LocalizationSupport.localized("Report or block %@"), name)
+  }
   var endingLabel: String { LocalizationSupport.localized("Ending...") }
 
   // MARK: Text-transition overlay

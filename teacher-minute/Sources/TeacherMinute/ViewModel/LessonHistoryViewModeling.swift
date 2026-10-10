@@ -14,6 +14,14 @@ protocol LessonHistoryViewModeling: AnyObject {}
 
 extension LessonHistoryViewModeling {
 
+    // MARK: Reporting the teacher (student only)
+    func reportOrBlockLabel(teacherName: String) -> String {
+        let name = teacherName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty
+            ? LocalizationSupport.localized("Report or block teacher")
+            : String(format: LocalizationSupport.localized("Report or block %@"), name)
+    }
+
     // MARK: List
     var pastLessonsTitle: String { LocalizationSupport.localized("Past Lessons") }
     var pastSectionTitle: String { LocalizationSupport.localized("Past") }

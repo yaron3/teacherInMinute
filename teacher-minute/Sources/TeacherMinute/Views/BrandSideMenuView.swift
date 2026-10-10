@@ -172,8 +172,9 @@ struct BrandSideMenuView: View {
     if let icon = item.brandIcon {
       menuIcon(icon.name, width: icon.size.width, height: icon.size.height, tint: tint)
     } else {
-      // Help & Support is not in the design, and keeps the icon it had.
-      PlatformIcon(systemName: item.tab.systemImage(isSelected: isSelected), size: 22, color: tint)
+      // Help & Support and Tutorial are not in the design, and draw a system
+      // icon.
+      PlatformIcon(systemName: item.systemImage(isSelected: isSelected), size: 22, color: tint)
         .frame(width: 28, height: 28)
     }
   }

@@ -59,3 +59,8 @@
 - Once Instant Teacher is on the App Store, set the `iOS` value of `student_app_url` in `backend/Firebase/remote_config_tim.json` to its App Store link (`https://apps.apple.com/app/id…`). The Google Play link is already the default.
 - Deploy the template from `backend/Firebase`: `firebase deploy --only remoteconfig`.
 - Release Instant Teacher in both stores before the Pro Teacher update, and deploy the template before that update ships (a device keeps its fetched config for up to an hour). Otherwise the dialog sends students to an app they cannot find.
+
+## 14. Report and block a student in Pro Teacher — TO DO
+- Instant Teacher lets a student report and block a teacher (App Store Guideline 1.2). Pro Teacher has the same user-generated content (chat, photos, board, voice and video) but no way for a teacher to report or block a student, so its next App Review may ask for one.
+- Backend: mirror `backend/Firebase/functions/src/moderation.ts` for the teacher side. A teacher reports a student of one of their lessons (the question's `acceptedByTeacher` is the caller). A block is stored on the teacher, and dispatch must never invite that teacher to that student's questions — the reverse of `QuestionDoc.blockedTeachers`.
+- App: reuse `ReportTeacherView` and its view model with the copy and calls for a student, from the teacher's lesson (flag next to End), `TeacherLessonHistoryView`'s lesson detail, and Settings → Privacy Controls (blocked students, with Unblock).

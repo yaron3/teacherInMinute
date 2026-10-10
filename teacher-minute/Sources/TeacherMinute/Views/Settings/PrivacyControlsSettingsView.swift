@@ -62,6 +62,11 @@ struct PrivacyControlsSettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .brandCard()
+
+            // Only students block: a teacher is sent questions, not people.
+            if viewModel.role == .student {
+                BlockedTeachersSection()
+            }
         }
     }
 

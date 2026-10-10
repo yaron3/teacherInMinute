@@ -108,13 +108,23 @@ async function onlineTeachers(): Promise<Record<string, TeacherRecord>> {
   return (snap.val() as Record<string, TeacherRecord>) ?? {};
 }
 
+/** Who a question must not reach: `invited` (already invited, or being
+ *  replaced) and every teacher its student has blocked. */
+export function dispatchExclusions(
+  question: Pick<QuestionDoc, "blockedTeachers">,
+  invited: Iterable<string>
+): Set<string> {
+  return new Set([...invited, ...(question.blockedTeachers ?? [])]);
+}
+
 async function sendWave(
   qid: string,
   questionData: QuestionDoc,
   wave: number,
-  exclude: Set<string>
+  alreadyInvited: Set<string>
 ): Promise<string[]> {
   const teachers = await onlineTeachers();
+  const exclude = dispatchExclusions(questionData, alreadyInvited);
   const ranked = rankTeachers(teachers, questionData.topic, exclude);
   const waveSize = WAVE_SIZES[wave - 1];
   const batch = ranked.slice(0, waveSize);
@@ -268,6 +278,9 @@ async function tryInviteTeacherForQuestionWave(
     const alreadyInvited = new Set(question.alreadyInvited ?? []);
     if (alreadyInvited.has(teacherUid)) {
       return { invited: false, reason: "already-invited" };
+    }
+    if ((question.blockedTeachers ?? []).includes(teacherUid)) {
+      return { invited: false, reason: "blocked-by-student" };
     }
 
     const ranked = rankTeachers({ [teacherUid]: teacher }, question.topic, alreadyInvited, narrow);

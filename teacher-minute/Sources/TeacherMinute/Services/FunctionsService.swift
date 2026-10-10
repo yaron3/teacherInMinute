@@ -404,6 +404,43 @@ final class FunctionsService {
     _ = try await call(function: "rateTeacher", data: data)
   }
 
+  // MARK: - Reporting and blocking teachers
+
+  /// Reports the teacher of the student's lesson `questionId`, and blocks them
+  /// too when `block` is set. The backend works out who the teacher is.
+  func reportTeacher(questionId: String, reason: TeacherReportReason, details: String, block: Bool) async throws {
+    _ = try await call(function: "reportTeacher", data: [
+      "questionId": questionId,
+      "reason": reason.rawValue,
+      "details": details.trimmingCharacters(in: .whitespacesAndNewlines),
+      "block": block,
+    ])
+  }
+
+  /// Blocks the teacher of the student's lesson `questionId`: they are not
+  /// sent this student's questions again.
+  func blockTeacher(questionId: String) async throws {
+    _ = try await call(function: "blockTeacher", data: ["questionId": questionId])
+  }
+
+  func unblockTeacher(teacherUid: String) async throws {
+    _ = try await call(function: "unblockTeacher", data: ["teacherUid": teacherUid])
+  }
+
+  func listBlockedTeachers() async throws -> [BlockedTeacher] {
+    let result = try await call(function: "listBlockedTeachers", data: [:])
+    let rows = result["teachers"] as? [[String: Any]] ?? []
+    return rows.compactMap { row in
+      guard let uid = row["teacherUid"] as? String, !uid.isEmpty else { return nil }
+      let millis = Self.doubleValue(row["blockedAtMillis"]) ?? 0
+      return BlockedTeacher(
+        teacherUid: uid,
+        teacherName: row["teacherName"] as? String ?? "",
+        blockedAt: Date(timeIntervalSince1970: millis / 1000)
+      )
+    }
+  }
+
   func getQuestionStatus(questionId: String) async throws -> QuestionStatusResult {
     let result = try await call(function: "getQuestionStatus", data: ["questionId": questionId])
     guard let status = result["status"] as? String else { throw FunctionsError.decodingError() }

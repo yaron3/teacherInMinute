@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "tutorial-text-en.jpg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

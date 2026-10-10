@@ -41,19 +41,25 @@ struct WelcomeView: View {
             .font(.system(size: 35, weight: .bold))
             .foregroundStyle(theme.onDarkFill)
             .padding(.top, 24)
+		  // Sized at most as designed, and smaller where the padded column is
+		  // narrower: a fixed width wider than the column made the whole column
+		  // wider than the screen, and the scroll view then pinned it to one
+		  // edge instead of centring it.
 		  ZStack(alignment: .top) {
 			Image(decorative: "splash-glow", bundle: .module)
 			  .resizable()
-			  .frame(width: 340, height: 340)
+			  .aspectRatio(1, contentMode: .fit)
+			  .frame(maxWidth: 340, maxHeight: 340)
 			  .offset(x: -7, y: 38)
-			
+
 			Image(decorative: "brand-logo", bundle: .module)
 			  .resizable()
 			  .scaledToFit()
-			  .frame(width: 375, height: 318)
+			  .frame(maxWidth: 375, maxHeight: 318)
 			  .offset(x: 10.5)
 			  .padding(.top, 6)
 		  }
+		  .frame(maxWidth: .infinity)
 
           Text(viewModel.subheadline)
             .font(.system(size: 16))

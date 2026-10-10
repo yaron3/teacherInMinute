@@ -67,6 +67,9 @@ export { sendVerificationEmail, verifyEmailLink } from "./emailVerification";
 // Contact Us messages are emailed to the recipients in support-config.json
 export { onContactRequestCreated } from "./contactSupport";
 
+// Reporting and blocking teachers
+export { reportTeacher, blockTeacher, unblockTeacher, listBlockedTeachers } from "./moderation";
+
 // Shared email checking — used by the payout form and available to signup
 export { validateEmailAddress } from "./emailValidation";
 

@@ -194,6 +194,9 @@ export interface QuestionDoc {
   searchEndsAt?: Timestamp;
   dispatchWave: number;      // wave currently being evaluated (1 | 2 | 3)
   alreadyInvited: string[];  // all teacher UIDs invited across all waves
+  /** Teachers the student had blocked when asking, copied here by
+   *  createQuestion so dispatch never invites them (see moderation.ts). */
+  blockedTeachers?: string[];
   acceptedByTeacher?: string;
   acceptedAt?: Timestamp;
   startedAt?: Timestamp;

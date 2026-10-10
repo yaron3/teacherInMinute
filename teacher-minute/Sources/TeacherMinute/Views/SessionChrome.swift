@@ -47,8 +47,16 @@ struct SessionTabToggle: View {
     }
   }
 
+  /// With three panes the 266pt toggle has no room for three titles, so the
+  /// selected segment — already marked by its fill — shows only its icon and
+  /// gives its width to the other two.
+  var compactsSelected: Bool {
+    items.count > 2
+  }
+
   func segment(_ item: SessionToggleItem) -> some View {
     let isSelected = item.id == selected
+    let isIconOnly = isSelected && compactsSelected
     return Button {
       onSelect(item.id)
     } label: {
@@ -57,13 +65,16 @@ struct SessionTabToggle: View {
           .renderingMode(.template)
           .resizable()
           .frame(width: 24, height: 24)
-        Text(item.title)
-          .font(.system(size: 17, weight: .medium))
-          .lineLimit(1)
-          .minimumScaleFactor(0.7)
+        if !isIconOnly {
+          Text(item.title)
+            .font(.system(size: 17, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+        }
       }
       .foregroundStyle(isSelected ? theme.onBrandAction : theme.onDarkFill)
-      .frame(maxWidth: .infinity)
+      .frame(width: isIconOnly ? 52 : nil)
+      .frame(maxWidth: isIconOnly ? nil : .infinity)
       .frame(height: 52)
       .background(isSelected ? theme.brandActionBackground : Color.clear)
       .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -85,6 +96,10 @@ struct SessionTabToggle: View {
       }
     }
     .buttonStyle(.plain)
+#if !os(Android)
+    // SkipUI has no string `accessibilityLabel`.
+    .accessibilityLabel(item.title)
+#endif
     .accessibilityIdentifier("session_tab_\(item.id.rawValue.lowercased())")
   }
 }

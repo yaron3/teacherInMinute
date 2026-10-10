@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "tutorial-chat-en.jpg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

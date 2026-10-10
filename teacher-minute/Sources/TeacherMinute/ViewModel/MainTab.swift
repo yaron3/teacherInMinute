@@ -79,9 +79,9 @@ enum MainTab: Hashable, CaseIterable {
 }
 
 /// A row of the side menu, and a tab of the tab bar. Each shows a section,
-/// except Minutes, which opens the purchase screen over Home. Ask, Minutes
-/// and Activity are Instant Teacher's; Home, Lessons and Earnings, Pro
-/// Teacher's.
+/// except Minutes, which opens the purchase screen over Home, and Tutorial,
+/// a menu row only, which opens the tutorial. Ask, Minutes, Activity and
+/// Tutorial are Instant Teacher's; Home, Lessons and Earnings, Pro Teacher's.
 enum MenuItem: Hashable, CaseIterable {
   case ask
   case minutes
@@ -92,11 +92,13 @@ enum MenuItem: Hashable, CaseIterable {
   case profile
   case settings
   case help
+  case tutorial
 
-  /// The section on screen after the row is picked.
+  /// The section on screen after the row is picked. Tutorial leaves the
+  /// section as it was (see `MainTabViewModel.select(_:)`).
   var tab: MainTab {
 	switch self {
-	  case .ask, .minutes, .home: .home
+	  case .ask, .minutes, .home, .tutorial: .home
 	  case .activity, .lessons: .lessons
 	  case .earnings: .earnings
 	  case .profile: .profile
@@ -105,11 +107,20 @@ enum MenuItem: Hashable, CaseIterable {
 	}
   }
 
+  /// The system icon for a row without one in the brand's set.
+  func systemImage(isSelected: Bool) -> String {
+	switch self {
+	  case .tutorial: isSelected ? "lightbulb.fill" : "lightbulb"
+	  default: tab.systemImage(isSelected: isSelected)
+	}
+  }
+
   var title: String {
 	switch self {
 	  case .ask: LocalizationSupport.localized("Ask")
 	  case .minutes: LocalizationSupport.localized("Minutes")
 	  case .activity: LocalizationSupport.localized("Activity")
+	  case .tutorial: LocalizationSupport.localized("Tutorial")
 	  case .home, .lessons, .earnings, .profile, .settings, .help: tab.title
 	}
   }
@@ -120,6 +131,7 @@ enum MenuItem: Hashable, CaseIterable {
 	  case .ask: "ask"
 	  case .minutes: "minutes"
 	  case .activity: "activity"
+	  case .tutorial: "tutorial"
 	  case .home, .lessons, .earnings, .profile, .settings, .help: tab.identifier
 	}
   }
@@ -159,7 +171,10 @@ final class MainTabViewModel {
 
   /// The menu, in order.
   var menuItems: [MenuItem] {
-	tabItems + [.help]
+	switch userMode {
+	  case .student: tabItems + [.help, .tutorial]
+	  case .teacher: tabItems + [.help]
+	}
   }
 
   /// The tabs along the bottom of the sections: the menu, less Help &
@@ -186,6 +201,11 @@ final class MainTabViewModel {
   /// clears it as it does.
   var isPurchaseScreenRequested = false
 
+  /// The student's tutorial, while it is on screen. It stands in for the
+  /// sections rather than over them: the student's Home asks for the camera
+  /// as it appears, and that prompt would land on top of the tutorial.
+  private(set) var tutorial: StudentTutorialViewModel?
+
   /// A student who has not made an account yet, and so has no email or phone
   /// to show in the menu, but may have one to log in to.
   var isAnonymousAccount: Bool {
@@ -194,6 +214,11 @@ final class MainTabViewModel {
 
   init(userMode: AppUserMode = .teacher) {
 	self.userMode = userMode
+	// Decided here, before the first frame, so a student's Home never
+	// appears — and asks for the camera — under a tutorial about to cover it.
+	if userMode == .student, StudentTutorialStore.shouldPresentAutomatically {
+	  presentTutorial(source: .launch)
+	}
   }
 
   /// Called whenever the current lesson count is known. Shows the badge only
@@ -246,13 +271,27 @@ final class MainTabViewModel {
 
   /// Whether `item` is the row for the section on screen. Minutes never is:
   /// the purchase screen it opens is part of Home, which Ask stands for.
+  /// Nor is Tutorial, which opens over whatever section is on screen.
   func isSelected(_ item: MenuItem) -> Bool {
-	item != .minutes && item.tab == selectedTab
+	item != .minutes && item != .tutorial && item.tab == selectedTab
   }
 
   /// A row of the menu, or a tab, was picked.
   func select(_ item: MenuItem) {
+	if item == .tutorial {
+	  closeSideMenu()
+	  presentTutorial(source: .menu)
+	  return
+	}
 	select(item.tab)
 	isPurchaseScreenRequested = item == .minutes
+  }
+
+  // MARK: - Tutorial
+
+  func presentTutorial(source: StudentTutorialViewModel.Source) {
+	tutorial = StudentTutorialViewModel(source: source) { [weak self] in
+	  self?.tutorial = nil
+	}
   }
 }
