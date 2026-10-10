@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 import type { Config } from "./config";
 import type { ChatMessage } from "./llm";
 import { generateStudentReply } from "./llm";
+import { reportStudentReady } from "./lessonReady";
 
 const ACTIVE_STATUSES = new Set(["accepted", "in_progress", "matched", "connected", "active"]);
 const TERMINAL_STATUSES = new Set(["completed", "cancelled", "canceled", "expired", "ended", "unanswered"]);
@@ -130,6 +131,7 @@ export function watchSession(config: Config, params: StudentSessionParams): void
       listening = true;
       messagesRef.on("child_added", onMessage);
       console.log(`[demo-student] teacher accepted qid=${params.questionId} — student is live`);
+      void reportStudentReady(config, params.questionId);
     }
   }
 
