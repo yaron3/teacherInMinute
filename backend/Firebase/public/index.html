@@ -330,23 +330,16 @@
             </p>
           </div>
 
-          <!-- Instant Teacher store buttons. The App Store link for Instant
-               Teacher is not known yet; replace "#" once the listing is live. -->
+          <!-- Instant Teacher download: getApp() sends the visitor to the store for
+               their platform (see the script at the bottom). -->
           <div class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
-            <a href="#" class="flex items-center gap-3 bg-brand-accent hover:bg-brand-accentStrong text-brand-onAccent px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
-              <i class="ph-bold ph-app-store-logo text-2xl"></i>
-              <div class="text-left">
-                <span class="text-[10px] block font-semibold opacity-75">Download on the</span>
-                <span class="text-sm block font-bold leading-tight -mt-0.5 font-sans">App Store</span>
+            <button type="button" onclick="getApp('student')" class="flex items-center gap-3 bg-brand-accent hover:bg-brand-accentStrong text-brand-onAccent px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
+              <span class="flex items-center gap-1 text-2xl"><i class="ph-bold ph-apple-logo"></i><i class="ph-bold ph-android-logo"></i></span>
+              <div class="text-start">
+                <span class="text-[10px] block font-semibold opacity-75"><span class="lang-he">להורדה ל-iPhone ול-Android</span><span class="lang-en">For iPhone and Android</span></span>
+                <span class="text-sm block font-bold leading-tight -mt-0.5"><span class="lang-he">הורידו את מורה לרגע</span><span class="lang-en">Get Instant Teacher</span></span>
               </div>
-            </a>
-            <a href="https://play.google.com/store/apps/details?id=com.yaronj.student" class="flex items-center gap-3 bg-brand-card hover:bg-brand-line text-brand-strong border border-brand-line px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
-              <i class="ph-bold ph-google-play-logo text-2xl"></i>
-              <div class="text-left font-sans">
-                <span class="text-[10px] block font-medium text-brand-textGray">GET IT ON</span>
-                <span class="text-sm block font-bold leading-tight -mt-0.5">Google Play</span>
-              </div>
-            </a>
+            </button>
           </div>
           <p class="text-sm text-brand-textGray">
             <span class="lang-he">מלמדים? <a href="#teachers" class="text-brand-accent font-bold hover:underline">הכירו את Pro Teacher ←</a></span>
@@ -562,20 +555,13 @@
             </p>
           </div>
           <div class="lg:col-span-5 flex flex-wrap items-center justify-center lg:justify-end gap-4">
-            <a href="https://apps.apple.com/us/app/teacher-in-a-minute/id6771022216" class="flex items-center gap-3 bg-brand-accent hover:bg-brand-accentStrong text-brand-onAccent px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
-              <i class="ph-bold ph-app-store-logo text-2xl"></i>
-              <div class="text-left">
-                <span class="text-[10px] block font-semibold opacity-75">Download on the</span>
-                <span class="text-sm block font-bold leading-tight -mt-0.5 font-sans">App Store</span>
+            <button type="button" onclick="getApp('teacher')" class="flex items-center gap-3 bg-brand-accent hover:bg-brand-accentStrong text-brand-onAccent px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
+              <span class="flex items-center gap-1 text-2xl"><i class="ph-bold ph-apple-logo"></i><i class="ph-bold ph-android-logo"></i></span>
+              <div class="text-start">
+                <span class="text-[10px] block font-semibold opacity-75"><span class="lang-he">להורדה ל-iPhone ול-Android</span><span class="lang-en">For iPhone and Android</span></span>
+                <span class="text-sm block font-bold leading-tight -mt-0.5"><span class="lang-he">הורידו את Pro Teacher</span><span class="lang-en">Get Pro Teacher</span></span>
               </div>
-            </a>
-            <a href="https://play.google.com/store/apps/details?id=com.yaronj.tim" class="flex items-center gap-3 bg-brand-card hover:bg-brand-line text-brand-strong border border-brand-line px-6 py-3 rounded-2xl font-bold transition shadow-xl hover:scale-105 transform duration-200">
-              <i class="ph-bold ph-google-play-logo text-2xl"></i>
-              <div class="text-left font-sans">
-                <span class="text-[10px] block font-medium text-brand-textGray">GET IT ON</span>
-                <span class="text-sm block font-bold leading-tight -mt-0.5">Google Play</span>
-              </div>
-            </a>
+            </button>
           </div>
         </div>
 
@@ -937,6 +923,96 @@
     </div>
   </section>
 
+
+  <!-- Download dialog: shown when getApp() cannot send the visitor straight to
+       a store — Android (closed pilot, register first) or an unsupported
+       device. -->
+  <dialog id="download-dialog" class="bg-brand-card text-brand-body border border-brand-line rounded-3xl p-0 w-[min(92vw,28rem)] shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm">
+    <div class="p-6 space-y-5 text-start">
+      <div class="flex items-start justify-between gap-4">
+        <h2 class="text-xl font-extrabold text-brand-strong">
+          <span class="lang-he">הורדת <span data-app-name-he></span></span>
+          <span class="lang-en">Download <span data-app-name-en></span></span>
+        </h2>
+        <button type="button" onclick="closeDownloadDialog()" aria-label="Close" class="text-brand-textGray hover:text-brand-strong text-xl leading-none"><i class="ph-bold ph-x"></i></button>
+      </div>
+
+      <!-- Neither iOS nor Android -->
+      <div data-step="unsupported" class="space-y-4">
+        <div class="flex items-center gap-3 text-brand-strong">
+          <i class="ph-bold ph-devices text-3xl text-brand-accent"></i>
+          <p class="font-semibold">
+            <span class="lang-he">כרגע האפליקציה זמינה רק ל-iOS ול-Android.</span>
+            <span class="lang-en">For now, only iOS and Android are supported.</span>
+          </p>
+        </div>
+        <p class="text-sm text-brand-textGray">
+          <span class="lang-he">פתחו את העמוד הזה מה-iPhone או ממכשיר ה-Android שלכם כדי להוריד.</span>
+          <span class="lang-en">Open this page on your iPhone or Android device to download.</span>
+        </p>
+      </div>
+
+      <!-- Android: closed pilot, registered testers only -->
+      <div data-step="android" class="space-y-4">
+        <p class="text-sm">
+          <span class="lang-he">גרסת ה-Android נמצאת בפיילוט סגור, ו-Google Play מאפשר להוריד אותה רק למי שנרשם. נרשמתם כבר וקיבלתם מאיתנו מייל? המשיכו ל-Google Play.</span>
+          <span class="lang-en">The Android app is in a closed pilot, and Google Play only lets registered testers download it. Already registered and got our email? Continue to Google Play.</span>
+        </p>
+        <a data-play-link href="#" class="flex items-center justify-center gap-2 bg-brand-accent hover:bg-brand-accentStrong text-brand-onAccent px-5 py-3 rounded-2xl font-bold transition">
+          <i class="ph-bold ph-google-play-logo text-xl"></i>
+          <span class="lang-he">נרשמתי — המשך ל-Google Play</span>
+          <span class="lang-en">I'm registered — continue to Google Play</span>
+        </a>
+
+        <form id="pilot-form" class="space-y-3 pt-4 border-t border-brand-line" novalidate>
+          <p class="font-bold text-brand-strong">
+            <span class="lang-he">עוד לא נרשמתם? הצטרפו לפיילוט</span>
+            <span class="lang-en">Not registered yet? Join the pilot</span>
+          </p>
+          <label for="pilot-email" class="block text-xs text-brand-textGray">
+            <span class="lang-he">כתובת ה-Gmail של חשבון Google שאיתו אתם משתמשים ב-Google Play</span>
+            <span class="lang-en">The Gmail address of the Google account you use on Google Play</span>
+          </label>
+          <input id="pilot-email" type="email" required autocomplete="email" inputmode="email" dir="ltr" placeholder="name@gmail.com"
+                 class="w-full bg-brand-black border border-brand-line rounded-xl px-4 py-3 text-brand-strong placeholder:text-brand-textGray focus:outline-none focus:border-brand-accent">
+          <p id="pilot-error" class="hidden text-sm text-brand-amber"></p>
+          <button id="pilot-submit" type="submit" class="w-full bg-brand-card hover:bg-brand-line text-brand-strong border border-brand-line px-5 py-3 rounded-2xl font-bold transition disabled:opacity-50">
+            <span class="lang-he">הרשמה לפיילוט</span>
+            <span class="lang-en">Register for the pilot</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- After registering -->
+      <div data-step="registered" class="space-y-3">
+        <div class="flex items-center gap-3 text-brand-strong">
+          <i class="ph-bold ph-check-circle text-3xl text-brand-accent"></i>
+          <p class="font-bold">
+            <span class="lang-he">נרשמתם לפיילוט!</span>
+            <span class="lang-en">You're registered for the pilot!</span>
+          </p>
+        </div>
+        <p class="text-sm">
+          <span class="lang-he">נשלח מייל ל-<bdi data-pilot-email class="font-semibold text-brand-strong"></bdi> ברגע שאפשר להוריד.</span>
+          <span class="lang-en">We'll email <bdi data-pilot-email class="font-semibold text-brand-strong"></bdi> as soon as you can download.</span>
+        </p>
+      </div>
+
+      <!-- Registered before, and already approved -->
+      <div data-step="approved" class="space-y-4">
+        <p class="text-sm">
+          <span class="lang-he">הכתובת <bdi data-pilot-email class="font-semibold text-brand-strong"></bdi> כבר אושרה לפיילוט — אפשר להוריד.</span>
+          <span class="lang-en"><bdi data-pilot-email class="font-semibold text-brand-strong"></bdi> is already approved for the pilot — you can download now.</span>
+        </p>
+        <a data-play-link href="#" class="flex items-center justify-center gap-2 bg-brand-accent hover:bg-brand-accentStrong text-brand-onAccent px-5 py-3 rounded-2xl font-bold transition">
+          <i class="ph-bold ph-google-play-logo text-xl"></i>
+          <span class="lang-he">המשך ל-Google Play</span>
+          <span class="lang-en">Continue to Google Play</span>
+        </a>
+      </div>
+    </div>
+  </dialog>
+
   <footer class="bg-brand-black border-t border-brand-line/70 py-8 px-4 text-center">
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-brand-textGray">
       <div class="flex items-center gap-3">
@@ -1035,6 +1111,118 @@
     // Event listeners for routing changes
     window.addEventListener('hashchange', handleRouting);
     window.addEventListener('load', handleRouting);
+
+    // ── App downloads ──────────────────────────────────────────────────────
+    // iOS goes straight to TestFlight. Android is a Play closed test that only
+    // registered testers can install, so it gets the pilot dialog first.
+    // Anything else is told only iOS and Android are supported.
+    const APPS = {
+      student: {
+        nameHe: 'מורה לרגע',
+        nameEn: 'Instant Teacher',
+        ios: 'https://testflight.apple.com/join/vP9qsPG4',
+        android: 'https://play.google.com/store/apps/details?id=com.yaronj.student'
+      },
+      teacher: {
+        nameHe: 'Pro Teacher',
+        nameEn: 'Pro Teacher',
+        ios: 'https://testflight.apple.com/join/V8V3CBCN',
+        android: 'https://play.google.com/store/apps/details?id=com.yaronj.tim'
+      }
+    };
+    const REGISTER_PILOT_URL = 'https://us-central1-teacher-in-a-moment.cloudfunctions.net/registerPilot';
+    let dialogApp = 'student';
+
+    function detectPlatform() {
+      const ua = navigator.userAgent || '';
+      if (/android/i.test(ua)) return 'android';
+      if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
+      // iPadOS asks for the desktop site and reports itself as a Mac.
+      if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return 'ios';
+      return 'other';
+    }
+
+    function getApp(app) {
+      const platform = detectPlatform();
+      if (platform === 'ios') {
+        window.location.href = APPS[app].ios;
+        return;
+      }
+      openDownloadDialog(app, platform === 'android' ? 'android' : 'unsupported');
+    }
+
+    function showDownloadStep(step) {
+      document.querySelectorAll('#download-dialog [data-step]').forEach(el => {
+        el.classList.toggle('hidden', el.dataset.step !== step);
+      });
+    }
+
+    function openDownloadDialog(app, step) {
+      dialogApp = app;
+      const dialog = document.getElementById('download-dialog');
+      dialog.querySelectorAll('[data-app-name-he]').forEach(el => el.textContent = APPS[app].nameHe);
+      dialog.querySelectorAll('[data-app-name-en]').forEach(el => el.textContent = APPS[app].nameEn);
+      dialog.querySelectorAll('[data-play-link]').forEach(el => el.href = APPS[app].android);
+      document.getElementById('pilot-error').classList.add('hidden');
+      showDownloadStep(step);
+      dialog.showModal();
+    }
+
+    function closeDownloadDialog() {
+      document.getElementById('download-dialog').close();
+    }
+
+    // A click on the backdrop lands on the <dialog> itself.
+    document.getElementById('download-dialog').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeDownloadDialog();
+    });
+
+    function showPilotError(he, en) {
+      const el = document.getElementById('pilot-error');
+      el.textContent = currentLang === 'he' ? he : en;
+      el.classList.remove('hidden');
+    }
+
+    document.getElementById('pilot-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('pilot-email');
+      const email = input.value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showPilotError('נא להזין כתובת מייל תקינה.', 'Please enter a valid email address.');
+        return;
+      }
+
+      const submit = document.getElementById('pilot-submit');
+      submit.disabled = true;
+      document.getElementById('pilot-error').classList.add('hidden');
+      try {
+        // The callable protocol: arguments under `data`, the reply under
+        // `result` or `error`.
+        const response = await fetch(REGISTER_PILOT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: { email, app: dialogApp, lang: currentLang } })
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !body.result) throw new Error(body.error?.message || response.statusText);
+
+        document.querySelectorAll('#download-dialog [data-pilot-email]').forEach(el => el.textContent = email.toLowerCase());
+        showDownloadStep(body.result.status === 'approved' ? 'approved' : 'registered');
+        input.value = '';
+      } catch (err) {
+        console.error('Pilot registration failed', err);
+        showPilotError('ההרשמה נכשלה. נסו שוב בעוד רגע.', 'Registration failed. Please try again in a moment.');
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    // QR codes point at /teacher and /student, which firebase.json redirects
+    // to /?get=teacher|student; route the visitor as if they tapped the button.
+    (function () {
+      const requested = new URLSearchParams(window.location.search).get('get');
+      if (requested in APPS) getApp(requested);
+    })();
 
     // Dynamic copy to clipboard function
     function copyCurrentDocumentText(heId, enId) {

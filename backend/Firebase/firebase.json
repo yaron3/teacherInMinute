@@ -24,6 +24,10 @@
       "**/.DS_Store",
       "**/node_modules/**"
     ],
+    "redirects": [
+      { "source": "/teacher", "destination": "/?get=teacher", "type": 302 },
+      { "source": "/student", "destination": "/?get=student", "type": 302 }
+    ],
     "headers": [
       {
         "source": "/.well-known/assetlinks.json",

@@ -220,6 +220,7 @@ extension StudentHomeViewModeling {
   var purchaseSummaryTitle: String { LocalizationSupport.localized("Purchase summary") }
   var minutesPackageLabel: String { LocalizationSupport.localized("Minutes package") }
   var totalToPayLabel: String { LocalizationSupport.localized("Total to pay") }
+  var reciptExplain: String { LocalizationSupport.localized("Payment to the teacher is processed via the app, and an invoice from 'Moreh LaRega' is issued solely for the brokerage fee.")}
   var securePaymentNote: String { LocalizationSupport.localized("Your payment is secure and encrypted") }
 
   var purchaseBalanceText: String {

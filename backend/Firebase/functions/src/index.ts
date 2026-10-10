@@ -67,6 +67,9 @@ export { sendVerificationEmail, verifyEmailLink } from "./emailVerification";
 // Contact Us messages are emailed to the recipients in support-config.json
 export { onContactRequestCreated } from "./contactSupport";
 
+// Android pilot sign-ups from the website, and the "you can download" email
+export { registerPilot, onPilotRegistrationUpdated } from "./pilot";
+
 // Reporting and blocking teachers
 export { reportTeacher, blockTeacher, unblockTeacher, listBlockedTeachers } from "./moderation";
 
@@ -87,6 +90,8 @@ export {
   adminDeleteCoupon,
   adminListPayments,
   adminListContactRequests,
+  adminListPilotRegistrations,
+  adminSetPilotStatus,
   adminListPendingTeachers,
   adminGetTeacherDocs,
   adminVerifyTeacher,

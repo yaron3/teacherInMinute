@@ -4,6 +4,7 @@ import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { recomputeRegisteredTeacherCount, STATS_COLLECTION, PLATFORM_STATS_DOC } from "./stats";
 import { republishAllTeacherPresence, ONLINE_TEACHERS_PATH } from "./presence";
+import { PILOT_COLLECTION } from "./pilot";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -1010,6 +1011,52 @@ export const adminListContactRequests = onCall(async (req) => {
     };
   });
   return { requests };
+});
+
+// ─── Android pilot registrations ──────────────────────────────────────────────
+//
+// Sign-ups from the website (see pilot.ts). Approving one emails the person
+// that they can download, via onPilotRegistrationUpdated.
+
+export const adminListPilotRegistrations = onCall(async (req) => {
+  assertAdmin(req);
+
+  const snap = await firestore
+    .collection(PILOT_COLLECTION)
+    .orderBy("createdAt", "desc")
+    .limit(200)
+    .get();
+
+  const registrations = snap.docs.map((d) => {
+    const data = d.data() as Record<string, unknown>;
+    return {
+      id: d.id,
+      email: data.email,
+      app: data.app,
+      lang: data.lang,
+      status: data.status,
+      createdAtMs: tsToMs(data.createdAt),
+      notifiedAtMs: tsToMs(data.notifiedAt),
+    };
+  });
+  return { registrations };
+});
+
+export const adminSetPilotStatus = onCall(async (req) => {
+  assertAdmin(req);
+
+  const { id, status } = req.data as { id: string; status: string };
+  if (!id) throw new HttpsError("invalid-argument", "id required");
+  if (status !== "approved" && status !== "pending") {
+    throw new HttpsError("invalid-argument", "status must be approved or pending");
+  }
+
+  const ref = firestore.collection(PILOT_COLLECTION).doc(id);
+  if (!(await ref.get()).exists) throw new HttpsError("not-found", "No such registration");
+  await ref.update({ status, statusChangedAt: Timestamp.now() });
+
+  logger.info(`[admin] pilot ${id} → ${status} by=${req.auth?.token?.email}`);
+  return { success: true, status };
 });
 
 // ─── adminListPendingTeachers ─────────────────────────────────────────────────

@@ -24,6 +24,11 @@ struct StudentTutorialView: View {
   @State var availableSize: CGSize = .zero
   /// How far a swipe in progress has dragged the pages, in points.
   @State var dragOffset: CGFloat = 0
+  /// Bumped on every change to the view model, and read in `body`. On
+  /// Android this screen never redrew for the view model's own changes, so
+  /// Next turned the page underneath while the counter, the dots and the
+  /// buttons stayed on the first (as in `MathEquationEditorView`).
+  @State var modelTick = 0
 
   @Environment(\.layoutDirection) var layoutDirection
   @Environment(\.colorScheme) var colorScheme
@@ -31,15 +36,25 @@ struct StudentTutorialView: View {
     AppTheme(colorScheme: colorScheme)
   }
 
+  /// The width the bar, the pages' copy and the buttons are laid out in: the
+  /// screen's, up to 520 on an iPad. Not `.frame(maxWidth: 520)`, which
+  /// SkipUI lays out as Compose's `requiredWidthIn(max:)`: that ignores the
+  /// screen, so on a phone everything came out 520 wide and ran off both
+  /// edges. Unset until the screen has been measured.
+  var contentWidth: CGFloat? {
+    availableSize.width > 0 ? min(520, availableSize.width) : nil
+  }
+
   var body: some View {
-    ZStack {
+    _ = modelTick
+    return ZStack {
       BrandScreenBackground(streaks: .subpage)
 
       VStack(spacing: 0) {
         topBar
           .padding(.top, 8)
           .padding(.horizontal, 24)
-          .frame(maxWidth: 520)
+          .frame(width: contentWidth)
 
         Spacer(minLength: 16)
 
@@ -53,7 +68,7 @@ struct StudentTutorialView: View {
         controls
           .padding(.bottom, 16)
           .padding(.horizontal, 24)
-          .frame(maxWidth: 520)
+          .frame(width: contentWidth)
       }
     }
     .onGeometryChange(for: CGSize.self, of: { $0.size }) { size in
@@ -100,12 +115,16 @@ struct StudentTutorialView: View {
     HStack(spacing: 10) {
       BrandCheckbox(isOn: Binding(
         get: { viewModel.dontShowAgain },
-        set: { viewModel.dontShowAgain = $0 }
+        set: {
+          viewModel.dontShowAgain = $0
+          modelTick += 1
+        }
       ))
       .accessibilityIdentifier("student_tutorial_hide")
 
       Button {
         viewModel.dontShowAgain.toggle()
+        modelTick += 1
       } label: {
         Text(viewModel.dontShowAgainLabel)
           .font(.system(size: 16, weight: .semibold))
@@ -133,7 +152,7 @@ struct StudentTutorialView: View {
       ForEach(0..<viewModel.pages.count, id: \.self) { index in
         pageContent(viewModel.pages[index])
           .padding(.horizontal, 24)
-          .frame(maxWidth: 520)
+          .frame(width: contentWidth)
           .frame(width: max(availableSize.width, 1))
           .environment(\.layoutDirection, layoutDirection)
           .offset(x: pageOffset(for: index))
@@ -162,6 +181,7 @@ struct StudentTutorialView: View {
     withAnimation(pageTurnAnimation) {
       dragOffset = 0
       viewModel.next()
+      modelTick += 1
     }
   }
 
@@ -169,6 +189,7 @@ struct StudentTutorialView: View {
     withAnimation(pageTurnAnimation) {
       dragOffset = 0
       viewModel.back()
+      modelTick += 1
     }
   }
 

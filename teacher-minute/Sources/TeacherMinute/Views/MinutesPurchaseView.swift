@@ -75,6 +75,7 @@ struct MinutesPurchaseView: View {
           header
           packageSection
           paymentSection
+		  explanation
           summaryCard
           payActions
         }
@@ -352,7 +353,17 @@ struct MinutesPurchaseView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .brandCard(cornerRadius: 14)
   }
-
+ 
+  // MARK: - ---------
+  private var explanation: some View {
+	HStack {
+	  Text(viewModel.reciptExplain)
+		.font(.system(size: 15, weight: .bold))
+		.foregroundStyle(theme.onDarkFill)
+	}
+	.frame(maxWidth: .infinity, alignment: .leading)
+	.brandCard(cornerRadius: 14)
+  }
   // MARK: - Paying
 
   private var payActions: some View {
