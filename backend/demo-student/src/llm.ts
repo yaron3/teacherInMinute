@@ -82,6 +82,9 @@ async function chatOllama(
         model,
         messages,
         stream: false,
+        // Reasoning models (qwen3) would otherwise spend num_predict on hidden
+        // thinking and cut the visible message short. Ignored by other models.
+        think: false,
         options: {
           temperature: options.temperature ?? 0.8,
           ...(options.maxTokens ? { num_predict: options.maxTokens } : {}),
@@ -166,7 +169,7 @@ export async function pingModel(config: Config): Promise<string> {
 
 function languageInstruction(language: string): string {
   return language === "he"
-    ? "Write in Hebrew."
+    ? "Write entirely in Hebrew. Do not use any English words or sentences; numbers and math symbols are fine."
     : "Write in English.";
 }
 

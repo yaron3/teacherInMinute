@@ -6,6 +6,10 @@ export type LlmApiType = "ollama" | "openai";
 export interface Config {
   firebaseServiceAccount: Record<string, unknown> | null; // null = application default creds
   firebaseDatabaseUrl: string;
+  /** Web API key, for signing the demo student in to report ready. */
+  firebaseWebApiKey: string;
+  /** Where the callable functions live, e.g. https://us-central1-<project>.cloudfunctions.net */
+  functionsBaseUrl: string;
   llmBaseUrl: string;
   llmModel: string;
   llmApiType: LlmApiType;
@@ -80,9 +84,16 @@ export function loadConfig(): Config {
     throw new Error(`LLM_API_TYPE must be "ollama" or "openai", got "${apiType}"`);
   }
 
+  const serviceAccount = loadServiceAccount();
+  const projectId =
+    String(serviceAccount?.project_id ?? "") || (process.env.GOOGLE_CLOUD_PROJECT ?? "teacher-in-a-moment");
+
   return {
-    firebaseServiceAccount: loadServiceAccount(),
+    firebaseServiceAccount: serviceAccount,
     firebaseDatabaseUrl: requireEnv("FIREBASE_DATABASE_URL"),
+    firebaseWebApiKey: process.env.FIREBASE_WEB_API_KEY ?? "",
+    functionsBaseUrl:
+      process.env.FUNCTIONS_BASE_URL ?? `https://us-central1-${projectId}.cloudfunctions.net`,
     llmBaseUrl: process.env.LLM_BASE_URL ?? "http://localhost:11434",
     llmModel: process.env.LLM_MODEL ?? "qwen2.5:7b",
     llmApiType: apiType,

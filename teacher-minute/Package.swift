@@ -17,7 +17,10 @@ let package = Package(
         // hold skip-ui at 1.59.3 or later (through skip-fuse-ui 1.18.2): 1.54.0
         // left a gap above every Android screen that hides its navigation bar,
         // and 1.53.1, the version before it, one above those that show it.
-        .package(url: "https://github.com/skiptools/skip.git", from: "1.9.8"),
+        // Exact: the Android build resolves this afresh, and skip 1.9.13
+        // generates bridge code (`BridgedJob`) that needs skip-bridge 0.18,
+        // which the rest of the pinned Skip packages are not ready for.
+        .package(url: "https://github.com/skiptools/skip.git", exact: "1.9.11"),
         .package(url: "https://github.com/skiptools/skip-fuse-ui.git", from: "1.18.2"),
         .package(url: "https://github.com/skiptools/skip-firebase.git", from: "0.20.4"),
         .package(url: "https://github.com/google/GoogleSignIn-iOS", from: "9.0.0"),
