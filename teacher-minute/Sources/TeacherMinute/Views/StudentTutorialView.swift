@@ -251,10 +251,21 @@ struct StudentTutorialView: View {
         .multilineTextAlignment(.center)
         .fixedSize(horizontal: false, vertical: true)
 
+      // A page with no callouts explains itself in a line or two instead,
+      // which takes about as much room as three callouts.
       annotatedScreenshot(screenshot, callouts: page.callouts)
-        .frame(height: screenshotHeight(calloutCount: page.callouts.count))
+        .frame(height: screenshotHeight(calloutCount: page.callouts.isEmpty ? 3 : page.callouts.count))
 
-      calloutLegend(page.callouts)
+      if page.callouts.isEmpty {
+        Text(page.body)
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(theme.brandSecondaryText)
+          .multilineTextAlignment(.center)
+          .lineSpacing(3)
+          .fixedSize(horizontal: false, vertical: true)
+      } else {
+        calloutLegend(page.callouts)
+      }
     }
     .frame(maxWidth: .infinity)
   }

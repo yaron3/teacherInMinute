@@ -15669,6 +15669,34 @@
         }
       },
       "valueType": "STRING"
+    },
+    "your_live_session": {
+      "defaultValue": {
+        "value": "Your live session"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השיעור החי שלכם"
+        },
+        "HebrewApp": {
+          "value": "השיעור החי שלכם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "this_the_lesson": {
+      "defaultValue": {
+        "value": "This is the lesson: you and your teacher see each other, talk, and work on the same board."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זה השיעור: אתם והמורה רואים זה את זה, מדברים ועובדים על אותו לוח."
+        },
+        "HebrewApp": {
+          "value": "זה השיעור: אתם והמורה רואים זה את זה, מדברים ועובדים על אותו לוח."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

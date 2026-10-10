@@ -55,6 +55,11 @@ extension StudentTutorialViewModel {
   var boardToolsCallout: String { LocalizationSupport.localized("Pen, line and shapes") }
   var boardDrawingCallout: String { LocalizationSupport.localized("You and the teacher draw on the same board") }
 
+  var sessionTitle: String { LocalizationSupport.localized("Your live session") }
+  var sessionBody: String {
+    LocalizationSupport.localized("This is the lesson: you and your teacher see each other, talk, and work on the same board.")
+  }
+
   var minutesTitle: String { LocalizationSupport.localized("Pay only for the minutes you use") }
   var minutesBody: String {
     LocalizationSupport.localized("Create a free account and load minutes. Only the time the lesson runs is charged, with no subscription and no fixed lessons.")

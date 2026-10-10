@@ -75,6 +75,11 @@ final class StudentTutorialViewModel {
         body: matchBody
       ),
       StudentTutorialPage(
+        art: .screenshot(screenshotName("video")),
+        title: sessionTitle,
+        body: sessionBody
+      ),
+      StudentTutorialPage(
         art: .screenshot(screenshotName("chat")),
         title: chatTitle,
         callouts: [

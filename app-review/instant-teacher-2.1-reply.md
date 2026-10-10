@@ -12,16 +12,18 @@ Thank you for the review. Here is the information you asked for.
 **1. Screen recording**
 
 A screen recording from a physical iPhone running iOS [version] is attached /
-available here: [link]. It starts at app launch and shows: the first-launch
-tutorial; asking a question; sign-up and login; buying minutes; a live lesson
-with a teacher; rating the teacher; reporting and blocking a teacher; and
-account deletion.
+available here: [link]. It starts at app launch and shows, in order: the
+first-launch tutorial; asking a question and account registration; the
+minutes purchase screen; a live lesson with a teacher; rating the teacher;
+reporting and blocking the teacher, and unblocking; account deletion; and
+logging in.
 
 This build adds an in-app tutorial. It opens at launch and walks through the
-whole flow on screenshots of the app, with numbered callouts on each
-control: taking a photo of the exercise, writing a question instead, the live
-lesson's chat, and the shared whiteboard. It has Skip on every page and "Don't show me again" on the last
-page. It can be opened again at any time from the side menu → Tutorial.
+whole flow on screenshots of the app: taking a photo of the exercise,
+writing a question instead, the live session, its chat and its shared
+whiteboard. It has Skip on every page, and a "Don't show me again" check box
+on the last page. It can be opened again at any time from the side menu →
+Tutorial.
 
 **2. Purpose and target audience**
 
@@ -133,32 +135,59 @@ Thank you,
 
 ## Screen recording — shot list (physical iPhone, latest iOS)
 
-Delete the app first, so the recording starts from a clean install.
+One continuous take, about 4–6 minutes. Apple asks for it to start with
+launching the app.
 
-1. Launch the app from the Home Screen. Show the intro and tap **Get started**.
-2. Tutorial: tap **Next** through all 9 pages. On the last page, show **Don't
-   show me again**, then tap **Let's start**.
-3. Home: take a photo of a question (or type one) and tap **Find a Teacher**.
-   Show the account prompt and create a new account (email + password).
-4. Side menu → **Minutes**: show the packages and the payment sheet. Complete
-   one purchase or cancel at the Apple Pay sheet.
-5. Ask the question again. A teacher (you, on a second device with Pro
-   Teacher) accepts. Show chat, the whiteboard and voice. End the lesson and
-   rate the teacher.
-6. Side menu → **Activity**: show the past lesson.
-7. Side menu → **Tutorial**: show that it opens again, then tap **Skip**.
-8. Settings → Account & Security → **Delete Account**. Confirm, and show the
-   app return to the start screen.
-9. In a lesson (or on the rating screen), tap the flag / **Report or block**,
-   pick a reason and send the report with **Also block** ticked. Then show
-   Settings → Privacy Controls → **Blocked teachers**, and **Unblock**.
+### Before recording
+
+- Install the new build (tutorial, reporting and blocking) on the iPhone, from
+  Xcode or TestFlight. The reviewed build has neither.
+- Two devices: the iPhone records the student; a second device runs Pro
+  Teacher signed in as the demo teacher, to accept the question.
+- Delete Instant Teacher from the iPhone, so the recording opens on a first
+  launch with the tutorial.
+- Turn on Do Not Disturb. Start recording from Control Center → Screen
+  Recording.
+- A question goes to every online teacher for its subject, and to all of them
+  when fewer than 3 cover it. Record when no real teacher is online (check
+  `onlineTeachers`), or have the demo teacher accept at once.
+
+### Steps
+
+1. **Launch** Instant Teacher from the Home Screen and tap **Get started**.
+2. **Tutorial:** tap **Next** through all 10 pages. On the last page tick
+   **Don't show me again**, then tap **Let's start**.
+3. **Registration:** photograph the exercise (or switch to **Text**), tap
+   **Find a Teacher**, and create a **new** account with email and password.
+   A new account, because step 9 deletes it.
+4. **Paid content:** side menu → **Minutes**. Show the packages, tap **Pay**,
+   and cancel at the Apple Pay sheet. If the new account has no minutes,
+   verifying its email grants the free minutes the lesson needs.
+5. **Live lesson:** ask the question; the demo teacher accepts on the second
+   device. Show a few chat messages, the **Board** with a quick sketch, and
+   switch to voice or video. End the lesson.
+6. **Rating:** give stars and a short comment, and send.
+7. **Report and block:** side menu → **Activity** → the lesson →
+   **Report or block**. Pick a reason, keep **Also block** ticked, send, and
+   show the thank-you screen.
+8. **Unblock:** **Settings → Privacy Controls**. Show the teacher under
+   **Blocked teachers**, then tap **Unblock**.
+9. **Account deletion:** **Settings → Account & Security → Delete Account**.
+   Enter the password and confirm; the app returns to the start screen.
+10. **Login:** side menu → **Log In**, sign in with
+    `student_demo_english@example.com`. Stop on the home screen.
+
+Attach the video to the reply in App Store Connect, or give an unlisted link,
+and fill in `[version]` and `[link]` in section 1.
 
 ## Before resubmitting
 
-- Deploy the backend so reporting and blocking work:
-  `firebase deploy --only functions` (from `backend/Firebase`). Make sure SMTP
-  is configured, so reports reach the support recipients by email.
-- Publish the Remote Config template, so the new Hebrew text is live:
+- Upload a new build: bump Instant Teacher's build number (1.0.6 build 5 is
+  probably the reviewed one) so App Store Connect accepts it.
+- The backend for reporting and blocking is deployed (2026-10-10). Make sure
+  SMTP is configured in `functions/.env`, so reports reach the support
+  recipients by email; without it they are saved but only logged.
+- Publish the Remote Config template, so the latest Hebrew text is live:
   `firebase deploy --only remoteconfig` (from `backend/Firebase`).
 - The reply promises reviewing reports within 24 hours. Make sure someone
   watches the report emails.
