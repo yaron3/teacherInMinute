@@ -8,6 +8,8 @@ struct RateSessionView: View {
   let teacherId: String
   let questionId: String
   let prepareForRating: @MainActor () async -> Void
+  /// Opens the report on this lesson's teacher.
+  let onReport: (@MainActor () -> Void)?
   let onFinish: @MainActor () -> Void
 
   @State var rating: Int = 0
@@ -29,6 +31,7 @@ struct RateSessionView: View {
     teacherId: String,
     questionId: String,
     prepareForRating: @escaping @MainActor () async -> Void = {},
+    onReport: (@MainActor () -> Void)? = nil,
     onFinish: @escaping @MainActor () -> Void
   ) {
     self.viewModel = viewModel
@@ -38,6 +41,7 @@ struct RateSessionView: View {
     self.teacherId = teacherId
     self.questionId = questionId
     self.prepareForRating = prepareForRating
+    self.onReport = onReport
     self.onFinish = onFinish
   }
 
@@ -189,6 +193,10 @@ struct RateSessionView: View {
               .foregroundStyle(theme.danger)
               .multilineTextAlignment(.center)
           }
+
+          if let onReport {
+            reportLink(onReport)
+          }
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 18)
@@ -223,6 +231,23 @@ struct RateSessionView: View {
       .padding(.bottom, 24)
     }
     .screenGround()
+  }
+
+  func reportLink(_ action: @escaping @MainActor () -> Void) -> some View {
+    Button {
+      action()
+    } label: {
+      HStack(spacing: 6) {
+        PlatformIcon(systemName: "flag.fill", size: 13, weight: .semibold, color: theme.danger)
+        Text(viewModel.reportOrBlockLabel(teacherName: teacherName))
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(theme.danger)
+      }
+      .frame(minHeight: 44)
+      .tappableFrame()
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("rating_report_teacher")
   }
 
   private func send() {

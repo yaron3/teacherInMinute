@@ -14815,6 +14815,860 @@
         }
       },
       "valueType": "STRING"
+    },
+    "tutorial": {
+      "defaultValue": {
+        "value": "Tutorial"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מדריך"
+        },
+        "HebrewApp": {
+          "value": "מדריך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "skip": {
+      "defaultValue": {
+        "value": "Skip"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "דלג"
+        },
+        "HebrewApp": {
+          "value": "דלג"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "let_start": {
+      "defaultValue": {
+        "value": "Let's start"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "בואו נתחיל"
+        },
+        "HebrewApp": {
+          "value": "בואו נתחיל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "don_show_again": {
+      "defaultValue": {
+        "value": "Don't show me again"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אל תציג לי שוב"
+        },
+        "HebrewApp": {
+          "value": "אל תציג לי שוב"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_tutorial_page_counter": {
+      "defaultValue": {
+        "value": "%d of %d"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%d מתוך %d"
+        },
+        "HebrewApp": {
+          "value": "%d מתוך %d"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "welcome_instant_teacher": {
+      "defaultValue": {
+        "value": "Welcome to Instant Teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ברוכים הבאים למורה לרגע"
+        },
+        "HebrewApp": {
+          "value": "ברוכים הבאים למורה לרגע"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "stuck_question_real": {
+      "defaultValue": {
+        "value": "Stuck on a question? A real human teacher joins you in about 90 seconds and explains exactly the step you missed."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נתקעת בשאלה? מורה אנושי אמיתי מצטרף אליך תוך כ-90 שניות ומסביר בדיוק את השלב שפספסת."
+        },
+        "HebrewApp": {
+          "value": "נתקעת בשאלה? מורה אנושי אמיתי מצטרף אליך תוך כ-90 שניות ומסביר בדיוק את השלב שפספסת."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "find_you_teacher": {
+      "defaultValue": {
+        "value": "We find you a teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אנחנו מוצאים לך מורה"
+        },
+        "HebrewApp": {
+          "value": "אנחנו מוצאים לך מורה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "tap_find_teacher": {
+      "defaultValue": {
+        "value": "Tap Find a Teacher. Your question goes to available teachers for that subject, and the first to accept joins you."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הקישו על \"מצא מורה\". השאלה נשלחת למורים זמינים במקצוע, והראשון שמקבל אותה מצטרף אליכם."
+        },
+        "HebrewApp": {
+          "value": "הקישו על \"מצא מורה\". השאלה נשלחת למורים זמינים במקצוע, והראשון שמקבל אותה מצטרף אליכם."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "live_one_one": {
+      "defaultValue": {
+        "value": "A live one-on-one lesson"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שיעור חי אחד על אחד"
+        },
+        "HebrewApp": {
+          "value": "שיעור חי אחד על אחד"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "tutorial_pay_minutes_title": {
+      "defaultValue": {
+        "value": "Pay only for the minutes you use"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "משלמים רק על הדקות שמשתמשים בהן"
+        },
+        "HebrewApp": {
+          "value": "משלמים רק על הדקות שמשתמשים בהן"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "create_free_account": {
+      "defaultValue": {
+        "value": "Create a free account and load minutes. Only the time the lesson runs is charged, with no subscription and no fixed lessons."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "צרו חשבון בחינם וטענו דקות. מחויב רק הזמן שבו השיעור מתקיים, בלי מנוי ובלי שיעורים קבועים."
+        },
+        "HebrewApp": {
+          "value": "צרו חשבון בחינם וטענו דקות. מחויב רק הזמן שבו השיעור מתקיים, בלי מנוי ובלי שיעורים קבועים."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "everything_the_menu": {
+      "defaultValue": {
+        "value": "Everything is in the menu"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הכול נמצא בתפריט"
+        },
+        "HebrewApp": {
+          "value": "הכול נמצא בתפריט"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "rate_your_teacher": {
+      "defaultValue": {
+        "value": "Rate your teacher after each lesson. Your past lessons, minutes, settings and support are in the menu, and so is this tutorial."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "דרגו את המורה אחרי כל שיעור. השיעורים הקודמים, הדקות, ההגדרות והתמיכה נמצאים בתפריט, וגם המדריך הזה."
+        },
+        "HebrewApp": {
+          "value": "דרגו את המורה אחרי כל שיעור. השיעורים הקודמים, הדקות, ההגדרות והתמיכה נמצאים בתפריט, וגם המדריך הזה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "point_the_camera": {
+      "defaultValue": {
+        "value": "Point the camera at the exercise"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כוונו את המצלמה לתרגיל"
+        },
+        "HebrewApp": {
+          "value": "כוונו את המצלמה לתרגיל"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "photo_the_camera": {
+      "defaultValue": {
+        "value": "Photo: the camera opens on the home screen"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תמונה: המצלמה נפתחת במסך הבית"
+        },
+        "HebrewApp": {
+          "value": "תמונה: המצלמה נפתחת במסך הבית"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "tap_here_take": {
+      "defaultValue": {
+        "value": "Tap here to take the picture"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הקישו כאן כדי לצלם"
+        },
+        "HebrewApp": {
+          "value": "הקישו כאן כדי לצלם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "tutorial_teachers_online_callout": {
+      "defaultValue": {
+        "value": "Teachers online now, and the price per minute"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורים זמינים עכשיו, והמחיר לדקה"
+        },
+        "HebrewApp": {
+          "value": "מורים זמינים עכשיו, והמחיר לדקה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_photo_attached": {
+      "defaultValue": {
+        "value": "Your photo is attached"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התמונה צורפה"
+        },
+        "HebrewApp": {
+          "value": "התמונה צורפה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "your_picture_tap": {
+      "defaultValue": {
+        "value": "Your picture. Tap it to remove it and retake"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התמונה שלכם. הקישו עליה כדי למחוק ולצלם שוב"
+        },
+        "HebrewApp": {
+          "value": "התמונה שלכם. הקישו עליה כדי למחוק ולצלם שוב"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "add_few_words": {
+      "defaultValue": {
+        "value": "Add a few words about where you got stuck"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוסיפו כמה מילים על המקום שבו נתקעתם"
+        },
+        "HebrewApp": {
+          "value": "הוסיפו כמה מילים על המקום שבו נתקעתם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "find_teacher_sends": {
+      "defaultValue": {
+        "value": "Find a Teacher sends your question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "\"מצא מורה\" שולח את השאלה"
+        },
+        "HebrewApp": {
+          "value": "\"מצא מורה\" שולח את השאלה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "tutorial_write_question_title": {
+      "defaultValue": {
+        "value": "Or write your question"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "או כתבו את השאלה"
+        },
+        "HebrewApp": {
+          "value": "או כתבו את השאלה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "text_type_the": {
+      "defaultValue": {
+        "value": "Text: type the question instead"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "טקסט: הקלידו את השאלה במקום לצלם"
+        },
+        "HebrewApp": {
+          "value": "טקסט: הקלידו את השאלה במקום לצלם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "write_the_exercise": {
+      "defaultValue": {
+        "value": "Write the exercise and what you don't understand"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "כתבו את התרגיל ומה לא ברור לכם"
+        },
+        "HebrewApp": {
+          "value": "כתבו את התרגיל ומה לא ברור לכם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "math_keyboard_for": {
+      "defaultValue": {
+        "value": "A math keyboard for equations and symbols"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מקלדת מתמטית למשוואות וסימנים"
+        },
+        "HebrewApp": {
+          "value": "מקלדת מתמטית למשוואות וסימנים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "chat_with_your": {
+      "defaultValue": {
+        "value": "Chat with your teacher in real time"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התכתבו עם המורה בזמן אמת"
+        },
+        "HebrewApp": {
+          "value": "התכתבו עם המורה בזמן אמת"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "media_switch_voice": {
+      "defaultValue": {
+        "value": "Media: switch to voice or video"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מדיה: עברו לקול או לווידאו"
+        },
+        "HebrewApp": {
+          "value": "מדיה: עברו לקול או לווידאו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "lesson_time_you": {
+      "defaultValue": {
+        "value": "Lesson time: you pay only for these minutes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זמן השיעור: משלמים רק על הדקות האלה"
+        },
+        "HebrewApp": {
+          "value": "זמן השיעור: משלמים רק על הדקות האלה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "end_the_lesson": {
+      "defaultValue": {
+        "value": "End the lesson when you understand"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "סיימו את השיעור כשהבנתם"
+        },
+        "HebrewApp": {
+          "value": "סיימו את השיעור כשהבנתם"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "draw_together_the": {
+      "defaultValue": {
+        "value": "Draw together on the board"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מציירים יחד על הלוח"
+        },
+        "HebrewApp": {
+          "value": "מציירים יחד על הלוח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "switch_between_chat": {
+      "defaultValue": {
+        "value": "Switch between Chat and Board"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מעבר בין צ'אט ללוח"
+        },
+        "HebrewApp": {
+          "value": "מעבר בין צ'אט ללוח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pen_line_and": {
+      "defaultValue": {
+        "value": "Pen, line and shapes"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "עט, קו וצורות"
+        },
+        "HebrewApp": {
+          "value": "עט, קו וצורות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_and_the": {
+      "defaultValue": {
+        "value": "You and the teacher draw on the same board"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אתם והמורה מציירים על אותו לוח"
+        },
+        "HebrewApp": {
+          "value": "אתם והמורה מציירים על אותו לוח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "report_block": {
+      "defaultValue": {
+        "value": "Report or block %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "דיווח על %@ או חסימה"
+        },
+        "HebrewApp": {
+          "value": "דיווח על %@ או חסימה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "report_block_teacher": {
+      "defaultValue": {
+        "value": "Report or block teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "דיווח על המורה או חסימה"
+        },
+        "HebrewApp": {
+          "value": "דיווח על המורה או חסימה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "what_happened": {
+      "defaultValue": {
+        "value": "What happened?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מה קרה?"
+        },
+        "HebrewApp": {
+          "value": "מה קרה?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "inappropriate_offensive_behavior": {
+      "defaultValue": {
+        "value": "Inappropriate or offensive behavior"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התנהגות לא הולמת או פוגענית"
+        },
+        "HebrewApp": {
+          "value": "התנהגות לא הולמת או פוגענית"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "harassment_bullying": {
+      "defaultValue": {
+        "value": "Harassment or bullying"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הטרדה או בריונות"
+        },
+        "HebrewApp": {
+          "value": "הטרדה או בריונות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "sexual_content": {
+      "defaultValue": {
+        "value": "Sexual content"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תוכן מיני"
+        },
+        "HebrewApp": {
+          "value": "תוכן מיני"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "asked_pay_talk": {
+      "defaultValue": {
+        "value": "Asked to pay or talk outside the app"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ביקש תשלום או קשר מחוץ לאפליקציה"
+        },
+        "HebrewApp": {
+          "value": "ביקש תשלום או קשר מחוץ לאפליקציה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "did_not_teach": {
+      "defaultValue": {
+        "value": "Did not teach or wasted my time"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא לימד או בזבז את הזמן שלי"
+        },
+        "HebrewApp": {
+          "value": "לא לימד או בזבז את הזמן שלי"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "something_else": {
+      "defaultValue": {
+        "value": "Something else"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "משהו אחר"
+        },
+        "HebrewApp": {
+          "value": "משהו אחר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "tell_more_optional": {
+      "defaultValue": {
+        "value": "Tell us more (optional)"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ספרו לנו עוד (לא חובה)"
+        },
+        "HebrewApp": {
+          "value": "ספרו לנו עוד (לא חובה)"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "also_block": {
+      "defaultValue": {
+        "value": "Also block %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לחסום גם את %@"
+        },
+        "HebrewApp": {
+          "value": "לחסום גם את %@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "blocked_teacher_never": {
+      "defaultValue": {
+        "value": "A blocked teacher is never sent your questions again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה חסום לא יקבל יותר את השאלות שלכם."
+        },
+        "HebrewApp": {
+          "value": "מורה חסום לא יקבל יותר את השאלות שלכם."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "send_report": {
+      "defaultValue": {
+        "value": "Send report"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שליחת דיווח"
+        },
+        "HebrewApp": {
+          "value": "שליחת דיווח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "our_team_reviews": {
+      "defaultValue": {
+        "value": "Our team reviews every report within 24 hours and acts on it, up to removing the teacher from the app."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הצוות שלנו בודק כל דיווח תוך 24 שעות ופועל בהתאם, עד להסרת המורה מהאפליקציה."
+        },
+        "HebrewApp": {
+          "value": "הצוות שלנו בודק כל דיווח תוך 24 שעות ופועל בהתאם, עד להסרת המורה מהאפליקציה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "block_without_reporting": {
+      "defaultValue": {
+        "value": "Block %@ without reporting"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לחסום את %@ בלי לדווח"
+        },
+        "HebrewApp": {
+          "value": "לחסום את %@ בלי לדווח"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_block_teacher_confirm": {
+      "defaultValue": {
+        "value": "Block %@?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לחסום את %@?"
+        },
+        "HebrewApp": {
+          "value": "לחסום את %@?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "block": {
+      "defaultValue": {
+        "value": "Block"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "חסימה"
+        },
+        "HebrewApp": {
+          "value": "חסימה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "report_send_failed": {
+      "defaultValue": {
+        "value": "Could not send. Check your connection and try again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השליחה נכשלה. בדקו את החיבור ונסו שוב."
+        },
+        "HebrewApp": {
+          "value": "השליחה נכשלה. בדקו את החיבור ונסו שוב."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "thank_you": {
+      "defaultValue": {
+        "value": "Thank you"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "תודה"
+        },
+        "HebrewApp": {
+          "value": "תודה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "blocked_and_will": {
+      "defaultValue": {
+        "value": "%@ is blocked and will not be sent your questions again. You can unblock them in Settings → Privacy Controls."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "%@ חסום ולא יקבל יותר את השאלות שלכם. אפשר לבטל את החסימה בהגדרות ← בקרות פרטיות."
+        },
+        "HebrewApp": {
+          "value": "%@ חסום ולא יקבל יותר את השאלות שלכם. אפשר לבטל את החסימה בהגדרות ← בקרות פרטיות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "received_your_report": {
+      "defaultValue": {
+        "value": "We received your report and will review it within 24 hours."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "קיבלנו את הדיווח ונבדוק אותו תוך 24 שעות."
+        },
+        "HebrewApp": {
+          "value": "קיבלנו את הדיווח ונבדוק אותו תוך 24 שעות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "this_teacher": {
+      "defaultValue": {
+        "value": "this teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "המורה הזה"
+        },
+        "HebrewApp": {
+          "value": "המורה הזה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "blocked_teachers": {
+      "defaultValue": {
+        "value": "Blocked teachers"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורים חסומים"
+        },
+        "HebrewApp": {
+          "value": "מורים חסומים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_have_not": {
+      "defaultValue": {
+        "value": "You have not blocked anyone. To block a teacher, use the flag in a lesson or open the lesson in Activity."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא חסמתם אף אחד. כדי לחסום מורה, הקישו על הדגל בשיעור או פתחו את השיעור בפעילות."
+        },
+        "HebrewApp": {
+          "value": "לא חסמתם אף אחד. כדי לחסום מורה, הקישו על הדגל בשיעור או פתחו את השיעור בפעילות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "unblock": {
+      "defaultValue": {
+        "value": "Unblock"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ביטול חסימה"
+        },
+        "HebrewApp": {
+          "value": "ביטול חסימה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "could_not_unblock": {
+      "defaultValue": {
+        "value": "Could not unblock. Check your connection and try again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא הצלחנו לבטל את החסימה. בדקו את החיבור ונסו שוב."
+        },
+        "HebrewApp": {
+          "value": "לא הצלחנו לבטל את החסימה. בדקו את החיבור ונסו שוב."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "blocked_teachers_load_failed": {
+      "defaultValue": {
+        "value": "Could not load your blocked teachers. Check your connection and try again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא הצלחנו לטעון את המורים החסומים. בדקו את החיבור ונסו שוב."
+        },
+        "HebrewApp": {
+          "value": "לא הצלחנו לטעון את המורים החסומים. בדקו את החיבור ונסו שוב."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

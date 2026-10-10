@@ -32,6 +32,7 @@ import {
 import { enqueueAbandonedLessonCheck } from "./lessons";
 import { markTeacherBusy, releaseTeacherBusy } from "./busy";
 import { ANY_TOPIC, isTeacherBusy } from "./scoring";
+import { blockedTeacherUids } from "./moderation";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -149,11 +150,12 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
   // overlap rather than queueing up on the ask path. The limits and the search
   // timeout come from one cached Remote Config template, so this is a single
   // fetch, usually cached.
-  const [studentSnap, maxQuestionLength, rateLimits, searchTimeoutSeconds] = await Promise.all([
+  const [studentSnap, maxQuestionLength, rateLimits, searchTimeoutSeconds, blockedTeachers] = await Promise.all([
     firestore.collection("users").doc(uid).get(),
     getQuestionMaxLength(),
     getQuestionRateLimits(),
     getSearchTimeoutSeconds(),
+    blockedTeacherUids(uid),
   ]);
 
   // Measured after trimming, so the limit counts what is stored rather than
@@ -257,6 +259,7 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     // down; if the dispatch throws we reset it to 0 and hand the question back.
     dispatchWave: 1,
     alreadyInvited: [],
+    ...(blockedTeachers.length > 0 ? { blockedTeachers } : {}),
   };
 
   const liveQuestion: Record<string, unknown> = {
@@ -517,6 +520,11 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
     }
 
     if (inv.response !== "pending") {
+      throw new HttpsError("failed-precondition", "Invite is no longer pending");
+    }
+
+    // Invited before the student blocked them is still blocked.
+    if ((q.blockedTeachers ?? []).includes(teacherUid)) {
       throw new HttpsError("failed-precondition", "Invite is no longer pending");
     }
 

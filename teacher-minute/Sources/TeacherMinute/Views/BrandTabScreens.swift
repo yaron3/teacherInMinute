@@ -46,7 +46,7 @@ extension MenuItem {
     case .earnings: ("brand-menu-earnings", CGSize(width: 24, height: 24))
     case .profile: ("brand-menu-profile", CGSize(width: 18, height: 18))
     case .settings: ("brand-menu-settings", CGSize(width: 23, height: 23))
-    case .help: nil
+    case .help, .tutorial: nil
     }
   }
 }

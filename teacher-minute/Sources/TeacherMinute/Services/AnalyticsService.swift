@@ -109,6 +109,18 @@ enum AnalyticsEvent {
     static let contactSupportSubmitted = "contact_support_submitted"
     static let contactSupportFailed    = "contact_support_failed"
 
+    // Student tutorial
+    static let tutorialShown     = "tutorial_shown"
+    static let tutorialSkipped   = "tutorial_skipped"
+    static let tutorialCompleted = "tutorial_completed"
+    static let tutorialHidden    = "tutorial_hidden"
+
+    // Reporting and blocking teachers
+    static let teacherReportOpened = "teacher_report_opened"
+    static let teacherReported     = "teacher_reported"
+    static let teacherBlocked      = "teacher_blocked"
+    static let teacherUnblocked    = "teacher_unblocked"
+
     // Backend errors
     static let firestorePermissionDenied = "firestore_permission_denied"
 }
@@ -145,6 +157,8 @@ enum AnalyticsScreen {
     static let launchSplash          = "launch_splash"
     static let minutesPackage        = "minutes_package"
     static let rateSession           = "rate_session"
+    static let studentTutorial       = "student_tutorial"
+    static let reportTeacher         = "report_teacher"
 }
 
 @MainActor

@@ -104,15 +104,22 @@ struct MainTabView: View {
   /// environment.
   var tabLayers: some View {
 	ZStack {
-	  tabContent(viewModel.selectedTab)
-		// Each section starts afresh. On Android, SkipUI otherwise handed the
-		// state one section remembered to the next in its place: going from
-		// Profile to Settings, Settings' `onChange` of a URL was given a Bool
-		// Profile had kept, and the app aborted on the cast.
-		.id(viewModel.selectedTab)
-		.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
-		.environment(\.sideMenuAction, sideMenuAction)
-		.environment(\.tabBarAction, tabBarAction)
+	  // The student's tutorial takes the section's place while it is up, so
+	  // the section underneath — Home, with its camera prompt — waits for it.
+	  if let tutorial = viewModel.tutorial {
+		StudentTutorialView(viewModel: tutorial)
+		  .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+	  } else {
+		tabContent(viewModel.selectedTab)
+		  // Each section starts afresh. On Android, SkipUI otherwise handed the
+		  // state one section remembered to the next in its place: going from
+		  // Profile to Settings, Settings' `onChange` of a URL was given a Bool
+		  // Profile had kept, and the app aborted on the cast.
+		  .id(viewModel.selectedTab)
+		  .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+		  .environment(\.sideMenuAction, sideMenuAction)
+		  .environment(\.tabBarAction, tabBarAction)
+	  }
 
 	  teacherGlobalOverlay
 	}

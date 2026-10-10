@@ -63,6 +63,8 @@ struct ChatSessionView: View {
   @State var teacherPreviewAccumOffset: CGSize = .zero
   @State var conversationType: String
   @State var isRatingPromptVisible = false
+  /// The student reporting or blocking the teacher, over the lesson.
+  @State var reportViewModel: ReportTeacherViewModel?
   @State var endSessionPrompt: EndSessionPrompt?
   @State var farewellText = ""
   /// The teacher chose to wait, so the notice stays down until the hold lifts
@@ -229,6 +231,12 @@ struct ChatSessionView: View {
 
       if isRatingPromptVisible {
         ratingPromptOverlay
+      }
+
+      if let reportViewModel {
+        ReportTeacherView(viewModel: reportViewModel)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .zIndex(35)
       }
     }
     .screenGround()
@@ -630,6 +638,7 @@ struct ChatSessionView: View {
         didRequestLessonEnd = true
         await viewModel.endLesson()
       },
+      onReport: { presentReport() },
       onFinish: {
         isRatingPromptVisible = false
         onClose()
@@ -820,6 +829,39 @@ struct ChatSessionView: View {
     Task {
       await viewModel.endLessonWithFarewell(note)
       closeWithOptionalRating()
+    }
+  }
+
+  /// Opens the report over the lesson, or over the rating that follows it.
+  /// A block ends a running lesson, or closes the rating of an ended one.
+  func presentReport() {
+    dismissChatInput()
+    reportViewModel = ReportTeacherViewModel(
+      questionId: viewModel.questionId,
+      teacherName: viewModel.participantName
+    ) { blocked in
+      reportViewModel = nil
+      guard blocked else { return }
+      if isRatingPromptVisible {
+        isRatingPromptVisible = false
+        onClose()
+      } else {
+        endLessonAfterBlocking()
+      }
+    }
+  }
+
+  /// Ends the lesson at once, with no rating: the student has just blocked
+  /// this teacher.
+  func endLessonAfterBlocking() {
+    guard !isEndingSession else { return }
+    endSessionPrompt = nil
+    isEndingSession = true
+    didRequestLessonEnd = true
+    if sessionFrozenDate == nil { sessionFrozenDate = Date() }
+    Task {
+      await viewModel.endLesson()
+      onClose()
     }
   }
 

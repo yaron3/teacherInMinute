@@ -111,7 +111,9 @@ extension ChatSessionView {
       items: sessionToggleItems,
       selected: selectedTab,
       closeAccessibilityLabel: viewModel.endLabel,
+      reportAccessibilityLabel: viewModel.reportTeacherAccessibilityLabel,
       onSelect: { tab in selectSessionTab(tab) },
+      onReport: isStudent && !viewModel.teacherId.isEmpty ? { presentReport() } : nil,
       onClose: { requestEndSession() }
     )
   }

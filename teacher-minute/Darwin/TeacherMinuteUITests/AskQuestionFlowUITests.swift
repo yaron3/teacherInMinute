@@ -87,6 +87,11 @@ final class AskQuestionFlowUITests: XCTestCase {
         }
 
         app = XCUIApplication()
+        // The student's tutorial opens in place of Home at launch, where it
+        // would hide both the home screen and the menu button the sign-in
+        // check looks for. Passed as a defaults argument, the setting lasts
+        // for this run only and the simulator's own choice is left alone.
+        app.launchArguments += ["-tutorial.student.hidden", "YES"]
         app.launch()
     }
 

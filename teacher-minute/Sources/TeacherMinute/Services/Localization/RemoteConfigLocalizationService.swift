@@ -1262,6 +1262,19 @@ enum LocalizationKey {
         // `upload_clear_photo` holds the math-problem prompt.
         // `available` holds the teacher dashboard's status label.
         "Available?": "available_question",
+        // `pay_only_for` holds the home's How it works step.
+        "Pay only for the minutes you use": "tutorial_pay_minutes_title",
+        // Reduces to no words at all.
+        "%d of %d": "fmt_tutorial_page_counter",
+        // `teachers_online_now` and `write_your_question` hold the home
+        // screen's own lines; these are the tutorial's.
+        "Teachers online now, and the price per minute": "tutorial_teachers_online_callout",
+        "Or write your question": "tutorial_write_question_title",
+        // Reporting and blocking teachers: `block`, `could_not_load` and
+        // `could_not_send` hold older, unrelated strings.
+        "Block %@?": "fmt_block_teacher_confirm",
+        "Could not load your blocked teachers. Check your connection and try again.": "blocked_teachers_load_failed",
+        "Could not send. Check your connection and try again.": "report_send_failed",
     ]
 
     /// Deterministic three-word snake-case slug for any source string that

@@ -62,43 +62,54 @@ export function buildContactEmail(data: Record<string, unknown>): { subject: str
   return { subject, text };
 }
 
+/**
+ * Sends `subject` and `text` to the support recipients. Returns false, having
+ * logged it, when SMTP is not configured; throws if the send itself fails.
+ * Also used for teacher reports (see moderation.ts).
+ */
+export async function sendSupportEmail(subject: string, text: string, replyToAddress?: unknown): Promise<boolean> {
+  const recipients = readContactRecipients();
+
+  const host = process.env.SMTP_HOST;
+  if (!host) {
+    logger.warn(
+      `[contactSupport] SMTP_HOST not set; not sending. to=${recipients.join(",")} subject=${subject}`
+    );
+    return false;
+  }
+
+  const transport = nodemailer.createTransport({
+    host,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    auth: process.env.SMTP_USER
+      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? "" }
+      : undefined,
+  });
+
+  const replyTo = typeof replyToAddress === "string" && replyToAddress.includes("@")
+    ? replyToAddress
+    : undefined;
+
+  await transport.sendMail({
+    from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+    to: recipients,
+    replyTo,
+    subject,
+    text,
+  });
+  logger.info(`[contactSupport] sent "${subject}" to ${recipients.length} recipient(s)`);
+  return true;
+}
+
 export const onContactRequestCreated = onDocumentCreated(
   "contactRequests/{requestId}",
   async (event) => {
     const data = event.data?.data();
     if (!data) return;
 
-    const recipients = readContactRecipients();
     const { subject, text } = buildContactEmail(data);
-
-    const host = process.env.SMTP_HOST;
-    if (!host) {
-      logger.warn(
-        `[contactSupport] SMTP_HOST not set; not sending. to=${recipients.join(",")} subject=${subject}`
-      );
-      return;
-    }
-
-    const transport = nodemailer.createTransport({
-      host,
-      port: Number(process.env.SMTP_PORT ?? 587),
-      auth: process.env.SMTP_USER
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? "" }
-        : undefined,
-    });
-
-    const replyTo = typeof data.userEmail === "string" && data.userEmail.includes("@")
-      ? data.userEmail
-      : undefined;
-
     // Throwing lets Firestore retry if retries are enabled; otherwise it is logged.
-    await transport.sendMail({
-      from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
-      to: recipients,
-      replyTo,
-      subject,
-      text,
-    });
-    logger.info(`[contactSupport] sent request ${event.params.requestId} to ${recipients.length} recipient(s)`);
+    const sent = await sendSupportEmail(subject, text, data.userEmail);
+    if (sent) logger.info(`[contactSupport] sent request ${event.params.requestId}`);
   }
 );

@@ -181,6 +181,8 @@ struct LessonDetailView: View {
     @State var questionText: String
     @State var questionPhotoUrls: [String]
     @State var isLoading: Bool
+    /// A student reporting or blocking this lesson's teacher.
+    @State var reportViewModel: ReportTeacherViewModel?
 
     init(
         viewModel: any LessonHistoryViewModeling,
@@ -256,6 +258,10 @@ struct LessonDetailView: View {
                     action: audioAction
                 )
                 .disabled(!lesson.hasAudio)
+
+                if viewerRole == "student" {
+                    reportButton
+                }
 
                 if !questionText.isEmpty || !questionPhotoUrls.isEmpty {
                     RoundedInfoCard {
@@ -351,6 +357,33 @@ struct LessonDetailView: View {
                 }
             }
         }
+        .overlay {
+            if let reportViewModel {
+                ReportTeacherView(viewModel: reportViewModel)
+            }
+        }
+    }
+
+    var reportButton: some View {
+        Button {
+            reportViewModel = ReportTeacherViewModel(
+                questionId: lesson.questionId,
+                teacherName: lesson.otherParticipant
+            ) { _ in
+                reportViewModel = nil
+            }
+        } label: {
+            HStack(spacing: 8) {
+                PlatformIcon(systemName: "flag.fill", size: 14, weight: .semibold, color: theme.brandDestructive)
+                Text(viewModel.reportOrBlockLabel(teacherName: lesson.otherParticipant))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.brandDestructive)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .tappableFrame()
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("lesson_report_teacher")
     }
 
     private func loadLessonDetails() async {

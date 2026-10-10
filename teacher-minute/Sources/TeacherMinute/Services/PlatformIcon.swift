@@ -191,6 +191,8 @@ struct PlatformIcon: View {
 	  case "g.circle.fill":						return "G"
 	  case "building.columns.fill":				return "🏰"
 	  case "lightbulb.fill":					return "💡"
+	  case "lightbulb":                         return "💡"
+	  case "flag.fill":                         return "🚩"
 	  case "checkmark":							return "✓"
 	  case "envelope.fill":						return "📧"
 	  case "envelope.open.fill":                return "📬"
