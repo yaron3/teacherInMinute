@@ -1640,8 +1640,6 @@ extension ChatSessionViewModeling {
   // MARK: End-session button (header)
 
   var endLabel: String { LocalizationSupport.localized("End") }
-  /// The flag beside End, and the link under a lesson's rating.
-  var reportTeacherAccessibilityLabel: String { LocalizationSupport.localized("Report or block teacher") }
   func reportOrBlockLabel(teacherName: String) -> String {
     let name = teacherName.trimmingCharacters(in: .whitespacesAndNewlines)
     return name.isEmpty

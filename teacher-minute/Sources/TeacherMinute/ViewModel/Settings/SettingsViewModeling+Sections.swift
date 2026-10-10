@@ -99,25 +99,25 @@ extension SettingsViewModeling {
         ]
 
         #if DEBUG
-        rows.append(
-            SettingsRow(
-                title: LocalizationSupport.localized("Force Reload Remote Config"),
-                subtitle: LocalizationSupport.localized("Debug builds only"),
-                systemImage: "arrow.clockwise.circle",
-                iconColor: .primary,
-                action: .forceReloadRemoteConfig
-            )
-        )
-        rows.append(
-            SettingsRow(
-                title: LocalizationSupport.localized("Test Crashlytics Crash"),
-                subtitle: LocalizationSupport.localized("Debug builds only"),
-                systemImage: "exclamationmark.triangle",
-                iconColor: .red,
-                isDestructive: true,
-                action: .testCrashlyticsCrash
-            )
-        )
+//        rows.append(
+//            SettingsRow(
+//                title: LocalizationSupport.localized("Force Reload Remote Config"),
+//                subtitle: LocalizationSupport.localized("Debug builds only"),
+//                systemImage: "arrow.clockwise.circle",
+//                iconColor: .primary,
+//                action: .forceReloadRemoteConfig
+//            )
+//        )
+//        rows.append(
+//            SettingsRow(
+//                title: LocalizationSupport.localized("Test Crashlytics Crash"),
+//                subtitle: LocalizationSupport.localized("Debug builds only"),
+//                systemImage: "exclamationmark.triangle",
+//                iconColor: .red,
+//                isDestructive: true,
+//                action: .testCrashlyticsCrash
+//            )
+//        )
         #endif
 
         return rows

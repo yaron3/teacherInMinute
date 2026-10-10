@@ -7,12 +7,13 @@ Paste the reply below into App Store Connect, and the same text into
 
 Hello App Review team,
 
-Thank you for the review. Here is the information you asked for.
+Thank you for the review. Here is the information you asked for. This
+submission is version 1.0.6 (build 7).
 
 **1. Screen recording**
 
-A screen recording from a physical iPhone running iOS [version] is attached /
-available here: [link]. It starts at app launch and shows, in order: the
+A screen recording from a physical iPhone running iOS [version] is attached
+to this reply. It starts at app launch and shows, in order: the
 first-launch tutorial; asking a question and account registration; the
 minutes purchase screen; a live lesson with a teacher; rating the teacher;
 reporting and blocking the teacher, and unblocking; account deletion; and
@@ -177,13 +178,13 @@ launching the app.
 10. **Login:** side menu → **Log In**, sign in with
     `student_demo_english@example.com`. Stop on the home screen.
 
-Attach the video to the reply in App Store Connect, or give an unlisted link,
-and fill in `[version]` and `[link]` in section 1.
+Attach the video to the reply in App Store Connect, and fill in `[version]`
+(the iPhone's iOS version) in section 1.
 
 ## Before resubmitting
 
-- Upload a new build: bump Instant Teacher's build number (1.0.6 build 5 is
-  probably the reviewed one) so App Store Connect accepts it.
+- Submit Instant Teacher 1.0.6 (build 7), the build the reply names, and
+  select it on the version page before submitting.
 - The backend for reporting and blocking is deployed (2026-10-10). Make sure
   SMTP is configured in `functions/.env`, so reports reach the support
   recipients by email; without it they are saved but only logged.

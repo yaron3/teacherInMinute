@@ -47,8 +47,16 @@ struct SessionTabToggle: View {
     }
   }
 
+  /// With three panes the 266pt toggle has no room for three titles, so the
+  /// selected segment — already marked by its fill — shows only its icon and
+  /// gives its width to the other two.
+  var compactsSelected: Bool {
+    items.count > 2
+  }
+
   func segment(_ item: SessionToggleItem) -> some View {
     let isSelected = item.id == selected
+    let isIconOnly = isSelected && compactsSelected
     return Button {
       onSelect(item.id)
     } label: {
@@ -57,13 +65,16 @@ struct SessionTabToggle: View {
           .renderingMode(.template)
           .resizable()
           .frame(width: 24, height: 24)
-        Text(item.title)
-          .font(.system(size: 17, weight: .medium))
-          .lineLimit(1)
-          .minimumScaleFactor(0.7)
+        if !isIconOnly {
+          Text(item.title)
+            .font(.system(size: 17, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+        }
       }
       .foregroundStyle(isSelected ? theme.onBrandAction : theme.onDarkFill)
-      .frame(maxWidth: .infinity)
+      .frame(width: isIconOnly ? 52 : nil)
+      .frame(maxWidth: isIconOnly ? nil : .infinity)
       .frame(height: 52)
       .background(isSelected ? theme.brandActionBackground : Color.clear)
       .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -85,6 +96,10 @@ struct SessionTabToggle: View {
       }
     }
     .buttonStyle(.plain)
+#if !os(Android)
+    // SkipUI has no string `accessibilityLabel`.
+    .accessibilityLabel(item.title)
+#endif
     .accessibilityIdentifier("session_tab_\(item.id.rawValue.lowercased())")
   }
 }
@@ -126,57 +141,19 @@ struct SessionCloseButton: View {
   }
 }
 
-/// A flag beside the close button, for a student to report or block the
-/// teacher without leaving the lesson first.
-struct SessionReportButton: View {
-  let accessibilityLabel: String
-  let action: () -> Void
-
-  @Environment(\.colorScheme) var colorScheme
-  var theme: AppTheme {
-    AppTheme(colorScheme: colorScheme)
-  }
-
-  var body: some View {
-    Button {
-      action()
-    } label: {
-      PlatformIcon(systemName: "flag.fill", size: 18, weight: .semibold, color: theme.brandSecondaryText)
-        .frame(width: 44, height: 44)
-        .background(theme.brandActionBackground.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay {
-          RoundedRectangle(cornerRadius: 10)
-            .stroke(theme.brandControlBorder, lineWidth: 1)
-        }
-    }
-    .buttonStyle(.plain)
-#if !os(Android)
-    .accessibilityLabel(accessibilityLabel)
-#endif
-    .accessibilityIdentifier("session_report_button")
-  }
-}
-
 /// The toggle and the close button. The toggle leads, so in Hebrew it stands
-/// on the right and the close button on the left, as designed. A student's
-/// bar also has the report flag, just inside the close button.
+/// on the right and the close button on the left, as designed.
 struct SessionTopBar: View {
   let items: [SessionToggleItem]
   let selected: ChatSessionView.TAB_TYPE
   let closeAccessibilityLabel: String
-  var reportAccessibilityLabel = ""
   let onSelect: (ChatSessionView.TAB_TYPE) -> Void
-  var onReport: (() -> Void)?
   let onClose: () -> Void
 
   var body: some View {
     HStack(spacing: 12) {
       SessionTabToggle(items: items, selected: selected, onSelect: onSelect)
       Spacer(minLength: 0)
-      if let onReport {
-        SessionReportButton(accessibilityLabel: reportAccessibilityLabel, action: onReport)
-      }
       SessionCloseButton(accessibilityLabel: closeAccessibilityLabel, action: onClose)
     }
     .padding(.horizontal, 24)
