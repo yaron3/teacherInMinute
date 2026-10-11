@@ -9,8 +9,19 @@ import Foundation
 
 extension String {
     /// Returns true if the string looks like a valid e-mail address.
+    ///
+    /// A dot may only separate two runs of characters, on either side of the
+    /// `@`, so `a..b@x.com`, `.a@x.com`, `a.@x.com` and `a@example..com` are
+    /// all refused. Each domain label starts and ends with a letter or digit,
+    /// and the last is at least two letters. The lengths are the limits mail
+    /// servers enforce: 64 before the `@`, 254 in all.
     var isEmail: Bool {
-        let regex = #"^[A-Z0-9a-z._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"#
+        let regex = #"^[A-Za-z0-9_%+\-]+(\.[A-Za-z0-9_%+\-]+)*@([A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$"#
+        guard count <= 254,
+              let at = firstIndex(of: "@"),
+              distance(from: startIndex, to: at) <= 64 else {
+            return false
+        }
         return range(of: regex, options: .regularExpression) != nil
     }
 

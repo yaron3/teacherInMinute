@@ -41,7 +41,7 @@ final class WelcomeViewModel {
         LocalizationSupport.localized("Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise.")
     }
 	var subheadline2: String {
-	LocalizationSupport.localized("You're an employee—we handle all the bureaucracy!\n Self-employed ● Freelance ● Receipts")
+	LocalizationSupport.localized("You're an employee — we handle all the bureaucracy!\n Self-employed ● Freelance ● Receipts")
 	}
   
     var appPreviewLabel: String { LocalizationSupport.localized("App Preview") }
