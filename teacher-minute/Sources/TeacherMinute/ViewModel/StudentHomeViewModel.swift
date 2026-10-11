@@ -180,6 +180,9 @@ protocol StudentHomeViewModeling: AnyObject, PhotoSourceViewModeling {
   /// Whether `remainingMinutes` has been read from the profile yet. Until it
   /// has, the balance is unknown rather than zero — see `canAskTeacher`.
   var isProfileLoaded: Bool { get }
+  /// Whether the student has ever bought minutes, the free welcome minutes
+  /// aside. From then on the home's price bubble shows the balance instead.
+  var hasBoughtMinutes: Bool { get }
   var checkoutURL: URL? { get set }
   var isStartingCheckout: Bool { get set }
   var isPreparingCheckout: Bool { get set }
@@ -695,6 +698,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// cannot stand in for it: that one is raised before the fetch to keep the
   /// load from running twice, so it is true while the balance is still zero.
   var isProfileLoaded = false
+  var hasBoughtMinutes = false
   var checkoutURL: URL?
   var isStartingCheckout = false
   /// True from the moment checkout starts until the buyer is handed off to
@@ -1468,10 +1472,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       let currencyCode = try await HistoryModel.shared.fetchPurchasedCurrencyCode(for: uid)
       purchasedCurrencyCode = currencyCode
       let allLessons = try await HistoryModel.shared.fetchRecentLessons(for: uid, limit: 100)
-      let totalPurchasedMinutes = try await HistoryModel.shared.fetchTotalPurchasedMinutes(for: uid)
+      let purchaseTotals = try await HistoryModel.shared.fetchPurchaseTotals(for: uid)
       lessonCount = allLessons.count
       totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: allLessons)
-      totalPurchasedText = LessonFormatting.minutesText(totalPurchasedMinutes)
+      totalPurchasedText = LessonFormatting.minutesText(purchaseTotals.minutes)
+      hasBoughtMinutes = purchaseTotals.hasBoughtMinutes
       let recent = Array(allLessons.prefix(3))
       if !recent.isEmpty {
         recentLessons = recent.map(Self.recentLesson)
@@ -1835,6 +1840,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var remainingMinutes: Int
   /// Previews and tests stand in for a screen whose profile has arrived.
   var isProfileLoaded = true
+  var hasBoughtMinutes = true
   var checkoutURL: URL?
   var isStartingCheckout = false
   /// True from the moment checkout starts until the buyer is handed off to

@@ -1,6 +1,26 @@
 {
   "conditions": [
     {
+      "name": "iOS - Teacher - English",
+      "expression": "app.id == '1:922632930084:ios:e87cc0d1e7afa01bfde9b1' && device.language in ['en']",
+      "tagColor": "TEAL"
+    },
+    {
+      "name": "iOS - Teacher - Hebrew",
+      "expression": "app.id == '1:922632930084:ios:621a96f2e9fca5f7fde9b1' && device.language in ['he', 'iw']",
+      "tagColor": "ORANGE"
+    },
+    {
+      "name": "Android Teacher English",
+      "expression": "device.language in ['en'] && device.os == 'android'",
+      "tagColor": "BLUE"
+    },
+    {
+      "name": "Android Teacher - Hebrew",
+      "expression": "app.id == '1:922632930084:android:9d52fa48bd34879bfde9b1' && device.language in ['he', 'iw']",
+      "tagColor": "ORANGE"
+    },
+    {
       "name": "iOS",
       "expression": "device.os == 'ios'",
       "tagColor": "BLUE"
@@ -14,26 +34,25 @@
       "name": "HebrewApp",
       "expression": "app.userProperty['user_language'].exactlyMatches(['he'])",
       "tagColor": "CYAN"
-    },
-    {
-      "name": "Android Teacher - Hebrew",
-      "expression": "app.id == '1:922632930084:android:9d52fa48bd34879bfde9b1' && device.language in ['he', 'iw']",
-      "tagColor": "ORANGE"
-    },
-    {
-      "name": "iOS - Teacher - Hebrew",
-      "expression": "app.id == '1:922632930084:ios:621a96f2e9fca5f7fde9b1' && device.language in ['he', 'iw']",
-      "tagColor": "ORANGE"
     }
   ],
   "parameters": {
-    "payment_the_teacher": {
+    "verified_tutors": {
       "defaultValue": {
-        "value": "Payment to the teacher is processed via the app, and an invoice from 'Moreh LaRega' is issued solely for the brokerage fee."
+        "value": "Students waiting"
       },
       "conditionalValues": {
+        "iOS - Teacher - Hebrew": {
+          "value": "סטודנטים ממתינים"
+        },
+        "Android Teacher - Hebrew": {
+          "value": "סטודנטים ממתינים"
+        },
         "Hebrew": {
-          "value": "התשלום למורה מועבר דרך האפליקציה, וחשבונית מטעם מורה לרגע מופקת על דמי התיווך בלבד."
+          "value": "מורים מאומתים"
+        },
+        "HebrewApp": {
+          "value": "מורים מאומתים"
         }
       },
       "valueType": "STRING"
@@ -89,7 +108,7 @@
     },
     "connect_instantly_with": {
       "defaultValue": {
-        "value": "Connect instantly with verified math\nteachers for on-demand help, or share your\nexpertise."
+        "value": "You have a few minutes, you have an income - 120 NIS for 60 minutes."
       },
       "conditionalValues": {
         "Hebrew": {
@@ -391,26 +410,6 @@
         },
         "HebrewApp": {
           "value": "לא הצלחנו לחבר את השמע. הקש כדי לנסות שוב."
-        }
-      },
-      "valueType": "STRING"
-    },
-    "verified_tutors": {
-      "defaultValue": {
-        "value": "Verified Tutors"
-      },
-      "conditionalValues": {
-        "Hebrew": {
-          "value": "מורים מאומתים"
-        },
-        "HebrewApp": {
-          "value": "מורים מאומתים"
-        },
-        "Android Teacher - Hebrew": {
-          "value": "סטודנטים ממתינים"
-        },
-        "iOS - Teacher - Hebrew": {
-          "value": "סטודנטים ממתינים"
         }
       },
       "valueType": "STRING"
@@ -11316,6 +11315,17 @@
       },
       "valueType": "STRING"
     },
+    "payment_the_teacher": {
+      "defaultValue": {
+        "value": "Payment to the teacher is processed via the app, and an invoice from 'Moreh LaRega' is issued solely for the brokerage fee."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התשלום למורה מועבר דרך האפליקציה, וחשבונית מטעם מורה לרגע מופקת על דמי התיווך בלבד."
+        }
+      },
+      "valueType": "STRING"
+    },
     "this_week": {
       "defaultValue": {
         "value": "This Week"
@@ -11598,14 +11608,14 @@
     },
     "you_employee_handle": {
       "defaultValue": {
-        "value": "You're an employee? - we handle all the bureaucracy!.Self-employed ● Freelance ● Receipts"
+        "value": "You're an employee? - we handle all the bureaucracy!\\n Self-employed ● Freelance ● Receipts"
       },
       "conditionalValues": {
         "Hebrew": {
           "value": "אתה שכיר?, כל הבירוקטיה עלינו!\nעצמאי ● פרילנס ● קבלות"
         },
         "HebrewApp": {
-          "value": "אתה שכיר?, כל הבירוקטיה עלינו!\nעצמאי ● פרילנס ● קבלות"
+          "value": "אתה שכיר?, כל הבירוקטיה עלינו!\\nעצמאי ● פרילנס ● קבלות"
         }
       },
       "valueType": "STRING"
@@ -15725,8 +15735,8 @@
     }
   },
   "version": {
-    "versionNumber": "131",
-    "updateTime": "2026-10-10T21:25:27.652529Z",
+    "versionNumber": "138",
+    "updateTime": "2026-10-11T07:58:15.312359Z",
     "updateUser": {
       "email": "yaronj3@gmail.com"
     },

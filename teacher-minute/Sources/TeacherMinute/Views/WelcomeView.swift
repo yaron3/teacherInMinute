@@ -21,7 +21,7 @@ struct WelcomeView: View {
 
   var body: some View {
     ZStack {
-      BrandScreenBackground(streaks: .home)
+	  BrandScreenBackground(streaks: .none)
 
       welcomeContent
     }
@@ -60,19 +60,29 @@ struct WelcomeView: View {
 			  .padding(.top, 6)
 		  }
 		  .frame(maxWidth: .infinity)
+		  
+		  HStack (alignment: .center){
+			Spacer()
+			Text(viewModel.subheadline)
+			  .font(.system(size: 16))
+			  .foregroundStyle(theme.brandSecondaryText)
+			  .lineSpacing(7)
+			  .fixedSize(horizontal: false, vertical: true)
+			  .padding(.top, 36)
+		  }
+		  
+		  HStack (alignment: .center){
+			Spacer()
+			Text(viewModel.subheadline2)
+			  .font(.system(size: 14))
+			  .foregroundStyle(theme.brandSecondaryText)
+			  .lineSpacing(7)
+			  .fixedSize(horizontal: false, vertical: true)
+			  .padding(.top, 12)
+			Spacer()
+		  }
+		  Spacer()
 
-          Text(viewModel.subheadline)
-            .font(.system(size: 16))
-            .foregroundStyle(theme.brandSecondaryText)
-            .lineSpacing(7)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 36)
-		  Text(viewModel.subheadline2)
-			.font(.system(size: 14))
-			.foregroundStyle(theme.brandSecondaryText)
-			.lineSpacing(7)
-			.fixedSize(horizontal: false, vertical: true)
-			.padding(.top, 36)
           badges
             .padding(.top, 44)
 

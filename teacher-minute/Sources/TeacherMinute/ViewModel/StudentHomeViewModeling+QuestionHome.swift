@@ -50,6 +50,31 @@ extension StudentHomeViewModeling {
   /// The character's third bubble: two lines in English, one in Hebrew.
   var pricePerMinuteBubbleText: String { LocalizationSupport.localized("₪2\nper minute") }
   var noFixedLessonsText: String { LocalizationSupport.localized("₪2 per minute • no fixed lessons") }
+
+  /// Once the student has bought minutes the price bubble shows the balance
+  /// instead: the price matters before the first purchase, the minutes after.
+  /// Not until the profile has arrived, so it never shows a zero it never read.
+  var showsMinutesLeftBubble: Bool { hasBoughtMinutes && isProfileLoaded }
+
+  /// The third bubble: the price, or the minutes left.
+  var priceBubbleText: String {
+    guard showsMinutesLeftBubble else { return pricePerMinuteBubbleText }
+    return remainingMinutes == 1
+      ? LocalizationSupport.localized("1\nminute left")
+      : String(format: LocalizationSupport.localized("%d\nminutes left"), remainingMinutes)
+  }
+
+  /// Below this many minutes the balance in the bubble turns red. Remote
+  /// Config's `low_minutes_warning_threshold`, or 3 when it has no usable one.
+  var lowMinutesThreshold: Int {
+    let configured = RemoteConfigService.readString("low_minutes_warning_threshold")
+    guard let minutes = Double(configured), minutes.isFinite else { return 3 }
+    return max(0, Int(minutes))
+  }
+
+  var isLowOnMinutes: Bool {
+    showsMinutesLeftBubble && remainingMinutes < lowMinutesThreshold
+  }
   var chooseKeyboardTitle: String { LocalizationSupport.localized("Choose keyboard") }
   var deletePhotoLabel: String { LocalizationSupport.localized("Delete photo") }
   var findTeacherLabel: String { LocalizationSupport.localized("Find a Teacher") }

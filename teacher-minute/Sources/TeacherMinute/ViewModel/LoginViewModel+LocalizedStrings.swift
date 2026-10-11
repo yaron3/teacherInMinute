@@ -23,6 +23,7 @@ extension LoginViewModel {
     // MARK: Fields
     var emailFieldTitle: String { LocalizationSupport.localized("Email") }
     var emailPlaceholder: String { LocalizationSupport.localized("Enter your email") }
+    var emailErrorMessage: String { LocalizationSupport.localized("Enter a valid email address.") }
     var passwordFieldTitle: String { LocalizationSupport.localized("Password") }
     var passwordPlaceholder: String { LocalizationSupport.localized("Enter your password") }
     var forgotPasswordLabel: String { LocalizationSupport.localized("Forgot Password?") }

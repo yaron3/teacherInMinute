@@ -31,8 +31,23 @@ final class LoginViewModel {
   
   let authService = AuthService()
   
+  var trimmedEmail: String {
+	emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  /// Checked here rather than left to Firebase, so a malformed address such
+  /// as `name@example..com` is pointed out under the field as it is typed,
+  /// with no sign-in attempt.
+  var isEmailValid: Bool {
+	trimmedEmail.isEmail
+  }
+
+  var showsEmailError: Bool {
+	!trimmedEmail.isEmpty && !isEmailValid
+  }
+
   var canSubmit: Bool {
-	!emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+	isEmailValid &&
 	!password.isEmpty &&
 	!isLoading
   }

@@ -97,6 +97,8 @@ struct LoginView: View {
         title: viewModel.emailFieldTitle,
         placeholder: viewModel.emailPlaceholder,
         text: $viewModel.emailOrPhone,
+        isValid: !viewModel.showsEmailError,
+        errorMessage: viewModel.emailErrorMessage,
         keyboardType: .emailAddress,
         textContentType: .emailAddress,
         autocapitalization: .never
