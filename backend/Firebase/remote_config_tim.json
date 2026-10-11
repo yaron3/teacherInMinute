@@ -37,16 +37,16 @@
     }
   ],
   "parameters": {
-    "moreh_rega_acts": {
+    "search_waiting_jokes": {
       "defaultValue": {
-        "value": "\"More Le-Rega\" acts as an intermediary between the student and the teacher, and payment to the teacher is made based on the actual minutes of instruction."
+        "value": "[   \"Math is so spoiled – how can it have so many problems?\",   \"Why is the equal sign so humble? It knows it's not greater or less than anyone.\",   \"Parallel lines have so much in common. Too bad they'll never meet.\",   \"Why do plants hate math? It gives them square roots.\",   \"Why did the obtuse angle go to the beach? It was over 90 degrees!\",   \"Why is a right angle never wrong? Because it's always right!\",   \"Dear Algebra, stop asking us to find your X. It's not coming back.\" ]"
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "מורה לרגע מתווכת בין התלמיד למורה, והתשלום למורה מועבר בהתאם לדקות ההוראה בפועל."
+          "value": "[   \"מתמטיקה היא כזאת מפונקת, לא יכול להיות שיש לה כל כך הרבה בעיות!\",   \"למה סימן השוויון כל כך צנוע? כי הוא יודע שהוא לא גדול ולא קטן מאף אחד.\",   \"לישרים מקבילים יש כל כך הרבה במשותף. חבל שהם אף פעם לא ייפגשו.\",   \"למה צמחים שונאים מתמטיקה? כי היא נותנת להם שורשים ריבועיים.\",   \"למה הזווית הקהה הלכה לים? כי היו לה יותר מ־90 מעלות!\",   \"למה זווית של 90 מעלות אף פעם לא משקרת? כי היא תמיד ישרה!\",   \"אלגברה יקרה, די לבקש מאיתנו למצוא את האקס שלך. הוא לא יחזור.\" ]"
         }
       },
-      "valueType": "STRING"
+      "valueType": "JSON"
     },
     "ampersand": {
       "defaultValue": {
@@ -15144,6 +15144,17 @@
       },
       "valueType": "STRING"
     },
+    "moreh_rega_acts": {
+      "defaultValue": {
+        "value": "\"More Le-Rega\" acts as an intermediary between the student and the teacher, and payment to the teacher is made based on the actual minutes of instruction."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה לרגע מתווכת בין התלמיד למורה, והתשלום למורה מועבר בהתאם לדקות ההוראה בפועל."
+        }
+      },
+      "valueType": "STRING"
+    },
     "student_requesting_video_mic": {
       "defaultValue": {
         "value": "The student is requesting a video call. Enable microphone access to accept."
@@ -15743,25 +15754,11 @@
         }
       },
       "valueType": "STRING"
-    },
-    "search_waiting_jokes_en": {
-      "defaultValue": {
-        "value": "[\"Placeholder joke 1 of 6 (from Remote Config)\", \"Placeholder joke 2 of 6 (from Remote Config)\", \"Placeholder joke 3 of 6 (from Remote Config)\", \"Placeholder joke 4 of 6 (from Remote Config)\", \"Placeholder joke 5 of 6 (from Remote Config)\", \"Placeholder joke 6 of 6 (from Remote Config)\"]"
-      },
-      "description": "English jokes the student app takes turns with while a question waits for a teacher: the first changes after 10 seconds, then one every 8. A JSON array of strings.",
-      "valueType": "JSON"
-    },
-    "search_waiting_jokes_he": {
-      "defaultValue": {
-        "value": "[\"בדיחה לדוגמה 1 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 2 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 3 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 4 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 5 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 6 מתוך 6 (מ-Remote Config)\"]"
-      },
-      "description": "Hebrew jokes the student app takes turns with while a question waits for a teacher: the first changes after 10 seconds, then one every 8. A JSON array of strings.",
-      "valueType": "JSON"
     }
   },
   "version": {
-    "versionNumber": "143",
-    "updateTime": "2026-10-11T15:46:35.373866Z",
+    "versionNumber": "144",
+    "updateTime": "2026-10-11T18:22:11.330602Z",
     "updateUser": {
       "email": "yaronj3@gmail.com"
     },

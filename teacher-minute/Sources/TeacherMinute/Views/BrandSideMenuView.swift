@@ -83,18 +83,12 @@ struct BrandSideMenuView: View {
     }
     .padding(.top, 16)
     .padding(.bottom, 24)
-    .padding(.leading, 16)
-    // 16, inside the 1pt edge on the right.
-    .padding(.trailing, 17)
+    .padding(.horizontal, 16)
     .frame(width: 280)
     .frame(maxHeight: .infinity)
     .background {
-      HStack(spacing: 0) {
-        theme.brandBackgroundTop
-        theme.brandControlBorder
-          .frame(width: 1)
-      }
-      .ignoresSafeArea()
+      theme.brandBackgroundTop
+        .ignoresSafeArea()
     }
   }
 
@@ -112,10 +106,6 @@ struct BrandSideMenuView: View {
           .frame(width: 40, height: 40)
           .background(theme.brandCardSurface)
           .clipShape(RoundedRectangle(cornerRadius: 10))
-          .overlay {
-            RoundedRectangle(cornerRadius: 10)
-              .stroke(theme.brandControlBorder, lineWidth: 1)
-          }
       }
       .buttonStyle(.plain)
 #if !os(Android)

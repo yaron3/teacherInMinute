@@ -187,10 +187,11 @@ extension StudentHomeViewModeling {
   }
 
   /// The jokes the wait takes turns with, in the student's language: Remote
-  /// Config's `search_waiting_jokes_en` / `_he`, each a JSON array of strings.
+  /// Config's `search_waiting_jokes`, a JSON array of strings whose Hebrew
+  /// condition carries the Hebrew ones.
   /// Never empty — the one joke above stands in until they are published.
   var searchWaitingJokes: [String] {
-    let key = "search_waiting_jokes_\(LocalizationSupport.currentLanguageCode)"
+    let key = "search_waiting_jokes"
     let jokes = RemoteConfigService.shared.getJSONStringArray(key)
     return jokes.isEmpty ? [searchWaitingJoke] : jokes
   }
