@@ -74,6 +74,8 @@ struct QuestionHomeScene: View {
   let teacherCount: String
   let teacherLabel: String
   let priceText: String
+  /// Red when the bubble shows a balance that is running low.
+  let priceTextColor: Color
   let footnote: String
   let footnoteColor: Color
   let textColor: Color
@@ -145,7 +147,7 @@ struct QuestionHomeScene: View {
       fontSize: 13,
       weight: .bold,
       lineHeight: lines.count > 1 ? lineHeight : nil,
-      textColor: textColor,
+      textColor: priceTextColor,
       textDirection: textDirection
     )
   }

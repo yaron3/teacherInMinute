@@ -224,6 +224,16 @@ struct AppTheme {
         )
     }
 
+    /// Warning text on the home's speech bubbles, which are white in both
+    /// modes — so one dark red, unlike `danger`, which lightens in dark mode
+    /// and would barely show on white.
+    var onBubbleWarning: Color {
+        adaptive(
+            light: (200, 30, 30),
+            dark: (200, 30, 30)
+        )
+    }
+
     /// Outline of a card on the brand background.
     var brandCardBorder: Color {
         adaptive(

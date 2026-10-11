@@ -59,6 +59,11 @@ struct LessonMessage: Identifiable {
     let createdAt: Date
 }
 
+struct PurchaseTotals {
+    var minutes: Int
+    var hasBoughtMinutes: Bool
+}
+
 @MainActor
 final class HistoryModel {
     static let shared = HistoryModel()
@@ -75,16 +80,26 @@ final class HistoryModel {
         ) ?? LessonFormatting.defaultCurrencyCode
     }
 
-    func fetchTotalPurchasedMinutes(for uid: String) async throws -> Int {
+    /// The minutes the student has acquired in all, and whether any of them
+    /// were bought. The free minutes for verifying an email are written as a
+    /// purchase too (`provider: "email_reward"`, functions/src/emailRewards.ts)
+    /// and count towards the total, but are not a purchase; a coupon is.
+    func fetchPurchaseTotals(for uid: String) async throws -> PurchaseTotals {
         let snapshot = try await Firestore.firestore()
             .collection("users")
             .document(uid)
             .collection("purchases")
             .getDocuments()
 
-        return snapshot.documents.reduce(0) { total, document in
-            total + max(0, Self.intValue(document.data()["minutesPurchased"]) ?? 0)
+        var totals = PurchaseTotals(minutes: 0, hasBoughtMinutes: false)
+        for document in snapshot.documents {
+            let data = document.data()
+            totals.minutes += max(0, Self.intValue(data["minutesPurchased"]) ?? 0)
+            if data["provider"] as? String != "email_reward" {
+                totals.hasBoughtMinutes = true
+            }
         }
+        return totals
     }
 
     /// Every purchase the student has made, newest first, dated by when it was

@@ -230,6 +230,8 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "teacher\nonline": "מורה\nזמין",
         "teachers\nonline": "מורים\nזמינים",
         "₪2\nper minute": "₪2 לדקה",
+        "%d\nminutes left": "נותרו\n%d דקות",
+        "1\nminute left": "נותרה\nדקה אחת",
         "Choose keyboard": "בחר מקלדת",
         "Delete photo": "מחק תמונה",
         "Load minutes": "טען דקות",
