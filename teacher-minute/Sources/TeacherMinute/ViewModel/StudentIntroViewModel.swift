@@ -30,15 +30,31 @@ final class StudentIntroViewModel {
   var pitch: String {
     LocalizationSupport.localized("When AI can't explain it, we have a human teacher who sees exactly where you got stuck")
   }
-  /// The email-verification promotion, with the amounts the backend grants
-  /// (Remote Config `email_reward_student_minutes` and
-  /// `email_reward_student_slots`), or nil while either is set to 0. A value
-  /// not published yet falls back to the backend's own default
-  /// (functions/src/emailRewards.ts), so the line matches what is granted.
+  /// The welcome promotions, with the amounts the backend grants: the minutes
+  /// for signing up (Remote Config `signup_reward_student_minutes` and
+  /// `signup_reward_student_slots`) and for verifying the email
+  /// (`email_reward_student_minutes` and `email_reward_student_slots`). Their
+  /// minutes add up; the subscribers are the smaller cap, since only those
+  /// get both. A reward set to 0 is left out, and the line with it while both
+  /// are. A value not published yet falls back to the backend's own default
+  /// (functions/src/signupRewards.ts and emailRewards.ts), so the line matches
+  /// what is granted.
   var promotionText: String? {
-    let minutes = remoteConfigCount("email_reward_student_minutes", default: 60)
-    let slots = remoteConfigCount("email_reward_student_slots", default: 100)
-    guard minutes > 0, slots > 0 else { return nil }
+    var signupMinutes = remoteConfigCount("signup_reward_student_minutes", default: 0)
+    var signupSlots = remoteConfigCount("signup_reward_student_slots", default: 100)
+    if signupMinutes == 0 || signupSlots == 0 {
+      signupMinutes = 0
+      signupSlots = Int.max
+    }
+    var verifyMinutes = remoteConfigCount("email_reward_student_minutes", default: 60)
+    var verifySlots = remoteConfigCount("email_reward_student_slots", default: 100)
+    if verifyMinutes == 0 || verifySlots == 0 {
+      verifyMinutes = 0
+      verifySlots = Int.max
+    }
+    let minutes = signupMinutes + verifyMinutes
+    guard minutes > 0 else { return nil }
+    let slots = min(signupSlots, verifySlots)
     return String(
       format: LocalizationSupport.localized("First %d minutes up to the next %d subscribers"),
       minutes,
