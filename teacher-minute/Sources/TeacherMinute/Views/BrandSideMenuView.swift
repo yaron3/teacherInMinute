@@ -106,10 +106,6 @@ struct BrandSideMenuView: View {
           .frame(width: 40, height: 40)
           .background(theme.brandCardSurface)
           .clipShape(RoundedRectangle(cornerRadius: 10))
-          .overlay {
-            RoundedRectangle(cornerRadius: 10)
-              .stroke(theme.brandControlBorder, lineWidth: 1)
-          }
       }
       .buttonStyle(.plain)
 #if !os(Android)
