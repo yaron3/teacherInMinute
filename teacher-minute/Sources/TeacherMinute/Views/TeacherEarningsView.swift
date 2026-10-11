@@ -72,6 +72,7 @@ struct TeacherEarningsView: View {
             if viewModel.hasPendingPayment {
                 nextPaymentCard
             }
+			payoutNote
             payoutMethodCard
             if viewModel.hasEarningsData {
                 monthSelectorRow
@@ -87,8 +88,19 @@ struct TeacherEarningsView: View {
         .padding(.bottom, 20)
     }
 
-    // MARK: - Payout Method
+  var payoutNote: some View {
+	FlatCard {
+	  HStack {
+		Text(viewModel.paymentNote)
+		  .font(.system(size: 17, weight: .bold))
+		  .foregroundStyle(theme.onDarkFill)
+		  .frame(maxWidth: .infinity, alignment: .leading)
 
+	  }
+	}
+  }
+    // MARK: - Payout Method
+	  
     var payoutMethodCard: some View {
         FlatCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -218,17 +230,6 @@ struct TeacherEarningsView: View {
                 paymentRow(icon: "calendar", value: viewModel.nextPaymentDate)
                 if let method = viewModel.payoutMethod {
                     paymentRow(icon: method.type.systemImage, value: viewModel.payoutMethodSummary)
-
-                    HStack {
-                        Text(method.type.displayName)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(theme.onBrandAction)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 4)
-                            .background(theme.brandActionBackground)
-                            .clipShape(Capsule())
-                        Spacer()
-                    }
                 }
             }
         }

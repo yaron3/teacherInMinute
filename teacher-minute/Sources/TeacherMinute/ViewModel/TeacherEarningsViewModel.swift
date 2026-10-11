@@ -212,6 +212,7 @@ final class TeacherEarningsViewModel {
 
     var payoutMethodTitle: String { LocalizationSupport.localized("Payment Method") }
 
+  var paymentNote: String{ LocalizationSupport.localized("'Moreh Le-Rega' acts as an intermediary between the student and the teacher, and payment to the teacher is made based on the actual minutes of instruction.")}
     /// Shown in place of the saved destination. Until the fetch lands there is
     /// no basis for telling a teacher who has set one up that they have not.
     var noPayoutMethodText: String {

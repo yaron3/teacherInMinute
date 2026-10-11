@@ -37,22 +37,13 @@
     }
   ],
   "parameters": {
-    "verified_tutors": {
+    "moreh_rega_acts": {
       "defaultValue": {
-        "value": "Students waiting"
+        "value": "\"More Le-Rega\" acts as an intermediary between the student and the teacher, and payment to the teacher is made based on the actual minutes of instruction."
       },
       "conditionalValues": {
-        "iOS - Teacher - Hebrew": {
-          "value": "סטודנטים ממתינים"
-        },
-        "Android Teacher - Hebrew": {
-          "value": "סטודנטים ממתינים"
-        },
         "Hebrew": {
-          "value": "מורים מאומתים"
-        },
-        "HebrewApp": {
-          "value": "מורים מאומתים"
+          "value": "מורה לרגע מתווכת בין התלמיד למורה, והתשלום למורה מועבר בהתאם לדקות ההוראה בפועל."
         }
       },
       "valueType": "STRING"
@@ -410,6 +401,26 @@
         },
         "HebrewApp": {
           "value": "לא הצלחנו לחבר את השמע. הקש כדי לנסות שוב."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "verified_tutors": {
+      "defaultValue": {
+        "value": "Students waiting"
+      },
+      "conditionalValues": {
+        "iOS - Teacher - Hebrew": {
+          "value": "סטודנטים ממתינים"
+        },
+        "Android Teacher - Hebrew": {
+          "value": "סטודנטים ממתינים"
+        },
+        "Hebrew": {
+          "value": "מורים מאומתים"
+        },
+        "HebrewApp": {
+          "value": "מורים מאומתים"
         }
       },
       "valueType": "STRING"
@@ -15721,8 +15732,8 @@
     }
   },
   "version": {
-    "versionNumber": "138",
-    "updateTime": "2026-10-11T07:58:15.312359Z",
+    "versionNumber": "143",
+    "updateTime": "2026-10-11T15:46:35.373866Z",
     "updateUser": {
       "email": "yaronj3@gmail.com"
     },
