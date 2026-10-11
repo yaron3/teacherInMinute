@@ -186,6 +186,15 @@ extension StudentHomeViewModeling {
     LocalizationSupport.localized("Math is so spoiled – how can it have so many problems?")
   }
 
+  /// The jokes the wait takes turns with, in the student's language: Remote
+  /// Config's `search_waiting_jokes_en` / `_he`, each a JSON array of strings.
+  /// Never empty — the one joke above stands in until they are published.
+  var searchWaitingJokes: [String] {
+    let key = "search_waiting_jokes_\(LocalizationSupport.currentLanguageCode)"
+    let jokes = RemoteConfigService.shared.getJSONStringArray(key)
+    return jokes.isEmpty ? [searchWaitingJoke] : jokes
+  }
+
   /// The chips name the subjects as the design does: short, and trigonometry
   /// shortest.
   func searchTopicLabel(_ topic: String) -> String {

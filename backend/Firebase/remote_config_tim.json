@@ -15708,6 +15708,20 @@
         }
       },
       "valueType": "STRING"
+    },
+    "search_waiting_jokes_en": {
+      "defaultValue": {
+        "value": "[\"Math is so spoiled – how can it have so many problems?\", \"Why is the equal sign so humble? It knows it's not greater or less than anyone.\", \"Parallel lines have so much in common. Too bad they'll never meet.\", \"Why do plants hate math? It gives them square roots.\", \"Why did the obtuse angle go to the beach? It was over 90 degrees!\", \"Why is a right angle never wrong? Because it's always right!\", \"Dear Algebra, stop asking us to find your X. It's not coming back.\"]"
+      },
+      "description": "English jokes the student app takes turns with, one every 8 seconds, while a question waits for a teacher. A JSON array of strings.",
+      "valueType": "JSON"
+    },
+    "search_waiting_jokes_he": {
+      "defaultValue": {
+        "value": "[\"מתמטיקה היא כזאת מפונקת, לא יכול להיות שיש לה כל כך הרבה בעיות!\", \"למה סימן השוויון כל כך צנוע? כי הוא יודע שהוא לא גדול ולא קטן מאף אחד.\", \"לישרים מקבילים יש כל כך הרבה במשותף. חבל שהם אף פעם לא ייפגשו.\", \"למה צמחים שונאים מתמטיקה? כי היא נותנת להם שורשים ריבועיים.\", \"למה הזווית הקהה הלכה לים? כי היו לה יותר מ־90 מעלות!\", \"למה זווית של 90 מעלות אף פעם לא משקרת? כי היא תמיד ישרה!\", \"אלגברה יקרה, די לבקש מאיתנו למצוא את האקס שלך. הוא לא יחזור.\"]"
+      },
+      "description": "Hebrew jokes the student app takes turns with, one every 8 seconds, while a question waits for a teacher. A JSON array of strings.",
+      "valueType": "JSON"
     }
   },
   "version": {
