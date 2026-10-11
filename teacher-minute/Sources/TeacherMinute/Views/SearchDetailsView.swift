@@ -115,6 +115,10 @@ struct SearchDetailsView: View {
   let viewModel: any StudentHomeViewModeling
   let onCancel: () -> Void
 
+  /// Which of the wait's scenes is showing. Counts up for as long as the
+  /// wait lasts; `waitingScenes` wraps it.
+  @State var waitingSceneIndex = 0
+
   @Environment(\.layoutDirection) var layoutDirection
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -294,14 +298,12 @@ struct SearchDetailsView: View {
         .frame(width: layout.cardWidth, height: layout.waitingCardHeight)
         .offset(x: layout.cardLeading, y: layout.cardTop)
 
-      SearchWaitingScene(
-        joke: viewModel.searchWaitingJoke,
-        textColor: theme.onDarkFill,
-        textDirection: layoutDirection
-      )
-      .scaleEffect(layout.waitingScale)
-      .frame(width: 0, height: 0)
-      .offset(x: layout.waitingSceneCenter.x, y: layout.waitingSceneCenter.y)
+      currentWaitingScene
+        .id(waitingSceneIndex)
+        .transition(.opacity)
+        .scaleEffect(layout.waitingScale)
+        .frame(width: 0, height: 0)
+        .offset(x: layout.waitingSceneCenter.x, y: layout.waitingSceneCenter.y)
 
       LottieLoopView(name: "search-waiting-dots")
         .frame(
@@ -310,6 +312,47 @@ struct SearchDetailsView: View {
         )
         .offset(x: layout.waitingDotsOrigin.x, y: layout.waitingDotsOrigin.y)
     }
+    .animation(.easeInOut(duration: 0.5), value: waitingSceneIndex)
+    .task {
+      // Each search starts on a different scene, then takes turns: the
+      // first stays a little longer than the rest.
+      waitingSceneIndex = Int.random(in: 0..<waitingScenes.count)
+      var wait = Self.firstWaitingSceneNanoseconds
+      while !Task.isCancelled {
+        try? await Task.sleep(nanoseconds: wait)
+        guard !Task.isCancelled else { return }
+        waitingSceneIndex += 1
+        wait = Self.waitingSceneNanoseconds
+      }
+    }
+  }
+
+  /// How long the wait's first scene stays.
+  static let firstWaitingSceneNanoseconds: UInt64 = 10_000_000_000
+  /// How long each later scene stays: long enough to read a joke.
+  static let waitingSceneNanoseconds: UInt64 = 8_000_000_000
+
+  /// The wait's scenes: the jokes, the students and the teachers paired off
+  /// in turn, as many as the longest of the three, so every one of each gets
+  /// shown.
+  var waitingScenes: [SearchWaitingScene] {
+    let jokes = viewModel.searchWaitingJokes
+    let students = SearchWaitingCharacter.students
+    let teachers = SearchWaitingCharacter.teachers
+    return (0..<max(jokes.count, students.count, teachers.count)).map { index in
+      SearchWaitingScene(
+        joke: jokes[index % jokes.count],
+        student: students[index % students.count],
+        teacher: teachers[index % teachers.count],
+        textColor: theme.onDarkFill,
+        textDirection: layoutDirection
+      )
+    }
+  }
+
+  var currentWaitingScene: SearchWaitingScene {
+    let scenes = waitingScenes
+    return scenes[waitingSceneIndex % scenes.count]
   }
 
   /// Not in the design, which leaves the student no way out of the search:
@@ -408,11 +451,69 @@ struct SearchCharacterScene: View {
   }
 }
 
+/// A character in the waiting scene, and where their art goes in its
+/// coordinates.
+struct SearchWaitingCharacter {
+  let imageName: String
+  let frame: CGRect
+
+  /// The students on the ledge. Every one is drawn to the same scale as the
+  /// boy stuck on his sums, the design's own, and sits on the ledge as he
+  /// does.
+  static let students: [SearchWaitingCharacter] = [
+    SearchWaitingCharacter(
+      imageName: "search-wait-boy",
+      frame: CGRect(x: 85.563, y: 236.568, width: 135.131, height: 207.89)
+    ),
+    SearchWaitingCharacter(
+      imageName: "search-wait-girl",
+      frame: CGRect(x: 125.7, y: 247.3, width: 72.3, height: 164)
+    ),
+    // Cross-legged, so set higher: he sits on the ledge, not his feet.
+    SearchWaitingCharacter(
+      imageName: "search-wait-boy-thinking",
+      frame: CGRect(x: 124.2, y: 230.4, width: 75.3, height: 130.7)
+    ),
+    // In mid-jump, clear of the ledge and over its shadow.
+    SearchWaitingCharacter(
+      imageName: "search-wait-boy-cheering",
+      frame: CGRect(x: 110.4, y: 204, width: 103, height: 146.3)
+    ),
+  ]
+
+  /// The teachers on their way. Every one is as tall as the design's own
+  /// and stands where he does: over the shadow, on the same line.
+  static let teachers: [SearchWaitingCharacter] = [
+    SearchWaitingCharacter(
+      imageName: "search-wait-teacher",
+      frame: CGRect(x: -93, y: 435, width: 300, height: 300)
+    ),
+    SearchWaitingCharacter(
+      imageName: "search-wait-teacher-book",
+      frame: CGRect(x: 16.9, y: 489.5, width: 83.7, height: 215.3)
+    ),
+    SearchWaitingCharacter(
+      imageName: "search-wait-teacher-shrug",
+      frame: CGRect(x: -14.5, y: 489.8, width: 153, height: 215)
+    ),
+    SearchWaitingCharacter(
+      imageName: "search-wait-teacher-thinking",
+      frame: CGRect(x: 24.4, y: 490.5, width: 77, height: 214.3)
+    ),
+    SearchWaitingCharacter(
+      imageName: "search-wait-teacher-stopwatch",
+      frame: CGRect(x: -27.8, y: 489.8, width: 148.3, height: 215)
+    ),
+  ]
+}
+
 /// The wait, in the design's coordinates from the card's top left: the joke,
-/// the boy stuck on his sums on a ledge, and the teacher on his way, who
-/// stands over the card's bottom edge. The caller scales and places it.
+/// a student on a ledge, and a teacher on the way, who stands over the card's
+/// bottom edge. The caller scales and places it.
 struct SearchWaitingScene: View {
   let joke: String
+  let student: SearchWaitingCharacter
+  let teacher: SearchWaitingCharacter
   let textColor: Color
   let textDirection: LayoutDirection
 
@@ -429,10 +530,10 @@ struct SearchWaitingScene: View {
         .offset(x: 60, y: 88)
 
       art("intro-character-shadow", x: 26, y: 697, width: 73.866, height: 9.613)
-      art("search-wait-teacher", x: -93, y: 435, width: 300, height: 300)
+      art(teacher)
       art("search-wait-line", x: 72, y: 356, width: 162, height: 1)
       art("intro-character-shadow", x: 137, y: 342, width: 64, height: 21)
-      art("search-wait-boy", x: 85.563, y: 236.568, width: 135.131, height: 207.89)
+      art(student)
     }
     .frame(
       width: SearchDetailsLayout.waitingSceneSize.width,
@@ -441,6 +542,16 @@ struct SearchWaitingScene: View {
     )
     .environment(\.layoutDirection, .leftToRight)
     .allowsHitTesting(false)
+  }
+
+  private func art(_ character: SearchWaitingCharacter) -> some View {
+    art(
+      character.imageName,
+      x: character.frame.minX,
+      y: character.frame.minY,
+      width: character.frame.width,
+      height: character.frame.height
+    )
   }
 
   private func art(_ name: String, x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> some View {

@@ -1500,6 +1500,20 @@
       },
       "valueType": "STRING"
     },
+    "signup_reward_student_minutes": {
+      "defaultValue": {
+        "value": "60"
+      },
+      "description": "Free minutes a student gets once, as soon as they create an account, before and regardless of verifying their email. Adds to email_reward_student_minutes. 0 turns it off.",
+      "valueType": "NUMBER"
+    },
+    "signup_reward_student_slots": {
+      "defaultValue": {
+        "value": "100"
+      },
+      "description": "How many students in all get the sign-up minutes, once per mailbox. Once that many have been rewarded (count in Firestore emailRewardPromotion/studentSignup.granted), it has ended. Raise it to extend.",
+      "valueType": "NUMBER"
+    },
     "email_reward_student_minutes": {
       "defaultValue": {
         "value": "60"
@@ -15729,6 +15743,20 @@
         }
       },
       "valueType": "STRING"
+    },
+    "search_waiting_jokes_en": {
+      "defaultValue": {
+        "value": "[\"Placeholder joke 1 of 6 (from Remote Config)\", \"Placeholder joke 2 of 6 (from Remote Config)\", \"Placeholder joke 3 of 6 (from Remote Config)\", \"Placeholder joke 4 of 6 (from Remote Config)\", \"Placeholder joke 5 of 6 (from Remote Config)\", \"Placeholder joke 6 of 6 (from Remote Config)\"]"
+      },
+      "description": "English jokes the student app takes turns with while a question waits for a teacher: the first changes after 10 seconds, then one every 8. A JSON array of strings.",
+      "valueType": "JSON"
+    },
+    "search_waiting_jokes_he": {
+      "defaultValue": {
+        "value": "[\"בדיחה לדוגמה 1 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 2 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 3 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 4 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 5 מתוך 6 (מ-Remote Config)\", \"בדיחה לדוגמה 6 מתוך 6 (מ-Remote Config)\"]"
+      },
+      "description": "Hebrew jokes the student app takes turns with while a question waits for a teacher: the first changes after 10 seconds, then one every 8. A JSON array of strings.",
+      "valueType": "JSON"
     }
   },
   "version": {

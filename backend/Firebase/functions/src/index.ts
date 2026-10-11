@@ -62,6 +62,8 @@ export {
 
 // Welcome reward for a verified email, once per real mailbox
 export { claimEmailReward } from "./emailRewards";
+// Welcome minutes as soon as a student has an account, verified or not
+export { onStudentSignup } from "./signupRewards";
 export { sendVerificationEmail, verifyEmailLink } from "./emailVerification";
 
 // Contact Us messages are emailed to the recipients in support-config.json

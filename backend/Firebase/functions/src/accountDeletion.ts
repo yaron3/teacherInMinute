@@ -78,7 +78,7 @@ export async function deleteAccountData(uid: string): Promise<void> {
   for (const teacher of await firestore.collection("teachers").listDocuments()) {
     await removeMatches(teacher.collection("ratings").where("studentId", "==", uid));
   }
-  for (const role of ["student", "teacher"]) {
+  for (const role of ["student", "teacher", "studentSignup"]) {
     const claims = await firestore.collection("emailRewardClaims").where(`${role}.uid`, "==", uid).get();
     for (const claim of claims.docs) {
       await firestore.runTransaction(async tx => {

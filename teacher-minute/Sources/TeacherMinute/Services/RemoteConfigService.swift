@@ -359,6 +359,22 @@ final class RemoteConfigService {
             .filter { !$0.isEmpty }
     }
 
+    /// A JSON array of strings, as published. Unlike `getStringArray(_:)`, a
+    /// value that is not one reads as no list at all rather than being split
+    /// on its commas, so its entries can be sentences.
+    func getJSONStringArray(_ key: String) -> [String] {
+        #if !os(Android)
+        guard FirebaseApp.app() != nil else { return [] }
+        #endif
+        let raw = RemoteConfig.remoteConfig().configValue(forKey: key).stringValue
+        guard let data = raw.data(using: .utf8),
+              let array = try? JSONSerialization.jsonObject(with: data) as? [Any] else { return [] }
+        return array
+            .compactMap { $0 as? String }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     #if os(Android)
     private static func logFetchState(
         _ remoteConfig: RemoteConfig,

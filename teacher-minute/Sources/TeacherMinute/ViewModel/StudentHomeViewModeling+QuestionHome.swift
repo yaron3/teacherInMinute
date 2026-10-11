@@ -115,11 +115,18 @@ extension StudentHomeViewModeling {
     Auth.auth().currentUser?.isAnonymous == true
   }
 
-  /// The free minutes a verified account earns, as the backend reads them:
-  /// the Remote Config value when it has a usable one, 30 when it has none.
+  /// The free minutes a new account earns, as the backend reads them: those
+  /// for signing up (functions/src/signupRewards.ts, 0 by default) and those
+  /// for verifying (60 by default), from Remote Config when it has a usable
+  /// value.
   var signUpRewardMinutes: Int {
-    let configured = RemoteConfigService.readString("email_reward_student_minutes")
-    guard let minutes = Double(configured), minutes.isFinite else { return 30 }
+    rewardMinutes("signup_reward_student_minutes", default: 0)
+      + rewardMinutes("email_reward_student_minutes", default: 60)
+  }
+
+  private func rewardMinutes(_ key: String, default defaultValue: Int) -> Int {
+    let configured = RemoteConfigService.readString(key)
+    guard let minutes = Double(configured), minutes.isFinite else { return defaultValue }
     return max(0, Int(minutes))
   }
 
