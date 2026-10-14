@@ -45,6 +45,11 @@ struct StudentTutorialView: View {
     availableSize.width > 0 ? min(520, availableSize.width) : nil
   }
 
+  /// A page's width, the screen's; unset until the screen has been measured.
+  var pageWidth: CGFloat? {
+    availableSize.width > 0 ? availableSize.width : nil
+  }
+
   var body: some View {
     _ = modelTick
     return ZStack {
@@ -153,7 +158,12 @@ struct StudentTutorialView: View {
         pageContent(viewModel.pages[index])
           .padding(.horizontal, 24)
           .frame(width: contentWidth)
-          .frame(width: max(availableSize.width, 1))
+          // Unset, not a token width, until the screen is measured, so the
+          // current page fills the screen from the first frame. On Android
+          // the measurement comes a layout pass later — up to a second into
+          // a cold launch — and a 1pt page showed meanwhile as a thin column
+          // of letters.
+          .frame(width: pageWidth)
           .environment(\.layoutDirection, layoutDirection)
           .offset(x: pageOffset(for: index))
           // Until the width is known every page sits at 0, on top of the
