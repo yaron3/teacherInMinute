@@ -154,6 +154,9 @@ def main():
     ios_icon("dark").save(out / "AppIcon1024x1024-dark.png")
     ios_icon("tinted").save(out / "AppIcon1024x1024-tinted.png")
     android_layers(out)
+    # Play Console store-listing icon: a full square, since Play rounds the
+    # corners and adds the shadow itself.
+    ios_icon("light").resize((512, 512), Image.LANCZOS).save(out / "play-store-512.png", optimize=True)
 
 
 if __name__ == "__main__":
