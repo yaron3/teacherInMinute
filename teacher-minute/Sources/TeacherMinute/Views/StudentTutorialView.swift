@@ -55,6 +55,16 @@ struct StudentTutorialView: View {
     return ZStack {
       BrandScreenBackground(streaks: .subpage)
 
+      // Measures the screen. The ZStack's own size is not the screen's: the
+      // pages are framed to the measured width, so a ZStack once laid out
+      // wider than the screen — as iOS 27 did — measured its own pages and
+      // stayed that wide, cutting off both edges. This layer takes exactly
+      // the room the ZStack is offered, whatever the pages' widths.
+      Color.clear
+        .onGeometryChange(for: CGSize.self, of: { $0.size }) { size in
+          availableSize = size
+        }
+
       VStack(spacing: 0) {
         topBar
           .padding(.top, 8)
@@ -75,9 +85,6 @@ struct StudentTutorialView: View {
           .padding(.horizontal, 24)
           .frame(width: contentWidth)
       }
-    }
-    .onGeometryChange(for: CGSize.self, of: { $0.size }) { size in
-      availableSize = size
     }
     .gesture(pageSwipe)
     .systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
