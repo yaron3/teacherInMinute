@@ -2,7 +2,7 @@ jest.mock("firebase-admin", () => ({
   firestore: () => ({}),
 }));
 
-import { becameStudent, signupSlotsRemaining } from "../signupRewards";
+import { anonymousStudentRegistered, becameStudent, signupSlotsRemaining } from "../signupRewards";
 
 describe("becameStudent", () => {
   it.each([
@@ -21,6 +21,25 @@ describe("becameStudent", () => {
     [undefined, undefined],
   ])("does not fire from %p to %p", (before, after) => {
     expect(becameStudent(before, after)).toBe(false);
+  });
+});
+
+describe("anonymousStudentRegistered", () => {
+  it("fires when a linked anonymous student's profile stops being anonymous", () => {
+    expect(anonymousStudentRegistered(
+      { role: "student", isAnonymous: true },
+      { role: "student", isAnonymous: false }
+    )).toBe(true);
+  });
+
+  it.each([
+    [{ role: "student", isAnonymous: true }, { role: "student", isAnonymous: true }],
+    [{ role: "student" }, { role: "student", isAnonymous: false }],
+    [undefined, { role: "student", isAnonymous: false }],
+    [{ role: "student", isAnonymous: true }, undefined],
+    [{ role: "student", isAnonymous: true }, { role: "teacher", isAnonymous: false }],
+  ])("does not fire from %p to %p", (before, after) => {
+    expect(anonymousStudentRegistered(before, after)).toBe(false);
   });
 });
 

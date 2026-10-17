@@ -481,6 +481,13 @@ final class FunctionsService {
     )
   }
 
+  /// Deletes the anonymous account a student started with, after they signed
+  /// in to one they already had. `idToken` is the anonymous session's, taken
+  /// before signing in (functions/src/accountDeletion.ts).
+  func deleteAnonymousAccount(idToken: String) async throws {
+    _ = try await call(function: "deleteAnonymousAccount", data: ["anonymousIdToken": idToken])
+  }
+
   /// Emails the signed-in user a link that verifies `email` — the account's own
   /// address when nil — and opens the app with the outcome
   /// (functions/src/emailVerification.ts). A different address replaces the

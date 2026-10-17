@@ -20,6 +20,12 @@ import SkipFirebaseCore
 import SkipFirebaseAuth
 #endif
 
+/// An anonymous account and the proof that this app held it.
+struct AnonymousSession {
+  let uid: String
+  let idToken: String
+}
+
 @MainActor
 final class AuthService {
   
@@ -174,11 +180,64 @@ final class AuthService {
     return result.user.uid
   }
 
+  /// Creates an email/password account. A student who started anonymously
+  /// has the email linked to that account instead, so they keep its uid and
+  /// everything on it — their questions, lessons and profile.
   func createUser(email: String, password: String) async throws -> Bool{
+    if let user = Auth.auth().currentUser, user.isAnonymous {
+      let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+      let result = try await user.link(with: credential)
+      logger.info("[Auth] linked anonymous uid=\(result.user.uid) to an email account")
+      return true
+    }
       let result = try await Auth.auth().createUser(withEmail: email, password: password)
       logger.info("got result: \(result)")
     return true
     }
+
+  /// The anonymous session, if that is what is signed in, captured just
+  /// before a sign-in that may replace it. See `finishReplacingAnonymousSession`.
+  func currentAnonymousSession() async -> AnonymousSession? {
+    guard let user = Auth.auth().currentUser, user.isAnonymous else { return nil }
+    do {
+      return AnonymousSession(uid: user.uid, idToken: try await user.getIDToken())
+    } catch {
+      // Without the token the account cannot be deleted later; signing in
+      // still goes ahead.
+      AnalyticsService.shared.recordError(error, context: "anonymousSessionToken")
+      return nil
+    }
+  }
+
+  /// Settles the anonymous session a sign-in started from, once it succeeded.
+  ///
+  /// Signing up links the new email or provider to the anonymous account, so
+  /// the uid is the same and only its profile has to stop calling itself
+  /// anonymous — which is also what earns the sign-up reward
+  /// (functions/src/signupRewards.ts). Signing in to an account the student
+  /// already had replaces the anonymous one, which is then deleted with
+  /// everything on it; the app is no longer signed in as it, so the backend
+  /// does that, on the strength of the token taken beforehand.
+  func finishReplacingAnonymousSession(_ session: AnonymousSession?) async {
+    guard let session, let uid = currentUserID else { return }
+    if uid == session.uid {
+      guard Auth.auth().currentUser?.isAnonymous == false else { return }
+      do {
+        try await UserService.shared.markAnonymousProfileRegistered(uid: uid)
+      } catch {
+        AnalyticsService.shared.recordError(error, context: "anonymousProfileRegistered")
+      }
+      return
+    }
+    Task { @MainActor in
+      do {
+        try await FunctionsService.shared.deleteAnonymousAccount(idToken: session.idToken)
+        logger.info("[Auth] deleted replaced anonymous uid=\(session.uid)")
+      } catch {
+        AnalyticsService.shared.recordError(error, context: "deleteAnonymousAccount")
+      }
+    }
+  }
   
   /// Clears teacher presence before dropping the auth session.
   ///

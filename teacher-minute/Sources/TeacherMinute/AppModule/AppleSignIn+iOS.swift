@@ -83,7 +83,7 @@ extension iOSAppleSignInProvider: ASAuthorizationControllerDelegate {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }()
 
-        Auth.auth().signIn(with: credential) { [weak self] authResult, error in
+        signInLinkingAnonymousAccount(with: credential) { [weak self] authResult, error in
             if let error {
                 self?.finish(.failure(error))
                 return

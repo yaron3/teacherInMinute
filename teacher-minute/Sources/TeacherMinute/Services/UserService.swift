@@ -54,6 +54,15 @@ final class UserService {
 	logger.info("Saved anonymous student profile for uid: \(uid)")
   }
 
+  /// An anonymous student's account now has an email or a provider linked
+  /// to it: the same uid, no longer anonymous.
+  func markAnonymousProfileRegistered(uid: String) async throws {
+	try await Firestore.firestore().collection("users").document(uid).setData([
+	  "isAnonymous": false,
+	], merge: true)
+	logger.info("Marked anonymous student profile registered for uid: \(uid)")
+  }
+
   // MARK: - Fetch raw Firestore document
   
   func fetchRaw(uid: String) async throws -> [String: Any]? {

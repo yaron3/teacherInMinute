@@ -44,7 +44,7 @@ class iOSGoogleSignInProvider: GoogleSignInProvider {
 
             let firebaseCredential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
 
-            Auth.auth().signIn(with: firebaseCredential) { firebaseAuthResult, firebaseAuthError in
+            signInLinkingAnonymousAccount(with: firebaseCredential) { firebaseAuthResult, firebaseAuthError in
                 if let firebaseAuthError = firebaseAuthError {
                     completion(.failure(firebaseAuthError))
                     return

@@ -63,7 +63,9 @@ final class LoginViewModel {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.loginStart, parameters: ["method": "email"])
 
 	do {
-	  // 1. Authenticate
+	  // 1. Authenticate. An anonymous session it replaces is deleted once
+	  //    this succeeds.
+	  let anonymousSession = await authService.currentAnonymousSession()
 	  _ = try await authService.signIn(
 		email: emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines),
 		password: password
@@ -77,6 +79,7 @@ final class LoginViewModel {
 	  }
 	  AnalyticsService.shared.setUser(uid: uid)
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "email"])
+	  await authService.finishReplacingAnonymousSession(anonymousSession)
 
 	  // 3. Resolve where in onboarding this user should go
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
@@ -93,6 +96,12 @@ final class LoginViewModel {
   
   func loginWithGoogle() {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.loginStart, parameters: ["method": "google"])
+	Task { await loginWithGoogle(replacing: authService.currentAnonymousSession()) }
+  }
+
+  /// A Google account with no account of ours yet is linked to the anonymous
+  /// session, as on sign-up; one that has an account replaces it.
+  private func loginWithGoogle(replacing anonymousSession: AnonymousSession?) {
 #if os(iOS)
 	iOSGoogleSignInProvider().signIn { [weak self] result in
 	  switch result {
@@ -105,6 +114,7 @@ final class LoginViewModel {
 			}
 			AnalyticsService.shared.setUser(uid: uid)
 			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
+			await self?.authService.finishReplacingAnonymousSession(anonymousSession)
 			do {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
 			  self?.proceed(to: resume)
@@ -130,6 +140,7 @@ final class LoginViewModel {
 		}
 		AnalyticsService.shared.setUser(uid: uid)
 		AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "google"])
+		await authService.finishReplacingAnonymousSession(anonymousSession)
 		let resume = try await UserService.shared.resumeRoute(uid: uid)
 		proceed(to: resume)
 	  } catch {
@@ -142,6 +153,10 @@ final class LoginViewModel {
 
   func loginWithApple() {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.loginStart, parameters: ["method": "apple"])
+	Task { await loginWithApple(replacing: authService.currentAnonymousSession()) }
+  }
+
+  private func loginWithApple(replacing anonymousSession: AnonymousSession?) {
 #if os(iOS)
 	iOSAppleSignInProvider().signIn { [weak self] result in
 	  switch result {
@@ -154,6 +169,7 @@ final class LoginViewModel {
 			}
 			AnalyticsService.shared.setUser(uid: uid)
 			AnalyticsService.shared.logEvent(AnalyticsEvent.loginSuccess, parameters: ["method": "apple"])
+			await self?.authService.finishReplacingAnonymousSession(anonymousSession)
 			do {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
 			  self?.proceed(to: resume)

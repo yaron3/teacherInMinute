@@ -120,3 +120,47 @@ export const deleteAccount = onCall({ timeoutSeconds: 540 }, async req => {
   await admin.auth().deleteUser(uid);
   return { deleted: true };
 });
+
+/**
+ * A student who started anonymously and then signed in to an account they
+ * already had leaves the anonymous one behind. The app, by then signed in as
+ * that account, cannot delete it, so it hands over the anonymous session's ID
+ * token — taken just before signing in — as proof that it owned it.
+ *
+ * Returns the anonymous UID to delete, or null if it is gone already.
+ */
+export async function assertAnonymousDeletionRequest(
+  req: Pick<CallableRequest, "auth" | "data">
+): Promise<string | null> {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in first.");
+  const idToken = req.data?.anonymousIdToken;
+  if (typeof idToken !== "string" || !idToken) {
+    throw new HttpsError("invalid-argument", "Missing the anonymous session.");
+  }
+  const token = await admin.auth().verifyIdToken(idToken, true).catch(() => {
+    throw new HttpsError("permission-denied", "The anonymous session could not be verified.");
+  });
+  if (token.firebase?.sign_in_provider !== "anonymous" || token.uid === req.auth.uid) {
+    throw new HttpsError("permission-denied", "Only a replaced anonymous account can be deleted.");
+  }
+  // A token minted while anonymous still says so after the account is linked
+  // to an email or a provider, so the account itself has to be checked: a
+  // linked one is the student's real account and must never go.
+  const user = await admin.auth().getUser(token.uid).catch((err) => {
+    if (err?.code === "auth/user-not-found") return null;
+    throw err;
+  });
+  if (!user) return null;
+  if (user.providerData.length > 0) {
+    throw new HttpsError("failed-precondition", "That account is no longer anonymous.");
+  }
+  return token.uid;
+}
+
+export const deleteAnonymousAccount = onCall({ timeoutSeconds: 540 }, async req => {
+  const uid = await assertAnonymousDeletionRequest(req);
+  if (!uid) return { deleted: false };
+  await deleteAccountData(uid);
+  await admin.auth().deleteUser(uid);
+  return { deleted: true };
+});

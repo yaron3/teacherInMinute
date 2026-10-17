@@ -14,8 +14,10 @@
 //     (`signup_reward_student_slots`), counted in
 //     `emailRewardPromotion/studentSignup.granted`.
 //
-// Anonymous sessions never get it: an anonymous student signs up into a new
-// account, and that account is the one rewarded.
+// Anonymous sessions never get it. An anonymous student who signs up keeps
+// their uid — the app links the email or provider to the anonymous account —
+// so the reward is granted when the profile stops being anonymous rather than
+// when the role is first set, which happened back when they started.
 //
 // Granted from a trigger on the user document rather than from a callable, so
 // it reaches every app version already installed: the moment an account first
@@ -80,6 +82,15 @@ export function signupSlotsRemaining(offer: SignupRewardOffer, granted: unknown)
 /** Whether a user-document write is the account first becoming a student. */
 export function becameStudent(beforeRole: unknown, afterRole: unknown): boolean {
   return beforeRole !== "student" && afterRole === "student";
+}
+
+/** Whether a user-document write is an anonymous student's profile being
+ *  marked registered, after the app linked it to an account. */
+export function anonymousStudentRegistered(
+  before: { role?: unknown; isAnonymous?: unknown } | undefined,
+  after: { role?: unknown; isAnonymous?: unknown } | undefined
+): boolean {
+  return before?.isAnonymous === true && after?.isAnonymous !== true && after?.role === "student";
 }
 
 export type SignupGrantStatus =
@@ -155,9 +166,9 @@ export async function grantSignupRewardFor(uid: string): Promise<SignupGrantStat
 }
 
 export const onStudentSignup = onDocumentWritten("users/{uid}", async (event) => {
-  const before = event.data?.before?.data()?.role;
-  const after = event.data?.after?.data()?.role;
-  if (!becameStudent(before, after)) return;
+  const before = event.data?.before?.data();
+  const after = event.data?.after?.data();
+  if (!becameStudent(before?.role, after?.role) && !anonymousStudentRegistered(before, after)) return;
 
   const uid = event.params.uid;
   try {

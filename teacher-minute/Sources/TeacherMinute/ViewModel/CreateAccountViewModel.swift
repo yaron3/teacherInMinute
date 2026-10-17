@@ -152,8 +152,10 @@ final class CreateAccountViewModel {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpStart, parameters: ["method": "email", "send_updates": sendUpdates])
 
 	do {
+	  let anonymousSession = await authService.currentAnonymousSession()
 	  _ = try await authService.createUser(email: emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines),
 										   password: password)
+	  await authService.finishReplacingAnonymousSession(anonymousSession)
 	  if let uid = Auth.auth().currentUser?.uid {
 		AnalyticsService.shared.setUser(uid: uid)
 	  }
@@ -187,12 +189,16 @@ final class CreateAccountViewModel {
   
   func signupWithGoogle() {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpStart, parameters: ["method": "google"])
+	Task { await signupWithGoogle(replacing: authService.currentAnonymousSession()) }
+  }
+
+  private func signupWithGoogle(replacing anonymousSession: AnonymousSession?) {
 #if os(iOS)
 	iOSGoogleSignInProvider().signIn { [weak self] result in
 	  switch result {
 		case .success:
 		  Task { @MainActor in
-			await self?.resolveRouteAfterSocialSignIn(method: "google")
+			await self?.resolveRouteAfterSocialSignIn(method: "google", replacing: anonymousSession)
 		  }
 		case .failure(let error):
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
@@ -208,7 +214,7 @@ final class CreateAccountViewModel {
 	Task {
 	  do {
 		let signInResult = try await AndroidGoogleAuth().signIn()
-		await resolveRouteAfterSocialSignIn(method: "google", uidOverride: AndroidGoogleAuth.uid(from: signInResult))
+		await resolveRouteAfterSocialSignIn(method: "google", replacing: anonymousSession, uidOverride: AndroidGoogleAuth.uid(from: signInResult))
 	  } catch {
 		AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 		alertMessage = localizedAuthErrorMessage(error)
@@ -220,12 +226,16 @@ final class CreateAccountViewModel {
 
   func signupWithApple() {
 	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpStart, parameters: ["method": "apple"])
+	Task { await signupWithApple(replacing: authService.currentAnonymousSession()) }
+  }
+
+  private func signupWithApple(replacing anonymousSession: AnonymousSession?) {
 #if os(iOS)
 	iOSAppleSignInProvider().signIn { [weak self] result in
 	  switch result {
 		case .success:
 		  Task { @MainActor in
-			await self?.resolveRouteAfterSocialSignIn(method: "apple")
+			await self?.resolveRouteAfterSocialSignIn(method: "apple", replacing: anonymousSession)
 		  }
 		case .failure(let error):
 		  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "apple", "reason": error.localizedDescription])
@@ -238,7 +248,7 @@ final class CreateAccountViewModel {
 #endif
   }
 
-  private func resolveRouteAfterSocialSignIn(method: String, uidOverride: String? = nil) async {
+  private func resolveRouteAfterSocialSignIn(method: String, replacing anonymousSession: AnonymousSession?, uidOverride: String? = nil) async {
 	guard let uid = Auth.auth().currentUser?.uid ?? uidOverride else {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": method, "reason": "no_session"])
 	  alertMessage = LocalizationSupport.localized("Could not retrieve user session. Please try again.")
@@ -247,6 +257,7 @@ final class CreateAccountViewModel {
 	}
 	AnalyticsService.shared.setUser(uid: uid)
 	AnalyticsService.shared.logEvent(AnalyticsEvent.signUpSuccess, parameters: ["method": method])
+	await authService.finishReplacingAnonymousSession(anonymousSession)
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
 	  // Signing up with Google or Apple can land on an existing account,

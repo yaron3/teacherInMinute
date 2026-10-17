@@ -8,6 +8,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.GoogleAuthProvider
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -88,7 +89,23 @@ object AndroidGoogleSignInManager {
             }
 
             val credential = GoogleAuthProvider.getCredential(idToken, null)
-            FirebaseAuth.getInstance().signInWithCredential(credential)
+            val auth = FirebaseAuth.getInstance()
+            // A student who started anonymously has the Google account linked
+            // to that account, keeping its uid. If the Google account already
+            // has one, they are signed in to it and the app deletes the
+            // anonymous account (AuthService.finishReplacingAnonymousSession).
+            val anonymousUser = auth.currentUser?.takeIf { it.isAnonymous }
+            val signInTask = anonymousUser?.linkWithCredential(credential)
+                ?.continueWithTask { linkTask ->
+                    val collision = linkTask.exception as? FirebaseAuthUserCollisionException
+                    if (collision != null) {
+                        auth.signInWithCredential(collision.updatedCredential ?: credential)
+                    } else {
+                        linkTask
+                    }
+                }
+                ?: auth.signInWithCredential(credential)
+            signInTask
                 .addOnCompleteListener { firebaseTask ->
                     if (firebaseTask.isSuccessful) {
                         val user = firebaseTask.result?.user
