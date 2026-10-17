@@ -21,14 +21,14 @@ describe("readContactRecipients", () => {
   });
 
   it("falls back to the default when missing, empty or malformed", () => {
-    expect(readContactRecipients("/nonexistent.json")).toEqual(["yaron@yaronj.com"]);
-    expect(readContactRecipients(write('{"contactRecipients":[]}'))).toEqual(["yaron@yaronj.com"]);
-    expect(readContactRecipients(write("not json"))).toEqual(["yaron@yaronj.com"]);
+    expect(readContactRecipients("/nonexistent.json")).toEqual(["support@moreh-lerega.co.il"]);
+    expect(readContactRecipients(write('{"contactRecipients":[]}'))).toEqual(["support@moreh-lerega.co.il"]);
+    expect(readContactRecipients(write("not json"))).toEqual(["support@moreh-lerega.co.il"]);
   });
 
-  it("ships a config whose default is yaron@yaronj.com", () => {
+  it("ships a config whose default is support@moreh-lerega.co.il", () => {
     expect(readContactRecipients(path.join(__dirname, "..", "..", "support-config.json"))).toEqual([
-      "yaron@yaronj.com",
+      "support@moreh-lerega.co.il",
     ]);
   });
 });

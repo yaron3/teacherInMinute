@@ -5,6 +5,8 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { recomputeRegisteredTeacherCount, STATS_COLLECTION, PLATFORM_STATS_DOC } from "./stats";
 import { republishAllTeacherPresence, ONLINE_TEACHERS_PATH } from "./presence";
 import { PILOT_COLLECTION } from "./pilot";
+import { deleteAccountData } from "./accountDeletion";
+import { sendMail } from "./mailer";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -309,26 +311,29 @@ export const adminDashboardStatus = onCall(async (req) => {
     .where("status", "==", "completed")
     .get();
 
+  // Sums, averages and the outlier check are per currency: 5000 ILS and 5000
+  // USD are not the same payment, so nothing here adds or compares across them.
   const totalCentsByCurrency: Record<string, number> = {};
-  let maxPaymentCents = 0;
-  let maxPaymentId = "";
-  const paymentValues: number[] = [];
+  const countByCurrency: Record<string, number> = {};
+  const maxByCurrency: Record<string, { cents: number; id: string }> = {};
 
   for (const d of completedPaymentsSnap.docs) {
     const c = (d.data().currency as string) || "USD";
     const cents = Number(d.data().priceCents) || 0;
     totalCentsByCurrency[c] = (totalCentsByCurrency[c] ?? 0) + cents;
-    paymentValues.push(cents);
-    if (cents > maxPaymentCents) { maxPaymentCents = cents; maxPaymentId = d.id; }
+    countByCurrency[c] = (countByCurrency[c] ?? 0) + 1;
+    if (cents > (maxByCurrency[c]?.cents ?? 0)) maxByCurrency[c] = { cents, id: d.id };
   }
-
-  const avgPaymentCents = paymentValues.length
-    ? Math.round(paymentValues.reduce((a, b) => a + b, 0) / paymentValues.length)
-    : 0;
 
   const sortedCurrencies = Object.entries(totalCentsByCurrency).sort((a, b) => b[1] - a[1]);
   const revenueCurrency = sortedCurrencies[0]?.[0] ?? "USD";
   const totalRevenueCents = sortedCurrencies[0]?.[1] ?? 0;
+  // `avg` and `max` describe `revenueCurrency` only, the one the card labels them in.
+  const avgPaymentCents = countByCurrency[revenueCurrency]
+    ? Math.round(totalRevenueCents / countByCurrency[revenueCurrency])
+    : 0;
+  const maxPaymentCents = maxByCurrency[revenueCurrency]?.cents ?? 0;
+  const maxPaymentId = maxByCurrency[revenueCurrency]?.id ?? "";
 
   // A live lesson is worth showing with the people in it, so the row can be
   // acted on without copying UIDs into the users page.
@@ -405,15 +410,21 @@ export const adminDashboardStatus = onCall(async (req) => {
 export const adminListUsers = onCall(async (req) => {
   assertAdmin(req);
 
-  const { pageToken } = req.data as { pageToken?: string };
+  const { pageToken, limit } = req.data as { pageToken?: string; limit?: number };
+  // The console now loads every page, so it asks for big ones; 1000 is the
+  // Auth maximum and well within one `getAll`.
+  const pageSize = Math.min(Math.max(Number(limit) || 100, 1), 1000);
 
-  const listResult = await admin.auth().listUsers(100, pageToken);
+  const listResult = await admin.auth().listUsers(pageSize, pageToken);
 
   const uids = listResult.users.map((u) => u.uid);
   const firestoreDocs = uids.length
     ? await firestore.getAll(...uids.map((uid) => firestore.collection("users").doc(uid)))
     : [];
+  // `getAll` returns a snapshot for missing documents too, so existence has
+  // to be read off the snapshot, not off membership in the map.
   const fsMap = new Map(firestoreDocs.map((d) => [d.id, (d.data() ?? {}) as Record<string, unknown>]));
+  const withProfile = new Set(firestoreDocs.filter((d) => d.exists).map((d) => d.id));
 
   const users = listResult.users.map((u) => {
     const fs = fsMap.get(u.uid) ?? {};
@@ -435,7 +446,9 @@ export const adminListUsers = onCall(async (req) => {
       totalMinutesUsed: fs.totalMinutesUsed ?? null,
       // Major units of the user's own `currency`, not cents.
       totalEarnings: numberOrNull(fs.totalEarnings),
-      hasProfile: fsMap.has(u.uid),
+      hasProfile: withProfile.has(u.uid),
+      anonymous: isAnonymous(u),
+      lastActiveAt: lastActiveMs(u) || null,
     };
   });
 
@@ -529,6 +542,7 @@ export const adminGetUserDetail = onCall(async (req) => {
       providers: authUser.providerData.map((p) => p.providerId),
       createdAt: authUser.metadata.creationTime ? new Date(authUser.metadata.creationTime).getTime() : null,
       lastSignIn: authUser.metadata.lastSignInTime ? new Date(authUser.metadata.lastSignInTime).getTime() : null,
+      lastActiveAt: lastActiveMs(authUser) || null,
     },
     firestore: fsData,
     purchases,
@@ -558,42 +572,32 @@ export const adminGetUserDetail = onCall(async (req) => {
 // ─── adminMutateUser ──────────────────────────────────────────────────────────
 
 /**
- * Removes everything a deleted account leaves behind.
- *
- * Deleting only the auth account and `users/{uid}` used to leave the teacher
- * published in RTDB `onlineTeachers`, so the dispatcher kept inviting a user
- * who no longer existed, and left their purchases and inbox as orphaned
- * subcollections (deleting a document does not delete its subcollections).
+ * Clears both presence nodes, so dispatch stops inviting the teacher. Signing
+ * out does not do this on its own. It sticks only for an app that is gone: a
+ * running app with the toggle on re-sends `status: "online"` with every
+ * keep-alive (see ./keepAlive).
  */
-async function purgeUserData(uid: string): Promise<void> {
-  const userRef = firestore.collection("users").doc(uid);
-
-  for (const name of ["purchases", "incomingMessages", "generalMessages"]) {
-    const snap = await userRef.collection(name).limit(500).get();
-    if (snap.empty) continue;
-    const batch = firestore.batch();
-    snap.docs.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
-  }
-
-  const ratingsSnap = await firestore.collection("teachers").doc(uid).collection("ratings").limit(500).get();
-  if (!ratingsSnap.empty) {
-    const batch = firestore.batch();
-    ratingsSnap.docs.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
-  }
-
-  await Promise.all([
-    userRef.delete(),
-    firestore.collection("teachers").doc(uid).delete(),
-    db.ref(`teachers/${uid}`).remove(),
-    db.ref(`${ONLINE_TEACHERS_PATH}/${uid}`).remove(),
-    db.ref(`teacherInvites/${uid}`).remove(),
-    db.ref(`users/${uid}`).remove(),
-  ]);
+async function takeTeacherOffline(uid: string): Promise<void> {
+  await db.ref(`teachers/${uid}/status`).set("offline");
+  await db.ref(`${ONLINE_TEACHERS_PATH}/${uid}`).remove();
 }
 
-export const adminMutateUser = onCall(async (req) => {
+/**
+ * The same purge as the in-app deletion: questions, Storage uploads (including
+ * ID documents), RTDB presence and every subcollection. It refuses while a
+ * lesson or search is live, and runs before the auth delete so a failure
+ * leaves an account that can be deleted again.
+ */
+async function deleteUserCompletely(uid: string): Promise<void> {
+  await deleteAccountData(uid);
+  await admin.auth().deleteUser(uid).catch((err) => {
+    if (err?.code !== "auth/user-not-found") throw err;
+  });
+}
+
+// Deletion walks every question, file and subcollection of the account, which
+// can take far longer than the default 60s.
+export const adminMutateUser = onCall({ timeoutSeconds: 540 }, async (req) => {
   assertAdmin(req);
 
   const data = req.data as {
@@ -617,8 +621,8 @@ export const adminMutateUser = onCall(async (req) => {
 
   switch (action) {
     case "delete": {
-      await admin.auth().deleteUser(uid);
-      await purgeUserData(uid);
+      if (uid === req.auth?.uid) throw new HttpsError("failed-precondition", "You cannot delete your own admin account");
+      await deleteUserCompletely(uid);
       logger.info(`[admin] deleted user uid=${uid}`);
       return { success: true };
     }
@@ -642,8 +646,13 @@ export const adminMutateUser = onCall(async (req) => {
       return { success: true, link };
     }
 
+    // A disabled account must stop working now, not when its ID token
+    // expires, and a disabled teacher must stop being dispatched to — the
+    // keep-alive otherwise keeps them available by push.
     case "disable": {
       await admin.auth().updateUser(uid, { disabled: true });
+      await admin.auth().revokeRefreshTokens(uid);
+      await takeTeacherOffline(uid);
       logger.info(`[admin] disabled user uid=${uid}`);
       return { success: true };
     }
@@ -654,14 +663,8 @@ export const adminMutateUser = onCall(async (req) => {
       return { success: true };
     }
 
-    // Signing a teacher out does not clear presence, so a demo (or stuck)
-    // teacher keeps receiving dispatched questions until someone clears both
-    // the authoritative node and the published projection. It sticks only for
-    // an app that is gone: a running app with the toggle on re-sends `status:
-    // "online"` with every keep-alive (see ./keepAlive).
     case "goOffline": {
-      await db.ref(`teachers/${uid}/status`).set("offline");
-      await db.ref(`${ONLINE_TEACHERS_PATH}/${uid}`).remove();
+      await takeTeacherOffline(uid);
       logger.info(`[admin] forced teacher offline uid=${uid}`);
       return { success: true };
     }
@@ -1181,4 +1184,166 @@ export const adminSendTeacherMessage = onCall(async (req) => {
 
   logger.info(`[admin] sent message to uid=${uid} title="${title}" by=${req.auth?.token?.email}`);
   return { success: true };
+});
+
+// ─── Bulk actions ─────────────────────────────────────────────────────────────
+//
+// The console works through a selection in chunks — one call per chunk — so a
+// large cleanup reports progress and never runs into a function timeout.
+
+const DAY_MS = 24 * 3600 * 1000;
+export const BULK_DELETE_MAX = 20;
+export const BULK_EMAIL_MAX = 100;
+
+/** An account with no linked provider: a guest session the app opened with
+ *  `signInAnonymously`, never turned into a real account. */
+function isAnonymous(user: admin.auth.UserRecord): boolean {
+  return user.providerData.length === 0 && !user.email && !user.phoneNumber;
+}
+
+/** The latest sign of life: a token refresh happens every hour the app is
+ *  open, so it is a far better measure than the last explicit sign-in. */
+function lastActiveMs(user: admin.auth.UserRecord): number {
+  const m = user.metadata as admin.auth.UserMetadata & { lastRefreshTime?: string | null };
+  return Math.max(
+    ...[m.lastRefreshTime, m.lastSignInTime, m.creationTime]
+      .map((t) => (t ? Date.parse(t) : NaN))
+      .filter((n) => Number.isFinite(n)),
+    0
+  );
+}
+
+function inactiveDays(value: unknown): number {
+  const days = Number(value ?? 7);
+  if (!Number.isFinite(days) || days < 1) throw new HttpsError("invalid-argument", "days must be at least 1");
+  return days;
+}
+
+/**
+ * Anonymous accounts nobody has used for `days` (default 7). Accounts holding
+ * minutes are left out and counted instead — a guest who paid keeps what they
+ * paid for.
+ */
+export const adminFindInactiveAnonymous = onCall({ timeoutSeconds: 300 }, async (req) => {
+  assertAdmin(req);
+  const days = inactiveDays((req.data as { days?: number })?.days);
+  const cutoff = Date.now() - days * DAY_MS;
+
+  const stale: admin.auth.UserRecord[] = [];
+  let scanned = 0;
+  let pageToken: string | undefined;
+  do {
+    const page = await admin.auth().listUsers(1000, pageToken);
+    scanned += page.users.length;
+    stale.push(...page.users.filter((u) => isAnonymous(u) && lastActiveMs(u) < cutoff));
+    pageToken = page.pageToken;
+  } while (pageToken);
+
+  const balances = new Map<string, number>();
+  for (let i = 0; i < stale.length; i += 300) {
+    const refs = stale.slice(i, i + 300).map((u) => firestore.collection("users").doc(u.uid));
+    for (const snap of await firestore.getAll(...refs)) {
+      balances.set(snap.id, Number(snap.data()?.remainingMinutes) || 0);
+    }
+  }
+
+  const accounts = stale
+    .filter((u) => !(balances.get(u.uid)! > 0))
+    .map((u) => ({ uid: u.uid, createdAt: Date.parse(u.metadata.creationTime) || null, lastActiveAt: lastActiveMs(u) || null }))
+    .sort((a, b) => (a.lastActiveAt ?? 0) - (b.lastActiveAt ?? 0));
+
+  logger.info(`[admin] inactive anonymous: scanned=${scanned} found=${accounts.length} withBalance=${stale.length - accounts.length} days=${days}`);
+  return { days, scanned, accounts, skippedWithBalance: stale.length - accounts.length };
+});
+
+/**
+ * Deletes up to BULK_DELETE_MAX accounts, each the way a single delete does,
+ * and reports per account — one failure (a live lesson, say) does not stop
+ * the rest.
+ *
+ * With `requireInactiveAnonymousDays`, each account is checked again right
+ * before it goes: a guest who signed up, topped up or came back since the
+ * list was built is skipped, never deleted.
+ */
+export const adminBulkDeleteUsers = onCall({ timeoutSeconds: 540 }, async (req) => {
+  assertAdmin(req);
+  const { uids, requireInactiveAnonymousDays } = req.data as {
+    uids?: unknown;
+    requireInactiveAnonymousDays?: number;
+  };
+  if (!Array.isArray(uids) || uids.length === 0 || !uids.every((u) => typeof u === "string" && u)) {
+    throw new HttpsError("invalid-argument", "uids must be a non-empty list");
+  }
+  if (uids.length > BULK_DELETE_MAX) {
+    throw new HttpsError("invalid-argument", `At most ${BULK_DELETE_MAX} users per call`);
+  }
+  const days = requireInactiveAnonymousDays == null ? null : inactiveDays(requireInactiveAnonymousDays);
+
+  const results: { uid: string; status: "deleted" | "skipped" | "failed"; reason?: string }[] = [];
+  for (const uid of uids as string[]) {
+    try {
+      if (uid === req.auth?.uid) {
+        results.push({ uid, status: "skipped", reason: "your own admin account" });
+        continue;
+      }
+      if (days != null) {
+        const user = await admin.auth().getUser(uid).catch(() => null);
+        if (!user) { results.push({ uid, status: "skipped", reason: "already gone" }); continue; }
+        if (!isAnonymous(user)) { results.push({ uid, status: "skipped", reason: "no longer anonymous" }); continue; }
+        if (lastActiveMs(user) >= Date.now() - days * DAY_MS) {
+          results.push({ uid, status: "skipped", reason: "active again" });
+          continue;
+        }
+        const balance = Number((await firestore.collection("users").doc(uid).get()).data()?.remainingMinutes) || 0;
+        if (balance > 0) { results.push({ uid, status: "skipped", reason: "holds minutes" }); continue; }
+      }
+      await deleteUserCompletely(uid);
+      results.push({ uid, status: "deleted" });
+    } catch (err) {
+      results.push({ uid, status: "failed", reason: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  const deleted = results.filter((r) => r.status === "deleted").length;
+  logger.info(`[admin] bulk delete: requested=${uids.length} deleted=${deleted} anonymousOnly=${days != null} by=${req.auth?.token?.email}`);
+  return { results };
+});
+
+/**
+ * Emails up to BULK_EMAIL_MAX users, one message each — recipients never see
+ * one another's addresses. Accounts without an email (anonymous ones) are
+ * counted, not failed.
+ */
+export const adminSendEmail = onCall({ timeoutSeconds: 540 }, async (req) => {
+  assertAdmin(req);
+  const { uids, subject, text } = req.data as { uids?: unknown; subject?: string; text?: string };
+  if (!Array.isArray(uids) || uids.length === 0 || !uids.every((u) => typeof u === "string" && u)) {
+    throw new HttpsError("invalid-argument", "uids must be a non-empty list");
+  }
+  if (uids.length > BULK_EMAIL_MAX) throw new HttpsError("invalid-argument", `At most ${BULK_EMAIL_MAX} users per call`);
+  if (!subject?.trim() || !text?.trim()) throw new HttpsError("invalid-argument", "subject and text required");
+  if (!process.env.SMTP_HOST) throw new HttpsError("failed-precondition", "Email is not configured (SMTP_HOST is not set)");
+
+  const { users } = await admin.auth().getUsers((uids as string[]).map((uid) => ({ uid })));
+  const emails = [...new Set(users.map((u) => u.email).filter((e): e is string => Boolean(e)))];
+
+  let sent = 0;
+  const failed: string[] = [];
+  for (const to of emails) {
+    try {
+      await sendMail({ to, subject: subject.trim(), text: text.trim() });
+      sent++;
+    } catch (err) {
+      logger.warn(`[admin] email to ${to} failed`, err);
+      failed.push(to);
+    }
+  }
+
+  logger.info(`[admin] bulk email "${subject.trim()}": sent=${sent} failed=${failed.length} by=${req.auth?.token?.email}`);
+  return {
+    sent,
+    failed,
+    withoutEmail: users.filter((u) => !u.email).length,
+    notFound: uids.length - users.length,
+  };
 });

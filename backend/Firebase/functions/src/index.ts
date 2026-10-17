@@ -100,6 +100,9 @@ export {
   adminSendTeacherMessage,
   adminRecomputePlatformStats,
   adminRepublishOnlineTeachers,
+  adminFindInactiveAnonymous,
+  adminBulkDeleteUsers,
+  adminSendEmail,
 } from "./admin";
 
 // Payments — PayPal Checkout + Braintree (Apple Pay, Google Pay)

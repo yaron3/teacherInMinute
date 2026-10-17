@@ -19,7 +19,7 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as nodemailer from "nodemailer";
 
 const CONFIG_PATH = path.join(__dirname, "..", "support-config.json");
-const FALLBACK_RECIPIENTS = ["yaron@yaronj.com"];
+const FALLBACK_RECIPIENTS = ["support@moreh-lerega.co.il"];
 
 /** Recipients from support-config.json; the default if the file is missing or empty. */
 export function readContactRecipients(configPath = CONFIG_PATH): string[] {
