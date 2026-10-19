@@ -105,7 +105,7 @@ object AndroidLiveKitManager {
                         Log.e(TAG, "Camera enable returned false, continuing audio-only")
                     }
                 } catch (t: Throwable) {
-                    Log.e(TAG, "Camera enable failed, continuing audio-only: ${t.message}")
+                    AndroidErrorReporter.report(TAG, "Camera enable failed, continuing audio-only", t)
                 }
             }
 
@@ -133,7 +133,7 @@ object AndroidLiveKitManager {
                 current.localParticipant.setMicrophoneEnabled(enabled)
                 Log.i(TAG, "setMicrophoneEnabled=$enabled")
             } catch (t: Throwable) {
-                Log.e(TAG, "setMicrophoneEnabled failed: ${t.message}")
+                AndroidErrorReporter.report(TAG, "setMicrophoneEnabled failed", t)
             }
         }
     }
@@ -147,7 +147,7 @@ object AndroidLiveKitManager {
                 Log.i(TAG, "setCameraEnabled=$enabled")
                 refreshTracks(current)
             } catch (t: Throwable) {
-                Log.e(TAG, "setCameraEnabled failed: ${t.message}")
+                AndroidErrorReporter.report(TAG, "setCameraEnabled failed", t)
             }
         }
     }

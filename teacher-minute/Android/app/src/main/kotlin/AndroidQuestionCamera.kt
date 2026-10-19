@@ -115,7 +115,7 @@ object AndroidQuestionCamera {
                     currentCapture.set(capture)
                     Log.i(TAG, "camera bound")
                 } catch (error: Exception) {
-                    Log.e(TAG, "Could not start the camera", error)
+                    AndroidErrorReporter.report(TAG, "Could not start the camera", error)
                 }
             }, ContextCompat.getMainExecutor(androidContext))
 
@@ -127,7 +127,7 @@ object AndroidQuestionCamera {
                         providerFuture.get().unbind(preview, capture)
                         Log.i(TAG, "camera released")
                     } catch (error: Exception) {
-                        Log.w(TAG, "Could not release the camera", error)
+                        AndroidErrorReporter.report(TAG, "Could not release the camera", error)
                     }
                 }
             }

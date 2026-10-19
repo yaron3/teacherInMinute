@@ -70,7 +70,7 @@ object AndroidLocaleManager {
             Log.i(TAG, "Applied Remote Config custom signals app_language=$normalizedCode")
             normalizedCode
         } catch (error: Throwable) {
-            Log.e(TAG, "Failed applying Remote Config custom signals app_language=$normalizedCode", error)
+            AndroidErrorReporter.report(TAG, "Failed applying Remote Config custom signals app_language=$normalizedCode", error)
             ""
         }
     }

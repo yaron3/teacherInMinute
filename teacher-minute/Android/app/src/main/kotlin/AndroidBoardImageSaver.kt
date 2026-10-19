@@ -114,7 +114,7 @@ object AndroidBoardImageSaver {
         val strokes = try {
             JSONArray(strokesJson)
         } catch (error: Throwable) {
-            Log.e(TAG, "Failed to parse strokes JSON", error)
+            AndroidErrorReporter.report(TAG, "Failed to parse strokes JSON", error)
             JSONArray()
         }
 
@@ -167,7 +167,7 @@ object AndroidBoardImageSaver {
             )
             url.toString()
         } catch (error: Throwable) {
-            Log.e(TAG, "Failed to upload board snapshot", error)
+            AndroidErrorReporter.report(TAG, "Failed to upload board snapshot", error)
             ""
         }
     }
@@ -199,7 +199,7 @@ object AndroidBoardImageSaver {
                 TimeUnit.SECONDS
             )
         } catch (error: Throwable) {
-            Log.e(TAG, "Failed to send image chat message", error)
+            AndroidErrorReporter.report(TAG, "Failed to send image chat message", error)
         }
     }
 
@@ -221,7 +221,7 @@ object AndroidBoardImageSaver {
             } ?: return false
             true
         } catch (error: Throwable) {
-            Log.e(TAG, "Failed to save board snapshot to gallery", error)
+            AndroidErrorReporter.report(TAG, "Failed to save board snapshot to gallery", error)
             false
         }
     }

@@ -38,7 +38,7 @@ object AndroidPermissionManager {
             try {
                 activity.startActivity(intent)
             } catch (t: Throwable) {
-                Log.e(TAG, "openAppSettings failed", t)
+                AndroidErrorReporter.report(TAG, "openAppSettings failed", t)
             }
         }
     }

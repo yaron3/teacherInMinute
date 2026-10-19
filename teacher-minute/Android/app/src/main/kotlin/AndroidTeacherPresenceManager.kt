@@ -42,7 +42,7 @@ object AndroidTeacherPresenceManager {
         } catch (error: Throwable) {
             // Still optimistic: blocking a student from asking because a
             // presence read failed is worse than dispatching to nobody.
-            Log.e(TAG, "hasOnlineTeacher check failed; assuming available", error)
+            AndroidErrorReporter.report(TAG, "hasOnlineTeacher check failed; assuming available", error)
             true
         }
     }
@@ -95,7 +95,7 @@ object AndroidTeacherPresenceManager {
             Log.i(TAG, "onlineTeachersJSON count=${teachers.length()}")
             teachers.toString()
         } catch (error: Throwable) {
-            Log.e(TAG, "onlineTeachersJSON failed", error)
+            AndroidErrorReporter.report(TAG, "onlineTeachersJSON failed", error)
             "[]"
         }
     }

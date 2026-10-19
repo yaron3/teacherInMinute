@@ -1,6 +1,5 @@
 package teacher.minute
 
-import android.util.Log
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.database.FirebaseDatabase
 import org.json.JSONObject
@@ -42,7 +41,7 @@ object AndroidDemoStudentManager {
             result.put("error", snapshot.child("error").getValue(String::class.java) ?: "")
             result.toString()
         } catch (error: Throwable) {
-            Log.e(TAG, "Failed reading simulation request id=$requestId", error)
+            AndroidErrorReporter.report(TAG, "Failed reading simulation request id=$requestId", error)
             "{}"
         }
     }

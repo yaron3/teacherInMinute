@@ -3,7 +3,6 @@ package teacher.minute
 import android.content.Context
 import android.os.Build
 import android.os.Looper
-import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -62,7 +61,7 @@ object AndroidKeyboardManager {
                 // still holds focus would pull the keyboard straight back up.
                 focused?.clearFocus()
             } catch (error: Throwable) {
-                Log.e(TAG, "Failed to hide the soft keyboard", error)
+                AndroidErrorReporter.report(TAG, "Failed to hide the soft keyboard", error)
             }
         }
     }
@@ -87,7 +86,7 @@ object AndroidKeyboardManager {
                     as? InputMethodManager
                 manager?.showSoftInput(view, 0)
             } catch (error: Throwable) {
-                Log.e(TAG, "Failed to show the soft keyboard", error)
+                AndroidErrorReporter.report(TAG, "Failed to show the soft keyboard", error)
             }
         }
     }
@@ -113,7 +112,7 @@ object AndroidKeyboardManager {
             val insets = ViewCompat.getRootWindowInsets(activity.window.decorView) ?: return false
             insets.isVisible(WindowInsetsCompat.Type.ime())
         } catch (error: Throwable) {
-            Log.e(TAG, "Failed to read soft keyboard visibility", error)
+            AndroidErrorReporter.report(TAG, "Failed to read soft keyboard visibility", error)
             false
         }
     }
