@@ -119,6 +119,7 @@ final class LoginViewModel {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
 			  self?.proceed(to: resume)
 			} catch {
+			  logger.error("[LoginViewModel] \(error.localizedDescription)")
 			  self?.present(message: localizedAuthErrorMessage(error))
 			}
 		  }
@@ -144,6 +145,7 @@ final class LoginViewModel {
 		let resume = try await UserService.shared.resumeRoute(uid: uid)
 		proceed(to: resume)
 	  } catch {
+		logger.error("[LoginViewModel] \(error.localizedDescription)")
 		AnalyticsService.shared.logEvent(AnalyticsEvent.loginFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 		present(message: localizedAuthErrorMessage(error))
 	  }
@@ -174,6 +176,7 @@ final class LoginViewModel {
 			  let resume = try await UserService.shared.resumeRoute(uid: uid)
 			  self?.proceed(to: resume)
 			} catch {
+			  logger.error("[LoginViewModel] \(error.localizedDescription)")
 			  self?.present(message: localizedAuthErrorMessage(error))
 			}
 		  }

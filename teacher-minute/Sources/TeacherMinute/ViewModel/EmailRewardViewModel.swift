@@ -86,7 +86,7 @@ final class EmailRewardViewModel {
     do {
       result = try await FunctionsService.shared.claimEmailReward()
     } catch {
-      logger.info("[EmailReward] claim failed: \(error.localizedDescription)")
+      logger.error("[EmailReward] claim failed: \(error.localizedDescription)")
       return
     }
     reward = result

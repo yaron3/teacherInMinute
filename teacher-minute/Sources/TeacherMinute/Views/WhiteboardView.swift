@@ -317,6 +317,7 @@ struct WhiteboardView: View {
 
 	  if isCompact {
 		Button {
+		  trackTap("whiteboard_move_mode")
 		  activeStroke.removeAll()
 		  shapeStartLogical = nil
 		  lastMoveDragTranslation = .zero
@@ -335,6 +336,7 @@ struct WhiteboardView: View {
 		.buttonStyle(.plain)
 
 		Button {
+		  trackTap("whiteboard_maximize")
 		  isMaximized.toggle()
 		} label: {
 		  PlatformIcon(
@@ -350,6 +352,7 @@ struct WhiteboardView: View {
 
 	  if canClearBoard {
 		Button {
+		  trackTap("whiteboard_clear")
 		  clearDialogReason = .local
 		  isClearDialogPresented = true
 		} label: {
@@ -372,7 +375,7 @@ struct WhiteboardView: View {
   @ViewBuilder
   func jumpToPeerButton(viewSize: CGSize) -> some View {
 	if usesScrollableViewport(viewSize: viewSize), isPeerOffscreen {
-	  Button(action: jumpToPeer) {
+	  Button(action: { trackTap("whiteboard_jump_to_peer"); jumpToPeer() }) {
 		HStack(spacing: 6) {
 		  PlatformIcon(
 			systemName: "arrow.up",
@@ -399,6 +402,7 @@ struct WhiteboardView: View {
   func toolButton(_ tool: DrawingTool) -> some View {
 	let isActive = selectedTool == tool && !isMoveMode
 	return Button {
+	  trackTap("whiteboard_tool", detail: "\(tool)")
 	  selectedTool = tool
 	  activeStroke.removeAll()
 	  shapeStartLogical = nil

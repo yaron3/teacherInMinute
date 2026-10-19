@@ -58,6 +58,7 @@ struct SessionTabToggle: View {
     let isSelected = item.id == selected
     let isIconOnly = isSelected && compactsSelected
     return Button {
+      trackTap("session_tab", detail: "\(item.id)")
       onSelect(item.id)
     } label: {
       HStack(spacing: 9) {
@@ -117,6 +118,7 @@ struct SessionCloseButton: View {
 
   var body: some View {
     Button {
+      trackTap("session_close")
       action()
     } label: {
       Image("brand-close-circle", bundle: .module)
@@ -418,6 +420,7 @@ struct SessionMediaControl: View {
         optionsButton
       }
       Button {
+        trackTap("session_media_type_picker")
         onPickType()
       } label: {
         HStack(spacing: 2) {
@@ -439,6 +442,7 @@ struct SessionMediaControl: View {
 
   var optionsButton: some View {
     Button {
+      trackTap("session_media_options")
       if actions.isEmpty {
         onPickType()
       } else {
@@ -462,6 +466,7 @@ struct SessionMediaControl: View {
     VStack(spacing: 7) {
       ForEach(actions) { action in
         Button {
+          trackTap("session_media_action", detail: action.id)
           action.action()
         } label: {
           Image(action.iconName, bundle: .module)
@@ -556,6 +561,7 @@ struct SessionMessageComposer: View {
 
   var sendButton: some View {
     Button {
+      trackTap("session_message_send")
       send()
     } label: {
       Image("session-send", bundle: .module)
@@ -584,6 +590,7 @@ struct SessionMessageComposer: View {
         .accessibilityIdentifier("chat_message_field")
 
       Button {
+        trackTap("session_math")
         onMath()
       } label: {
         Image("session-math", bundle: .module)

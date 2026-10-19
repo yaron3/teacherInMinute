@@ -52,6 +52,7 @@ struct ChatInputBar: View {
           .accessibilityIdentifier("chat_message_field")
 
         Button {
+          trackTap("chat_send")
           send()
         } label: {
           PlatformIcon(systemName: "paperplane.fill", size: 15, weight: .bold, color: theme.onDarkFill)

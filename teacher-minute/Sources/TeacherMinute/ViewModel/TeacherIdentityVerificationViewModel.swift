@@ -72,7 +72,7 @@ final class TeacherIdentityVerificationViewModel {
 	Task {
 	  defer { isCheckingCompletion = false }
 	  guard let uid = Auth.auth().currentUser?.uid else { return }
-	  let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+	  let data = (await attempt({ try await UserService.shared.fetchRaw(uid: uid) })) ?? [:]
 	  let docs = data["uploadedDocuments"] as? [String] ?? []
 	  // Auto-advance only when front side is uploaded (minimum requirement)
 	  if docs.contains(where: { $0.contains("_front") }) {

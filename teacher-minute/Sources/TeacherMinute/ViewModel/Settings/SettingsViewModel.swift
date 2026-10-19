@@ -112,6 +112,7 @@ class SettingsViewModel: SettingsViewModeling {
                 AnalyticsService.shared.logEvent(AnalyticsEvent.passwordResetSent, parameters: ["method": "email"])
                 present(title: LocalizationSupport.localized("Change Password"), message: LocalizationSupport.localized("Password reset email sent."))
             } catch {
+                logger.error("[SettingsViewModel] \(error.localizedDescription)")
                 present(title: LocalizationSupport.localized("Change Password"), message: error.localizedDescription)
             }
         }
@@ -170,11 +171,16 @@ class SettingsViewModel: SettingsViewModeling {
             try await authService.deleteCurrentUser()
             return true
         } catch (let error){
+            logger.error("[SettingsViewModel] \(error.localizedDescription)")
             present(
                 title: LocalizationSupport.localized("Delete Account"),
                 message: error.localizedDescription
             )
-			Analytics.logEvent("Delete Account error", parameters: ["error" : error])
+            // Firebase drops an event whose name has spaces, and an `Error`
+            // value is not a valid parameter, so the old event never arrived.
+            AnalyticsService.shared.logEvent(AnalyticsEvent.deleteAccountFailed, parameters: [
+                "reason": String(error.localizedDescription.prefix(100))
+            ])
             return false
         }
     }
@@ -184,6 +190,7 @@ class SettingsViewModel: SettingsViewModeling {
             try authService.signOut()
             return true
         } catch {
+            logger.error("[SettingsViewModel] \(error.localizedDescription)")
             present(title: LocalizationSupport.localized("Log Out"), message: error.localizedDescription)
             return false
         }
@@ -227,7 +234,7 @@ class SettingsViewModel: SettingsViewModeling {
         isLoading = true
         Task {
             defer { isLoading = false }
-            let userData = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+            let userData = (await attempt({ try await UserService.shared.fetchRaw(uid: uid) })) ?? [:]
             let name = userDisplayName(from: userData)
             contactSupportPreview = ContactSupportService.shared.makeRequest(
                 title: title,
@@ -283,6 +290,7 @@ class SettingsViewModel: SettingsViewModeling {
             let url = try await remoteConfigService.fetchEULAURL()
             navigationPath.append(.webPage(title: title, url: url))
         } catch {
+            logger.error("[SettingsViewModel] \(error.localizedDescription)")
             present(title: title, message: error.localizedDescription)
         }
     }
@@ -328,6 +336,7 @@ class SettingsViewModel: SettingsViewModeling {
         do {
             navigationPath.append(.webPage(title: title, url: try await fetchURL()))
         } catch {
+            logger.error("[SettingsViewModel] \(error.localizedDescription)")
             present(title: title, message: error.localizedDescription)
         }
     }

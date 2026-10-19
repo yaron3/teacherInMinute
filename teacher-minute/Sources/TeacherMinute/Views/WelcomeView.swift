@@ -89,11 +89,13 @@ struct WelcomeView: View {
           Spacer(minLength: 24)
 
           BrandPrimaryButton(title: viewModel.signUpLabel) {
+            trackTap("welcome_sign_up")
             router.push(.createAccount)
           }
           .accessibilityIdentifier("welcome_sign_up")
 
           Button {
+            trackTap("welcome_log_in")
             router.push(.login)
           } label: {
             Text(viewModel.logInLabel)

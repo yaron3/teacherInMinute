@@ -69,6 +69,7 @@ struct VerifyEmailView: View {
             .padding(.top, 12)
 
           Button {
+            trackTap("verify_email_edit")
             OnboardingBackCoordinator.shared.handleBack()
           } label: {
             HStack(spacing: 6) {
@@ -102,11 +103,13 @@ struct VerifyEmailView: View {
         // No "I've verified": the link itself brings the student back and
         // moves this step on.
         BrandSecondaryButton(title: viewModel.resendLabel) {
+          trackTap("verify_email_resend")
           Task { await viewModel.resendTapped() }
         }
         .disabled(viewModel.isWorking)
 
         Button {
+          trackTap("verify_email_not_now")
           viewModel.notNowTapped()
         } label: {
           Text(viewModel.notNowLabel)
@@ -170,6 +173,7 @@ struct VerifyEmailView: View {
     HStack(spacing: 12) {
       Spacer(minLength: 0)
       BrandBackButton(accessibilityLabel: viewModel.backLabel) {
+        trackTap("verify_email_back")
         OnboardingBackCoordinator.shared.handleBack()
       }
     }

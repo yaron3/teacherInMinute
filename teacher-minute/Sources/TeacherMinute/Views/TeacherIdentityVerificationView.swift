@@ -110,6 +110,7 @@ struct TeacherIdentityVerificationView: View {
       }
 #else
       Button {
+        trackTap("identity_front_pick")
         androidPickTarget = .governmentIDFront
         showAndroidPhotoSourceDialog = true
       } label: {
@@ -141,6 +142,7 @@ struct TeacherIdentityVerificationView: View {
       title: viewModel.submitForReviewLabel,
       isEnabled: viewModel.canSubmit
     ) {
+      trackTap("identity_submit")
       Task { @MainActor in
         viewModel.submitForReview()
       }
@@ -148,6 +150,7 @@ struct TeacherIdentityVerificationView: View {
     .padding(.top, 8)
 
     BrandSecondaryButton(title: viewModel.continueUploadLaterLabel) {
+      trackTap("identity_upload_later")
       Task { @MainActor in
         viewModel.onSubmit?()
       }
@@ -227,7 +230,7 @@ struct TeacherIdentityVerificationView: View {
 		logger.info("TeacherMinute Android image decoded target=\(target) bytes=\(data.count)")
 		viewModel.handlePickedImage(data, for: target)
 	  } catch {
-		logger.info("TeacherMinute Android image pick failed target=\(target) error=\(error)")
+		logger.error("TeacherMinute Android image pick failed target=\(target) error=\(error)")
 		viewModel.uploadError = error.localizedDescription
 	  }
 	}

@@ -119,7 +119,7 @@ final class CompleteProfileViewModel {
 	Task {
 	  defer { isCheckingCompletion = false }
 	  guard let uid = Auth.auth().currentUser?.uid else { return }
-	  let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+	  let data = (await attempt({ try await UserService.shared.fetchRaw(uid: uid) })) ?? [:]
 	  let savedName  = data["fullName"]    as? String ?? ""
 	  let savedPhone = data["phoneNumber"] as? String ?? ""
 	  let hasName  = !savedName.isEmpty

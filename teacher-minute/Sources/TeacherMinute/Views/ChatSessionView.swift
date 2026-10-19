@@ -490,6 +490,7 @@ struct ChatSessionView: View {
 
         VStack(spacing: 10) {
           Button {
+            trackTap("chat_end_prompt_primary", detail: "\(prompt)")
             handleEndSessionPrimaryAction(prompt)
           } label: {
             HStack {
@@ -518,6 +519,7 @@ struct ChatSessionView: View {
             // peer already ended the session the chat copy is saved separately.
             if !saveBoardIsRemoteInitiated {
               Button {
+                trackTap("chat_end_save_to_chat_only")
                 endSessionAfterSnapshot(saveToChat: true, saveToGallery: false)
               } label: {
                 Text(viewModel.saveToChatOnlyLabel)
@@ -534,6 +536,7 @@ struct ChatSessionView: View {
 
             // End without saving the board anywhere.
             Button {
+              trackTap("chat_end_dont_save")
               finalizeEndSession()
             } label: {
               Text(viewModel.dontSaveLabel)
@@ -546,6 +549,7 @@ struct ChatSessionView: View {
             .disabled(isEndingSession)
           } else if prompt == .studentOutOfMinutes {
             Button {
+              trackTap("chat_end_call_out_of_minutes")
               endSessionPrompt = nil
               requestEndSession()
             } label: {
@@ -563,6 +567,7 @@ struct ChatSessionView: View {
             // Where buying is the primary action, ending is offered here.
             if onBuyMinutes != nil {
               Button {
+                trackTap("chat_end_call_farewell")
                 endSessionPrompt = .farewell
               } label: {
                 Text(viewModel.endTheCallLabel)
@@ -579,6 +584,7 @@ struct ChatSessionView: View {
             EmptyView()
           } else if prompt == .farewell {
             Button {
+              trackTap("chat_end_farewell_cancel")
               endSessionPrompt = .outOfMinutes
             } label: {
               Text(viewModel.cancelLabel)
@@ -591,6 +597,7 @@ struct ChatSessionView: View {
             .disabled(isEndingSession)
           } else {
             Button {
+              trackTap("chat_end_cancel")
               endSessionPrompt = nil
             } label: {
               Text(viewModel.cancelLabel)
@@ -1325,6 +1332,7 @@ struct ChatSessionView: View {
   func composerModeToggle(scrollProxy: ScrollViewProxy? = nil) -> some View {
     HStack(spacing: 6) {
       composerModePill(title: viewModel.regularModeLabel, isSelected: composerMode == .regular) {
+        trackTap("chat_keyboard_regular")
         composerMode = .regular
         isMessageFieldFocused = true
         if let scrollProxy {
@@ -1332,6 +1340,7 @@ struct ChatSessionView: View {
         }
       }
       composerModePill(title: viewModel.algebraModeLabel, isSelected: composerMode == .algebra) {
+        trackTap("chat_keyboard_algebra")
         composerMode = .algebra
         // The math keys are the keyboard in this mode. Dropping the focus state
         // is not enough to send the system one away on Android — SkipUI's
@@ -1419,6 +1428,7 @@ struct ChatSessionView: View {
   @ViewBuilder var sessionConditionNotice: some View {
     if let sessionTypeNotice {
       Button {
+        trackTap("chat_session_type_notice_dismiss")
         self.sessionTypeNotice = nil
       } label: {
         conditionLine(icon: "exclamationmark.triangle.fill", text: sessionTypeNotice, color: theme.danger)
@@ -1470,6 +1480,7 @@ struct ChatSessionView: View {
   /// Background audio gave up after its retries; tapping the line starts it again.
   var audioFailedNoticeButton: some View {
     Button {
+      trackTap("chat_audio_retry")
       retryMediaConnection()
     } label: {
       conditionLine(icon: "arrow.clockwise", text: viewModel.audioFailedNotice, color: theme.danger)

@@ -135,6 +135,7 @@ private final class ProfileImageCache {
             try resizedData.write(to: fileURL, options: [.atomic])
             return resizedImage
         } catch {
+            logger.error("[ProfileAvatarView] \(error.localizedDescription)")
             return nil
         }
     }

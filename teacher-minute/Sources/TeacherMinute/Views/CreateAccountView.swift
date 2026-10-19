@@ -92,6 +92,7 @@ struct CreateAccountView: View {
       }
       Spacer(minLength: 0)
       BrandBackButton(accessibilityLabel: viewModel.backLabel) {
+        trackTap("sign_up_back")
         router.pop()
       }
     }
@@ -126,7 +127,7 @@ struct CreateAccountView: View {
       )
       .focused($focusedField, equals: .email)
       .submitLabel(.next)
-      .onSubmit { focusedField = .password }
+      .onSubmit { trackTap("sign_up_email_return_key"); focusedField = .password }
 
       BrandTextField(
         title: viewModel.passwordFieldTitle,
@@ -140,7 +141,7 @@ struct CreateAccountView: View {
       )
       .focused($focusedField, equals: .password)
       .submitLabel(.next)
-      .onSubmit { focusedField = .confirmPassword }
+      .onSubmit { trackTap("sign_up_password_return_key"); focusedField = .confirmPassword }
 
       BrandTextField(
         title: viewModel.confirmPasswordFieldTitle,
@@ -165,6 +166,7 @@ struct CreateAccountView: View {
       }
 
       BrandPrimaryButton(title: viewModel.continueLabel, isLoading: viewModel.isLoading) {
+        trackTap("sign_up_continue")
         Task { await viewModel.signup() }
       }
 
@@ -202,13 +204,13 @@ struct CreateAccountView: View {
     VStack(alignment: .leading, spacing: 6) {
       consentText(Self.plainAgreementText(markdown))
       HStack(spacing: 16) {
-        Button { viewModel.openTerms() } label: {
+        Button { trackTap("sign_up_terms"); viewModel.openTerms() } label: {
           Text(viewModel.termsOfServiceTitle)
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(theme.brandActionBackground)
         }
         .buttonStyle(.plain)
-        Button { viewModel.openPrivacy() } label: {
+        Button { trackTap("sign_up_privacy"); viewModel.openPrivacy() } label: {
           Text(viewModel.privacyPolicyTitle)
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(theme.brandActionBackground)
@@ -314,6 +316,7 @@ struct CreateAccountView: View {
     action: @escaping () -> Void
   ) -> some View {
     Button {
+      trackTap("sign_up_social", detail: identifier)
       action()
     } label: {
       HStack(spacing: 8) {
@@ -341,6 +344,7 @@ struct CreateAccountView: View {
       Text(viewModel.alreadyHaveAccountText)
         .foregroundStyle(theme.brandSecondaryText)
       Button {
+        trackTap("sign_up_log_in")
         router.push(.login)
       } label: {
         Text(viewModel.logInLabel)

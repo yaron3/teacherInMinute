@@ -99,6 +99,7 @@ enum AnalyticsEvent {
 
     // Settings / misc
     static let languageChanged        = "language_changed"
+    static let deleteAccountFailed    = "delete_account_failed"
     static let permissionRequest      = "permission_request"
     static let permissionGranted      = "permission_granted"
     static let permissionDenied       = "permission_denied"
@@ -123,6 +124,14 @@ enum AnalyticsEvent {
 
     // Backend errors
     static let firestorePermissionDenied = "firestore_permission_denied"
+
+    // Every tap and every error, whatever else they log
+    /// A button, toggle, picker or other control was tapped. `element` names
+    /// it (`login_submit`) and `screen` is the last screen logged.
+    static let uiTap    = "ui_tap"
+    /// An error was thrown or logged. `source` is where (`Type.function`),
+    /// `message` what.
+    static let appError = "app_error"
 }
 
 /// Names for `screen_view` tracking. Used as the `screen_name` parameter.
@@ -166,6 +175,12 @@ final class AnalyticsService {
     static let shared = AnalyticsService()
 
     private init() {}
+
+    /// The screen most recently logged, attached to every tap.
+    var currentScreen = ""
+    /// When each error source last reached Analytics, so one failing in a
+    /// loop does not flood it.
+    var lastErrorReport: [String: Date] = [:]
 
     // MARK: - Setup
 
@@ -215,11 +230,23 @@ final class AnalyticsService {
             AnalyticsParameterScreenName: screen,
             AnalyticsParameterScreenClass: screenClass ?? AnalyticsService.screenTitle(for: screen)
         ]
+        currentScreen = screen
         Analytics.logEvent(AnalyticsEventScreenView, parameters: params)
         // The Events list shows every screen_view as one row; a per-screen
         // event (`screen_student_home`) makes each screen its own row there.
         Analytics.logEvent("screen_\(screen)", parameters: nil)
         Crashlytics.crashlytics().log("screen_view \(screen)")
+    }
+
+    /// Counts a tap. `element` is a stable snake_case name for the control,
+    /// prefixed by its screen (`login_submit`); `detail` tells apart the
+    /// items of a list (`subject` id, star count…), never personal data.
+    func logTap(_ element: String, detail: String? = nil) {
+        var params: [String: Any] = ["element": element, "screen": currentScreen]
+        if let detail, !detail.isEmpty {
+            params["detail"] = detail
+        }
+        logEvent(AnalyticsEvent.uiTap, parameters: params)
     }
 
     // MARK: - Purchase helpers
@@ -281,11 +308,46 @@ final class AnalyticsService {
 
     // MARK: - Crashlytics
 
+    /// Reports `error` to Analytics (`app_error`) and Crashlytics (a log line
+    /// and a non-fatal). `context` names where it happened.
     func recordError(_ error: Error, context: String? = nil) {
-        if let context {
-            Crashlytics.crashlytics().log("error in \(context): \(error.localizedDescription)")
+        reportError(source: context ?? "unknown", message: error.localizedDescription, error: error)
+    }
+
+    /// The one place errors are reported, from `recordError` and from every
+    /// `logger.error`. Crashlytics always gets the log line; the Analytics
+    /// event and the non-fatal are sent at most once a minute per source and
+    /// message.
+    func reportError(source: String, message: String, error: Error?) {
+        guard ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" else { return }
+        let crashlytics = Crashlytics.crashlytics()
+        crashlytics.log("error in \(source): \(message)")
+
+        let key = "\(source)|\(message)"
+        let now = Date()
+        if let last = lastErrorReport[key], now.timeIntervalSince(last) < 60 {
+            return
         }
-        Crashlytics.crashlytics().record(error: error)
+        lastErrorReport[key] = now
+
+        var params: [String: Any] = [
+            "source": String(source.prefix(100)),
+            "message": String(message.prefix(100))
+        ]
+        if let error {
+            let nsError = error as NSError
+            params["error_domain"] = String(nsError.domain.prefix(100))
+            params["error_code"] = nsError.code
+        }
+        Analytics.logEvent(AnalyticsEvent.appError, parameters: params)
+
+        // A logged message has no Error of its own; its source is the domain,
+        // so Crashlytics groups each call site as one issue.
+        crashlytics.record(error: error ?? NSError(
+            domain: source,
+            code: 0,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        ), userInfo: ["source": source])
     }
 
     /// Emits a `firestore_permission_denied` analytics event when `error`
@@ -367,6 +429,14 @@ final class AnalyticsService {
             AnalyticsService.shared.logScreen(screen)
         }
     }
+}
+
+/// Counts a tap on a control: call it first thing in the control's action.
+/// Like `trackScreen`, it is instrumentation rather than view logic, so views
+/// call it directly. See `AnalyticsService.logTap`.
+@MainActor
+func trackTap(_ element: String, detail: String? = nil) {
+    AnalyticsService.shared.logTap(element, detail: detail)
 }
 
 extension View {

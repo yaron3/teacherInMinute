@@ -85,6 +85,7 @@ struct EmailRewardBanner: View {
         // No "I've verified": the link itself opens the app and credits the
         // reward, and the banner drops its offer when it comes back.
         Button {
+          trackTap("email_reward_resend")
           Task { await viewModel.resendTapped() }
         } label: {
           Text(viewModel.resendLabel)

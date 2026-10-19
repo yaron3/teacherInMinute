@@ -72,7 +72,7 @@ struct PrivacyControlsSettingsView: View {
 
     func brandToggleRow(_ title: String, isOn: Bool, identifier: String, action: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
-            BrandToggle(isOn: isOn, action: action)
+            BrandToggle(isOn: isOn, action: { trackTap("privacy_toggle", detail: identifier); action() })
                 .accessibilityIdentifier("privacy_toggle_\(identifier)")
             Text(title)
                 .font(.system(size: 16))
@@ -89,13 +89,13 @@ struct PrivacyControlsSettingsView: View {
     // participant — a device-local @AppStorage value is invisible to it.
     private func loadShowProfileImage() async {
         guard let uid = authService.currentUserID,
-              let data = try? await UserService.shared.fetchRaw(uid: uid),
+              let data = await attempt({ try await UserService.shared.fetchRaw(uid: uid) }),
               let stored = data["showProfileImage"] as? Bool else { return }
         showProfileImage = stored
     }
 
     private func persistShowProfileImage(_ newValue: Bool) async {
         guard let uid = authService.currentUserID else { return }
-        try? await UserService.shared.updateShowProfileImage(uid: uid, enabled: newValue)
+        await attempt({ try await UserService.shared.updateShowProfileImage(uid: uid, enabled: newValue) })
     }
 }

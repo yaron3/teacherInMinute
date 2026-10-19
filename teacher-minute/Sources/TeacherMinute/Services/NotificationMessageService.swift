@@ -31,8 +31,8 @@ final class NotificationMessageService {
     private init() {}
 
     func fetchMessages(uid: String) async throws -> [NotificationMessage] {
-        let incoming = (try? await fetchIncomingMessages(uid: uid)) ?? []
-        let general = (try? await fetchGeneralMessages(uid: uid)) ?? []
+        let incoming = (await attempt({ try await fetchIncomingMessages(uid: uid) })) ?? []
+        let general = (await attempt({ try await fetchGeneralMessages(uid: uid) })) ?? []
         return (incoming + general).sorted { $0.timestamp > $1.timestamp }
     }
 
@@ -106,11 +106,11 @@ final class NotificationMessageService {
         var messages: [NotificationMessage] = []
         var seenMessageIDs = Set<String>()
 
-        if let snapshot = try? await Firestore.firestore()
+        if let snapshot = await attempt({ try await Firestore.firestore()
             .collection("users")
             .document(uid)
             .collection("generalMessages")
-            .getDocuments() {
+            .getDocuments() }) {
             for document in snapshot.documents {
                 let referenceData = document.data()
                 let messageID = Self.firstString(in: referenceData, keys: ["messageID", "messageId", "id"])

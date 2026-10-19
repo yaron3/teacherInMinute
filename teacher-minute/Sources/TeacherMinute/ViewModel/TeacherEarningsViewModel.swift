@@ -471,6 +471,7 @@ final class TeacherEarningsViewModel {
             if case .cancelled = error {
                 logger.info("[Earnings] PayPal payout connect cancelled")
             } else {
+                logger.error("[Earnings] PayPal payout connect failed: \(error.localizedDescription)")
                 payoutMethodErrorMessage = error.localizedDescription
             }
         } catch let error as FunctionsError {

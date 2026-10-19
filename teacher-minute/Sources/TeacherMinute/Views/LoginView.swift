@@ -71,6 +71,7 @@ struct LoginView: View {
     HStack(spacing: 12) {
       Spacer(minLength: 0)
       BrandBackButton(accessibilityLabel: viewModel.backLabel) {
+        trackTap("login_back")
         router.pop()
       }
     }
@@ -105,7 +106,7 @@ struct LoginView: View {
       )
       .focused($focusedField, equals: .email)
       .submitLabel(.next)
-      .onSubmit { focusedField = .password }
+      .onSubmit { trackTap("login_email_return_key"); focusedField = .password }
       .accessibilityIdentifier("email_input")
 
       BrandTextField(
@@ -122,6 +123,7 @@ struct LoginView: View {
       .accessibilityIdentifier("password_input")
 
       Button {
+        trackTap("login_forgot_password")
         viewModel.forgotPassword()
       } label: {
         Text(viewModel.forgotPasswordLabel)
@@ -136,6 +138,7 @@ struct LoginView: View {
         isLoading: viewModel.isLoading,
         isEnabled: viewModel.canSubmit
       ) {
+        trackTap("login_submit")
         Task { await viewModel.login() }
       }
 
@@ -197,6 +200,7 @@ struct LoginView: View {
     action: @escaping () -> Void
   ) -> some View {
     Button {
+      trackTap("login_social", detail: identifier)
       action()
     } label: {
       HStack(spacing: 8) {
@@ -224,6 +228,7 @@ struct LoginView: View {
       Text(viewModel.noAccountText)
         .foregroundStyle(theme.brandSecondaryText)
       Button {
+        trackTap("login_sign_up")
         router.push(.createAccount)
       } label: {
         Text(viewModel.signUpLabel)

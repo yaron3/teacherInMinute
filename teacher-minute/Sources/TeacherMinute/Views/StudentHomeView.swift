@@ -409,6 +409,7 @@ struct StudentHomeView: View {
   @ViewBuilder
   var heroAskTeacherButton: some View {
     Button {
+      trackTap("home_ask_teacher_hero")
       askTeacherTapped()
     } label: {
       heroAskTeacherButtonContent
@@ -789,7 +790,7 @@ struct StudentHomeView: View {
           .minimumScaleFactor(0.8)
 
         if let actionTitle, let action {
-          Button(action: action) {
+          Button(action: { trackTap("home_info_card_action", detail: systemImage); action() }) {
             Text(actionTitle)
               .font(.system(size: 15, weight: .bold))
               .foregroundStyle(theme.info)
@@ -923,6 +924,7 @@ struct StudentHomeView: View {
 
   func creditOptionCard(_ option: PricingOption) -> some View {
     Button {
+      trackTap("home_credit_option", detail: option.id)
       beginCheckout(option)
     } label: {
       FlatCard(outlined: true) {
@@ -999,6 +1001,7 @@ struct StudentHomeView: View {
 		.frame(maxWidth: .infinity, alignment: .leading)
 
 	  Button {
+		trackTap("home_redeem_coupon")
 		Task {
 		  await viewModel.redeemCouponFromHome()
 		}
@@ -1033,6 +1036,7 @@ struct StudentHomeView: View {
 		  .multilineTextAlignment(.center)
 
 		Button {
+		  trackTap("home_payment_result_ok")
 		  viewModel.consumePaymentResult()
 		} label: {
 		  Text(viewModel.okLabel)
@@ -1178,6 +1182,7 @@ struct StudentHomeView: View {
   
   var askTeacherCard: some View {
 	Button {
+	  trackTap("home_ask_teacher_card")
 	  askTeacherTapped()
 	} label: {
 	  askTeacherCardContent
@@ -1271,7 +1276,7 @@ struct StudentHomeView: View {
       Spacer()
 
       if let actionTitle, let action {
-        Button(action: action) {
+        Button(action: { trackTap("home_section_action"); action() }) {
           Text(actionTitle)
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(theme.primaryText)
@@ -1309,7 +1314,7 @@ struct ConversationTypeChip: View {
 	}
   }
   var body: some View {
-	Button(action: action) {
+	Button(action: { trackTap("conversation_type_chip", detail: systemIcons.joined(separator: ",")); action() }) {
 	  HStack(spacing: 6) {
 		ForEach(systemIcons, id: \.self) { icon in
 		  PlatformIcon(
@@ -1377,7 +1382,7 @@ struct MatchedOverlay: View {
 		  .foregroundStyle(theme.secondaryText)
 		  .multilineTextAlignment(.center)
 
-		Button(action: onDismiss) {
+		Button(action: { trackTap("matched_overlay_done"); onDismiss() }) {
 		  Text(doneLabel)
 			.font(.system(size: 15, weight: .semibold))
 			.foregroundStyle(theme.onAccentText)
@@ -1408,6 +1413,7 @@ struct NoMatchOverlay: View {
 	  BrandModalBadge(systemName: "person.slash.fill")
 	  BrandModalText(title: title, message: message)
 	  BrandPrimaryButton(title: okLabel) {
+		trackTap("no_match_overlay_ok")
 		onDismiss()
 	  }
 	}
@@ -1428,6 +1434,7 @@ struct ErrorOverlay: View {
 	  BrandModalBadge(systemName: "exclamationmark.triangle.fill")
 	  BrandModalText(title: title, message: message)
 	  BrandPrimaryButton(title: okLabel) {
+		trackTap("error_overlay_ok")
 		onDismiss()
 	  }
 	}
@@ -1483,7 +1490,7 @@ struct PricingCard: View {
           .padding(.top, 8)
           .frame(maxWidth: .infinity, alignment: .topLeading)
 
-        Button(action: action) {
+        Button(action: { trackTap("pricing_card", detail: option.id); action() }) {
           HStack(spacing: 8) {
             if isLoading {
               ProgressView()
@@ -1815,6 +1822,7 @@ struct RedeemCouponSheet: View {
 		  .padding(.horizontal)
 		
 		Button {
+		  trackTap("coupon_redeem")
 		  Task {
 			state = await onRedeem(couponCode)
 		  }
@@ -1849,6 +1857,7 @@ struct RedeemCouponSheet: View {
 	  .toolbar {
 		ToolbarItem(placement: .cancellationAction) {
 		  Button(cancelLabel) {
+			trackTap("coupon_cancel")
 			onDismiss()
 		  }
 		}

@@ -169,8 +169,8 @@ final class UserService {
 	// app offers that start, but an anonymous session is the student's either
 	// way. The profile is written again if the one written at the start was lost.
 	if Auth.auth().currentUser?.isAnonymous == true {
-	  if (try? await fetchRaw(uid: uid))?["role"] == nil {
-		try? await saveAnonymousStudentProfile(uid: uid)
+	  if (await attempt({ try await fetchRaw(uid: uid) }))?["role"] == nil {
+		await attempt({ try await saveAnonymousStudentProfile(uid: uid) })
 	  }
 	  return .home(role: .student)
 	}

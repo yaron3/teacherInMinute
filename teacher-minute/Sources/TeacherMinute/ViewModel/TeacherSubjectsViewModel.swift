@@ -156,7 +156,7 @@ final class TeacherSubjectsViewModel {
 
   private func restoreExistingSelections() async {
 	guard let uid = Auth.auth().currentUser?.uid else { return }
-	let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+	let data = (await attempt({ try await UserService.shared.fetchRaw(uid: uid) })) ?? [:]
 	guard let selections = data["subjectSelections"] as? [String: [String]], !selections.isEmpty else { return }
 
 	for area in subjectAreas {
@@ -272,11 +272,15 @@ final class TeacherSubjectsViewModel {
 		  return (area.englishTitle, keys)
 		}
 	  )
-	  try? await db.collection("users").document(uid).setData([
-		"subjectAreaIDs": selectedAreaIDs,
-		"subjectAreas": selectedAreaTitles,
-		"subjectSelections": subjectSelections
-	  ], merge: true)
+	  do {
+		try await db.collection("users").document(uid).setData([
+		  "subjectAreaIDs": selectedAreaIDs,
+		  "subjectAreas": selectedAreaTitles,
+		  "subjectSelections": subjectSelections
+		], merge: true)
+	  } catch {
+		logger.error("[TeacherSubjects] saving subjects failed: \(error.localizedDescription)")
+	  }
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.teacherSubjectsSaved, parameters: [
 		"area_count": selectedAreaIDs.count,
 		"subtopic_count": subjectSelections.values.reduce(0) { $0 + $1.count },

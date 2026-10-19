@@ -24,6 +24,12 @@ extension PhotoSourceViewModeling {
         LocalizationSupport.localized("Camera access is disabled. Open Settings and enable camera access to take a photo.")
     }
     var openSettingsLabel: String { LocalizationSupport.localized("Open Settings") }
+
+    var photoSourceCameraDeniedTitle: String { LocalizationSupport.localized("Camera access required") }
+    var photoSourceCameraDeniedMessage: String {
+        LocalizationSupport.localized("Enable camera access in Settings to take photos.")
+    }
+    var photoSourceNotNowLabel: String { LocalizationSupport.localized("Not now") }
 }
 
 extension ProfileViewModel: PhotoSourceViewModeling {}

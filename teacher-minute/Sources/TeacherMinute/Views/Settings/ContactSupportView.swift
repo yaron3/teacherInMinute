@@ -94,6 +94,7 @@ struct ContactSupportView: View {
                 isLoading: viewModel.isLoading,
                 isEnabled: !viewModel.isSubmittingContactSupport
             ) {
+                trackTap("contact_support_submit")
                 viewModel.previewContactSupport()
             }
         }

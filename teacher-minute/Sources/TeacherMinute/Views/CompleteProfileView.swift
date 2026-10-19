@@ -107,6 +107,7 @@ struct CompleteProfileView: View {
         .minimumScaleFactor(0.6)
       Spacer(minLength: 0)
       BrandBackButton(accessibilityLabel: viewModel.backLabel) {
+        trackTap("complete_profile_back")
         OnboardingBackCoordinator.shared.handleBack()
       }
     }
@@ -126,7 +127,7 @@ struct CompleteProfileView: View {
       )
       .focused($focusedField, equals: .fullName)
       .submitLabel(.next)
-      .onSubmit { focusedField = viewModel.showsEmailField ? .email : .phone }
+      .onSubmit { trackTap("complete_profile_name_return_key"); focusedField = viewModel.showsEmailField ? .email : .phone }
 
       if viewModel.showsEmailField {
         BrandTextField(
@@ -142,7 +143,7 @@ struct CompleteProfileView: View {
         )
         .focused($focusedField, equals: .email)
         .submitLabel(.next)
-        .onSubmit { focusedField = .phone }
+        .onSubmit { trackTap("complete_profile_email_return_key"); focusedField = .phone }
       }
 
       BrandTextField(
@@ -176,6 +177,7 @@ struct CompleteProfileView: View {
         isLoading: viewModel.isLoading,
         isEnabled: viewModel.canContinue
       ) {
+        trackTap("complete_profile_continue")
         viewModel.continueFlow()
       }
     }

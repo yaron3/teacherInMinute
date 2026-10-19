@@ -164,6 +164,7 @@ struct TeacherDocumentsView: View {
     let title = viewModel.title(for: target)
     let uploading = viewModel.isUploading(target)
     return Button {
+      trackTap("documents_upload", detail: "\(target)")
       androidPickTarget = target
       showAndroidPhotoSourceDialog = true
     } label: {
@@ -194,6 +195,7 @@ struct TeacherDocumentsView: View {
         guard !base64.isEmpty, let data = Data(base64Encoded: base64) else { return }
         viewModel.handlePickedImage(data, for: target)
       } catch {
+        logger.error("[TeacherDocumentsView] \(error.localizedDescription)")
         viewModel.errorMessage = error.localizedDescription
       }
     }
@@ -219,6 +221,7 @@ struct TeacherDocumentsView: View {
         .font(.system(size: 13, weight: .semibold))
         .foregroundStyle(theme.danger)
       Button {
+        trackTap("documents_retry")
         Task { await viewModel.load() }
       } label: {
         Text(viewModel.retryLabel)

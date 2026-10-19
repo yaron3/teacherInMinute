@@ -102,7 +102,7 @@ struct ConnectionSetupView: View {
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(viewModel.statusTextColorNeedsAttention ? theme.warning : theme.secondaryText)
 
-      Button(action: onCancel) {
+      Button(action: { trackTap("connection_setup_cancel_session"); onCancel() }) {
         Text(viewModel.cancelSessionLabel)
           .font(.system(size: 12, weight: .semibold))
           .foregroundStyle(theme.accent)
@@ -146,6 +146,7 @@ struct ConnectionSetupView: View {
 
         VStack(spacing: 10) {
           Button {
+            trackTap("connection_setup_retry")
             viewModel.retry()
           } label: {
             Text(viewModel.retryLabel)
@@ -160,6 +161,7 @@ struct ConnectionSetupView: View {
 
           if let onContinueAsText {
             Button {
+              trackTap("connection_setup_continue_as_text")
               viewModel.continueAsText()
               onContinueAsText()
             } label: {
@@ -174,7 +176,7 @@ struct ConnectionSetupView: View {
             .buttonStyle(.plain)
           }
 
-          Button(action: onCancel) {
+          Button(action: { trackTap("connection_setup_cancel"); onCancel() }) {
             Text(viewModel.cancelLabel)
               .font(.system(size: 13, weight: .semibold))
               .foregroundStyle(theme.secondaryText)
@@ -236,6 +238,7 @@ struct ConnectionSetupView: View {
   var chatOfferButtons: some View {
     VStack(spacing: 10) {
       Button {
+        trackTap("connection_setup_start_with_chat")
         viewModel.startWithChat()
       } label: {
         Text(viewModel.startWithChatLabel)
@@ -249,6 +252,7 @@ struct ConnectionSetupView: View {
       .buttonStyle(.plain)
 
       Button {
+        trackTap("connection_setup_keep_waiting")
         viewModel.keepWaitingForMedia()
       } label: {
         Text(viewModel.keepWaitingLabel)
@@ -404,7 +408,7 @@ struct ConnectionSetupView: View {
         }
       }
 
-      Button(action: action) {
+      Button(action: { trackTap("connection_setup_permission_action", detail: icon); action() }) {
         HStack(spacing: 8) {
           PlatformIcon(systemName: buttonIcon, size: 11, weight: .bold, color: theme.onBrightFill)
           Text(buttonTitle)

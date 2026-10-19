@@ -92,7 +92,7 @@ public final class PushNotificationService: NSObject {
             try await writeToken(token, uid: uid, role: role)
 		  logger.info("[Push] ✅ FCM token written to RTDB uid=\(uid) role=\(role.rawValue)")
         } catch {
-            logger.info("[Push] ❌ FCM token registration failed: \(error.localizedDescription)")
+            logger.error("[Push] ❌ FCM token registration failed: \(error.localizedDescription)")
         }
     }
 
@@ -184,7 +184,7 @@ extension PushNotificationService: MessagingDelegate {
                 try await self.writeToken(fcmToken, uid: uid, role: role)
                 logger.info("[Push] ✅ refreshed FCM token written uid=\(uid)")
             } catch {
-                logger.info("[Push] ❌ FCM token refresh write failed: \(error.localizedDescription)")
+                logger.error("[Push] ❌ FCM token refresh write failed: \(error.localizedDescription)")
             }
         }
     }

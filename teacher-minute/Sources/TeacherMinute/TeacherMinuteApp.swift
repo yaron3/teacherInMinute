@@ -13,8 +13,9 @@ import SkipFirebaseAuth
 #endif
 
 
-/// A logger for the TeacherMinute module.
-let logger: Logger = Logger(subsystem: "com.yaronj.tim", category: "TeacherMinute")
+/// A logger for the TeacherMinute module. Its `error`s also reach Analytics
+/// and Crashlytics (`AppLogger`).
+let logger = AppLogger(subsystem: "com.yaronj.tim", category: "TeacherMinute")
 
 /// The shared top-level view for the app, loaded from the platform-specific App delegates below.
 ///

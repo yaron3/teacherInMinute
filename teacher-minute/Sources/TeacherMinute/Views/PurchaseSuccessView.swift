@@ -163,6 +163,7 @@ struct PurchaseSuccessView: View {
       }
 
       BrandPrimaryButton(title: viewModel.backToQuestionLabel) {
+        trackTap("purchase_success_done")
         onDone()
       }
       .accessibilityIdentifier("purchase_success_done")

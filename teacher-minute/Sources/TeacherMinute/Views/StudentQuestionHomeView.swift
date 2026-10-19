@@ -209,7 +209,7 @@ struct StudentQuestionHomeView: View {
         )
       }
       .tappableFrame()
-      .onTapGesture { dismissKeyboard() }
+      .onTapGesture { trackTap("question_home_background"); dismissKeyboard() }
     } else {
       ZStack {
         LinearGradient(
@@ -220,7 +220,7 @@ struct StudentQuestionHomeView: View {
         BrandStreaks()
       }
       .tappableFrame()
-      .onTapGesture { dismissKeyboard() }
+      .onTapGesture { trackTap("question_home_background"); dismissKeyboard() }
     }
   }
 
@@ -271,6 +271,7 @@ struct StudentQuestionHomeView: View {
   var menuButton: some View {
     if let sideMenuAction {
       Button {
+        trackTap("question_home_menu")
         dismissKeyboard()
         sideMenuAction.open()
       } label: {
@@ -335,6 +336,7 @@ struct StudentQuestionHomeView: View {
     let isSelected = mode == segment
     let color = isSelected ? theme.onBrandAction : theme.onDarkFill
     return Button {
+      trackTap("question_home_mode", detail: "\(segment)")
       select(segment)
     } label: {
       HStack(spacing: 9) {
@@ -357,6 +359,7 @@ struct StudentQuestionHomeView: View {
 
   var captureButton: some View {
     Button {
+      trackTap("question_home_capture")
       captureTapped()
     } label: {
       VStack(spacing: 0) {
@@ -481,6 +484,7 @@ struct StudentQuestionHomeView: View {
   func keyboardOption(_ option: ChatComposerMode, icon name: String, iconSize: CGFloat) -> some View {
     let isSelected = keyboardMode == option
     return Button {
+      trackTap("question_home_keyboard", detail: "\(option)")
       chooseKeyboard(option)
     } label: {
       HStack(spacing: 10) {
@@ -531,6 +535,7 @@ struct StudentQuestionHomeView: View {
         }
     } else if photoURL != nil {
       Button {
+        trackTap("question_home_remove_photo")
         self.photoURL = nil
         photoData = nil
       } label: {
@@ -543,6 +548,7 @@ struct StudentQuestionHomeView: View {
       .accessibilityIdentifier("delete_question_photo")
     } else {
       Button {
+        trackTap("question_home_add_photo")
         select(.photo)
       } label: {
         RoundedRectangle(cornerRadius: 4)
@@ -584,6 +590,7 @@ struct StudentQuestionHomeView: View {
             .environment(\.layoutDirection, .leftToRight)
 
           Button {
+            trackTap("question_home_remove_formula")
             attachedFormulas.remove(at: index)
           } label: {
             Circle()
@@ -636,6 +643,7 @@ struct StudentQuestionHomeView: View {
   func findTeacherButton(width: CGFloat) -> some View {
     let isBusy = isSubmitting || isUploadingPhoto
     return Button {
+      trackTap("question_home_find_teacher")
       findTeacherTapped()
     } label: {
       ZStack {
@@ -661,6 +669,7 @@ struct StudentQuestionHomeView: View {
 
   func loadMinutesButton(width: CGFloat) -> some View {
     Button {
+      trackTap("question_home_load_minutes")
       dismissKeyboard()
       onLoadMinutes()
     } label: {
@@ -821,6 +830,7 @@ struct StudentQuestionHomeView: View {
     do {
       data = try await viewModel.takeQuestionPhoto()
     } catch {
+      logger.error("[StudentQuestionHomeView] \(error.localizedDescription)")
       isTakingPhoto = false
       photoErrorMessage = error.localizedDescription
       return
@@ -837,6 +847,7 @@ struct StudentQuestionHomeView: View {
     do {
       photoURL = try await viewModel.uploadQuestionPhoto(data, source: source)
     } catch {
+      logger.error("[StudentQuestionHomeView] \(error.localizedDescription)")
       photoData = nil
       photoErrorMessage = error.localizedDescription
     }
@@ -853,6 +864,7 @@ struct StudentQuestionHomeView: View {
         select(.text)
         await attachPhoto(data, source: .library)
       } catch {
+        logger.error("[StudentQuestionHomeView] \(error.localizedDescription)")
         photoErrorMessage = error.localizedDescription
       }
     }
@@ -867,6 +879,7 @@ struct StudentQuestionHomeView: View {
       select(.text)
       await attachPhoto(photo, source: .library)
     } catch {
+      logger.error("[StudentQuestionHomeView] \(error.localizedDescription)")
       photoErrorMessage = error.localizedDescription
     }
   }

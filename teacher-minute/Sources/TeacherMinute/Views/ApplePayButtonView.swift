@@ -32,7 +32,8 @@ struct ApplePayButtonView: UIViewRepresentable {
     init(action: @escaping () -> Void) {
       self.action = action
     }
-    @objc func tapped() {
+    @MainActor @objc func tapped() {
+      trackTap("apple_pay_button")
       action()
     }
   }

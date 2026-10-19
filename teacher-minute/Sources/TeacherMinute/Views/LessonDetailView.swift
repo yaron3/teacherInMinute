@@ -57,7 +57,7 @@ struct LessonHistoryRow: View {
         AppTheme(colorScheme: colorScheme)
     }
     var body: some View {
-        Button(action: action) {
+        Button(action: { trackTap("lesson_history_row"); action() }) {
             rowContent
         }
         .buttonStyle(.plain)
@@ -255,7 +255,7 @@ struct LessonDetailView: View {
                     systemImage: isPlaying ? "pause.fill" : "play.fill",
                     foreground: lesson.hasAudio ? theme.onBrandAction : theme.brandSecondaryText,
                     background: lesson.hasAudio ? theme.brandActionBackground : theme.brandCardSurface,
-                    action: audioAction
+                    action: { trackTap("lesson_detail_audio"); audioAction() }
                 )
                 .disabled(!lesson.hasAudio)
 
@@ -366,6 +366,7 @@ struct LessonDetailView: View {
 
     var reportButton: some View {
         Button {
+            trackTap("lesson_detail_report")
             reportViewModel = ReportTeacherViewModel(
                 questionId: lesson.questionId,
                 teacherName: lesson.otherParticipant
@@ -393,6 +394,7 @@ struct LessonDetailView: View {
             questionPhotoUrls = details.photoUrls
             messages = try await HistoryModel.shared.fetchLessonMessages(questionId: lesson.questionId)
         } catch {
+            logger.error("[LessonDetailView] \(error.localizedDescription)")
             // Basic lesson info is already displayed
         }
         isLoading = false

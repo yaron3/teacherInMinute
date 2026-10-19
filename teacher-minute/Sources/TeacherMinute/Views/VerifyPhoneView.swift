@@ -48,6 +48,7 @@ struct VerifyPhoneView: View {
                 .padding(.top, 6)
 
             Button {
+                trackTap("verify_phone_change_contact")
                 viewModel.changeContactInfo()
             } label: {
                 HStack(spacing: 5) {
@@ -74,6 +75,7 @@ struct VerifyPhoneView: View {
             .padding(.top, 34)
 
             Button {
+                trackTap("verify_phone_resend")
                 viewModel.resendCode()
             } label: {
                 HStack(spacing: 6) {
@@ -109,6 +111,7 @@ struct VerifyPhoneView: View {
                     .foregroundStyle(theme.secondaryText)
 
                 Button {
+                    trackTap("verify_phone_contact_support")
                     viewModel.contactSupport()
                 } label: {
                     Text(viewModel.contactSupportLabel)

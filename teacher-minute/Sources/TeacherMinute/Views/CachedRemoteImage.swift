@@ -127,6 +127,7 @@ private final class QuestionImageCache {
         try? data.write(to: fileURL, options: [.atomic])
         return image
       } catch {
+        logger.error("[CachedRemoteImage] \(error.localizedDescription)")
         return nil
       }
     }

@@ -351,6 +351,7 @@ struct BrandMessagesButton: View {
 
   var body: some View {
     Button {
+      trackTap("messages_bell")
       showsMessages = true
     } label: {
       Image(systemName: "bell")

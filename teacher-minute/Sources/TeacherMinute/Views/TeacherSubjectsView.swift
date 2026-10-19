@@ -146,6 +146,7 @@ struct TeacherSubjectsView: View {
       title: viewModel.continueButtonLabel(isEditing: isEditing),
       isEnabled: viewModel.canContinue
     ) {
+      trackTap("teacher_subjects_continue")
       viewModel.continueOnboarding()
     }
     .padding(.top, 8)
@@ -177,7 +178,7 @@ struct SubjectAreaChip: View {
   }
 
   var body: some View {
-    Button(action: action) {
+    Button(action: { trackTap("teacher_subject_area_chip", detail: "\(area)"); action() }) {
       HStack(spacing: 7) {
         PlatformIcon(
           systemName: area.systemImage,

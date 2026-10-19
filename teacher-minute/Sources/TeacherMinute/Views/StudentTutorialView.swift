@@ -107,6 +107,7 @@ struct StudentTutorialView: View {
           .frame(width: 1, height: 44)
       } else {
         Button {
+          trackTap("tutorial_skip")
           viewModel.skip()
         } label: {
           Text(viewModel.skipLabel)
@@ -135,6 +136,7 @@ struct StudentTutorialView: View {
       .accessibilityIdentifier("student_tutorial_hide")
 
       Button {
+        trackTap("tutorial_dont_show_again")
         viewModel.dontShowAgain.toggle()
         modelTick += 1
       } label: {
@@ -388,6 +390,7 @@ struct StudentTutorialView: View {
     if viewModel.isLastPage {
       VStack(spacing: 12) {
         BrandPrimaryButton(title: viewModel.startLabel) {
+          trackTap("tutorial_start")
           viewModel.finish()
         }
         .accessibilityIdentifier("student_tutorial_start")
@@ -398,12 +401,14 @@ struct StudentTutorialView: View {
       HStack(spacing: 12) {
         if !viewModel.isFirstPage {
           BrandSecondaryButton(title: viewModel.backLabel, height: 56) {
+            trackTap("tutorial_back")
             turnToPreviousPage()
           }
           .accessibilityIdentifier("student_tutorial_back")
         }
 
         BrandPrimaryButton(title: viewModel.nextLabel) {
+          trackTap("tutorial_next")
           turnToNextPage()
         }
         .accessibilityIdentifier("student_tutorial_next")

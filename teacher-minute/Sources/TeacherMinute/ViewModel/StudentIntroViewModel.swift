@@ -92,7 +92,7 @@ final class StudentIntroViewModel {
     do {
       try await UserService.shared.saveAnonymousStudentProfile(uid: uid)
     } catch {
-      logger.error("[Intro] could not save the anonymous student profile: \(error)")
+      logger.warning("[Intro] could not save the anonymous student profile: \(error)")
       AnalyticsService.shared.recordError(error, context: "anonymousStartProfile")
     }
 

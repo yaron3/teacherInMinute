@@ -64,7 +64,7 @@ final class TeacherDocumentsViewModel {
     errorMessage = nil
     defer { isLoading = false }
 
-    let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+    let data = (await attempt({ try await UserService.shared.fetchRaw(uid: uid) })) ?? [:]
     let names = (data["uploadedDocuments"] as? [String]) ?? []
     uploadedNames = Set(names)
     let ordered = names.sorted { Self.rank(for: $0) < Self.rank(for: $1) }
@@ -72,7 +72,7 @@ final class TeacherDocumentsViewModel {
     var resolved: [TeacherDocument] = []
     for name in ordered {
       let title = Self.title(for: name)
-      let url = (try? await StorageService.shared.documentDownloadURL(name: name, uid: uid)) ?? ""
+      let url = (await attempt({ try await StorageService.shared.documentDownloadURL(name: name, uid: uid) })) ?? ""
       resolved.append(TeacherDocument(id: name, title: title, url: url))
     }
     documents = resolved
@@ -96,6 +96,7 @@ final class TeacherDocumentsViewModel {
         uploadingTarget = nil
         await load()
       } catch {
+        logger.error("[TeacherDocumentsViewModel] \(error.localizedDescription)")
         errorMessage = error.localizedDescription
         uploadingTarget = nil
       }

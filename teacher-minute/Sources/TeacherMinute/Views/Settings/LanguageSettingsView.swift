@@ -61,6 +61,7 @@ struct LanguageSettingsView: View {
 
     func brandRow(_ language: SettingsLanguageChoice) -> some View {
         Button {
+            trackTap("language_option", detail: "\(language)")
             viewModel.updateLanguage(language)
         } label: {
             HStack(spacing: 12) {

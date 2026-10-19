@@ -200,6 +200,7 @@ struct SearchDetailsView: View {
         )
 
       BrandPrimaryButton(title: viewModel.searchNextLabel) {
+        trackTap("search_details_next")
         viewModel.advanceSearchDetails()
       }
       .frame(width: 164)
@@ -267,6 +268,7 @@ struct SearchDetailsView: View {
         HStack(spacing: 8) {
           ForEach(rows[index], id: \.self) { key in
             SearchChoiceChip(title: title(key), isChosen: isChosen(key)) {
+              trackTap("search_details_choice", detail: key)
               choose(key)
             }
             .accessibilityIdentifier("search_choice_\(key)")
@@ -359,6 +361,7 @@ struct SearchDetailsView: View {
   /// the brand sheet's close button, over the card's far corner.
   func closeButton(_ layout: SearchDetailsLayout) -> some View {
     BrandCloseButton(accessibilityLabel: viewModel.cancelLabel) {
+      trackTap("search_details_cancel")
       onCancel()
     }
     .accessibilityIdentifier("search_details_cancel")
@@ -577,7 +580,7 @@ struct SearchPermissionPrompt: View {
     GeometryReader { proxy in
       ZStack {
         theme.brandScrim
-          .onTapGesture { viewModel.declineSearchStartPermission() }
+          .onTapGesture { trackTap("search_permission_scrim_dismiss"); viewModel.declineSearchStartPermission() }
 
         // The design's 354pt, less where the screen is narrower than its
         // 24pt margins allow.
@@ -602,12 +605,14 @@ struct SearchPermissionPrompt: View {
 
       VStack(spacing: 10) {
         BrandPrimaryButton(title: viewModel.checkPermissionLabel) {
+          trackTap("search_permission_check")
           Task { await viewModel.checkSearchStartPermission() }
         }
         .accessibilityIdentifier("search_permission_check")
 
         if viewModel.searchPermissionIsVideo {
           BrandSecondaryButton(title: viewModel.notNowLabel, height: 56) {
+            trackTap("search_permission_not_now")
             viewModel.declineSearchStartPermission()
           }
           .accessibilityIdentifier("search_permission_not_now")

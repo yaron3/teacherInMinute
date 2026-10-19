@@ -216,6 +216,7 @@ final class CreateAccountViewModel {
 		let signInResult = try await AndroidGoogleAuth().signIn()
 		await resolveRouteAfterSocialSignIn(method: "google", replacing: anonymousSession, uidOverride: AndroidGoogleAuth.uid(from: signInResult))
 	  } catch {
+		logger.error("[CreateAccountViewModel] \(error.localizedDescription)")
 		AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "google", "reason": error.localizedDescription])
 		alertMessage = localizedAuthErrorMessage(error)
 		showAlert = true
@@ -268,6 +269,7 @@ final class CreateAccountViewModel {
 	  }
 	  destination = resume
 	} catch {
+	  logger.error("[CreateAccountViewModel] \(error.localizedDescription)")
 	  alertMessage = localizedAuthErrorMessage(error)
 	  showAlert = true
 	}

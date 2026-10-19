@@ -100,7 +100,7 @@ struct SubjectChip: View {
   }
 
   var body: some View {
-    Button(action: action) {
+    Button(action: { trackTap("subject_chip", detail: subject.key); action() }) {
       HStack(spacing: 7) {
         PlatformIcon(
           systemName: subject.systemImage,

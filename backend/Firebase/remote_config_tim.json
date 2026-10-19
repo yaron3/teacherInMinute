@@ -15770,6 +15770,34 @@
       },
       "valueType": "STRING"
     },
+    "minutes_left": {
+      "defaultValue": {
+        "value": "%d\nminutes left"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נותרו\n%d דקות"
+        },
+        "HebrewApp": {
+          "value": "נותרו\n%d דקות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "minute_left": {
+      "defaultValue": {
+        "value": "1\nminute left"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נותרה\nדקה אחת"
+        },
+        "HebrewApp": {
+          "value": "נותרה\nדקה אחת"
+        }
+      },
+      "valueType": "STRING"
+    },
     "minutes_package": {
       "defaultValue": {
         "value": "Minutes package"

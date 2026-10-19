@@ -60,6 +60,7 @@ struct AboutWebView: View {
     let title: String
     let backLabel: String
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.openURL) var openURL
     var theme: AppTheme {
         AppTheme(colorScheme: colorScheme)
     }
@@ -72,7 +73,10 @@ struct AboutWebView: View {
 
     var body: some View {
         BrandSubpage(label: "", title: title, backLabel: backLabel) {
-            Link(destination: url) {
+            Button {
+                trackTap("about_open_link")
+                openURL(url)
+            } label: {
                 Text("Open \(title)")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(theme.brandBackgroundTop)
@@ -81,6 +85,7 @@ struct AboutWebView: View {
                     .background(theme.brandActionBackground)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
+            .buttonStyle(.plain)
             .trackScreen(AnalyticsScreen.about)
         }
     }

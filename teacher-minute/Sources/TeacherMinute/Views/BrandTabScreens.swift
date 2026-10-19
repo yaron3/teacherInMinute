@@ -121,6 +121,7 @@ struct BrandSubpage<Content: View>: View {
       VStack(spacing: 0) {
         BrandPageHeader(label: label, title: title) {
           BrandBackButton(accessibilityLabel: backLabel) {
+            trackTap("subpage_back")
             if let onBack {
               onBack()
             } else {
@@ -181,6 +182,7 @@ struct BrandSheet<Content: View>: View {
       VStack(spacing: 0) {
         BrandPageHeader(label: "", title: title) {
           BrandCloseButton(accessibilityLabel: closeLabel) {
+            trackTap("sheet_close")
             onClose()
           }
           .accessibilityIdentifier("brand_sheet_close")
@@ -261,6 +263,7 @@ struct BrandSettingsRows: View {
   /// As designed, only Preferences and Notifications carry the chevron.
   func rowButton(_ row: SettingsRow) -> some View {
     Button {
+      trackTap("settings_row", detail: "\(row.action.id)")
       select(row)
     } label: {
       HStack(spacing: 12) {
@@ -350,6 +353,7 @@ struct BrandTabBar: View {
       HStack(alignment: .bottom, spacing: 0) {
         ForEach(action.items, id: \.self) { item in
           Button {
+            trackTap("tab_bar", detail: "\(item)")
             action.select(item)
           } label: {
             tab(item, isSelected: item == action.selected)
@@ -473,6 +477,7 @@ struct BrandMenuButton: View {
   var body: some View {
     if let action {
       Button {
+        trackTap("side_menu_open")
         action.open()
       } label: {
         Image("brand-menu", bundle: .module)
@@ -576,6 +581,7 @@ struct BrandOptionPicker<Option: Hashable>: View {
     HStack(spacing: 8) {
       ForEach(options, id: \.self) { option in
         Button {
+          trackTap("option_picker", detail: "\(option)")
           select(option)
         } label: {
           optionLabel(option, isSelected: option == selection)

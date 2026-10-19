@@ -101,6 +101,7 @@ struct MinutesPurchaseView: View {
       }
       Spacer(minLength: 0)
       BrandBackButton(accessibilityLabel: viewModel.purchaseBackLabel) {
+        trackTap("purchase_back")
         onClose()
       }
     }
@@ -158,6 +159,7 @@ struct MinutesPurchaseView: View {
   private func packageCard(_ option: PricingOption, width: CGFloat?) -> some View {
     let isSelected = option.id == selectedOption?.id
     return Button {
+      trackTap("purchase_option", detail: option.id)
       selectedOptionID = option.id
     } label: {
       VStack(spacing: 0) {
@@ -291,6 +293,7 @@ struct MinutesPurchaseView: View {
 
       if availableMethods.count > 1 {
         Button {
+          trackTap("purchase_change_method")
           showsMethodPicker = true
         } label: {
           HStack(spacing: 5) {
@@ -398,6 +401,7 @@ struct MinutesPurchaseView: View {
 #endif
       case .googlePay:
         Button {
+          trackTap("purchase_google_pay")
           pay(option, with: method)
         } label: {
           Image("google-pay-logo", bundle: .module)
@@ -416,6 +420,7 @@ struct MinutesPurchaseView: View {
           title: viewModel.payLabel(for: option),
           isLoading: viewModel.isStartingCheckout
         ) {
+          trackTap("purchase_pay", detail: "\(method)")
           pay(option, with: method)
         }
       }

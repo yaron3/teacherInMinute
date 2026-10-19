@@ -28,6 +28,7 @@ struct ReportTeacherView: View {
       VStack(spacing: 0) {
         BrandPageHeader(label: "", title: viewModel.title) {
           BrandCloseButton(accessibilityLabel: viewModel.closeLabel) {
+            trackTap("report_teacher_close")
             viewModel.close()
           }
           .accessibilityIdentifier("report_teacher_close")
@@ -91,6 +92,7 @@ struct ReportTeacherView: View {
   func reasonRow(_ reason: TeacherReportReason) -> some View {
     let isSelected = viewModel.reason == reason
     return Button {
+      trackTap("report_teacher_reason", detail: "\(reason)")
       viewModel.reason = reason
     } label: {
       HStack(spacing: 12) {
@@ -178,11 +180,13 @@ struct ReportTeacherView: View {
         isLoading: viewModel.isSending,
         isEnabled: viewModel.canSendReport
       ) {
+        trackTap("report_teacher_send")
         Task { await viewModel.sendReport() }
       }
       .accessibilityIdentifier("report_send")
 
       Button {
+        trackTap("report_teacher_block_only")
         viewModel.requestBlockOnly()
       } label: {
         Text(viewModel.blockOnlyLabel)
@@ -218,6 +222,7 @@ struct ReportTeacherView: View {
         .fixedSize(horizontal: false, vertical: true)
       Spacer(minLength: 0)
       BrandPrimaryButton(title: viewModel.doneLabel) {
+        trackTap("report_teacher_done")
         viewModel.close()
       }
       .accessibilityIdentifier("report_done")

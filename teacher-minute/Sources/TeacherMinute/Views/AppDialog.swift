@@ -41,11 +41,22 @@ struct AppDialogAction {
     let title: String
     let kind: Kind
     let handler: () -> Void
+    /// Where the action was declared (`ProfileView.swift:212`), which names
+    /// its taps in Analytics without depending on the language of `title`.
+    let source: String
 
-    init(_ title: String, kind: Kind = .primary, handler: @escaping () -> Void = {}) {
+    init(
+        _ title: String,
+        kind: Kind = .primary,
+        handler: @escaping () -> Void = {},
+        file: String = #fileID,
+        line: Int = #line
+    ) {
         self.title = title
         self.kind = kind
         self.handler = handler
+        let fileName = file.split(separator: "/").last.map(String.init) ?? file
+        self.source = "\(fileName):\(line)"
     }
 }
 
@@ -111,6 +122,7 @@ struct AppDialogView: View {
 
     func actionButton(_ action: AppDialogAction) -> some View {
         Button {
+            trackTap("dialog_\(action.kind)", detail: action.source)
             // Dismiss first so a handler that presents something else is not
             // fighting this dialog for the screen.
             onDismiss()

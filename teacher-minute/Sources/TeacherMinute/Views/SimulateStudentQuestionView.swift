@@ -36,21 +36,21 @@ struct SimulateStudentQuestionView: View {
       VStack(alignment: .leading, spacing: 22) {
         header
         chipSection(
-          title: LocalizationSupport.localized("Topic"),
+          title: viewModel.topicTitle,
           options: DemoStudentSimulation.topics,
           selected: viewModel.simulation.topic
         ) { option in
           viewModel.selectTopic(option)
         }
         chipSection(
-          title: LocalizationSupport.localized("Difficulty"),
+          title: viewModel.difficultyTitle,
           options: DemoStudentSimulation.difficulties,
           selected: viewModel.simulation.difficulty
         ) { option in
           viewModel.selectDifficulty(option)
         }
         chipSection(
-          title: LocalizationSupport.localized("Session type"),
+          title: viewModel.sessionTypeTitle,
           options: DemoStudentSimulation.conversationTypes,
           selected: viewModel.simulation.conversationType
         ) { option in
@@ -71,13 +71,14 @@ struct SimulateStudentQuestionView: View {
   var header: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text(LocalizationSupport.localized("Simulate a Student Question"))
+        Text(viewModel.screenTitle)
           .font(.system(size: 22, weight: .bold))
           .foregroundStyle(theme.primaryText)
 
         Spacer()
 
         Button {
+          trackTap("simulate_question_close")
           onClose()
         } label: {
           PlatformIcon(systemName: "xmark", size: 13, weight: .semibold, color: theme.secondaryText)
@@ -85,7 +86,7 @@ struct SimulateStudentQuestionView: View {
         .buttonStyle(.plain)
       }
 
-      Text(LocalizationSupport.localized("A demo student writes the question with a local AI model and sends it to you, so you can practise the whole flow without a real student."))
+      Text(viewModel.introText)
         .font(.system(size: 12))
         .foregroundStyle(theme.secondaryText)
         .lineSpacing(3)
@@ -110,9 +111,10 @@ struct SimulateStudentQuestionView: View {
         HStack(spacing: 8) {
           ForEach(options, id: \.self) { option in
             Button {
+              trackTap("simulate_question_option", detail: option)
               select(option)
             } label: {
-              Text(LocalizationSupport.localized(option.capitalized))
+              Text(viewModel.optionLabel(option))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(selected == option ? theme.onAccentText : theme.primaryText)
                 .padding(.horizontal, 14)
@@ -130,12 +132,12 @@ struct SimulateStudentQuestionView: View {
 
   var hintField: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text(LocalizationSupport.localized("What should it be about? (optional)"))
+      Text(viewModel.hintTitle)
         .font(.system(size: 15, weight: .bold))
         .foregroundStyle(theme.primaryText)
 
       TextField(
-        LocalizationSupport.localized("e.g. solving quadratic equations"),
+        viewModel.hintPlaceholder,
         text: $viewModel.hint
       )
       .font(.system(size: 15))
@@ -151,16 +153,17 @@ struct SimulateStudentQuestionView: View {
 
   var sendButton: some View {
     FlatPrimaryButton(
-      title: LocalizationSupport.localized("Send Simulated Question"),
+      title: viewModel.sendLabel,
       systemImage: "paperplane.fill"
     ) {
+      trackTap("simulate_question_send")
       onSend(viewModel.pendingSimulation())
       onClose()
     }
   }
 
   var footnote: some View {
-    Text(LocalizationSupport.localized("The question takes a few seconds to write. You will get it on your dashboard like any other request."))
+    Text(viewModel.footnoteText)
       .font(.system(size: 12))
       .foregroundStyle(theme.secondaryText)
       .lineSpacing(3)

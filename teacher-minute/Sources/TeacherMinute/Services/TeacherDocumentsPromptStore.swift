@@ -54,7 +54,7 @@ enum TeacherDocumentsPromptStore {
     static func shouldPresentSuggestion() async -> Bool {
         guard hasCompletedLesson(), !hasShownSuggestion() else { return false }
         guard let uid = Auth.auth().currentUser?.uid else { return false }
-        let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+        let data = (await attempt({ try await UserService.shared.fetchRaw(uid: uid) })) ?? [:]
         let docs = (data["uploadedDocuments"] as? [String]) ?? []
         return hasMissingDocuments(docs)
     }

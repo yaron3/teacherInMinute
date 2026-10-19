@@ -150,6 +150,7 @@ struct StudentIntroView: View {
 
   private var startButton: some View {
     Button {
+      trackTap("student_intro_start")
       Task { await viewModel.start() }
     } label: {
       ZStack {

@@ -2155,16 +2155,16 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           // written before its sender's leave, so this way it is always in
           // hand when the leave ends the session. Optional, so a failed read
           // costs only itself.
-          let presence = try? await service.fetchPresence()
+          let presence = await attempt({ try await service.fetchPresence() })
           let rows = try await service.fetchMessages()
           let strokes = try await service.fetchBoardStrokes()
           let viewports = try await service.fetchBoardViewports()
           let paused = try await service.fetchChatPaused()
           // Optional: a failed read leaves the last one standing.
-          let boardPermission = try? await service.fetchBoardPermission()
+          let boardPermission = await attempt({ try await service.fetchBoardPermission() })
           let mediaPending = try await service.fetchMediaPending()
           // Optional, like the presence reading: it only colours a badge.
-          let mediaState = try? await service.fetchMediaState()
+          let mediaState = await attempt({ try await service.fetchMediaState() })
           guard !Task.isCancelled else { return }
           receiveMessages(rows)
           receiveBoardStrokes(strokes)
@@ -2183,6 +2183,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
             receivePeerPresence(presence)
           }
         } catch {
+          logger.error("[ChatSessionService] \(error.localizedDescription)")
           errorMessage = error.localizedDescription
         }
         try? await Task.sleep(nanoseconds: 1_500_000_000)
@@ -2650,7 +2651,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     peerSetupTask?.cancel()
     peerSetupTask = Task {
       while !Task.isCancelled {
-        if let reading = try? await service.fetchConnectionSetup() {
+        if let reading = await attempt({ try await service.fetchConnectionSetup() }) {
           guard !Task.isCancelled else { return }
           receivePeerSetupSignals(reading.signals)
           if !reading.isLive {
@@ -2751,7 +2752,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       // end never arrived — the question is still there after a while.
       try? await Task.sleep(nanoseconds: Self.peerCancelSettleNanos)
       guard !hasReportedLessonEnd,
-            (try? await service.fetchSessionDetails()) != nil else { return }
+            (await attempt({ try await service.fetchSessionDetails() })) != nil else { return }
       logger.info("[ChatSession] the other side's end never arrived; ending the lesson questionId=\(self.questionId) role=\(self.role)")
       await reportLessonEnded()
     }
@@ -3090,7 +3091,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     var teacherImageURL = current.teacherImageURL
 
     if currentUserId == nonEmpty(current.studentId),
-       let profile = try? await UserService.shared.fetchProfileSummary(uid: currentUserId) {
+       let profile = await attempt({ try await UserService.shared.fetchProfileSummary(uid: currentUserId) }) {
       if nonEmpty(studentName) == nil {
         studentName = profile.displayName
       }
@@ -3100,7 +3101,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     }
 
     if currentUserId == nonEmpty(current.teacherId),
-       let profile = try? await UserService.shared.fetchProfileSummary(uid: currentUserId) {
+       let profile = await attempt({ try await UserService.shared.fetchProfileSummary(uid: currentUserId) }) {
       if nonEmpty(teacherName) == nil {
         teacherName = profile.displayName
       }

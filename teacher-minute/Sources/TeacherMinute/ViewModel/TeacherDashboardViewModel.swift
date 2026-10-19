@@ -151,6 +151,16 @@ protocol TeacherDashboardViewModeling: AnyObject {
 
 extension TeacherDashboardViewModeling {
 
+    // MARK: Permission dialog
+    var permissionRequiredTitle: String { LocalizationSupport.localized("Permission required") }
+    var permissionOpenSettingsLabel: String { LocalizationSupport.localized("Open Settings") }
+    var permissionNotNowLabel: String { LocalizationSupport.localized("Not now") }
+
+    // MARK: Demo mode
+    var demoModeTitle: String { LocalizationSupport.localized("Demo Mode") }
+    var demoModeSubtitle: String { LocalizationSupport.localized("Send yourself a question from a simulated student.") }
+    var simulateQuestionLabel: String { LocalizationSupport.localized("Simulate a Student Question") }
+
     // MARK: Verification-documents suggestion
     var documentsSuggestionTitle: String { LocalizationSupport.localized("Complete your verification") }
     var documentsSuggestionText: String {
@@ -1157,7 +1167,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		activeCallStudentUid = result.studentId ?? inviteStudentUids[questionId]
 		activeLessonId = result.questionId
 		if let studentId = activeCallStudentUid, !studentId.isEmpty,
-		   let profile = try? await UserService.shared.fetchProfileSummary(uid: studentId) {
+		   let profile = await attempt({ try await UserService.shared.fetchProfileSummary(uid: studentId) }) {
 		  if activeStudentName == "Student" {
 			activeStudentName = profile.displayName
 		  }
@@ -1206,7 +1216,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		AnalyticsService.shared.recordError(error, context: "declineInvite")
 		AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.declineInvite")
 		errorMessage = error.localizedDescription
-		logger.error("[VM] declineInvite failed — \(error.localizedDescription)")
+		logger.warning("[VM] declineInvite failed — \(error.localizedDescription)")
 	  }
 	}
   }
@@ -1433,7 +1443,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   func reloadSubjects() {
 	guard let uid = Auth.auth().currentUser?.uid else { return }
 	Task {
-	  if let data = try? await UserService.shared.fetchRaw(uid: uid) {
+	  if let data = await attempt({ try await UserService.shared.fetchRaw(uid: uid) }) {
 		let summary = UserProfileSummary(uid: uid, data: data)
 		subjects = summary?.subjects ?? []
 		subjectRawKeys = summary?.rawSubjectKeys ?? []
@@ -1486,7 +1496,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	guard !didLoadProfile else { return }
 	didLoadProfile = true
 	
-	if let data = try? await UserService.shared.fetchRaw(uid: uid) {
+	if let data = await attempt({ try await UserService.shared.fetchRaw(uid: uid) }) {
 	  let summary = UserProfileSummary(uid: uid, data: data)
 	  teacherName = summary?.displayName ?? "Teacher"
 	  teacherImageURL = summary?.profileImageURL ?? ""
@@ -1496,7 +1506,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  totalMinutes = summary?.totalMinutes ?? 0
 	}
 	
-	isVerified = (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
+	isVerified = (await attempt({ try await UserService.shared.isTeacherVerified(uid: uid) })) ?? false
 	// Verification status, subjects and the rate are all known now, so they are
 	// released before waiting on the slower rating and earnings queries.
 	isLoadingProfile = false
@@ -1541,7 +1551,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   private func loadEarnings(uid: String) async {
 	let startedAt = Date()
 	defer { logger.info("[VM] loadEarnings took \(Int(Date().timeIntervalSince(startedAt) * 1000))ms") }
-	guard let summary = try? await TeacherEarningsStore.shared.summary() else { return }
+	guard let summary = await attempt({ try await TeacherEarningsStore.shared.summary() }) else { return }
 	let lessons = summary.lessons
 
 	let calendar = Calendar.current

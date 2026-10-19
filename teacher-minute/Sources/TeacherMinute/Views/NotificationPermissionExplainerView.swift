@@ -52,10 +52,12 @@ struct NotificationPermissionExplainerView: View {
                 title: viewModel.enableNotificationsButtonLabel(isRequesting: isRequesting),
                 isEnabled: !isRequesting
             ) {
+                trackTap("notification_explainer_enable")
                 Task { await enable() }
             }
 
             Button {
+                trackTap("notification_explainer_not_now")
                 onFinish()
             } label: {
                 Text(viewModel.notNowLabel)

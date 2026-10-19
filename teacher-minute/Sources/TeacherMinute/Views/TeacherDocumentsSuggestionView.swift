@@ -53,10 +53,12 @@ struct TeacherDocumentsSuggestionView: View {
                 title: viewModel.completeNowLabel,
                 isEnabled: true
             ) {
+                trackTap("documents_suggestion_complete")
                 onComplete()
             }
 
             Button {
+                trackTap("documents_suggestion_later")
                 onDismiss()
             } label: {
                 Text(viewModel.maybeLaterLabel)

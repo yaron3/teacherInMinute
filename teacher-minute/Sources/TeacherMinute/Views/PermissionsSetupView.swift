@@ -95,10 +95,12 @@ struct PermissionsSetupView: View {
 
       VStack(spacing: 0) {
         AuthPrimaryButton(title: viewModel.continueSetupLabel) {
+          trackTap("permissions_setup_continue")
           viewModel.continueSetup()
         }
 
         Button {
+          trackTap("permissions_setup_skip")
           viewModel.limitedMode()
         } label: {
           Text(viewModel.skipLabel)
@@ -134,6 +136,7 @@ struct PermissionsSetupView: View {
     HStack(spacing: 12) {
       Spacer(minLength: 0)
       BrandBackButton(accessibilityLabel: viewModel.onboardingBackLabel) {
+        trackTap("permissions_setup_back")
         OnboardingBackCoordinator.shared.handleBack()
       }
     }
@@ -176,6 +179,7 @@ struct PermissionCard: View {
       .frame(maxWidth: .infinity, alignment: .leading)
 
       BrandToggle(isOn: isOn) {
+        trackTap("permissions_setup_toggle", detail: icon)
         isOn.toggle()
       }
     }

@@ -175,7 +175,7 @@ final class ProfileViewModel {
             apply(profile)
             if profile.role == .teacher {
                 isVerified = try await repository.isTeacherVerified(uid: uid)
-                let docs = (try? await repository.fetchUploadedDocuments(uid: uid)) ?? []
+                let docs = (await attempt({ try await repository.fetchUploadedDocuments(uid: uid) })) ?? []
                 hasMissingDocuments = TeacherDocumentsPromptStore.hasMissingDocuments(docs)
                 await loadTeacherRating(uid: uid)
             } else {
@@ -399,6 +399,7 @@ final class ProfileViewModel {
                 guard !base64.isEmpty, let data = Data(base64Encoded: base64) else { return }
                 uploadProfileImage(data: data)
             } catch {
+                logger.error("[ProfileViewModel] \(error.localizedDescription)")
                 errorMessage = error.localizedDescription
             }
         }

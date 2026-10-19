@@ -152,7 +152,7 @@ enum DemoStudentService {
       try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
       try Task.checkCancellation()
 
-      guard let status = try? await fetchStatus(requestId: requestId) else { continue }
+      guard let status = await attempt({ try await fetchStatus(requestId: requestId) }) else { continue }
       if status.isFailed {
         logger.error("[DemoStudent] simulation failed — \(status.error)")
         throw DemoStudentError.failed(status.error)

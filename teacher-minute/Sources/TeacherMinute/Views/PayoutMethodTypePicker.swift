@@ -37,6 +37,7 @@ struct PayoutMethodTypePicker: View {
     let isSelected = selected == type
     let tint = isSelected ? theme.brandActionBackground : theme.onDarkFill
     return Button {
+      trackTap("payout_method_type", detail: "\(type)")
       onSelect(type)
     } label: {
       HStack(spacing: 6) {

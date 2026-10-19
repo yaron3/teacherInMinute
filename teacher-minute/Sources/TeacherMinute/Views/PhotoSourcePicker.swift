@@ -72,6 +72,7 @@ struct PhotoSourceButton<Label: View>: View {
 
   var body: some View {
     Button {
+      trackTap("photo_source_open")
       photoSourceDebug("Upload control tapped; presenting source dialog")
       showSourceDialog = true
     } label: {
@@ -111,7 +112,7 @@ struct PhotoSourceButton<Label: View>: View {
     .onChange(of: pickedItem) { _, item in
       guard let item else { return }
       Task {
-        if let data = try? await item.loadTransferable(type: Data.self) {
+        if let data = await attempt({ try await item.loadTransferable(type: Data.self) }) {
           onImageData(data)
         }
         pickedItem = nil
@@ -129,14 +130,14 @@ struct PhotoSourceButton<Label: View>: View {
     }
 #endif
     .appDialog(
-      LocalizationSupport.localized("Camera access required"),
+      viewModel.photoSourceCameraDeniedTitle,
       isPresented: $showCameraPermissionDenied,
-      message: LocalizationSupport.localized("Enable camera access in Settings to take photos."),
+      message: viewModel.photoSourceCameraDeniedMessage,
       actions: [
-        AppDialogAction(LocalizationSupport.localized("Open Settings")) {
+        AppDialogAction(viewModel.openSettingsLabel) {
           PermissionService.shared.openAppSettings()
         },
-        AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
+        AppDialogAction(viewModel.photoSourceNotNowLabel, kind: .cancel)
       ],
       coversScreen: true
     )

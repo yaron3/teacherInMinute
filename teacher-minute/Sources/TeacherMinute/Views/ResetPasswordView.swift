@@ -34,6 +34,7 @@ struct ResetPasswordView: View {
                 .padding(.top, 34)
 
             AuthPrimaryButton(title: viewModel.sendResetLinkLabel, isEnabled: viewModel.canSubmit) {
+                trackTap("reset_password_send")
                 viewModel.sendResetLink()
             }
             .padding(.top, 22)
@@ -41,6 +42,7 @@ struct ResetPasswordView: View {
             Spacer()
 
             Button {
+                trackTap("reset_password_back")
                 // NavigationStack back action should be handled by caller/environment if needed.
             } label: {
                 HStack(spacing: 6) {
@@ -100,6 +102,7 @@ struct ResetPasswordView: View {
     var methodPicker: some View {
         HStack(spacing: 0) {
             Button {
+                trackTap("reset_password_method_email")
                 withAnimation {
                     viewModel.method = .email
                 }
@@ -114,6 +117,7 @@ struct ResetPasswordView: View {
             }
 
             Button {
+                trackTap("reset_password_method_phone")
                 withAnimation {
                     viewModel.method = .phone
                 }

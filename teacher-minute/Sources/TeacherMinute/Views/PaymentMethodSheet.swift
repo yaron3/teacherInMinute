@@ -34,6 +34,7 @@ struct PaymentMethodSheet: View {
       .padding(.horizontal, 20)
 
       Button {
+        trackTap("payment_method_cancel")
         dismiss()
       } label: {
         Text(viewModel.cancelLabel)
@@ -87,6 +88,7 @@ struct PaymentMethodSheet: View {
   /// and tapping charges it directly rather than opening a login redirect.
   private func payPalRow(savedEmail: String? = nil) -> some View {
     Button {
+      trackTap("payment_method_paypal", detail: savedEmail == nil ? "new" : "saved")
       onSelect(savedEmail == nil ? .paypal : .savedPayPal)
     } label: {
       VStack(spacing: 2) {
@@ -125,6 +127,7 @@ struct PaymentMethodSheet: View {
   /// horizontal padding satisfy the 8dp minimum clear space.
   private func googlePayRow() -> some View {
     Button {
+      trackTap("payment_method_google_pay")
       onSelect(.googlePay)
     } label: {
       Image("google-pay-logo", bundle: .module)
@@ -146,6 +149,7 @@ struct PaymentMethodSheet: View {
 
   private func standardRow(for method: PaymentMethod) -> some View {
     Button {
+      trackTap("payment_method_option", detail: "\(method)")
       onSelect(method)
     } label: {
       Text(method.displayName)

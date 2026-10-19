@@ -58,6 +58,7 @@ struct TeacherPayoutMethodSheet: View {
           isLoading: isSaving,
           isEnabled: method.isComplete && !isSaving
         ) {
+          trackTap("payout_method_save")
           onSave()
         }
         .padding(.top, 4)
@@ -128,6 +129,7 @@ struct TeacherPayoutMethodSheet: View {
           ForEach(banks) { bank in
             let isSelected = method.bankCode == bank.code
             Button {
+              trackTap("payout_bank", detail: bank.code)
               method.bankCode = bank.code
               method.bankName = bank.displayName
             } label: {
@@ -177,6 +179,7 @@ struct TeacherPayoutMethodSheet: View {
 
       if !profilePhone.isEmpty, method.phone.trimmingCharacters(in: .whitespacesAndNewlines) != profilePhone {
         Button {
+          trackTap("payout_use_profile_phone")
           onUseProfilePhone()
         } label: {
           HStack(spacing: 8) {

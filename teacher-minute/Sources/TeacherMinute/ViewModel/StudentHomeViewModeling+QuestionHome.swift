@@ -223,7 +223,7 @@ extension StudentHomeViewModeling {
       return url
     }
     guard let photoData else { return nil }
-    return try? await uploadQuestionPhoto(photoData, source: .restoredDraft)
+    return await attempt({ try await uploadQuestionPhoto(photoData, source: .restoredDraft) })
   }
 
   func logNotEnoughMinutesShown() {
@@ -436,7 +436,7 @@ extension StudentHomeViewModeling {
   }
 
   private func logQuestionPhotoFailure(_ error: Error, source: QuestionPhotoSource) {
-    logger.error("[QuestionHome] photo from \(source.rawValue) failed: \(error.localizedDescription)")
+    logger.warning("[QuestionHome] photo from \(source.rawValue) failed: \(error.localizedDescription)")
     AnalyticsService.shared.logEvent(AnalyticsEvent.questionPhotoFailed, parameters: [
       "source": source.rawValue
     ])

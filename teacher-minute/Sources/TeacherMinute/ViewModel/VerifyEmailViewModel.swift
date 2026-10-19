@@ -52,7 +52,7 @@ final class VerifyEmailViewModel {
   /// Reads the offer quietly. An account that is somehow verified already is
   /// rewarded and moved on.
   func load() async {
-    guard let result = try? await FunctionsService.shared.claimEmailReward() else { return }
+    guard let result = await attempt({ try await FunctionsService.shared.claimEmailReward() }) else { return }
     switch result.status {
     case .granted:
       AnalyticsService.shared.logEvent(AnalyticsEvent.emailRewardGranted, parameters: ["role": result.role ?? ""])
@@ -125,6 +125,7 @@ final class VerifyEmailViewModel {
     do {
       verified = try await authService.isEmailVerified(email)
     } catch {
+      logger.error("[VerifyEmailViewModel] \(error.localizedDescription)")
       if Auth.auth().currentUser == nil {
         sessionEnded = true
         dialog = EmailRewardDialog(title: emailChangedTitle, message: logInAgainMessage)
@@ -134,7 +135,7 @@ final class VerifyEmailViewModel {
     guard verified else { return }
 
     AnalyticsService.shared.logEvent(AnalyticsEvent.emailVerifyConfirmed)
-    let result = try? await FunctionsService.shared.claimEmailReward()
+    let result = await attempt({ try await FunctionsService.shared.claimEmailReward() })
     if let result, result.status == .granted {
       AnalyticsService.shared.logEvent(AnalyticsEvent.emailRewardGranted, parameters: ["role": result.role ?? ""])
       finish(withDialog: grantedDialog(minutes: result.studentMinutes))

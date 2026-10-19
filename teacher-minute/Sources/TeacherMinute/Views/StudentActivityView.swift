@@ -155,6 +155,7 @@ struct StudentActivityView: View {
   /// The book at the start, then the question and who, when and how long.
   private func lessonCard(_ lesson: LessonHistoryItem) -> some View {
     Button {
+      trackTap("student_activity_lesson")
       presentingLesson = lesson
       viewModel.view(lesson)
     } label: {

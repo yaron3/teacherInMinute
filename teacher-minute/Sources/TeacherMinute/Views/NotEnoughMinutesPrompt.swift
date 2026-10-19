@@ -23,7 +23,7 @@ struct NotEnoughMinutesPrompt: View {
     GeometryReader { proxy in
       ZStack {
         theme.brandScrim
-          .onTapGesture { onDismiss() }
+          .onTapGesture { trackTap("not_enough_minutes_scrim_dismiss"); onDismiss() }
 
         // The design's 354pt, less where the screen is narrower than its
         // 24pt margins allow.
@@ -132,6 +132,7 @@ struct NotEnoughMinutesPrompt: View {
 
   private var primaryButton: some View {
     Button {
+      trackTap("not_enough_minutes_primary")
       onPrimary()
     } label: {
       // 25pt as designed, smaller only where a translation would not fit.
@@ -164,6 +165,7 @@ struct NotEnoughMinutesPrompt: View {
 
   private var logInButton: some View {
     Button {
+      trackTap("not_enough_minutes_log_in")
       onLogIn()
     } label: {
       Text(viewModel.alreadyHaveAccountLabel)
@@ -185,6 +187,7 @@ struct NotEnoughMinutesPrompt: View {
 
   private var dismissButton: some View {
     Button {
+      trackTap("not_enough_minutes_not_now")
       onDismiss()
     } label: {
       Text(viewModel.notNowLabel)

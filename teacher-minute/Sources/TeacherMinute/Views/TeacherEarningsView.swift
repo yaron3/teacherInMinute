@@ -111,6 +111,7 @@ struct TeacherEarningsView: View {
                     Spacer()
                     if viewModel.showsPayoutMethodAction {
                         Button {
+                            trackTap("earnings_payout_method_edit")
                             viewModel.editPayoutMethod()
                         } label: {
                             Text(viewModel.payoutMethodActionLabel)
@@ -253,6 +254,7 @@ struct TeacherEarningsView: View {
                 ForEach(viewModel.months) { month in
                     let isSelected = viewModel.selectedMonthId == month.id
                     Button {
+                        trackTap("earnings_month", detail: "\(month.id)")
                         viewModel.selectedMonthId = month.id
                     } label: {
                         Text(month.shortName)

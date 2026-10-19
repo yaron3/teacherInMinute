@@ -108,6 +108,7 @@ struct MathKeyboardView: View {
     @ViewBuilder
     func keyButton(_ key: MathKey) -> some View {
         Button {
+            trackTap("math_key", detail: key.label)
             onAction(key.action)
         } label: {
             Text(key.label)

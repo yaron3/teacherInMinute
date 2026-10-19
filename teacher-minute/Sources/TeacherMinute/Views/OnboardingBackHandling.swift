@@ -102,6 +102,7 @@ struct OnboardingBackHandlingModifier: ViewModifier {
                 if isActive {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
+                            trackTap("onboarding_back")
                             handleBack()
                         } label: {
                             // "chevron.left", not "chevron.backward": the

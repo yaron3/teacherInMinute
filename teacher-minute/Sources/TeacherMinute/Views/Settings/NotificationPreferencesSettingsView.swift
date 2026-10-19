@@ -95,7 +95,7 @@ struct NotificationPreferencesSettingsView: View {
     action: @escaping () -> Void
   ) -> some View {
     HStack(spacing: 12) {
-      BrandToggle(isOn: isOn, isEnabled: isEnabled, action: action)
+      BrandToggle(isOn: isOn, isEnabled: isEnabled, action: { trackTap("notification_toggle", detail: identifier); action() })
         .accessibilityIdentifier("notification_toggle_\(identifier)")
       Text(title)
         .font(.system(size: size))

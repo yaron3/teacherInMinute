@@ -861,7 +861,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     QuestionStatusStore.stopListening()
     unsentSearchDetails = UnsentSearchDetails()
     if !qid.isEmpty {
-      try? await FunctionsService.shared.cancelQuestion(questionId: qid)
+      await attempt({ try await FunctionsService.shared.cancelQuestion(questionId: qid) })
     }
     searchState = .idle
   }
@@ -1235,7 +1235,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       return
     }
     didLoadProfile = true
-    if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+    if let profile = await attempt({ try await UserService.shared.fetchProfileSummary(uid: uid) }) {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
       remainingMinutes = profile.remainingMinutes
@@ -1257,7 +1257,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// turns it on.
   private func loadSubjectAvailability() async {
     await RemoteConfigService.shared.ready()
-    subjectCatalog = (try? await SettingsRemoteConfigService.shared.fetchTeachingSubjects()) ?? []
+    subjectCatalog = (await attempt({ try await SettingsRemoteConfigService.shared.fetchTeachingSubjects() })) ?? []
 
     var enabled: Set<String> = []
     for subject in subjectCatalog {
@@ -1348,7 +1348,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     await loadPricingOptions()
     await loadSubjectAvailability()
     guard let uid = Auth.auth().currentUser?.uid else { return }
-    if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+    if let profile = await attempt({ try await UserService.shared.fetchProfileSummary(uid: uid) }) {
       name = profile.displayName
       profileImageURL = profile.profileImageURL
       remainingMinutes = profile.remainingMinutes
@@ -1424,7 +1424,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// Reads the authoritative remaining-minutes balance straight from the
   /// `users/{uid}` Firestore document rather than deriving it on the client.
   private func loadRemainingMinutes(uid: String) async {
-    if let profile = try? await UserService.shared.fetchProfileSummary(uid: uid) {
+    if let profile = await attempt({ try await UserService.shared.fetchProfileSummary(uid: uid) }) {
       remainingMinutes = profile.remainingMinutes
     }
   }
@@ -1455,7 +1455,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       methods = methods.filter { $0 != .applePay }
     }
     if let uid = Auth.auth().currentUser?.uid {
-      savedPayPalEmail = try? await UserService.shared.fetchSavedPayPalEmail(uid: uid)
+      savedPayPalEmail = await attempt({ try await UserService.shared.fetchSavedPayPalEmail(uid: uid) })
     }
     // A saved account replaces the redirect-based PayPal entry outright —
     // charging it goes through chargeSavedPayPal directly, so both options
@@ -1565,7 +1565,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
           // the server — but only on the change itself, never once per tick:
           // a status the loop takes no action on ("unanswered", say) would
           // otherwise turn this into a call every 200ms until the timeout.
-          result = try? await currentQuestionStatus(questionId: questionId)
+          result = await attempt({ try await currentQuestionStatus(questionId: questionId) })
           lastBackstopAt = now
         }
         lastLiveKind = liveKind
@@ -1593,7 +1593,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
               token = createdToken
             }
             if room.isEmpty || token.isEmpty,
-               let minted = try? await FunctionsService.shared.getQuestionStatus(questionId: questionId) {
+               let minted = await attempt({ try await FunctionsService.shared.getQuestionStatus(questionId: questionId) }) {
               room = minted.liveKitRoom ?? room
               token = minted.liveKitToken ?? token
             }
@@ -1658,7 +1658,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
             "reason": "timeout",
             "conversation_type": activeConversationType
           ])
-          try? await FunctionsService.shared.cancelQuestion(questionId: questionId)
+          await attempt({ try await FunctionsService.shared.cancelQuestion(questionId: questionId) })
           searchState = .noMatch
           return
         }
@@ -1675,7 +1675,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       return functionResult
     }
 
-    if let realtimeResult = try? await QuestionStatusStore.fetch(questionId: questionId) {
+    if let realtimeResult = await attempt({ try await QuestionStatusStore.fetch(questionId: questionId) }) {
       let realtimeStatus = realtimeResult.status.lowercased()
       if isAcceptedStatus(realtimeStatus) || realtimeStatus == "cancelled" || realtimeStatus == "canceled" {
         logger.info("TeacherMinute questionStatus realtimeOverride questionId=\(questionId) status=\(realtimeResult.status)")

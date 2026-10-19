@@ -51,6 +51,7 @@ struct ContactSupportPreviewSheet: View {
             .brandCard()
 
             BrandPrimaryButton(title: viewModel.sendLabel, isLoading: isSubmitting) {
+                trackTap("contact_support_preview_send")
                 onSubmit()
             }
         }

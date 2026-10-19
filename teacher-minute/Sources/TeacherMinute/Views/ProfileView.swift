@@ -160,6 +160,7 @@ struct ProfileView: View {
         .foregroundStyle(theme.danger)
         .frame(maxWidth: .infinity, alignment: .leading)
       Button {
+        trackTap("profile_retry")
         Task { await viewModel.loadProfile() }
       } label: {
         Text(viewModel.retryLabel)
@@ -248,6 +249,7 @@ struct ProfileView: View {
     .accessibilityIdentifier("profile_photo_button")
 #else
     Button {
+      trackTap("profile_photo_change")
       isShowingPhotoSourceDialog = true
     } label: {
       captureBadge
@@ -278,6 +280,7 @@ struct ProfileView: View {
 
   private func editButton(identifier: String, action: @escaping () -> Void) -> some View {
     Button {
+      trackTap("profile_edit", detail: identifier)
       action()
     } label: {
       Text(viewModel.editLabel)
@@ -305,6 +308,7 @@ struct ProfileView: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
       BrandPrimaryButton(title: viewModel.createAccountLabel) {
+        trackTap("profile_create_account")
         router.startRegistration()
       }
       .accessibilityIdentifier("profile_create_account_button")
@@ -389,6 +393,7 @@ struct ProfileView: View {
 
         if includeAdd {
           Button {
+            trackTap("profile_add_teaching")
             edit()
           } label: {
             FlatChip(title: viewModel.addChipLabel, outlined: true)
@@ -402,6 +407,7 @@ struct ProfileView: View {
 
   private var documentsButton: some View {
     Button {
+      trackTap("profile_documents")
       isShowingDocuments = true
     } label: {
       HStack(spacing: 14) {
@@ -485,7 +491,7 @@ struct ProfileView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      BrandToggle(isOn: state.isGranted, action: action)
+      BrandToggle(isOn: state.isGranted, action: { trackTap("profile_permission_toggle", detail: identifier); action() })
         .accessibilityIdentifier("permission_toggle_\(identifier)")
     }
   }
@@ -531,6 +537,7 @@ struct ProfileEditView: View {
             isLoading: viewModel.isLoading,
             isEnabled: viewModel.canSaveProfileEdits
           ) {
+            trackTap("profile_save")
             viewModel.saveProfileEdits()
           }
         }
@@ -665,7 +672,7 @@ struct ProfileDateOfBirthPicker: View {
         HStack {
           DatePicker(
             "",
-            selection: Binding(get: { currentDate }, set: { date = $0 }),
+            selection: Binding(get: { currentDate }, set: { trackTap("profile_date_of_birth_picker"); date = $0 }),
             in: Date.distantPast...Date(),
             displayedComponents: .date
           )
@@ -677,6 +684,7 @@ struct ProfileDateOfBirthPicker: View {
           Spacer()
 
           Button {
+            trackTap("profile_date_of_birth_clear")
             date = nil
           } label: {
             Text(viewModel.clearLabel)
@@ -695,6 +703,7 @@ struct ProfileDateOfBirthPicker: View {
         }
       } else {
         Button {
+          trackTap("profile_date_of_birth_set")
           date = defaultDate
         } label: {
           HStack {
@@ -746,6 +755,7 @@ struct ProfileGradePicker: View {
       Menu {
         ForEach(grades, id: \.self) { grade in
           Button(grade) {
+            trackTap("profile_grade_option", detail: grade)
             selectedGrade = grade
           }
         }
@@ -837,7 +847,7 @@ struct ProfileCurrencyChip: View {
   }
 
   var body: some View {
-    Button(action: action) {
+    Button(action: { trackTap("profile_currency_chip", detail: title); action() }) {
       Text(title)
         .font(.system(size: 13, weight: .medium))
         .foregroundStyle(theme.primaryText)
@@ -864,7 +874,7 @@ struct ProfileTeachingGradeChip: View {
   }
 
   var body: some View {
-    Button(action: action) {
+    Button(action: { trackTap("profile_teaching_grade_chip", detail: title); action() }) {
       HStack(spacing: 7) {
         PlatformIcon(systemName: "graduationcap")
           .font(.system(size: 12, weight: .semibold))

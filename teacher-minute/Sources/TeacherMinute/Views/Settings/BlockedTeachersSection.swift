@@ -73,6 +73,7 @@ struct BlockedTeachersSection: View {
           .frame(width: 80)
       } else {
         Button {
+          trackTap("blocked_teacher_unblock")
           Task { await viewModel.unblock(teacher) }
         } label: {
           Text(viewModel.unblockLabel)

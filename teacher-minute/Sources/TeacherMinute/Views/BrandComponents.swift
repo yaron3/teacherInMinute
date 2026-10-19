@@ -224,6 +224,7 @@ struct BrandCheckbox: View {
 
   var body: some View {
     Button {
+      trackTap("checkbox", detail: isOn ? "uncheck" : "check")
       isOn.toggle()
     } label: {
       ZStack {

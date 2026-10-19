@@ -32,11 +32,11 @@ final class FirebaseProfileRepository: ProfileRepository {
     }
 
     override func isTeacherVerified(uid: String) async throws -> Bool {
-        (try? await UserService.shared.isTeacherVerified(uid: uid)) ?? false
+        (await attempt({ try await UserService.shared.isTeacherVerified(uid: uid) })) ?? false
     }
 
     override func fetchUploadedDocuments(uid: String) async throws -> [String] {
-        let data = (try? await UserService.shared.fetchRaw(uid: uid)) ?? [:]
+        let data = (await attempt({ try await UserService.shared.fetchRaw(uid: uid) })) ?? [:]
         return data["uploadedDocuments"] as? [String] ?? []
     }
 

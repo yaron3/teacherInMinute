@@ -184,6 +184,7 @@ struct AskTeacherSheet: View {
                         HStack(spacing: 10) {
                             ForEach(AskTeacherSheet.topics, id: \.self) { topic in
                                 Button {
+                                    trackTap("ask_topic", detail: topic)
                                     selectedTopic = topic
                                 } label: {
                                     Text(viewModel.localizedTopicName(topic))
@@ -254,6 +255,7 @@ struct AskTeacherSheet: View {
                         Spacer(minLength: 0)
 
                         Button {
+                            trackTap("ask_send")
                             Task { await findTeacherTapped() }
                         } label: {
                             Text(viewModel.sendLabel)
@@ -277,6 +279,7 @@ struct AskTeacherSheet: View {
                 infoCard
 
                 Button {
+                    trackTap("ask_find_teacher_now")
                     Task { await findTeacherTapped() }
                 } label: {
                     Text(viewModel.findTeacherNowLabel)
@@ -312,7 +315,7 @@ struct AskTeacherSheet: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(viewModel.cancelLabel) { closeAskTeacher() }
+                Button(viewModel.cancelLabel) { trackTap("ask_cancel"); closeAskTeacher() }
             }
         }
         .environment(\.locale, LocalizationSupport.locale(languagePreference: languagePreference))
@@ -497,6 +500,7 @@ struct AskTeacherSheet: View {
         .disabled(isUploadingPhoto)
 #else
         Button {
+            trackTap("ask_add_photo")
             showAndroidPhotoSourceDialog = true
         } label: {
             addPhotoLabel
@@ -509,12 +513,14 @@ struct AskTeacherSheet: View {
             titleVisibility: .visible
         ) {
             Button(viewModel.takePhotoLabel) {
+                trackTap("ask_photo_camera")
                 pickAndroidPhoto(source: .camera)
             }
             Button(viewModel.chooseFromLibraryLabel) {
+                trackTap("ask_photo_library")
                 pickAndroidPhoto(source: .gallery)
             }
-            Button(viewModel.cancelLabel, role: .cancel) {}
+            Button(viewModel.cancelLabel, role: .cancel) { trackTap("ask_photo_cancel") }
         }
 #endif
     }
@@ -530,6 +536,7 @@ struct AskTeacherSheet: View {
         .disabled(isUploadingPhoto)
 #else
         Button {
+            trackTap("ask_add_photo_large")
             showAndroidPhotoSourceDialog = true
         } label: {
             largeAddPhotoLabel
@@ -542,12 +549,14 @@ struct AskTeacherSheet: View {
             titleVisibility: .visible
         ) {
             Button(viewModel.takePhotoLabel) {
+                trackTap("ask_photo_camera")
                 pickAndroidPhoto(source: .camera)
             }
             Button(viewModel.chooseFromLibraryLabel) {
+                trackTap("ask_photo_library")
                 pickAndroidPhoto(source: .gallery)
             }
-            Button(viewModel.cancelLabel, role: .cancel) {}
+            Button(viewModel.cancelLabel, role: .cancel) { trackTap("ask_photo_cancel") }
         }
 #endif
     }
@@ -609,6 +618,7 @@ struct AskTeacherSheet: View {
                 }
 
             Button {
+                trackTap("ask_remove_photo")
                 removePhoto(url: url)
             } label: {
                 Circle()
@@ -705,6 +715,7 @@ struct AskTeacherSheet: View {
     func keyboardModePills(scrollProxy: ScrollViewProxy) -> some View {
         HStack(spacing: 8) {
             keyboardModePill(title: viewModel.regularKeyboardLabel, isSelected: keyboardMode == .regular) {
+                trackTap("ask_keyboard_regular")
                 keyboardMode = .regular
                 pendingFormulaLatex = ""
                 isQuestionFocused = true
@@ -714,6 +725,7 @@ struct AskTeacherSheet: View {
             // so the pills carry identifiers to tell the two apart.
             .accessibilityIdentifier("keyboard_mode_regular")
             keyboardModePill(title: viewModel.algebraKeyboardLabel, isSelected: keyboardMode == .algebra) {
+                trackTap("ask_keyboard_algebra")
                 keyboardMode = .algebra
                 // The math keys are the keyboard in this mode, so the system
                 // one gives up the space it was holding. Dropping the focus
@@ -801,6 +813,7 @@ struct AskTeacherSheet: View {
                         .environment(\.layoutDirection, .leftToRight)
 
                     Button {
+                        trackTap("ask_remove_formula")
                         attachedFormulas.remove(at: index)
                     } label: {
                         Circle()

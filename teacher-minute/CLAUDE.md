@@ -55,6 +55,29 @@ func submitQuestionWithPermissions(...) async -> String? {
 
 **Why:** Keeps Views testable without mocking services, makes analytics and permission logic auditable in one place, and makes Views easy to read at a glance.
 
+### Every tap is counted, every error reported
+
+Two pieces of instrumentation are the exception to "analytics lives in the
+view model", the way `.trackScreen` already is:
+
+- **Taps.** The first line of every control's action — `Button`, tap gesture,
+  `onSubmit`, a `BrandToggle`'s action, a `Binding` setter behind a picker —
+  is `trackTap("<screen>_<control>")`, with `detail:` to tell list items apart
+  (an id or enum case, never the localized title or personal data). It logs
+  one `ui_tap` event with `element`, `detail` and `screen`, so new controls
+  never add event types. Shared components that own their action
+  (`BrandMenuButton`, `BrandTabBar`, `BrandSettingsRows`, `BrandOptionPicker`,
+  chips, `AppDialog`'s buttons) count inside; components that take an action
+  (`BrandPrimaryButton`, `BrandBackButton`, `AuthPrimaryButton`…) are counted
+  by the caller.
+- **Errors.** `logger.error` reports itself — an `app_error` event, a
+  Crashlytics log line and a non-fatal, grouped by the calling
+  `Type.function`. So every `catch` that does not rethrow logs with
+  `logger.error`, and a backend call whose failure is ignored uses
+  `await attempt({ try await … })` instead of `try?`. Expected outcomes
+  (cancellation, a user backing out) stay `logger.info`. On Android, a Kotlin
+  manager that swallows an error calls `AndroidErrorReporter.report`.
+
 ### No `LocalizationSupport.localized` in views
 
 Views must never call `LocalizationSupport.localized(...)` directly. All localized strings must be requested from the view model.

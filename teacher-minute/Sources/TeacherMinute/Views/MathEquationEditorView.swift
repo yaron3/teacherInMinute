@@ -61,6 +61,7 @@ struct MathEquationEditorView: View {
                 formulaField(preview: preview)
 
                 Button {
+                    trackTap("math_editor_send")
                     sendCurrent(exported: exported)
                     modelTick &+= 1
                 } label: {

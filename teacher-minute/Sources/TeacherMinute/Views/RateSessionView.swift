@@ -49,7 +49,7 @@ struct RateSessionView: View {
     VStack(spacing: 0) {
       HStack {
         Spacer()
-        Button(action: onFinish) {
+        Button(action: { trackTap("rate_session_close"); onFinish() }) {
           PlatformIcon(systemName: "xmark")
             .font(.system(size: 16, weight: .bold))
             .foregroundStyle(theme.secondaryText)
@@ -134,6 +134,7 @@ struct RateSessionView: View {
               HStack(spacing: 10) {
                 ForEach(1..<6, id: \.self) { index in
                   Button {
+                    trackTap("rate_session_star", detail: "\(index)")
                     rating = index
                   } label: {
                     PlatformIcon(systemName: index <= rating ? "star.fill" : "star")
@@ -202,7 +203,7 @@ struct RateSessionView: View {
         .padding(.bottom, 18)
       }
 
-      Button(action: send) {
+      Button(action: { trackTap("rate_session_send"); send() }) {
         HStack {
           Spacer()
           if isSending {
@@ -235,6 +236,7 @@ struct RateSessionView: View {
 
   func reportLink(_ action: @escaping @MainActor () -> Void) -> some View {
     Button {
+      trackTap("rate_session_report")
       action()
     } label: {
       HStack(spacing: 6) {

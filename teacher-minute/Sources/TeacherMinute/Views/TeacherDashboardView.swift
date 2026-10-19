@@ -158,7 +158,7 @@ struct TeacherDashboardView: View {
 		  isDemoEnabled = DemoStudentService.isEnabled
 		}
 		.appDialog(
-		  LocalizationSupport.localized("Permission required"),
+		  viewModel.permissionRequiredTitle,
 		  isPresented: Binding(
 			get: { viewModel.permissionAlertMessage != nil },
 			set: { if !$0 {
@@ -170,10 +170,10 @@ struct TeacherDashboardView: View {
 		  actions: [
 			// The dialog clears the question before it runs a handler, so it is
 			// taken now, as the buttons are built.
-			AppDialogAction(LocalizationSupport.localized("Open Settings")) { [questionId = viewModel.permissionAlertQuestionId] in
+			AppDialogAction(viewModel.permissionOpenSettingsLabel) { [questionId = viewModel.permissionAlertQuestionId] in
 			  viewModel.finishSetupInSettings(questionId: questionId)
 			},
-			AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel) {
+			AppDialogAction(viewModel.permissionNotNowLabel, kind: .cancel) {
 			  if let qid = viewModel.permissionAlertQuestionId {
 				viewModel.declineInvite(questionId: qid)
 			  }
@@ -272,6 +272,7 @@ struct TeacherDashboardView: View {
 		isOn: viewModel.isOnline || viewModel.isAwaitingOnlinePermission,
 		isEnabled: !viewModel.isAwaitingOnlinePermission
 	  ) {
+		trackTap("dashboard_online_toggle")
 		viewModel.toggleOnline()
 	  }
 	  .accessibilityIdentifier("availability_toggle")
@@ -360,11 +361,11 @@ struct TeacherDashboardView: View {
 		  )
 
 		  VStack(alignment: .leading, spacing: 3) {
-			Text(LocalizationSupport.localized("Demo Mode"))
+			Text(viewModel.demoModeTitle)
 			  .font(.system(size: 15, weight: .bold))
 			  .foregroundStyle(theme.primaryText)
 
-			Text(LocalizationSupport.localized("Send yourself a question from a simulated student."))
+			Text(viewModel.demoModeSubtitle)
 			  .font(.system(size: 13))
 			  .foregroundStyle(theme.secondaryText)
 			  .frame(maxWidth: .infinity, alignment: .leading)
@@ -372,9 +373,10 @@ struct TeacherDashboardView: View {
 		}
 
 		FlatSecondaryButton(
-		  title: LocalizationSupport.localized("Simulate a Student Question"),
+		  title: viewModel.simulateQuestionLabel,
 		  systemImage: "paperplane.fill"
 		) {
+		  trackTap("dashboard_simulate_question")
 		  showsQuestionSimulator = true
 		}
 
@@ -425,6 +427,7 @@ struct TeacherDashboardView: View {
 		HStack {
 		  Spacer()
 		  Button {
+			trackTap("dashboard_edit_subjects")
 			viewModel.editSubjects()
 		  } label: {
 			FlatChip(title: viewModel.editSubjectsLabel, systemImage: "pencil", outlined: true)
@@ -630,7 +633,7 @@ struct TeacherDashboardView: View {
 	isGranted: Bool,
 	action: @escaping () -> Void
   ) -> some View {
-	Button(action: action) {
+	Button(action: { trackTap("dashboard_permission_row", detail: icon); action() }) {
 	  HStack(spacing: 14) {
 		FlatIconTile(systemName: icon, size: 44, tint: isGranted ? theme.positive : theme.secondaryText)
 
@@ -910,9 +913,9 @@ struct TeacherDashboardView: View {
 
 	var actions: some View {
 	  VStack(spacing: 10) {
-		FlatPrimaryButton(title: viewModel.acceptQuestionLabel, action: accept)
+		FlatPrimaryButton(title: viewModel.acceptQuestionLabel, action: { trackTap("invite_accept"); accept() })
 
-		Button(action: decline) {
+		Button(action: { trackTap("invite_decline"); decline() }) {
 		  Text(viewModel.declineLabel)
 			.font(.system(size: 14, weight: .bold))
 			.foregroundStyle(theme.secondaryText)
@@ -979,17 +982,17 @@ struct TeacherIncomingQuestionOverlay: View {
 	}
 	.frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
 	.appDialog(
-	  LocalizationSupport.localized("Permission required"),
+	  viewModel.permissionRequiredTitle,
 	  isPresented: Binding(
 		get: { viewModel.permissionAlertMessage != nil },
 		set: { if !$0 { viewModel.permissionAlertMessage = nil } }
 	  ),
 	  message: viewModel.permissionAlertMessage ?? "",
 	  actions: [
-		AppDialogAction(LocalizationSupport.localized("Open Settings")) { [questionId = viewModel.permissionAlertQuestionId] in
+		AppDialogAction(viewModel.permissionOpenSettingsLabel) { [questionId = viewModel.permissionAlertQuestionId] in
 		  viewModel.finishSetupInSettings(questionId: questionId)
 		},
-		AppDialogAction(LocalizationSupport.localized("Not now"), kind: .cancel)
+		AppDialogAction(viewModel.permissionNotNowLabel, kind: .cancel)
 	  ]
 	)
   }

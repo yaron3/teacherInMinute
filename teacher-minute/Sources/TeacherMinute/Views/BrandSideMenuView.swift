@@ -55,7 +55,7 @@ struct BrandSideMenuView: View {
         // `MainTabView` blurs what this covers: SwiftUI has no backdrop blur.
         theme.scrim.opacity(0.5)
           .ignoresSafeArea()
-          .onTapGesture { viewModel.closeSideMenu() }
+          .onTapGesture { trackTap("side_menu_scrim_close"); viewModel.closeSideMenu() }
           .transition(.opacity)
 
         panel
@@ -96,6 +96,7 @@ struct BrandSideMenuView: View {
   var header: some View {
     HStack(spacing: 12) {
       Button {
+        trackTap("side_menu_close")
         viewModel.closeSideMenu()
       } label: {
         Image("brand-close-circle", bundle: .module)
@@ -128,6 +129,7 @@ struct BrandSideMenuView: View {
     let isSelected = viewModel.isSelected(item)
     let tint = isSelected ? theme.onBrandAction : theme.brandActionBackground
     return Button {
+      trackTap("side_menu_item", detail: "\(item)")
       viewModel.select(item)
     } label: {
       HStack(spacing: 12) {
@@ -225,6 +227,7 @@ struct BrandSideMenuView: View {
       Text(viewModel.alreadyHaveAccountText)
         .foregroundStyle(theme.brandSecondaryText)
       Button {
+        trackTap("side_menu_log_in")
         onLogIn()
       } label: {
         Text(viewModel.logInLabel)

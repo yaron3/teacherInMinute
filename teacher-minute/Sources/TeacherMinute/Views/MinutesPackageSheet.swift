@@ -32,6 +32,7 @@ struct MinutesPackageSheet: View {
       .padding(.horizontal, 20)
 
       Button(viewModel.cancelLabel) {
+        trackTap("minutes_package_cancel")
         dismiss()
       }
       .foregroundStyle(theme.secondaryText)
@@ -45,6 +46,7 @@ struct MinutesPackageSheet: View {
   /// purchase look like one flow.
   private func row(for option: PricingOption) -> some View {
     Button {
+      trackTap("minutes_package_option", detail: option.id)
       onSelect(option)
     } label: {
       HStack(spacing: 12) {
