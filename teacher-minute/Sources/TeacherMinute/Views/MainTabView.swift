@@ -63,6 +63,21 @@ struct MainTabView: View {
 	  message: teacherDashboardViewModel?.studentCancelledMessage,
 	  actions: [AppDialogAction(teacherDashboardViewModel?.okLabel ?? "")]
 	)
+	.appDialog(
+	  viewModel.shareChoiceTitle,
+	  isPresented: $viewModel.isShareChoicePresented,
+	  message: viewModel.shareChoiceMessage,
+	  actions: shareChoiceActions
+	)
+  }
+
+  /// The side menu's Share: this app, the other one, or the website.
+  var shareChoiceActions: [AppDialogAction] {
+	viewModel.shareTargets.map { target in
+	  AppDialogAction(viewModel.shareChoiceLabel(for: target)) {
+		viewModel.share(target)
+	  }
+	} + [AppDialogAction(viewModel.cancelLabel, kind: .cancel)]
   }
 
   var sideMenu: some View {

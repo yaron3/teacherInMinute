@@ -79,9 +79,10 @@ enum MainTab: Hashable, CaseIterable {
 }
 
 /// A row of the side menu, and a tab of the tab bar. Each shows a section,
-/// except Minutes, which opens the purchase screen over Home, and Tutorial,
-/// a menu row only, which opens the tutorial. Ask, Minutes, Activity and
-/// Tutorial are Instant Teacher's; Home, Lessons and Earnings, Pro Teacher's.
+/// except Minutes, which opens the purchase screen over Home, and Tutorial
+/// and Share, menu rows only, which open the tutorial and the share choice.
+/// Ask, Minutes, Activity and Tutorial are Instant Teacher's; Home, Lessons
+/// and Earnings, Pro Teacher's.
 enum MenuItem: Hashable, CaseIterable {
   case ask
   case minutes
@@ -93,12 +94,13 @@ enum MenuItem: Hashable, CaseIterable {
   case settings
   case help
   case tutorial
+  case share
 
-  /// The section on screen after the row is picked. Tutorial leaves the
-  /// section as it was (see `MainTabViewModel.select(_:)`).
+  /// The section on screen after the row is picked. Tutorial and Share leave
+  /// the section as it was (see `MainTabViewModel.select(_:)`).
   var tab: MainTab {
 	switch self {
-	  case .ask, .minutes, .home, .tutorial: .home
+	  case .ask, .minutes, .home, .tutorial, .share: .home
 	  case .activity, .lessons: .lessons
 	  case .earnings: .earnings
 	  case .profile: .profile
@@ -111,6 +113,7 @@ enum MenuItem: Hashable, CaseIterable {
   func systemImage(isSelected: Bool) -> String {
 	switch self {
 	  case .tutorial: isSelected ? "lightbulb.fill" : "lightbulb"
+	  case .share: "square.and.arrow.up"
 	  default: tab.systemImage(isSelected: isSelected)
 	}
   }
@@ -121,6 +124,7 @@ enum MenuItem: Hashable, CaseIterable {
 	  case .minutes: LocalizationSupport.localized("Minutes")
 	  case .activity: LocalizationSupport.localized("Activity")
 	  case .tutorial: LocalizationSupport.localized("Tutorial")
+	  case .share: LocalizationSupport.localized("Share the App")
 	  case .home, .lessons, .earnings, .profile, .settings, .help: tab.title
 	}
   }
@@ -132,6 +136,7 @@ enum MenuItem: Hashable, CaseIterable {
 	  case .minutes: "minutes"
 	  case .activity: "activity"
 	  case .tutorial: "tutorial"
+	  case .share: "share"
 	  case .home, .lessons, .earnings, .profile, .settings, .help: tab.identifier
 	}
   }
@@ -172,8 +177,8 @@ final class MainTabViewModel {
   /// The menu, in order.
   var menuItems: [MenuItem] {
 	switch userMode {
-	  case .student: tabItems + [.help, .tutorial]
-	  case .teacher: tabItems + [.help]
+	  case .student: tabItems + [.help, .tutorial, .share]
+	  case .teacher: tabItems + [.help, .share]
 	}
   }
 
@@ -205,6 +210,9 @@ final class MainTabViewModel {
   /// sections rather than over them: the student's Home asks for the camera
   /// as it appears, and that prompt would land on top of the tutorial.
   private(set) var tutorial: StudentTutorialViewModel?
+
+  /// Whether the menu's Share is asking what to share.
+  var isShareChoicePresented = false
 
   /// A student who has not made an account yet, and so has no email or phone
   /// to show in the menu, but may have one to log in to.
@@ -271,9 +279,10 @@ final class MainTabViewModel {
 
   /// Whether `item` is the row for the section on screen. Minutes never is:
   /// the purchase screen it opens is part of Home, which Ask stands for.
-  /// Nor is Tutorial, which opens over whatever section is on screen.
+  /// Nor are Tutorial and Share, which open over whatever section is on
+  /// screen.
   func isSelected(_ item: MenuItem) -> Bool {
-	item != .minutes && item != .tutorial && item.tab == selectedTab
+	item != .minutes && item != .tutorial && item != .share && item.tab == selectedTab
   }
 
   /// A row of the menu, or a tab, was picked.
@@ -283,8 +292,32 @@ final class MainTabViewModel {
 	  presentTutorial(source: .menu)
 	  return
 	}
+	if item == .share {
+	  closeSideMenu()
+	  isShareChoicePresented = true
+	  return
+	}
 	select(item.tab)
 	isPurchaseScreenRequested = item == .minutes
+  }
+
+  // MARK: - Share
+
+  /// What Share offers, in order: this app, the other one, the website.
+  var shareTargets: [ShareTarget] {
+	let thisApp = AuthRole.appRole
+	let otherApp: AuthRole = thisApp == .student ? .teacher : .student
+	return [.app(thisApp), .app(otherApp), .website]
+  }
+
+  /// One of `shareTargets` was picked: hand its link to the share sheet.
+  func share(_ target: ShareTarget) {
+	isShareChoicePresented = false
+	AnalyticsService.shared.logEvent(AnalyticsEvent.appShareOpened, parameters: [
+	  "target": target.identifier,
+	  "app_role": AuthRole.appRole.rawValue,
+	])
+	AppShare.share(text: shareText(for: target))
   }
 
   // MARK: - Tutorial

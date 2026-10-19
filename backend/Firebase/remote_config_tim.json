@@ -15839,6 +15839,90 @@
         }
       },
       "valueType": "STRING"
+    },
+    "share_the_app": {
+      "defaultValue": {
+        "value": "Share the App"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שיתוף האפליקציה"
+        },
+        "HebrewApp": {
+          "value": "שיתוף האפליקציה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "what_would_you": {
+      "defaultValue": {
+        "value": "What would you like to share?"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מה תרצו לשתף?"
+        },
+        "HebrewApp": {
+          "value": "מה תרצו לשתף?"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "our_website": {
+      "defaultValue": {
+        "value": "Our Website"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "האתר שלנו"
+        },
+        "HebrewApp": {
+          "value": "האתר שלנו"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "stuck_question_instant": {
+      "defaultValue": {
+        "value": "Stuck on a question? Instant Teacher connects you to a real teacher in about a minute: %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "נתקעתם בשאלה? מורה לרגע מחברת אתכם למורה אמיתי תוך דקה בערך: %@"
+        },
+        "HebrewApp": {
+          "value": "נתקעתם בשאלה? מורה לרגע מחברת אתכם למורה אמיתי תוך דקה בערך: %@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teach_students_live": {
+      "defaultValue": {
+        "value": "Teach students live, whenever you are free, and get paid with Pro Teacher: %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מלמדים תלמידים בשידור חי, מתי שנוח לכם, ומקבלים תשלום עם Pro Teacher: %@"
+        },
+        "HebrewApp": {
+          "value": "מלמדים תלמידים בשידור חי, מתי שנוח לכם, ומקבלים תשלום עם Pro Teacher: %@"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "meet_instant_teacher": {
+      "defaultValue": {
+        "value": "Meet Instant Teacher and Pro Teacher, live help from real teachers in about a minute: %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הכירו את מורה לרגע ו-Pro Teacher: עזרה חיה ממורים אמיתיים תוך דקה בערך: %@"
+        },
+        "HebrewApp": {
+          "value": "הכירו את מורה לרגע ו-Pro Teacher: עזרה חיה ממורים אמיתיים תוך דקה בערך: %@"
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

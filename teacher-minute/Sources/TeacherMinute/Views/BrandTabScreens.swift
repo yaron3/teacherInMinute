@@ -35,8 +35,8 @@ extension EnvironmentValues {
 extension MenuItem {
   /// The item's icon in the brand's set, at the size the design draws it in
   /// its 28pt box. Pro Teacher's Home and Earnings are drawn in the same
-  /// line style; its Lessons share Activity's. Help & Support has none: it
-  /// keeps its system icon.
+  /// line style; its Lessons share Activity's. Help & Support, Tutorial and
+  /// Share have none: they keep their system icons.
   var brandIcon: (name: String, size: CGSize)? {
     switch self {
     case .ask: ("brand-menu-ask", CGSize(width: 28, height: 28))
@@ -46,7 +46,7 @@ extension MenuItem {
     case .earnings: ("brand-menu-earnings", CGSize(width: 24, height: 24))
     case .profile: ("brand-menu-profile", CGSize(width: 18, height: 18))
     case .settings: ("brand-menu-settings", CGSize(width: 23, height: 23))
-    case .help, .tutorial: nil
+    case .help, .tutorial, .share: nil
     }
   }
 }

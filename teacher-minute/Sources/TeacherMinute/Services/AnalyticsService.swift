@@ -45,6 +45,9 @@ enum AnalyticsEvent {
     static let otherAppAccountRefused  = "other_app_account_refused"
     /// They took the welcome screen's link to the store page of their app.
     static let otherAppDownloadOpened  = "other_app_download_opened"
+    /// The side menu's Share handed a link to the share sheet: one of the two
+    /// apps, or the website.
+    static let appShareOpened          = "app_share_opened"
     static let profileCompleted        = "profile_completed"
     static let teacherSubjectsSaved    = "teacher_subjects_saved"
     static let teacherIdentityUploaded = "teacher_identity_uploaded"
