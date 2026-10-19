@@ -443,7 +443,7 @@
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconStudent;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
@@ -453,10 +453,11 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Instant Teacher uses the microphone for live voice tutoring sessions.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Instant Teacher may save images you create or receive during lessons to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Instant Teacher lets you choose photos for your profile and your lesson questions.";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.7;
+				MARKETING_VERSION = 1.0.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.student;
 				PRODUCT_NAME = InstantTeacher;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -474,7 +475,7 @@
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconStudent;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Instant Teacher";
@@ -484,10 +485,11 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Instant Teacher uses the microphone for live voice tutoring sessions.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Instant Teacher may save images you create or receive during lessons to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Instant Teacher lets you choose photos for your profile and your lesson questions.";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.7;
+				MARKETING_VERSION = 1.0.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.student;
 				PRODUCT_NAME = InstantTeacher;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -667,7 +669,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 0;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Pro Teacher";
@@ -677,10 +679,11 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Pro Teacher uses the microphone for live voice tutoring sessions.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Pro Teacher may save images you create or receive during lessons to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Pro Teacher lets you choose photos for your profile and your teacher verification documents.";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.7;
+				MARKETING_VERSION = 1.0.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.tim;
 				PRODUCT_NAME = ProTeacher;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -695,7 +698,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* TeacherMinute.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 0;
 				DEVELOPMENT_TEAM = 5WRH6356JL;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Pro Teacher";
@@ -705,10 +708,11 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Pro Teacher uses the microphone for live voice tutoring sessions.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Pro Teacher may save images you create or receive during lessons to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Pro Teacher lets you choose photos for your profile and your teacher verification documents.";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 1.0.7;
+				MARKETING_VERSION = 1.0.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yaronj.tim;
 				PRODUCT_NAME = ProTeacher;
 				TARGETED_DEVICE_FAMILY = "1,2";

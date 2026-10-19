@@ -144,7 +144,12 @@ android {
     }
     packaging {
         jniLibs {
-            keepDebugSymbols.add("**/*.so")
+            // No keepDebugSymbols: AGP strips the Swift .so files, and only a
+            // library it strips gets its symbols written to the bundle's
+            // BUNDLE-METADATA for Play (debugSymbolLevel in the release build
+            // type). Kept whole, every library shipped with its full DWARF and
+            // Play reported the bundle as having no debug symbols. Crashlytics
+            // reads the unstripped copies through unstrippedNativeLibsDir.
             pickFirsts.add("**/*.so")
             // this option will compress JNI .so files
             useLegacyPackaging = true
