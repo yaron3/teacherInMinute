@@ -12041,6 +12041,54 @@
       },
       "valueType": "STRING"
     },
+    "currency_and_appearance": {
+      "defaultValue": {
+        "value": "Currency and appearance"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מטבע ומראה"
+        },
+        "HebrewApp": {
+          "value": "מטבע ומראה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teacher_app_url": {
+      "defaultValue": {
+        "value": ""
+      },
+      "valueType": "STRING"
+    },
+    "teacher_app_prompt_pending_message": {
+      "defaultValue": {
+        "value": "This is a teacher account. Teachers should use %@, our app for teachers. It isn't available yet; once it is, a download link will appear here."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "זהו חשבון מורה. מורים צריכים להשתמש ב-%@, האפליקציה שלנו למורים. היא עדיין לא זמינה; ברגע שתהיה, יופיע כאן קישור להורדה."
+        },
+        "HebrewApp": {
+          "value": "זהו חשבון מורה. מורים צריכים להשתמש ב-%@, האפליקציה שלנו למורים. היא עדיין לא זמינה; ברגע שתהיה, יופיע כאן קישור להורדה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "teacher_app_prompt_download": {
+      "defaultValue": {
+        "value": "Download %@"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "להורדת %@"
+        },
+        "HebrewApp": {
+          "value": "להורדת %@"
+        }
+      },
+      "valueType": "STRING"
+    },
     "student_app_url": {
       "defaultValue": {
         "value": "https://play.google.com/store/apps/details?id=com.yaronj.student"

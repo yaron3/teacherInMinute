@@ -68,10 +68,6 @@ extension SettingsViewModeling {
     var defaultSessionTypeFooterText: String {
         LocalizationSupport.localized("This session type is preselected when you ask a teacher a question. You can still change it for each question.")
     }
-    var launchPresenceSectionTitle: String { LocalizationSupport.localized("Availability on launch") }
-    var launchPresenceFooterText: String {
-        LocalizationSupport.localized("Choose whether you start out available for questions when the app opens. \"Last state\" reuses the availability you left the app on.")
-    }
     var currencySectionTitle: String { LocalizationSupport.localized("Currency") }
     var currencyFooterText: String {
         LocalizationSupport.localized("Your currency is set to Israeli Shekel (ILS) and cannot be changed for now.")

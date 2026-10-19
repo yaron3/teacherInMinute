@@ -60,8 +60,9 @@ final class WelcomeViewModel {
     /// A student in Pro Teacher is, above all, someone whose app has just
     /// updated into it, so they are offered Instant Teacher. The copy and the
     /// store link are all in Remote Config, to be reworded or pointed elsewhere
-    /// without a release. A teacher in Instant Teacher is only told where to
-    /// sign in.
+    /// without a release. A teacher in Instant Teacher is offered Pro Teacher
+    /// once `teacher_app_url` holds its store page; until then they are told
+    /// it is coming.
     func otherAppNotice(for role: AuthRole) -> OtherAppNotice {
         switch role {
         case .student:
@@ -75,11 +76,17 @@ final class WelcomeViewModel {
                 }
             )
         case .teacher:
+            let storePage = RemoteConfigService.shared.getURL(RemoteConfigKey.teacherAppURL.rawValue)
+            let message = storePage == nil
+                ? LocalizationSupport.localized("This is a teacher account. Teachers should use %@, our app for teachers. It isn't available yet; once it is, a download link will appear here.")
+                : LocalizationSupport.localized("This is a teacher account. Please sign in to %@, our app for teachers.")
             return OtherAppNotice(
                 accountRole: role,
                 title: LocalizationSupport.localized("Sign In Error"),
-                message: String(format: LocalizationSupport.localized("This is a teacher account. Please sign in to %@, our app for teachers."), role.appName),
-                download: nil
+                message: String(format: message, role.appName),
+                download: storePage.map {
+                    OtherAppNotice.Download(url: $0, label: String(format: LocalizationSupport.localized("Download %@"), role.appName))
+                }
             )
         }
     }

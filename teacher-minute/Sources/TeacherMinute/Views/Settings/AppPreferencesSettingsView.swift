@@ -3,8 +3,7 @@
 //  teacher-minute
 //
 //  The preferences, as Instant Teacher's design draws them: the session type a
-//  student's question starts with — for a teacher, their availability when
-//  the app opens — the currency, and the appearance.
+//  student's question starts with, the currency, and the appearance.
 //
 
 import SwiftUI
@@ -12,7 +11,6 @@ import SwiftUI
 struct AppPreferencesSettingsView: View {
   let viewModel: any SettingsViewModeling
   @AppStorage(SessionPreferences.defaultQuestionTypeKey) var defaultQuestionType = ConversationType.audio.rawValue
-  @AppStorage(TeacherPresencePreferences.launchPresenceKey) var launchPresence = TeacherPresencePreferences.defaultLaunchPresence.rawValue
   @AppStorage("appearanceMode") var appearanceMode = "system"
 
   @Environment(\.colorScheme) var colorScheme
@@ -33,13 +31,11 @@ struct AppPreferencesSettingsView: View {
 
   private var card: some View {
     VStack(alignment: .leading, spacing: 12) {
-      if viewModel.role == .teacher {
-        launchPresenceSection
-      } else {
+      if viewModel.role != .teacher {
         sessionTypeSection
-      }
 
-      BrandRule()
+        BrandRule()
+      }
 
       VStack(alignment: .leading, spacing: 8) {
         sectionTitle(viewModel.currencySectionTitle, size: 17)
@@ -85,21 +81,6 @@ struct AppPreferencesSettingsView: View {
         defaultQuestionType = type.rawValue
       }
       footnote(viewModel.defaultSessionTypeFooterText)
-    }
-  }
-
-  /// Whether the teacher comes online by themselves when the app opens.
-  private var launchPresenceSection: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      sectionTitle(viewModel.launchPresenceSectionTitle, size: 16)
-      BrandOptionPicker(
-        options: TeacherLaunchPresence.allCases,
-        selection: TeacherLaunchPresence(rawValue: launchPresence) ?? TeacherPresencePreferences.defaultLaunchPresence,
-        title: { $0.title }
-      ) { presence in
-        launchPresence = presence.rawValue
-      }
-      footnote(viewModel.launchPresenceFooterText)
     }
   }
 

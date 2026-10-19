@@ -174,6 +174,9 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Pro Teacher is now our app for teachers only. To keep learning, download Instant Teacher, our new app for students, and sign in there with the same account.":
           "מעכשיו Pro Teacher היא האפליקציה שלנו למורים בלבד. כדי להמשיך ללמוד, הורידו את Instant Teacher, האפליקציה החדשה שלנו לתלמידים, והתחברו אליה עם אותו החשבון.",
         "Download Instant Teacher": "להורדת Instant Teacher",
+        "This is a teacher account. Teachers should use %@, our app for teachers. It isn't available yet; once it is, a download link will appear here.":
+          "זהו חשבון מורה. מורים צריכים להשתמש ב-%@, האפליקציה שלנו למורים. היא עדיין לא זמינה; ברגע שתהיה, יופיע כאן קישור להורדה.",
+        "Download %@": "להורדת %@",
         "Save board to gallery?": "לשמור את הלוח לגלריה?",
         "The session ended. Do you want to save the board image to your device gallery?": "השיעור הסתיים. האם ברצונך לשמור את תמונת הלוח לגלריית המכשיר?",
         "The board will be saved to the chat. Do you also want to save it to your device gallery?": "הלוח יישמר בצ׳אט. האם ברצונך לשמור אותו גם לגלריית המכשיר?",
@@ -591,14 +594,10 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         // stars, so the whole comment block read as untranslated.
         "Add a comment (optional)": "הוספת הערה (לא חובה)",
         "Your teacher sees this without your name.": "המורה רואה את ההערה בלי השם שלך.",
-        // Teacher preference: availability when the app opens.
-        "Availability on launch": "זמינות בפתיחת האפליקציה",
-        "Availability on launch and currency": "זמינות בפתיחה ומטבע",
+        // The teacher's Preferences row.
+        "Currency and appearance": "מטבע ומראה",
         "Online": "זמין",
         "Offline": "לא זמין",
-        "Last state": "המצב האחרון",
-        "Choose whether you start out available for questions when the app opens. \"Last state\" reuses the availability you left the app on.":
-            "בחרו אם להתחיל כזמינים לשאלות כשהאפליקציה נפתחת. \"המצב האחרון\" משחזר את הזמינות שבה סגרתם את האפליקציה.",
         // Teacher dashboard warning header — the teacher is unreachable.
         "Notifications are off. You can take questions while the app is open, and you go offline when you leave it.":
             "ההתראות כבויות. אפשר לקבל שאלות כל עוד האפליקציה פתוחה, וברגע שתצאו ממנה תעברו למצב לא זמין.",
@@ -1144,6 +1143,13 @@ enum LocalizationKey {
         "Pro Teacher is now our app for teachers only. To keep learning, download Instant Teacher, our new app for students, and sign in there with the same account.":
           "student_app_prompt_message",
         "Download Instant Teacher": "student_app_prompt_download",
+
+        // The dialog that sends a teacher in Instant Teacher to Pro Teacher.
+        // `teacher_app_url` empty shows the "coming" message; set, the usual
+        // "sign in to" message plus a download button.
+        "This is a teacher account. Teachers should use %@, our app for teachers. It isn't available yet; once it is, a download link will appear here.":
+          "teacher_app_prompt_pending_message",
+        "Download %@": "teacher_app_prompt_download",
 
         // Copy that names the app, which `%@` fills with `AuthRole.appName`.
         // The older keys for these hold "Instant Teacher" itself, which is the

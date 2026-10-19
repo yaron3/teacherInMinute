@@ -599,6 +599,10 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #endif
 		  // Sign-out has already written this teacher offline (see
 		  // AuthService); a keep-alive now would undo it.
+		  self?.isOnline = false
+		  // The next sign-in loads its own profile and goes online again.
+		  self?.didLoadProfile = false
+		  self?.didApplyLaunchPresence = false
 		  self?.keepAlive?.stop()
 		  self?.keepAlive = nil
 		  self?.presenceService = nil
@@ -633,8 +637,8 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	logger.info("[VM] configurePresence — presenceService ready")
 	// The backend can still hold this teacher online from the last run: once
 	// the app is gone, a teacher it can reach by push stays online. The
-	// dashboard starts offline until `applyLaunchPresence` decides, so the
-	// backend is told the same, as the Android branch above does.
+	// dashboard starts offline until `applyLaunchPresence` puts it online, so
+	// the backend is told the same, as the Android branch above does.
 	if !isOnline {
 	  presenceService?.goOffline()
 	}
@@ -770,9 +774,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #endif
 #endif
 
-	// `.lastState` restores this on the next launch, so it has to follow every
-	// change of availability, not just the ones made from the dashboard.
-	TeacherPresencePreferences.lastKnownOnline = isOnline
 	syncKeepAlive()
 	// Going offline is the teacher's own decision, so the header has nothing
 	// left to warn about.
@@ -799,17 +800,19 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	}
   }
 
-  /// Puts the teacher online at launch when their setting asks for it — see
-  /// `TeacherLaunchPresence`. Called once the profile is in, because going
-  /// online publishes the teacher's subjects and those arrive with it.
+  /// Puts the teacher online on every launch and every sign-in. Going
+  /// offline lasts only while the app runs: a teacher who switched off and
+  /// then closed the app is online again the next time it opens. Called once
+  /// the profile is in, because going online publishes the teacher's subjects
+  /// and those arrive with it.
   ///
   /// Routed through `toggleOnline()` so the automatic path is the manual one:
   /// same permission gate, same analytics, same presence write.
   private func applyLaunchPresence() {
 	guard !didApplyLaunchPresence else { return }
 	didApplyLaunchPresence = true
-	guard !isOnline, TeacherPresencePreferences.shouldGoOnlineAtLaunch() else { return }
-	logger.info("[VM] applyLaunchPresence — going online, setting=\(TeacherPresencePreferences.launchPresence.rawValue)")
+	guard !isOnline else { return }
+	logger.info("[VM] applyLaunchPresence — going online")
 	toggleOnline()
   }
 
@@ -851,7 +854,6 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// The platform-specific presence write, shared by the toggle and by the
   /// notification rule above so both take the same path off.
   private func writePresence(online: Bool) {
-	TeacherPresencePreferences.lastKnownOnline = online
 	syncKeepAlive()
 	let status = online ? "online" : "offline"
 #if os(Android)

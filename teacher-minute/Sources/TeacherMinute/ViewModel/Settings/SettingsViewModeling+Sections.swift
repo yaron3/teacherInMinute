@@ -34,7 +34,7 @@ extension SettingsViewModeling {
             SettingsRow(
                 title: LocalizationSupport.localized("Preferences"),
                 subtitle: role == .teacher
-                    ? LocalizationSupport.localized("Availability on launch and currency")
+                    ? LocalizationSupport.localized("Currency and appearance")
                     : LocalizationSupport.localized("Default session type and currency"),
                 systemImage: "slider.horizontal.3",
                 iconColor: .primary,
