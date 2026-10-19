@@ -81,6 +81,9 @@ let logger = AppLogger(subsystem: "com.yaronj.tim", category: "TeacherMinute")
 				if SessionTypeUITestHarness.isRequested {
 				  SessionTypeUITestHarness()
 				}
+				if StudentTutorialUITestHarness.isRequested {
+				  StudentTutorialUITestHarness()
+				}
 #endif
 				}
 				// The welcome branch owns a NavigationStack bound to the router's

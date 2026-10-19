@@ -183,6 +183,7 @@ struct StudentTutorialView: View {
     }
     .frame(maxWidth: .infinity)
     .environment(\.layoutDirection, .leftToRight)
+    .accessibilityIdentifier("student_tutorial_pager")
   }
 
   /// Where page `index` stands: a screen's width per page away from the
