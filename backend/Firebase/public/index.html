@@ -232,6 +232,16 @@
     html[dir="rtl"] .lang-en { display: none !important; }
     html[dir="ltr"] .lang-he { display: none !important; }
 
+    /* Audience tabs: Students / Teachers switch, no scrolling needed. */
+    .audience-tab {
+      color: rgb(var(--text-3));
+      border-color: transparent;
+    }
+    .audience-tab[aria-selected="true"] {
+      color: rgb(var(--accent));
+      border-color: rgb(var(--accent));
+    }
+
     /* Custom scrollbar styling for legal viewer */
     .custom-scrollbar::-webkit-scrollbar {
       width: 6px;
@@ -265,11 +275,11 @@
       </div>
 
       <nav class="hidden md:flex items-center gap-6">
-        <a href="#students" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">לתלמידים</a>
-        <a href="#students" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">For students</a>
+        <a href="#students" onclick="switchAudience(event, 'student')" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">לתלמידים</a>
+        <a href="#students" onclick="switchAudience(event, 'student')" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">For students</a>
 
-        <a href="#teachers" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">למורים</a>
-        <a href="#teachers" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">For teachers</a>
+        <a href="#teachers" onclick="switchAudience(event, 'teacher')" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">למורים</a>
+        <a href="#teachers" onclick="switchAudience(event, 'teacher')" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">For teachers</a>
 
         <a href="#privacy" class="text-brand-body hover:text-brand-strong transition font-medium lang-he">מדיניות פרטיות</a>
         <a href="#privacy" class="text-brand-body hover:text-brand-strong transition font-medium lang-en">Privacy Policy</a>
@@ -301,6 +311,25 @@
 
   <!-- MAIN LANDING EXPERIENCE VIEW -->
   <main id="view-landing" class="flex-grow">
+    <!-- Audience tabs: picking one shows that role's content in place, so
+         reaching the teacher side never requires scrolling past the
+         student hero and gallery. -->
+    <div class="bg-brand-black/60 border-b border-brand-line/80 px-4">
+      <div class="max-w-6xl mx-auto flex" role="tablist">
+        <button type="button" id="tab-student" class="audience-tab flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold border-b-2 transition" role="tab" aria-selected="true" onclick="switchAudience(null, 'student')">
+          <i class="ph-bold ph-student text-lg"></i>
+          <span class="lang-he">לתלמידים</span>
+          <span class="lang-en">Students</span>
+        </button>
+        <button type="button" id="tab-teacher" class="audience-tab flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold border-b-2 transition" role="tab" aria-selected="false" onclick="switchAudience(null, 'teacher')">
+          <i class="ph-bold ph-chalkboard-teacher text-lg"></i>
+          <span class="lang-he">למורים</span>
+          <span class="lang-en">Teachers</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="panel-student">
     <!-- Hero: the Instant Teacher welcome screen, in words and on the phone -->
     <section id="about" class="stage py-16 md:py-24 px-4">
       <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -342,8 +371,8 @@
             </button>
           </div>
           <p class="text-sm text-brand-textGray">
-            <span class="lang-he">מלמדים? <a href="#teachers" class="text-brand-accent font-bold hover:underline">הכירו את Pro Teacher ←</a></span>
-            <span class="lang-en">Do you teach? <a href="#teachers" class="text-brand-accent font-bold hover:underline">Meet Pro Teacher →</a></span>
+            <span class="lang-he">מלמדים? <a href="#teachers" onclick="switchAudience(event, 'teacher')" class="text-brand-accent font-bold hover:underline">הכירו את Pro Teacher ←</a></span>
+            <span class="lang-en">Do you teach? <a href="#teachers" onclick="switchAudience(event, 'teacher')" class="text-brand-accent font-bold hover:underline">Meet Pro Teacher →</a></span>
           </p>
 
           <!-- Feature Badges -->
@@ -534,7 +563,9 @@
         </div>
       </div>
     </section>
+    </div>
 
+    <div id="panel-teacher" class="hidden">
     <!-- Pro Teacher gallery -->
     <section id="teachers" class="stage py-16 md:py-20 px-4 border-t border-brand-line/70 bg-brand-dark/60">
       <div class="max-w-6xl mx-auto space-y-10">
@@ -623,6 +654,7 @@
         </div>
       </div>
     </section>
+    </div>
 
     <!-- Support / Call to Action inside landing -->
     <section class="py-12 text-center px-4 border-t border-brand-line/70">
@@ -1082,6 +1114,18 @@
     // Initialize detected language immediately
     applyLanguage(currentLang);
 
+    // Audience tabs: Students / Teachers. Switching never scrolls — the
+    // chosen panel simply replaces the other one in place at the top of
+    // the landing view.
+    function switchAudience(event, role) {
+      if (event) event.preventDefault();
+      document.getElementById('panel-student').classList.toggle('hidden', role !== 'student');
+      document.getElementById('panel-teacher').classList.toggle('hidden', role !== 'teacher');
+      document.getElementById('tab-student').setAttribute('aria-selected', role === 'student');
+      document.getElementById('tab-teacher').setAttribute('aria-selected', role === 'teacher');
+      history.replaceState(null, '', role === 'teacher' ? '#teachers' : '#students');
+    }
+
     // Client-side router logic using URI Hash
     function handleRouting() {
       const hash = window.location.hash;
@@ -1105,6 +1149,7 @@
       } else {
         viewLanding.classList.remove('hidden');
         document.title = "מורה לרגע · Instant Teacher";
+        switchAudience(null, hash === '#teachers' ? 'teacher' : 'student');
       }
     }
 
@@ -1116,18 +1161,44 @@
     // iOS goes straight to TestFlight. Android is a Play closed test that only
     // registered testers can install, so it gets the pilot dialog first.
     // Anything else is told only iOS and Android are supported.
+    // The visitor's App Store country, as the two-letter code in an
+    // apps.apple.com link. A browser cannot read the storefront itself, so
+    // this guesses: Israel's time zone first, since Safari often reports
+    // en-US whatever the region, then the region of a preferred language.
+    // A link to a country the app is not sold in is a page that does not
+    // exist, so a guess outside `storefronts` falls back to Israel.
+    function storeCountry(storefronts) {
+      const guesses = [];
+      try {
+        const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        if (zone === 'Asia/Jerusalem' || zone === 'Asia/Tel_Aviv') guesses.push('il');
+      } catch (e) {}
+      const languages = navigator.languages && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language || ''];
+      for (const tag of languages) {
+        const region = tag.split(/[-_]/).slice(1).find(part => /^[A-Za-z]{2}$/.test(part));
+        if (region) guesses.push(region.toLowerCase());
+      }
+      return guesses.find(country => storefronts.includes(country)) || 'il';
+    }
+
     const APPS = {
       student: {
         nameHe: 'מורה לרגע',
         nameEn: 'Instant Teacher',
-        ios: 'https://testflight.apple.com/join/vP9qsPG4',
+        // The countries it is sold in, per App Store Connect's availability.
+        ios: `https://apps.apple.com/${storeCountry(['il', 'us'])}/app/instant-teacher/id6818179310`,
         android: 'https://play.google.com/store/apps/details?id=com.yaronj.student'
       },
       teacher: {
         nameHe: 'Pro Teacher',
         nameEn: 'Pro Teacher',
-        ios: 'https://testflight.apple.com/join/V8V3CBCN',
-        android: 'https://play.google.com/store/apps/details?id=com.yaronj.tim'
+        ios: `https://apps.apple.com/${storeCountry(['il', 'us', 'ca'])}/app/pro-teacher/id6771022216`,
+        android: 'https://play.google.com/apps/testing/com.yaronj.tim',
+        // Open testing: anyone with the link can opt in and install, no
+        // manual registration/approval needed — skip the pilot dialog.
+        androidOpen: true
       }
     };
     const REGISTER_PILOT_URL = 'https://us-central1-teacher-in-a-moment.cloudfunctions.net/registerPilot';
@@ -1146,6 +1217,10 @@
       const platform = detectPlatform();
       if (platform === 'ios') {
         window.location.href = APPS[app].ios;
+        return;
+      }
+      if (platform === 'android' && APPS[app].androidOpen) {
+        window.location.href = APPS[app].android;
         return;
       }
       openDownloadDialog(app, platform === 'android' ? 'android' : 'unsupported');
