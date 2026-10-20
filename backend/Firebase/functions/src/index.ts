@@ -92,6 +92,7 @@ export {
   adminDeleteCoupon,
   adminListPayments,
   adminListContactRequests,
+  adminRespondToContactRequest,
   adminListPilotRegistrations,
   adminSetPilotStatus,
   adminListPendingTeachers,

@@ -5,8 +5,9 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { recomputeRegisteredTeacherCount, STATS_COLLECTION, PLATFORM_STATS_DOC } from "./stats";
 import { republishAllTeacherPresence, ONLINE_TEACHERS_PATH } from "./presence";
 import { PILOT_COLLECTION } from "./pilot";
+import { summarizeOnlineTeachers } from "./presenceHistory";
 import { deleteAccountData } from "./accountDeletion";
-import { sendMail } from "./mailer";
+import { sendMail, supportSmtpConfig } from "./mailer";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -159,6 +160,54 @@ async function readTeacherAggregates(uids: string[]): Promise<Map<string, Teache
 }
 
 // ─── adminDashboardStatus ─────────────────────────────────────────────────────
+
+const DAY_MS = 24 * 3600 * 1000;
+
+/**
+ * Questions asked in the last 24 hours: how many no teacher took, and how long
+ * the ones a teacher did take waited for them.
+ *
+ * "Not answered" is any question that left the queue without an `acceptedAt` —
+ * timed out (`unanswered`) or cancelled by the student while still waiting.
+ * Questions still searching are neither, and are counted live elsewhere.
+ */
+async function summarizeLastDayQuestions(nowMs: number) {
+  const snap = await firestore
+    .collection("questions")
+    .where("createdAt", ">=", Timestamp.fromMillis(nowMs - DAY_MS))
+    .get();
+
+  let notAnswered = 0;
+  let timedOut = 0;
+  let cancelledWaiting = 0;
+  let answered = 0;
+  let totalWaitMs = 0;
+
+  for (const doc of snap.docs) {
+    const q = doc.data();
+    const createdAt = tsToMs(q.createdAt);
+    const acceptedAt = tsToMs(q.acceptedAt);
+    if (acceptedAt !== null && createdAt !== null && acceptedAt >= createdAt) {
+      answered += 1;
+      totalWaitMs += acceptedAt - createdAt;
+    } else if (acceptedAt === null && q.status === "unanswered") {
+      notAnswered += 1;
+      timedOut += 1;
+    } else if (acceptedAt === null && q.status === "cancelled") {
+      notAnswered += 1;
+      cancelledWaiting += 1;
+    }
+  }
+
+  return {
+    asked: snap.size,
+    notAnswered,
+    timedOut,
+    cancelledWaiting,
+    answered,
+    avgWaitSeconds: answered > 0 ? Math.round(totalWaitMs / answered / 1000) : null,
+  };
+}
 
 /**
  * Recomputes the cached platform counters. Seeds `registeredTeacherCount` for
@@ -362,6 +411,12 @@ export const adminDashboardStatus = onCall(async (req) => {
     };
   });
 
+  const nowMs = Date.now();
+  const [lastDayQuestions, lastDayTeachers] = await Promise.all([
+    summarizeLastDayQuestions(nowMs),
+    summarizeOnlineTeachers(nowMs, DAY_MS),
+  ]);
+
   const platformStats = platformStatsSnap.exists
     ? serializeDoc(platformStatsSnap.data() as Record<string, unknown>)
     : null;
@@ -391,6 +446,10 @@ export const adminDashboardStatus = onCall(async (req) => {
     },
     users: {
       total: userCountSnap.data().count,
+    },
+    lastDay: {
+      questions: lastDayQuestions,
+      teachers: lastDayTeachers,
     },
     platform: platformStats,
     revenue: {
@@ -1006,7 +1065,8 @@ export const adminListContactRequests = onCall(async (req) => {
   const requests = snap.docs.map((d) => {
     const data = d.data() as Record<string, unknown>;
     return {
-      ...data,
+      // Serialized for the `sentAt` timestamps inside `responses`.
+      ...serializeDoc(data),
       id: d.id,
       // Written by the client as an ISO-8601 string (see firestore.rules), so
       // it needs parsing rather than the Timestamp path.
@@ -1014,6 +1074,98 @@ export const adminListContactRequests = onCall(async (req) => {
     };
   });
   return { requests };
+});
+
+/** Strips CR/LF so ticket text cannot inject mail headers through a subject. */
+function oneLine(text: unknown): string {
+  return String(text ?? "").replace(/[\r\n]+/g, " ").trim();
+}
+
+/** The subject of a reply to a support ticket. Carries the case ID so a reply
+ *  to the reply can be matched back to its ticket. */
+export function supportReplySubject(caseId: string, title: unknown): string {
+  return `Re: ${oneLine(title) || "Your support request"} [Case #${caseId}]`;
+}
+
+export const SUPPORT_REPLY_MAX_CHARS = 10_000;
+
+/**
+ * Emails a reply to the sender of `contactRequests/{requestId}` from the
+ * support address, then records it on the ticket under `responses`.
+ *
+ * The record is written only after the send succeeds, so a ticket never shows
+ * a reply its sender did not get.
+ */
+export const adminRespondToContactRequest = onCall(async (req) => {
+  assertAdmin(req);
+  const { requestId, message } = req.data as { requestId?: unknown; message?: unknown };
+  if (typeof requestId !== "string" || !requestId) {
+    throw new HttpsError("invalid-argument", "requestId required");
+  }
+  const text = typeof message === "string" ? message.trim() : "";
+  if (!text) throw new HttpsError("invalid-argument", "message required");
+  if (text.length > SUPPORT_REPLY_MAX_CHARS) {
+    throw new HttpsError("invalid-argument", `message is over ${SUPPORT_REPLY_MAX_CHARS} characters`);
+  }
+
+  const smtp = supportSmtpConfig();
+  if (!smtp.host || !smtp.pass || !smtp.from) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Support email is not configured (SUPPORT_SMTP_HOST, SUPPORT_SMTP_PASS and SUPPORT_SMTP_FROM)"
+    );
+  }
+
+  const ref = firestore.collection("contactRequests").doc(requestId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "No such support request");
+  const ticket = snap.data() as Record<string, unknown>;
+
+  const to = typeof ticket.userEmail === "string" ? ticket.userEmail.trim() : "";
+  if (!to.includes("@")) {
+    throw new HttpsError("failed-precondition", "The request has no email address to reply to");
+  }
+
+  const subject = supportReplySubject(requestId, ticket.title);
+  const askedAtMs = dateFieldToMs(ticket.sentAt);
+  const quoted = String(ticket.description ?? "")
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
+  const body = [
+    text,
+    "",
+    "—",
+    `Case #${requestId}`,
+    askedAtMs ? `On ${new Date(askedAtMs).toUTCString()} you wrote:` : "You wrote:",
+    quoted,
+  ].join("\n");
+
+  let messageId: string | false;
+  try {
+    messageId = await sendMail({ to, subject, text: body }, smtp);
+  } catch (err) {
+    logger.error(`[admin] support reply failed request=${requestId}`, err);
+    throw new HttpsError("internal", `Sending failed: ${(err as Error).message}`);
+  }
+  if (!messageId) throw new HttpsError("failed-precondition", "Support email is not configured");
+
+  const response = {
+    to,
+    from: smtp.from,
+    subject,
+    message: text,
+    sentAt: Timestamp.now(),
+    sentBy: req.auth?.token?.email ?? req.auth?.uid ?? null,
+    messageId,
+  };
+  await ref.update({
+    responses: FieldValue.arrayUnion(response),
+    lastRespondedAt: response.sentAt,
+  });
+
+  logger.info(`[admin] support reply sent request=${requestId} by=${response.sentBy}`);
+  return { response: serializeDoc(response) };
 });
 
 // ─── Android pilot registrations ──────────────────────────────────────────────
@@ -1191,7 +1343,6 @@ export const adminSendTeacherMessage = onCall(async (req) => {
 // The console works through a selection in chunks — one call per chunk — so a
 // large cleanup reports progress and never runs into a function timeout.
 
-const DAY_MS = 24 * 3600 * 1000;
 export const BULK_DELETE_MAX = 20;
 export const BULK_EMAIL_MAX = 100;
 

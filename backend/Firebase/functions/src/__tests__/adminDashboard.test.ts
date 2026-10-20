@@ -164,6 +164,37 @@ describe("overview", () => {
     expect(page.$("#verify-badge").style.display).not.toBe("none");
   });
 
+  it("summarises the live queue and the last 24 hours", async () => {
+    page = openConsole({
+      adminDashboardStatus: dashboard({
+        teachers: { total: 5, online: 3, list: [], staleProjections: 0 },
+        questions: { ...dashboard().questions, searching: 4 },
+        lastDay: {
+          questions: { asked: 10, notAnswered: 3, timedOut: 2, cancelledWaiting: 1, answered: 6, avgWaitSeconds: 75 },
+          teachers: { avgOnline: 2.46, avgDistinctPerHour: 4, hoursCovered: 6 },
+        },
+      }),
+    });
+    await page.signIn();
+    const card = (label: string) => page!.$$("#overview-summary .stat-card")
+      .find((c) => c.textContent!.includes(label))!;
+    expect(card("Online Teachers").querySelector(".stat-value")!.textContent).toBe("3");
+    expect(card("Waiting for an Answer").querySelector(".stat-value")!.textContent).toBe("4");
+    expect(card("Avg Teachers Online / Hour").querySelector(".stat-value")!.textContent).toBe("2.5");
+    expect(card("Avg Teachers Online / Hour").textContent).toContain("6h of data");
+    expect(card("Not Answered (24h)").querySelector(".stat-value")!.textContent).toBe("3");
+    expect(card("Avg Wait to Answer (24h)").querySelector(".stat-value")!.textContent).toBe("1m 15s");
+  });
+
+  it("shows dashes in the 24-hour summary when there is no data yet", async () => {
+    page = openConsole({ adminDashboardStatus: dashboard() });
+    await page.signIn();
+    const summary = page.$("#overview-summary").textContent!;
+    expect(summary).toContain("Avg Teachers Online / Hour");
+    expect(summary).toContain("0h of data");
+    expect(summary).not.toContain("undefined");
+  });
+
   it("shows revenue per currency instead of adding shekels to dollars", async () => {
     page = openConsole({ adminDashboardStatus: dashboard() });
     await page.signIn();
@@ -209,17 +240,40 @@ describe("users", () => {
     return page;
   }
 
-  it("lists users, blanks the balance for teachers and marks missing profiles", async () => {
+  it("splits students and teachers into their own tables and marks missing profiles", async () => {
     const p = await usersPage([
       user(),
+      user({ uid: "uid-3", email: "guest@example.com", role: null, anonymous: true }),
       user({ uid: "uid-2", email: "yossi@example.com", displayName: "Yossi", role: "teacher", totalMinutes: 90, hasProfile: false }),
     ]);
-    const rows = p.$$("#users-table tr");
-    expect(rows).toHaveLength(2);
-    expect(rows[0].textContent).toContain("dana@example.com");
-    expect(rows[0].textContent).not.toContain("no profile doc");
-    expect(rows[1].textContent).toContain("90 taught");
-    expect(rows[1].textContent).toContain("no profile doc");
+    const students = p.$$("#students-table tr");
+    expect(students.map((r) => r.dataset.id)).toEqual(["uid-1", "uid-3"]);
+    expect(students[0].textContent).toContain("dana@example.com");
+    expect(students[0].textContent).not.toContain("no profile doc");
+    expect(students[1].textContent).toContain("guest");
+    expect(p.$("#students-count").textContent).toBe("(2)");
+
+    const teachers = p.$$("#teachers-table tr");
+    expect(teachers.map((r) => r.dataset.id)).toEqual(["uid-2"]);
+    expect(teachers[0].textContent).toContain("90");
+    expect(teachers[0].textContent).toContain("no profile doc");
+    expect(p.$("#teachers-count").textContent).toBe("(1)");
+    // A teacher has no minutes balance to adjust.
+    expect(p.$$("#teachers-table button").map((b) => b.textContent)).not.toContain("± Min");
+  });
+
+  it("filters both tables by the one search box", async () => {
+    const p = await usersPage([
+      user(),
+      user({ uid: "uid-2", email: "yossi@example.com", displayName: "Yossi", role: "teacher" }),
+      user({ uid: "uid-4", email: "yael@example.com", displayName: "Yael", role: "teacher" }),
+    ]);
+    const search = p.$("#user-search") as HTMLInputElement;
+    search.value = "yossi";
+    search.dispatchEvent(new p.window.Event("input"));
+    expect(p.$("#students-table").textContent).toContain("No students found");
+    expect(p.$$("#teachers-table tr").map((r) => r.dataset.id)).toEqual(["uid-2"]);
+    expect(p.$("#teachers-count").textContent).toBe("(1 of 2)");
   });
 
   it("filters the loaded users by search text", async () => {
@@ -227,20 +281,20 @@ describe("users", () => {
     const search = p.$("#user-search") as HTMLInputElement;
     search.value = "yos";
     search.dispatchEvent(new p.window.Event("input"));
-    expect(p.$$("#users-table tr")).toHaveLength(1);
-    expect(p.$("#users-table").textContent).toContain("Yossi");
+    expect(p.$$("#students-table tr")).toHaveLength(1);
+    expect(p.$("#students-table").textContent).toContain("Yossi");
   });
 
   it("passes a hostile name and UID to every row action as plain text", async () => {
     const uid = `u'1"<b>`;
     const p = await usersPage([user({ uid, email: EVIL, displayName: EVIL })]);
-    expect(p.$("#users-table b")).toBeNull();
-    expect(p.$("#users-table img")).toBeNull();
+    expect(p.$("#students-table b")).toBeNull();
+    expect(p.$("#students-table img")).toBeNull();
 
-    p.button("#users-table", "✉").click();
+    p.button("#students-table", "✉").click();
     expect(p.$("#msg-teacher-label").textContent).toBe(EVIL);
 
-    p.button("#users-table", "Delete").click();
+    p.button("#students-table", "Delete").click();
     await p.settle();
     expect(p.confirm).toHaveBeenCalledWith(expect.stringContaining(EVIL));
     expect(p.callsTo("adminMutateUser")).toEqual([
@@ -251,23 +305,23 @@ describe("users", () => {
 
   it("never turns a javascript: photo URL into an image source", async () => {
     const p = await usersPage([user({ photoURL: "javascript:window.__pwned=3" })]);
-    expect(p.$("#users-table img").getAttribute("src")).toBe("about:blank");
+    expect(p.$("#students-table img").getAttribute("src")).toBe("about:blank");
   });
 
   it("keeps an https photo URL, query string included", async () => {
     const p = await usersPage([user({ photoURL: "https://cdn.example.com/a.png?x=1&y=2" })]);
-    expect(p.$("#users-table img").getAttribute("src")).toBe("https://cdn.example.com/a.png?x=1&y=2");
+    expect(p.$("#students-table img").getAttribute("src")).toBe("https://cdn.example.com/a.png?x=1&y=2");
   });
 
   it("asks before disabling and does nothing if the admin cancels", async () => {
     const p = await usersPage([user()]);
     p.confirm.mockReturnValueOnce(false);
-    p.button("#users-table", "Disable").click();
+    p.button("#students-table", "Disable").click();
     await p.settle();
     expect(p.confirm).toHaveBeenCalledWith(expect.stringContaining("takes them offline"));
     expect(p.callsTo("adminMutateUser")).toHaveLength(0);
 
-    p.button("#users-table", "Disable").click();
+    p.button("#students-table", "Disable").click();
     await p.settle();
     expect(p.callsTo("adminMutateUser")).toEqual([
       { name: "adminMutateUser", data: { action: "disable", uid: "uid-1" } },
@@ -276,7 +330,7 @@ describe("users", () => {
 
   it("enables a disabled user without asking", async () => {
     const p = await usersPage([user({ disabled: true })]);
-    p.button("#users-table", "Enable").click();
+    p.button("#students-table", "Enable").click();
     await p.settle();
     expect(p.confirm).not.toHaveBeenCalled();
     expect(p.callsTo("adminMutateUser")[0].data).toEqual({ action: "enable", uid: "uid-1" });
@@ -284,7 +338,7 @@ describe("users", () => {
 
   it("adjusts minutes by the entered delta", async () => {
     const p = await usersPage([user()]);
-    p.button("#users-table", "± Min").click();
+    p.button("#students-table", "± Min").click();
     expect(p.$("#adjust-modal").classList.contains("open")).toBe(true);
     (p.$("#adjust-delta") as HTMLInputElement).value = "-15";
     p.button("#adjust-modal", "Apply").click();
@@ -306,7 +360,7 @@ describe("users", () => {
     });
     await page.signIn();
     await page.nav("Users");
-    page.button("#users-table", "View").click();
+    page.button("#students-table", "View").click();
     await page.settle();
 
     expect(page.$("#user-modal-title").textContent).toBe(EVIL);
@@ -525,26 +579,26 @@ describe("multi-select", () => {
     return page;
   }
   const tick = (p: NonNullable<typeof page>, uid: string) => {
-    const box = p.$(`#users-table .row-select[data-id="${uid}"]`) as HTMLInputElement;
+    const box = p.$(`#students-table .row-select[data-id="${uid}"]`) as HTMLInputElement;
     box.checked = !box.checked;
     box.dispatchEvent(new p.window.Event("change", { bubbles: true }));
   };
   const selectAll = (p: NonNullable<typeof page>, on: boolean) => {
-    const all = p.$("#users-select-all") as HTMLInputElement;
+    const all = p.$("#students-select-all") as HTMLInputElement;
     all.checked = on;
     all.dispatchEvent(new p.window.Event("change", { bubbles: true }));
   };
 
   it("shows the action bar only while something is selected", async () => {
     const p = await usersPage(many(3));
-    expect(p.$("#users-bulk-bar").classList.contains("show")).toBe(false);
+    expect(p.$("#students-bulk-bar").classList.contains("show")).toBe(false);
     tick(p, "u0");
     tick(p, "u2");
-    expect(p.$("#users-bulk-bar").classList.contains("show")).toBe(true);
-    expect(p.$("#users-selected-count").textContent).toBe("2 selected");
-    expect((p.$("#users-select-all") as HTMLInputElement).indeterminate).toBe(true);
-    p.button("#users-bulk-bar", "Clear").click();
-    expect(p.$("#users-bulk-bar").classList.contains("show")).toBe(false);
+    expect(p.$("#students-bulk-bar").classList.contains("show")).toBe(true);
+    expect(p.$("#students-selected-count").textContent).toBe("2 selected");
+    expect((p.$("#students-select-all") as HTMLInputElement).indeterminate).toBe(true);
+    p.button("#students-bulk-bar", "Clear").click();
+    expect(p.$("#students-bulk-bar").classList.contains("show")).toBe(false);
   });
 
   it("select-all takes only the rows the search shows, and keeps them across searches", async () => {
@@ -554,19 +608,19 @@ describe("multi-select", () => {
     search.dispatchEvent(new p.window.Event("input"));
     await p.settle();
     selectAll(p, true);
-    expect(p.$("#users-selected-count").textContent).toBe("1 selected");
+    expect(p.$("#students-selected-count").textContent).toBe("1 selected");
 
     search.value = "";
     search.dispatchEvent(new p.window.Event("input"));
     await p.settle();
-    expect((p.$(`#users-table .row-select[data-id="z"]`) as HTMLInputElement).checked).toBe(true);
-    expect((p.$(`#users-table .row-select[data-id="u0"]`) as HTMLInputElement).checked).toBe(false);
+    expect((p.$(`#students-table .row-select[data-id="z"]`) as HTMLInputElement).checked).toBe(true);
+    expect((p.$(`#students-table .row-select[data-id="u0"]`) as HTMLInputElement).checked).toBe(false);
   });
 
   it("deletes a large selection in chunks of 20 after one confirmation", async () => {
     const p = await usersPage(many(25));
     selectAll(p, true);
-    p.button("#users-bulk-bar", "Delete selected").click();
+    p.button("#students-bulk-bar", "Delete selected").click();
     await p.settle(); await p.settle();
     expect(p.confirm).toHaveBeenCalledTimes(1);
     expect(p.confirm).toHaveBeenCalledWith(expect.stringContaining("Delete 25 users?"));
@@ -578,7 +632,7 @@ describe("multi-select", () => {
     const p = await usersPage(many(2));
     tick(p, "u1");
     p.confirm.mockReturnValueOnce(false);
-    p.button("#users-bulk-bar", "Delete selected").click();
+    p.button("#students-bulk-bar", "Delete selected").click();
     await p.settle();
     expect(p.callsTo("adminBulkDeleteUsers")).toHaveLength(0);
   });
@@ -592,7 +646,7 @@ describe("multi-select", () => {
       ] },
     });
     selectAll(p, true);
-    p.button("#users-bulk-bar", "Delete selected").click();
+    p.button("#students-bulk-bar", "Delete selected").click();
     await p.settle(); await p.settle();
     const toast = p.$("#toast");
     expect(toast.textContent).toBe("Deleted 1 · skipped 1 · failed 1 (End your active lesson first.)");
@@ -604,7 +658,7 @@ describe("multi-select", () => {
       adminSendEmail: { sent: 2, failed: [], withoutEmail: 1, notFound: 0 },
     });
     selectAll(p, true);
-    p.button("#users-bulk-bar", "📧 Email").click();
+    p.button("#students-bulk-bar", "📧 Email").click();
     expect(p.$("#email-modal").classList.contains("open")).toBe(true);
     expect(p.$("#email-to-label").textContent).toBe("3 selected users — 1 without an email will be skipped");
 
@@ -745,10 +799,15 @@ describe("sorting", () => {
     page = openConsole({ adminDashboardStatus: dashboard(), adminListUsers: { users: [user()], nextPageToken: null } });
     await page.signIn();
     await page.nav("Users");
-    const sortable = page.$$("#page-users thead th").map((th) => th.classList.contains("sortable"));
-    const labels = page.$$("#page-users thead th").map((th) => th.textContent!.trim());
-    expect(labels.filter((_, i) => sortable[i])).toEqual(
+    const sortableLabels = (table: string) => {
+      const ths = page!.$$(`#page-users table:has(#${table}) thead th`);
+      return ths.filter((th) => th.classList.contains("sortable")).map((th) => th.textContent!.trim());
+    };
+    expect(sortableLabels("students-table")).toEqual(
       ["Email", "Display Name", "Role", "Remaining Min", "Total Min", "Joined", "Last Active", "Status"]
+    );
+    expect(sortableLabels("teachers-table")).toEqual(
+      ["Email", "Display Name", "Minutes Taught", "Joined", "Last Active", "Status"]
     );
   });
 
@@ -760,7 +819,7 @@ describe("sorting", () => {
     await page.signIn();
     await page.nav("Users");
     header(page, "#page-users", "Display Name").click();
-    expect(page.$$("#users-table tr").map((r) => r.dataset.id)).toEqual(["User1", "user9", "user10"]);
+    expect(page.$$("#students-table tr").map((r) => r.dataset.id)).toEqual(["User1", "user9", "user10"]);
   });
 });
 
@@ -910,10 +969,94 @@ describe("selection on other tables", () => {
       reader.readAsText(blob!);
     });
     const csv = text.replace(/^\uFEFF/, "").split("\n");
-    expect(csv[0]).toBe("id,User,Email,Role,Title,Device,OS,Locale,Sent At,Description");
+    expect(csv[0]).toBe("id,Name,Email,Description,Device,Role,Sent At,Status");
     expect(csv).toHaveLength(2);
-    expect(csv[1]).toMatch(/^req-1,u1…,a@x\.com,—,"Says ""hi"", twice",/);
+    expect(csv[1]).toMatch(/^req-1,—,a@x\.com,"Says ""hi"", twiceline",/);
     expect((page.window as any).__downloaded).toMatch(/^support-\d{4}-\d{2}-\d{2}\.csv$/);
+  });
+});
+
+describe("support tickets", () => {
+  const ticket = (overrides: any = {}) => ({
+    id: "case-1", userId: "u1", userName: "Dana", userEmail: "dana@example.com",
+    title: "Can't join", description: "The lesson won't start.\nPlease help.",
+    deviceType: "iPhone 16", osVersion: "iOS 26.3", locale: "he_IL", role: "student",
+    sentAt: "2026-10-19T08:00:00Z", sentAtMs: Date.UTC(2026, 9, 19, 8), ...overrides,
+  });
+
+  async function openSupport(requests: any[], respond?: (data: any) => any) {
+    page = openConsole({
+      adminDashboardStatus: dashboard(),
+      adminListContactRequests: { requests },
+      ...(respond ? { adminRespondToContactRequest: respond } : {}),
+    });
+    await page.signIn();
+    await page.nav("Support");
+    return page;
+  }
+
+  it("lists name, email, description, device, role and date", async () => {
+    const p = await openSupport([ticket()]);
+    const headers = p.$$("#page-support thead th").map((th) => th.textContent).filter(Boolean);
+    expect(headers).toEqual(["Name", "Email", "Description", "Device", "Role", "Sent At", "Status"]);
+    const row = p.$("#support-table tr").textContent!;
+    for (const text of ["Dana", "dana@example.com", "The lesson won't start.", "iPhone 16", "student", "Open"]) {
+      expect(row).toContain(text);
+    }
+  });
+
+  it("opens the full ticket when a row is clicked, but not from its checkbox", async () => {
+    const p = await openSupport([ticket()]);
+    (p.$("#support-table tr .select-cell input") as HTMLInputElement).click();
+    expect(p.$("#support-modal").classList.contains("open")).toBe(false);
+
+    (p.$("#support-table tr td:nth-child(3)") as HTMLElement).click();
+    expect(p.$("#support-modal").classList.contains("open")).toBe(true);
+    const body = p.$("#support-modal-body").textContent!;
+    for (const text of ["case-1", "Dana", "dana@example.com", "u1", "iOS 26.3", "he_IL", "Please help."]) {
+      expect(body).toContain(text);
+    }
+    expect(p.$("#support-reply-to").textContent).toBe("→ dana@example.com");
+  });
+
+  it("sends a response and shows it on the ticket", async () => {
+    const sentAt = Date.UTC(2026, 9, 20, 9);
+    const p = await openSupport([ticket()], ({ requestId, message }) => ({
+      response: { to: "dana@example.com", subject: `Re: Can't join [Case #${requestId}]`, message, sentAt, sentBy: "admin@example.com" },
+    }));
+    (p.$("#support-table tr td:nth-child(2)") as HTMLElement).click();
+    (p.$("#support-reply-text") as HTMLTextAreaElement).value = "  Try updating the app.  ";
+    p.button("#support-modal", "Send response").click();
+    await p.settle();
+
+    expect(p.confirm).toHaveBeenCalledWith("Send this response to dana@example.com?");
+    expect(p.callsTo("adminRespondToContactRequest")[0].data).toEqual({ requestId: "case-1", message: "Try updating the app." });
+    expect(p.$("#support-modal-body").textContent).toContain("Try updating the app.");
+    expect(p.$("#support-modal-body").textContent).toContain("[Case #case-1]");
+    expect(p.$("#support-reply-text") as HTMLTextAreaElement).toHaveProperty("value", "");
+    expect(p.$("#support-table tr").textContent).toContain("Replied");
+  });
+
+  it("does not send an empty response", async () => {
+    const p = await openSupport([ticket()], () => ({ response: {} }));
+    (p.$("#support-table tr td:nth-child(2)") as HTMLElement).click();
+    p.button("#support-modal", "Send response").click();
+    await p.settle();
+    expect(p.callsTo("adminRespondToContactRequest")).toHaveLength(0);
+  });
+
+  it("cannot reply to a ticket with no email", async () => {
+    const p = await openSupport([ticket({ userEmail: "" })]);
+    (p.$("#support-table tr td:nth-child(2)") as HTMLElement).click();
+    expect((p.button("#support-modal", "Send response") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("escapes what the sender wrote", async () => {
+    const p = await openSupport([ticket({ userName: EVIL, description: EVIL, title: EVIL })]);
+    (p.$("#support-table tr td:nth-child(2)") as HTMLElement).click();
+    await p.settle();
+    expect((p.window as any).__pwned).toBeUndefined();
+    expect(p.$("#support-modal-body img")).toBeNull();
   });
 });
 
@@ -928,7 +1071,7 @@ describe("last activity", () => {
     await page.signIn();
     await page.nav("Users");
     const idx = (page.$$("#page-users thead th").find((th) => th.textContent === "Last Active") as HTMLTableCellElement).cellIndex;
-    const cell = (page.$("#users-table tr") as HTMLTableRowElement).cells[idx];
+    const cell = (page.$("#students-table tr") as HTMLTableRowElement).cells[idx];
     expect(cell.textContent).toBe("2h ago");
     expect(cell.getAttribute("title")).toMatch(/^Active: .+\nSigned in: .+/);
   });
@@ -940,7 +1083,7 @@ describe("last activity", () => {
     });
     await page.signIn();
     await page.nav("Users");
-    expect(page.$("#users-table").textContent).toContain("3d ago");
+    expect(page.$("#students-table").textContent).toContain("3d ago");
   });
 
   it("lists both times in the user detail window", async () => {
@@ -955,7 +1098,7 @@ describe("last activity", () => {
     });
     await page.signIn();
     await page.nav("Users");
-    page.button("#users-table", "View").click();
+    page.button("#students-table", "View").click();
     await page.settle();
     const rows = page.$$("#user-modal-body .info-row").map((r) => r.textContent!.replace(/\s+/g, " ").trim());
     expect(rows).toContain("Last Active5m ago");
@@ -987,7 +1130,7 @@ describe("loading every user", () => {
     expect(page.callsTo("adminListUsers").map((c) => c.data)).toEqual([
       { limit: 1000 }, { pageToken: "1", limit: 1000 }, { pageToken: "2", limit: 1000 },
     ]);
-    expect(page.$$("#users-table tr")).toHaveLength(3);
+    expect(page.$$("#students-table tr")).toHaveLength(3);
     expect(page.$("#users-updated").textContent).toMatch(/^3 users · last updated /);
     expect(page.$("#page-users").textContent).not.toContain("Load more");
   });
@@ -1001,7 +1144,7 @@ describe("loading every user", () => {
     search.value = "s1@a.com";
     search.dispatchEvent(new page.window.Event("input"));
     await page.settle();
-    const rows = page.$$("#users-table tr");
+    const rows = page.$$("#students-table tr");
     expect(rows.map((r) => r.dataset.id)).toEqual(["s1"]);
     expect(rows[0].textContent).toContain("16m ago");
   });
@@ -1017,13 +1160,13 @@ describe("loading every user", () => {
     const search = page.$("#user-search") as HTMLInputElement;
     search.value = "s1@a.com";
     search.dispatchEvent(new page.window.Event("input"));
-    expect(page.$("#users-table").textContent).toContain("101d ago");
+    expect(page.$("#students-table").textContent).toContain("101d ago");
 
     active = Date.now() - 60 * 1000;
     page.button("#page-users", "⟳ Force refresh").click();
     expect(page.$("#users-force-refresh").textContent).toBe("⟳ Refreshing…");
     for (let i = 0; i < 3; i++) await page.settle();
-    expect(page.$("#users-table").textContent).toContain("1m ago");
+    expect(page.$("#students-table").textContent).toContain("1m ago");
     expect(search.value).toBe("s1@a.com");
     expect(page.$("#toast").textContent).toBe("Reloaded all 1 users");
     expect((page.$("#users-force-refresh") as HTMLButtonElement).disabled).toBe(false);
@@ -1044,6 +1187,6 @@ describe("loading every user", () => {
     for (let i = 0; i < 3; i++) await page.settle();
     release({ users: [user({ uid: "old", email: "old@a.com" })], nextPageToken: null });
     for (let i = 0; i < 3; i++) await page.settle();
-    expect(page.$$("#users-table tr").map((r) => r.dataset.id)).toEqual(["new"]);
+    expect(page.$$("#students-table tr").map((r) => r.dataset.id)).toEqual(["new"]);
   });
 });

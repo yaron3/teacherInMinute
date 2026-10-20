@@ -26,6 +26,7 @@ import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
+import { recordOnlineTeacherSample } from "./presenceHistory";
 import { isTeacherReachable } from "./scoring";
 import { TeacherRecord } from "./types";
 
@@ -85,6 +86,12 @@ export async function takeUnreachableTeachersOffline(): Promise<string[]> {
       logger.error(`[keepAlive] failed taking teacher offline uid=${uid}`, err);
     }
   }
+
+  // Best-effort: a failed history write must not fail the sweep.
+  const stillOnline = Object.keys(online).filter((uid) => !takenOffline.includes(uid));
+  await recordOnlineTeacherSample(stillOnline, now).catch((err) => {
+    logger.warn(`[keepAlive] failed recording online sample`, err);
+  });
 
   logger.info(
     `[keepAlive] sweep online=${Object.keys(online).length} unreachable=${unreachable.length} takenOffline=${takenOffline.length}`

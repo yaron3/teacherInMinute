@@ -98,6 +98,7 @@
   .stat-red .stat-value { color: var(--red); }
   .stat-blue .stat-value { color: var(--accent); }
   .stat-purple .stat-value { color: var(--accent2); }
+  .stat-section-label { font-size: .75rem; color: var(--muted2); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
 
   /* ── Tables ── */
   /* Scroll rather than clip: the questions and lessons tables carry more
@@ -112,6 +113,7 @@
   tbody tr:hover { background: rgba(79,124,255,.04); }
   tbody td { padding: 11px 16px; vertical-align: middle; }
   .td-mono { font-family: monospace; font-size: .75rem; color: var(--muted2); }
+  tr.clickable-row { cursor: pointer; }
   .empty-row td { text-align: center; color: var(--muted); padding: 32px; }
 
   /* ── Badges ── */
@@ -262,6 +264,11 @@
         </div>
       </div>
       <div class="page-sub" id="overview-updated">—</div>
+      <div class="stat-section-label">Now &amp; last 24 hours</div>
+      <div id="overview-summary" class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Loading</div><div class="stat-value pulse">…</div></div>
+      </div>
+      <div class="stat-section-label">All time</div>
       <div id="overview-stats" class="stat-grid">
         <div class="stat-card"><div class="stat-label">Loading</div><div class="stat-value pulse">…</div></div>
       </div>
@@ -307,10 +314,18 @@
         <button class="btn-ghost btn-sm" id="users-force-refresh" onclick="forceRefreshUsers()">⟳ Force refresh</button>
         <button class="btn-ghost btn-sm" onclick="openCleanup()">🧹 Clean up anonymous</button>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap section-gap">
+        <div class="table-header"><h3>🎓 Students <span id="students-count" style="color:var(--muted2);font-weight:400"></span></h3></div>
         <table>
           <thead><tr><th data-nosort></th><th>Email</th><th>Display Name</th><th>Role</th><th>Remaining Min</th><th>Total Min</th><th>Joined</th><th title="Last time the app was open — not just the last explicit sign-in">Last Active</th><th>Status</th><th data-nosort>Actions</th></tr></thead>
-          <tbody id="users-table"><tr class="empty-row"><td colspan="10">Loading…</td></tr></tbody>
+          <tbody id="students-table"><tr class="empty-row"><td colspan="10">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><h3>🧑‍🏫 Teachers <span id="teachers-count" style="color:var(--muted2);font-weight:400"></span></h3></div>
+        <table>
+          <thead><tr><th data-nosort></th><th>Email</th><th>Display Name</th><th>Minutes Taught</th><th>Joined</th><th title="Last time the app was open — not just the last explicit sign-in">Last Active</th><th>Status</th><th data-nosort>Actions</th></tr></thead>
+          <tbody id="teachers-table"><tr class="empty-row"><td colspan="8">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -426,12 +441,12 @@
     <!-- ── Support ── -->
     <div id="page-support" class="page">
       <div class="page-title">Support Requests</div>
-      <div class="page-sub">Contact requests submitted from the app</div>
+      <div class="page-sub">Contact requests submitted from the app. Click a row to read it and reply.</div>
       <div class="toolbar"><button class="btn-ghost btn-sm" onclick="loadSupport()">↻ Reload</button></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Title</th><th>Device</th><th>OS</th><th>Locale</th><th>Sent At</th><th>Description</th></tr></thead>
-          <tbody id="support-table"><tr class="empty-row"><td colspan="9">Loading…</td></tr></tbody>
+          <thead><tr><th>Name</th><th>Email</th><th>Description</th><th>Device</th><th>Role</th><th>Sent At</th><th>Status</th></tr></thead>
+          <tbody id="support-table"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -472,6 +487,27 @@
     <div class="modal-body" id="user-modal-body"><div class="loader">Loading…</div></div>
     <div class="modal-foot">
       <button class="btn-ghost btn-sm" onclick="closeModal('user-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Support Ticket Modal ── -->
+<div class="modal-overlay" id="support-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-head">
+      <h2 id="support-modal-title">Support Request</h2>
+      <button class="btn-icon" onclick="closeModal('support-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="support-modal-body"></div>
+    <div class="modal-body" style="border-top:1px solid var(--border)">
+      <div class="form-group">
+        <label>Reply <span id="support-reply-to" style="text-transform:none;color:var(--muted)"></span></label>
+        <textarea id="support-reply-text" rows="6" placeholder="Write your response…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost btn-sm" onclick="closeModal('support-modal')">Close</button>
+      <button class="btn-primary btn-sm" id="support-send-btn" onclick="sendSupportReply()">Send response</button>
     </div>
   </div>
 </div>
@@ -836,17 +872,41 @@ function renderOverview(d) {
   const stale = d.teachers.staleProjections || 0;
   const platform = d.platform || {};
 
-  document.getElementById("overview-stats").innerHTML = `
+  // Last-24h figures. Teacher history is sampled by the keep-alive watchdog,
+  // so it covers fewer than 24 hours until a full day has been recorded.
+  const dq = d.lastDay?.questions || {};
+  const dt = d.lastDay?.teachers || {};
+  const hours = dt.hoursCovered ?? 0;
+  const oneDecimal = (n) => n == null ? "—" : (Math.round(n * 10) / 10).toString();
+  document.getElementById("overview-summary").innerHTML = `
     <div class="stat-card ${stale > 0 ? 'stat-red' : 'stat-green'}">
       <div class="stat-label">Online Teachers</div>
       <div class="stat-value">${d.teachers.online}</div>
       <div class="stat-sub">${d.teachers.total} with a teacher role${stale > 0 ? ` · <span style="color:var(--red)">⚠ ${stale} out of sync</span>` : ""}</div>
     </div>
     <div class="stat-card stat-yellow">
-      <div class="stat-label">Searching Questions</div>
+      <div class="stat-label">Waiting for an Answer</div>
       <div class="stat-value">${q.searching}</div>
       <div class="stat-sub">${q.rtdbActive} live in RTDB · ${q.accepted} accepted</div>
     </div>
+    <div class="stat-card stat-blue">
+      <div class="stat-label">Avg Teachers Online / Hour</div>
+      <div class="stat-value">${oneDecimal(dt.avgOnline)}</div>
+      <div class="stat-sub">${dt.avgDistinctPerHour != null ? `${oneDecimal(dt.avgDistinctPerHour)} distinct per hour · ` : ""}${hours < 24 ? `${hours}h of data` : "last 24h"}</div>
+    </div>
+    <div class="stat-card ${dq.notAnswered > 0 ? 'stat-red' : 'stat-green'}">
+      <div class="stat-label">Not Answered (24h)</div>
+      <div class="stat-value">${dq.notAnswered ?? "—"}</div>
+      <div class="stat-sub">of ${dq.asked ?? 0} asked · ${dq.timedOut ?? 0} timed out, ${dq.cancelledWaiting ?? 0} cancelled waiting</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Wait to Answer (24h)</div>
+      <div class="stat-value">${dq.avgWaitSeconds == null ? "—" : dq.avgWaitSeconds === 0 ? "0s" : duration(dq.avgWaitSeconds)}</div>
+      <div class="stat-sub">${dq.answered ?? 0} answered · unanswered excluded</div>
+    </div>
+  `;
+
+  document.getElementById("overview-stats").innerHTML = `
     <div class="stat-card stat-blue">
       <div class="stat-label">Active Lessons</div>
       <div class="stat-value">${d.lessons.active.length}</div>
@@ -1027,38 +1087,45 @@ function renderUsers() {
         || u.uid.toLowerCase().includes(q))
     : allUsers;
 
-  const tb = document.getElementById("users-table");
-  if (filtered.length === 0) {
-    tb.innerHTML = `<tr class="empty-row"><td colspan="10">No users found</td></tr>`;
+  // Everyone without the teacher role — students, guests, and accounts that
+  // never picked a role — is on the student side, where the Role column says which.
+  const teachers = filtered.filter(u => u.role === "teacher");
+  const students = filtered.filter(u => u.role !== "teacher");
+  renderUserTable("students", students, false);
+  renderUserTable("teachers", teachers, true);
+}
+
+function renderUserTable(key, users, teachers) {
+  const tb = document.getElementById(`${key}-table`);
+  const total = allUsers.filter(u => (u.role === "teacher") === teachers).length;
+  document.getElementById(`${key}-count`).textContent =
+    users.length === total ? `(${total})` : `(${users.length} of ${total})`;
+  if (users.length === 0) {
+    tb.innerHTML = `<tr class="empty-row"><td colspan="${teachers ? 8 : 10}">No ${key} found</td></tr>`;
     return;
   }
-  // A teacher has no minutes balance and a student no minutes taught, so the
-  // two minute columns mean different things per row — blank the one that does
-  // not apply rather than showing a misleading zero.
-  tb.innerHTML = filtered.map(u => {
-    const isTeacher = u.role === "teacher";
-    return `<tr data-id="${esc(u.uid)}">
+  tb.innerHTML = users.map(u => `<tr data-id="${esc(u.uid)}">
     <td>${u.photoURL ? `<img class="avatar" src="${safeUrl(u.photoURL)}" onerror="this.style.display='none'">` : `<div class="avatar">${esc((u.displayName||u.email||"?")[0].toUpperCase())}</div>`}</td>
     <td>${esc(u.email || "—")}</td>
     <td>${esc(u.displayName || "—")}</td>
-    <td>${u.role ? badge(u.role, isTeacher ? "purple" : "blue") : badge("no role","gray")}${u.anonymous ? " " + badge("guest","gray") : ""}</td>
-    <td style="font-weight:600;color:${u.remainingMinutes > 0 ? 'var(--green)' : 'var(--muted)'}">${isTeacher ? "—" : u.remainingMinutes}</td>
-    <td>${u.totalMinutes}${isTeacher ? " taught" : ""}</td>
+    ${teachers ? `<td>${u.totalMinutes}</td>` : `
+    <td>${u.role ? badge(u.role, "blue") : badge("no role","gray")}${u.anonymous ? " " + badge("guest","gray") : ""}</td>
+    <td style="font-weight:600;color:${u.remainingMinutes > 0 ? 'var(--green)' : 'var(--muted)'}">${u.remainingMinutes}</td>
+    <td>${u.totalMinutes}</td>`}
     <td data-sort="${(u.createdAt) ?? ""}">${fmtDate(u.createdAt)}</td>
     <td data-sort="${(u.lastActiveAt || u.lastSignIn) ?? ""}" title="${esc(activityTitle(u))}">${ago(u.lastActiveAt || u.lastSignIn)}</td>
     <td>${u.disabled ? badge("Disabled","red") : badge("Active","green")}${u.hasProfile ? "" : " " + badge("no profile doc","yellow")}</td>
-    <td style="min-width:290px">
+    <td style="min-width:${teachers ? 240 : 290}px">
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn-ghost btn-sm" onclick="viewUser(${jsArg(u.uid)})">View</button>
-        <button class="btn-ghost btn-sm" onclick="openAdjust(${jsArg(u.uid)},${jsArg(u.email||u.uid)})">± Min</button>
+        ${teachers ? "" : `<button class="btn-ghost btn-sm" onclick="openAdjust(${jsArg(u.uid)},${jsArg(u.email||u.uid)})">± Min</button>`}
         <button class="btn-ghost btn-sm" onclick="openTeacherMsg(${jsArg(u.uid)},${jsArg(u.displayName||u.email||u.uid)})">✉</button>
         <button class="btn-ghost btn-sm" onclick="doPasswordReset(${jsArg(u.uid)})">Reset PW</button>
         <button class="btn-ghost btn-sm" onclick="toggleDisable(${jsArg(u.uid)},${u.disabled ? "true" : "false"})">${u.disabled ? "Enable" : "Disable"}</button>
         <button class="btn-danger btn-sm" onclick="doDelete(${jsArg(u.uid)},${jsArg(u.email||u.uid)})">Delete</button>
       </div>
     </td>
-  </tr>`;
-  }).join("");
+  </tr>`).join("");
 }
 
 // ── User bulk actions ─────────────────────────────────────────────────────────
@@ -1085,6 +1152,12 @@ function summarizeDeletes(results) {
   return { msg, deleted, failed: failed.length };
 }
 
+/** A user is selectable in whichever of the two tables holds them. */
+function forgetUserSelection(uid) {
+  selectionOf("students").delete(uid);
+  selectionOf("teachers").delete(uid);
+}
+
 async function bulkDeleteUsers(uids) {
   if (!uids.length) return;
   const labels = uids.slice(0, 5).map(uid => {
@@ -1095,7 +1168,7 @@ async function bulkDeleteUsers(uids) {
   try {
     const results = await deleteInChunks(uids, {}, (done, total) => showToast(`Deleting… ${done}/${total}`));
     const { msg, failed } = summarizeDeletes(results);
-    results.filter(r => r.status === "deleted").forEach(r => selectionOf("users").delete(r.uid));
+    results.filter(r => r.status === "deleted").forEach(r => forgetUserSelection(r.uid));
     showToast(msg, failed ? "error" : "success");
     loadUsers();
   } catch (e) {
@@ -1489,7 +1562,7 @@ async function doDelete(uid, label) {
   try {
     await call("adminMutateUser", { action: "delete", uid });
     showToast("User deleted");
-    selectionOf("users").delete(uid);
+    forgetUserSelection(uid);
     allUsers = allUsers.filter(u => u.uid !== uid);
     renderUsers();
     closeModal("user-modal");
@@ -1760,24 +1833,96 @@ async function loadSupport() {
   try {
     const d = await call("adminListContactRequests");
     supportRequests = d.requests;
-    const tb = document.getElementById("support-table");
-    if (d.requests.length === 0) {
-      tb.innerHTML = `<tr class="empty-row"><td colspan="9">No contact requests</td></tr>`;
-      return;
-    }
-    tb.innerHTML = d.requests.map(r => `<tr data-id="${esc(r.id)}">
-      <td class="td-mono">${esc((r.userId||"—").slice(0,8))}…</td>
-      <td>${esc(r.userEmail||"—")}</td>
-      <td>${r.role ? badge(r.role, r.role==="teacher"?"purple":"blue") : "—"}</td>
-      <td><strong>${esc(r.title||"—")}</strong></td>
-      <td>${esc(r.deviceType||"—")}</td>
-      <td>${esc(r.osVersion||"—")}</td>
-      <td>${esc(r.locale||"—")}</td>
-      <td style="white-space:nowrap" data-sort="${(r.sentAtMs) ?? ""}">${r.sentAtMs ? fmt(r.sentAtMs) : esc(r.sentAt||"—")}</td>
-      <td style="max-width:280px;white-space:pre-wrap;font-size:.75rem">${esc((r.description||"").slice(0,200))}</td>
-    </tr>`).join("");
+    renderSupportTable();
   } catch (e) {
     showToast("Failed to load support: " + e.message, "error");
+  }
+}
+
+function renderSupportTable() {
+  const tb = document.getElementById("support-table");
+  if (supportRequests.length === 0) {
+    tb.innerHTML = `<tr class="empty-row"><td colspan="7">No contact requests</td></tr>`;
+    return;
+  }
+  tb.innerHTML = supportRequests.map(r => {
+    const replies = (r.responses || []).length;
+    return `<tr data-id="${esc(r.id)}" class="clickable-row">
+      <td dir="auto" style="white-space:nowrap"><strong>${esc(r.userName || "—")}</strong></td>
+      <td>${esc(r.userEmail || "—")}</td>
+      <td dir="auto" style="min-width:220px;max-width:320px;white-space:pre-wrap;font-size:.75rem">${r.title ? `<strong>${esc(r.title)}</strong><br>` : ""}${esc((r.description || "").slice(0, 160))}${(r.description || "").length > 160 ? "…" : ""}</td>
+      <td>${esc(r.deviceType || "—")}</td>
+      <td>${r.role ? badge(r.role, r.role === "teacher" ? "purple" : "blue") : "—"}</td>
+      <td style="white-space:nowrap" data-sort="${r.sentAtMs ?? ""}">${r.sentAtMs ? fmt(r.sentAtMs) : esc(r.sentAt || "—")}</td>
+      <td data-sort="${r.lastRespondedAt ?? ""}">${replies ? badge(`Replied${replies > 1 ? " ×" + replies : ""}`, "green") : badge("Open", "yellow")}</td>
+    </tr>`;
+  }).join("");
+}
+
+// A row opens its ticket; the selection checkbox keeps its own job.
+document.getElementById("support-table").addEventListener("click", e => {
+  if (e.target.closest(".select-cell, input, button, a")) return;
+  const row = e.target.closest("tr[data-id]");
+  if (row) openSupportTicket(row.dataset.id);
+});
+
+let openTicketId = null;
+
+function openSupportTicket(id) {
+  const r = supportRequests.find(x => x.id === id);
+  if (!r) return;
+  openTicketId = id;
+  const field = (label, value, mono) => `<div style="display:flex;gap:12px;padding:5px 0;font-size:.82rem">
+    <div style="width:110px;flex-shrink:0;color:var(--muted2)">${label}</div>
+    <div class="${mono ? "td-mono" : ""}" style="word-break:break-all">${value}</div></div>`;
+  const responses = (r.responses || []).slice().sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
+
+  document.getElementById("support-modal-title").textContent = r.title || "Support Request";
+  document.getElementById("support-modal-body").innerHTML = `
+    ${field("Case ID", esc(r.id), true)}
+    ${field("Name", esc(r.userName || "—"))}
+    ${field("Email", r.userEmail ? `<a href="mailto:${esc(r.userEmail)}" style="color:var(--accent)">${esc(r.userEmail)}</a>` : "—")}
+    ${field("Role", r.role ? badge(r.role, r.role === "teacher" ? "purple" : "blue") : "—")}
+    ${field("User ID", r.userId ? `<a href="#" style="color:var(--accent)" onclick="viewUser(${jsArg(r.userId)});return false">${esc(r.userId)}</a>` : "—", true)}
+    ${field("Device", `${esc(r.deviceType || "—")}${r.osVersion ? ` · ${esc(r.osVersion)}` : ""}`)}
+    ${field("Locale", esc(r.locale || "—"))}
+    ${field("Sent", r.sentAtMs ? fmt(r.sentAtMs) : esc(r.sentAt || "—"))}
+    <div style="margin-top:14px;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:8px;white-space:pre-wrap;font-size:.85rem;line-height:1.5" dir="auto">${esc(r.description || "")}</div>
+    ${responses.length ? `<div class="stat-section-label" style="margin-top:20px">Responses</div>` + responses.map(x => `
+      <div style="margin-bottom:10px;padding:12px 14px;border-left:3px solid var(--green);background:var(--card);border-radius:6px">
+        <div style="font-size:.72rem;color:var(--muted2);margin-bottom:6px">${x.sentAt ? fmt(x.sentAt) : "—"} · to ${esc(x.to || "—")} · by ${esc(x.sentBy || "—")}</div>
+        <div style="font-size:.75rem;color:var(--muted2);margin-bottom:6px">${esc(x.subject || "")}</div>
+        <div style="white-space:pre-wrap;font-size:.82rem" dir="auto">${esc(x.message || "")}</div>
+      </div>`).join("") : ""}
+  `;
+  document.getElementById("support-reply-to").textContent = r.userEmail ? `→ ${r.userEmail}` : "(no email on this request)";
+  document.getElementById("support-reply-text").value = "";
+  document.getElementById("support-send-btn").disabled = !r.userEmail;
+  openModal("support-modal");
+}
+
+async function sendSupportReply() {
+  const id = openTicketId;
+  const r = supportRequests.find(x => x.id === id);
+  const message = document.getElementById("support-reply-text").value.trim();
+  if (!r || !message) { showToast("Write a response first", "error"); return; }
+  if (!confirm(`Send this response to ${r.userEmail}?`)) return;
+
+  const btn = document.getElementById("support-send-btn");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  try {
+    const d = await call("adminRespondToContactRequest", { requestId: id, message });
+    r.responses = [...(r.responses || []), d.response];
+    r.lastRespondedAt = d.response.sentAt;
+    renderSupportTable();
+    openSupportTicket(id);
+    showToast("Response sent to " + r.userEmail);
+  } catch (e) {
+    showToast("Failed to send: " + e.message, "error");
+  } finally {
+    btn.disabled = !r.userEmail;
+    btn.textContent = "Send response";
   }
 }
 
@@ -1992,7 +2137,14 @@ const TABLES = {
   "searching-table": {},
   "online-teachers-table": { actions: [{ label: "Go offline", fn: bulkGoOffline }] },
   "active-lessons-table": {},
-  "users-table": {
+  "students-table": {
+    keepHidden: true,
+    actions: [
+      { label: "📧 Email", fn: ids => openBulkEmail(ids) },
+      { label: "Delete selected", danger: true, fn: bulkDeleteUsers },
+    ],
+  },
+  "teachers-table": {
     keepHidden: true,
     actions: [
       { label: "📧 Email", fn: ids => openBulkEmail(ids) },

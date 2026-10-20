@@ -131,7 +131,7 @@ export class FakeQuery {
   constructor(
     private readonly store: FakeFirestore,
     readonly collectionPath: string,
-    private readonly filters: Array<[string, unknown]> = [],
+    private readonly filters: Array<[string, string, unknown]> = [],
     private readonly max = Infinity
   ) {}
 
@@ -140,8 +140,8 @@ export class FakeQuery {
   }
 
   where(field: string, op: string, value: unknown): FakeQuery {
-    if (op !== "==") throw new Error(`fake Firestore supports only ==, got ${op}`);
-    return new FakeQuery(this.store, this.collectionPath, [...this.filters, [field, value]], this.max);
+    if (op !== "==" && op !== ">=") throw new Error(`fake Firestore supports only == and >=, got ${op}`);
+    return new FakeQuery(this.store, this.collectionPath, [...this.filters, [field, op, value]], this.max);
   }
 
   limit(n: number): FakeQuery {
@@ -155,7 +155,11 @@ export class FakeQuery {
   run(): FakeQuerySnapshot {
     const docs = this.store
       .childrenOf(this.collectionPath)
-      .filter(([, data]) => this.filters.every(([field, value]) => data[field] === value))
+      .filter(([, data]) =>
+        this.filters.every(([field, op, value]) =>
+          op === "==" ? data[field] === value : (data[field] as number) >= (value as number)
+        )
+      )
       .slice(0, this.max)
       .map(([path, data]) => new FakeDocSnapshot(path.split("/").pop() as string, data));
     return new FakeQuerySnapshot(docs);
