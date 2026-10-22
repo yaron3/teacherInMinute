@@ -102,6 +102,19 @@ export function isTeacherReachable(teacher: TeacherRecord, now = Date.now()): bo
   return hasPushToken(teacher);
 }
 
+/**
+ * Whether the teacher's app is running — it has sent a keep-alive within the
+ * timeout, so the dashboard's own listener shows a question the moment it is
+ * sent. An app too old to send keep-alives counts as running, as it does in
+ * `isTeacherReachable`. The rest of the reachable teachers have an app that is
+ * gone, killed or suspended, and hear of a question only by push.
+ */
+export function isTeacherLive(teacher: TeacherRecord, now = Date.now()): boolean {
+  const lastSeenAt = finite(teacher.lastSeenAt);
+  if (lastSeenAt === undefined) return true;
+  return now - lastSeenAt < KEEPALIVE_TIMEOUT_SECONDS * 1000;
+}
+
 export interface ScoredTeacher {
   uid: string;
   score: number;

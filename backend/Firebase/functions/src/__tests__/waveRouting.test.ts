@@ -408,6 +408,54 @@ describe("a student who cancels before a teacher's accept lands", () => {
   });
 });
 
+describe("wave 1 with teachers whose app is not running", () => {
+  /** Silent past the keep-alive timeout, so a question reaches them only by
+   *  push; everyone else has just sent a keep-alive. */
+  function terminate(...uids: string[]): void {
+    for (const uid of RANKED) {
+      const silent = uids.includes(uid);
+      fakeRtdb.write(`teachers/${uid}/lastSeenAt`, START_MS - (silent ? 10 * 60_000 : 1_000));
+    }
+  }
+
+  test("goes to the 3 best live teachers, plus the best teacher reached by push", async () => {
+    const [anna, ben, carmen, dan, eli] = RANKED;
+    terminate(anna, carmen);
+
+    const qid = await ask("student-maya");
+
+    expect(pendingInWave(qid, 1)).toEqual([anna, ben, dan, eli]);
+    expect(dashboardsShowing(qid)).not.toContain(carmen);
+  });
+
+  test("wave 2 picks up where rank order left off, push teachers included", async () => {
+    const [anna, , carmen, , , fay, gil, hila, idan] = RANKED;
+    terminate(anna, carmen);
+
+    const qid = await ask("student-maya");
+    await advanceTo(12);
+
+    expect(pendingInWave(qid, 2)).toEqual([carmen, fay, gil, hila, idan]);
+  });
+
+  test("with fewer than 3 live teachers, push teachers fill the empty places", async () => {
+    const [anna, ben, carmen, dan] = RANKED;
+    terminate(...RANKED.filter((uid) => uid !== carmen));
+
+    const qid = await ask("student-maya");
+
+    expect(pendingInWave(qid, 1)).toEqual([anna, ben, carmen, dan]);
+  });
+
+  test("with every app running, wave 1 is the 3 best teachers as before", async () => {
+    terminate();
+
+    const qid = await ask("student-maya");
+
+    expect(pendingInWave(qid, 1)).toEqual(RANKED.slice(0, 3));
+  });
+});
+
 describe("a teacher whose accept lands after another teacher's", () => {
   test("the accept is refused with a reason the app can tell apart", async () => {
     const qid = await ask("student-maya");

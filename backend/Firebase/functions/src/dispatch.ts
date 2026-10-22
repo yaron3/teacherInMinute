@@ -6,7 +6,7 @@ import { onValueWritten } from "firebase-functions/v2/database";
 import { getFunctions } from "firebase-admin/functions";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
-import { rankTeachers, subjectNarrows, teachesTopic } from "./scoring";
+import { isTeacherLive, rankTeachers, ScoredTeacher, subjectNarrows, teachesTopic } from "./scoring";
 import { sendInvitePush, sendNoMatchPush } from "./fcm";
 import {
   TeacherRecord,
@@ -117,6 +117,42 @@ export function dispatchExclusions(
   return new Set([...invited, ...(question.blockedTeachers ?? [])]);
 }
 
+/** The extra wave-1 place for a teacher reached by push; see selectWaveBatch. */
+const WAVE_1_PUSH_PLACES = 1;
+
+/** How many invites a wave may hold, the push place in wave 1 included. */
+function waveCapacity(wave: number): number {
+  return WAVE_SIZES[wave - 1] + (wave === 1 ? WAVE_1_PUSH_PLACES : 0);
+}
+
+/**
+ * Who a wave goes to, out of `ranked` (best first).
+ *
+ * Wave 1 goes to the best WAVE_SIZES[0] teachers whose app is running, who see
+ * the question at once, and also to the best-ranked teacher whose app is not,
+ * who hears of it by push. A teacher answering a notification is slower than
+ * one already looking at the dashboard, so they ride alongside the live
+ * teachers rather than taking one of their places. With too few live teachers
+ * the empty places go to more push teachers, in rank order, so the student is
+ * never left with a smaller first wave than before.
+ *
+ * Later waves go to the next teachers in rank order, whatever their app is
+ * doing.
+ */
+export function selectWaveBatch(
+  ranked: ScoredTeacher[],
+  teachers: Record<string, TeacherRecord>,
+  wave: number,
+  now = Date.now()
+): ScoredTeacher[] {
+  const waveSize = WAVE_SIZES[wave - 1];
+  if (wave !== 1) return ranked.slice(0, waveSize);
+
+  const live = ranked.filter(({ uid }) => isTeacherLive(teachers[uid], now)).slice(0, waveSize);
+  const byPush = ranked.filter(({ uid }) => !isTeacherLive(teachers[uid], now));
+  return [...live, ...byPush.slice(0, waveCapacity(wave) - live.length)];
+}
+
 async function sendWave(
   qid: string,
   questionData: QuestionDoc,
@@ -126,8 +162,7 @@ async function sendWave(
   const teachers = await onlineTeachers();
   const exclude = dispatchExclusions(questionData, alreadyInvited);
   const ranked = rankTeachers(teachers, questionData.topic, exclude);
-  const waveSize = WAVE_SIZES[wave - 1];
-  const batch = ranked.slice(0, waveSize);
+  const batch = selectWaveBatch(ranked, teachers, wave);
 
   logger.info(
     `[dispatch] sendWave prepared qid=${qid} wave=${wave} onlinePool=${Object.keys(teachers).length} excluded=${exclude.size} eligible=${ranked.length} selected=${batch.length}`
@@ -288,7 +323,7 @@ async function tryInviteTeacherForQuestionWave(
       return { invited: false, reason: "not-eligible-now" };
     }
 
-    const waveSize = WAVE_SIZES[wave - 1];
+    const waveSize = waveCapacity(wave);
     const waveInviteQuery = qRef.collection("invites").where("wave", "==", wave);
     const waveInvitesSnap = await tx.get(waveInviteQuery);
     // A withdrawn invite no longer reaches anyone, so it does not hold a slot.
