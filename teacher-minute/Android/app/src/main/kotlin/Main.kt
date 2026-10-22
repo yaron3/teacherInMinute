@@ -84,6 +84,9 @@ open class MainActivity: AppCompatActivity {
         setTheme(androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar)
         super.onCreate(savedInstanceState)
         currentActivity = this
+        // A recreated activity is handed its original launch intent again, and
+        // that tap has already been taken.
+        if (savedInstanceState == null) rememberTappedInvite(intent)
         logger.info("starting activity")
         UIApplication.launch(this)
         enableEdgeToEdge()
@@ -135,6 +138,20 @@ open class MainActivity: AppCompatActivity {
         super.onNewIntent(intent)
         setIntent(intent)
         AndroidPayPalManager.handleReturnToApp(this, intent)
+        rememberTappedInvite(intent)
+    }
+
+    /**
+     * An invite notification's tap (AndroidIncomingQuestionNotifier) carries the
+     * question, and tapping it is the teacher taking that question. Held for
+     * the dashboard's poll to collect through [takeTappedInviteQuestionId].
+     */
+    private fun rememberTappedInvite(intent: android.content.Intent?) {
+        val questionId = intent?.getStringExtra(TAPPED_INVITE_EXTRA)
+        if (questionId.isNullOrEmpty()) return
+        intent.removeExtra(TAPPED_INVITE_EXTRA)
+        logger.info("[Push] invite notification tapped qid=${questionId}")
+        tappedInviteQuestionId = questionId
     }
 
     override fun onResume() {
@@ -219,6 +236,23 @@ open class MainActivity: AppCompatActivity {
          */
         @JvmStatic
         var isResumed: Boolean = false
+
+        /** The intent extra an invite notification carries its question in. */
+        const val TAPPED_INVITE_EXTRA = "questionId"
+
+        @Volatile
+        private var tappedInviteQuestionId: String? = null
+
+        /**
+         * The question whose invite notification was tapped since the last
+         * call, or "" — read once, so a tap is taken once.
+         */
+        @JvmStatic
+        fun takeTappedInviteQuestionId(): String {
+            val questionId = tappedInviteQuestionId ?: return ""
+            tappedInviteQuestionId = null
+            return questionId
+        }
 
         @JvmStatic
         fun setSystemBackBlocked(blocked: Boolean) {

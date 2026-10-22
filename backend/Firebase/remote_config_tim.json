@@ -15928,6 +15928,34 @@
         }
       },
       "valueType": "STRING"
+    },
+    "this_question_was": {
+      "defaultValue": {
+        "value": "This question was cancelled."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "השאלה בוטלה."
+        },
+        "HebrewApp": {
+          "value": "השאלה בוטלה."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "another_teacher_already": {
+      "defaultValue": {
+        "value": "Another teacher already answered it, or the student cancelled it."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה אחר/ת כבר ענה/תה עליה, או שהתלמיד/ה ביטל/ה אותה."
+        },
+        "HebrewApp": {
+          "value": "מורה אחר/ת כבר ענה/תה עליה, או שהתלמיד/ה ביטל/ה אותה."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

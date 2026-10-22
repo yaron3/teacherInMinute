@@ -72,6 +72,10 @@ extension ServerErrorDetails {
   /// `acceptInvite` refused because the student cancelled the question first.
   static let questionCancelled = "question_cancelled"
 
+  /// `acceptInvite` refused because another teacher took the question, or
+  /// this teacher's invite expired or was withdrawn.
+  static let questionUnavailable = "question_unavailable"
+
   /// The value `scope` carries when it is the hourly allowance.
   static let hourScope = "hour"
 }

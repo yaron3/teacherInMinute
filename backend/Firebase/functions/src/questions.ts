@@ -458,6 +458,12 @@ export const updateQuestion = onCall(HOT_PATH, async (req) => {
 // FR-B-004: atomic Firestore transaction guarantees exactly one teacher wins.
 // Returns Agora token for the teacher; pushes token to student via FCM.
 
+/** `acceptInvite`'s reason for a question this teacher can no longer take —
+ *  another teacher took it, or the invite expired or was withdrawn. The app
+ *  shows the teacher that the question is gone, which matters most when they
+ *  tapped a notification and never saw the card disappear. */
+const QUESTION_UNAVAILABLE = "question_unavailable";
+
 export const acceptInvite = onCall(HOT_PATH, async (req) => {
   const teacherUid = req.auth?.uid;
   if (!teacherUid) throw new HttpsError("unauthenticated", "Sign in required");
@@ -506,7 +512,9 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
     // a still-valid invite (INVITE_EXPIRY_SECONDS > WAVE_TIMEOUT_SECONDS * waves)
     // can still legitimately accept it.
     if (q.status === "accepted" || q.status === "in_progress" || q.status === "completed") {
-      throw new HttpsError("already-exists", "Question already claimed by another teacher");
+      throw new HttpsError("already-exists", "Question already claimed by another teacher", {
+        reason: QUESTION_UNAVAILABLE,
+      });
     }
     if (q.status === "cancelled") {
       // The app tells this apart by `reason`: the teacher is shown that the
@@ -516,21 +524,29 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
       });
     }
     if (q.status !== "searching" && q.status !== "unanswered") {
-      throw new HttpsError("failed-precondition", `Question is not available (status: ${q.status})`);
+      throw new HttpsError("failed-precondition", `Question is not available (status: ${q.status})`, {
+        reason: QUESTION_UNAVAILABLE,
+      });
     }
 
     if (inv.response !== "pending") {
-      throw new HttpsError("failed-precondition", "Invite is no longer pending");
+      throw new HttpsError("failed-precondition", "Invite is no longer pending", {
+        reason: QUESTION_UNAVAILABLE,
+      });
     }
 
     // Invited before the student blocked them is still blocked.
     if ((q.blockedTeachers ?? []).includes(teacherUid)) {
-      throw new HttpsError("failed-precondition", "Invite is no longer pending");
+      throw new HttpsError("failed-precondition", "Invite is no longer pending", {
+        reason: QUESTION_UNAVAILABLE,
+      });
     }
 
     // Check invite hasn't expired
     if (inv.expiresAt.toMillis() < Date.now()) {
-      throw new HttpsError("deadline-exceeded", "Invite has expired");
+      throw new HttpsError("deadline-exceeded", "Invite has expired", {
+        reason: QUESTION_UNAVAILABLE,
+      });
     }
 
     studentUid = q.studentUid;

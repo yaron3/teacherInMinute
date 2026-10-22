@@ -56,6 +56,12 @@ struct MainTabView: View {
 	  actions: [AppDialogAction(teacherDashboardViewModel?.okLabel ?? "")]
 	)
 	.appDialog(
+	  teacherDashboardViewModel?.questionUnavailableTitle ?? "",
+	  isPresented: isQuestionUnavailableDialogPresented,
+	  message: teacherDashboardViewModel?.questionUnavailableMessage,
+	  actions: [AppDialogAction(teacherDashboardViewModel?.okLabel ?? "")]
+	)
+	.appDialog(
 	  viewModel.shareChoiceTitle,
 	  isPresented: $viewModel.isShareChoicePresented,
 	  message: viewModel.shareChoiceMessage,
@@ -132,6 +138,15 @@ struct MainTabView: View {
 	Binding(
 	  get: { teacherDashboardViewModel?.studentCancelledBeforeStart ?? false },
 	  set: { teacherDashboardViewModel?.studentCancelledBeforeStart = $0 }
+	)
+  }
+
+  /// Another teacher took the question, or it expired, before this teacher's
+  /// accept landed — usually one taken from a notification.
+  var isQuestionUnavailableDialogPresented: Binding<Bool> {
+	Binding(
+	  get: { teacherDashboardViewModel?.questionUnavailableBeforeStart ?? false },
+	  set: { teacherDashboardViewModel?.questionUnavailableBeforeStart = $0 }
 	)
   }
 

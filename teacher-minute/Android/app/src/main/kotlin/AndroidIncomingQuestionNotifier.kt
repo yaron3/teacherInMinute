@@ -89,10 +89,9 @@ object AndroidIncomingQuestionNotifier {
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            // Opening the app restarts the invite poll, which picks the invite
-            // up from RTDB and raises the overlay; the id rides along so a
-            // later routing change can jump straight to it.
-            putExtra("questionId", questionId)
+            // Tapping takes the question: MainActivity hands the id to the
+            // dashboard, which accepts it once the invite poll has it.
+            putExtra(MainActivity.TAPPED_INVITE_EXTRA, questionId)
         }
         val notificationId = questionId.hashCode().absoluteValue
         val pendingIntent = PendingIntent.getActivity(

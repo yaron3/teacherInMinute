@@ -16,6 +16,7 @@ import kotlin.math.absoluteValue
 object AndroidLocalNotificationManager {
     private const val CHANNEL_ID = "teacher_minute_updates"
     private const val CHANNEL_NAME = "Teacher Minute updates"
+    private const val INVITE_IDENTIFIER_PREFIX = "teacher-question-"
 
     private var appContext: Context? = null
 
@@ -33,6 +34,11 @@ object AndroidLocalNotificationManager {
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            // An invite posted locally (LocalNotificationService) is taken by
+            // its tap, the same as the one the push posts.
+            if (identifier.startsWith(INVITE_IDENTIFIER_PREFIX)) {
+                putExtra(MainActivity.TAPPED_INVITE_EXTRA, identifier.removePrefix(INVITE_IDENTIFIER_PREFIX))
+            }
         }
         val pendingIntent = PendingIntent.getActivity(
             context,

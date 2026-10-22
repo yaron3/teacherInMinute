@@ -408,6 +408,24 @@ describe("a student who cancels before a teacher's accept lands", () => {
   });
 });
 
+describe("a teacher whose accept lands after another teacher's", () => {
+  test("the accept is refused with a reason the app can tell apart", async () => {
+    const qid = await ask("student-maya");
+    const [anna, ben] = RANKED;
+
+    await advanceTo(3);
+    await accept(anna, qid);
+
+    // Often a teacher who tapped the notification and never saw the card go,
+    // so the app has to say the question is gone.
+    await expect(accept(ben, qid)).rejects.toMatchObject({
+      code: "already-exists",
+      details: { reason: "question_unavailable" },
+    });
+    expect(question(qid)).toMatchObject({ status: "accepted", acceptedByTeacher: anna });
+  });
+});
+
 describe("a teacher in a session is busy", () => {
   test("accepting marks the teacher busy with that question", async () => {
     const qid = await ask("student-maya");

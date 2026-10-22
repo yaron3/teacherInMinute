@@ -69,6 +69,10 @@ protocol TeacherDashboardViewModeling: AnyObject {
   /// as a dialog: the question's card is gone by then, and with it the line
   /// that shows why an accept failed.
   var studentCancelledBeforeStart: Bool { get set }
+  /// The question went to another teacher, or its invite ran out, before this
+  /// teacher's accept landed — most often one taken from a notification, whose
+  /// card the teacher never saw leave.
+  var questionUnavailableBeforeStart: Bool { get set }
   var isAcceptingCalls: Bool { get set }
   var isVerified: Bool { get set }
   var todayEarningsCents: Int { get set }
@@ -186,6 +190,10 @@ extension TeacherDashboardViewModeling {
 
   var studentCancelledTitle: String { LocalizationSupport.localized("The student cancelled the session.") }
   var studentCancelledMessage: String { LocalizationSupport.localized("You can take the next question.") }
+  var questionUnavailableTitle: String { LocalizationSupport.localized("This question was cancelled.") }
+  var questionUnavailableMessage: String {
+    LocalizationSupport.localized("Another teacher already answered it, or the student cancelled it.")
+  }
   var okLabel: String { LocalizationSupport.localized("OK") }
 
   // MARK: Dashboard warning header
@@ -461,6 +469,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var permissionAlertQuestionId: String? = nil
   var errorMessageGeneral: String? = nil
   var studentCancelledBeforeStart = false
+  var questionUnavailableBeforeStart = false
   var isAcceptingCalls = false
   var isVerified = false
   var subjects: [String] = []
@@ -563,6 +572,9 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 #endif
   private var authListenerHandle: Any?
   private var acceptingTask: Task<Void, Never>?
+  /// Waits for a question tapped in a notification to be listed; see
+  /// `acceptFromNotification`.
+  private var notificationAcceptTask: Task<Void, Never>?
   /// Questions whose accept the teacher backed out of while it was still on
   /// its way. See `cancelAcceptingInvite`.
   private var withdrawnQuestionIds: Set<String> = []
@@ -625,6 +637,9 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   private func configurePresence(uid: String) {
 	logger.info("[VM] configurePresence — uid=\(uid)")
+	PushNotificationService.shared.onInviteTapped = { [weak self] questionId in
+	  self?.acceptFromNotification(questionId: questionId)
+	}
 	// Bound to this account, and started once the teacher goes online.
 	keepAlive?.stop()
 	keepAlive = TeacherKeepAlive { [weak self] in
@@ -929,6 +944,9 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	androidInvitePollingTask = Task { [weak self] in
 	  var lastCount = -1
 	  while !Task.isCancelled {
+		if let tapped = AndroidInviteTapBridge.takeTappedQuestionId() {
+		  PushNotificationService.shared.inviteNotificationTapped(questionId: tapped)
+		}
 		switch AndroidInviteFetcher.liveInvites() {
 		case .ready(let updated):
 		  guard !Task.isCancelled else { return }
@@ -1076,6 +1094,44 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	accept(questionId: questionId, finishesSetupInSettings: false)
   }
 
+  /// How long a question tapped in a notification may take to appear in the
+  /// invite listener. On a cold launch that covers sign-in and the listener's
+  /// first snapshot.
+  private static let notificationInviteWaitNanos: UInt64 = 10_000_000_000
+  private static let notificationInvitePollNanos: UInt64 = 250_000_000
+
+  /// The teacher tapped an invite's notification, which takes the question.
+  ///
+  /// The accept reads the invite's details — above all its conversation type,
+  /// which decides the permission checks and the kind of lesson — from the
+  /// same listener the cards come from, so it waits for the question to be
+  /// listed. The backend removes an invite once its question is taken,
+  /// cancelled or expired, so one that never shows up is gone, and the teacher
+  /// is told so instead of being left on the dashboard wondering.
+  private func acceptFromNotification(questionId: String) {
+	notificationAcceptTask?.cancel()
+	notificationAcceptTask = Task { [weak self] in
+	  var waited: UInt64 = 0
+	  while self?.inviteIDs.contains(questionId) == false, waited < Self.notificationInviteWaitNanos {
+		try? await Task.sleep(nanoseconds: Self.notificationInvitePollNanos)
+		guard !Task.isCancelled else { return }
+		waited += Self.notificationInvitePollNanos
+	  }
+	  guard let self else { return }
+	  guard self.acceptingQuestionId == nil, self.activeQuestionId == nil else {
+		logger.info("[VM] notification accept skipped — already in a lesson qid=\(questionId)")
+		return
+	  }
+	  guard self.inviteIDs.contains(questionId) else {
+		logger.info("[VM] notification accept — question no longer listed qid=\(questionId)")
+		self.questionUnavailableBeforeStart = true
+		return
+	  }
+	  logger.info("[VM] notification accept qid=\(questionId)")
+	  self.accept(questionId: questionId, finishesSetupInSettings: false)
+	}
+  }
+
   /// "Open Settings" on the dialog that stopped an accept for a refused
   /// permission. The teacher takes the question now, and the lesson's setup
   /// sends them to Settings: the student is told the teacher is finishing
@@ -1199,6 +1255,12 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		  logger.info("[VM] acceptInvite — the student cancelled first questionId=\(questionId)")
 		  return
 		}
+		if Self.isQuestionUnavailable(error) {
+		  questionUnavailableBeforeStart = true
+		  inviteIDs = inviteIDs.filter { $0 != questionId }
+		  logger.info("[VM] acceptInvite — question no longer available questionId=\(questionId)")
+		  return
+		}
 		errorMessage = error.localizedDescription
 		logger.error("[VM] acceptInvite failed — \(error.localizedDescription)")
 		AnalyticsService.shared.recordPermissionIfNeeded(error, context: "TeacherDashboard.acceptInvite")
@@ -1280,6 +1342,22 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  return true
 	}
 	return status == "FAILED_PRECONDITION" && message.contains("cancelled by the student")
+  }
+
+  /// `acceptInvite` refuses a question another teacher took, or whose invite
+  /// expired or was withdrawn. Told apart by the `question_unavailable`
+  /// reason; the statuses are checked as well, for a backend deployed before
+  /// the reason was sent.
+  private static func isQuestionUnavailable(_ error: Error) -> Bool {
+	guard case FunctionsError.serverError(let message, let status, let details) = error else {
+	  return false
+	}
+	if details?.reason == ServerErrorDetails.questionUnavailable {
+	  return true
+	}
+	return status == "ALREADY_EXISTS"
+	  || status == "DEADLINE_EXCEEDED"
+	  || (status == "FAILED_PRECONDITION" && message.hasPrefix("Invite is no longer pending"))
   }
   
   func endCall() {
@@ -1717,6 +1795,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   var acceptingQuestionId: String? = nil
   var errorMessage: String? = nil
   var studentCancelledBeforeStart = false
+  var questionUnavailableBeforeStart = false
   var isAcceptingCalls: Bool = false
   var isVerified: Bool
   var todayEarningsCents: Int

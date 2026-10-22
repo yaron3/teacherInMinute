@@ -20,6 +20,17 @@ public final class PushNotificationService: NSObject {
     private var registeredUID: String?
     private var registeredRole: AppUserMode?
 
+    /// The invite whose notification the teacher tapped, held until the
+    /// dashboard is there to take it — on a cold launch the tap arrives well
+    /// before the teacher's dashboard exists.
+    private var tappedInviteQuestionId: String?
+
+    /// Set by the teacher dashboard. Receives a tapped invite at once, or the
+    /// one tapped before it was set.
+    var onInviteTapped: ((String) -> Void)? {
+        didSet { deliverTappedInvite() }
+    }
+
     private override init() {
         super.init()
     }
@@ -35,6 +46,21 @@ public final class PushNotificationService: NSObject {
 	  logger.info("[Push] configureDelegates (Android no-op)")
     }
 #endif
+
+    /// Tapping an invite's notification is the teacher taking the question.
+    /// Called by the iOS notification delegate, and on Android by the
+    /// dashboard's poll of MainActivity.
+    func inviteNotificationTapped(questionId: String) {
+        logger.info("[Push] invite notification tapped qid=\(questionId)")
+        tappedInviteQuestionId = questionId
+        deliverTappedInvite()
+    }
+
+    private func deliverTappedInvite() {
+        guard let questionId = tappedInviteQuestionId, let onInviteTapped else { return }
+        tappedInviteQuestionId = nil
+        onInviteTapped(questionId)
+    }
 
     func registerCurrentDevice(role: AppUserMode) {
         guard let uid = Auth.auth().currentUser?.uid else {
@@ -196,9 +222,22 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
     ) {
         let userInfo = response.notification.request.content.userInfo
         let type = userInfo["type"] as? String ?? "unknown"
+        // The invite push carries `questionId`; the local notification posted
+        // for the same invite (LocalNotificationService) only its identifier.
+        let identifier = response.notification.request.identifier
+        let inviteQuestionId = userInfo["questionId"] as? String
+            ?? (identifier.hasPrefix(Self.inviteIdentifierPrefix)
+                ? String(identifier.dropFirst(Self.inviteIdentifierPrefix.count))
+                : nil)
+        let isInvite = type == Self.inviteType || identifier.hasPrefix(Self.inviteIdentifierPrefix)
+        let isDefaultAction = response.actionIdentifier == UNNotificationDefaultActionIdentifier
         Task { @MainActor in
             logger.info("[Push] tapped notification type=\(type)")
             AnalyticsService.shared.logEvent(AnalyticsEvent.notificationOpened, parameters: ["type": type])
+            // Only the tap itself takes the question, not dismissing it.
+            if isInvite, isDefaultAction, let inviteQuestionId, !inviteQuestionId.isEmpty {
+                self.inviteNotificationTapped(questionId: inviteQuestionId)
+            }
         }
         completionHandler()
     }

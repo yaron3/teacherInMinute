@@ -575,6 +575,11 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "The student cancelled the session.": "התלמיד/ה ביטל/ה את השיעור.",
         "Your teacher cancelled the session.": "המורה ביטל/ה את השיעור.",
         "You can take the next question.": "אפשר לקבל את השאלה הבאה.",
+        // Teacher dialog when an accept — usually from a notification — finds
+        // the question already gone.
+        "This question was cancelled.": "השאלה בוטלה.",
+        "Another teacher already answered it, or the student cancelled it.":
+          "מורה אחר/ת כבר ענה/תה עליה, או שהתלמיד/ה ביטל/ה אותה.",
         "You can ask your question again.": "אפשר לשאול את השאלה שוב.",
         // Session header until both sides have connected. New key
         // (`billing_starts_once`), not in the published config until the
