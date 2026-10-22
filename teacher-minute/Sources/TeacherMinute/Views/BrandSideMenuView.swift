@@ -38,6 +38,9 @@ extension EnvironmentValues {
 struct BrandSideMenuView: View {
   let viewModel: MainTabViewModel
   let profile: ProfileViewModel
+  /// Standing beside the section on a wide screen, rather than laid over it:
+  /// no scrim, nothing to close.
+  let isDocked: Bool
   /// For a student without an account yet, who has one to log in to.
   let onLogIn: () -> Void
 
@@ -49,7 +52,23 @@ struct BrandSideMenuView: View {
     AppTheme(colorScheme: colorScheme)
   }
 
+  @ViewBuilder
   var body: some View {
+    if isDocked {
+      panel
+        // Where the panel meets the section.
+        .overlay(alignment: .trailing) {
+          theme.brandControlBorder
+            .frame(width: 1)
+            .ignoresSafeArea()
+        }
+        .readingDirection(.leftToRight)
+    } else {
+      overlaidMenu
+    }
+  }
+
+  var overlaidMenu: some View {
     ZStack(alignment: .leading) {
       if viewModel.isSideMenuOpen {
         // `MainTabView` blurs what this covers: SwiftUI has no backdrop blur.
@@ -84,7 +103,7 @@ struct BrandSideMenuView: View {
     .padding(.top, 16)
     .padding(.bottom, 24)
     .padding(.horizontal, 16)
-    .frame(width: 280)
+    .frame(width: MainTabViewModel.sideMenuWidth)
     .frame(maxHeight: .infinity)
     .background {
       theme.brandBackgroundTop
@@ -92,28 +111,13 @@ struct BrandSideMenuView: View {
     }
   }
 
-  /// The way out on the left, the title on the right.
+  /// The way out on the left, the title on the right. Docked, the menu has
+  /// no way out; the title keeps its place.
   var header: some View {
     HStack(spacing: 12) {
-      Button {
-        trackTap("side_menu_close")
-        viewModel.closeSideMenu()
-      } label: {
-        Image("brand-close-circle", bundle: .module)
-          .renderingMode(.template)
-          .resizable()
-          .foregroundStyle(theme.onDarkFill)
-          .frame(width: 20, height: 20)
-          .frame(width: 40, height: 40)
-          .background(theme.brandCardSurface)
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+      if !isDocked {
+        closeButton
       }
-      .buttonStyle(.plain)
-#if !os(Android)
-      // SkipUI has no string `accessibilityLabel`.
-      .accessibilityLabel(viewModel.closeMenuLabel)
-#endif
-      .accessibilityIdentifier("side_menu_close")
 
       Spacer(minLength: 0)
 
@@ -122,6 +126,29 @@ struct BrandSideMenuView: View {
         .foregroundStyle(theme.onDarkFill)
         .lineLimit(1)
     }
+    .frame(height: 40)
+  }
+
+  var closeButton: some View {
+    Button {
+      trackTap("side_menu_close")
+      viewModel.closeSideMenu()
+    } label: {
+      Image("brand-close-circle", bundle: .module)
+        .renderingMode(.template)
+        .resizable()
+        .foregroundStyle(theme.onDarkFill)
+        .frame(width: 20, height: 20)
+        .frame(width: 40, height: 40)
+        .background(theme.brandCardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+    .buttonStyle(.plain)
+#if !os(Android)
+    // SkipUI has no string `accessibilityLabel`.
+    .accessibilityLabel(viewModel.closeMenuLabel)
+#endif
+    .accessibilityIdentifier("side_menu_close")
   }
 
   /// The icon, then the name. The row on screen is filled cyan.
@@ -241,3 +268,4 @@ struct BrandSideMenuView: View {
     .environment(\.layoutDirection, layoutDirection)
   }
 }
+

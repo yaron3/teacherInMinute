@@ -268,6 +268,28 @@ final class MainTabViewModel {
 	isSideMenuOpen = false
   }
 
+  /// The menu's width, laid over the section or docked beside it.
+  static let sideMenuWidth: CGFloat = 280
+
+  /// The narrowest a section may be with the menu docked beside it: the
+  /// narrowest iPhone the sections are drawn for. Any narrower and the menu
+  /// would be squeezing them rather than sitting next to them.
+  static let minimumSectionWidth: CGFloat = 375
+
+  /// Whether a window `width` wide holds the menu and the section side by
+  /// side — an iPad, the iPhone Duo's inner screen (669pt), a phone on its
+  /// side — so
+  /// the menu stays on screen instead of waiting behind its button.
+  func isMenuDocked(forWidth width: CGFloat) -> Bool {
+	width >= Self.sideMenuWidth + Self.minimumSectionWidth
+  }
+
+  /// The docked menu steps aside for the student's tutorial, which stands in
+  /// for the whole app until it is done.
+  var isTutorialShowing: Bool {
+	tutorial != nil
+  }
+
   /// A section was picked from the menu: show it and close the menu.
   func select(_ tab: MainTab) {
 	selectedTab = tab

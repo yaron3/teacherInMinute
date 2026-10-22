@@ -21,6 +21,7 @@ struct MainTabView: View {
   @State var studentHomeViewModel: StudentHomeViewModel?
   @Environment(\.appRouter) var router
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.layoutDirection) var layoutDirection
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
@@ -45,17 +46,8 @@ struct MainTabView: View {
 	// The stack exists for the teacher's live session, which is pushed rather
 	// than laid over the sections. Its bar stays hidden: every section draws
 	// its own header.
-	ZStack {
-	  NavigationStack {
-		tabLayers
-		  .toolbar(.hidden, for: .navigationBar)
-		  .navigationDestination(isPresented: isTeacherInLiveSession) {
-			teacherSessionScreen
-		  }
-	  }
-	  .blurredUnderMenu(viewModel.isSideMenuOpen)
-
-	  sideMenu
+	GeometryReader { proxy in
+	  layout(isMenuDocked: viewModel.isMenuDocked(forWidth: proxy.size.width))
 	}
 	.appDialog(
 	  teacherDashboardViewModel?.studentCancelledTitle ?? "",
@@ -80,8 +72,55 @@ struct MainTabView: View {
 	} + [AppDialogAction(viewModel.cancelLabel, kind: .cancel)]
   }
 
-  var sideMenu: some View {
-	BrandSideMenuView(viewModel: viewModel, profile: profileViewModel) {
+  /// On a screen wide enough for both — an unfolded iPhone, an iPad — the
+  /// menu stands at the left of the section and the menu button and tab bar
+  /// step aside. Otherwise it is laid over the section from its button.
+  func layout(isMenuDocked: Bool) -> some View {
+	ZStack {
+	  NavigationStack {
+		sections(isMenuDocked: isMenuDocked)
+		  .toolbar(.hidden, for: .navigationBar)
+		  .navigationDestination(isPresented: isTeacherInLiveSession) {
+			teacherSessionScreen
+		  }
+	  }
+	  .blurredUnderMenu(viewModel.isSideMenuOpen && !isMenuDocked)
+
+	  if !isMenuDocked {
+		sideMenu(isDocked: false)
+	  }
+	}
+	.onChange(of: isMenuDocked) { _, isDocked in
+	  // Unfolded with the menu open: it is docked now, and folding again
+	  // should not bring the laid-over one back.
+	  if isDocked { viewModel.closeSideMenu() }
+	}
+  }
+
+  /// The section, with the docked menu at its left. The pair is laid out left
+  /// to right in both languages, like the laid-over menu, and the section
+  /// reads in its own.
+  func sections(isMenuDocked: Bool) -> some View {
+	HStack(spacing: 0) {
+	  if isMenuDocked && !hidesDockedMenu {
+		sideMenu(isDocked: true)
+		  // Above the section, whose background streaks reach past its edge.
+		  .zIndex(1)
+	  }
+	  tabLayers(isMenuDocked: isMenuDocked)
+		.readingDirection(layoutDirection)
+	}
+	.readingDirection(.leftToRight)
+  }
+
+  /// The tutorial, an arriving question or a lesson being set up each take
+  /// the whole screen, so the docked menu leaves it to them.
+  var hidesDockedMenu: Bool {
+	viewModel.isTutorialShowing || isTeacherGlobalOverlayVisible
+  }
+
+  func sideMenu(isDocked: Bool) -> some View {
+	BrandSideMenuView(viewModel: viewModel, profile: profileViewModel, isDocked: isDocked) {
 	  viewModel.closeSideMenu()
 	  router.startLogin()
 	}
@@ -116,8 +155,9 @@ struct MainTabView: View {
   /// Only the selected section is on screen; the side menu and the tab bar
   /// switch between them. Each section places `BrandMenuButton` in its own
   /// header, and the button and the bar find their actions through the
-  /// environment.
-  var tabLayers: some View {
+  /// environment. With the menu docked neither is given one: the menu
+  /// already shows every section.
+  func tabLayers(isMenuDocked: Bool) -> some View {
 	ZStack {
 	  // The student's tutorial takes the section's place while it is up, so
 	  // the section underneath — Home, with its camera prompt — waits for it.
@@ -132,8 +172,8 @@ struct MainTabView: View {
 		  // Profile had kept, and the app aborted on the cast.
 		  .id(viewModel.selectedTab)
 		  .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
-		  .environment(\.sideMenuAction, sideMenuAction)
-		  .environment(\.tabBarAction, tabBarAction)
+		  .environment(\.sideMenuAction, isMenuDocked ? nil : sideMenuAction)
+		  .environment(\.tabBarAction, isMenuDocked ? nil : tabBarAction)
 	  }
 
 	  teacherGlobalOverlay
