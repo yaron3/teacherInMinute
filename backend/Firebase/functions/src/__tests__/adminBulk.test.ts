@@ -66,7 +66,7 @@ jest.mock("../accountDeletion", () => ({ deleteAccountData: mockDeleteAccountDat
 jest.mock("../mailer", () => ({ sendMail: mockSendMail }));
 jest.mock("../fcm", () => ({ sendAdminPush: mockSendAdminPush }));
 
-import { adminFindInactiveAnonymous, adminBulkDeleteUsers, adminSendEmail, adminSendPush, adminListUsers } from "../admin";
+import { adminFindInactiveAnonymous, adminBulkDeleteUsers, adminSendEmail, adminSendPush, adminCheckPushTokens, adminListUsers } from "../admin";
 
 const call = (fn: unknown, data: unknown, uid = "admin-uid") =>
   (fn as (req: unknown) => Promise<any>)({
@@ -286,6 +286,26 @@ describe("adminSendPush", () => {
       await expect(call(adminSendPush, data)).rejects.toMatchObject({ code: "invalid-argument" });
     }
     expect(mockSendAdminPush).not.toHaveBeenCalled();
+  });
+});
+
+describe("adminCheckPushTokens", () => {
+  it("splits users by whether any device registered for push", async () => {
+    mockRtdb.set("users/a/fcmToken", "tok-a");
+    mockRtdb.set("users/b/devices", { "android-1": { fcmToken: "tok-b" } });
+    mockRtdb.set("users/c/devices", { "ios-1": { platform: "ios" } });
+
+    const d = await call(adminCheckPushTokens, { uids: ["a", "b", "c", "d", "a"] });
+
+    expect(d).toEqual({ registered: ["a", "b"], unregistered: ["c", "d"] });
+    expect(mockSendAdminPush).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty or oversized list", async () => {
+    await expect(call(adminCheckPushTokens, { uids: [] })).rejects.toMatchObject({ code: "invalid-argument" });
+    await expect(
+      call(adminCheckPushTokens, { uids: Array.from({ length: 101 }, (_, i) => `u${i}`) })
+    ).rejects.toMatchObject({ code: "invalid-argument" });
   });
 });
 

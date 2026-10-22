@@ -180,6 +180,7 @@
   .bulk-bar { display: none; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; background: rgba(79,124,255,.1); border: 1px solid var(--accent); border-radius: 10px; font-size: .85rem; flex-wrap: wrap; }
   .bulk-bar.show { display: flex; }
   .bulk-bar .spacer { flex: 1; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
   td.select-cell, th.select-cell { width: 34px; padding-right: 0; }
   th.sortable { cursor: pointer; user-select: none; }
   th.sortable:hover { color: var(--text); }
@@ -637,12 +638,17 @@
         To: <strong id="push-to-label"></strong>. Reaches every device they are
         signed in on; anyone who never allowed notifications is skipped.
       </p>
+      <div id="push-unregistered" style="display:none;font-size:.85rem;margin-bottom:16px;padding:10px 12px;border:1px solid var(--yellow);border-radius:8px">
+        <div id="push-unregistered-text" style="margin-bottom:8px"></div>
+        <div id="push-unregistered-list" style="color:var(--muted2);margin-bottom:10px;max-height:120px;overflow:auto"></div>
+        <button class="btn-ghost btn-sm" onclick="emailUnregisteredInstead()">📧 Email them instead</button>
+      </div>
       <div class="form-group"><label>Title</label><input id="push-title" maxlength="100" placeholder="e.g. New teachers are online"></div>
       <div class="form-group"><label>Message</label><textarea id="push-body" rows="4" maxlength="500" placeholder="Plain text, up to 500 characters…"></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn-ghost btn-sm" onclick="closeModal('push-modal')">Cancel</button>
-      <button class="btn-primary btn-sm" onclick="sendBulkPush()">Send Push</button>
+      <button class="btn-primary btn-sm" id="push-send" onclick="sendBulkPush()">Send Push</button>
     </div>
   </div>
 </div>
@@ -1265,17 +1271,59 @@ async function sendBulkEmail() {
   }
 }
 
-let pushUids = [];
-/** Opens the push form for `uids`. Whether each has a device to reach is only
- *  known to the server, so the skipped count shows in the result. */
-function openBulkPush(uids) {
-  pushUids = [...new Set(uids)].filter(Boolean);
-  const n = pushUids.length;
-  if (!n) { showToast("None of the selected rows has a user", "error"); return; }
-  document.getElementById("push-to-label").textContent = `${n} selected user${n === 1 ? "" : "s"}`;
+let pushUids = [], pushUnregisteredUids = [];
+/** Opens the push form for `uids`, after asking the server which of them have
+ *  a device registered for push. The rest are named, with email offered in
+ *  their place, and only the registered ones are sent to. */
+async function openBulkPush(uids) {
+  const requested = [...new Set(uids)].filter(Boolean);
+  if (!requested.length) { showToast("None of the selected rows has a user", "error"); return; }
+  pushUids = []; pushUnregisteredUids = [];
   document.getElementById("push-title").value = "";
   document.getElementById("push-body").value = "";
+  document.getElementById("push-unregistered").style.display = "none";
+  document.getElementById("push-send").disabled = true;
+  document.getElementById("push-to-label").textContent = "checking which users can receive push…";
   openModal("push-modal");
+
+  const CHUNK = 100;
+  try {
+    for (let i = 0; i < requested.length; i += CHUNK) {
+      const d = await call("adminCheckPushTokens", { uids: requested.slice(i, i + CHUNK) });
+      pushUids.push(...d.registered); pushUnregisteredUids.push(...d.unregistered);
+    }
+  } catch (e) {
+    closeModal("push-modal");
+    showToast("Could not check push registration: " + e.message, "error");
+    return;
+  }
+
+  const n = pushUids.length, m = pushUnregisteredUids.length;
+  document.getElementById("push-to-label").textContent = n
+    ? `${n} user${n === 1 ? "" : "s"} registered for push`
+    : "nobody — none of the selected users is registered for push";
+  document.getElementById("push-send").disabled = n === 0;
+  if (m) {
+    document.getElementById("push-unregistered-text").textContent =
+      `${m} user${m === 1 ? " hasn't" : "s haven't"} registered for push notifications` +
+      ` (never allowed them, or not signed in on a device) and will not get this:`;
+    document.getElementById("push-unregistered-list").innerHTML = pushUnregisteredUids.map(uid => {
+      const u = allUsers.find(x => x.uid === uid);
+      return "• " + esc(u?.email || u?.displayName || uid);
+    }).join("<br>");
+    document.getElementById("push-unregistered").style.display = "block";
+  }
+}
+
+/** Hands the users who cannot get a push to the email form, carrying over
+ *  what was typed so far. */
+function emailUnregisteredInstead() {
+  const title = document.getElementById("push-title").value;
+  const body = document.getElementById("push-body").value;
+  closeModal("push-modal");
+  openBulkEmail(pushUnregisteredUids);
+  document.getElementById("email-subject").value = title;
+  document.getElementById("email-text").value = body;
 }
 
 async function sendBulkPush() {
@@ -1283,6 +1331,7 @@ async function sendBulkPush() {
   const body = document.getElementById("push-body").value.trim();
   if (!title || !body) { showToast("Title and message are required", "error"); return; }
   const uids = pushUids;
+  if (!uids.length) { showToast("None of the selected users is registered for push", "error"); return; }
   if (!confirm(`Send "${title}" as a push notification to ${uids.length} user${uids.length === 1 ? "" : "s"}?`)) return;
   const CHUNK = 100;
   let reached = 0, withoutToken = 0, unreachable = 0;

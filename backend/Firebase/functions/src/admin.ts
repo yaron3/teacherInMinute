@@ -1603,6 +1603,30 @@ async function pushTokensOf(uid: string): Promise<string[]> {
   return [...tokens];
 }
 
+function pushUids(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length === 0 || !value.every((u) => typeof u === "string" && u)) {
+    throw new HttpsError("invalid-argument", "uids must be a non-empty list");
+  }
+  if (value.length > BULK_PUSH_MAX) throw new HttpsError("invalid-argument", `At most ${BULK_PUSH_MAX} users per call`);
+  return [...new Set(value as string[])];
+}
+
+/**
+ * Which of up to BULK_PUSH_MAX users have a device registered for push, so the
+ * console can name the rest before sending and offer them email instead. A
+ * user with no token never allowed notifications, or never signed in on a
+ * device since the app started registering them.
+ */
+export const adminCheckPushTokens = onCall(async (req) => {
+  assertAdmin(req);
+  const uids = pushUids((req.data as { uids?: unknown })?.uids);
+  const counts = await Promise.all(uids.map(async (uid) => [uid, (await pushTokensOf(uid)).length] as const));
+  return {
+    registered: counts.filter(([, n]) => n > 0).map(([uid]) => uid),
+    unregistered: counts.filter(([, n]) => n === 0).map(([uid]) => uid),
+  };
+});
+
 /**
  * Sends a push notification to every device of up to BULK_PUSH_MAX users.
  * Users who never granted notifications have no token; they are counted, not
@@ -1611,17 +1635,13 @@ async function pushTokensOf(uid: string): Promise<string[]> {
 export const adminSendPush = onCall({ timeoutSeconds: 300 }, async (req) => {
   assertAdmin(req);
   const { uids, title, body } = req.data as { uids?: unknown; title?: string; body?: string };
-  if (!Array.isArray(uids) || uids.length === 0 || !uids.every((u) => typeof u === "string" && u)) {
-    throw new HttpsError("invalid-argument", "uids must be a non-empty list");
-  }
-  if (uids.length > BULK_PUSH_MAX) throw new HttpsError("invalid-argument", `At most ${BULK_PUSH_MAX} users per call`);
+  const unique = pushUids(uids);
   const t = title?.trim() ?? "";
   const b = body?.trim() ?? "";
   if (!t || !b) throw new HttpsError("invalid-argument", "title and body required");
   if (t.length > PUSH_TITLE_MAX_CHARS) throw new HttpsError("invalid-argument", `Title is over ${PUSH_TITLE_MAX_CHARS} characters`);
   if (b.length > PUSH_BODY_MAX_CHARS) throw new HttpsError("invalid-argument", `Message is over ${PUSH_BODY_MAX_CHARS} characters`);
 
-  const unique = [...new Set(uids as string[])];
   const tokensByUid = new Map(await Promise.all(unique.map(async (uid) => [uid, await pushTokensOf(uid)] as const)));
   const tokens = [...new Set([...tokensByUid.values()].flat())];
   const { sent, dead, failed } = await sendAdminPush({ tokens, title: t, body: b });
