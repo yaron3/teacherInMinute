@@ -229,6 +229,9 @@ let logger = AppLogger(subsystem: "com.yaronj.tim", category: "TeacherMinute")
     isInForeground = true
     Task { @MainActor in
       LocalNotificationService.shared.resetDeliveredCache()
+#if !os(Android)
+      PushNotificationService.shared.clearInviteNotifications()
+#endif
     }
   }
   

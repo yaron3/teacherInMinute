@@ -31,8 +31,22 @@ async function forgetDeadToken(teacherUid: string, deadToken: string): Promise<v
   if (dropped) logger.info(`[fcm] dropped dead push token teacher=${teacherUid}`);
 }
 
-// Teacher invite — data-only, high priority, TTL matches the wave timeout.
-// The client renders a full-screen incoming-call UI from these fields.
+/** "Maya needs help with algebra", or "Maya needs help" for a question put to
+ *  every teacher. Matches the Android client's AndroidIncomingQuestionNotifier. */
+export function inviteAlertTitle(studentName: string, topic: string): string {
+  const name = studentName || "A student";
+  return topic === ANY_TOPIC || !topic ? `${name} needs help` : `${name} needs help with ${topic}`;
+}
+
+// Teacher invite — high priority, TTL matches the wave timeout.
+//
+// Data-only on Android, where the client posts the notification itself
+// (AndroidIncomingQuestionNotifier) so it controls the channel and timeout.
+// iOS shows nothing for a data-only push to an app that is suspended or killed,
+// and that is the only state a push matters in, so the APNs override carries a
+// visible alert. Its collapse id is the identifier the iOS client gives the
+// same invite when it posts one locally (LocalNotificationService), so the two
+// collapse into one notification rather than announcing the invite twice.
 export async function sendInvitePush(params: {
   teacherUid: string;
   fcmToken: string;
@@ -70,7 +84,18 @@ export async function sendInvitePush(params: {
     apns: {
       headers: {
         "apns-priority": "10",
+        "apns-push-type": "alert",
         "apns-expiration": String(Math.floor(Date.now() / 1000) + ttlSeconds),
+        "apns-collapse-id": `teacher-question-${questionId}`,
+      },
+      payload: {
+        aps: {
+          alert: {
+            title: inviteAlertTitle(studentName, topic),
+            body: questionText.slice(0, 300),
+          },
+          sound: "default",
+        },
       },
     },
   }).catch(async (err) => {

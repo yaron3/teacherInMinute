@@ -122,6 +122,33 @@ public final class PushNotificationService: NSObject {
     }
 
 #if !os(Android)
+    /// The `type` of the teacher invite push (functions/src/fcm.ts).
+    nonisolated static let inviteType = "incoming_question"
+
+    /// The identifier prefix both the invite push (its `apns-collapse-id`) and
+    /// LocalNotificationService give an invite notification.
+    nonisolated static let inviteIdentifierPrefix = "teacher-question-"
+
+    /// Clears invite notifications. Called when the app comes to the front:
+    /// from then on the in-app overlay is how an invite is answered, and one
+    /// left in Notification Center outlives the invite it offers. Mirrors
+    /// AndroidIncomingQuestionNotifier.cancelAll.
+    public func clearInviteNotifications() {
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let ids = await center.deliveredNotifications()
+                .map(\.request)
+                .filter {
+                    $0.identifier.hasPrefix(Self.inviteIdentifierPrefix)
+                        || $0.content.userInfo["type"] as? String == Self.inviteType
+                }
+                .map(\.identifier)
+            guard !ids.isEmpty else { return }
+            center.removeDeliveredNotifications(withIdentifiers: ids)
+            logger.info("[Push] cleared \(ids.count) invite notification(s)")
+        }
+    }
+
     private static func currentDeviceKey() -> String {
 #if os(iOS)
         if let identifier = UIDevice.current.identifierForVendor?.uuidString {
@@ -153,6 +180,12 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // In the foreground the dashboard already raises the invite overlay
+        // from RTDB, so a banner would announce the same invite twice.
+        if notification.request.content.userInfo["type"] as? String == Self.inviteType {
+            completionHandler([])
+            return
+        }
         completionHandler([.banner, .sound, .badge, .list])
     }
 

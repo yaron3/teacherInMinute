@@ -21,7 +21,7 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { sendInvitePush } from "../fcm";
+import { inviteAlertTitle, sendInvitePush } from "../fcm";
 
 const TOKEN = "fcm-anna";
 
@@ -51,6 +51,44 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+});
+
+describe("the invite on iOS", () => {
+  // A data-only push shows nothing on an iOS device whose app is suspended or
+  // killed, which is the only time the push matters.
+  test("carries a visible alert that expires and collapses with the invite", async () => {
+    mockSend.mockResolvedValue("message-id");
+
+    await invite();
+
+    const apns = mockSend.mock.calls[0][0].apns;
+    expect(apns.payload.aps).toEqual({
+      alert: { title: "Maya needs help with algebra", body: "2x + 5 = 15" },
+      sound: "default",
+    });
+    expect(apns.headers).toMatchObject({
+      "apns-push-type": "alert",
+      "apns-collapse-id": "teacher-question-question-1",
+      "apns-expiration": String(Math.floor(Date.now() / 1000) + 90),
+    });
+  });
+
+  test("stays data-only on Android, whose client posts its own notification", async () => {
+    mockSend.mockResolvedValue("message-id");
+
+    await invite();
+
+    expect(mockSend.mock.calls[0][0].notification).toBeUndefined();
+  });
+
+  test.each([
+    ["Maya", "algebra", "Maya needs help with algebra"],
+    ["Maya", "any", "Maya needs help"],
+    ["Maya", "", "Maya needs help"],
+    ["", "algebra", "A student needs help with algebra"],
+  ])("titles %p asking about %p as %p", (name, topic, title) => {
+    expect(inviteAlertTitle(name, topic)).toBe(title);
+  });
 });
 
 describe("a token FCM reports dead", () => {
