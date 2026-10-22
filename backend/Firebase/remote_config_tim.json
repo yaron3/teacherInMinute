@@ -12059,6 +12059,11 @@
       "defaultValue": {
         "value": ""
       },
+      "conditionalValues": {
+        "iOS": {
+          "value": "https://apps.apple.com/us/app/%D7%9E%D7%95%D7%A8%D7%94-%D7%9E%D7%A7%D7%A6%D7%95%D7%A2%D7%99/id6771022216"
+        }
+      },
       "valueType": "STRING"
     },
     "teacher_app_prompt_pending_message": {
@@ -12091,11 +12096,11 @@
     },
     "student_app_url": {
       "defaultValue": {
-        "value": "https://play.google.com/store/apps/details?id=com.yaronj.student"
+        "value": ""
       },
       "conditionalValues": {
         "iOS": {
-          "value": ""
+          "value": "https://apps.apple.com/us/app/instant-teacher/id6818179310"
         }
       },
       "valueType": "STRING"

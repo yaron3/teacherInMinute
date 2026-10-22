@@ -42,6 +42,7 @@ struct StudentQuestionHomeView: View {
   @State var submitErrorMessage: String?
   @State var showsEmptyQuestionAlert = false
   @State var showsCameraDisabledAlert = false
+  @State var showsPhotoSourceDialog = false
   /// The screen's height, and the bottom of its safe area, with no keyboard
   /// up: the largest either has been. Zero until measured.
   @State var restingHeight: CGFloat = 0
@@ -524,7 +525,7 @@ struct StudentQuestionHomeView: View {
   }
 
   /// The attached photo, which a tap takes off the question once it has
-  /// uploaded; while there is none, a way back to the camera.
+  /// uploaded; while there is none, a choice of the camera or the library.
   @ViewBuilder
   var photoThumbnail: some View {
     if isUploadingPhoto {
@@ -549,7 +550,8 @@ struct StudentQuestionHomeView: View {
     } else {
       Button {
         trackTap("question_home_add_photo")
-        select(.photo)
+        dismissKeyboard()
+        showsPhotoSourceDialog = true
       } label: {
         RoundedRectangle(cornerRadius: 4)
           .stroke(theme.brandControlBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
@@ -750,8 +752,11 @@ struct StudentQuestionHomeView: View {
       viewModel: viewModel,
       showsEmptyQuestionAlert: $showsEmptyQuestionAlert,
       showsCameraDisabledAlert: $showsCameraDisabledAlert,
+      showsPhotoSourceDialog: $showsPhotoSourceDialog,
       photoErrorMessage: $photoErrorMessage,
       submitErrorMessage: $submitErrorMessage,
+      offersCamera: hasCamera,
+      onTakePhoto: { select(.photo) },
       onChooseFromLibrary: { pickFromLibrary() }
     )
   }
@@ -985,9 +990,28 @@ struct QuestionHomeDialogs: ViewModifier {
   let viewModel: any StudentHomeViewModeling
   @Binding var showsEmptyQuestionAlert: Bool
   @Binding var showsCameraDisabledAlert: Bool
+  @Binding var showsPhotoSourceDialog: Bool
   @Binding var photoErrorMessage: String?
   @Binding var submitErrorMessage: String?
+  /// The device has a camera, so the photo source dialog offers it.
+  let offersCamera: Bool
+  /// Back to the photo tab, whose camera takes the picture.
+  let onTakePhoto: () -> Void
   let onChooseFromLibrary: () -> Void
+
+  var photoSourceActions: [AppDialogAction] {
+    var actions: [AppDialogAction] = []
+    if offersCamera {
+      actions.append(AppDialogAction(viewModel.photoSourceTakePhotoLabel) {
+        onTakePhoto()
+      })
+    }
+    actions.append(AppDialogAction(viewModel.photoSourceLibraryLabel) {
+      onChooseFromLibrary()
+    })
+    actions.append(AppDialogAction(viewModel.photoSourceCancelLabel, kind: .cancel))
+    return actions
+  }
 
   func body(content: Content) -> some View {
     content
@@ -1010,6 +1034,11 @@ struct QuestionHomeDialogs: ViewModifier {
           },
           AppDialogAction(viewModel.cancelLabel, kind: .cancel),
         ]
+      )
+      .appDialog(
+        viewModel.photoSourceDialogTitle,
+        isPresented: $showsPhotoSourceDialog,
+        actions: photoSourceActions
       )
       .appDialog(
         viewModel.photoNotAttachedTitle,
