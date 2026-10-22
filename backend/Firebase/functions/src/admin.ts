@@ -9,6 +9,7 @@ import { summarizeOnlineTeachers } from "./presenceHistory";
 import { DEMO_USER_FIELD, inChunks, readDemoUserUids } from "./demoUsers";
 import { deleteAccountData } from "./accountDeletion";
 import { sendMail, supportSmtpConfig } from "./mailer";
+import { sendAdminPush } from "./fcm";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -1579,4 +1580,65 @@ export const adminSendEmail = onCall({ timeoutSeconds: 540 }, async (req) => {
     withoutEmail: users.filter((u) => !u.email).length,
     notFound: uids.length - users.length,
   };
+});
+
+export const BULK_PUSH_MAX = 100;
+export const PUSH_TITLE_MAX_CHARS = 100;
+export const PUSH_BODY_MAX_CHARS = 500;
+
+/** Every push token a user's devices registered: the latest one at
+ *  `users/{uid}/fcmToken`, and one per device under `devices/` — a user signed
+ *  in on a phone and a tablet has two. */
+async function pushTokensOf(uid: string): Promise<string[]> {
+  const [latest, devices] = await Promise.all([
+    db.ref(`users/${uid}/fcmToken`).get(),
+    db.ref(`users/${uid}/devices`).get(),
+  ]);
+  const tokens = new Set<string>();
+  if (typeof latest.val() === "string" && latest.val()) tokens.add(latest.val());
+  const byDevice = (devices.val() ?? {}) as Record<string, { fcmToken?: unknown }>;
+  for (const device of Object.values(byDevice)) {
+    if (typeof device?.fcmToken === "string" && device.fcmToken) tokens.add(device.fcmToken);
+  }
+  return [...tokens];
+}
+
+/**
+ * Sends a push notification to every device of up to BULK_PUSH_MAX users.
+ * Users who never granted notifications have no token; they are counted, not
+ * failed. Reports per user: reached means at least one device took it.
+ */
+export const adminSendPush = onCall({ timeoutSeconds: 300 }, async (req) => {
+  assertAdmin(req);
+  const { uids, title, body } = req.data as { uids?: unknown; title?: string; body?: string };
+  if (!Array.isArray(uids) || uids.length === 0 || !uids.every((u) => typeof u === "string" && u)) {
+    throw new HttpsError("invalid-argument", "uids must be a non-empty list");
+  }
+  if (uids.length > BULK_PUSH_MAX) throw new HttpsError("invalid-argument", `At most ${BULK_PUSH_MAX} users per call`);
+  const t = title?.trim() ?? "";
+  const b = body?.trim() ?? "";
+  if (!t || !b) throw new HttpsError("invalid-argument", "title and body required");
+  if (t.length > PUSH_TITLE_MAX_CHARS) throw new HttpsError("invalid-argument", `Title is over ${PUSH_TITLE_MAX_CHARS} characters`);
+  if (b.length > PUSH_BODY_MAX_CHARS) throw new HttpsError("invalid-argument", `Message is over ${PUSH_BODY_MAX_CHARS} characters`);
+
+  const unique = [...new Set(uids as string[])];
+  const tokensByUid = new Map(await Promise.all(unique.map(async (uid) => [uid, await pushTokensOf(uid)] as const)));
+  const tokens = [...new Set([...tokensByUid.values()].flat())];
+  const { sent, dead, failed } = await sendAdminPush({ tokens, title: t, body: b });
+
+  const undelivered = new Set([...dead, ...failed]);
+  let reached = 0;
+  let withoutToken = 0;
+  let unreachable = 0;
+  for (const userTokens of tokensByUid.values()) {
+    if (userTokens.length === 0) withoutToken++;
+    else if (userTokens.some((tok) => !undelivered.has(tok))) reached++;
+    else unreachable++;
+  }
+
+  logger.info(
+    `[admin] push "${t}": users=${unique.length} reached=${reached} withoutToken=${withoutToken} unreachable=${unreachable} ` +
+      `devices=${sent}/${tokens.length} dead=${dead.length} by=${req.auth?.token?.email}`
+  );
+  return { reached, withoutToken, unreachable, devicesSent: sent, devicesFailed: failed.length + dead.length };
 });

@@ -22,6 +22,9 @@ class TeacherMinuteFirebaseMessagingService : FirebaseMessagingService() {
      *  - `question_accepted` and `no_match` carry a `notification` payload, so
      *    the system posts them itself while the app is away. Posting again here
      *    would duplicate them.
+     *  - `admin_message`, sent from the admin console, carries one too. Only
+     *    reaches here in the foreground, where Android shows nothing on its own,
+     *    so it is posted here — iOS shows the same push as a banner.
      */
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
@@ -31,6 +34,13 @@ class TeacherMinuteFirebaseMessagingService : FirebaseMessagingService() {
 
         when (type) {
             "incoming_question" -> AndroidIncomingQuestionNotifier.handle(applicationContext, data)
+            "admin_message" -> message.notification?.let {
+                AndroidLocalNotificationManager.showNotification(
+                    message.messageId ?: "admin-${System.currentTimeMillis()}",
+                    it.title.orEmpty(),
+                    it.body.orEmpty()
+                )
+            }
             else -> Unit
         }
     }

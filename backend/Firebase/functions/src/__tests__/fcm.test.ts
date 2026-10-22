@@ -8,12 +8,16 @@
 import { FakeRtdbRef, fakeRtdb, resetFakeFirebase } from "./support/fakeFirebase";
 
 const mockSend = jest.fn();
+const mockSendEach = jest.fn();
 
 jest.mock("firebase-admin", () => {
   const fake = require("./support/fakeFirebase");
   return {
     database: () => fake.fakeRtdb,
-    messaging: () => ({ send: (...args: unknown[]) => mockSend(...args) }),
+    messaging: () => ({
+      send: (...args: unknown[]) => mockSend(...args),
+      sendEach: (...args: unknown[]) => mockSendEach(...args),
+    }),
   };
 });
 
@@ -21,7 +25,7 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { inviteAlertTitle, sendInvitePush } from "../fcm";
+import { inviteAlertTitle, sendAdminPush, sendInvitePush } from "../fcm";
 
 const TOKEN = "fcm-anna";
 
@@ -46,6 +50,7 @@ function invite(): Promise<void> {
 beforeEach(() => {
   resetFakeFirebase(Date.UTC(2026, 8, 25, 9, 0, 0));
   mockSend.mockReset();
+  mockSendEach.mockReset();
   fakeRtdb.write("teachers/teacher-anna", { status: "online", fcmToken: TOKEN });
 });
 
@@ -137,5 +142,34 @@ describe("a token that is merely failing", () => {
 
     expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({ token: TOKEN }));
     expect(fakeRtdb.read("teachers/teacher-anna/fcmToken")).toBe(TOKEN);
+  });
+});
+
+describe("an admin push", () => {
+  test("goes to each token as a visible notification and sorts out the failures", async () => {
+    mockSendEach.mockResolvedValue({
+      successCount: 1,
+      responses: [
+        { success: true },
+        { success: false, error: fcmError("messaging/registration-token-not-registered") },
+        { success: false, error: fcmError("messaging/internal-error") },
+      ],
+    });
+
+    const result = await sendAdminPush({ tokens: ["live", "gone", "flaky"], title: "Hi", body: "Hello" });
+
+    const messages = mockSendEach.mock.calls[0][0];
+    expect(messages.map((m: { token: string }) => m.token)).toEqual(["live", "gone", "flaky"]);
+    expect(messages[0]).toMatchObject({
+      notification: { title: "Hi", body: "Hello" },
+      data: { type: "admin_message" },
+      android: { notification: { channelId: "teacher_minute_updates" } },
+    });
+    expect(result).toEqual({ sent: 1, dead: ["gone"], failed: ["flaky"] });
+  });
+
+  test("sends nothing when no one has a token", async () => {
+    expect(await sendAdminPush({ tokens: [], title: "Hi", body: "Hello" })).toEqual({ sent: 0, dead: [], failed: [] });
+    expect(mockSendEach).not.toHaveBeenCalled();
   });
 });

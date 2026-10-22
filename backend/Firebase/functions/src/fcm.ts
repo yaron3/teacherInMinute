@@ -109,6 +109,45 @@ export async function sendInvitePush(params: {
   });
 }
 
+/** The Android channel AndroidLocalNotificationManager creates for general
+ *  updates, so an admin message does not land in the incoming-questions one. */
+const UPDATES_CHANNEL_ID = "teacher_minute_updates";
+
+/**
+ * Sends one admin-composed notification to each of `tokens`. A visible
+ * `notification` payload, so the system posts it on both platforms while the
+ * app is away; in the foreground iOS shows it as a banner and the Android
+ * client posts it itself. Reports per token instead of throwing, so one dead
+ * device never stops the rest.
+ */
+export async function sendAdminPush(params: {
+  tokens: string[];
+  title: string;
+  body: string;
+}): Promise<{ sent: number; dead: string[]; failed: string[] }> {
+  const { tokens, title, body } = params;
+  if (tokens.length === 0) return { sent: 0, dead: [], failed: [] };
+
+  const response = await admin.messaging().sendEach(
+    tokens.map((token) => ({
+      token,
+      notification: { title, body },
+      data: { type: "admin_message" },
+      android: { priority: "high" as const, notification: { channelId: UPDATES_CHANNEL_ID } },
+      apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
+    }))
+  );
+
+  const dead: string[] = [];
+  const failed: string[] = [];
+  response.responses.forEach((r, i) => {
+    if (r.success) return;
+    if (DEAD_TOKEN_CODES.has(r.error?.code ?? "")) dead.push(tokens[i]);
+    else failed.push(tokens[i]);
+  });
+  return { sent: response.successCount, dead, failed };
+}
+
 // Notify student that their question was accepted.
 export async function sendAcceptedPush(params: {
   fcmToken: string;

@@ -625,6 +625,28 @@
   </div>
 </div>
 
+<!-- ── Bulk Push Modal ── -->
+<div class="modal-overlay" id="push-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <h2>Send Push Notification</h2>
+      <button class="btn-icon" onclick="closeModal('push-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.85rem;color:var(--muted2);margin-bottom:16px">
+        To: <strong id="push-to-label"></strong>. Reaches every device they are
+        signed in on; anyone who never allowed notifications is skipped.
+      </p>
+      <div class="form-group"><label>Title</label><input id="push-title" maxlength="100" placeholder="e.g. New teachers are online"></div>
+      <div class="form-group"><label>Message</label><textarea id="push-body" rows="4" maxlength="500" placeholder="Plain text, up to 500 characters…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost btn-sm" onclick="closeModal('push-modal')">Cancel</button>
+      <button class="btn-primary btn-sm" onclick="sendBulkPush()">Send Push</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Cleanup Modal ── -->
 <div class="modal-overlay" id="cleanup-modal">
   <div class="modal" style="max-width:480px">
@@ -1239,6 +1261,40 @@ async function sendBulkEmail() {
     showToast(`Sent ${sent}` + (withoutEmail ? ` · ${withoutEmail} without email` : "") + (failed ? ` · ${failed} failed` : ""), failed ? "error" : "success");
   } catch (e) {
     showToast("Email failed: " + e.message, "error");
+  }
+}
+
+let pushUids = [];
+/** Opens the push form for `uids`. Whether each has a device to reach is only
+ *  known to the server, so the skipped count shows in the result. */
+function openBulkPush(uids) {
+  pushUids = [...new Set(uids)].filter(Boolean);
+  const n = pushUids.length;
+  if (!n) { showToast("None of the selected rows has a user", "error"); return; }
+  document.getElementById("push-to-label").textContent = `${n} selected user${n === 1 ? "" : "s"}`;
+  document.getElementById("push-title").value = "";
+  document.getElementById("push-body").value = "";
+  openModal("push-modal");
+}
+
+async function sendBulkPush() {
+  const title = document.getElementById("push-title").value.trim();
+  const body = document.getElementById("push-body").value.trim();
+  if (!title || !body) { showToast("Title and message are required", "error"); return; }
+  const uids = pushUids;
+  if (!confirm(`Send "${title}" as a push notification to ${uids.length} user${uids.length === 1 ? "" : "s"}?`)) return;
+  const CHUNK = 100;
+  let reached = 0, withoutToken = 0, unreachable = 0;
+  try {
+    for (let i = 0; i < uids.length; i += CHUNK) {
+      const d = await call("adminSendPush", { uids: uids.slice(i, i + CHUNK), title, body });
+      reached += d.reached; withoutToken += d.withoutToken; unreachable += d.unreachable;
+    }
+    closeModal("push-modal");
+    showToast(`Reached ${reached}` + (withoutToken ? ` · ${withoutToken} without notifications` : "") + (unreachable ? ` · ${unreachable} unreachable` : ""),
+      reached ? "success" : "error");
+  } catch (e) {
+    showToast("Push failed: " + e.message, "error");
   }
 }
 
@@ -2170,6 +2226,7 @@ const TABLES = {
     keepHidden: true,
     actions: [
       { label: "📧 Email", fn: ids => openBulkEmail(ids) },
+      { label: "🔔 Push", fn: ids => openBulkPush(ids) },
       { label: "🧪 Mark as demo", fn: ids => setDemoUsers(ids, true) },
       { label: "Unmark demo", fn: ids => setDemoUsers(ids, false) },
       { label: "Delete selected", danger: true, fn: bulkDeleteUsers },
@@ -2179,6 +2236,7 @@ const TABLES = {
     keepHidden: true,
     actions: [
       { label: "📧 Email", fn: ids => openBulkEmail(ids) },
+      { label: "🔔 Push", fn: ids => openBulkPush(ids) },
       { label: "🧪 Mark as demo", fn: ids => setDemoUsers(ids, true) },
       { label: "Unmark demo", fn: ids => setDemoUsers(ids, false) },
       { label: "Delete selected", danger: true, fn: bulkDeleteUsers },

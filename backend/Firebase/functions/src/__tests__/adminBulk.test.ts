@@ -1,6 +1,6 @@
 /**
  * The admin console's bulk actions: finding stale anonymous accounts, deleting
- * a selection, and emailing a selection.
+ * a selection, and emailing or pushing to a selection.
  */
 
 const DAY = 24 * 3600 * 1000;
@@ -19,6 +19,8 @@ const mockBalances = new Map<string, number>();
 const mockDeleteAccountData = jest.fn();
 const mockDeleteUser = jest.fn();
 const mockSendMail = jest.fn();
+const mockSendAdminPush = jest.fn();
+const mockRtdb = new Map<string, unknown>();
 
 jest.mock("firebase-admin", () => {
   const userDoc = (uid: string) => ({
@@ -46,7 +48,10 @@ jest.mock("firebase-admin", () => {
     }),
     deleteUser: mockDeleteUser,
   };
-  return { firestore: () => firestore, database: () => ({}), auth: () => auth };
+  const database = {
+    ref: (path: string) => ({ get: async () => ({ val: () => mockRtdb.get(path) ?? null }) }),
+  };
+  return { firestore: () => firestore, database: () => database, auth: () => auth };
 });
 jest.mock("firebase-admin/firestore", () => ({ Timestamp: class {}, FieldValue: {} }));
 jest.mock("firebase-functions", () => ({ logger: { info: jest.fn(), warn: jest.fn() } }));
@@ -59,8 +64,9 @@ jest.mock("../presence", () => ({ ONLINE_TEACHERS_PATH: "onlineTeachers" }));
 jest.mock("../pilot", () => ({ PILOT_COLLECTION: "pilotRegistrations" }));
 jest.mock("../accountDeletion", () => ({ deleteAccountData: mockDeleteAccountData }));
 jest.mock("../mailer", () => ({ sendMail: mockSendMail }));
+jest.mock("../fcm", () => ({ sendAdminPush: mockSendAdminPush }));
 
-import { adminFindInactiveAnonymous, adminBulkDeleteUsers, adminSendEmail, adminListUsers } from "../admin";
+import { adminFindInactiveAnonymous, adminBulkDeleteUsers, adminSendEmail, adminSendPush, adminListUsers } from "../admin";
 
 const call = (fn: unknown, data: unknown, uid = "admin-uid") =>
   (fn as (req: unknown) => Promise<any>)({
@@ -93,6 +99,8 @@ beforeEach(() => {
   mockDeleteAccountData.mockReset().mockResolvedValue(undefined);
   mockDeleteUser.mockReset().mockResolvedValue(undefined);
   mockSendMail.mockReset().mockResolvedValue(true);
+  mockSendAdminPush.mockReset().mockImplementation(async ({ tokens }: { tokens: string[] }) => ({ sent: tokens.length, dead: [], failed: [] }));
+  mockRtdb.clear();
   process.env.SMTP_HOST = "smtp.example.com";
 });
 afterEach(() => jest.restoreAllMocks());
@@ -228,6 +236,56 @@ describe("adminSendEmail", () => {
   it("requires a subject and a message", async () => {
     await expect(call(adminSendEmail, { uids: ["a"], subject: " ", text: "t" })).rejects.toMatchObject({ code: "invalid-argument" });
     await expect(call(adminSendEmail, { uids: ["a"], subject: "s", text: "" })).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+});
+
+describe("adminSendPush", () => {
+  it("pushes to every device of each user once, and counts users without a token", async () => {
+    mockRtdb.set("users/a/fcmToken", "tok-a-phone");
+    mockRtdb.set("users/a/devices", { "ios-1": { fcmToken: "tok-a-phone" }, "ios-2": { fcmToken: "tok-a-tablet" } });
+    mockRtdb.set("users/b/devices", { "android-1": { fcmToken: "tok-b" } });
+
+    const d = await call(adminSendPush, { uids: ["a", "b", "c", "a"], title: " New teachers ", body: " Come and ask " });
+
+    expect(mockSendAdminPush).toHaveBeenCalledTimes(1);
+    const { tokens, title, body } = mockSendAdminPush.mock.calls[0][0];
+    expect([...tokens].sort()).toEqual(["tok-a-phone", "tok-a-tablet", "tok-b"]);
+    expect({ title, body }).toEqual({ title: "New teachers", body: "Come and ask" });
+    expect(d).toEqual({ reached: 2, withoutToken: 1, unreachable: 0, devicesSent: 3, devicesFailed: 0 });
+  });
+
+  it("counts a user reached when any one of their devices took it", async () => {
+    mockRtdb.set("users/a/devices", { one: { fcmToken: "dead-a" }, two: { fcmToken: "live-a" } });
+    mockRtdb.set("users/b/fcmToken", "dead-b");
+    mockSendAdminPush.mockResolvedValue({ sent: 1, dead: ["dead-a"], failed: ["dead-b"] });
+
+    const d = await call(adminSendPush, { uids: ["a", "b"], title: "t", body: "b" });
+
+    expect(d).toEqual({ reached: 1, withoutToken: 0, unreachable: 1, devicesSent: 1, devicesFailed: 2 });
+  });
+
+  it("refuses a caller without admin rights", async () => {
+    await expect(
+      (adminSendPush as unknown as (r: unknown) => Promise<unknown>)({
+        auth: { uid: "x", token: { email: "x@example.com", email_verified: true } },
+        data: { uids: ["a"], title: "t", body: "b" },
+      })
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(mockSendAdminPush).not.toHaveBeenCalled();
+  });
+
+  it("requires a title and a message within the limits", async () => {
+    for (const data of [
+      { uids: ["a"], title: " ", body: "b" },
+      { uids: ["a"], title: "t", body: "" },
+      { uids: ["a"], title: "t".repeat(101), body: "b" },
+      { uids: ["a"], title: "t", body: "b".repeat(501) },
+      { uids: [], title: "t", body: "b" },
+      { uids: Array.from({ length: 101 }, (_, i) => `u${i}`), title: "t", body: "b" },
+    ]) {
+      await expect(call(adminSendPush, data)).rejects.toMatchObject({ code: "invalid-argument" });
+    }
+    expect(mockSendAdminPush).not.toHaveBeenCalled();
   });
 });
 
