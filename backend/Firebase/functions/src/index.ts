@@ -82,6 +82,7 @@ export { validateEmailAddress } from "./emailValidation";
 export {
   adminDashboardStatus,
   adminListUsers,
+  adminSetDemoUsers,
   adminGetUserDetail,
   adminMutateUser,
   adminListQuestions,

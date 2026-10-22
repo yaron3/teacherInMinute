@@ -14,6 +14,8 @@ import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 
+import { DEMO_USER_FIELD, includesDemoUser } from "./demoUsers";
+
 const firestore = admin.firestore();
 
 export const STATS_COLLECTION = "stats";
@@ -48,13 +50,14 @@ export interface PlatformStatsDoc {
  * Best-effort: callers should not fail their own work if this rejects.
  */
 export async function recomputeRegisteredTeacherCount(): Promise<number> {
-  const snapshot = await firestore
-    .collection("users")
-    .where("role", "==", "teacher")
-    .count()
-    .get();
+  const teachers = firestore.collection("users").where("role", "==", "teacher");
+  // Demo teachers are not part of the platform (see ./demoUsers).
+  const [all, demo] = await Promise.all([
+    teachers.count().get(),
+    teachers.where(DEMO_USER_FIELD, "==", true).count().get(),
+  ]);
 
-  const count = numberOrZero(snapshot.data().count);
+  const count = Math.max(0, numberOrZero(all.data().count) - numberOrZero(demo.data().count));
 
   await firestore
     .collection(STATS_COLLECTION)
@@ -74,7 +77,8 @@ export async function recomputeRegisteredTeacherCount(): Promise<number> {
 export async function recordQuestionConnected(
   questionId: string,
   createdAtMillis: number | undefined,
-  acceptedAtMillis: number
+  acceptedAtMillis: number,
+  participantUids: string[] = []
 ): Promise<void> {
   if (createdAtMillis === undefined || !Number.isFinite(createdAtMillis)) {
     logger.info(`[stats] skip connect sample qid=${questionId} reason=no-createdAt`);
@@ -84,6 +88,11 @@ export async function recordQuestionConnected(
   const seconds = (acceptedAtMillis - createdAtMillis) / 1000;
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > MAX_CONNECT_SAMPLE_SECONDS) {
     logger.info(`[stats] skip connect sample qid=${questionId} seconds=${seconds} reason=out-of-range`);
+    return;
+  }
+
+  if (await includesDemoUser(participantUids)) {
+    logger.info(`[stats] skip connect sample qid=${questionId} reason=demo-user`);
     return;
   }
 
@@ -119,7 +128,8 @@ function numberOrZero(value: unknown): number {
 // ─── Keeping registeredTeacherCount fresh ────────────────────────────────────
 
 /**
- * Recounts teachers whenever a user document's `role` changes.
+ * Recounts teachers whenever a user document's `role` changes, or a teacher is
+ * marked or unmarked as a demo user.
  *
  * A trigger rather than an increment at each place that writes a role: the app
  * sets roles from onboarding, the profile screen and the admin tools, and any
@@ -130,9 +140,13 @@ function numberOrZero(value: unknown): number {
  * aggregation query.
  */
 export const onUserRoleChange = onDocumentWritten("users/{uid}", async (event) => {
-  const before = event.data?.before?.data()?.role;
-  const after = event.data?.after?.data()?.role;
-  if (before === after) return;
+  const beforeData = event.data?.before?.data();
+  const afterData = event.data?.after?.data();
+  const before = beforeData?.role;
+  const after = afterData?.role;
+  // Marking a teacher as a demo user takes them out of the count too.
+  const demoChanged = (beforeData?.[DEMO_USER_FIELD] === true) !== (afterData?.[DEMO_USER_FIELD] === true);
+  if (before === after && !(demoChanged && after === "teacher")) return;
   if (before !== "teacher" && after !== "teacher") return;
 
   try {

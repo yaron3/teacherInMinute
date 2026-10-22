@@ -23,7 +23,9 @@ service cloud.firestore {
         'totalEarnings',
         'totalRevenueGenerated',
         'emailRewards',
-        'teacherBonus'
+        'teacherBonus',
+        // Set from the admin console; keeps an account out of statistics.
+        'isDemoUser'
       ];
     }
 

@@ -307,10 +307,15 @@
         <div class="page-title">Users</div>
         <button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button>
       </div>
-      <div class="page-sub">All registered Firebase Auth users — every page is loaded, so search and sorting cover everyone</div>
+      <div class="page-sub">All registered Firebase Auth users — every page is loaded, so search and sorting cover everyone. Select users and choose 🧪 Mark as demo to leave them out of every statistic.</div>
       <div class="page-sub" id="users-updated">Last updated: —</div>
       <div class="toolbar">
         <input id="user-search" placeholder="Search email or name…" oninput="filterUsers()">
+        <select id="user-demo-filter" onchange="filterUsers()" style="width:auto">
+          <option value="all">All users</option>
+          <option value="real">Hide demo users</option>
+          <option value="demo">Demo users only</option>
+        </select>
         <button class="btn-ghost btn-sm" id="users-force-refresh" onclick="forceRefreshUsers()">⟳ Force refresh</button>
         <button class="btn-ghost btn-sm" onclick="openCleanup()">🧹 Clean up anonymous</button>
       </div>
@@ -863,7 +868,8 @@ async function loadOverview() {
 
 function renderOverview(d) {
   if (d.revenue?.currency) defaultCurrency = d.revenue.currency;
-  document.getElementById("overview-updated").textContent = "Last updated: " + new Date().toLocaleTimeString();
+  document.getElementById("overview-updated").textContent = "Last updated: " + new Date().toLocaleTimeString()
+    + (d.demoUsers ? ` · ${d.demoUsers} demo user${d.demoUsers === 1 ? "" : "s"} excluded from all figures` : "");
   updateVerifyBadge(d.pendingVerifications || 0);
 
   const q = d.questions;
@@ -964,7 +970,7 @@ function renderOverview(d) {
         <div class="flex-center">
           ${t.photoUrl ? `<img class="avatar" src="${safeUrl(t.photoUrl)}" onerror="this.style.display='none'">` : `<div class="avatar">T</div>`}
           <div>
-            <div style="font-size:.8rem">${esc(t.displayName)}${t.verified ? "" : ` ${badge("unverified","yellow")}`}</div>
+            <div style="font-size:.8rem">${esc(t.displayName)}${t.verified ? "" : ` ${badge("unverified","yellow")}`}${t.demo ? ` ${badge("demo","gray")}` : ""}</div>
             <div class="td-mono">${esc(t.uid.slice(0,8))}…</div>
           </div>
         </div>
@@ -1081,11 +1087,12 @@ function filterUsers() {
 
 function renderUsers() {
   const q = document.getElementById("user-search").value.trim().toLowerCase();
-  const filtered = q
-    ? allUsers.filter(u => (u.email||"").toLowerCase().includes(q)
+  const demoFilter = document.getElementById("user-demo-filter").value;
+  const filtered = allUsers.filter(u =>
+    (!q || (u.email||"").toLowerCase().includes(q)
         || (u.displayName||"").toLowerCase().includes(q)
         || u.uid.toLowerCase().includes(q))
-    : allUsers;
+    && (demoFilter === "all" || (demoFilter === "demo") === Boolean(u.isDemoUser)));
 
   // Everyone without the teacher role — students, guests, and accounts that
   // never picked a role — is on the student side, where the Role column says which.
@@ -1114,7 +1121,7 @@ function renderUserTable(key, users, teachers) {
     <td>${u.totalMinutes}</td>`}
     <td data-sort="${(u.createdAt) ?? ""}">${fmtDate(u.createdAt)}</td>
     <td data-sort="${(u.lastActiveAt || u.lastSignIn) ?? ""}" title="${esc(activityTitle(u))}">${ago(u.lastActiveAt || u.lastSignIn)}</td>
-    <td>${u.disabled ? badge("Disabled","red") : badge("Active","green")}${u.hasProfile ? "" : " " + badge("no profile doc","yellow")}</td>
+    <td>${u.disabled ? badge("Disabled","red") : badge("Active","green")}${u.isDemoUser ? " " + badge("🧪 Demo","purple") : ""}${u.hasProfile ? "" : " " + badge("no profile doc","yellow")}</td>
     <td style="min-width:${teachers ? 240 : 290}px">
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn-ghost btn-sm" onclick="viewUser(${jsArg(u.uid)})">View</button>
@@ -1150,6 +1157,28 @@ function summarizeDeletes(results) {
   if (skipped.length) msg += ` · skipped ${skipped.length}`;
   if (failed.length) msg += ` · failed ${failed.length} (${failed[0].reason})`;
   return { msg, deleted, failed: failed.length };
+}
+
+/** Marks or unmarks `uids` as demo users, which every statistic leaves out. */
+async function setDemoUsers(uids, isDemo) {
+  if (!uids.length) return;
+  const n = `${uids.length} user${uids.length === 1 ? "" : "s"}`;
+  if (!confirm(isDemo
+      ? `Mark ${n} as demo?\n\nThey keep working normally in the app, but are left out of every dashboard figure and platform statistic.`
+      : `Unmark ${n} as demo?\n\nThey will count in statistics again.`)) return;
+  try {
+    const CHUNK = 500;
+    for (let i = 0; i < uids.length; i += CHUNK) {
+      await call("adminSetDemoUsers", { uids: uids.slice(i, i + CHUNK), isDemo });
+    }
+    const set = new Set(uids);
+    allUsers.forEach(u => { if (set.has(u.uid)) u.isDemoUser = isDemo; });
+    uids.forEach(forgetUserSelection);
+    renderUsers();
+    showToast(isDemo ? `Marked ${n} as demo` : `Unmarked ${n}`);
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
+  }
 }
 
 /** A user is selectable in whichever of the two tables holds them. */
@@ -2141,6 +2170,8 @@ const TABLES = {
     keepHidden: true,
     actions: [
       { label: "📧 Email", fn: ids => openBulkEmail(ids) },
+      { label: "🧪 Mark as demo", fn: ids => setDemoUsers(ids, true) },
+      { label: "Unmark demo", fn: ids => setDemoUsers(ids, false) },
       { label: "Delete selected", danger: true, fn: bulkDeleteUsers },
     ],
   },
@@ -2148,6 +2179,8 @@ const TABLES = {
     keepHidden: true,
     actions: [
       { label: "📧 Email", fn: ids => openBulkEmail(ids) },
+      { label: "🧪 Mark as demo", fn: ids => setDemoUsers(ids, true) },
+      { label: "Unmark demo", fn: ids => setDemoUsers(ids, false) },
       { label: "Delete selected", danger: true, fn: bulkDeleteUsers },
     ],
   },

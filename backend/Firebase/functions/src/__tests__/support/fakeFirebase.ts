@@ -37,6 +37,8 @@ export class FakeTimestamp {
 
 class ServerTimestampSentinel {}
 
+class DeleteFieldSentinel {}
+
 class ArrayUnionSentinel {
   constructor(readonly values: unknown[]) {}
 }
@@ -44,6 +46,7 @@ class ArrayUnionSentinel {
 export const FakeFieldValue = {
   serverTimestamp: () => new ServerTimestampSentinel(),
   arrayUnion: (...values: unknown[]) => new ArrayUnionSentinel(values),
+  delete: () => new DeleteFieldSentinel(),
 };
 
 /** Copies plain objects and arrays, leaving class instances (timestamps) shared. */
@@ -63,7 +66,9 @@ function resolveWrite(
 ): Record<string, unknown> {
   const next = clone(existing);
   for (const [key, value] of Object.entries(patch)) {
-    if (value instanceof ServerTimestampSentinel) {
+    if (value instanceof DeleteFieldSentinel) {
+      delete next[key];
+    } else if (value instanceof ServerTimestampSentinel) {
       next[key] = FakeTimestamp.now();
     } else if (value instanceof ArrayUnionSentinel) {
       const current = Array.isArray(next[key]) ? (next[key] as unknown[]) : [];
@@ -118,8 +123,8 @@ export class FakeDocRef {
     return this.store.snapshot(this.path);
   }
 
-  async set(data: DocData): Promise<void> {
-    this.store.write(this.path, data, false);
+  async set(data: DocData, options?: { merge?: boolean }): Promise<void> {
+    this.store.write(this.path, data, options?.merge ? "set-merge" : false);
   }
 
   async update(data: DocData): Promise<void> {
@@ -127,12 +132,18 @@ export class FakeDocRef {
   }
 }
 
+/** Timestamps compare by their millis; anything else as a number. */
+function comparable(value: unknown): number {
+  return value instanceof FakeTimestamp ? value.toMillis() : Number(value);
+}
+
 export class FakeQuery {
   constructor(
     private readonly store: FakeFirestore,
     readonly collectionPath: string,
     private readonly filters: Array<[string, string, unknown]> = [],
-    private readonly max = Infinity
+    private readonly max = Infinity,
+    private readonly order: [string, "asc" | "desc"] | null = null
   ) {}
 
   doc(id: string): FakeDocRef {
@@ -140,12 +151,22 @@ export class FakeQuery {
   }
 
   where(field: string, op: string, value: unknown): FakeQuery {
-    if (op !== "==" && op !== ">=") throw new Error(`fake Firestore supports only == and >=, got ${op}`);
-    return new FakeQuery(this.store, this.collectionPath, [...this.filters, [field, op, value]], this.max);
+    if (op !== "==" && op !== ">=" && op !== "in") {
+      throw new Error(`fake Firestore supports only ==, >= and in, got ${op}`);
+    }
+    return new FakeQuery(this.store, this.collectionPath, [...this.filters, [field, op, value]], this.max, this.order);
   }
 
   limit(n: number): FakeQuery {
-    return new FakeQuery(this.store, this.collectionPath, this.filters, n);
+    return new FakeQuery(this.store, this.collectionPath, this.filters, n, this.order);
+  }
+
+  orderBy(field: string, direction: "asc" | "desc" = "asc"): FakeQuery {
+    return new FakeQuery(this.store, this.collectionPath, this.filters, this.max, [field, direction]);
+  }
+
+  count() {
+    return { get: async () => ({ data: () => ({ count: this.run().size }) }) };
   }
 
   async get(): Promise<FakeQuerySnapshot> {
@@ -156,10 +177,18 @@ export class FakeQuery {
     const docs = this.store
       .childrenOf(this.collectionPath)
       .filter(([, data]) =>
-        this.filters.every(([field, op, value]) =>
-          op === "==" ? data[field] === value : (data[field] as number) >= (value as number)
-        )
+        this.filters.every(([field, op, value]) => {
+          if (op === "==") return data[field] === value;
+          if (op === "in") return (value as unknown[]).includes(data[field]);
+          return data[field] !== undefined && comparable(data[field]) >= comparable(value);
+        })
       )
+      .sort(([, a], [, b]) => {
+        if (!this.order) return 0;
+        const [field, dir] = this.order;
+        const diff = comparable(a[field]) - comparable(b[field]);
+        return dir === "asc" ? diff : -diff;
+      })
       .slice(0, this.max)
       .map(([path, data]) => new FakeDocSnapshot(path.split("/").pop() as string, data));
     return new FakeQuerySnapshot(docs);
@@ -202,8 +231,8 @@ export class FakeFirestore {
   batch() {
     const writes: Array<() => void> = [];
     return {
-      set: (ref: FakeDocRef, data: DocData) => {
-        writes.push(() => this.write(ref.path, data, false));
+      set: (ref: FakeDocRef, data: DocData, options?: { merge?: boolean }) => {
+        writes.push(() => this.write(ref.path, data, options?.merge ? "set-merge" : false));
       },
       update: (ref: FakeDocRef, data: DocData) => {
         writes.push(() => this.write(ref.path, data, true));
@@ -212,6 +241,10 @@ export class FakeFirestore {
         writes.forEach((w) => w());
       },
     };
+  }
+
+  async getAll(...refs: FakeDocRef[]): Promise<FakeDocSnapshot[]> {
+    return refs.map((ref) => this.snapshot(ref.path));
   }
 
   runTransaction<T>(work: (tx: FakeTransaction) => Promise<T>): Promise<T> {
@@ -231,9 +264,10 @@ export class FakeFirestore {
     return new FakeDocSnapshot(path.split("/").pop() as string, this.docs.get(path));
   }
 
-  write(path: string, data: DocData, merge: boolean): void {
+  /** `true` is an update (the document must exist), "set-merge" a merging set. */
+  write(path: string, data: DocData, merge: boolean | "set-merge"): void {
     const existing = this.docs.get(path);
-    if (merge && existing === undefined) {
+    if (merge === true && existing === undefined) {
       throw new Error(`fake Firestore: update on missing document ${path}`);
     }
     this.docs.set(path, resolveWrite(merge ? existing ?? {} : {}, data));

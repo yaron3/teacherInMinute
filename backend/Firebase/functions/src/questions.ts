@@ -650,7 +650,7 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
   // Feeds the "avg time to connect" the student home shows. Best-effort: the
   // teacher has already claimed the question, so a stats failure must not fail
   // the accept.
-  await recordQuestionConnected(questionId, questionCreatedAtMillis, Date.now()).catch((error) => {
+  await recordQuestionConnected(questionId, questionCreatedAtMillis, Date.now(), [studentUid, teacherUid]).catch((error) => {
     logger.warn(`[questions] failed recording connect stat qid=${questionId}`, error);
   });
 

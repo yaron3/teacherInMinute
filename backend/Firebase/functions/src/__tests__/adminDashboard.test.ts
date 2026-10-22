@@ -976,6 +976,96 @@ describe("selection on other tables", () => {
   });
 });
 
+describe("demo users", () => {
+  async function usersPage(users: any[]) {
+    page = openConsole({
+      adminDashboardStatus: dashboard(),
+      adminListUsers: { users, nextPageToken: null },
+      adminSetDemoUsers: (d: any) => ({ updated: d.uids.length }),
+    });
+    await page.signIn();
+    await page.nav("Users");
+    return page;
+  }
+  const tickIn = (p: NonNullable<typeof page>, table: string, uid: string) => {
+    const box = p.$(`#${table} .row-select[data-id="${uid}"]`) as HTMLInputElement;
+    box.checked = true;
+    box.dispatchEvent(new p.window.Event("change", { bubbles: true }));
+  };
+  const setFilter = (p: NonNullable<typeof page>, value: string) => {
+    const select = p.$("#user-demo-filter") as HTMLSelectElement;
+    select.value = value;
+    select.dispatchEvent(new p.window.Event("change"));
+  };
+
+  it("marks the selected users of both tables as demo after one confirmation", async () => {
+    const p = await usersPage([
+      user({ uid: "s1", displayName: "Dana" }),
+      user({ uid: "s2", displayName: "Avi" }),
+      user({ uid: "t1", displayName: "Yossi", role: "teacher" }),
+    ]);
+    const search = p.$("#user-search") as HTMLInputElement;
+    search.value = "dana";
+    search.dispatchEvent(new p.window.Event("input"));
+    await p.settle();
+    tickIn(p, "students-table", "s1");
+    p.button("#students-bulk-bar", "🧪 Mark as demo").click();
+    await p.settle();
+
+    expect(p.confirm).toHaveBeenCalledTimes(1);
+    expect(p.callsTo("adminSetDemoUsers")[0].data).toEqual({ uids: ["s1"], isDemo: true });
+    expect(p.$('#students-table tr[data-id="s1"]').textContent).toContain("Demo");
+    expect(p.$("#students-bulk-bar").classList.contains("show")).toBe(false);
+
+    search.value = "";
+    search.dispatchEvent(new p.window.Event("input"));
+    await p.settle();
+    tickIn(p, "teachers-table", "t1");
+    p.button("#teachers-bulk-bar", "🧪 Mark as demo").click();
+    await p.settle();
+    expect(p.callsTo("adminSetDemoUsers")[1].data).toEqual({ uids: ["t1"], isDemo: true });
+    expect(p.$('#teachers-table tr[data-id="t1"]').textContent).toContain("Demo");
+  });
+
+  it("unmarks demo users", async () => {
+    const p = await usersPage([user({ uid: "s1", isDemoUser: true })]);
+    tickIn(p, "students-table", "s1");
+    p.button("#students-bulk-bar", "Unmark demo").click();
+    await p.settle();
+    expect(p.callsTo("adminSetDemoUsers")[0].data).toEqual({ uids: ["s1"], isDemo: false });
+    expect(p.$('#students-table tr[data-id="s1"]').textContent).not.toContain("Demo");
+  });
+
+  it("changes nothing when the confirmation is declined", async () => {
+    const p = await usersPage([user({ uid: "s1" })]);
+    p.confirm.mockReturnValueOnce(false);
+    tickIn(p, "students-table", "s1");
+    p.button("#students-bulk-bar", "🧪 Mark as demo").click();
+    await p.settle();
+    expect(p.callsTo("adminSetDemoUsers")).toHaveLength(0);
+  });
+
+  it("filters to demo users only, or hides them", async () => {
+    const p = await usersPage([
+      user({ uid: "s1", isDemoUser: true }),
+      user({ uid: "s2" }),
+      user({ uid: "t1", role: "teacher", isDemoUser: true }),
+    ]);
+    setFilter(p, "demo");
+    expect(p.$$("#students-table tr").map((r) => r.dataset.id)).toEqual(["s1"]);
+    expect(p.$$("#teachers-table tr").map((r) => r.dataset.id)).toEqual(["t1"]);
+    setFilter(p, "real");
+    expect(p.$$("#students-table tr").map((r) => r.dataset.id)).toEqual(["s2"]);
+    expect(p.$("#teachers-table").textContent).toContain("No teachers found");
+  });
+
+  it("says on the overview how many demo users are left out", async () => {
+    page = openConsole({ adminDashboardStatus: dashboard({ demoUsers: 3 }) });
+    await page.signIn();
+    expect(page.$("#overview-updated").textContent).toContain("3 demo users excluded from all figures");
+  });
+});
+
 describe("support tickets", () => {
   const ticket = (overrides: any = {}) => ({
     id: "case-1", userId: "u1", userName: "Dana", userEmail: "dana@example.com",

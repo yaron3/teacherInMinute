@@ -6,6 +6,7 @@ import { recomputeRegisteredTeacherCount, STATS_COLLECTION, PLATFORM_STATS_DOC }
 import { republishAllTeacherPresence, ONLINE_TEACHERS_PATH } from "./presence";
 import { PILOT_COLLECTION } from "./pilot";
 import { summarizeOnlineTeachers } from "./presenceHistory";
+import { DEMO_USER_FIELD, inChunks, readDemoUserUids } from "./demoUsers";
 import { deleteAccountData } from "./accountDeletion";
 import { sendMail, supportSmtpConfig } from "./mailer";
 
@@ -163,6 +164,32 @@ async function readTeacherAggregates(uids: string[]): Promise<Map<string, Teache
 
 const DAY_MS = 24 * 3600 * 1000;
 
+/** A question asked by, or taken by, a demo user. */
+function involvesDemoUser(q: Record<string, unknown>, demoUids: Set<string>): boolean {
+  return demoUids.has(String(q.studentUid ?? "")) || demoUids.has(String(q.acceptedByTeacher ?? ""));
+}
+
+/**
+ * How many questions per status involve a demo user, so the dashboard can take
+ * them off the all-time counts. Reads only the demo users' own questions,
+ * which stay few, rather than every question.
+ */
+async function countDemoQuestionsByStatus(demoUids: Set<string>): Promise<Record<string, number>> {
+  const uids = [...demoUids];
+  const queries = inChunks(uids).flatMap((chunk) => [
+    firestore.collection("questions").where("studentUid", "in", chunk).get(),
+    firestore.collection("questions").where("acceptedByTeacher", "in", chunk).get(),
+  ]);
+  // A demo teacher answering a demo student turns up in both queries.
+  const statusById = new Map<string, string>();
+  for (const snap of await Promise.all(queries)) {
+    for (const d of snap.docs) statusById.set(d.id, String(d.data().status ?? ""));
+  }
+  const counts: Record<string, number> = {};
+  for (const status of statusById.values()) counts[status] = (counts[status] ?? 0) + 1;
+  return counts;
+}
+
 /**
  * Questions asked in the last 24 hours: how many no teacher took, and how long
  * the ones a teacher did take waited for them.
@@ -171,11 +198,12 @@ const DAY_MS = 24 * 3600 * 1000;
  * timed out (`unanswered`) or cancelled by the student while still waiting.
  * Questions still searching are neither, and are counted live elsewhere.
  */
-async function summarizeLastDayQuestions(nowMs: number) {
+async function summarizeLastDayQuestions(nowMs: number, demoUids: Set<string>) {
   const snap = await firestore
     .collection("questions")
     .where("createdAt", ">=", Timestamp.fromMillis(nowMs - DAY_MS))
     .get();
+  const docs = snap.docs.filter((d) => !involvesDemoUser(d.data(), demoUids));
 
   let notAnswered = 0;
   let timedOut = 0;
@@ -183,7 +211,7 @@ async function summarizeLastDayQuestions(nowMs: number) {
   let answered = 0;
   let totalWaitMs = 0;
 
-  for (const doc of snap.docs) {
+  for (const doc of docs) {
     const q = doc.data();
     const createdAt = tsToMs(q.createdAt);
     const acceptedAt = tsToMs(q.acceptedAt);
@@ -200,7 +228,7 @@ async function summarizeLastDayQuestions(nowMs: number) {
   }
 
   return {
-    asked: snap.size,
+    asked: docs.length,
     notAnswered,
     timedOut,
     cancelledWaiting,
@@ -248,6 +276,7 @@ export const adminDashboardStatus = onCall(async (req) => {
     activeLessonsSnap,
     teacherUsersSnap,
     platformStatsSnap,
+    demoUids,
   ] = await Promise.all([
     db.ref("teachers").once("value"),
     db.ref(ONLINE_TEACHERS_PATH).once("value"),
@@ -262,11 +291,18 @@ export const adminDashboardStatus = onCall(async (req) => {
     firestore.collection("lessons").where("status", "==", "in_progress").get(),
     firestore.collection("users").where("role", "==", "teacher").get(),
     firestore.collection(STATS_COLLECTION).doc(PLATFORM_STATS_DOC).get(),
+    readDemoUserUids(),
   ]);
+
+  // Demo users (see ./demoUsers) are left out of every figure below. They
+  // still appear in the online list, flagged, so they can be taken offline.
+  const demoQuestionCounts = await countDemoQuestionsByStatus(demoUids);
+  const realCount = (status: string, total: number) => Math.max(0, total - (demoQuestionCounts[status] ?? 0));
+  const realTeacherDocs = teacherUsersSnap.docs.filter((d) => !demoUids.has(d.id));
 
   // Teachers who uploaded credentials but have no `verifiedAt` on their
   // Firestore `teachers/{uid}` record.
-  const teacherUidsWithDocs = teacherUsersSnap.docs
+  const teacherUidsWithDocs = realTeacherDocs
     .filter((d) => ((d.data().uploadedDocuments as string[] | undefined) ?? []).length > 0)
     .map((d) => d.id);
 
@@ -329,11 +365,14 @@ export const adminDashboardStatus = onCall(async (req) => {
       presenceStatus: (presence.status as string) ?? null,
       published: uid in onlineProjection,
       stale: (presence.status === "online") !== (uid in onlineProjection),
+      demo: demoUids.has(uid),
     };
   });
 
   const rtdbQs = (rtdbQsSnap.val() ?? {}) as Record<string, Record<string, unknown>>;
-  const rtdbQList = Object.entries(rtdbQs).map(([qid, q]) => ({
+  const rtdbQList = Object.entries(rtdbQs)
+    .filter(([, q]) => !demoUids.has(String(q.studentUid ?? q.userId ?? "")))
+    .map(([qid, q]) => ({
     qid,
     status: q.status,
     createdAt: dateFieldToMs(q.createdAt),
@@ -342,17 +381,15 @@ export const adminDashboardStatus = onCall(async (req) => {
   }));
 
   let oldestSearching: Record<string, unknown> | null = null;
-  if (searchingCount.data().count > 0) {
+  if (realCount("searching", searchingCount.data().count) > 0) {
     const snap = await firestore
       .collection("questions")
       .where("status", "==", "searching")
       .orderBy("createdAt", "asc")
-      .limit(5)
+      .limit(5 + (demoQuestionCounts.searching ?? 0))
       .get();
-    if (!snap.empty) {
-      const docs = snap.docs.map((d) => ({ id: d.id, ...serializeDoc(d.data()) }));
-      oldestSearching = docs[0];
-    }
+    const oldest = snap.docs.find((d) => !involvesDemoUser(d.data(), demoUids));
+    if (oldest) oldestSearching = { id: oldest.id, ...serializeDoc(oldest.data()) };
   }
 
   const completedPaymentsSnap = await firestore
@@ -366,7 +403,8 @@ export const adminDashboardStatus = onCall(async (req) => {
   const countByCurrency: Record<string, number> = {};
   const maxByCurrency: Record<string, { cents: number; id: string }> = {};
 
-  for (const d of completedPaymentsSnap.docs) {
+  const realPayments = completedPaymentsSnap.docs.filter((d) => !demoUids.has(String(d.data().uid ?? "")));
+  for (const d of realPayments) {
     const c = (d.data().currency as string) || "USD";
     const cents = Number(d.data().priceCents) || 0;
     totalCentsByCurrency[c] = (totalCentsByCurrency[c] ?? 0) + cents;
@@ -386,9 +424,13 @@ export const adminDashboardStatus = onCall(async (req) => {
 
   // A live lesson is worth showing with the people in it, so the row can be
   // acted on without copying UIDs into the users page.
+  const realActiveLessons = activeLessonsSnap.docs.filter((d) => {
+    const data = d.data();
+    return !demoUids.has(String(data.studentUid ?? "")) && !demoUids.has(String(data.teacherUid ?? ""));
+  });
   const activeLessonUids = [
     ...new Set(
-      activeLessonsSnap.docs.flatMap((d) => {
+      realActiveLessons.flatMap((d) => {
         const data = d.data();
         return [data.studentUid, data.teacherUid].filter((v): v is string => typeof v === "string");
       })
@@ -401,7 +443,7 @@ export const adminDashboardStatus = onCall(async (req) => {
     activeLessonUserDocs.map((d) => [d.id, firstString(d.data()?.fullName) ?? null])
   );
 
-  const activeLessons = activeLessonsSnap.docs.map((d) => {
+  const activeLessons = realActiveLessons.map((d) => {
     const data = serializeDoc(d.data());
     return {
       id: d.id,
@@ -413,7 +455,7 @@ export const adminDashboardStatus = onCall(async (req) => {
 
   const nowMs = Date.now();
   const [lastDayQuestions, lastDayTeachers] = await Promise.all([
-    summarizeLastDayQuestions(nowMs),
+    summarizeLastDayQuestions(nowMs, demoUids),
     summarizeOnlineTeachers(nowMs, DAY_MS),
   ]);
 
@@ -423,20 +465,21 @@ export const adminDashboardStatus = onCall(async (req) => {
 
   return {
     pendingVerifications: pendingVerificationCount,
+    demoUsers: demoUids.size,
     teachers: {
-      total: teacherUsersSnap.size,
-      online: onlineTeachers.length,
+      total: realTeacherDocs.length,
+      online: onlineTeachers.filter((t) => !t.demo).length,
       list: onlineTeachers,
       // Presence rows and published rows that disagree — see `stale` above.
       staleProjections: onlineTeachers.filter((t) => t.stale).length,
     },
     questions: {
-      searching: searchingCount.data().count,
-      accepted: acceptedCount.data().count,
-      inProgress: inProgressCount.data().count,
-      completed: completedCount.data().count,
-      unanswered: unansweredCount.data().count,
-      cancelled: cancelledCount.data().count,
+      searching: realCount("searching", searchingCount.data().count),
+      accepted: realCount("accepted", acceptedCount.data().count),
+      inProgress: realCount("in_progress", inProgressCount.data().count),
+      completed: realCount("completed", completedCount.data().count),
+      unanswered: realCount("unanswered", unansweredCount.data().count),
+      cancelled: realCount("cancelled", cancelledCount.data().count),
       rtdbActive: rtdbQList.length,
       rtdbList: rtdbQList.slice(0, 20),
       oldestSearching,
@@ -445,7 +488,7 @@ export const adminDashboardStatus = onCall(async (req) => {
       active: activeLessons,
     },
     users: {
-      total: userCountSnap.data().count,
+      total: Math.max(0, userCountSnap.data().count - demoUids.size),
     },
     lastDay: {
       questions: lastDayQuestions,
@@ -456,7 +499,7 @@ export const adminDashboardStatus = onCall(async (req) => {
       totalCents: totalRevenueCents,
       currency: revenueCurrency,
       byCurrency: totalCentsByCurrency,
-      completedPayments: completedPaymentsSnap.size,
+      completedPayments: realPayments.length,
       avgPaymentCents,
       maxPaymentCents,
       maxPaymentId,
@@ -507,6 +550,7 @@ export const adminListUsers = onCall(async (req) => {
       totalEarnings: numberOrNull(fs.totalEarnings),
       hasProfile: withProfile.has(u.uid),
       anonymous: isAnonymous(u),
+      isDemoUser: fs[DEMO_USER_FIELD] === true,
       lastActiveAt: lastActiveMs(u) || null,
     };
   });
@@ -515,6 +559,44 @@ export const adminListUsers = onCall(async (req) => {
     users,
     nextPageToken: listResult.pageToken ?? null,
   };
+});
+
+// ─── adminSetDemoUsers ────────────────────────────────────────────────────────
+
+export const DEMO_MARK_MAX = 500;
+
+/**
+ * Marks `uids` as demo users, or clears the mark, so every statistic leaves
+ * them out (see ./demoUsers). Sets the flag on the Firestore user document,
+ * creating one for an account that has none, and recounts teachers so the
+ * figure the app shows follows at once.
+ */
+export const adminSetDemoUsers = onCall(async (req) => {
+  assertAdmin(req);
+  const { uids, isDemo } = req.data as { uids?: unknown; isDemo?: unknown };
+  if (!Array.isArray(uids) || uids.length === 0 || !uids.every((u) => typeof u === "string" && u)) {
+    throw new HttpsError("invalid-argument", "uids must be a non-empty list");
+  }
+  if (uids.length > DEMO_MARK_MAX) throw new HttpsError("invalid-argument", `At most ${DEMO_MARK_MAX} users per call`);
+  if (typeof isDemo !== "boolean") throw new HttpsError("invalid-argument", "isDemo must be true or false");
+
+  const unique = [...new Set(uids as string[])];
+  const batch = firestore.batch();
+  for (const uid of unique) {
+    batch.set(
+      firestore.collection("users").doc(uid),
+      { [DEMO_USER_FIELD]: isDemo ? true : FieldValue.delete() },
+      { merge: true }
+    );
+  }
+  await batch.commit();
+
+  await recomputeRegisteredTeacherCount().catch((err) => {
+    logger.warn(`[admin] teacher recount after demo change failed`, err);
+  });
+
+  logger.info(`[admin] ${isDemo ? "marked" : "unmarked"} ${unique.length} demo user(s) by=${req.auth?.token?.email}`);
+  return { updated: unique.length };
 });
 
 // ─── adminGetUserDetail ────────────────────────────────────────────────────────
