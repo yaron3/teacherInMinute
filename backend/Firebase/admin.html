@@ -1149,6 +1149,7 @@ function renderUserTable(key, users, teachers) {
         <button class="btn-ghost btn-sm" onclick="viewUser(${jsArg(u.uid)})">View</button>
         ${teachers ? "" : `<button class="btn-ghost btn-sm" onclick="openAdjust(${jsArg(u.uid)},${jsArg(u.email||u.uid)})">± Min</button>`}
         <button class="btn-ghost btn-sm" onclick="openTeacherMsg(${jsArg(u.uid)},${jsArg(u.displayName||u.email||u.uid)})">✉</button>
+        <button class="btn-ghost btn-sm" title="Send push notification" onclick="openBulkPush([${jsArg(u.uid)}])">🔔</button>
         <button class="btn-ghost btn-sm" onclick="doPasswordReset(${jsArg(u.uid)})">Reset PW</button>
         <button class="btn-ghost btn-sm" onclick="toggleDisable(${jsArg(u.uid)},${u.disabled ? "true" : "false"})">${u.disabled ? "Enable" : "Disable"}</button>
         <button class="btn-danger btn-sm" onclick="doDelete(${jsArg(u.uid)},${jsArg(u.email||u.uid)})">Delete</button>
@@ -1572,6 +1573,7 @@ function renderUserDetail(d) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
       <button class="btn-ghost btn-sm" onclick="openAdjust(${jsArg(a.uid)},${jsArg(a.email||a.uid)})">± Adjust Minutes</button>
       <button class="btn-ghost btn-sm" onclick="openTeacherMsg(${jsArg(a.uid)},${jsArg(fs.fullName || a.email || a.uid)})">✉ Send Message</button>
+      <button class="btn-ghost btn-sm" onclick="openBulkPush([${jsArg(a.uid)}])">🔔 Send Push</button>
       <button class="btn-ghost btn-sm" onclick="doPasswordReset(${jsArg(a.uid)})">Reset Password</button>
       <button class="btn-ghost btn-sm" onclick="setRole(${jsArg(a.uid)},'${isTeacher ? "student" : "teacher"}')">Make ${isTeacher ? "student" : "teacher"}</button>
       <button class="btn-danger btn-sm" onclick="doDelete(${jsArg(a.uid)},${jsArg(a.email||a.uid)})">Delete User</button>
