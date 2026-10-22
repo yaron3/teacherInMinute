@@ -123,16 +123,19 @@ const UPDATES_CHANNEL_ID = "teacher_minute_updates";
 export async function sendAdminPush(params: {
   tokens: string[];
   title: string;
-  body: string;
+  /** Optional: a notification can be a title alone. */
+  body?: string;
+  /** Extra key/value pairs for the app, next to `type`, which always wins. */
+  data?: Record<string, string>;
 }): Promise<{ sent: number; dead: string[]; failed: string[] }> {
-  const { tokens, title, body } = params;
+  const { tokens, title, body, data } = params;
   if (tokens.length === 0) return { sent: 0, dead: [], failed: [] };
 
   const response = await admin.messaging().sendEach(
     tokens.map((token) => ({
       token,
-      notification: { title, body },
-      data: { type: "admin_message" },
+      notification: body ? { title, body } : { title },
+      data: { ...data, type: "admin_message" },
       android: { priority: "high" as const, notification: { channelId: UPDATES_CHANNEL_ID } },
       apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
     }))

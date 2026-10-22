@@ -168,6 +168,16 @@ describe("an admin push", () => {
     expect(result).toEqual({ sent: 1, dead: ["gone"], failed: ["flaky"] });
   });
 
+  test("sends a title alone, and custom data that cannot override the type", async () => {
+    mockSendEach.mockResolvedValue({ successCount: 1, responses: [{ success: true }] });
+
+    await sendAdminPush({ tokens: ["live"], title: "Hi", data: { screen: "minutes", type: "spoofed" } });
+
+    const [message] = mockSendEach.mock.calls[0][0];
+    expect(message.notification).toEqual({ title: "Hi" });
+    expect(message.data).toEqual({ screen: "minutes", type: "admin_message" });
+  });
+
   test("sends nothing when no one has a token", async () => {
     expect(await sendAdminPush({ tokens: [], title: "Hi", body: "Hello" })).toEqual({ sent: 0, dead: [], failed: [] });
     expect(mockSendEach).not.toHaveBeenCalled();

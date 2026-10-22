@@ -644,7 +644,13 @@
         <button class="btn-ghost btn-sm" onclick="emailUnregisteredInstead()">📧 Email them instead</button>
       </div>
       <div class="form-group"><label>Title</label><input id="push-title" maxlength="100" placeholder="e.g. New teachers are online"></div>
-      <div class="form-group"><label>Message</label><textarea id="push-body" rows="4" maxlength="500" placeholder="Plain text, up to 500 characters…"></textarea></div>
+      <div class="form-group"><label>Message (optional)</label><textarea id="push-body" rows="4" maxlength="500" placeholder="Plain text, up to 500 characters — leave empty to send the title alone"></textarea></div>
+      <div class="form-group">
+        <label>Data (optional)</label>
+        <div style="font-size:.78rem;color:var(--muted2);margin-bottom:6px">Key/value pairs delivered to the app with the notification. Up to 10.</div>
+        <div id="push-data-rows"></div>
+        <button class="btn-ghost btn-sm" id="push-data-add" onclick="addPushDataRow()">+ Add field</button>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn-ghost btn-sm" onclick="closeModal('push-modal')">Cancel</button>
@@ -1281,6 +1287,8 @@ async function openBulkPush(uids) {
   pushUids = []; pushUnregisteredUids = [];
   document.getElementById("push-title").value = "";
   document.getElementById("push-body").value = "";
+  document.getElementById("push-data-rows").innerHTML = "";
+  document.getElementById("push-data-add").disabled = false;
   document.getElementById("push-unregistered").style.display = "none";
   document.getElementById("push-send").disabled = true;
   document.getElementById("push-to-label").textContent = "checking which users can receive push…";
@@ -1315,6 +1323,36 @@ async function openBulkPush(uids) {
   }
 }
 
+const PUSH_DATA_MAX_FIELDS = 10;
+function addPushDataRow() {
+  const rows = document.getElementById("push-data-rows");
+  if (rows.children.length >= PUSH_DATA_MAX_FIELDS) return;
+  const row = document.createElement("div");
+  row.className = "push-data-row";
+  row.style.cssText = "display:flex;gap:6px;margin-bottom:6px";
+  row.innerHTML = `<input class="push-data-key" maxlength="64" placeholder="key" style="flex:1">
+    <input class="push-data-value" placeholder="value" style="flex:2">
+    <button class="btn-icon" title="Remove" onclick="this.parentElement.remove();document.getElementById('push-data-add').disabled=false">✕</button>`;
+  rows.appendChild(row);
+  document.getElementById("push-data-add").disabled = rows.children.length >= PUSH_DATA_MAX_FIELDS;
+  row.querySelector(".push-data-key").focus();
+}
+
+/** The data rows as an object; rows left entirely empty are ignored. Throws
+ *  a message for the toast on a row the server would refuse anyway. */
+function collectPushData() {
+  const data = {};
+  for (const row of document.querySelectorAll("#push-data-rows .push-data-row")) {
+    const key = row.querySelector(".push-data-key").value.trim();
+    const value = row.querySelector(".push-data-value").value;
+    if (!key && !value) continue;
+    if (!key) throw new Error("Every data value needs a key");
+    if (key in data) throw new Error(`Data key "${key}" appears twice`);
+    data[key] = value;
+  }
+  return data;
+}
+
 /** Hands the users who cannot get a push to the email form, carrying over
  *  what was typed so far. */
 function emailUnregisteredInstead() {
@@ -1329,7 +1367,9 @@ function emailUnregisteredInstead() {
 async function sendBulkPush() {
   const title = document.getElementById("push-title").value.trim();
   const body = document.getElementById("push-body").value.trim();
-  if (!title || !body) { showToast("Title and message are required", "error"); return; }
+  if (!title) { showToast("A title is required", "error"); return; }
+  let data;
+  try { data = collectPushData(); } catch (e) { showToast(e.message, "error"); return; }
   const uids = pushUids;
   if (!uids.length) { showToast("None of the selected users is registered for push", "error"); return; }
   if (!confirm(`Send "${title}" as a push notification to ${uids.length} user${uids.length === 1 ? "" : "s"}?`)) return;
@@ -1337,7 +1377,7 @@ async function sendBulkPush() {
   let reached = 0, withoutToken = 0, unreachable = 0;
   try {
     for (let i = 0; i < uids.length; i += CHUNK) {
-      const d = await call("adminSendPush", { uids: uids.slice(i, i + CHUNK), title, body });
+      const d = await call("adminSendPush", { uids: uids.slice(i, i + CHUNK), title, body, data });
       reached += d.reached; withoutToken += d.withoutToken; unreachable += d.unreachable;
     }
     closeModal("push-modal");

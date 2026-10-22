@@ -1585,6 +1585,44 @@ export const adminSendEmail = onCall({ timeoutSeconds: 540 }, async (req) => {
 export const BULK_PUSH_MAX = 100;
 export const PUSH_TITLE_MAX_CHARS = 100;
 export const PUSH_BODY_MAX_CHARS = 500;
+export const PUSH_DATA_MAX_FIELDS = 10;
+export const PUSH_DATA_KEY_MAX_CHARS = 64;
+/** Well under FCM's 4 KB payload limit, leaving room for the notification. */
+export const PUSH_DATA_MAX_BYTES = 2048;
+
+/** Keys FCM rejects or reserves for itself, plus the `type` the app routes on. */
+function isReservedPushKey(key: string): boolean {
+  const k = key.toLowerCase();
+  return ["type", "from", "message_type", "collapse_key", "notification"].includes(k)
+    || k.startsWith("google.") || k.startsWith("gcm.");
+}
+
+/** The optional custom data, checked: string keys and values only, since FCM
+ *  data payloads carry nothing else. */
+function pushData(value: unknown): Record<string, string> {
+  if (value == null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) throw new HttpsError("invalid-argument", "data must be an object");
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > PUSH_DATA_MAX_FIELDS) {
+    throw new HttpsError("invalid-argument", `At most ${PUSH_DATA_MAX_FIELDS} data fields`);
+  }
+  const data: Record<string, string> = {};
+  for (const [rawKey, v] of entries) {
+    const key = rawKey.trim();
+    if (!key) throw new HttpsError("invalid-argument", "Data keys must not be empty");
+    if (key.length > PUSH_DATA_KEY_MAX_CHARS) {
+      throw new HttpsError("invalid-argument", `Data key "${key.slice(0, 20)}…" is over ${PUSH_DATA_KEY_MAX_CHARS} characters`);
+    }
+    if (isReservedPushKey(key)) throw new HttpsError("invalid-argument", `"${key}" is a reserved data key`);
+    if (typeof v !== "string") throw new HttpsError("invalid-argument", `Data value for "${key}" must be text`);
+    if (key in data) throw new HttpsError("invalid-argument", `Data key "${key}" appears twice`);
+    data[key] = v;
+  }
+  if (Buffer.byteLength(JSON.stringify(data)) > PUSH_DATA_MAX_BYTES) {
+    throw new HttpsError("invalid-argument", `Data is over ${PUSH_DATA_MAX_BYTES} bytes`);
+  }
+  return data;
+}
 
 /** Every push token a user's devices registered: the latest one at
  *  `users/{uid}/fcmToken`, and one per device under `devices/` — a user signed
@@ -1634,17 +1672,18 @@ export const adminCheckPushTokens = onCall(async (req) => {
  */
 export const adminSendPush = onCall({ timeoutSeconds: 300 }, async (req) => {
   assertAdmin(req);
-  const { uids, title, body } = req.data as { uids?: unknown; title?: string; body?: string };
+  const { uids, title, body, data } = req.data as { uids?: unknown; title?: string; body?: string; data?: unknown };
   const unique = pushUids(uids);
   const t = title?.trim() ?? "";
   const b = body?.trim() ?? "";
-  if (!t || !b) throw new HttpsError("invalid-argument", "title and body required");
+  if (!t) throw new HttpsError("invalid-argument", "title required");
   if (t.length > PUSH_TITLE_MAX_CHARS) throw new HttpsError("invalid-argument", `Title is over ${PUSH_TITLE_MAX_CHARS} characters`);
   if (b.length > PUSH_BODY_MAX_CHARS) throw new HttpsError("invalid-argument", `Message is over ${PUSH_BODY_MAX_CHARS} characters`);
+  const extra = pushData(data);
 
   const tokensByUid = new Map(await Promise.all(unique.map(async (uid) => [uid, await pushTokensOf(uid)] as const)));
   const tokens = [...new Set([...tokensByUid.values()].flat())];
-  const { sent, dead, failed } = await sendAdminPush({ tokens, title: t, body: b });
+  const { sent, dead, failed } = await sendAdminPush({ tokens, title: t, body: b || undefined, data: extra });
 
   const undelivered = new Set([...dead, ...failed]);
   let reached = 0;

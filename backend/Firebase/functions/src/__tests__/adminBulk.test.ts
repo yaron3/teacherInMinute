@@ -274,10 +274,35 @@ describe("adminSendPush", () => {
     expect(mockSendAdminPush).not.toHaveBeenCalled();
   });
 
-  it("requires a title and a message within the limits", async () => {
+  it("sends a title alone, with no body", async () => {
+    mockRtdb.set("users/a/fcmToken", "tok-a");
+    await call(adminSendPush, { uids: ["a"], title: "Hi", body: "  " });
+    expect(mockSendAdminPush.mock.calls[0][0]).toMatchObject({ title: "Hi", body: undefined });
+  });
+
+  it("passes custom data along, with keys trimmed", async () => {
+    mockRtdb.set("users/a/fcmToken", "tok-a");
+    await call(adminSendPush, { uids: ["a"], title: "Hi", data: { " screen ": "minutes", campaign: "oct" } });
+    expect(mockSendAdminPush.mock.calls[0][0].data).toEqual({ screen: "minutes", campaign: "oct" });
+  });
+
+  it.each([
+    [{ type: "x" }, "the key the app routes on"],
+    [{ "google.c.a": "x" }, "a key FCM reserves"],
+    [{ " ": "x" }, "an empty key"],
+    [{ n: 5 }, "a value that is not text"],
+    [{ a: "1", " a": "2" }, "a key given twice"],
+    [Object.fromEntries(Array.from({ length: 11 }, (_, i) => [`k${i}`, "v"])), "too many fields"],
+    [{ k: "v".repeat(2100) }, "too many bytes"],
+    [["a"], "a list"],
+  ])("refuses data with %p (%s)", async (data) => {
+    await expect(call(adminSendPush, { uids: ["a"], title: "t", data })).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(mockSendAdminPush).not.toHaveBeenCalled();
+  });
+
+  it("requires a title, and a message within the limits", async () => {
     for (const data of [
       { uids: ["a"], title: " ", body: "b" },
-      { uids: ["a"], title: "t", body: "" },
       { uids: ["a"], title: "t".repeat(101), body: "b" },
       { uids: ["a"], title: "t", body: "b".repeat(501) },
       { uids: [], title: "t", body: "b" },
