@@ -6,6 +6,11 @@ Geometry is lifted from the shared 1024 icon so the two apps stay siblings.
 Everything is drawn at 4x and downsampled for clean edges.
 
     python3 make_icon.py <out-dir>
+
+Superseded: the shipped icon is now the art in
+teacher-minute/Darwin/Assets.xcassets/AppIconStudent.appiconset, and
+export_android.py cuts the Android and Play Store icons from it. Running this
+into this folder would bring the old design back.
 """
 import sys
 from pathlib import Path
