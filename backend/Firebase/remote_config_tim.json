@@ -12057,7 +12057,7 @@
     },
     "teacher_app_url": {
       "defaultValue": {
-        "value": ""
+        "value": "https://play.google.com/store/apps/details?id=com.yaronj.tim"
       },
       "conditionalValues": {
         "iOS": {
