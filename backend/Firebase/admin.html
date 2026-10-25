@@ -249,6 +249,7 @@
     <div class="nav-item" onclick="showPage('pricing')">🏷 Pricing</div>
     <div class="nav-item" onclick="showPage('support')">📩 Support</div>
     <div class="nav-item" onclick="showPage('pilot')">🤖 Android Pilot</div>
+    <div class="nav-item" onclick="showPage('report')">📧 Daily Report</div>
     <div class="nav-item" id="nav-verify" onclick="showPage('verify')" style="display:flex;align-items:center">📋 Verify Teachers<span class="nav-badge" id="verify-badge" style="display:none">0</span></div>
     <div class="nav-signout" onclick="doSignOut()">↩ Sign out</div>
   </nav>
@@ -468,6 +469,25 @@
           <tbody id="pilot-table"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- ── Daily Report ── -->
+    <div id="page-report" class="page">
+      <div class="page-title">Daily Report</div>
+      <div class="page-sub">A summary of the last 24 hours, emailed Sunday to Friday at 09:00 Israel time over SMTP: new users, registrations, sessions, teacher availability and questions.</div>
+      <div class="table-wrap" style="padding:20px;max-width:560px">
+        <div class="form-group"><label><input id="report-enabled" type="checkbox"> Send the daily report</label></div>
+        <div class="form-group">
+          <label>Recipients (one per line or comma-separated)</label>
+          <textarea id="report-recipients" rows="4" placeholder="name@example.com"></textarea>
+        </div>
+        <div class="toolbar">
+          <button class="btn-primary btn-sm" id="report-save" onclick="saveReportSettings()">Save</button>
+          <button class="btn-ghost btn-sm" id="report-send" onclick="sendReportNow()">Send now</button>
+        </div>
+        <div id="report-status" style="color:var(--muted);font-size:13px"></div>
+      </div>
+      <div id="report-preview" style="margin-top:20px"></div>
     </div>
 
     <!-- ── Verify Teachers ── -->
@@ -887,6 +907,7 @@ function showPage(name) {
   else if (name === "pricing") loadPricing();
   else if (name === "support") loadSupport();
   else if (name === "pilot") loadPilot();
+  else if (name === "report") loadReportSettings();
   else if (name === "verify") loadVerify();
 }
 
@@ -2139,6 +2160,75 @@ async function setPilotStatus(id, status) {
   } catch (e) {
     showToast("Failed: " + e.message, "error");
   }
+}
+
+// ── Daily Report ──────────────────────────────────────────────────────────────
+function renderReportSettings(d) {
+  document.getElementById("report-enabled").checked = d.enabled;
+  document.getElementById("report-recipients").value = d.recipients.join("\n");
+  document.getElementById("report-status").textContent =
+    "Last sent: " + (d.lastSentAtMs ? fmtFull(d.lastSentAtMs) : "never");
+}
+
+async function loadReportSettings() {
+  try {
+    renderReportSettings(await call("adminGetDailyReportSettings"));
+  } catch (e) {
+    showToast("Failed to load report settings: " + e.message, "error");
+  }
+}
+
+async function saveReportSettings() {
+  const btn = document.getElementById("report-save");
+  btn.disabled = true;
+  try {
+    renderReportSettings(await call("adminSetDailyReportSettings", {
+      enabled: document.getElementById("report-enabled").checked,
+      recipients: document.getElementById("report-recipients").value,
+    }));
+    showToast("Report settings saved", "success");
+  } catch (e) {
+    showToast("Failed to save: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/** Sends to the saved recipients, so save first if the list was edited. */
+async function sendReportNow() {
+  const btn = document.getElementById("report-send");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  try {
+    const r = await call("adminSendDailyReportNow");
+    renderReportPreview(r.report);
+    showToast(r.sent ? `Sent to ${r.recipients.join(", ")}` : "Not sent — SMTP is not configured or there are no recipients",
+      r.sent ? "success" : "error");
+    loadReportSettings();
+  } catch (e) {
+    showToast("Failed to send: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send now";
+  }
+}
+
+function renderReportPreview(r) {
+  const rows = [
+    ["New users", r.users.created],
+    ["Finished registration (added email)", r.users.registered],
+    ["Sessions", r.lessons.count],
+    ["Average session length", duration(r.lessons.avgSeconds)],
+    ["Teachers available", r.teachers.distinctTeachers],
+    ["Average time available per teacher", duration(r.teachers.avgSecondsPerTeacher)],
+    ["Questions asked (excluding demo)", r.questions.real],
+    ["Questions asked (including demo)", r.questions.all],
+  ];
+  document.getElementById("report-preview").innerHTML = `
+    <div class="page-sub">Figures for ${esc(fmtFull(r.fromMs))} – ${esc(fmtFull(r.toMs))}</div>
+    <div class="table-wrap" style="max-width:560px"><table><tbody>
+      ${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td style="font-weight:600;text-align:right">${esc(v)}</td></tr>`).join("")}
+    </tbody></table></div>`;
 }
 
 // ── Verify Teachers ───────────────────────────────────────────────────────────

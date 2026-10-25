@@ -92,3 +92,45 @@ export async function summarizeOnlineTeachers(nowMs: number, windowMs: number): 
     hoursCovered: hours,
   };
 }
+
+export interface TeacherAvailability {
+  /** Teachers seen online at any sweep in the window. */
+  distinctTeachers: number;
+  /** Teacher-minutes online in the window: one per teacher per sweep. */
+  onlineMinutes: number;
+  /** `onlineMinutes` shared out over `distinctTeachers`, in seconds. */
+  avgSecondsPerTeacher: number | null;
+  hoursCovered: number;
+}
+
+/**
+ * Who was available between `fromMs` and `toMs`, and for how long on average.
+ * Sweeps run once a minute, so each teacher counted in a sweep is one minute
+ * online. Works in whole hours: a bucket counts when its hour starts in the
+ * window.
+ */
+export async function summarizeTeacherAvailability(fromMs: number, toMs: number): Promise<TeacherAvailability> {
+  const snap = await admin
+    .firestore()
+    .collection(PRESENCE_HOURLY_COLLECTION)
+    .where("hourStartMs", ">=", hourStartOf(fromMs))
+    .get();
+
+  const uids = new Set<string>();
+  let onlineMinutes = 0;
+  let hours = 0;
+  for (const doc of snap.docs) {
+    const b = doc.data() as Partial<PresenceHourBucket>;
+    if (Number(b.hourStartMs) >= toMs || !(Number(b.samples) > 0)) continue;
+    onlineMinutes += Number(b.onlineSum) || 0;
+    (Array.isArray(b.uids) ? b.uids : []).forEach((uid) => uids.add(uid));
+    hours += 1;
+  }
+
+  return {
+    distinctTeachers: uids.size,
+    onlineMinutes,
+    avgSecondsPerTeacher: uids.size > 0 ? Math.round((onlineMinutes * 60) / uids.size) : null,
+    hoursCovered: hours,
+  };
+}

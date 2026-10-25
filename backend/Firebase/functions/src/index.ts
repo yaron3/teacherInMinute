@@ -43,6 +43,9 @@ export { teacherKeepAliveWatchdog } from "./keepAlive";
 // Platform statistics
 export { onUserRoleChange } from "./stats";
 
+// Sunday–Friday 09:00 Israel summary email; recipients set in the admin console
+export { dailySummaryReport } from "./dailyReport";
+
 // Demo tooling — simulated student questions (local AI service, or canned
 // Remote Config messages when it is not running)
 export { simulateDemoQuestion, demoStudentAutoReply } from "./demoStudent";
@@ -107,6 +110,9 @@ export {
   adminSendEmail,
   adminSendPush,
   adminCheckPushTokens,
+  adminGetDailyReportSettings,
+  adminSetDailyReportSettings,
+  adminSendDailyReportNow,
 } from "./admin";
 
 // Payments — PayPal Checkout + Braintree (Apple Pay, Google Pay)

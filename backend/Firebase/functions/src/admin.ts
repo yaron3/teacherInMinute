@@ -10,6 +10,14 @@ import { DEMO_USER_FIELD, inChunks, readDemoUserUids } from "./demoUsers";
 import { deleteAccountData } from "./accountDeletion";
 import { sendMail, supportSmtpConfig } from "./mailer";
 import { sendAdminPush } from "./fcm";
+import {
+  isPlausibleEmail,
+  parseRecipients,
+  readDailyReportSettings,
+  RECIPIENTS_MAX,
+  sendDailyReport,
+  writeDailyReportSettings,
+} from "./dailyReport";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -1700,4 +1708,45 @@ export const adminSendPush = onCall({ timeoutSeconds: 300 }, async (req) => {
       `devices=${sent}/${tokens.length} dead=${dead.length} by=${req.auth?.token?.email}`
   );
   return { reached, withoutToken, unreachable, devicesSent: sent, devicesFailed: failed.length + dead.length };
+});
+
+// ─── Daily summary email ───────────────────────────────────────────────────────
+
+export const adminGetDailyReportSettings = onCall(async (req) => {
+  assertAdmin(req);
+  return readDailyReportSettings();
+});
+
+/** Recipients from a list or a comma/newline-separated string. */
+function reportRecipients(value: unknown): string[] {
+  const recipients = parseRecipients(value);
+  const invalid = recipients.filter((r) => !isPlausibleEmail(r));
+  if (invalid.length > 0) throw new HttpsError("invalid-argument", `Not an email address: ${invalid.join(", ")}`);
+  if (recipients.length > RECIPIENTS_MAX) {
+    throw new HttpsError("invalid-argument", `At most ${RECIPIENTS_MAX} recipients`);
+  }
+  return recipients;
+}
+
+export const adminSetDailyReportSettings = onCall(async (req) => {
+  assertAdmin(req);
+  const { enabled, recipients } = req.data as { enabled?: unknown; recipients?: unknown };
+  if (typeof enabled !== "boolean") throw new HttpsError("invalid-argument", "enabled must be true or false");
+  const list = reportRecipients(recipients);
+  if (enabled && list.length === 0) throw new HttpsError("invalid-argument", "Add a recipient, or turn the report off");
+
+  await writeDailyReportSettings({ enabled, recipients: list }, req.auth?.token?.email);
+  logger.info(`[admin] daily report enabled=${enabled} recipients=${list.length} by=${req.auth?.token?.email}`);
+  return readDailyReportSettings();
+});
+
+/** Sends the report for the last 24 hours now, to the saved recipients or to
+ *  the ones given. Sends even when the schedule is turned off. */
+export const adminSendDailyReportNow = onCall({ timeoutSeconds: 300 }, async (req) => {
+  assertAdmin(req);
+  const given = (req.data as { recipients?: unknown } | null)?.recipients;
+  const recipients = given === undefined ? undefined : reportRecipients(given);
+  const result = await sendDailyReport(Date.now(), recipients);
+  logger.info(`[admin] daily report sent now sent=${result.sent} by=${req.auth?.token?.email}`);
+  return result;
 });
