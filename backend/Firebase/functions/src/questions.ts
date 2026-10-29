@@ -26,6 +26,7 @@ import {
   applyQuestionDetails,
   dispatchFirstWave,
   enqueueQuestionWatchdog,
+  getUseWaveQuestion,
   QuestionDetails,
   withdrawTeacherFromOtherQuestions,
 } from "./dispatch";
@@ -148,15 +149,17 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
 
   // The limits and the student's balance are independent reads, so they
   // overlap rather than queueing up on the ask path. The limits and the search
-  // timeout come from one cached Remote Config template, so this is a single
-  // fetch, usually cached.
-  const [studentSnap, maxQuestionLength, rateLimits, searchTimeoutSeconds, blockedTeachers] = await Promise.all([
-    firestore.collection("users").doc(uid).get(),
-    getQuestionMaxLength(),
-    getQuestionRateLimits(),
-    getSearchTimeoutSeconds(),
-    blockedTeacherUids(uid),
-  ]);
+  // timeout (and the wave flag) come from one cached Remote Config template, so
+  // this is a single fetch, usually cached.
+  const [studentSnap, maxQuestionLength, rateLimits, searchTimeoutSeconds, blockedTeachers, useWaves] =
+    await Promise.all([
+      firestore.collection("users").doc(uid).get(),
+      getQuestionMaxLength(),
+      getQuestionRateLimits(),
+      getSearchTimeoutSeconds(),
+      blockedTeacherUids(uid),
+      getUseWaveQuestion(),
+    ]);
 
   // Measured after trimming, so the limit counts what is stored rather than
   // whitespace the student cannot see.
@@ -259,6 +262,9 @@ export const createQuestion = onCall(HOT_PATH, async (req) => {
     // down; if the dispatch throws we reset it to 0 and hand the question back.
     dispatchWave: 1,
     alreadyInvited: [],
+    // Stamped once, so the question keeps the mode it was asked under even if
+    // use_wave_question is flipped while it is searching.
+    ...(useWaves ? {} : { sendToAll: true }),
     ...(blockedTeachers.length > 0 ? { blockedTeachers } : {}),
   };
 

@@ -52,3 +52,22 @@ export async function readRcNumber(key: string): Promise<number | undefined> {
     return undefined;
   }
 }
+
+/** One boolean Remote Config parameter (`"true"` / `"false"`), or `undefined`
+ *  when it is absent, unreadable or neither — callers supply their own
+ *  fallback, as with readRcNumber. */
+export async function readRcBoolean(key: string): Promise<boolean | undefined> {
+  try {
+    const template = await getRcTemplate();
+    const param = template.parameters?.[key] as
+      | { defaultValue?: { value?: string } }
+      | undefined;
+    const raw = param?.defaultValue?.value?.trim().toLowerCase();
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    return undefined;
+  } catch (error) {
+    logger.warn(`[remoteConfig] failed reading Remote Config ${key}`, error);
+    return undefined;
+  }
+}

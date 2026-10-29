@@ -87,13 +87,17 @@ jest.mock("../rateLimit", () => ({
   checkQuestionAllowance: jest.fn(async () => ({ allowed: true })),
   recordSessionStart: jest.fn(async () => undefined),
 }));
+jest.mock("../remoteConfig", () => ({
+  readRcBoolean: jest.fn(async () => undefined),
+}));
 jest.mock("../lessons", () => ({
   enqueueAbandonedLessonCheck: jest.fn(async () => undefined),
 }));
 
-import { evaluateWave, questionWatchdog } from "../dispatch";
+import { backfillPendingQuestionsForTeacher, evaluateWave, questionWatchdog } from "../dispatch";
 import { createQuestion, acceptInvite, cancelQuestion } from "../questions";
 import { getSearchTimeoutSeconds } from "../questionLimits";
+import { readRcBoolean } from "../remoteConfig";
 import { WAVE_SIZES, WAVE_TIMEOUT_SECONDS } from "../types";
 
 // ─── The virtual roster ──────────────────────────────────────────────────────
@@ -611,5 +615,94 @@ describe("how long a question searches", () => {
 
     await advanceTo(120);
     expect(question(qid).status).toBe("unanswered");
+  });
+});
+
+describe("with use_wave_question off", () => {
+  beforeEach(() => {
+    (readRcBoolean as jest.Mock).mockImplementation(async (key: string) =>
+      key === "use_wave_question" ? false : undefined
+    );
+  });
+
+  afterEach(() => {
+    (readRcBoolean as jest.Mock).mockImplementation(async () => undefined);
+  });
+
+  test("the question goes to every available teacher at once", async () => {
+    const qid = await ask("student-maya");
+
+    expect(pendingInWave(qid, 1)).toEqual(RANKED);
+    expect(dashboardsShowing(qid)).toEqual(RANKED);
+    expect(question(qid)).toMatchObject({ sendToAll: true, dispatchWave: 1 });
+    expect(question(qid).alreadyInvited).toHaveLength(RANKED.length);
+  });
+
+  test("no later waves are scheduled", async () => {
+    await ask("student-maya");
+
+    expect(fakeTasks.history).not.toContainEqual(
+      expect.objectContaining({ queue: "evaluateWave" })
+    );
+    expect(fakeTasks.history).toContainEqual(
+      expect.objectContaining({ queue: "questionWatchdog" })
+    );
+  });
+
+  test("a teacher who comes online later still gets the question", async () => {
+    const qid = await ask("student-maya");
+
+    fakeRtdb.write("teachers/teacher-kim", {
+      status: "online",
+      subjects: ["algebra"],
+      ratingAvg: 4.0,
+      ratingCount: 20,
+      displayName: "teacher-kim",
+      fcmToken: "fcm-teacher-kim",
+    });
+    await backfillPendingQuestionsForTeacher("teacher-kim");
+
+    expect(fakeRtdb.read(`teacherInvites/teacher-kim/${qid}`)).toBeDefined();
+    expect(invitesFor(qid)["teacher-kim"]).toMatchObject({ wave: 1, response: "pending" });
+  });
+
+  test("a question asked during a session skips the teacher who is teaching it", async () => {
+    const q1 = await ask("student-maya");
+    const [anna] = RANKED;
+
+    await advanceTo(3);
+    await accept(anna, q1);
+
+    await advanceTo(4);
+    const q2 = await ask("student-omer");
+    expect(dashboardsShowing(q2)).toEqual(RANKED.slice(1));
+    expect(invitesFor(q2)[anna]).toBeUndefined();
+  });
+
+  test("a teacher who starts a session loses the other questions sent to them", async () => {
+    const q1 = await ask("student-maya");
+    const q2 = await ask("student-omer");
+    const [anna] = RANKED;
+    expect(dashboardsShowing(q2)).toContain(anna);
+
+    await advanceTo(3);
+    await accept(anna, q1);
+
+    expect(fakeRtdb.read(`teacherInvites/${anna}/${q2}`)).toBeUndefined();
+    expect(invitesFor(q2)[anna]).toMatchObject({ response: "withdrawn" });
+  });
+
+  test("a busy teacher is not backfilled into a waiting question", async () => {
+    const q1 = await ask("student-maya");
+    const [anna] = RANKED;
+    await advanceTo(3);
+    await accept(anna, q1);
+
+    await advanceTo(4);
+    const q2 = await ask("student-omer");
+    await backfillPendingQuestionsForTeacher(anna);
+
+    expect(fakeRtdb.read(`teacherInvites/${anna}/${q2}`)).toBeUndefined();
+    expect(invitesFor(q2)[anna]).toBeUndefined();
   });
 });
