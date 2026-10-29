@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Support Case — Teacher in a Minute</title>
+<link rel="icon" href="favicon.png">
+<!--
+  The page a new-support-request email links to (support.html?case=<id>, see
+  functions/src/contactSupport.ts). It signs in the same way as the app — Google
+  or email and password — and everything it shows comes from callables gated to
+  admins and the support team added on the admin console's Support page, each
+  with a verified email. Without ?case it lists recent cases.
+-->
+<style>
+  :root {
+    --bg: #f6f7fb; --surface: #fff; --card: #f1f3f8; --border: #e2e5ee;
+    --text: #1b1f2a; --muted: #6b7285; --accent: #4f46e5; --green: #16a34a;
+    --yellow: #b45309; --red: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1117; --surface: #181b24; --card: #1f2330; --border: #2a2f3d;
+      --text: #e7e9f0; --muted: #9097ab; --accent: #818cf8; --green: #4ade80;
+      --yellow: #fbbf24; --red: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  header .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  header img { width: 32px; height: 32px; border-radius: 8px; }
+  .who { font-size: 13px; color: var(--muted); text-align: right; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 20px 0 8px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+                    background: var(--bg); color: var(--text); font: inherit; margin-bottom: 12px; }
+  textarea { resize: vertical; min-height: 140px; }
+  button { font: inherit; font-weight: 600; border-radius: 8px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--border);
+           background: var(--surface); color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .55; cursor: default; }
+  .google { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .or { text-align: center; color: var(--muted); font-size: 13px; margin: 14px 0; }
+  .error { color: var(--red); font-size: 14px; margin-top: 10px; white-space: pre-wrap; }
+  .field { display: flex; gap: 12px; padding: 4px 0; font-size: 14px; }
+  .field > div:first-child { width: 90px; flex-shrink: 0; color: var(--muted); }
+  .field > div:last-child { word-break: break-word; }
+  .mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  .message { margin-top: 14px; padding: 14px; background: var(--card); border-radius: 8px; white-space: pre-wrap; }
+  .response { margin-bottom: 10px; padding: 12px 14px; border-left: 3px solid var(--green); background: var(--card); border-radius: 6px; }
+  .response .meta { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+  .badge.open { color: var(--yellow); }
+  .badge.replied { color: var(--green); }
+  a { color: var(--accent); }
+  .case-row { display: block; padding: 12px 0; border-top: 1px solid var(--border); text-decoration: none; color: inherit; }
+  .case-row:first-child { border-top: 0; }
+  .case-row .title { font-weight: 600; }
+  .case-row .sub { font-size: 13px; color: var(--muted); }
+  .actions { display: flex; justify-content: flex-end; gap: 10px; }
+  .notice { font-size: 14px; color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><img src="logo-mark.png" alt=""> Teacher in a Minute · Support</div>
+    <div class="who" id="who" hidden><span id="who-email"></span><br><a href="#" id="sign-out">Sign out</a></div>
+  </header>
+
+  <!-- Sign in -->
+  <div class="panel" id="login" hidden>
+    <h1>Sign in</h1>
+    <p class="notice">Use the account you sign in to the app with. It needs support access.</p>
+    <button class="google" id="google-login">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Sign in with Google
+    </button>
+    <div class="or">or</div>
+    <form id="email-login">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button class="primary" type="submit" style="width:100%">Sign in</button>
+    </form>
+    <div class="error" id="login-error"></div>
+  </div>
+
+  <!-- Signed in, but not an admin -->
+  <div class="panel" id="denied" hidden>
+    <h1>No access</h1>
+    <p class="notice" id="denied-text"></p>
+    <button id="denied-sign-out">Sign in with another account</button>
+  </div>
+
+  <div class="panel" id="loading" hidden><p class="notice">Loading…</p></div>
+  <div class="panel" id="error" hidden><p class="error" id="error-text"></p></div>
+
+  <!-- One case -->
+  <div id="case" hidden>
+    <div class="panel">
+      <h1 id="case-title" dir="auto"></h1>
+      <div id="case-fields"></div>
+      <div class="message" id="case-message" dir="auto"></div>
+      <div id="case-responses"></div>
+    </div>
+    <div class="panel">
+      <label for="reply">Reply <span id="reply-to"></span></label>
+      <textarea id="reply" dir="auto" placeholder="Write your response…"></textarea>
+      <div class="actions">
+        <a href="support.html" style="margin-right:auto;align-self:center">All cases</a>
+        <button class="primary" id="send">Send response</button>
+      </div>
+      <div class="error" id="send-error"></div>
+    </div>
+  </div>
+
+  <!-- Recent cases -->
+  <div class="panel" id="cases" hidden>
+    <h1>Support cases</h1>
+    <div id="case-list"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyCPZN55YDMuLc8R8vXfpJ0yPaoU7b30BWU",
+  authDomain: "teacher-in-a-moment.firebaseapp.com",
+  projectId: "teacher-in-a-moment",
+  storageBucket: "teacher-in-a-moment.firebasestorage.app",
+  messagingSenderId: "922632930084",
+  appId: "1:922632930084:web:b33a89cf2d985cd7fde9b1",
+});
+const auth = firebase.auth();
+const fns = firebase.functions();
+
+const caseId = new URLSearchParams(location.search).get("case");
+let current = null;
+
+const $ = id => document.getElementById(id);
+function call(name, data = {}) {
+  return fns.httpsCallable(name)(data).then(r => r.data);
+}
+function esc(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function fmt(ms) {
+  return ms ? new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
+}
+function show(...ids) {
+  for (const id of ["login", "denied", "loading", "error", "case", "cases"]) $(id).hidden = !ids.includes(id);
+}
+function fail(e) {
+  $("error-text").textContent = e.message || String(e);
+  show("error");
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+auth.onAuthStateChanged(user => {
+  $("who").hidden = !user;
+  if (!user) { show("login"); return; }
+  $("who-email").textContent = user.email || user.uid;
+  load();
+});
+
+$("google-login").onclick = () => signIn(auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()));
+$("email-login").onsubmit = e => {
+  e.preventDefault();
+  signIn(auth.signInWithEmailAndPassword($("email").value.trim(), $("password").value));
+};
+function signIn(promise) {
+  $("login-error").textContent = "";
+  promise.catch(e => { $("login-error").textContent = e.message; });
+}
+$("sign-out").onclick = e => { e.preventDefault(); auth.signOut(); };
+$("denied-sign-out").onclick = () => auth.signOut();
+
+/** The callables reject anyone not on the support team, or without a verified email. */
+function denied(e) {
+  if (e.code !== "functions/permission-denied") return false;
+  const user = auth.currentUser;
+  $("denied-text").textContent = user && !user.emailVerified
+    ? `${user.email} has not verified its email address. Verify it from the app, then sign in again.`
+    : `${user?.email || "This account"} is not on the support team. Ask an admin to add it on the admin console's Support page, then reload this page.`;
+  show("denied");
+  return true;
+}
+
+async function load() {
+  show("loading");
+  try {
+    if (caseId) {
+      current = (await call("adminGetContactRequest", { requestId: caseId })).request;
+      renderCase();
+    } else {
+      renderList((await call("adminListContactRequests")).requests);
+    }
+  } catch (e) {
+    if (!denied(e)) fail(e);
+  }
+}
+
+// ── Case ──────────────────────────────────────────────────────────────────────
+function renderCase() {
+  const r = current;
+  const field = (label, html) => `<div class="field"><div>${label}</div><div>${html}</div></div>`;
+  const replies = (r.responses || []).slice().sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
+  document.title = `${r.title || "Support case"} — Teacher in a Minute`;
+  $("case-title").textContent = r.title || "Support request";
+  $("case-fields").innerHTML = [
+    field("Status", replies.length ? `<span class="badge replied">Replied${replies.length > 1 ? " ×" + replies.length : ""}</span>` : `<span class="badge open">Open</span>`),
+    field("From", `${esc(r.userName || "—")}${r.userEmail ? ` &lt;<a href="mailto:${esc(r.userEmail)}">${esc(r.userEmail)}</a>&gt;` : ""}`),
+    field("Role", esc(r.role || "—")),
+    field("Sent", r.sentAtMs ? fmt(r.sentAtMs) : esc(r.sentAt || "—")),
+    field("Device", `${esc(r.deviceType || "—")}${r.osVersion ? ` · ${esc(r.osVersion)}` : ""}`),
+    field("Locale", esc(r.locale || "—")),
+    field("User ID", `<span class="mono">${esc(r.userId || "—")}</span>`),
+    field("Case", `<span class="mono">${esc(r.id)}</span>`),
+  ].join("");
+  $("case-message").textContent = r.description || "";
+  $("case-responses").innerHTML = replies.length ? `<h2>Responses</h2>` + replies.map(x => `
+    <div class="response">
+      <div class="meta">${fmt(x.sentAt)} · to ${esc(x.to || "—")} · by ${esc(x.sentBy || "—")}</div>
+      <div style="white-space:pre-wrap" dir="auto">${esc(x.message || "")}</div>
+    </div>`).join("") : "";
+  $("reply-to").textContent = r.userEmail ? `→ ${r.userEmail}` : "(no email on this request)";
+  $("send").disabled = !r.userEmail;
+  show("case");
+}
+
+$("send").onclick = async () => {
+  const message = $("reply").value.trim();
+  $("send-error").textContent = "";
+  if (!message) { $("send-error").textContent = "Write a response first."; return; }
+  if (!confirm(`Send this response to ${current.userEmail}?`)) return;
+
+  const btn = $("send");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  try {
+    const d = await call("adminRespondToContactRequest", { requestId: current.id, message });
+    current.responses = [...(current.responses || []), d.response];
+    $("reply").value = "";
+    renderCase();
+  } catch (e) {
+    if (!denied(e)) $("send-error").textContent = "Not sent: " + e.message;
+  } finally {
+    btn.disabled = !current.userEmail;
+    btn.textContent = "Send response";
+  }
+};
+
+// ── Recent cases ──────────────────────────────────────────────────────────────
+function renderList(requests) {
+  $("case-list").innerHTML = requests.length ? requests.map(r => {
+    const replied = (r.responses || []).length > 0;
+    return `<a class="case-row" href="?case=${encodeURIComponent(r.id)}">
+      <div class="title" dir="auto">${esc(r.title || (r.description || "").slice(0, 80) || "Support request")}</div>
+      <div class="sub">${esc(r.userName || "—")} · ${r.sentAtMs ? fmt(r.sentAtMs) : esc(r.sentAt || "—")}
+        · <span class="badge ${replied ? "replied" : "open"}">${replied ? "Replied" : "Open"}</span></div>
+    </a>`;
+  }).join("") : `<p class="notice">No support requests.</p>`;
+  show("cases");
+}
+</script>
+</body>
+</html>
