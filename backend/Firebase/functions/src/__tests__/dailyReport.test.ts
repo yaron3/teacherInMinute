@@ -44,7 +44,7 @@ describe("formatDailyReportEmail", () => {
   const report: DailyReport = {
     fromMs: NINE - DAY,
     toMs: NINE,
-    users: { created: 7, registered: 3 },
+    users: { created: 7, teachers: 2, students: 4, noRole: 1, registered: 3 },
     lessons: { count: 4, avgSeconds: 330 },
     teachers: { distinctTeachers: 2, onlineMinutes: 180, avgSecondsPerTeacher: 5400, hoursCovered: 24 },
     questions: { all: 9, real: 6 },
@@ -54,6 +54,9 @@ describe("formatDailyReportEmail", () => {
     const { subject, text } = formatDailyReportEmail(report);
     expect(subject).toContain("Daily summary");
     expect(text).toContain("New users: 7");
+    expect(text).toContain("of them teachers: 2");
+    expect(text).toContain("of them students: 4");
+    expect(text).toContain("of them no role yet: 1");
     expect(text).toContain("Finished registration (added email): 3");
     expect(text).toContain("Sessions: 4");
     expect(text).toContain("Average session length: 5m 30s");
@@ -62,6 +65,11 @@ describe("formatDailyReportEmail", () => {
     expect(text).toContain("Questions asked (excluding demo): 6");
     expect(text).toContain("Questions asked (including demo): 9");
     expect(text).not.toContain("of 24 hours");
+  });
+
+  test("leaves out the no-role line when every new user has a role", () => {
+    const { text } = formatDailyReportEmail({ ...report, users: { ...report.users, students: 5, noRole: 0 } });
+    expect(text).not.toContain("no role yet");
   });
 
   test("says when the presence history is short", () => {

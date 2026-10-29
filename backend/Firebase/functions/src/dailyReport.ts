@@ -3,7 +3,8 @@
 // Sunday to Friday at 09:00 Israel time, emails the last 24 hours to the
 // recipients set in the admin console (Daily Report page):
 //
-//   • new accounts, and accounts that finished registration (have an email);
+//   • new accounts by role, and accounts that finished registration (have an
+//     email);
 //   • lessons that ended, and their average length;
 //   • teachers who were available, and their average time online;
 //   • questions asked, with and without demo users and simulated questions.
@@ -51,7 +52,7 @@ export interface DailyReportSettings {
 export interface DailyReport {
   fromMs: number;
   toMs: number;
-  users: { created: number; registered: number };
+  users: { created: number; teachers: number; students: number; noRole: number; registered: number };
   lessons: { count: number; avgSeconds: number | null };
   teachers: TeacherAvailability;
   questions: { all: number; real: number };
@@ -108,8 +109,9 @@ function dateToMs(value: unknown): number | null {
 }
 
 /**
- * Accounts created in the window, and accounts that finished registration in
- * it. Stamps every account with an email that has no registration record yet.
+ * Accounts created in the window, split by the role on their user document —
+ * one that has not finished onboarding has none yet — and accounts that
+ * finished registration in it. Stamps every account with an email that has no registration record yet.
  * On the very first run every such account is old news, so it is stamped with
  * its creation time and counted only if that falls in the window.
  */
@@ -124,10 +126,23 @@ async function summarizeUsers(fromMs: number, toMs: number, demoUids: Set<string
   } while (pageToken);
 
   const real = accounts.filter((u) => !demoUids.has(u.uid));
-  const created = real.filter((u) => {
-    const ms = Date.parse(u.metadata.creationTime);
-    return ms >= fromMs && ms < toMs;
-  }).length;
+  const createdUids = real
+    .filter((u) => {
+      const ms = Date.parse(u.metadata.creationTime);
+      return ms >= fromMs && ms < toMs;
+    })
+    .map((u) => u.uid);
+
+  let teachers = 0;
+  let students = 0;
+  for (let i = 0; i < createdUids.length; i += 300) {
+    const refs = createdUids.slice(i, i + 300).map((uid) => firestore.collection("users").doc(uid));
+    for (const snap of await firestore.getAll(...refs)) {
+      const role = snap.data()?.role;
+      if (role === "teacher") teachers += 1;
+      else if (role === "student") students += 1;
+    }
+  }
 
   const withEmail = real.filter((u) => Boolean(u.email));
   let registered = 0;
@@ -150,7 +165,8 @@ async function summarizeUsers(fromMs: number, toMs: number, demoUids: Set<string
     if (writes > 0) await batch.commit();
   }
 
-  return { created, registered };
+  const created = createdUids.length;
+  return { created, teachers, students, noRole: created - teachers - students, registered };
 }
 
 /** Lessons that ended in the window. Length is the unrounded time talked. */
@@ -235,6 +251,9 @@ export function formatDailyReportEmail(report: DailyReport): { subject: string; 
   const { users, lessons, teachers, questions } = report;
   const rows: Array<[string, string]> = [
     ["New users", String(users.created)],
+    ["  of them teachers", String(users.teachers)],
+    ["  of them students", String(users.students)],
+    ...(users.noRole > 0 ? [["  of them no role yet", String(users.noRole)] as [string, string]] : []),
     ["Finished registration (added email)", String(users.registered)],
     ["Sessions", String(lessons.count)],
     ["Average session length", formatMinutes(lessons.avgSeconds)],
@@ -270,7 +289,7 @@ export function formatDailyReportEmail(report: DailyReport): { subject: string; 
 ${rows
   .map(
     ([label, value]) =>
-      `<tr><td style="border-bottom:1px solid #eee">${esc(label)}</td><td style="border-bottom:1px solid #eee;font-weight:600;text-align:right">${esc(value)}</td></tr>`
+      `<tr><td style="border-bottom:1px solid #eee${label.startsWith("  ") ? ";padding-left:24px;color:#555" : ""}">${esc(label.trim())}</td><td style="border-bottom:1px solid #eee;font-weight:600;text-align:right">${esc(value)}</td></tr>`
   )
   .join("\n")}
 </table>

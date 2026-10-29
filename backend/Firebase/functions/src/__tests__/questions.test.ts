@@ -8,6 +8,7 @@ const mockQuestionMaxLength = jest.fn();
 const mockRateLimits = jest.fn();
 const mockSearchTimeoutSeconds = jest.fn();
 const mockCheckAllowance = jest.fn();
+const mockUseWaveQuestion = jest.fn();
 
 jest.mock("firebase-admin", () => ({
   database: jest.fn(() => ({
@@ -78,6 +79,7 @@ jest.mock("../rateLimit", () => ({
 jest.mock("../dispatch", () => ({
   dispatchFirstWave: (...args: unknown[]) => mockDispatchFirstWave(...args),
   enqueueQuestionWatchdog: jest.fn().mockResolvedValue(undefined),
+  getUseWaveQuestion: () => mockUseWaveQuestion(),
 }));
 
 import { createQuestion } from "../questions";
@@ -133,6 +135,26 @@ describe("createQuestion", () => {
     mockRateLimits.mockResolvedValue({ perMinute: 2, perHour: 5 });
     mockSearchTimeoutSeconds.mockResolvedValue(90);
     mockCheckAllowance.mockResolvedValue({ allowed: true, kept: [] });
+    mockUseWaveQuestion.mockResolvedValue(true);
+  });
+
+  describe("use_wave_question", () => {
+    test("leaves a question to the waves while the flag is on", async () => {
+      await ask("text");
+      expect(mockQuestionSet).toHaveBeenCalledWith(
+        expect.not.objectContaining({ sendToAll: expect.anything() })
+      );
+    });
+
+    test("marks the question for every teacher at once while the flag is off", async () => {
+      mockUseWaveQuestion.mockResolvedValue(false);
+      await ask("text");
+      expect(mockQuestionSet).toHaveBeenCalledWith(expect.objectContaining({ sendToAll: true }));
+      expect(mockDispatchFirstWave).toHaveBeenCalledWith(
+        "q-1",
+        expect.objectContaining({ sendToAll: true })
+      );
+    });
   });
 
   describe("question photos", () => {

@@ -7612,6 +7612,13 @@
       },
       "valueType": "STRING"
     },
+    "use_wave_question": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "true: a student's question goes out to teachers in waves (3, then 5, then 10). false: it goes to every available teacher at once.",
+      "valueType": "BOOLEAN"
+    },
     "question_search_timeout_seconds": {
       "defaultValue": {
         "value": "90"

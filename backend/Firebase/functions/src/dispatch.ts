@@ -20,6 +20,7 @@ import {
   HOT_PATH,
   QuestionStruggle,
 } from "./types";
+import { readRcBoolean } from "./remoteConfig";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -117,6 +118,16 @@ export function dispatchExclusions(
   return new Set([...invited, ...(question.blockedTeachers ?? [])]);
 }
 
+/** Remote Config flag: true sends a question out in waves (WAVE_SIZES), false
+ *  sends it to every eligible online teacher at once. */
+export const USE_WAVE_QUESTION_RC_KEY = "use_wave_question";
+
+/** Whether new questions go out in waves. Waves unless Remote Config says
+ *  otherwise, so a missing or unreadable flag keeps today's behaviour. */
+export async function getUseWaveQuestion(): Promise<boolean> {
+  return (await readRcBoolean(USE_WAVE_QUESTION_RC_KEY)) ?? true;
+}
+
 /** The extra wave-1 place for a teacher reached by push; see selectWaveBatch. */
 const WAVE_1_PUSH_PLACES = 1;
 
@@ -162,7 +173,7 @@ async function sendWave(
   const teachers = await onlineTeachers();
   const exclude = dispatchExclusions(questionData, alreadyInvited);
   const ranked = rankTeachers(teachers, questionData.topic, exclude);
-  const batch = selectWaveBatch(ranked, teachers, wave);
+  const batch = questionData.sendToAll ? ranked : selectWaveBatch(ranked, teachers, wave);
 
   logger.info(
     `[dispatch] sendWave prepared qid=${qid} wave=${wave} onlinePool=${Object.keys(teachers).length} excluded=${exclude.size} eligible=${ranked.length} selected=${batch.length}`
@@ -323,15 +334,18 @@ async function tryInviteTeacherForQuestionWave(
       return { invited: false, reason: "not-eligible-now" };
     }
 
-    const waveSize = waveCapacity(wave);
-    const waveInviteQuery = qRef.collection("invites").where("wave", "==", wave);
-    const waveInvitesSnap = await tx.get(waveInviteQuery);
-    // A withdrawn invite no longer reaches anyone, so it does not hold a slot.
-    const liveWaveInvites = waveInvitesSnap.docs.filter(
-      (doc) => (doc.data() as DispatchInviteDoc).response !== "withdrawn"
-    ).length;
-    if (liveWaveInvites >= waveSize) {
-      return { invited: false, reason: `wave-full-${liveWaveInvites}/${waveSize}` };
+    // A question sent to everyone has no wave size to keep to.
+    if (!question.sendToAll) {
+      const waveSize = waveCapacity(wave);
+      const waveInviteQuery = qRef.collection("invites").where("wave", "==", wave);
+      const waveInvitesSnap = await tx.get(waveInviteQuery);
+      // A withdrawn invite no longer reaches anyone, so it does not hold a slot.
+      const liveWaveInvites = waveInvitesSnap.docs.filter(
+        (doc) => (doc.data() as DispatchInviteDoc).response !== "withdrawn"
+      ).length;
+      if (liveWaveInvites >= waveSize) {
+        return { invited: false, reason: `wave-full-${liveWaveInvites}/${waveSize}` };
+      }
     }
 
     const now = Timestamp.now();
@@ -651,7 +665,9 @@ export async function applyQuestionDetails(
  * fans out, so the trigger and this path can never double-invite.
  */
 export async function dispatchFirstWave(qid: string, data: QuestionDoc): Promise<void> {
-  logger.info(`[dispatch] starting dispatch for qid=${qid} topic=${data.topic}`);
+  logger.info(
+    `[dispatch] starting dispatch for qid=${qid} topic=${data.topic} mode=${data.sendToAll ? "all" : "waves"}`
+  );
 
   const qRef = firestore.collection("questions").doc(qid);
   const invited = await sendWave(qid, data, 1, new Set<string>());
@@ -674,8 +690,10 @@ export async function dispatchFirstWave(qid: string, data: QuestionDoc): Promise
     );
   }
 
+  // Sent to everyone, there is no next wave to fan out: teachers who come
+  // online later reach the question through onTeacherStatusChange instead.
   await Promise.all([
-    enqueueWaveEvaluation(qid, 1),
+    ...(data.sendToAll ? [] : [enqueueWaveEvaluation(qid, 1)]),
     enqueueQuestionWatchdog(qid, data),
   ]);
 }

@@ -113,6 +113,12 @@ export async function sendInvitePush(params: {
  *  updates, so an admin message does not land in the incoming-questions one. */
 const UPDATES_CHANNEL_ID = "teacher_minute_updates";
 
+/** Every notification the server composes plays the device's default sound.
+ *  On Android 8+ the channel decides the sound, and the updates channel uses
+ *  the default; `defaultSound` covers older versions. iOS is silent unless the
+ *  payload names a sound, hence `sound: "default"` on each APNs payload. */
+const ANDROID_UPDATES_NOTIFICATION = { channelId: UPDATES_CHANNEL_ID, defaultSound: true };
+
 /**
  * Sends one admin-composed notification to each of `tokens`. A visible
  * `notification` payload, so the system posts it on both platforms while the
@@ -136,7 +142,7 @@ export async function sendAdminPush(params: {
       token,
       notification: body ? { title, body } : { title },
       data: { ...data, type: "admin_message" },
-      android: { priority: "high" as const, notification: { channelId: UPDATES_CHANNEL_ID } },
+      android: { priority: "high" as const, notification: ANDROID_UPDATES_NOTIFICATION },
       apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
     }))
   );
@@ -175,8 +181,8 @@ export async function sendAcceptedPush(params: {
       agoraToken,
       agoraUid: String(agoraUid),
     },
-    android: { priority: "high" },
-    apns: { headers: { "apns-priority": "10" } },
+    android: { priority: "high", notification: ANDROID_UPDATES_NOTIFICATION },
+    apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
   }).catch((err) => logger.warn(`FCM accepted push failed for token ${fcmToken}:`, err));
 }
 
@@ -194,7 +200,7 @@ export async function sendNoMatchPush(params: {
       body: "Sorry, no teacher is available right now. Please try again soon.",
     },
     data: { type: "no_match", questionId },
-    android: { priority: "high" },
-    apns: { headers: { "apns-priority": "10" } },
+    android: { priority: "high", notification: ANDROID_UPDATES_NOTIFICATION },
+    apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
   }).catch((err) => logger.warn(`FCM no-match push failed for token ${fcmToken}:`, err));
 }

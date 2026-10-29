@@ -2216,6 +2216,9 @@ async function sendReportNow() {
 function renderReportPreview(r) {
   const rows = [
     ["New users", r.users.created],
+    ["  of them teachers", r.users.teachers],
+    ["  of them students", r.users.students],
+    ...(r.users.noRole > 0 ? [["  of them no role yet", r.users.noRole]] : []),
     ["Finished registration (added email)", r.users.registered],
     ["Sessions", r.lessons.count],
     ["Average session length", duration(r.lessons.avgSeconds)],
@@ -2227,7 +2230,7 @@ function renderReportPreview(r) {
   document.getElementById("report-preview").innerHTML = `
     <div class="page-sub">Figures for ${esc(fmtFull(r.fromMs))} – ${esc(fmtFull(r.toMs))}</div>
     <div class="table-wrap" style="max-width:560px"><table><tbody>
-      ${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td style="font-weight:600;text-align:right">${esc(v)}</td></tr>`).join("")}
+      ${rows.map(([k, v]) => `<tr><td${k.startsWith("  ") ? ' style="padding-left:28px;color:var(--muted)"' : ""}>${esc(k.trim())}</td><td style="font-weight:600;text-align:right">${esc(v)}</td></tr>`).join("")}
     </tbody></table></div>`;
 }
 

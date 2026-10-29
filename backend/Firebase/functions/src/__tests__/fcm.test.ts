@@ -25,7 +25,13 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import { inviteAlertTitle, sendAdminPush, sendInvitePush } from "../fcm";
+import {
+  inviteAlertTitle,
+  sendAcceptedPush,
+  sendAdminPush,
+  sendInvitePush,
+  sendNoMatchPush,
+} from "../fcm";
 
 const TOKEN = "fcm-anna";
 
@@ -163,7 +169,8 @@ describe("an admin push", () => {
     expect(messages[0]).toMatchObject({
       notification: { title: "Hi", body: "Hello" },
       data: { type: "admin_message" },
-      android: { notification: { channelId: "teacher_minute_updates" } },
+      android: { notification: { channelId: "teacher_minute_updates", defaultSound: true } },
+      apns: { payload: { aps: { sound: "default" } } },
     });
     expect(result).toEqual({ sent: 1, dead: ["gone"], failed: ["flaky"] });
   });
@@ -181,5 +188,31 @@ describe("an admin push", () => {
   test("sends nothing when no one has a token", async () => {
     expect(await sendAdminPush({ tokens: [], title: "Hi", body: "Hello" })).toEqual({ sent: 0, dead: [], failed: [] });
     expect(mockSendEach).not.toHaveBeenCalled();
+  });
+});
+
+describe("the student's pushes", () => {
+  const DEFAULT_SOUND = {
+    android: { notification: { channelId: "teacher_minute_updates", defaultSound: true } },
+    apns: { payload: { aps: { sound: "default" } } },
+  };
+
+  test("a teacher found plays the default sound", async () => {
+    mockSend.mockResolvedValue("message-id");
+    await sendAcceptedPush({
+      fcmToken: TOKEN,
+      teacherName: "Anna",
+      questionId: "question-1",
+      agoraChannel: "",
+      agoraToken: "",
+      agoraUid: 0,
+    });
+    expect(mockSend.mock.calls[0][0]).toMatchObject(DEFAULT_SOUND);
+  });
+
+  test("no teacher available plays the default sound", async () => {
+    mockSend.mockResolvedValue("message-id");
+    await sendNoMatchPush({ fcmToken: TOKEN, questionId: "question-1" });
+    expect(mockSend.mock.calls[0][0]).toMatchObject(DEFAULT_SOUND);
   });
 });
