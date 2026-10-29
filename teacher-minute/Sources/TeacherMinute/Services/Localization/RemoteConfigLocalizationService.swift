@@ -95,6 +95,13 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
     } 
 
     private static let hebrewFallbacks: [String: String] = [
+        // Share, from the side menu. The apps' Hebrew names, and the text sent
+        // with each link, which names them.
+        "Instant Teacher": "מורה לרגע",
+        "Pro Teacher": "מורה מקצועי",
+        "Stuck on a question? Instant Teacher connects you to a real teacher in about a minute: %@": "נתקעתם בשאלה? מורה לרגע מחברת אתכם למורה אמיתי תוך דקה בערך: %@",
+        "Teach students live, whenever you are free, and get paid with Pro Teacher: %@": "מלמדים תלמידים בשידור חי, מתי שנוח לכם, ומקבלים תשלום עם מורה מקצועי: %@",
+        "Meet Instant Teacher and Pro Teacher, live help from real teachers in about a minute: %@": "הכירו את מורה לרגע ומורה מקצועי: עזרה חיה ממורים אמיתיים תוך דקה בערך: %@",
         // Shown when the ask button is tapped before the balance has loaded.
         // Remote Config carries these too; the fallback covers the time
         // before it deploys.

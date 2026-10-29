@@ -22,12 +22,20 @@ extension MainTabViewModel {
     var shareChoiceMessage: String { LocalizationSupport.localized("What would you like to share?") }
     var cancelLabel: String { LocalizationSupport.localized("Cancel") }
 
-    /// A choice's button. The apps go by their names, which are not
-    /// translated (see `AuthRole.appName`).
+    /// A choice's button. The apps go by their names in the app's language
+    /// (see `AuthRole.localizedAppName`).
     func shareChoiceLabel(for target: ShareTarget) -> String {
         switch target {
-        case .app(let role): role.appName
+        case .app(let role): role.localizedAppName
         case .website: LocalizationSupport.localized("Our Website")
+        }
+    }
+
+    /// The icon on a choice's button: each app's own; none for the website.
+    func shareChoiceIcon(for target: ShareTarget) -> String? {
+        switch target {
+        case .app(let role): role.appIconAsset
+        case .website: nil
         }
     }
 
