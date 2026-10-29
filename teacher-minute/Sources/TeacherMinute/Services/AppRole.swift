@@ -41,6 +41,24 @@ extension AuthRole {
     case .teacher: "Pro Teacher"
     }
   }
+
+  /// The app's home-screen icon, as an image in the module's asset catalog:
+  /// orange for Instant Teacher, blue for Pro Teacher.
+  var appIconAsset: String {
+    switch self {
+    case .student: "app-icon-student"
+    case .teacher: "app-icon-teacher"
+    }
+  }
+
+  /// `appName` in the app's language — מורה לרגע and מורה מקצועי in Hebrew —
+  /// for copy that names the app to someone else, such as Share.
+  var localizedAppName: String {
+    switch self {
+    case .student: LocalizationSupport.localized("Instant Teacher")
+    case .teacher: LocalizationSupport.localized("Pro Teacher")
+    }
+  }
 }
 
 private func appRoleSetting() -> String {

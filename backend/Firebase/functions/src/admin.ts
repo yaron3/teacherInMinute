@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
@@ -9,6 +11,7 @@ import { summarizeOnlineTeachers } from "./presenceHistory";
 import { DEMO_USER_FIELD, inChunks, readDemoUserUids } from "./demoUsers";
 import { deleteAccountData } from "./accountDeletion";
 import { sendMail, supportSmtpConfig } from "./mailer";
+import { readSupportSettings, supportCaseUrl, writeSupportSettings } from "./supportSettings";
 import { sendAdminPush } from "./fcm";
 import {
   isPlausibleEmail,
@@ -54,6 +57,29 @@ function assertAdmin(req: CallableRequest): void {
     );
     throw new HttpsError("permission-denied", "Admin access required");
   }
+}
+
+/**
+ * People who answer support cases without being admins, one document per uid,
+ * added and removed on the console's Support page. A document rather than a
+ * custom claim so that removing someone takes effect on their next call, not
+ * when their ID token next refreshes.
+ */
+export const SUPPORT_AGENTS_COLLECTION = "supportAgents";
+
+/**
+ * Gate for the support-case callables (list, read, reply): an admin, or a
+ * support agent. Agents need a verified email for the same reason as admins.
+ */
+async function assertSupport(req: CallableRequest): Promise<void> {
+  const token = req.auth?.token;
+  const emailVerified = token?.email_verified === true;
+  if (emailVerified && (token?.admin === true || token?.email === ADMIN_EMAIL)) return;
+  const uid = req.auth?.uid;
+  if (emailVerified && uid && (await firestore.collection(SUPPORT_AGENTS_COLLECTION).doc(uid).get()).exists) return;
+
+  logger.warn(`[admin] support access denied uid=${uid ?? "anonymous"} emailVerified=${emailVerified}`);
+  throw new HttpsError("permission-denied", "Support access required");
 }
 
 /**
@@ -1145,7 +1171,7 @@ export const adminListPayments = onCall(async (req) => {
 // ─── adminListContactRequests ─────────────────────────────────────────────────
 
 export const adminListContactRequests = onCall(async (req) => {
-  assertAdmin(req);
+  await assertSupport(req);
 
   const snap = await firestore
     .collection("contactRequests")
@@ -1165,6 +1191,121 @@ export const adminListContactRequests = onCall(async (req) => {
     };
   });
   return { requests };
+});
+
+/** One support case, for the hosted support page an emailed case link opens. */
+export const adminGetContactRequest = onCall(async (req) => {
+  await assertSupport(req);
+  const { requestId } = req.data as { requestId?: unknown };
+  if (typeof requestId !== "string" || !requestId) {
+    throw new HttpsError("invalid-argument", "requestId required");
+  }
+
+  const snap = await firestore.collection("contactRequests").doc(requestId).get();
+  if (!snap.exists) throw new HttpsError("not-found", "No such support request");
+  const data = snap.data() as Record<string, unknown>;
+  return {
+    request: {
+      ...serializeDoc(data),
+      id: snap.id,
+      sentAtMs: dateFieldToMs(data.sentAt),
+    },
+  };
+});
+
+/**
+ * Writes a support request the way the app's Contact Us does, so the whole
+ * path — alert email, case link, support page, reply — can be tried without a
+ * phone. It is from the calling admin, so a reply to it reaches them, and
+ * carries `sample: true`, which puts [TEST] in the alert's subject.
+ */
+export const adminCreateSampleContactRequest = onCall(async (req) => {
+  assertAdmin(req);
+  const token = req.auth!.token;
+  // The app's IDs are Swift's UUID().uuidString: upper case.
+  const id = randomUUID().toUpperCase();
+  await firestore.collection("contactRequests").doc(id).set({
+    id,
+    title: "Sample support request",
+    description: "This is a sample request created from the admin console to test support alerts.\nReplying to it emails the admin who created it.",
+    userId: req.auth!.uid,
+    userName: typeof token.name === "string" && token.name ? token.name : "Admin console",
+    userEmail: token.email ?? "",
+    sentAt: new Date().toISOString(),
+    deviceType: "Admin console",
+    osVersion: "—",
+    locale: "en",
+    role: "student",
+    sample: true,
+  });
+  logger.info(`[admin] sample contact request ${id} by=${token.email}`);
+  return { id, caseUrl: supportCaseUrl(id) };
+});
+
+// ─── Support agents ───────────────────────────────────────────────────────────
+
+export const adminListSupportAgents = onCall(async (req) => {
+  assertAdmin(req);
+  const snap = await firestore.collection(SUPPORT_AGENTS_COLLECTION).orderBy("addedAt").get();
+  return { agents: snap.docs.map((d) => ({ ...serializeDoc(d.data()), uid: d.id })) };
+});
+
+/** Lets an existing account answer support cases, found by email or by its
+ *  Firebase Auth user ID. They need an account — from the app or Google sign-in
+ *  on the support page — before they can be added. */
+export const adminAddSupportAgent = onCall(async (req) => {
+  assertAdmin(req);
+  const { email: emailArg, uid: uidArg } = req.data as { email?: unknown; uid?: unknown };
+  const uid = String(uidArg ?? "").trim();
+  const email = String(emailArg ?? "").trim().toLowerCase();
+  if (!uid && !isPlausibleEmail(email)) throw new HttpsError("invalid-argument", "Enter an email address or a user ID");
+
+  let user: admin.auth.UserRecord;
+  try {
+    user = uid ? await admin.auth().getUser(uid) : await admin.auth().getUserByEmail(email);
+  } catch (err) {
+    if ((err as { code?: string }).code === "auth/user-not-found") {
+      throw new HttpsError("not-found", uid
+        ? `No account has the user ID ${uid}.`
+        : `No account uses ${email}. They need to sign up first.`);
+    }
+    throw err;
+  }
+
+  await firestore.collection(SUPPORT_AGENTS_COLLECTION).doc(user.uid).set({
+    email: user.email ?? (email || null),
+    displayName: user.displayName ?? null,
+    emailVerified: user.emailVerified,
+    addedAt: Timestamp.now(),
+    addedBy: req.auth?.token?.email ?? null,
+  });
+  logger.info(`[admin] support agent added uid=${user.uid} by=${req.auth?.token?.email}`);
+  return { uid: user.uid, email: user.email ?? null, emailVerified: user.emailVerified };
+});
+
+export const adminRemoveSupportAgent = onCall(async (req) => {
+  assertAdmin(req);
+  const { uid } = req.data as { uid?: unknown };
+  if (typeof uid !== "string" || !uid) throw new HttpsError("invalid-argument", "uid required");
+  await firestore.collection(SUPPORT_AGENTS_COLLECTION).doc(uid).delete();
+  logger.info(`[admin] support agent removed uid=${uid} by=${req.auth?.token?.email}`);
+  return { removed: uid };
+});
+
+/** Who is emailed when a support request comes in. */
+export const adminGetSupportSettings = onCall(async (req) => {
+  assertAdmin(req);
+  return readSupportSettings();
+});
+
+export const adminSetSupportSettings = onCall(async (req) => {
+  assertAdmin(req);
+  const list = reportRecipients((req.data as { recipients?: unknown }).recipients);
+  if (list.length === 0) throw new HttpsError("invalid-argument", "Add at least one recipient");
+
+  await writeSupportSettings(list, req.auth?.token?.email);
+  logger.info(`[admin] support recipients=${list.length} by=${req.auth?.token?.email}`);
+  return readSupportSettings();
 });
 
 /** Strips CR/LF so ticket text cannot inject mail headers through a subject. */
@@ -1188,7 +1329,7 @@ export const SUPPORT_REPLY_MAX_CHARS = 10_000;
  * a reply its sender did not get.
  */
 export const adminRespondToContactRequest = onCall(async (req) => {
-  assertAdmin(req);
+  await assertSupport(req);
   const { requestId, message } = req.data as { requestId?: unknown; message?: unknown };
   if (typeof requestId !== "string" || !requestId) {
     throw new HttpsError("invalid-argument", "requestId required");

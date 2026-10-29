@@ -40,6 +40,9 @@ struct AppDialogAction {
 
     let title: String
     let kind: Kind
+    /// An image from the module's asset catalog drawn before the title, such
+    /// as an app's icon on Share's choices.
+    let icon: String?
     let handler: () -> Void
     /// Where the action was declared (`ProfileView.swift:212`), which names
     /// its taps in Analytics without depending on the language of `title`.
@@ -48,12 +51,14 @@ struct AppDialogAction {
     init(
         _ title: String,
         kind: Kind = .primary,
+        icon: String? = nil,
         handler: @escaping () -> Void = {},
         file: String = #fileID,
         line: Int = #line
     ) {
         self.title = title
         self.kind = kind
+        self.icon = icon
         self.handler = handler
         let fileName = file.split(separator: "/").last.map(String.init) ?? file
         self.source = "\(fileName):\(line)"
@@ -128,11 +133,7 @@ struct AppDialogView: View {
             onDismiss()
             action.handler()
         } label: {
-            Text(action.title)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(action.kind == .cancel ? theme.brandActionBackground : theme.brandBackgroundTop)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            actionLabel(action)
                 .padding(.horizontal, 12)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
@@ -151,6 +152,24 @@ struct AppDialogView: View {
         // leaves a UI test two identical "Log Out" buttons to choose between.
         // The identifier says which one belongs to the dialog.
         .accessibilityIdentifier(action.kind == .cancel ? "dialog_cancel_button" : "dialog_confirm_button")
+    }
+
+    /// The title, after the action's icon when it has one.
+    func actionLabel(_ action: AppDialogAction) -> some View {
+        HStack(spacing: 10) {
+            if let icon = action.icon {
+                Image(icon, bundle: .module)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 30, height: 30)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+            }
+            Text(action.title)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(action.kind == .cancel ? theme.brandActionBackground : theme.brandBackgroundTop)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
     }
 
     func fill(for kind: AppDialogAction.Kind) -> Color {

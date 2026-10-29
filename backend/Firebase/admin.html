@@ -449,7 +449,31 @@
     <div id="page-support" class="page">
       <div class="page-title">Support Requests</div>
       <div class="page-sub">Contact requests submitted from the app. Click a row to read it and reply.</div>
-      <div class="toolbar"><button class="btn-ghost btn-sm" onclick="loadSupport()">↻ Reload</button></div>
+      <div class="table-wrap" style="padding:20px;max-width:560px;margin-bottom:20px">
+        <div class="form-group">
+          <label>Email new requests to (one per line or comma-separated)</label>
+          <textarea id="support-recipients" rows="3" placeholder="name@example.com"></textarea>
+        </div>
+        <div class="toolbar">
+          <button class="btn-primary btn-sm" id="support-recipients-save" onclick="saveSupportSettings()">Save</button>
+        </div>
+        <div id="support-recipients-status" style="color:var(--muted);font-size:13px">Each email links to the case on the support page (/support.html), which only admins and the support team below can open.</div>
+      </div>
+      <div class="table-wrap" style="padding:20px;max-width:560px;margin-bottom:20px">
+        <div class="form-group">
+          <label>Support team — can read and reply to cases on the support page</label>
+          <div style="display:flex;gap:8px">
+            <input id="support-agent-email" type="text" placeholder="Email or user ID" style="flex:1" onkeydown="if(event.key==='Enter')addSupportAgent()">
+            <button class="btn-primary btn-sm" id="support-agent-add" onclick="addSupportAgent()">Add</button>
+          </div>
+        </div>
+        <div id="support-agents" style="font-size:13px"></div>
+        <div style="color:var(--muted);font-size:13px;margin-top:8px">Add by email or by Firebase user ID (the UID in Authentication, or on the Users page). The person needs an account first (signed up in the app, or with Google on the support page) and a verified email. Adding them here does not email them alerts — add their address to the list above for that.</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn-ghost btn-sm" onclick="loadSupport()">↻ Reload</button>
+        <button class="btn-ghost btn-sm" id="support-sample-btn" onclick="createSampleSupportRequest()">＋ Sample request</button>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Name</th><th>Email</th><th>Description</th><th>Device</th><th>Role</th><th>Sent At</th><th>Status</th></tr></thead>
@@ -2027,6 +2051,8 @@ function setPayFilter(f, el) {
 
 // ── Support ───────────────────────────────────────────────────────────────────
 async function loadSupport() {
+  loadSupportSettings();
+  loadSupportAgents();
   try {
     const d = await call("adminListContactRequests");
     supportRequests = d.requests;
@@ -2049,11 +2075,105 @@ function renderSupportTable() {
       <td>${esc(r.userEmail || "—")}</td>
       <td dir="auto" style="min-width:220px;max-width:320px;white-space:pre-wrap;font-size:.75rem">${r.title ? `<strong>${esc(r.title)}</strong><br>` : ""}${esc((r.description || "").slice(0, 160))}${(r.description || "").length > 160 ? "…" : ""}</td>
       <td>${esc(r.deviceType || "—")}</td>
-      <td>${r.role ? badge(r.role, r.role === "teacher" ? "purple" : "blue") : "—"}</td>
+      <td>${r.role ? badge(r.role, r.role === "teacher" ? "purple" : "blue") : "—"}${r.sample ? " " + badge("sample", "gray") : ""}</td>
       <td style="white-space:nowrap" data-sort="${r.sentAtMs ?? ""}">${r.sentAtMs ? fmt(r.sentAtMs) : esc(r.sentAt || "—")}</td>
       <td data-sort="${r.lastRespondedAt ?? ""}">${replies ? badge(`Replied${replies > 1 ? " ×" + replies : ""}`, "green") : badge("Open", "yellow")}</td>
     </tr>`;
   }).join("");
+}
+
+function renderSupportSettings(d) {
+  document.getElementById("support-recipients").value = d.recipients.join("\n");
+}
+
+async function loadSupportSettings() {
+  try {
+    renderSupportSettings(await call("adminGetSupportSettings"));
+  } catch (e) {
+    showToast("Failed to load support recipients: " + e.message, "error");
+  }
+}
+
+async function saveSupportSettings() {
+  const btn = document.getElementById("support-recipients-save");
+  btn.disabled = true;
+  try {
+    renderSupportSettings(await call("adminSetSupportSettings", {
+      recipients: document.getElementById("support-recipients").value,
+    }));
+    showToast("Support recipients saved", "success");
+  } catch (e) {
+    showToast("Failed to save: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadSupportAgents() {
+  const el = document.getElementById("support-agents");
+  try {
+    const { agents } = await call("adminListSupportAgents");
+    el.innerHTML = agents.length ? agents.map(a => `
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border)">
+        <div style="flex:1">
+          <div>${esc(a.email || "—")}${a.displayName ? ` <span style="color:var(--muted)">· ${esc(a.displayName)}</span>` : ""}</div>
+          <div class="td-mono" style="color:var(--muted)">${esc(a.uid)}</div>
+          <div style="color:var(--muted);font-size:12px">Added ${fmtDate(a.addedAt)}${a.addedBy ? ` by ${esc(a.addedBy)}` : ""}${a.emailVerified === false ? ` · <span style="color:var(--yellow)">email not verified</span>` : ""}</div>
+        </div>
+        <button class="btn-ghost btn-sm" onclick="removeSupportAgent(${jsArg(a.uid)}, ${jsArg(a.email || a.uid)})">Remove</button>
+      </div>`).join("") : `<div style="color:var(--muted)">No one yet.</div>`;
+  } catch (e) {
+    showToast("Failed to load support team: " + e.message, "error");
+  }
+}
+
+async function addSupportAgent() {
+  const input = document.getElementById("support-agent-email");
+  const value = input.value.trim();
+  if (!value) return;
+  const btn = document.getElementById("support-agent-add");
+  btn.disabled = true;
+  try {
+    // Firebase user IDs never contain "@", so anything with one is an email.
+    const r = await call("adminAddSupportAgent", value.includes("@") ? { email: value } : { uid: value });
+    input.value = "";
+    const who = r.email || value;
+    showToast(r.emailVerified ? `${who} added` : `${who} added — they must verify their email before they can sign in`,
+      r.emailVerified ? "success" : "error");
+    loadSupportAgents();
+  } catch (e) {
+    showToast("Failed to add: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function removeSupportAgent(uid, email) {
+  if (!confirm(`Remove ${email} from the support team?`)) return;
+  try {
+    await call("adminRemoveSupportAgent", { uid });
+    showToast(`${email} removed`);
+    loadSupportAgents();
+  } catch (e) {
+    showToast("Failed to remove: " + e.message, "error");
+  }
+}
+
+/** Creates a request as if a user sent Contact Us, which emails the support
+ *  recipients with a link to the case. */
+async function createSampleSupportRequest() {
+  if (!confirm("Create a sample support request? It emails the support recipients, like a real one.")) return;
+  const btn = document.getElementById("support-sample-btn");
+  btn.disabled = true;
+  try {
+    await call("adminCreateSampleContactRequest");
+    showToast("Sample request created — the alert email is on its way");
+    await loadSupport();
+  } catch (e) {
+    showToast("Failed to create: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // A row opens its ticket; the selection checkbox keeps its own job.

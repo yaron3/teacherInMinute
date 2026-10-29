@@ -72,7 +72,7 @@ struct MainTabView: View {
   /// The side menu's Share: this app, the other one, or the website.
   var shareChoiceActions: [AppDialogAction] {
 	viewModel.shareTargets.map { target in
-	  AppDialogAction(viewModel.shareChoiceLabel(for: target)) {
+	  AppDialogAction(viewModel.shareChoiceLabel(for: target), icon: viewModel.shareChoiceIcon(for: target)) {
 		viewModel.share(target)
 	  }
 	} + [AppDialogAction(viewModel.cancelLabel, kind: .cancel)]

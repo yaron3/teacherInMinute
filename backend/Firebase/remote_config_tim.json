@@ -15894,6 +15894,34 @@
       },
       "valueType": "STRING"
     },
+    "instant_teacher": {
+      "defaultValue": {
+        "value": "Instant Teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה לרגע"
+        },
+        "HebrewApp": {
+          "value": "מורה לרגע"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "pro_teacher": {
+      "defaultValue": {
+        "value": "Pro Teacher"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "מורה מקצועי"
+        },
+        "HebrewApp": {
+          "value": "מורה מקצועי"
+        }
+      },
+      "valueType": "STRING"
+    },
     "stuck_question_instant": {
       "defaultValue": {
         "value": "Stuck on a question? Instant Teacher connects you to a real teacher in about a minute: %@"
@@ -15914,10 +15942,10 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "מלמדים תלמידים בשידור חי, מתי שנוח לכם, ומקבלים תשלום עם Pro Teacher: %@"
+          "value": "מלמדים תלמידים בשידור חי, מתי שנוח לכם, ומקבלים תשלום עם מורה מקצועי: %@"
         },
         "HebrewApp": {
-          "value": "מלמדים תלמידים בשידור חי, מתי שנוח לכם, ומקבלים תשלום עם Pro Teacher: %@"
+          "value": "מלמדים תלמידים בשידור חי, מתי שנוח לכם, ומקבלים תשלום עם מורה מקצועי: %@"
         }
       },
       "valueType": "STRING"
@@ -15928,10 +15956,10 @@
       },
       "conditionalValues": {
         "Hebrew": {
-          "value": "הכירו את מורה לרגע ו-Pro Teacher: עזרה חיה ממורים אמיתיים תוך דקה בערך: %@"
+          "value": "הכירו את מורה לרגע ומורה מקצועי: עזרה חיה ממורים אמיתיים תוך דקה בערך: %@"
         },
         "HebrewApp": {
-          "value": "הכירו את מורה לרגע ו-Pro Teacher: עזרה חיה ממורים אמיתיים תוך דקה בערך: %@"
+          "value": "הכירו את מורה לרגע ומורה מקצועי: עזרה חיה ממורים אמיתיים תוך דקה בערך: %@"
         }
       },
       "valueType": "STRING"

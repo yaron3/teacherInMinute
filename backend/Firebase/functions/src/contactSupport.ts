@@ -2,8 +2,9 @@
 //
 // The app saves a Settings → About → Contact Us message to
 // `contactRequests/{id}`. This trigger forwards each new one by email to the
-// recipients listed in `support-config.json` (functions root, next to
-// package.json). Edit that file and redeploy to change who is notified.
+// support recipients set in the admin console (see ./supportSettings). Each
+// email links to the case on the hosted support page
+// (`public/support.html?case=<id>`), where an admin signs in and replies.
 //
 // Mail goes out over SMTP, configured by env vars (see .env):
 //   SMTP_HOST, SMTP_PORT (default 587), SMTP_USER, SMTP_PASS, SMTP_FROM
@@ -11,43 +12,28 @@
 // unconfigured environments do not fail. The request document stays in
 // Firestore either way.
 
-import * as fs from "node:fs";
-import * as path from "node:path";
-
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as nodemailer from "nodemailer";
 
-const CONFIG_PATH = path.join(__dirname, "..", "support-config.json");
-const FALLBACK_RECIPIENTS = ["support@moreh-lerega.co.il"];
+import { readSupportSettings, supportCaseUrl } from "./supportSettings";
 
-/** Recipients from support-config.json; the default if the file is missing or empty. */
-export function readContactRecipients(configPath = CONFIG_PATH): string[] {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
-      contactRecipients?: unknown;
-    };
-    const list = Array.isArray(parsed.contactRecipients)
-      ? parsed.contactRecipients.filter(
-          (value): value is string => typeof value === "string" && value.includes("@")
-        )
-      : [];
-    return list.length > 0 ? list : FALLBACK_RECIPIENTS;
-  } catch (error) {
-    logger.warn(`[contactSupport] cannot read ${configPath}, using default`, error);
-    return FALLBACK_RECIPIENTS;
-  }
-}
+export { readContactRecipients, readSupportSettings, supportCaseUrl } from "./supportSettings";
 
 /** Strips CR/LF so user text cannot inject headers into the subject. */
 function oneLine(text: unknown): string {
   return String(text ?? "").replace(/[\r\n]+/g, " ").trim();
 }
 
-export function buildContactEmail(data: Record<string, unknown>): { subject: string; text: string } {
+export function buildContactEmail(
+  data: Record<string, unknown>,
+  caseUrl?: string
+): { subject: string; text: string } {
   const field = (key: string) => String(data[key] ?? "");
-  const subject = `[Teacher in a Minute] ${oneLine(data.title) || "Contact request"}`;
+  const tag = data.sample === true ? "[TEST] " : "";
+  const subject = `${tag}[Teacher in a Minute] ${oneLine(data.title) || "Contact request"}`;
   const text = [
+    ...(caseUrl ? [`Open the case to reply: ${caseUrl}`, ""] : []),
     field("description"),
     "",
     "—",
@@ -68,7 +54,11 @@ export function buildContactEmail(data: Record<string, unknown>): { subject: str
  * Also used for teacher reports (see moderation.ts).
  */
 export async function sendSupportEmail(subject: string, text: string, replyToAddress?: unknown): Promise<boolean> {
-  const recipients = readContactRecipients();
+  const { recipients } = await readSupportSettings();
+  if (recipients.length === 0) {
+    logger.warn(`[contactSupport] no support recipients set; not sending. subject=${subject}`);
+    return false;
+  }
 
   const host = process.env.SMTP_HOST;
   if (!host) {
@@ -107,7 +97,7 @@ export const onContactRequestCreated = onDocumentCreated(
     const data = event.data?.data();
     if (!data) return;
 
-    const { subject, text } = buildContactEmail(data);
+    const { subject, text } = buildContactEmail(data, supportCaseUrl(event.params.requestId));
     // Throwing lets Firestore retry if retries are enabled; otherwise it is logged.
     const sent = await sendSupportEmail(subject, text, data.userEmail);
     if (sent) logger.info(`[contactSupport] sent request ${event.params.requestId}`);

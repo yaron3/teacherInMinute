@@ -138,4 +138,16 @@ describe("adminRespondToContactRequest", () => {
       .rejects.toMatchObject({ code: "permission-denied" });
     expect(mockSendMail).not.toHaveBeenCalled();
   });
+
+  test("lets a support agent reply, but only with a verified email", async () => {
+    mockDocs.set("agent-1", { email: "agent@example.com" });
+    const agent = (verified: boolean) => ({
+      auth: { uid: "agent-1", token: { email: "agent@example.com", email_verified: verified } },
+      data: { requestId: "case-123", message: "On it." },
+    });
+
+    await expect(respond(agent(false))).rejects.toMatchObject({ code: "permission-denied" });
+    await respond(agent(true));
+    expect(mockDocs.get("case-123")!.responses[0].sentBy).toBe("agent@example.com");
+  });
 });
