@@ -57,6 +57,8 @@ async function resolvePricingAndCreateCheckout(params: {
   if (!packageSnap.exists) throw new HttpsError("not-found", "Pricing package not found");
 
   const pkg = packageSnap.data() as PricingDoc;
+  // The app hides inactive packages; an older build may still offer one.
+  if (pkg.active === false) throw new HttpsError("failed-precondition", "Pricing package is no longer available");
   const minutes = toSafeMinutes(pkg.minutes ?? pkg.minutesGranted);
   // Coerce to number — Firestore may return string if field was set via console
   const priceCents = Math.floor(Number(pkg.priceCents));

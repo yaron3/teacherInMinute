@@ -431,7 +431,10 @@
     <div id="page-pricing" class="page">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="page-title">Pricing Packages</div>
-        <button class="refresh-btn" onclick="loadPricing()">↻ Refresh</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary btn-sm" onclick="openCreatePricing()">+ New Package</button>
+          <button class="refresh-btn" onclick="loadPricing()">↻ Refresh</button>
+        </div>
       </div>
       <div class="page-sub">
         The <code>pricing</code> collection the checkout flows read. Per-minute
@@ -603,6 +606,42 @@
     <div class="modal-foot">
       <button class="btn-ghost btn-sm" onclick="closeModal('coupon-modal')">Cancel</button>
       <button class="btn-primary btn-sm" onclick="confirmCreateCoupon()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Pricing Package Modal ── -->
+<div class="modal-overlay" id="pricing-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <h2>New Pricing Package</h2>
+      <button class="btn-icon" onclick="closeModal('pricing-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name (English)</label><input id="pk-name" placeholder="e.g. 60 Minutes"></div>
+      <div class="form-group"><label>Name (Hebrew, optional)</label><input id="pk-he-name" dir="rtl"></div>
+      <div class="form-group"><label>Description (English, optional)</label><input id="pk-desc"></div>
+      <div class="form-group"><label>Description (Hebrew, optional)</label><input id="pk-he-desc" dir="rtl"></div>
+      <div class="form-group"><label>Type</label>
+        <select id="pk-type">
+          <option value="pay_as_you_go">pay_as_you_go</option>
+          <option value="unlimited_week">unlimited_week</option>
+          <option value="unlimited_month">unlimited_month</option>
+          <option value="unlimited_year">unlimited_year</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Price (major units, e.g. 49.90)</label><input id="pk-price" type="number" step="0.01" min="0.01"></div>
+      <div class="form-group"><label>Currency (ISO code)</label><input id="pk-currency" maxlength="3" style="text-transform:uppercase"></div>
+      <div class="form-group"><label>Minutes granted</label><input id="pk-minutes" type="number" min="1"></div>
+      <div class="form-group"><label>Sort order</label><input id="pk-order" type="number"></div>
+      <div class="form-group"><label>Purchase SKU (optional)</label><input id="pk-sku"></div>
+      <div class="form-group"><label>Document ID (leave blank for random)</label><input id="pk-id" placeholder="e.g. minutes_60"></div>
+      <div class="form-group"><label><input id="pk-highlighted" type="checkbox"> Highlighted</label></div>
+      <div class="form-group"><label><input id="pk-active" type="checkbox" checked> Active</label></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost btn-sm" onclick="closeModal('pricing-modal')">Cancel</button>
+      <button class="btn-primary btn-sm" onclick="confirmCreatePricing()">Create</button>
     </div>
   </div>
 </div>
@@ -1906,6 +1945,7 @@ async function loadPricing() {
       tb.innerHTML = `<tr class="empty-row"><td colspan="7">No pricing packages</td></tr>`;
       return;
     }
+    pricingRows = d.packages;
     tb.innerHTML = d.packages.map(p => `<tr data-id="${esc(p.id)}">
       <td class="td-mono">${esc(p.id)}</td>
       <td>${esc(p.name || "—")}</td>
@@ -1920,6 +1960,58 @@ async function loadPricing() {
     </tr>`).join("");
   } catch (e) {
     showToast("Failed to load pricing: " + e.message, "error");
+  }
+}
+
+let pricingRows = [];
+
+function openCreatePricing() {
+  for (const id of ["pk-name","pk-he-name","pk-desc","pk-he-desc","pk-price","pk-minutes","pk-sku","pk-id"]) {
+    document.getElementById(id).value = "";
+  }
+  document.getElementById("pk-type").value = "pay_as_you_go";
+  document.getElementById("pk-currency").value = pricingRows[0]?.currency || defaultCurrency;
+  // Append after the last package by default.
+  const maxOrder = pricingRows.reduce((m, p) => Math.max(m, Number(p.sortOrder) || 0), 0);
+  document.getElementById("pk-order").value = String(maxOrder + 1);
+  document.getElementById("pk-highlighted").checked = false;
+  document.getElementById("pk-active").checked = true;
+  openModal("pricing-modal");
+}
+
+async function confirmCreatePricing() {
+  const val = id => document.getElementById(id).value.trim();
+  const name = val("pk-name");
+  const price = parseFloat(val("pk-price"));
+  const minutes = parseInt(val("pk-minutes"));
+  const currency = val("pk-currency").toUpperCase();
+  const problem = !name ? "Name is required"
+    : !(price > 0) ? "Price must be above 0"
+    : !(minutes > 0) ? "Minutes must be at least 1 (checkout rejects 0-minute packages)"
+    : currency.length !== 3 ? "Currency must be a 3-letter ISO code"
+    : null;
+  if (problem) { showToast(problem, "error"); return; }
+  try {
+    const d = await call("adminCreatePricing", {
+      id: val("pk-id") || undefined,
+      name,
+      heName: val("pk-he-name"),
+      description: val("pk-desc"),
+      heDescription: val("pk-he-desc"),
+      type: val("pk-type"),
+      priceCents: Math.round(price * 100),
+      currency,
+      minutes,
+      sortOrder: parseInt(val("pk-order")) || 0,
+      purchaseSKU: val("pk-sku"),
+      isHighlighted: document.getElementById("pk-highlighted").checked,
+      active: document.getElementById("pk-active").checked,
+    });
+    closeModal("pricing-modal");
+    showToast(`Package "${d.id}" created`);
+    loadPricing();
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
   }
 }
 

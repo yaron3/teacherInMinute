@@ -1018,6 +1018,82 @@ export const adminListPricing = onCall(async (req) => {
   return { packages };
 });
 
+// ─── adminCreatePricing ───────────────────────────────────────────────────────
+
+const PRICING_TYPES = ["pay_as_you_go", "unlimited_week", "unlimited_month", "unlimited_year"];
+
+/** Adds a package to `pricing`. Clients can't write the collection, so this is
+ *  the only way in besides the console. The doc ID is what purchases record,
+ *  so an existing one is never overwritten. */
+export const adminCreatePricing = onCall(async (req) => {
+  assertAdmin(req);
+
+  const d = req.data as {
+    id?: string;
+    name?: string;
+    heName?: string;
+    description?: string;
+    heDescription?: string;
+    type?: string;
+    priceCents?: number;
+    currency?: string;
+    minutes?: number;
+    sortOrder?: number;
+    isHighlighted?: boolean;
+    active?: boolean;
+    purchaseSKU?: string;
+  };
+
+  const name = String(d.name ?? "").trim();
+  if (!name) throw new HttpsError("invalid-argument", "name required");
+  const type = String(d.type ?? "");
+  if (!PRICING_TYPES.includes(type)) throw new HttpsError("invalid-argument", `type must be one of ${PRICING_TYPES.join(", ")}`);
+  const priceCents = Math.round(Number(d.priceCents));
+  if (!Number.isFinite(priceCents) || priceCents <= 0) throw new HttpsError("invalid-argument", "priceCents must be positive");
+  const currency = String(d.currency ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw new HttpsError("invalid-argument", "currency must be a 3-letter ISO code");
+  const minutes = Math.floor(Number(d.minutes));
+  if (!Number.isFinite(minutes) || minutes <= 0) throw new HttpsError("invalid-argument", "minutes must be positive");
+  const sortOrder = Number.isFinite(Number(d.sortOrder)) ? Math.floor(Number(d.sortOrder)) : 0;
+
+  const customId = String(d.id ?? "").trim();
+  if (customId && !/^[A-Za-z0-9_-]{1,64}$/.test(customId))
+    throw new HttpsError("invalid-argument", "id may only contain letters, digits, - and _");
+  const ref = customId ? firestore.collection("pricing").doc(customId) : firestore.collection("pricing").doc();
+
+  const doc: Record<string, unknown> = {
+    name,
+    type,
+    priceCents,
+    currency,
+    minutes,
+    sortOrder,
+    isHighlighted: d.isHighlighted === true,
+    active: d.active !== false,
+    createdAt: Timestamp.now(),
+  };
+  const optional: Record<string, unknown> = {
+    he_name: d.heName,
+    description: d.description,
+    he_description: d.heDescription,
+    purchaseSKU: d.purchaseSKU,
+  };
+  for (const [key, value] of Object.entries(optional)) {
+    const s = String(value ?? "").trim();
+    if (s) doc[key] = s;
+  }
+
+  try {
+    await ref.create(doc);
+  } catch (e) {
+    if ((e as { code?: number }).code === 6) throw new HttpsError("already-exists", `Package "${ref.id}" already exists`);
+    throw e;
+  }
+  logger.info(`[admin] pricing package created id=${ref.id} by=${req.auth?.uid}`);
+
+  return { id: ref.id };
+});
+
 // ─── adminListCoupons ─────────────────────────────────────────────────────────
 
 export const adminListCoupons = onCall(async (req) => {

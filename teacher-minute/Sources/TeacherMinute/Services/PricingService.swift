@@ -36,6 +36,8 @@ final class PricingService {
     }
 
     private static func makeOption(id: String, data: [String: Any]) -> PricingOption? {
+        // Only an explicit `active: false` hides a package; older docs have no field.
+        if (data["active"] as? Bool) == false { return nil }
         let name = localizedString(data: data, key: "name")
         guard !name.isEmpty else { return nil }
 
