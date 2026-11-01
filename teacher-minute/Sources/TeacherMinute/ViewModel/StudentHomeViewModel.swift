@@ -959,15 +959,15 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     // spinner covers everything from the tap to the charge being confirmed or
     // rejected — including the beat after the wallet sheet closes, while the
     // nonce is sent to the backend.
+    // A wallet run through Tranzila hands over to the browser instead, and
+    // like the PayPal flow below leaves the spinner up until the return.
     if method == .applePay {
-      await checkoutWithApplePay(option)
-      isPreparingCheckout = false
+      if await !checkoutWithApplePay(option) { isPreparingCheckout = false }
       return
     }
 
     if method == .googlePay {
-      await checkoutWithGooglePay(option)
-      isPreparingCheckout = false
+      if await !checkoutWithGooglePay(option) { isPreparingCheckout = false }
       return
     }
 
@@ -1002,11 +1002,18 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   }
 
   /// Apple Pay confirms entirely in-process via Braintree — no checkout URL/deep
-  /// link round trip like the PayPal-redirect and hosted-card-page flows.
+  /// link round trip like the PayPal-redirect and hosted-card-page flows —
+  /// unless the backend runs it through Tranzila, whose page the browser
+  /// opens instead. Returns whether it handed over to the browser.
   #if canImport(UIKit)
-  private func checkoutWithApplePay(_ option: PricingOption) async {
+  private func checkoutWithApplePay(_ option: PricingOption) async -> Bool {
     do {
       let session = try await FunctionsService.shared.createApplePayCheckout(pricingOptionID: option.id)
+      if let hostedURL = session.hostedCheckoutURL {
+        logger.info("[PaymentReturn] Apple Pay via Tranzila url=\(hostedURL.absoluteString)")
+        checkoutURL = hostedURL
+        return true
+      }
       let nonce = try await ApplePayService.shared.startPayment(
         clientToken: session.clientToken,
         amountCents: session.amountCents,
@@ -1031,11 +1038,13 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.applePayCheckout")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     }
+    return false
   }
   #else
-  private func checkoutWithApplePay(_ option: PricingOption) async {
+  private func checkoutWithApplePay(_ option: PricingOption) async -> Bool {
     logger.error("[PaymentReturn] Apple Pay checkout requested on a platform without UIKit")
     searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    return false
   }
   #endif
 
@@ -1063,11 +1072,17 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   #endif
 
   /// Google Pay is the Android mirror of Apple Pay — same Braintree
-  /// create/confirm pair, no checkout URL or deep-link round trip.
+  /// create/confirm pair, no checkout URL or deep-link round trip, and the
+  /// same hand-over to the browser when the backend runs it through Tranzila.
   #if os(Android)
-  private func checkoutWithGooglePay(_ option: PricingOption) async {
+  private func checkoutWithGooglePay(_ option: PricingOption) async -> Bool {
     do {
       let session = try await FunctionsService.shared.createGooglePayCheckout(pricingOptionID: option.id)
+      if let hostedURL = session.hostedCheckoutURL {
+        logger.info("[PaymentReturn] Google Pay via Tranzila url=\(hostedURL.absoluteString)")
+        checkoutURL = hostedURL
+        return true
+      }
       let nonce = try await GooglePayService.shared.startPayment(
         clientToken: session.clientToken,
         amountCents: session.amountCents,
@@ -1093,11 +1108,13 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.googlePayCheckout")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     }
+    return false
   }
   #else
-  private func checkoutWithGooglePay(_ option: PricingOption) async {
+  private func checkoutWithGooglePay(_ option: PricingOption) async -> Bool {
     logger.error("[PaymentReturn] Google Pay checkout requested on a non-Android platform")
     searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+    return false
   }
   #endif
 

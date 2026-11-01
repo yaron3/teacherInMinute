@@ -122,7 +122,7 @@ export {
   adminSendDailyReportNow,
 } from "./admin";
 
-// Payments — PayPal Checkout + Braintree (Apple Pay, Google Pay)
+// Payments — PayPal Checkout + Braintree (Apple Pay, Google Pay) + Tranzila (cards, Apple Pay, Google Pay)
 export {
   createCheckoutSession,
   createPaymentSettingsSession,
@@ -136,6 +136,10 @@ export {
   chargeSavedPayPal,
   payCardCheckout,
   paypalSuccess,
+  tranzilaCheckout,
+  tranzilaCharge,
+  tranzilaCheckoutStatus,
+  tranzilaNotify,
   paypalCancel,
   paypalWebhook,
   billingPage,

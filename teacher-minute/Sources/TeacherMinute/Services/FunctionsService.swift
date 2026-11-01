@@ -156,6 +156,9 @@ struct CheckoutSessionResult {
 
 struct ApplePayCheckoutSession {
   let checkoutId: String
+  /// Set when the backend runs Apple Pay through Tranzila: the wallet pays on
+  /// this hosted page in the browser, and the remaining fields are unused.
+  var hostedCheckoutURL: URL? = nil
   let clientToken: String
   let amountCents: Int
   let currency: String
@@ -164,6 +167,9 @@ struct ApplePayCheckoutSession {
 
 struct GooglePayCheckoutSession {
   let checkoutId: String
+  /// Set when the backend runs Google Pay through Tranzila: the wallet pays on
+  /// this hosted page in the browser, and the remaining fields are unused.
+  var hostedCheckoutURL: URL? = nil
   let clientToken: String
   let amountCents: Int
   let currency: String
@@ -533,6 +539,13 @@ final class FunctionsService {
 
   func createApplePayCheckout(pricingOptionID: String) async throws -> ApplePayCheckoutSession {
     let result = try await call(function: "createApplePayCheckout", data: ["pricingOptionId": pricingOptionID])
+    if let checkoutId = Self.firstString(in: result, keys: ["checkoutId", "checkoutID"]),
+       let hostedURL = Self.hostedCheckoutURL(in: result) {
+      return ApplePayCheckoutSession(
+        checkoutId: checkoutId, hostedCheckoutURL: hostedURL,
+        clientToken: "", amountCents: 0, currency: "", label: ""
+      )
+    }
     guard
       let checkoutId = Self.firstString(in: result, keys: ["checkoutId", "checkoutID"]),
       let clientToken = result["clientToken"] as? String,
@@ -552,12 +565,27 @@ final class FunctionsService {
     )
   }
 
+  /// The Tranzila page a wallet checkout continues on, when the backend
+  /// returned one instead of a Braintree client token.
+  private static func hostedCheckoutURL(in result: [String: Any]) -> URL? {
+    guard let urlString = firstString(in: result, keys: ["checkoutUrl", "checkoutURL"]) else { return nil }
+    return URL(string: urlString)
+  }
+
   func confirmApplePayPayment(checkoutId: String, nonce: String) async throws {
     _ = try await call(function: "confirmApplePayPayment", data: ["checkoutId": checkoutId, "nonce": nonce])
   }
 
   func createGooglePayCheckout(pricingOptionID: String) async throws -> GooglePayCheckoutSession {
     let result = try await call(function: "createGooglePayCheckout", data: ["pricingOptionId": pricingOptionID])
+    if let checkoutId = Self.firstString(in: result, keys: ["checkoutId", "checkoutID"]),
+       let hostedURL = Self.hostedCheckoutURL(in: result) {
+      return GooglePayCheckoutSession(
+        checkoutId: checkoutId, hostedCheckoutURL: hostedURL,
+        clientToken: "", amountCents: 0, currency: "", label: "",
+        environment: "", merchantName: "", countryCode: ""
+      )
+    }
     guard
       let checkoutId = Self.firstString(in: result, keys: ["checkoutId", "checkoutID"]),
       let clientToken = result["clientToken"] as? String,

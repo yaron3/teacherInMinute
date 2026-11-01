@@ -1145,23 +1145,30 @@ export const adminListPayments = onCall(async (req) => {
   const payments = snap.docs.map((d) => {
     const data = serializeDoc(d.data() as Record<string, unknown>);
     // Checkout is no longer PayPal-only: Braintree handles Apple Pay, Google
-    // Pay and cards, and a vaulted account charges without a redirect. Which
-    // one ran is the difference between `paypalCaptureId` and
-    // `braintreeTransactionId`; `paymentMethod` records the wallet the buyer
-    // picked, and is absent on the plain PayPal flow.
+    // Pay and cards, Tranzila handles cards once configured, and a vaulted
+    // account charges without a redirect. Which one ran is told by
+    // `paypalCaptureId`, `braintreeTransactionId` or `tranzilaTransactionId`;
+    // `paymentMethod` records the wallet the buyer picked, and is absent on
+    // the plain PayPal flow.
     const provider = data.paypalCaptureId
       ? "paypal"
       : data.braintreeTransactionId
         ? "braintree"
-        : data.paypalOrderId
-          ? "paypal"
-          : null;
+        : data.tranzilaTransactionId
+          ? "tranzila"
+          : data.paypalOrderId
+            ? "paypal"
+            : null;
     return {
       ...data,
       id: d.id,
       provider,
       paymentMethod: firstString(data.paymentMethod) ?? (provider === "paypal" ? "paypal" : null),
-      transactionId: firstString(data.paypalCaptureId, data.braintreeTransactionId),
+      transactionId: firstString(
+        data.paypalCaptureId,
+        data.braintreeTransactionId,
+        data.tranzilaTransactionId
+      ),
     };
   });
 

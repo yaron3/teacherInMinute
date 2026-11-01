@@ -294,7 +294,16 @@ export interface PricingDoc {
 
 // ─── Firestore — paymentCheckouts/{checkoutId} ───────────────────────────────
 
-export type CheckoutStatus = "created" | "paypal_created" | "completed" | "cancelled";
+export type CheckoutStatus =
+  | "created"
+  | "paypal_created"
+  /** Card checkout routed to Tranzila, waiting for the buyer's card. */
+  | "tranzila_created"
+  /** A Tranzila debit is in flight, or its outcome is unknown — never retried
+   *  automatically, since the card may already have been charged. */
+  | "tranzila_charging"
+  | "completed"
+  | "cancelled";
 
 export interface PaymentCheckoutDoc {
   uid: string;
@@ -311,6 +320,10 @@ export interface PaymentCheckoutDoc {
   completedAt?: Timestamp;
   paypalCaptureId?: string;
   braintreeTransactionId?: string;
+  tranzilaTransactionId?: string;
+  tranzilaAuthNumber?: string;
+  /** Latest handshake token minted for this checkout's Tranzila page. */
+  tranzilaThtk?: string;
   /** Wallet the buyer picked, e.g. "apple_pay", "credit_card". Undefined means default PayPal flow. */
   paymentMethod?: string;
 }
@@ -354,7 +367,7 @@ export type PurchaseStatus = "active" | "expired" | "refunded";
 
 export interface PurchaseDoc {
   pricingOptionId: string;
-  provider: "paypal" | "braintree";
+  provider: "paypal" | "braintree" | "tranzila";
   amountCents: number;
   currency: string;
   type: PlanType;

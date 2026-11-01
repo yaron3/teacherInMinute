@@ -17,6 +17,18 @@ import {
   deleteVaultedPaymentMethod,
   createSaleWithVaultedPaymentMethod,
 } from "./braintree";
+import {
+  isTranzilaConfigured,
+  isTranzilaWalletEnabled,
+  isValidNotifyKey,
+  parseTranzilaNotification,
+  tranzilaPageBaseUrl,
+  tranzilaSupportsCurrency,
+  tranzilaTerminalName,
+  createHandshake,
+  createCardTransaction,
+  TranzilaApiError,
+} from "./tranzila";
 import { PricingDoc, PaymentCheckoutDoc, PurchaseDoc } from "./types";
 import { extendLessonMinutes } from "./lessons";
 
@@ -107,7 +119,9 @@ async function creditCompletedCheckout(params: {
       updatedAt: now,
       ...(params.provider === "paypal"
         ? { paypalCaptureId: params.providerTransactionId }
-        : { braintreeTransactionId: params.providerTransactionId }),
+        : params.provider === "tranzila"
+          ? { tranzilaTransactionId: params.providerTransactionId }
+          : { braintreeTransactionId: params.providerTransactionId }),
       ...params.extraCheckoutFields,
     });
     tx.set(
@@ -193,6 +207,15 @@ async function markCheckoutCancelled(
 
     if (checkout.status === "cancelled") return false;
 
+    // A Tranzila debit is in flight or ended without a clear answer; the card
+    // may have been charged, so only a person reconciling it may close it.
+    if (checkout.status === "tranzila_charging") {
+      logger.warn(
+        `[payments] refused to cancel a charging checkout checkoutId=${checkoutRef.id} reason=${reason}`
+      );
+      return false;
+    }
+
     if (expectedOrderId && checkout.paypalOrderId && checkout.paypalOrderId !== expectedOrderId) {
       logger.warn(
         `[payments] cancel skipped, order mismatch checkoutId=${checkoutRef.id} stored=${checkout.paypalOrderId} supplied=${expectedOrderId}`
@@ -204,6 +227,20 @@ async function markCheckoutCancelled(
     logger.info(`[payments] checkout cancelled checkoutId=${checkoutRef.id} reason=${reason}`);
     return true;
   });
+}
+
+/** Points a fresh checkout at the Tranzila checkout page and returns its URL. */
+async function openTranzilaCheckout(
+  checkoutRef: FirebaseFirestore.DocumentReference
+): Promise<string> {
+  const checkoutUrl = `${tranzilaPageBaseUrl(FUNCTIONS_BASE_URL)}/tranzilaCheckout?checkoutId=${checkoutRef.id}`;
+  await checkoutRef.update({
+    approvalUrl: checkoutUrl,
+    status: "tranzila_created",
+    updatedAt: Timestamp.now(),
+  });
+  logger.info(`[payments] Tranzila checkout saved checkoutId=${checkoutRef.id}`);
+  return checkoutUrl;
 }
 
 // ─── createCheckoutSession ────────────────────────────────────────────────────
@@ -268,6 +305,16 @@ export const createCheckoutSession = onCall(async (req) => {
   });
   const returnUrl = `${FUNCTIONS_BASE_URL}/paypalSuccess?checkoutId=${checkoutId}`;
   const cancelUrl = `${FUNCTIONS_BASE_URL}/paypalCancel?checkoutId=${checkoutId}`;
+
+  // Cards go to Tranzila once it is configured, for the currencies it takes;
+  // anything else stays on PayPal Card Fields below.
+  if (
+    rawWallet === "credit_card" &&
+    isTranzilaConfigured() &&
+    tranzilaSupportsCurrency(pkg.currency)
+  ) {
+    return { checkoutUrl: await openTranzilaCheckout(checkoutRef) };
+  }
 
   if (rawWallet === "bit") {
     try {
@@ -398,22 +445,29 @@ const GOOGLE_PAY_COUNTRY_CODE =
 
 /** Reads the pricing package, opens a checkout, and mints a Braintree client
  *  token scoped to the package currency. Shared by both wallet flows; the
- *  caller adds its own wallet-specific fields to the response. */
+ *  caller adds its own wallet-specific fields to the response.
+ *
+ *  When the wallet runs through Tranzila (see isTranzilaWalletEnabled) there
+ *  is no native sheet: the checkout gets a Tranzila page URL instead, which
+ *  the app opens in the browser like the PayPal flow. */
 async function startWalletCheckout(params: {
   uid: string;
   packageId: string;
   wallet: "apple_pay" | "google_pay";
   walletLabel: string;
-}): Promise<{
-  checkoutId: string;
-  clientToken: string;
-  pkg: PricingDoc & { priceCents: number };
-}> {
+}): Promise<
+  | { checkoutId: string; checkoutUrl: string }
+  | { checkoutId: string; clientToken: string; pkg: PricingDoc & { priceCents: number } }
+> {
   const { checkoutId, checkoutRef, pkg } = await resolvePricingAndCreateCheckout({
     uid: params.uid,
     packageId: params.packageId,
     paymentMethod: params.wallet,
   });
+
+  if (isTranzilaWalletEnabled(params.wallet) && tranzilaSupportsCurrency(pkg.currency)) {
+    return { checkoutId, checkoutUrl: await openTranzilaCheckout(checkoutRef) };
+  }
 
   let clientToken: string;
   try {
@@ -535,12 +589,14 @@ export const createApplePayCheckout = onCall(async (req) => {
 
   logger.info(`[payments] createApplePayCheckout uid=${uid} packageId=${packageId}`);
 
-  const { checkoutId, clientToken, pkg } = await startWalletCheckout({
+  const started = await startWalletCheckout({
     uid,
     packageId,
     wallet: "apple_pay",
     walletLabel: "Apple Pay",
   });
+  if ("checkoutUrl" in started) return started;
+  const { checkoutId, clientToken, pkg } = started;
 
   return {
     checkoutId,
@@ -573,12 +629,14 @@ export const createGooglePayCheckout = onCall(async (req) => {
 
   logger.info(`[payments] createGooglePayCheckout uid=${uid} packageId=${packageId}`);
 
-  const { checkoutId, clientToken, pkg } = await startWalletCheckout({
+  const started = await startWalletCheckout({
     uid,
     packageId,
     wallet: "google_pay",
     walletLabel: "Google Pay",
   });
+  if ("checkoutUrl" in started) return started;
+  const { checkoutId, clientToken, pkg } = started;
 
   return {
     checkoutId,
@@ -855,6 +913,462 @@ button:disabled{background:#93c5fd;cursor:not-allowed}
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
   res.status(200).send(html);
+});
+
+// ─── tranzilaCheckout (HTTP) ──────────────────────────────────────────────────
+// Tranzila checkout page. Cards: Hosted Fields validate the card (J2) and
+// tokenize it against a handshake locking the package price; the token is then
+// posted to `tranzilaCharge`, which takes the money. Apple Pay / Google Pay
+// checkouts also get their wallet's button, which charges inside Tranzila;
+// those are credited by `tranzilaNotify`, and the page polls
+// `tranzilaCheckoutStatus` until that has happened. See ./tranzila.ts.
+
+const TRANZILA_WALLETS: readonly string[] = ["apple_pay", "google_pay"];
+
+export const tranzilaCheckout = onRequest(async (req, res) => {
+  // Served through Hosting, whose CDN would otherwise keep an error page (a
+  // failed handshake, a checkout mid-charge) for this checkout's URL.
+  res.setHeader("Cache-Control", "no-store");
+  const checkoutId = req.query.checkoutId as string | undefined;
+  if (!checkoutId) {
+    res.status(400).send("Missing checkoutId");
+    return;
+  }
+
+  const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
+  const checkoutSnap = await checkoutRef.get();
+  if (!checkoutSnap.exists) {
+    res.status(404).send("Checkout not found");
+    return;
+  }
+
+  const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
+  if (checkout.status === "completed") {
+    res.redirect(302, tranzilaSuccessDeepLink(checkoutId, checkout.tranzilaTransactionId));
+    return;
+  }
+  if (checkout.status === "tranzila_charging") {
+    res
+      .status(409)
+      .send("This payment is already being processed. Please return to the app.");
+    return;
+  }
+  if (checkout.status !== "tranzila_created") {
+    res.status(409).send("Checkout is not a Tranzila checkout");
+    return;
+  }
+
+  let thtk: string;
+  try {
+    thtk = await createHandshake({ amountCents: checkout.priceCents, checkoutId });
+    // Lets `tranzilaNotify` find this checkout from a notification that
+    // carries only the handshake token.
+    await checkoutRef.update({ tranzilaThtk: thtk, updatedAt: Timestamp.now() });
+  } catch (err) {
+    logger.error(`[payments] Tranzila handshake failed checkoutId=${checkoutId}`, err);
+    res.status(502).send("Payments are not available right now. Please choose another payment method.");
+    return;
+  }
+
+  const wallet = TRANZILA_WALLETS.includes(checkout.paymentMethod ?? "")
+    ? (checkout.paymentMethod as "apple_pay" | "google_pay")
+    : null;
+  const cancelUrl = `paypalCancel?checkoutId=${encodeURIComponent(checkoutId)}`;
+  const amountLabel = `${(checkout.priceCents / 100).toFixed(2)} ${checkout.currency}`;
+  const common = {
+    terminal_name: tranzilaTerminalName(),
+    amount: (checkout.priceCents / 100).toFixed(2),
+    currency_code: checkout.currency.toUpperCase(),
+    thtk,
+    response_language: "english",
+  };
+  const cardParams = {
+    ...common,
+    // J2: validate the card and return a token, without charging it.
+    tran_mode: "N",
+    tokenize: true,
+  };
+  // Wallets support only a direct charge. `pdesc` names the checkout so the
+  // notification can be matched to it; the notify URL itself is configured
+  // on the terminal, not here, so the browser never learns its key.
+  const walletParams = { ...common, tran_mode: "A", pdesc: `checkout ${checkoutId}` };
+  const applePayParams = { ...walletParams, labelApple: APPLE_PAY_MERCHANT_NAME };
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Checkout – TeacherMinute</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:420px;margin:2rem auto;padding:0 1rem;color:#111}
+h1{font-size:1.2rem}
+.amount{color:#555;margin-bottom:1.5rem}
+label{display:block;font-size:.8rem;color:#555;margin:.75rem 0 .25rem}
+.field{border:1px solid #d1d5db;border-radius:8px;padding:0 .75rem;height:2.4rem}
+button{margin-top:1.5rem;width:100%;padding:.75rem;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:1rem;cursor:pointer}
+button:disabled{background:#93c5fd;cursor:not-allowed}
+.wallet{margin-top:0;height:48px;display:none}
+#pay-apple{-webkit-appearance:-apple-pay-button;-apple-pay-button-type:pay;-apple-pay-button-style:black;padding:0;background:none}
+#pay-google{background:#000;font-weight:600}
+.divider{text-align:center;color:#6b7280;font-size:.8rem;margin:1.25rem 0 0;display:none}
+.error{color:#b91c1c;font-size:.85rem;margin-top:1rem;display:none}
+.notice{color:#111;font-size:.95rem;margin-top:1rem;display:none}
+.cancel{display:block;text-align:center;margin-top:1rem;font-size:.85rem;color:#6b7280}
+</style>
+</head>
+<body>
+<h1>${wallet ? "Complete your payment" : "Pay by credit or debit card"}</h1>
+<div class="amount">${amountLabel}</div>
+<div id="pay-area">
+  ${wallet === "apple_pay" ? `<button id="pay-apple" class="wallet" type="button" aria-label="Apple Pay" onclick="hfChargeApple(applePayParams, onWalletResult)"></button>` : ""}
+  ${wallet === "google_pay" ? `<button id="pay-google" class="wallet" type="button" onclick="chargeGooglePay()">Pay with Google Pay</button>` : ""}
+  ${wallet ? `<div id="divider" class="divider">or pay by card</div>` : ""}
+  <div id="card-form">
+    <label>Card number</label><div id="card-number" class="field"></div>
+    <label>Expiry</label><div id="card-expiry" class="field"></div>
+    <label>CVV</label><div id="card-cvv" class="field"></div>
+    <button id="submit-btn" type="button" disabled>Pay ${amountLabel}</button>
+  </div>
+</div>
+<div id="notice" class="notice"></div>
+<div id="error" class="error"></div>
+<a id="cancel" class="cancel" href="${cancelUrl}">Cancel and go back</a>
+<script src="https://hf.tranzila.com/assets/js/thostedf.js"></script>
+${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfapplepay.js"></script>` : ""}
+<script>
+  const checkoutId = ${JSON.stringify(checkoutId)};
+  const cardParams = ${JSON.stringify(cardParams)};
+  const walletParams = ${JSON.stringify(walletParams)};
+  const applePayParams = ${JSON.stringify(applePayParams)};
+  const pendingUrl = ${JSON.stringify(`teacherminute://payment-return?status=no_response&checkout_id=${checkoutId}`)};
+  const submitBtn = document.getElementById("submit-btn");
+  const errorEl = document.getElementById("error");
+  const noticeEl = document.getElementById("notice");
+  const GENERIC_ERROR = "Payment failed. Please check your details and try again.";
+  let fields = null;
+
+  function showError(message) {
+    errorEl.textContent = message;
+    errorEl.style.display = "block";
+  }
+  function firstError(err, response) {
+    const txn = response && response.transaction_response;
+    const errors = (err && (err.messages || err.errors)) || (response && response.errors) || [];
+    return (txn && txn.error) || (errors[0] && errors[0].message) || GENERIC_ERROR;
+  }
+  function showWallet(id) {
+    const button = document.getElementById(id);
+    if (button) button.style.display = "block";
+    const divider = document.getElementById("divider");
+    if (divider) divider.style.display = "block";
+  }
+
+  // The wallet charged inside Tranzila; the server credits the minutes once
+  // Tranzila notifies it, so wait for that rather than trusting this page.
+  function onWalletResult(err, response) {
+    const txn = response && response.transaction_response;
+    if (err || !txn || !txn.success) {
+      console.error(err, response);
+      showError(firstError(err, response));
+      return;
+    }
+    document.getElementById("pay-area").style.display = "none";
+    document.getElementById("cancel").style.display = "none";
+    errorEl.style.display = "none";
+    noticeEl.textContent = "Payment approved. Confirming…";
+    noticeEl.style.display = "block";
+    const deadline = Date.now() + 30000;
+    (function poll() {
+      fetch("tranzilaCheckoutStatus?checkoutId=" + encodeURIComponent(checkoutId))
+        .then((r) => r.json())
+        .then((result) => {
+          if (result.redirectUrl) { window.location.href = result.redirectUrl; return; }
+          if (Date.now() < deadline) { setTimeout(poll, 2000); return; }
+          window.location.href = pendingUrl;
+        })
+        .catch(() => {
+          if (Date.now() < deadline) { setTimeout(poll, 2000); return; }
+          window.location.href = pendingUrl;
+        });
+    })();
+  }
+  function chargeGooglePay() {
+    if (fields) fields.chargeGpay(walletParams, onWalletResult);
+  }
+
+  if (document.getElementById("pay-apple") && window.ApplePaySession && ApplePaySession.canMakePayments()) {
+    showWallet("pay-apple");
+  }
+
+  try {
+    fields = TzlaHostedFields.create({
+      sandbox: false,
+      fields: {
+        credit_card_number: { selector: "#card-number", placeholder: "4580 4580 4580 4580" },
+        cvv: { selector: "#card-cvv", placeholder: "123" },
+        expiry: { selector: "#card-expiry", placeholder: "MM/YY", version: "1" },
+      },
+      styles: { input: { height: "2.4rem", "font-size": "1rem" } },
+    });
+    fields.onEvent("googleIsEnable", () => showWallet("pay-google"));
+    submitBtn.disabled = false;
+    submitBtn.addEventListener("click", () => {
+      submitBtn.disabled = true;
+      errorEl.style.display = "none";
+      fields.charge(cardParams, (err, response) => {
+        const txn = response && response.transaction_response;
+        if (err || !txn || !txn.success || !txn.token) {
+          console.error(err, response);
+          showError(firstError(err, response));
+          submitBtn.disabled = false;
+          return;
+        }
+        fetch("tranzilaCharge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            checkoutId,
+            token: txn.token,
+            expiryMonth: txn.expiry_month,
+            expiryYear: txn.expiry_year,
+          }),
+        })
+          .then((r) => r.json())
+          .then((result) => {
+            if (result.redirectUrl) {
+              window.location.href = result.redirectUrl;
+              return;
+            }
+            showError(result.error || GENERIC_ERROR);
+            if (result.retry) submitBtn.disabled = false;
+          })
+          .catch((e) => {
+            console.error(e);
+            showError("We could not confirm the payment. Please check your purchases in the app before trying again.");
+          });
+      });
+    });
+  } catch (err) {
+    console.error(err);
+    document.getElementById("card-form").style.display = "none";
+    showError("Card payments are not available right now. Please choose another payment method.");
+  }
+</script>
+</body></html>`;
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.status(200).send(html);
+});
+
+// ─── tranzilaCheckoutStatus (HTTP) ────────────────────────────────────────────
+// Polled by the checkout page after a wallet payment, until `tranzilaNotify`
+// has credited it.
+
+export const tranzilaCheckoutStatus = onRequest(async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const checkoutId = req.query.checkoutId as string | undefined;
+  if (!checkoutId) {
+    res.status(400).json({ error: "Missing checkoutId" });
+    return;
+  }
+  const snap = await firestore.collection("paymentCheckouts").doc(checkoutId).get();
+  const checkout = snap.data() as PaymentCheckoutDoc | undefined;
+  if (checkout?.status === "completed") {
+    res.json({
+      status: "completed",
+      redirectUrl: tranzilaSuccessDeepLink(checkoutId, checkout.tranzilaTransactionId),
+    });
+    return;
+  }
+  res.json({ status: "pending" });
+});
+
+// ─── tranzilaNotify (HTTP) ────────────────────────────────────────────────────
+// Tranzila's server-to-server notification (IPN). Set on the terminal in
+// my.tranzila as `<base>/tranzilaNotify?key=<TRANZILA_NOTIFY_KEY>`. It is the
+// only thing that credits a wallet payment, and a safety net for a card debit
+// whose answer never reached `tranzilaCharge`.
+
+export const tranzilaNotify = onRequest(async (req, res) => {
+  if (!isValidNotifyKey(req.query.key)) {
+    logger.warn("[payments] tranzilaNotify rejected: bad key");
+    res.status(403).send("Forbidden");
+    return;
+  }
+
+  const payload = {
+    ...(req.query as Record<string, unknown>),
+    ...((req.body ?? {}) as Record<string, unknown>),
+  };
+  delete payload.key;
+  const note = parseTranzilaNotification(payload);
+  logger.info(
+    `[payments] tranzilaNotify fields=${Object.keys(payload).join(",")} success=${note.success} checkoutId=${note.checkoutId ?? "-"} txn=${note.transactionId ?? "-"} amount=${note.amount ?? "-"} tranmode=${note.tranMode ?? "-"}`
+  );
+
+  // Always 200 from here on: a refusal is ours to log, not Tranzila's to retry.
+  const done = (): void => {
+    res.status(200).send("OK");
+  };
+
+  if (!note.success) return done();
+  // J2 validations (N) and J5 holds (V) move no money.
+  if (note.tranMode && /^[NV]/i.test(note.tranMode)) return done();
+
+  let checkoutRef: FirebaseFirestore.DocumentReference | undefined;
+  if (note.checkoutId) {
+    checkoutRef = firestore.collection("paymentCheckouts").doc(note.checkoutId);
+  } else if (note.thtk) {
+    const match = await firestore
+      .collection("paymentCheckouts")
+      .where("tranzilaThtk", "==", note.thtk)
+      .limit(1)
+      .get();
+    checkoutRef = match.docs[0]?.ref;
+  }
+  const snap = checkoutRef ? await checkoutRef.get() : undefined;
+  if (!checkoutRef || !snap?.exists) {
+    logger.error(`[payments] tranzilaNotify: paid transaction with no checkout txn=${note.transactionId ?? "-"}`);
+    return done();
+  }
+
+  const checkout = snap.data() as PaymentCheckoutDoc;
+  if (checkout.status === "completed") return done();
+
+  // A card checkout is credited by `tranzilaCharge`; here only if our own
+  // debit was sent and its answer was lost.
+  const isWallet = TRANZILA_WALLETS.includes(checkout.paymentMethod ?? "");
+  if (!isWallet && checkout.status !== "tranzila_charging") return done();
+
+  if (note.amount !== undefined && Math.round(note.amount * 100) !== checkout.priceCents) {
+    logger.error(
+      `[payments] tranzilaNotify amount mismatch checkoutId=${checkoutRef.id} paid=${note.amount} expected=${checkout.priceCents / 100}`
+    );
+    return done();
+  }
+
+  await creditCompletedCheckout({
+    checkoutRef,
+    checkout,
+    checkoutId: checkoutRef.id,
+    provider: "tranzila",
+    providerTransactionId: note.transactionId ?? "unknown",
+  });
+  logger.info(`[payments] tranzilaNotify credited checkoutId=${checkoutRef.id} uid=${checkout.uid}`);
+  done();
+});
+
+function tranzilaSuccessDeepLink(checkoutId: string, transactionId?: string): string {
+  return `teacherminute://payment-return?status=success&order_id=${transactionId ?? "unknown"}&checkout_id=${checkoutId}`;
+}
+
+/** Hosted Fields report the expiry year as YY or YYYY; the API wants YYYY. */
+function normalizeExpiryYear(value: unknown): number {
+  const year = Math.floor(Number(value));
+  if (!Number.isFinite(year)) return NaN;
+  return year < 100 ? 2000 + year : year;
+}
+
+// ─── tranzilaCharge (HTTP) ────────────────────────────────────────────────────
+// Called by the card page with the token Hosted Fields returned. Debits the
+// price stored on the checkout — the browser never states an amount — and
+// credits the minutes. Answers JSON: `{ redirectUrl }` on success, otherwise
+// `{ error, retry }`.
+
+export const tranzilaCharge = onRequest(async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method !== "POST") {
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const checkoutId = typeof body.checkoutId === "string" ? body.checkoutId : "";
+  const token = typeof body.token === "string" ? body.token : "";
+  const expireMonth = Math.floor(Number(body.expiryMonth));
+  const expireYear = normalizeExpiryYear(body.expiryYear);
+
+  if (!checkoutId || !token || !(expireMonth >= 1 && expireMonth <= 12) || !(expireYear >= 2000)) {
+    res.status(400).json({ error: "Invalid card details. Please try again.", retry: true });
+    return;
+  }
+
+  const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
+
+  // Claim the checkout before charging, so a double-tap or a replayed request
+  // can never debit the card twice.
+  const claim = await firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(checkoutRef);
+    if (!snap.exists) return { outcome: "missing" as const };
+    const checkout = snap.data() as PaymentCheckoutDoc;
+    if (checkout.status === "completed") return { outcome: "completed" as const, checkout };
+    if (checkout.status !== "tranzila_created") return { outcome: "busy" as const };
+    tx.update(checkoutRef, { status: "tranzila_charging", updatedAt: Timestamp.now() });
+    return { outcome: "claimed" as const, checkout };
+  });
+
+  if (claim.outcome === "missing") {
+    res.status(404).json({ error: "Checkout not found." });
+    return;
+  }
+  if (claim.outcome === "completed") {
+    res.json({ redirectUrl: tranzilaSuccessDeepLink(checkoutId, claim.checkout.tranzilaTransactionId) });
+    return;
+  }
+  if (claim.outcome === "busy") {
+    res.status(409).json({ error: "This payment is already being processed. Please return to the app." });
+    return;
+  }
+
+  const checkout = claim.checkout;
+  let result;
+  try {
+    const pkgSnap = await firestore.collection("pricing").doc(checkout.packageId).get();
+    const description = (pkgSnap.data() as PricingDoc | undefined)?.name ?? "Lesson minutes";
+    result = await createCardTransaction({
+      token,
+      expireMonth,
+      expireYear,
+      amountCents: checkout.priceCents,
+      currency: checkout.currency,
+      description,
+      checkoutId,
+      uid: checkout.uid,
+    });
+  } catch (err) {
+    if (err instanceof TranzilaApiError) {
+      // Tranzila answered with a refusal: nothing was charged, so the buyer
+      // may try again with the same or another card.
+      logger.warn(`[payments] Tranzila charge declined checkoutId=${checkoutId}`, err);
+      await checkoutRef.update({ status: "tranzila_created", updatedAt: Timestamp.now() });
+      res.status(402).json({
+        error: "The card was declined. Please try another card.",
+        retry: true,
+      });
+      return;
+    }
+    // No answer: the card may or may not have been charged. Leave the checkout
+    // claimed so nothing charges it again, for support to reconcile.
+    logger.error(
+      `[payments] Tranzila charge outcome unknown checkoutId=${checkoutId} uid=${checkout.uid}`,
+      err
+    );
+    res.status(502).json({
+      error: "We could not confirm the payment. Please check your purchases in the app, or contact support, before trying again.",
+    });
+    return;
+  }
+
+  await creditCompletedCheckout({
+    checkoutRef,
+    checkout,
+    checkoutId,
+    provider: "tranzila",
+    providerTransactionId: result.transactionId,
+    extraCheckoutFields: { tranzilaAuthNumber: result.authNumber },
+  });
+
+  res.json({ redirectUrl: tranzilaSuccessDeepLink(checkoutId, result.transactionId) });
 });
 
 // ─── paypalSuccess (HTTP) ─────────────────────────────────────────────────────
