@@ -1719,6 +1719,7 @@ function renderUserDetail(d) {
       <div class="two-col">
         <div>
           <div class="info-row"><div class="info-key">App Version</div><div class="info-val">${esc(ds.appVersion || "—")}${ds.appBuild ? ` <span style="color:var(--muted2)">(${esc(ds.appBuild)})</span>` : ""}</div></div>
+          <div class="info-row"><div class="info-key">Device</div><div class="info-val">${esc(ds.deviceType || "—")}</div></div>
           <div class="info-row"><div class="info-key">Platform</div><div class="info-val">${esc(ds.platform === "android" ? "Android" : ds.platform === "ios" ? "iOS" : ds.platform || "—")} ${esc(ds.osVersion || "")}</div></div>
           <div class="info-row"><div class="info-key">Device Language</div><div class="info-val">${esc(ds.deviceLanguage || "—")}</div></div>
           <div class="info-row"><div class="info-key">App Language</div><div class="info-val">${esc(ds.appLanguage === "he" ? "Hebrew" : ds.appLanguage === "en" ? "English" : ds.appLanguage || "—")}${ds.appLanguageSetting ? ` <span style="color:var(--muted2)">(${ds.appLanguageSetting === "system" ? "follows device" : "chosen in app"})</span>` : ""}</div></div>

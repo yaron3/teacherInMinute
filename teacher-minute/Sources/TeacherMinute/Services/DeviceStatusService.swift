@@ -6,6 +6,7 @@
 import Foundation
 
 #if !os(Android)
+import UIKit
 import FirebaseFirestore
 import FirebaseAuth
 #else
@@ -33,6 +34,7 @@ final class DeviceStatusService {
 	let camera = permissions.captureStatus(for: .camera).rawValue
 	let notifications = await permissions.notificationStatus().rawValue
 	let platform = Self.platform
+	let deviceType = Self.deviceType
 	let osVersion = Self.osVersion
 	let deviceLanguage = LocalizationSupport.deviceLanguageTag
 	let appLanguage = LocalizationSupport.currentLanguageCode
@@ -41,6 +43,7 @@ final class DeviceStatusService {
 	await attempt {
 	  let status: [String: Any] = [
 		"platform": platform,
+		"deviceType": deviceType,
 		"osVersion": osVersion,
 		"appVersion": appVersion,
 		"appBuild": appBuild,
@@ -63,6 +66,22 @@ final class DeviceStatusService {
 	"android"
 #else
 	"ios"
+#endif
+  }
+
+  /// "iPhone", "iPad" or "Android" — the hardware family, finer than `platform`.
+  private static var deviceType: String {
+#if os(Android)
+	"Android"
+#else
+	switch UIDevice.current.userInterfaceIdiom {
+	case .pad: return "iPad"
+	case .phone: return "iPhone"
+	case .mac: return "Mac"
+	case .vision: return "Apple Vision"
+	case .tv: return "Apple TV"
+	default: return "iOS"
+	}
 #endif
   }
 
