@@ -69,10 +69,11 @@ final class DeviceStatusService {
 #endif
   }
 
-  /// "iPhone", "iPad" or "Android" — the hardware family, finer than `platform`.
+  /// "iPhone" or "iPad", or on Android the manufacturer and model such as
+  /// "Google Pixel 3" — finer than `platform`.
   private static var deviceType: String {
 #if os(Android)
-	"Android"
+	AndroidDeviceInfoBridge.deviceModel() ?? "Android"
 #else
 	switch UIDevice.current.userInterfaceIdiom {
 	case .pad: return "iPad"
@@ -86,6 +87,10 @@ final class DeviceStatusService {
   }
 
   private static var osVersion: String {
+#if os(Android)
+	// ProcessInfo reports the Linux kernel version on Android.
+	if let version = AndroidDeviceInfoBridge.osVersion() { return version }
+#endif
 	let v = ProcessInfo.processInfo.operatingSystemVersion
 	return "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
   }

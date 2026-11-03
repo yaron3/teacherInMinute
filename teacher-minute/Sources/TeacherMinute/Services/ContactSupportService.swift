@@ -112,7 +112,8 @@ final class ContactSupportService {
   private static var osVersion: String {
 	let v = ProcessInfo.processInfo.operatingSystemVersion
 #if os(Android)
-	return "Android \(v.majorVersion).\(v.minorVersion)"
+	// ProcessInfo reports the Linux kernel version on Android.
+	return "Android \(AndroidDeviceInfoBridge.osVersion() ?? "\(v.majorVersion).\(v.minorVersion)")"
 #elseif os(iOS)
 	return "iOS \(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
 #else
