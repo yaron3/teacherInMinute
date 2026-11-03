@@ -252,6 +252,12 @@ final class MainTabViewModel {
 	hasUnseenLessons = count > seen
   }
 
+  /// Sends this device's app version and permission states for the admin
+  /// dashboard. Called on entry and whenever the app comes back to the front.
+  func reportDeviceStatus() async {
+	await DeviceStatusService.shared.report()
+  }
+
   /// The user opened the Lessons tab — mark all current lessons as seen.
   func markLessonsTabEntered() {
 	LessonsBadgeStore.markSeen(count: lessonCount)

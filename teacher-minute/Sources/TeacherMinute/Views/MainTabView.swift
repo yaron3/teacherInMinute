@@ -22,6 +22,7 @@ struct MainTabView: View {
   @Environment(\.appRouter) var router
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.layoutDirection) var layoutDirection
+  @Environment(\.scenePhase) var scenePhase
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
@@ -211,6 +212,13 @@ struct MainTabView: View {
 	  if let count = teacherDashboardViewModel?.lessonCount {
 		viewModel.updateLessonCount(count)
 	  }
+	}
+	.onChange(of: scenePhase) { _, phase in
+	  guard phase == .active else { return }
+	  Task { await viewModel.reportDeviceStatus() }
+	}
+	.task {
+	  await viewModel.reportDeviceStatus()
 	}
 	.task {
 	  // The menu's header shows the user's name, email and photo.

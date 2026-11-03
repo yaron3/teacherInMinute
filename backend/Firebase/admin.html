@@ -1706,6 +1706,30 @@ function renderUserDetail(d) {
       <div class="info-row"><div class="info-key">Total Minutes Used</div><div class="info-val">${fs.totalMinutesUsed ?? "—"}</div></div>
       <div class="info-row"><div class="info-key">Questions Asked</div><div class="info-val">${(fs.questions||[]).length}</div></div>`;
 
+  // Written by the app each time it comes to the front (DeviceStatusService).
+  const ds = fs.deviceStatus;
+  const permBadge = s => s === "granted" ? badge("Granted","green")
+    : s === "denied" ? badge("Denied","red")
+    : s === "notDetermined" ? badge("Not asked","yellow")
+    : "—";
+  const deviceHtml = `
+    <hr>
+    <div style="margin-bottom:8px;font-weight:600;font-size:.85rem">Device</div>
+    ${ds ? `
+      <div class="two-col">
+        <div>
+          <div class="info-row"><div class="info-key">App Version</div><div class="info-val">${esc(ds.appVersion || "—")}${ds.appBuild ? ` <span style="color:var(--muted2)">(${esc(ds.appBuild)})</span>` : ""}</div></div>
+          <div class="info-row"><div class="info-key">Platform</div><div class="info-val">${esc(ds.platform === "android" ? "Android" : ds.platform === "ios" ? "iOS" : ds.platform || "—")} ${esc(ds.osVersion || "")}</div></div>
+          <div class="info-row"><div class="info-key">Reported</div><div class="info-val" title="${esc(fmtFull(ds.updatedAt))}">${ago(ds.updatedAt)}</div></div>
+        </div>
+        <div>
+          <div class="info-row"><div class="info-key">Microphone</div><div class="info-val">${permBadge(ds.microphone)}</div></div>
+          <div class="info-row"><div class="info-key">Camera</div><div class="info-val">${permBadge(ds.camera)}</div></div>
+          <div class="info-row"><div class="info-key">Push Notifications</div><div class="info-val">${permBadge(ds.notifications)}</div></div>
+        </div>
+      </div>`
+    : `<div style="color:var(--muted2);font-size:.8rem">Not reported yet — needs an app version that sends it.</div>`}`;
+
   document.getElementById("user-modal-body").innerHTML = `
     ${headerHtml}
     <div class="two-col section-gap">
@@ -1725,6 +1749,7 @@ function renderUserDetail(d) {
         ${balanceHtml}
       </div>
     </div>
+    ${deviceHtml}
     <hr>
     ${profileHtml}
     ${payoutHtml}
