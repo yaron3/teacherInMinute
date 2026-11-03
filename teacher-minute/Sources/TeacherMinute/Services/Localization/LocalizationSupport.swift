@@ -91,6 +91,21 @@ enum LocalizationSupport {
         return "en"
     }
 
+    /// The device's first language as a raw tag such as "he-IL" or "ru-RU",
+    /// whether or not the app supports it. For reporting only.
+    static var deviceLanguageTag: String {
+        #if os(Android)
+        return AndroidLocaleBridge.systemLanguageTag() ?? Locale.current.identifier
+        #else
+        return Locale.preferredLanguages.first ?? Locale.current.identifier
+        #endif
+    }
+
+    /// The raw Settings → Language choice: "system", "english" or "hebrew".
+    static var languagePreference: String {
+        UserDefaults.standard.string(forKey: languagePreferenceKey) ?? SettingsLanguageChoice.system.rawValue
+    }
+
     #if os(Android)
     /// Read once: every localized string resolves the language, and a JNI
     /// round trip per string is not worth tracking a mid-session change of

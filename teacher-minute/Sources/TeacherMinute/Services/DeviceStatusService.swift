@@ -34,6 +34,9 @@ final class DeviceStatusService {
 	let notifications = await permissions.notificationStatus().rawValue
 	let platform = Self.platform
 	let osVersion = Self.osVersion
+	let deviceLanguage = LocalizationSupport.deviceLanguageTag
+	let appLanguage = LocalizationSupport.currentLanguageCode
+	let appLanguageSetting = LocalizationSupport.languagePreference
 	// Built inside the closure: `[String: Any]` is not Sendable, so it can't be captured.
 	await attempt {
 	  let status: [String: Any] = [
@@ -41,6 +44,9 @@ final class DeviceStatusService {
 		"osVersion": osVersion,
 		"appVersion": appVersion,
 		"appBuild": appBuild,
+		"deviceLanguage": deviceLanguage,
+		"appLanguage": appLanguage,
+		"appLanguageSetting": appLanguageSetting,
 		"microphone": microphone,
 		"camera": camera,
 		"notifications": notifications,
