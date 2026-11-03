@@ -25,8 +25,8 @@ final class StudentTutorialViewModel {
   let source: Source
   private(set) var pageIndex = 0
   /// The last page's "Don't show me again" check box, read when the student
-  /// taps Let's start. Off until they tick it.
-  var dontShowAgain = false
+  /// taps Let's start. On until they untick it.
+  var dontShowAgain = true
   /// Called once the tutorial has closed, by any of its ways out.
   private let onClose: () -> Void
 
