@@ -1291,8 +1291,7 @@
     window.addEventListener('load', handleRouting);
 
     // ── App downloads ──────────────────────────────────────────────────────
-    // iOS goes straight to TestFlight. Android is a Play closed test that only
-    // registered testers can install, so it gets the pilot dialog first.
+    // iOS and Android go straight to their store.
     // Anything else is told only iOS and Android are supported.
     // The visitor's App Store country, as the two-letter code in an
     // apps.apple.com link. A browser cannot read the storefront itself, so
@@ -1328,9 +1327,7 @@
         nameHe: 'Pro Teacher',
         nameEn: 'Pro Teacher',
         ios: `https://apps.apple.com/${storeCountry(['il', 'us', 'ca'])}/app/pro-teacher/id6771022216`,
-        android: 'https://play.google.com/store/apps/details?id=com.yaronj.tim',
-        // Public on Google Play: anyone can install, so skip the pilot dialog.
-        androidOpen: true
+        android: 'https://play.google.com/store/apps/details?id=com.yaronj.tim'
       }
     };
     const REGISTER_PILOT_URL = 'https://us-central1-teacher-in-a-moment.cloudfunctions.net/registerPilot';
@@ -1351,11 +1348,11 @@
         window.location.href = APPS[app].ios;
         return;
       }
-      if (platform === 'android' && APPS[app].androidOpen) {
+      if (platform === 'android') {
         window.location.href = APPS[app].android;
         return;
       }
-      openDownloadDialog(app, platform === 'android' ? 'android' : 'unsupported');
+      openDownloadDialog(app, 'unsupported');
     }
 
     function showDownloadStep(step) {
