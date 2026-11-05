@@ -227,6 +227,66 @@ describe("overview", () => {
   });
 });
 
+// ── Live ──────────────────────────────────────────────────────────────────────
+
+describe("live", () => {
+  function live(overrides: any = {}) {
+    return {
+      checkedAt: Date.now(), overall: "ok",
+      checks: [
+        { id: "watchdog", label: "Presence watchdog", state: "ok", detail: "Last sweep under a minute ago" },
+        { id: "queue", label: "Search queue", state: "ok", detail: "0 questions searching" },
+      ],
+      onlineTeachers: 3, answeredLastHour: 7, askedLastHour: 9,
+      ...overrides,
+    };
+  }
+
+  it("shows the status, teachers online and questions answered in the last hour", async () => {
+    page = openConsole({ adminDashboardStatus: dashboard(), adminLiveStatus: live() });
+    await page.signIn();
+    await page.nav("Live");
+
+    expect(page.callsTo("adminLiveStatus")).toHaveLength(1);
+    expect(page.$("#live-banner").className).toContain("ok");
+    expect(page.$("#live-banner").textContent).toContain("All systems operational");
+    const stats = page.$("#live-stats").textContent!;
+    expect(stats).toMatch(/Teachers online\s*3/);
+    expect(stats).toMatch(/Answered · last hour\s*7/);
+    expect(stats).toContain("9 asked in the same hour");
+    expect(page.$$("#live-checks tr")).toHaveLength(2);
+  });
+
+  it("names how many checks need attention, and escapes their text", async () => {
+    page = openConsole({
+      adminDashboardStatus: dashboard(),
+      adminLiveStatus: live({
+        overall: "warn",
+        checks: [{ id: "queue", label: "Search queue", state: "warn", detail: EVIL }],
+      }),
+    });
+    await page.signIn();
+    await page.nav("Live");
+
+    expect(page.$("#live-banner").className).toContain("warn");
+    expect(page.$("#live-banner").textContent).toContain("1 check needs attention");
+    expect(page.$("#live-checks").textContent).toContain(EVIL);
+    expect(page.window.__pwned).toBeUndefined();
+  });
+
+  it("reports the backend as down when the call fails", async () => {
+    page = openConsole({
+      adminDashboardStatus: dashboard(),
+      adminLiveStatus: () => { throw new Error("internal"); },
+    });
+    await page.signIn();
+    await page.nav("Live");
+
+    expect(page.$("#live-banner").className).toContain("down");
+    expect(page.$("#live-banner").textContent).toContain("Backend not responding");
+  });
+});
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 describe("users", () => {
