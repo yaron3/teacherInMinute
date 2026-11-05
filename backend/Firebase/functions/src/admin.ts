@@ -8,6 +8,7 @@ import { recomputeRegisteredTeacherCount, STATS_COLLECTION, PLATFORM_STATS_DOC }
 import { republishAllTeacherPresence, ONLINE_TEACHERS_PATH } from "./presence";
 import { PILOT_COLLECTION } from "./pilot";
 import { summarizeOnlineTeachers } from "./presenceHistory";
+import { readLiveStatus } from "./liveStatus";
 import { DEMO_USER_FIELD, inChunks, readDemoUserUids } from "./demoUsers";
 import { deleteAccountData } from "./accountDeletion";
 import { sendMail, supportSmtpConfig } from "./mailer";
@@ -540,6 +541,13 @@ export const adminDashboardStatus = onCall(async (req) => {
       maxPaymentId,
     },
   };
+});
+
+/** The Live page's poll: system checks, teachers online, questions answered
+ *  in the last hour (see ./liveStatus). */
+export const adminLiveStatus = onCall(async (req) => {
+  assertAdmin(req);
+  return readLiveStatus(Date.now());
 });
 
 // ─── adminListUsers ────────────────────────────────────────────────────────────

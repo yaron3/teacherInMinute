@@ -146,6 +146,20 @@
   .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
   .toolbar input { max-width: 260px; }
   .section-gap { margin-bottom: 24px; }
+  /* ── Live ── */
+  .status-banner {
+    display: flex; align-items: center; gap: 12px; padding: 18px 20px; margin-bottom: 24px;
+    border-radius: 12px; border: 1px solid var(--border); background: var(--card);
+    font-size: 1.1rem; font-weight: 700;
+  }
+  .status-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .status-banner.ok { border-color: rgba(34,197,94,.4); }
+  .status-banner.ok .status-dot { background: var(--green); }
+  .status-banner.warn { border-color: rgba(245,158,11,.4); }
+  .status-banner.warn .status-dot { background: var(--yellow); }
+  .status-banner.down { border-color: rgba(239,68,68,.4); }
+  .status-banner.down .status-dot { background: var(--red); }
+  .status-banner small { display: block; font-size: .8rem; font-weight: 400; color: var(--muted2); margin-top: 2px; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
   .info-row:last-child { border-bottom: none; }
@@ -240,6 +254,7 @@
     </div>
     <div class="nav-section">Monitor</div>
     <div class="nav-item active" onclick="showPage('overview')">📊 Overview</div>
+    <div class="nav-item" onclick="showPage('live')">🟢 Live</div>
     <div class="nav-section">Data</div>
     <div class="nav-item" onclick="showPage('users')">👥 Users</div>
     <div class="nav-item" onclick="showPage('questions')">❓ Questions</div>
@@ -299,6 +314,27 @@
         <div class="table-header"><h3>📚 Active Lessons</h3></div>
         <table><thead><tr><th>Lesson ID</th><th>Student</th><th>Teacher</th><th>Started</th><th>Hard Cap</th><th>Rate</th></tr></thead>
         <tbody id="active-lessons-table"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Live ── -->
+    <div id="page-live" class="page">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="page-title">Live Status</div>
+        <button class="refresh-btn" onclick="loadLive()">↻ Refresh</button>
+      </div>
+      <div class="page-sub" id="live-updated">Refreshes every 30 seconds while this page is open</div>
+      <div id="live-banner" class="status-banner">
+        <span class="status-dot"></span><div>Checking…</div>
+      </div>
+      <div id="live-stats" class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Loading</div><div class="stat-value pulse">…</div></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><h3>System checks</h3></div>
+        <table><thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+        <tbody id="live-checks"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -952,6 +988,7 @@ if (location.protocol === "file:") {
 }
 
 async function doSignOut() {
+  stopLivePolling();
   await auth.signOut();
 }
 
@@ -961,7 +998,9 @@ function showPage(name) {
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   document.getElementById("page-" + name).classList.add("active");
   event.currentTarget.classList.add("active");
+  stopLivePolling();
   if (name === "overview") loadOverview();
+  else if (name === "live") startLivePolling();
   else if (name === "users") loadUsers();
   else if (name === "questions") loadQuestions();
   else if (name === "lessons") loadLessons();
@@ -972,6 +1011,67 @@ function showPage(name) {
   else if (name === "pilot") loadPilot();
   else if (name === "report") loadReportSettings();
   else if (name === "verify") loadVerify();
+}
+
+// ── Live ─────────────────────────────────────────────────────────────────────
+const LIVE_POLL_MS = 30_000;
+const LIVE_LABELS = { ok: "All systems operational", warn: "Needs attention", down: "System down" };
+const LIVE_BADGES = { ok: ["OK", "green"], warn: ["Warning", "yellow"], down: ["Down", "red"] };
+let liveTimer = null;
+let liveInFlight = false;
+
+function startLivePolling() {
+  stopLivePolling();
+  loadLive();
+  liveTimer = setInterval(loadLive, LIVE_POLL_MS);
+}
+function stopLivePolling() {
+  clearInterval(liveTimer);
+  liveTimer = null;
+}
+
+async function loadLive() {
+  if (liveInFlight) return;
+  liveInFlight = true;
+  try {
+    renderLive(await call("adminLiveStatus"));
+  } catch (e) {
+    // The backend itself not answering is the one outage the checks cannot report.
+    renderLiveBanner("down", "Backend not responding", e.message);
+  } finally {
+    liveInFlight = false;
+  }
+}
+
+function renderLiveBanner(state, title, detail) {
+  const el = document.getElementById("live-banner");
+  el.className = "status-banner " + state;
+  el.innerHTML = `<span class="status-dot"></span><div>${esc(title)}${detail ? `<small>${esc(detail)}</small>` : ""}</div>`;
+}
+
+function renderLive(d) {
+  document.getElementById("live-updated").textContent =
+    `Last updated: ${new Date(d.checkedAt).toLocaleTimeString()} · refreshes every 30 seconds while this page is open`;
+  const problems = d.checks.filter(c => c.state !== "ok").length;
+  renderLiveBanner(d.overall, LIVE_LABELS[d.overall] ?? d.overall,
+    problems ? `${problems} check${problems === 1 ? "" : "s"} need${problems === 1 ? "s" : ""} attention` : "");
+
+  document.getElementById("live-stats").innerHTML = `
+    <div class="stat-card ${d.onlineTeachers > 0 ? "stat-green" : "stat-yellow"}">
+      <div class="stat-label">Teachers online</div>
+      <div class="stat-value">${d.onlineTeachers}</div>
+      <div class="stat-sub">Visible to students now</div>
+    </div>
+    <div class="stat-card stat-blue">
+      <div class="stat-label">Answered · last hour</div>
+      <div class="stat-value">${d.answeredLastHour}</div>
+      <div class="stat-sub">${d.askedLastHour} asked in the same hour</div>
+    </div>`;
+
+  document.getElementById("live-checks").innerHTML = d.checks.map(c => {
+    const [label, type] = LIVE_BADGES[c.state] ?? [c.state, "gray"];
+    return `<tr><td>${esc(c.label)}</td><td>${badge(label, type)}</td><td>${esc(c.detail)}</td></tr>`;
+  }).join("");
 }
 
 // ── Overview ─────────────────────────────────────────────────────────────────

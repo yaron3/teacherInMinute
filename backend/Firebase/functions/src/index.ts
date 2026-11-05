@@ -84,6 +84,7 @@ export { validateEmailAddress } from "./emailValidation";
 // Admin dashboard
 export {
   adminDashboardStatus,
+  adminLiveStatus,
   adminListUsers,
   adminSetDemoUsers,
   adminGetUserDetail,

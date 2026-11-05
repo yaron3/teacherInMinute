@@ -24,6 +24,8 @@ export interface PresenceHourBucket {
   onlineSum: number;
   /** Every teacher seen online at any sweep in the hour. */
   uids: string[];
+  /** When the latest sweep ran, so the console can tell the watchdog stopped. */
+  lastSampleMs: number;
 }
 
 export function hourStartOf(ms: number): number {
@@ -47,6 +49,7 @@ export async function recordOnlineTeacherSample(onlineUids: string[], nowMs: num
       samples: (Number(current.samples) || 0) + 1,
       onlineSum: (Number(current.onlineSum) || 0) + onlineUids.length,
       uids: [...uids],
+      lastSampleMs: Math.max(Number(current.lastSampleMs) || 0, nowMs),
     };
     tx.set(ref, bucket);
   });

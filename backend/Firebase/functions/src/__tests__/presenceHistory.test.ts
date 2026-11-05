@@ -31,6 +31,7 @@ describe("recordOnlineTeacherSample", () => {
       samples: 2,
       onlineSum: 4,
       uids: ["anna", "ben", "carl"],
+      lastSampleMs: NOON + 120_000,
     });
   });
 
