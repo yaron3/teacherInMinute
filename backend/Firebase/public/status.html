@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Status · Instant Teacher</title>
+  <!-- Not linked from the site yet, so kept out of search results too. -->
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <!-- The site's stored theme choice, applied before first paint as on index.html. -->
+  <script>
+    (function () {
+      var stored = null;
+      try { stored = localStorage.getItem('theme'); } catch (e) {}
+      if (stored === 'light' || stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', stored);
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* The same tokens as index.html, as bare RGB triples. */
+    :root {
+      --surface-0: 255 255 255;
+      --surface-1: 245 244 250;
+      --surface-2: 255 255 255;
+      --line: 224 222 236;
+      --text-1: 13 12 26;
+      --text-2: 58 56 80;
+      --text-3: 104 101 128;
+      --ok: 22 163 74;
+      --warn: 217 119 6;
+      --down: 220 38 38;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --surface-0: 13 12 26;
+        --surface-1: 20 19 39;
+        --surface-2: 27 26 51;
+        --line: 44 42 74;
+        --text-1: 255 255 255;
+        --text-2: 214 212 230;
+        --text-3: 179 175 202;
+        --ok: 34 197 94;
+        --warn: 245 158 11;
+        --down: 239 68 68;
+      }
+    }
+    :root[data-theme="dark"] {
+      --surface-0: 13 12 26;
+      --surface-1: 20 19 39;
+      --surface-2: 27 26 51;
+      --line: 44 42 74;
+      --text-1: 255 255 255;
+      --text-2: 214 212 230;
+      --text-3: 179 175 202;
+      --ok: 34 197 94;
+      --warn: 245 158 11;
+      --down: 239 68 68;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', 'Assistant', system-ui, sans-serif;
+      background: rgb(var(--surface-1));
+      color: rgb(var(--text-1));
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    html[lang="he"] body { font-family: 'Assistant', 'Inter', system-ui, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 40px 16px 56px; }
+
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    header img { width: 40px; height: auto; }
+    header h1 { font-size: 1.25rem; font-weight: 800; }
+    header p { font-size: .9rem; color: rgb(var(--text-3)); }
+
+    .card {
+      background: rgb(var(--surface-2));
+      border: 1px solid rgb(var(--line));
+      border-radius: 16px;
+    }
+
+    .banner { display: flex; align-items: center; gap: 14px; padding: 22px 24px; margin-bottom: 16px; }
+    .banner h2 { font-size: 1.3rem; font-weight: 800; }
+    .banner p { font-size: .9rem; color: rgb(var(--text-3)); margin-top: 2px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; background: rgb(var(--text-3)); }
+    .ok   .dot { background: rgb(var(--ok));   box-shadow: 0 0 0 5px rgb(var(--ok) / .18); }
+    .warn .dot { background: rgb(var(--warn)); box-shadow: 0 0 0 5px rgb(var(--warn) / .18); }
+    .down .dot { background: rgb(var(--down)); box-shadow: 0 0 0 5px rgb(var(--down) / .18); }
+    .banner.ok   { border-color: rgb(var(--ok) / .45); }
+    .banner.warn { border-color: rgb(var(--warn) / .45); }
+    .banner.down { border-color: rgb(var(--down) / .45); }
+
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .stat { padding: 20px 22px; }
+    .stat-label { font-size: .8rem; font-weight: 600; color: rgb(var(--text-3)); }
+    .stat-value { font-size: 2.4rem; font-weight: 800; line-height: 1.1; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .stat-sub { font-size: .85rem; color: rgb(var(--text-2)); margin-top: 4px; }
+
+    .checks { list-style: none; }
+    .checks li { display: flex; align-items: center; gap: 12px; padding: 16px 22px; }
+    .checks li + li { border-top: 1px solid rgb(var(--line)); }
+    .checks .dot { width: 10px; height: 10px; box-shadow: none; }
+    .checks .name { flex: 1; font-weight: 600; }
+    .checks .state { font-size: .85rem; font-weight: 600; color: rgb(var(--text-3)); }
+    .checks .ok .state   { color: rgb(var(--ok)); }
+    .checks .warn .state { color: rgb(var(--warn)); }
+    .checks .down .state { color: rgb(var(--down)); }
+
+    footer { margin-top: 18px; font-size: .8rem; color: rgb(var(--text-3)); text-align: center; }
+
+    @media (max-width: 480px) {
+      main { padding-top: 24px; }
+      .stats { grid-template-columns: 1fr; }
+      .stat-value { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="logo-mark.png" alt="">
+      <div>
+        <h1 data-t="title"></h1>
+        <p data-t="subtitle"></p>
+      </div>
+    </header>
+
+    <section id="banner" class="card banner" aria-live="polite">
+      <span class="dot"></span>
+      <div><h2 id="banner-title"></h2><p id="banner-detail"></p></div>
+    </section>
+
+    <section class="stats">
+      <div class="card stat">
+        <div class="stat-label" data-t="online"></div>
+        <div class="stat-value" id="online">–</div>
+      </div>
+      <div class="card stat">
+        <div class="stat-label" data-t="answered"></div>
+        <div class="stat-value" id="answered">–</div>
+        <div class="stat-sub" id="asked"></div>
+      </div>
+    </section>
+
+    <ul class="card checks" id="checks"></ul>
+
+    <footer id="updated"></footer>
+  </main>
+
+  <script>
+    // Read-only: the page only fetches /api/status (functions/src/liveStatus.ts),
+    // which Hosting's CDN caches for 30 seconds.
+    const POLL_MS = 30000;
+
+    const STRINGS = {
+      en: {
+        title: 'System Status',
+        subtitle: 'Instant Teacher · Pro Teacher',
+        online: 'Teachers online now',
+        answered: 'Questions answered · last hour',
+        asked: n => `${n} asked in the same hour`,
+        overall: { ok: 'All systems operational', warn: 'Some systems need attention', down: 'Service disruption' },
+        problems: n => n === 1 ? '1 check needs attention' : `${n} checks need attention`,
+        allGood: 'Teachers can be reached and questions are being matched',
+        unavailable: 'Status unavailable',
+        unavailableDetail: 'We could not reach the service. Retrying…',
+        checking: 'Checking…',
+        state: { ok: 'Operational', warn: 'Degraded', down: 'Down' },
+        checks: {
+          watchdog: 'Teacher availability tracking',
+          queue: 'Question matching',
+          presence: 'Teacher list',
+          coverage: 'Teachers on call',
+        },
+        updated: t => `Updated ${t} · refreshes every 30 seconds`,
+      },
+      he: {
+        title: 'מצב המערכת',
+        subtitle: 'מורה לרגע · Pro Teacher',
+        online: 'מורים מחוברים עכשיו',
+        answered: 'שאלות שנענו · בשעה האחרונה',
+        asked: n => `${n} נשאלו באותה שעה`,
+        overall: { ok: 'כל המערכות פועלות', warn: 'נדרשת תשומת לב', down: 'שיבוש בשירות' },
+        problems: n => n === 1 ? 'בדיקה אחת דורשת תשומת לב' : `${n} בדיקות דורשות תשומת לב`,
+        allGood: 'אפשר להגיע למורים והשאלות מותאמות',
+        unavailable: 'המצב אינו זמין',
+        unavailableDetail: 'לא הצלחנו להגיע לשירות. מנסים שוב…',
+        checking: 'בודקים…',
+        state: { ok: 'פועל', warn: 'חלקי', down: 'לא פועל' },
+        checks: {
+          watchdog: 'מעקב זמינות מורים',
+          queue: 'התאמת שאלות',
+          presence: 'רשימת המורים',
+          coverage: 'מורים זמינים',
+        },
+        updated: t => `עודכן ב-${t} · מתעדכן כל 30 שניות`,
+      },
+    };
+
+    // ?lang=he|en wins; otherwise the browser's language.
+    const param = new URLSearchParams(location.search).get('lang');
+    const lang = param === 'he' || param === 'en' ? param
+      : (navigator.language || '').toLowerCase().startsWith('he') ? 'he' : 'en';
+    const T = STRINGS[lang];
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+    document.title = `${T.title} · ${lang === 'he' ? 'מורה לרגע' : 'Instant Teacher'}`;
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = T[el.dataset.t]; });
+
+    const $ = id => document.getElementById(id);
+    const fmt = n => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US').format(n);
+
+    function setBanner(state, title, detail) {
+      $('banner').className = `card banner ${state}`;
+      $('banner-title').textContent = title;
+      $('banner-detail').textContent = detail;
+    }
+
+    function render(d) {
+      const problems = d.checks.filter(c => c.state !== 'ok').length;
+      setBanner(d.overall, T.overall[d.overall] || d.overall, problems ? T.problems(problems) : T.allGood);
+      $('online').textContent = fmt(d.onlineTeachers);
+      $('answered').textContent = fmt(d.answeredLastHour);
+      $('asked').textContent = T.asked(fmt(d.askedLastHour));
+
+      const list = $('checks');
+      list.replaceChildren(...d.checks.map(c => {
+        const li = document.createElement('li');
+        li.className = c.state;
+        const dot = document.createElement('span'); dot.className = 'dot';
+        const name = document.createElement('span'); name.className = 'name';
+        name.textContent = T.checks[c.id] || c.label;
+        const state = document.createElement('span'); state.className = 'state';
+        state.textContent = T.state[c.state] || c.state;
+        li.append(dot, name, state);
+        return li;
+      }));
+
+      const time = new Date(d.checkedAt).toLocaleTimeString(lang === 'he' ? 'he-IL' : 'en-US',
+        { hour: '2-digit', minute: '2-digit' });
+      $('updated').textContent = T.updated(time);
+    }
+
+    let inFlight = false;
+    async function refresh() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const res = await fetch('/api/status', { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        render(await res.json());
+      } catch (e) {
+        setBanner('down', T.unavailable, T.unavailableDetail);
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    setBanner('', T.checking, '');
+    refresh();
+    setInterval(() => { if (!document.hidden) refresh(); }, POLL_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  </script>
+</body>
+</html>

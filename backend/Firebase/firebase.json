@@ -28,7 +28,8 @@
       { "source": "/tranzilaCheckout", "function": "tranzilaCheckout" },
       { "source": "/tranzilaCharge", "function": "tranzilaCharge" },
       { "source": "/tranzilaCheckoutStatus", "function": "tranzilaCheckoutStatus" },
-      { "source": "/paypalCancel", "function": "paypalCancel" }
+      { "source": "/paypalCancel", "function": "paypalCancel" },
+      { "source": "/api/status", "function": "publicLiveStatus" }
     ],
     "redirects": [
       { "source": "/teacher", "destination": "/?get=teacher", "type": 302 },
