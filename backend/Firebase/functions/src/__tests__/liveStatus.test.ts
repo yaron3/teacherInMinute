@@ -1,6 +1,7 @@
 /**
- * The admin console's Live page: system checks, teachers online, and
- * questions answered in the last hour.
+ * The live status: system checks, teachers online, and questions answered in
+ * the last hour — for the admin console's Live page and the public
+ * status.html.
  */
 
 import { FakeTimestamp, fakeFirestore, fakeRtdb, resetFakeFirebase } from "./support/fakeFirebase";
@@ -12,8 +13,11 @@ jest.mock("firebase-admin", () => {
 jest.mock("firebase-admin/firestore", () => ({
   Timestamp: require("./support/fakeFirebase").FakeTimestamp,
 }));
+jest.mock("firebase-functions", () => ({ logger: { error: jest.fn() } }));
+jest.mock("firebase-functions/v2/https", () => ({ onRequest: (handler: unknown) => handler }));
 
 import { readLiveStatus } from "../liveStatus";
+import { publicLiveStatus } from "../publicStatus";
 import { PRESENCE_HOURLY_COLLECTION, hourStartOf } from "../presenceHistory";
 
 const MIN = 60_000;
@@ -131,3 +135,48 @@ test("warns when no teacher is online", async () => {
   expect(s.onlineTeachers).toBe(0);
   expect(check(s, "coverage").state).toBe("warn");
 });
+
+describe("publicLiveStatus", () => {
+  /** A minimal Express response that records what the handler sent. */
+  function response() {
+    const res: any = { statusCode: 200, headers: {} as Record<string, string>, body: undefined as unknown };
+    res.set = (key: string, value: string) => { res.headers[key] = value; return res; };
+    res.status = (code: number) => { res.statusCode = code; return res; };
+    res.json = (body: unknown) => { res.body = body; return res; };
+    res.send = (body: unknown) => { res.body = body; return res; };
+    return res;
+  }
+  const handler = publicLiveStatus as unknown as (req: { method: string }, res: any) => Promise<void>;
+
+  test("answers a GET with the states and counts, without the details, cacheable for 30 seconds", async () => {
+    healthy();
+    question("q1", { status: "completed", createdAt: ts(NOW - 5 * MIN), acceptedAt: ts(NOW - 4 * MIN) });
+    jest.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const res = response();
+    await handler({ method: "GET" }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["Cache-Control"]).toBe("public, max-age=30, s-maxage=30");
+    expect(res.body).toMatchObject({ overall: "ok", onlineTeachers: 1, answeredLastHour: 1, askedLastHour: 1 });
+    expect(res.body.checks).toHaveLength(4);
+    for (const c of res.body.checks) expect(Object.keys(c).sort()).toEqual(["id", "label", "state"]);
+  });
+
+  test("refuses anything but GET", async () => {
+    const res = response();
+    await handler({ method: "POST" }, res);
+    expect(res.statusCode).toBe(405);
+    expect(res.headers.Allow).toBe("GET");
+  });
+
+  test("answers 503, uncached, when the status cannot be read", async () => {
+    jest.spyOn(fakeRtdb, "ref").mockImplementation(() => { throw new Error("rtdb down"); });
+    const res = response();
+    await handler({ method: "GET" }, res);
+    expect(res.statusCode).toBe(503);
+    expect(res.headers["Cache-Control"]).toBe("no-store");
+  });
+});
+
+afterEach(() => jest.restoreAllMocks());

@@ -81,6 +81,9 @@ export { reportTeacher, blockTeacher, unblockTeacher, listBlockedTeachers } from
 // Shared email checking — used by the payout form and available to signup
 export { validateEmailAddress } from "./emailValidation";
 
+// Public, read-only status page (public/status.html)
+export { publicLiveStatus } from "./publicStatus";
+
 // Admin dashboard
 export {
   adminDashboardStatus,
