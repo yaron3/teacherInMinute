@@ -175,6 +175,7 @@ struct StudentIntroView: View {
     }
     .buttonStyle(.plain)
     .disabled(viewModel.isStarting)
+    .accessibilityIdentifier("student_intro_start")
   }
 
   /// The character, with the cyan glow behind his stopwatch and his shadow,

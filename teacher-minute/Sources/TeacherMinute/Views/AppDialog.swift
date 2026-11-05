@@ -115,6 +115,7 @@ struct AppDialogView: View {
                     textContentType: .password,
                     autocapitalization: .never
                 )
+                .accessibilityIdentifier("dialog_secure_input")
             }
 
             VStack(spacing: 10) {

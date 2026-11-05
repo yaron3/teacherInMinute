@@ -128,6 +128,7 @@ struct CompleteProfileView: View {
       .focused($focusedField, equals: .fullName)
       .submitLabel(.next)
       .onSubmit { trackTap("complete_profile_name_return_key"); focusedField = viewModel.showsEmailField ? .email : .phone }
+      .accessibilityIdentifier("complete_profile_full_name")
 
       if viewModel.showsEmailField {
         BrandTextField(
@@ -180,6 +181,7 @@ struct CompleteProfileView: View {
         trackTap("complete_profile_continue")
         viewModel.continueFlow()
       }
+      .accessibilityIdentifier("complete_profile_continue")
     }
     .brandCard()
   }

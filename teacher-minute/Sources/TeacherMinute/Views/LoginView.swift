@@ -141,6 +141,7 @@ struct LoginView: View {
         trackTap("login_submit")
         Task { await viewModel.login() }
       }
+      .accessibilityIdentifier("login_submit")
 
       divider
       socialButtons
@@ -236,6 +237,7 @@ struct LoginView: View {
           .foregroundStyle(theme.brandActionBackground)
       }
       .buttonStyle(.plain)
+      .accessibilityIdentifier("login_sign_up")
     }
     .font(.system(size: 14))
     .frame(maxWidth: .infinity)

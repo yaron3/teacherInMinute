@@ -128,6 +128,7 @@ struct CreateAccountView: View {
       .focused($focusedField, equals: .email)
       .submitLabel(.next)
       .onSubmit { trackTap("sign_up_email_return_key"); focusedField = .password }
+      .accessibilityIdentifier("sign_up_email")
 
       BrandTextField(
         title: viewModel.passwordFieldTitle,
@@ -142,6 +143,7 @@ struct CreateAccountView: View {
       .focused($focusedField, equals: .password)
       .submitLabel(.next)
       .onSubmit { trackTap("sign_up_password_return_key"); focusedField = .confirmPassword }
+      .accessibilityIdentifier("sign_up_password")
 
       BrandTextField(
         title: viewModel.confirmPasswordFieldTitle,
@@ -157,11 +159,12 @@ struct CreateAccountView: View {
       )
       .focused($focusedField, equals: .confirmPassword)
       .submitLabel(.done)
+      .accessibilityIdentifier("sign_up_confirm_password")
 
-      consentRow(isOn: $viewModel.agreedToTerms) {
+      consentRow(isOn: $viewModel.agreedToTerms, identifier: "sign_up_terms") {
         agreementText
       }
-      consentRow(isOn: $viewModel.sendUpdates) {
+      consentRow(isOn: $viewModel.sendUpdates, identifier: "sign_up_updates") {
         consentText(viewModel.marketingOptInText)
       }
 
@@ -169,6 +172,7 @@ struct CreateAccountView: View {
         trackTap("sign_up_continue")
         Task { await viewModel.signup() }
       }
+      .accessibilityIdentifier("sign_up_continue")
 
       divider
       socialButtons
@@ -178,11 +182,12 @@ struct CreateAccountView: View {
   }
 
   /// The sentence, then its box at the far end, as designed.
-  private func consentRow<Content: View>(isOn: Binding<Bool>, @ViewBuilder text: () -> Content) -> some View {
+  private func consentRow<Content: View>(isOn: Binding<Bool>, identifier: String, @ViewBuilder text: () -> Content) -> some View {
     HStack(alignment: .top, spacing: 8) {
       text()
         .frame(maxWidth: .infinity, alignment: .leading)
       BrandCheckbox(isOn: isOn)
+        .accessibilityIdentifier(identifier)
     }
   }
 
