@@ -119,6 +119,7 @@ struct VerifyEmailView: View {
             .tappableFrame()
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("verify_email_not_now")
         .padding(.top, 8)
         .padding(.bottom, 24)
       }

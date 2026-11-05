@@ -4,11 +4,9 @@ import android.content.Context
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
-import com.google.android.gms.tasks.Tasks
 import com.google.firebase.remoteconfig.CustomSignals
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 object AndroidLocaleManager {
     private const val TAG = "LocaleManager"
@@ -56,23 +54,23 @@ object AndroidLocaleManager {
             "" -> deviceLanguageTag()
             else -> languageCode
         }
-        return try {
-            val signals = CustomSignals.Builder()
-                .put("app_language", normalizedCode)
-                .put("language", normalizedCode)
-                .put("locale", Locale.forLanguageTag(normalizedCode).toLanguageTag())
-                .build()
-            Tasks.await(
-                FirebaseRemoteConfig.getInstance().setCustomSignals(signals),
-                5,
-                TimeUnit.SECONDS
-            )
-            Log.i(TAG, "Applied Remote Config custom signals app_language=$normalizedCode")
-            normalizedCode
-        } catch (error: Throwable) {
-            AndroidErrorReporter.report(TAG, "Failed applying Remote Config custom signals app_language=$normalizedCode", error)
-            ""
-        }
+        val signals = CustomSignals.Builder()
+            .put("app_language", normalizedCode)
+            .put("language", normalizedCode)
+            .put("locale", Locale.forLanguageTag(normalizedCode).toLanguageTag())
+            .build()
+        // Not awaited: the Swift callers run on the main thread, where
+        // Tasks.await throws "Must not be called on the main application
+        // thread", so the signals were never set. The SDK writes them on its
+        // background executor, ahead of the fetch every caller starts next.
+        FirebaseRemoteConfig.getInstance().setCustomSignals(signals)
+            .addOnSuccessListener {
+                Log.i(TAG, "Applied Remote Config custom signals app_language=$normalizedCode")
+            }
+            .addOnFailureListener { error ->
+                AndroidErrorReporter.report(TAG, "Failed applying Remote Config custom signals app_language=$normalizedCode", error)
+            }
+        return normalizedCode
     }
 
     /// The device's own language, as set in Android Settings.

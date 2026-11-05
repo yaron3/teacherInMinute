@@ -109,6 +109,7 @@ struct PermissionsSetupView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("permissions_setup_skip")
         .padding(.top, 20)
         .padding(.bottom, 24)
       }
