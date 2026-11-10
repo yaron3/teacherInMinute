@@ -21,6 +21,7 @@ import {
   QuestionStruggle,
 } from "./types";
 import { readRcBoolean } from "./remoteConfig";
+import { deferredInEmulator } from "./emulatorSchedule";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -789,6 +790,7 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
     rateLimits: { maxConcurrentDispatches: 50 },
   },
   async (req) => {
+    if (await deferredInEmulator("evaluateWave", req)) return;
     const { questionId: qid, wave } = req.data;
 
     logger.info(`[evaluateWave] start qid=${qid} wave=${wave}`);
@@ -870,6 +872,7 @@ export const questionWatchdog = onTaskDispatched<{ questionId: string }>(
     rateLimits: { maxConcurrentDispatches: 50 },
   },
   async (req) => {
+    if (await deferredInEmulator("questionWatchdog", req)) return;
     const { questionId: qid } = req.data;
 
     logger.info(`[watchdog] fired qid=${qid}`);

@@ -24,6 +24,7 @@ import { stampAuthoritativeRating } from "./presence";
 import { releaseTeacherBusy } from "./busy";
 import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
 import { readTeacherBonus } from "./emailRewards";
+import { deferredInEmulator } from "./emulatorSchedule";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -1415,6 +1416,7 @@ export const endAbandonedLesson = onTaskDispatched<{ questionId: string; unstart
     rateLimits: { maxConcurrentDispatches: 20 },
   },
   async (req) => {
+    if (await deferredInEmulator("endAbandonedLesson", req)) return;
     const { questionId, unstarted } = req.data;
     if (!questionId) {
       logger.warn("[lessons] endAbandonedLesson missing questionId payload");
@@ -1523,6 +1525,7 @@ export const forceEndLesson = onTaskDispatched<{ lessonId: string }>(
     rateLimits: { maxConcurrentDispatches: 20 },
   },
   async (req) => {
+    if (await deferredInEmulator("forceEndLesson", req)) return;
     const { lessonId } = req.data;
     logger.info(`[lessons] forceEndLesson fired lessonId=${lessonId}`);
 
@@ -1620,6 +1623,7 @@ export const endLostLesson = onTaskDispatched<{
     rateLimits: { maxConcurrentDispatches: 20 },
   },
   async (req) => {
+    if (await deferredInEmulator("endLostLesson", req)) return;
     const { questionId, role, lostAt } = req.data;
     if (!questionId || (role !== "student" && role !== "teacher")) {
       logger.warn("[lessons] endLostLesson missing questionId or role");
