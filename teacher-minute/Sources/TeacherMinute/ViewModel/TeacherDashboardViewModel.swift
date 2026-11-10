@@ -578,6 +578,15 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Questions whose accept the teacher backed out of while it was still on
   /// its way. See `cancelAcceptingInvite`.
   private var withdrawnQuestionIds: Set<String> = []
+  /// Questions `acceptInvite` refused as taken or cancelled, kept off the
+  /// dashboard until the invite list stops naming them.
+  ///
+  /// The backend has already removed their invites, but on a slow connection
+  /// the removal reaches the phone later than the refusal. Android re-reads its
+  /// cached invite list several times a second, so without this the dead card
+  /// would come straight back after the teacher closed the dialog, and could be
+  /// tapped again. See `setInvites`.
+  private var goneQuestionIds: Set<String> = []
   private var demoSimulationTask: Task<Void, Never>?
   private var didLoadProfile = false
   private var didApplyLaunchPresence = false
@@ -1006,8 +1015,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	var conversationTypes: [String: String] = [:]
 	var struggles: [String: String] = [:]
 
+	// A refused question stays hidden only while the list still names it; once
+	// the removal arrives it is forgotten.
+	let listedIds = Set(rows.compactMap { $0["id"] as? String })
+	goneQuestionIds = goneQuestionIds.intersection(listedIds)
+
 	for row in rows {
 	  guard let id = row["id"] as? String,
+			!goneQuestionIds.contains(id),
 			let topic = row["topic"] as? String,
 			let text = row["text"] as? String else {
 		continue
@@ -1252,11 +1267,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		clearActiveCallState()
 		if Self.isCancelledByStudent(error) {
 		  studentCancelledBeforeStart = true
+		  goneQuestionIds.insert(questionId)
+		  inviteIDs = inviteIDs.filter { $0 != questionId }
 		  logger.info("[VM] acceptInvite — the student cancelled first questionId=\(questionId)")
 		  return
 		}
 		if Self.isQuestionUnavailable(error) {
 		  questionUnavailableBeforeStart = true
+		  goneQuestionIds.insert(questionId)
 		  inviteIDs = inviteIDs.filter { $0 != questionId }
 		  logger.info("[VM] acceptInvite — question no longer available questionId=\(questionId)")
 		  return
