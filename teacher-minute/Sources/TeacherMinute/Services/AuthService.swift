@@ -271,21 +271,26 @@ final class AuthService {
 #endif
     logger.info("[Auth] cleared teacher presence ahead of sign out")
   }
-  
+
+  /// Takes the teacher offline first, as `signOut` does: a teacher who
+  /// deleted their account while online otherwise stayed in `onlineTeachers`
+  /// and kept being invited to questions. Afterwards there is no account left
+  /// to write as.
   func deleteCurrentUser() async throws {
     guard let user = Auth.auth().currentUser else {
       throw SettingsError.missingUser
     }
+    clearPresenceBeforeSignOut()
     try await user.delete()
   }
 
   /// The sign-in provider backing the current user (e.g. "password", "google.com", "apple.com").
+  ///
+  /// `providerData` on both platforms: Android's `User.providerID` is always
+  /// "firebase", which made every Android account look unsupported, so an
+  /// email/password user could never delete their account.
   var currentUserProviderID: String? {
-#if os(Android)
-    Auth.auth().currentUser?.providerID
-#else
     Auth.auth().currentUser?.providerData.first?.providerID
-#endif
   }
 
   /// True when the current user signed in with email/password and therefore must
