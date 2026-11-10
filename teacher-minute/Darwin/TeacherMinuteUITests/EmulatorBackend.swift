@@ -93,6 +93,17 @@ struct EmulatorBackend {
         return Account(uid: uid, email: email, password: password, idToken: token)
     }
 
+    /// True when the Auth emulator accepts these credentials.
+    func canSignIn(_ account: Account) async throws -> Bool {
+        let (_, status) = try await raw(
+            "POST",
+            "\(authBase)/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=emulator",
+            body: ["email": account.email, "password": account.password, "returnSecureToken": true],
+            owner: false
+        )
+        return (200..<300).contains(status)
+    }
+
     // MARK: - Firestore
 
     /// Merges `fields` into the document, creating it if needed.

@@ -58,6 +58,15 @@ class EmulatorBackend(private val host: String) {
         return Account(json.getString("localId"), email, password, json.getString("idToken"))
     }
 
+    /** True when the Auth emulator accepts these credentials. */
+    fun canSignIn(account: Account): Boolean {
+        val body = JSONObject().put("email", account.email).put("password", account.password).put("returnSecureToken", true)
+        val (status, _) = request(
+            "POST", "$authBase/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=emulator", body, owner = false
+        )
+        return status in 200..299
+    }
+
     // Firestore
 
     /** Merges `fields` into the document, creating it if needed. */

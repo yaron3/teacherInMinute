@@ -54,8 +54,11 @@ abstract class ProTeacherEmulatorTest {
 
     protected val takenMessages = listOf("Another teacher already answered it", "מורה אחר/ת כבר ענה/תה עליה")
 
+    /** False for a suite that signs in itself, or not at all. */
+    protected open val signsInAtStart = true
+
     @Before
-    fun signInAsNewTeacher() {
+    fun setUpScene() {
         assumeTrue("Firebase emulators not running", backend.isRunning())
         assumeTrue("needs a debug build on the emulators", AndroidFirebaseEmulator.host != null)
 
@@ -88,7 +91,12 @@ abstract class ProTeacherEmulatorTest {
             )
         }
         launchApp()
+        openLoginForm()
+        if (signsInAtStart) signIn()
+    }
 
+    /** From the welcome screen to the login form. */
+    protected fun openLoginForm() {
         // A tap while the welcome screen is still animating in does nothing.
         repeat(5) {
             if (device.hasObject(By.res("email_input"))) return@repeat
@@ -96,10 +104,17 @@ abstract class ProTeacherEmulatorTest {
             device.wait(Until.hasObject(By.res("email_input")), 5_000)
         }
         assertNotNull("the login form never opened", device.wait(Until.findObject(By.res("email_input")), 10_000))
-        type(appTeacher.email, into = "email_input")
-        type(appTeacher.password, into = "password_input")
-        device.findObject(By.res("login_submit")).click()
+    }
 
+    protected fun submitLogin(email: String, password: String) {
+        type(email, into = "email_input")
+        type(password, into = "password_input")
+        device.findObject(By.res("login_submit")).click()
+    }
+
+    /** Signs in as the app's teacher, from the login form to the dashboard. */
+    protected fun signIn() {
+        submitLogin(appTeacher.email, appTeacher.password)
         if (!device.wait(Until.hasObject(By.res("availability_toggle")), 90_000)) {
             capture("sign-in")
             fail("signing in did not reach the teacher dashboard: ${screenText()}")
@@ -124,7 +139,6 @@ abstract class ProTeacherEmulatorTest {
         if (qid.isNotEmpty()) runCatching { backend.merge("questions/$qid", mapOf("status" to "unanswered")) }
     }
 
-    /** AND-D-13: another teacher takes the question while its card is up. */
     // Scene
 
     /** A searching question sent to both teachers, cards delivered. */

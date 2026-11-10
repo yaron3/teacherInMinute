@@ -72,6 +72,16 @@ class ProTeacherEmulatorTestCase: XCTestCase {
     /// as the first teacher on its dashboard.
     @MainActor
     func signInAsNewTeacher() async throws {
+        try await createAccounts()
+        launchApp()
+        openLoginForm()
+        submitLogin(email: appTeacher.email, password: appTeacher.password)
+        XCTAssertTrue(waitForDashboard(timeout: 90), "signing in did not reach the teacher dashboard")
+    }
+
+    /// The app's teacher, the other teacher and a student, in the emulators.
+    @MainActor
+    func createAccounts() async throws {
         guard await backend.isRunning() else {
             throw XCTSkip("Firebase emulators not running; see the header for how to start them")
         }
@@ -101,36 +111,63 @@ class ProTeacherEmulatorTestCase: XCTestCase {
             }
             return false
         }
+    }
 
+    /// Launches Pro Teacher against the emulators. `signedOut` starts it at
+    /// the welcome screen whatever an earlier run left signed in; without it
+    /// the app restores the session it had.
+    @MainActor
+    func launchApp(signedOut: Bool = true) {
         app = XCUIApplication(bundleIdentifier: "com.yaronj.tim")
-        app.launchArguments += [
-            "-firebaseEmulatorHost", EmulatorBackend.host,
-            // Whatever an earlier run left signed in, start at the welcome screen.
-            "-firebaseEmulatorSignOut", "YES",
-        ]
+        app.launchArguments = ["-firebaseEmulatorHost", EmulatorBackend.host]
+        if signedOut { app.launchArguments += ["-firebaseEmulatorSignOut", "YES"] }
         app.launch()
+    }
 
-        let logIn = app.buttons["welcome_log_in"]
-        let dashboard = app.switches["availability_toggle"]
+    /// From the welcome screen to the login form.
+    @MainActor
+    func openLoginForm() {
         // A tap while the welcome screen is still animating in does nothing,
         // so it is repeated until the form opens.
         let emailField = app.textFields["email_input"]
         for _ in 0..<5 where !emailField.exists {
-            XCTAssertTrue(tapWhenHittable(logIn, "the welcome screen's Log in"),
+            XCTAssertTrue(tapWhenHittable(app.buttons["welcome_log_in"], "the welcome screen's Log in"),
                           "the welcome screen's Log in never appeared")
             _ = emailField.waitForExistence(timeout: 5)
         }
+    }
 
-        type(appTeacher.email, into: app.textFields["email_input"], "the login email field")
-        type(appTeacher.password, into: app.secureTextFields["password_input"], "the login password field")
+    @MainActor
+    func submitLogin(email: String, password: String) {
+        let emailField = app.textFields["email_input"]
+        let passwordField = app.secureTextFields["password_input"]
+        clear(emailField)
+        type(email, into: emailField, "the login email field")
+        clear(passwordField)
+        type(password, into: passwordField, "the login password field")
         dismissKeyboard()
         XCTAssertTrue(tapWhenHittable(app.buttons["login_submit"], "Log in"), "Log in was never tappable")
+    }
 
-        let reached = waitForAny([dashboard, app.buttons["availability_toggle"]], timeout: 90) { [self] in
+    /// Empties a text field that may hold an earlier attempt.
+    @MainActor
+    func clear(_ field: XCUIElement) {
+        guard field.waitForExistence(timeout: 10),
+              let value = field.value as? String, !value.isEmpty,
+              value != field.placeholderValue else { return }
+        field.tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count + 2))
+    }
+
+    /// Waits for the teacher dashboard, getting past the first-run prompts.
+    @MainActor
+    func waitForDashboard(timeout: TimeInterval) -> Bool {
+        let reached = waitForAny([app.switches["availability_toggle"], app.buttons["availability_toggle"]],
+                                 timeout: timeout) { [self] in
             _ = tapIfPresent(app.buttons["permissions_setup_skip"])
             _ = tapIfPresent(app.buttons["Not Now"])
         }
-        XCTAssertNotNil(reached, "signing in did not reach the teacher dashboard")
+        return reached != nil
     }
 
     /// A searching question already sent to both teachers, with both cards
