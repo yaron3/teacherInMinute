@@ -926,6 +926,7 @@ struct TeacherDashboardView: View {
 			.frame(height: 36)
 		}
 		.buttonStyle(.plain)
+		.accessibilityIdentifier("invite_decline_\(id)")
 	  }
 	  .padding(.horizontal, 16)
 	  .padding(.bottom, 16)

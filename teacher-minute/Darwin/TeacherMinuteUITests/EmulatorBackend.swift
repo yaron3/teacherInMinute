@@ -39,11 +39,16 @@ struct EmulatorBackend {
     }
 
     /// What a callable answered: its result, or the refusal's status and reason.
-    struct CallOutcome {
+    struct CallOutcome: CustomStringConvertible {
         let succeeded: Bool
         let status: String?
         let reason: String?
         let message: String?
+        var result: [String: Any]? = nil
+
+        var description: String {
+            succeeded ? "succeeded" : "refused status=\(status ?? "-") reason=\(reason ?? "-") message=\(message ?? "-")"
+        }
     }
 
     enum Failure: Error, CustomStringConvertible {
@@ -127,6 +132,28 @@ struct EmulatorBackend {
         _ = try await send("PUT", databaseURL(path), body: value, owner: true)
     }
 
+    /// Merges `value` into what is stored at `path`.
+    func patch(_ path: String, _ value: [String: Any]) async throws {
+        _ = try await send("PATCH", databaseURL(path), body: value, owner: true)
+    }
+
+    func delete(_ path: String) async throws {
+        _ = try await raw("DELETE", databaseURL(path), body: nil, owner: true)
+    }
+
+    /// What is stored at `path`, decoded from JSON; nil when nothing is.
+    func value(_ path: String) async throws -> Any? {
+        let (data, _) = try await raw("GET", databaseURL(path), body: nil, owner: true)
+        let decoded = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        return decoded is NSNull ? nil : decoded
+    }
+
+    /// The names of the children of `path`, without their contents.
+    func childKeys(_ path: String) async throws -> [String] {
+        let (data, _) = try await raw("GET", databaseURL(path) + "&shallow=true", body: nil, owner: true)
+        return ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any]).map { Array($0.keys) } ?? []
+    }
+
     /// Whether anything is stored at `path`.
     func exists(_ path: String) async throws -> Bool {
         let (data, _) = try await raw("GET", databaseURL(path), body: nil, owner: true)
@@ -158,7 +185,10 @@ struct EmulatorBackend {
                 message: error["message"] as? String
             )
         }
-        return CallOutcome(succeeded: json?["result"] != nil, status: nil, reason: nil, message: nil)
+        return CallOutcome(
+            succeeded: json?["result"] != nil, status: nil, reason: nil, message: nil,
+            result: json?["result"] as? [String: Any]
+        )
     }
 
     // MARK: - Transport

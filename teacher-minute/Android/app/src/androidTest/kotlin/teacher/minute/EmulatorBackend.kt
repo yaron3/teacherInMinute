@@ -28,7 +28,13 @@ class EmulatorBackend(private val host: String) {
     data class Account(val uid: String, val email: String, val password: String, val idToken: String)
 
     /** What a callable answered: success, or the refusal's status and reason. */
-    data class CallOutcome(val succeeded: Boolean, val status: String?, val reason: String?, val message: String?)
+    data class CallOutcome(
+        val succeeded: Boolean,
+        val status: String?,
+        val reason: String?,
+        val message: String?,
+        val result: JSONObject? = null,
+    )
 
     fun isRunning(): Boolean = try {
         request("GET", "$authBase/", null, owner = false, timeoutMs = 3_000)
@@ -107,6 +113,28 @@ class EmulatorBackend(private val host: String) {
         check(status in 200..299) { "PUT $path failed: $status $text" }
     }
 
+    /** Merges `value` into what is stored at `path`. */
+    fun patch(path: String, value: JSONObject) {
+        val (status, text) = request("PATCH", "$databaseBase/$path.json?ns=$projectId", value)
+        check(status in 200..299) { "PATCH $path failed: $status $text" }
+    }
+
+    /** What is stored at `path`, as org.json decodes it; null when nothing is. */
+    fun value(path: String): Any? {
+        val (_, text) = request("GET", "$databaseBase/$path.json?ns=$projectId", null)
+        val decoded = org.json.JSONTokener(text.ifBlank { "null" }).nextValue()
+        return if (decoded == JSONObject.NULL) null else decoded
+    }
+
+    fun exists(path: String): Boolean = value(path) != null
+
+    /** The names of the children of `path`, without their contents. */
+    fun childKeys(path: String): List<String> {
+        val (_, text) = request("GET", "$databaseBase/$path.json?ns=$projectId&shallow=true", null)
+        val decoded = org.json.JSONTokener(text.ifBlank { "null" }).nextValue()
+        return (decoded as? JSONObject)?.keys()?.asSequence()?.toList() ?: emptyList()
+    }
+
     // Functions
 
     /** Calls a callable as `account`, the way the apps do. */
@@ -116,7 +144,8 @@ class EmulatorBackend(private val host: String) {
             owner = false, bearer = account.idToken, timeoutMs = 60_000
         )
         val json = JSONObject(text)
-        val error = json.optJSONObject("error") ?: return CallOutcome(json.has("result"), null, null, null)
+        val error = json.optJSONObject("error")
+            ?: return CallOutcome(json.has("result"), null, null, null, json.optJSONObject("result"))
         return CallOutcome(
             succeeded = false,
             status = error.optString("status").ifEmpty { null },
