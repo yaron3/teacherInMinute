@@ -22,6 +22,10 @@ import java.util.Date
  *   AND-D-10  a question the student asks reaches the online teacher
  *   AND-D-21  a teacher who is in a lesson gets no invite
  *   AND-D-23  a teacher the student blocked gets no invite
+ *   AND-D-17  every teacher declines: the search runs to its end
+ *   AND-D-18  nobody answers: at the end the cards close
+ *
+ * The last two wait out the whole search, 90 seconds on the emulators.
  *
  * Run like ProTeacherAcceptRaceTest, with this class's name.
  */
@@ -136,5 +140,56 @@ class ProTeacherDispatchTest : ProTeacherEmulatorTest() {
         Thread.sleep(5_000)
         assertFalse("the blocked teacher was invited", backend.exists("teacherInvites/${appTeacher.uid}/$asked"))
         assertFalse("the blocked teacher's app shows the question", device.hasObject(acceptSelector()))
+    }
+
+    /** AND-D-17: every teacher declines. The question keeps searching until its
+     *  search ends, and only then is unanswered. */
+    @Test
+    fun allDecliningKeepsSearchingUntilTheTimeout() {
+        prepareRealDispatch()
+        val asked = ask()
+        assertTrue("the asked question never reached the app", device.wait(Until.hasObject(acceptSelector()), 20_000))
+        assertTrue("the other online teacher was not invited", waitForInvite(otherTeacher, asked))
+
+        val decline = device.wait(Until.findObject(declineSelector()), 10_000)
+        assertNotNull("no Decline", decline)
+        decline.click()
+        assertTrue("the card stayed after declining", device.wait(Until.gone(acceptSelector()), 15_000))
+        val outcome = backend.call("declineInvite", otherTeacher, JSONObject().put("questionId", asked))
+        assertTrue("declineInvite: $outcome", outcome.succeeded)
+
+        Thread.sleep(5_000)
+        assertEquals("the search ended as soon as everyone declined", "searching", backend.strings("questions/$asked")?.get("status"))
+
+        assertTrue("the question was never declared unanswered", waitForStatus(asked, "unanswered", 150_000))
+        assertFalse("the declined card came back", device.hasObject(acceptSelector()))
+        assertFalse("the timeout showed a dialog", device.hasObject(By.res("dialog_confirm_button")))
+    }
+
+    /** AND-D-18: nobody answers. When the search ends the question is
+     *  unanswered and every teacher's card closes by itself. */
+    @Test
+    fun nobodyAnsweringClosesTheCardsAtTheTimeout() {
+        prepareRealDispatch()
+        val asked = ask()
+        assertTrue("the asked question never reached the app", device.wait(Until.hasObject(acceptSelector()), 20_000))
+        assertTrue("the other online teacher was not invited", waitForInvite(otherTeacher, asked))
+
+        assertTrue("the question was never declared unanswered", waitForStatus(asked, "unanswered", 150_000))
+        assertTrue("the card stayed after the search ended", device.wait(Until.gone(acceptSelector()), 15_000))
+        assertFalse("the app teacher's card was not removed", backend.exists("teacherInvites/${appTeacher.uid}/$asked"))
+        assertFalse("the other teacher's card was not removed", backend.exists("teacherInvites/${otherTeacher.uid}/$asked"))
+        Thread.sleep(2_000)
+        assertFalse("the timeout showed a dialog", device.hasObject(By.res("dialog_confirm_button")))
+    }
+
+    /** Waits until the question's status is `status`. */
+    private fun waitForStatus(question: String, status: String, timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (backend.strings("questions/$question")?.get("status") == status) return true
+            Thread.sleep(2_000)
+        }
+        return false
     }
 }

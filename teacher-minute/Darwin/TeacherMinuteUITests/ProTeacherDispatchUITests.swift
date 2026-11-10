@@ -10,6 +10,10 @@
 //   IOS-D-10  a question the student asks reaches the online teacher
 //   IOS-D-21  a teacher who is in a lesson gets no invite
 //   IOS-D-23  a teacher the student blocked gets no invite
+//   IOS-D-17  every teacher declines: the search runs to its end
+//   IOS-D-18  nobody answers: at the end the cards close
+//
+//  The last two wait out the whole search, 90 seconds on the emulators.
 //
 //  The first two seed a question already sent to both teachers. The last three
 //  have the student ask through the real createQuestion, so dispatch itself
@@ -147,5 +151,65 @@ final class ProTeacherDispatchUITests: ProTeacherEmulatorTestCase {
         let ownCard = try await backend.exists("teacherInvites/\(appTeacher.uid)/\(qid)")
         XCTAssertFalse(ownCard, "the blocked teacher was invited")
         XCTAssertFalse(acceptButton.exists, "the blocked teacher's app shows the question")
+    }
+
+    /// IOS-D-17: every teacher declines. The question keeps searching until its
+    /// search ends, and only then is unanswered.
+    @MainActor
+    func testAllDecliningKeepsSearchingUntilTheTimeout() async throws {
+        try await signInAsNewTeacher()
+        try await prepareRealDispatch()
+        let qid = try await ask()
+        XCTAssertTrue(acceptButton.waitForExistence(timeout: 20), "the asked question never reached the app")
+        let otherInvited = try await waitForInvite(of: otherTeacher, to: qid)
+        XCTAssertTrue(otherInvited, "the other online teacher was not invited")
+
+        let decline = try XCTUnwrap(visibleCardButton("decline"), "Decline was never tappable")
+        decline.tap()
+        XCTAssertTrue(waitForDisappearance(acceptButton, timeout: 15), "the card stayed after declining")
+        let outcome = try await backend.call("declineInvite", as: otherTeacher, data: ["questionId": qid])
+        XCTAssertTrue(outcome.succeeded, "declineInvite: \(outcome)")
+
+        pause(seconds: 5)
+        let midway = try await backend.strings("questions/\(qid)")?["status"]
+        XCTAssertEqual(midway, "searching", "the search ended as soon as everyone declined")
+
+        let ended = try await waitForStatus(of: qid, "unanswered", timeout: 150)
+        XCTAssertTrue(ended, "the question was never declared unanswered")
+        XCTAssertFalse(acceptButton.exists, "the declined card came back")
+        XCTAssertFalse(dialogButton.exists, "the timeout showed a dialog: \(dialogText())")
+    }
+
+    /// IOS-D-18: nobody answers. When the search ends the question is
+    /// unanswered and every teacher's card closes by itself.
+    @MainActor
+    func testNobodyAnsweringClosesTheCardsAtTheTimeout() async throws {
+        try await signInAsNewTeacher()
+        try await prepareRealDispatch()
+        let qid = try await ask()
+        XCTAssertTrue(acceptButton.waitForExistence(timeout: 20), "the asked question never reached the app")
+        let otherInvited = try await waitForInvite(of: otherTeacher, to: qid)
+        XCTAssertTrue(otherInvited, "the other online teacher was not invited")
+
+        let ended = try await waitForStatus(of: qid, "unanswered", timeout: 150)
+        XCTAssertTrue(ended, "the question was never declared unanswered")
+        XCTAssertTrue(waitForDisappearance(acceptButton, timeout: 15), "the card stayed after the search ended")
+        let ownCard = try await backend.exists("teacherInvites/\(appTeacher.uid)/\(qid)")
+        XCTAssertFalse(ownCard, "the app teacher's card was not removed")
+        let otherCard = try await backend.exists("teacherInvites/\(otherTeacher.uid)/\(qid)")
+        XCTAssertFalse(otherCard, "the other teacher's card was not removed")
+        pause(seconds: 2)
+        XCTAssertFalse(dialogButton.exists, "the timeout showed a dialog: \(dialogText())")
+    }
+
+    /// Waits until the question's status is `status`.
+    @MainActor
+    private func waitForStatus(of qid: String, _ status: String, timeout: TimeInterval) async throws -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if try await backend.strings("questions/\(qid)")?["status"] == status { return true }
+            pause(seconds: 2)
+        } while Date() < deadline
+        return false
     }
 }
