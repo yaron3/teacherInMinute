@@ -22,9 +22,12 @@ import org.junit.runner.RunWith
  *             right one still works
  *   AND-A-06  logging out while online takes the teacher offline at once
  *   AND-A-09  deleting the account while online: offline, gone, never invited
+ *   AND-A-12  system Back on login and sign-up returns to the welcome screen
  *
  * AND-A-07, the session surviving a relaunch, is not here: the test runs in
  * the app's own process, so it cannot kill the app and start it cold.
+ *
+ * AND-A-11, logging in offline, is ProTeacherOfflineLoginTest, run on its own.
  *
  * Each test starts on the login form. Run like ProTeacherAcceptRaceTest.
  */
@@ -87,6 +90,28 @@ class ProTeacherAccountTest : ProTeacherEmulatorTest() {
             "still online after deleting the account: ${presence()}",
             waitForPresence(online = false, timeoutMs = 15_000)
         )
+    }
+
+    /** AND-A-12: Back on the login form and on sign-up returns to the welcome
+     *  screen, and the app stays open and signed out. */
+    @Test
+    fun backOnLoginAndSignUpReturnsToWelcome() {
+        device.pressBack()
+        assertTrue("Back on login did not return to the welcome screen",
+            device.wait(Until.hasObject(By.res("welcome_log_in")), 10_000))
+        assertFalse("the login form is still up", device.hasObject(By.res("email_input")))
+
+        val signUp = device.wait(Until.findObject(By.res("welcome_sign_up")), 10_000)
+        assertNotNull("no Sign up on the welcome screen", signUp)
+        signUp.click()
+        assertTrue("sign-up did not open", device.wait(Until.hasObject(By.res("sign_up_email")), 15_000))
+        device.pressBack()
+        assertTrue("Back on sign-up did not return to the welcome screen",
+            device.wait(Until.hasObject(By.res("welcome_log_in")), 10_000))
+
+        assertTrue("the app closed", device.hasObject(By.pkg(context.packageName)))
+        assertFalse("Back left the teacher signed in", device.hasObject(By.res("availability_toggle")))
+        assertNull("Back left someone signed in", com.google.firebase.auth.FirebaseAuth.getInstance().currentUser)
     }
 
     // Steps

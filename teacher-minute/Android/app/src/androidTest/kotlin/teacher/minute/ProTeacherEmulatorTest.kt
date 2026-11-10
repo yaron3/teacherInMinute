@@ -191,8 +191,10 @@ abstract class ProTeacherEmulatorTest {
             "teachers/${otherTeacher.uid}",
             JSONObject().put("status", "online").put("subjects", org.json.JSONArray(listOf(topic)))
         )
+        // The app can take half a minute: after signing in it sets its
+        // presence up twice, and the second pass writes offline first.
         var online = false
-        repeat(30) {
+        repeat(60) {
             if (!online) {
                 online = backend.value("teachers/${appTeacher.uid}/status") == "online"
                 if (!online) Thread.sleep(1_000)
@@ -264,6 +266,11 @@ abstract class ProTeacherEmulatorTest {
 
     protected fun takenDialogShown(): Boolean = takenMessages.any { device.hasObject(By.textContains(it)) }
 
+    /** Every text on screen, for a failure message. An element that goes away
+     *  while it is being read is skipped. */
     protected fun screenText(): String =
-        device.findObjects(By.textContains("")).mapNotNull { it.text }.filter { it.isNotBlank() }.joinToString(" | ")
+        device.findObjects(By.textContains(""))
+            .mapNotNull { runCatching { it.text }.getOrNull() }
+            .filter { it.isNotBlank() }
+            .joinToString(" | ")
 }
