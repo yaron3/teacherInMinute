@@ -32,7 +32,10 @@ object AndroidFunctionsManager {
     private fun callFunctionBlocking(baseUrl: String, functionName: String, payloadJson: String): String {
         Log.i(TAG, "Preparing function $functionName")
         val token = currentUserIdToken()
-        val connection = URL("$baseUrl/$functionName").openConnection() as HttpURLConnection
+        // On the local emulators (debug builds under a test), callables are
+        // served there instead of where Remote Config points.
+        val base = AndroidFirebaseEmulator.functionsBaseUrl ?: baseUrl
+        val connection = URL("$base/$functionName").openConnection() as HttpURLConnection
 
         try {
             Log.i(TAG, "Calling function $functionName")

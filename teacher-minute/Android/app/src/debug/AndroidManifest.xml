@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Merged into debug builds only.
+
+    - Lets them reach the local Firebase emulators over plain HTTP (see
+      res/xml/network_security_config.xml).
+    - Removes Firebase's start-up provider, so that AndroidAppMain starts
+      Firebase itself (AndroidFirebaseEmulator.startFirebase): for the local
+      emulators when an instrumented test asks for them, as usual otherwise.
+      Firebase cannot be started for production and then swapped for the
+      emulators. Release builds keep the provider.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application android:networkSecurityConfig="@xml/network_security_config">
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
+    </application>
+</manifest>
