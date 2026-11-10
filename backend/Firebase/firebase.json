@@ -48,7 +48,10 @@
 	"template": "remote_config_tim.json"
   },
   "emulators": {
+    "auth": { "port": 9099 },
+    "functions": { "port": 5001 },
     "database": { "port": 9000 },
+    "firestore": { "port": 8085 },
     "ui": { "enabled": false },
     "singleProjectMode": true
   }

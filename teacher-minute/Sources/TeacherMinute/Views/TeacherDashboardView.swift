@@ -914,6 +914,9 @@ struct TeacherDashboardView: View {
 	var actions: some View {
 	  VStack(spacing: 10) {
 		FlatPrimaryButton(title: viewModel.acceptQuestionLabel, action: { trackTap("invite_accept"); accept() })
+		  // Per question: the dashboard can hold several cards, and the
+		  // incoming-question overlay repeats the newest one.
+		  .accessibilityIdentifier("invite_accept_\(id)")
 
 		Button(action: { trackTap("invite_decline"); decline() }) {
 		  Text(viewModel.declineLabel)

@@ -942,6 +942,9 @@ final class FunctionsService {
   }
 
   private func functionsBaseURL() async -> String {
+    if let emulatorURL = FirebaseEmulator.functionsBaseURL {
+      return emulatorURL
+    }
     await RemoteConfigService.shared.ready()
     return RemoteConfigService.shared.getURL(baseURLKey)?.absoluteString ?? defaultBaseURL
   }

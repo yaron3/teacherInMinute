@@ -212,9 +212,13 @@ let logger = AppLogger(subsystem: "com.yaronj.tim", category: "TeacherMinute")
   /* SKIP @bridge */@MainActor public func onInit() {
 			logger.debug("onInit")
 			if FirebaseApp.app() == nil {
-			  FirebaseApp.configure()
-			  logger.info("Firebase configured")
-			  AnalyticsService.shared.start()
+			  // Debug builds launched with `-firebaseEmulatorHost` run against
+			  // the local emulators, with Analytics and Crashlytics off.
+			  if !FirebaseEmulator.configureIfRequested() {
+				FirebaseApp.configure()
+				logger.info("Firebase configured")
+				AnalyticsService.shared.start()
+			  }
 			}
 			RemoteConfigService.shared.start()
 			PushNotificationService.shared.configureDelegates()
