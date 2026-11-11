@@ -77,6 +77,10 @@ final class ProTeacherAccountUITests: ProTeacherEmulatorTestCase {
         try await prepareRealDispatch()
         let online = try await waitForPresence(online: true)
         XCTAssertTrue(online, "the teacher never went online")
+        // Records only the server's deletion removes: the app alone used to
+        // delete just the users document and the login.
+        try await backend.merge("teachers/\(appTeacher.uid)", ["bio": "Deleted with the account"])
+        try await backend.merge("users/\(appTeacher.uid)/inbox/welcome", ["title": "Welcome"])
 
         deleteAccount()
 
@@ -84,6 +88,10 @@ final class ProTeacherAccountUITests: ProTeacherEmulatorTestCase {
         XCTAssertFalse(canSignIn, "the deleted account can still sign in")
         let profile = try await backend.strings("users/\(appTeacher.uid)")
         XCTAssertNil(profile, "the deleted teacher's profile is still there")
+        let teacherRecord = try await backend.strings("teachers/\(appTeacher.uid)")
+        XCTAssertNil(teacherRecord, "the deleted teacher's record is still there")
+        let inbox = try await backend.strings("users/\(appTeacher.uid)/inbox/welcome")
+        XCTAssertNil(inbox, "the deleted teacher's inbox is still there")
 
         let qid = try await ask()
         let otherInvited = try await waitForInvite(of: otherTeacher, to: qid)

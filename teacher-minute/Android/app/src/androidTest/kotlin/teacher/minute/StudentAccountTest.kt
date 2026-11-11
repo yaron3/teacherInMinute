@@ -14,8 +14,10 @@ import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import com.google.firebase.auth.FirebaseAuth
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -24,8 +26,11 @@ import org.junit.runner.RunWith
 
 /**
  * The student app's account deletion on Android, against the local Firebase
- * emulators. QA test plan: AND-A-08 — an email/password student deletes their
- * account and it is gone: no Auth user, no profile, no way back in.
+ * emulators. QA test plan:
+ *
+ *   AND-A-05  a student logs out from Settings and no session is left
+ *   AND-A-08  an email/password student deletes their account and it is
+ *             gone: no Auth user, no profile, no way back in
  *
  * It runs in the student flavor and skips itself in Pro Teacher:
  *
@@ -52,6 +57,8 @@ class StudentAccountTest {
 
         student = backend.createAccount("delete.student")
         backend.merge("users/${student.uid}", mapOf("role" to "student", "fullName" to "Delete Student"))
+        // Only the server's deletion removes the profile's subcollections.
+        backend.merge("users/${student.uid}/inbox/welcome", mapOf("title" to "Welcome"))
 
         // The test runs in the app's own process: start signed out, with the
         // prompts the home screen raises already answered.
@@ -67,28 +74,37 @@ class StudentAccountTest {
         device.wait(Until.hasObject(By.pkg(context.packageName).depth(0)), 30_000)
     }
 
+    /** AND-A-05: a student logs out from Settings and is signed out: the
+     *  intro, or the menu offering Log in again, and no session left. */
+    @Test
+    fun loggingOutSignsTheStudentOut() {
+        logIn()
+        openAccountSecurity()
+        tap("settings_row_logOut", "the Log Out row")
+        val confirm = device.wait(Until.findObject(dialogButton), 10_000)
+            ?: failWithScreen("logout-confirm", "the log-out confirmation did not appear")
+        confirm.click()
+
+        val deadline = System.currentTimeMillis() + 30_000
+        while (System.currentTimeMillis() < deadline && FirebaseAuth.getInstance().currentUser?.uid == student.uid) {
+            Thread.sleep(500)
+        }
+        assertNotEquals("logging out left the student signed in", student.uid, FirebaseAuth.getInstance().currentUser?.uid)
+        // Back where a student without an account starts.
+        if (!device.wait(Until.hasObject(By.res("student_intro_start")), 30_000)) {
+            openSideMenu(30_000)
+            if (!device.wait(Until.hasObject(By.res("side_menu_log_in")), 10_000)) {
+                failWithScreen("logout-end", "after logging out the app offers no way to log in again")
+            }
+        }
+        assertTrue("the logged-out account was harmed", backend.canSignIn(student))
+    }
+
     /** AND-A-08: an email/password student deletes their account. */
     @Test
     fun deletingTheAccountRemovesIt() {
-        // Only the home of a student without an account leads to the login form.
-        tap("student_intro_start", "the intro's start button", 60_000)
-        openSideMenu(60_000)
-        tap("side_menu_log_in", "the menu's Log in link")
-        assertNotNull("the login form did not open", device.wait(Until.findObject(By.res("email_input")), 20_000))
-        type(student.email, into = "email_input")
-        type(student.password, into = "password_input")
-        device.findObject(By.res("login_submit")).click()
-        // The home screen: the form is gone and the menu button is back.
-        if (!device.wait(Until.gone(By.res("email_input")), 90_000) ||
-            device.wait(Until.findObject(By.res("side_menu_button")), 30_000) == null
-        ) {
-            failWithScreen("login", "logging in did not reach the home screen")
-        }
-
-        openSideMenu(30_000)
-        tap("side_menu_item_settings", "the menu's Settings row")
-        scrollTo(By.res("settings_row_accountSecurity"))?.click()
-            ?: failWithScreen("settings", "Settings has no Account & Security row")
+        logIn()
+        openAccountSecurity()
         scrollTo(By.res("settings_row_deleteAccount"))?.click()
             ?: failWithScreen("account-security", "Account & Security has no Delete Account row")
 
@@ -115,9 +131,44 @@ class StudentAccountTest {
 
         assertFalse("the deleted account can still sign in", backend.canSignIn(student))
         assertNull("the deleted student's profile is still there", backend.strings("users/${student.uid}"))
+        assertNull("the deleted student's inbox is still there", backend.strings("users/${student.uid}/inbox/welcome"))
     }
 
     // Steps
+
+    /** From the intro, through the menu's Log in, to the student's home. */
+    private fun logIn() {
+        // Only the home of a student without an account leads to the login form.
+        // Tap until the intro is gone: right after a relaunch the previous
+        // activity's intro can still be on screen and swallow the first tap.
+        tap("student_intro_start", "the intro's start button", 60_000)
+        val introDeadline = System.currentTimeMillis() + 30_000
+        while (System.currentTimeMillis() < introDeadline && !device.wait(Until.gone(By.res("student_intro_start")), 3_000)) {
+            runCatching { device.findObject(By.res("student_intro_start"))?.click() }
+        }
+        openSideMenu(60_000)
+        tap("side_menu_log_in", "the menu's Log in link")
+        assertNotNull("the login form did not open", device.wait(Until.findObject(By.res("email_input")), 20_000))
+        type(student.email, into = "email_input")
+        type(student.password, into = "password_input")
+        device.findObject(By.res("login_submit")).click()
+        // The home screen: the form is gone and the menu button is back.
+        if (!device.wait(Until.gone(By.res("email_input")), 90_000) ||
+            device.wait(Until.findObject(By.res("side_menu_button")), 30_000) == null
+        ) {
+            failWithScreen("login", "logging in did not reach the home screen")
+        }
+    }
+
+    private fun openAccountSecurity() {
+        openSideMenu(30_000)
+        tap("side_menu_item_settings", "the menu's Settings row")
+        scrollTo(By.res("settings_row_accountSecurity"))?.click()
+            ?: failWithScreen("settings", "Settings has no Account & Security row")
+        if (!device.wait(Until.hasObject(By.res("settings_row_logOut")), 15_000)) {
+            failWithScreen("account-security", "Account & Security did not open")
+        }
+    }
 
     /** Opens the side menu, skipping the tutorial a new student is shown first. */
     private fun openSideMenu(timeoutMs: Long) {

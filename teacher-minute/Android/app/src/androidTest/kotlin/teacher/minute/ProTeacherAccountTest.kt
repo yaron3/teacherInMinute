@@ -75,11 +75,17 @@ class ProTeacherAccountTest : ProTeacherEmulatorTest() {
         signIn()
         prepareRealDispatch()
         assertTrue("the teacher never went online", waitForPresence(online = true))
+        // Records only the server's deletion removes: the app alone used to
+        // delete just the users document and the login.
+        backend.merge("teachers/${appTeacher.uid}", mapOf("bio" to "Deleted with the account"))
+        backend.merge("users/${appTeacher.uid}/inbox/welcome", mapOf("title" to "Welcome"))
 
         deleteAccount()
 
         assertFalse("the deleted account can still sign in", backend.canSignIn(appTeacher))
         assertNull("the deleted teacher's profile is still there", backend.strings("users/${appTeacher.uid}"))
+        assertNull("the deleted teacher's record is still there", backend.strings("teachers/${appTeacher.uid}"))
+        assertNull("the deleted teacher's inbox is still there", backend.strings("users/${appTeacher.uid}/inbox/welcome"))
 
         val asked = ask()
         assertTrue("dispatch did not run: the other teacher was not invited either", waitForInvite(otherTeacher, asked))
