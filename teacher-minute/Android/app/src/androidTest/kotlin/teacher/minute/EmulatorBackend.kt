@@ -67,7 +67,34 @@ class EmulatorBackend(private val host: String) {
         return status in 200..299
     }
 
+    /** An address no account on the emulators has yet, for a test that signs up. */
+    fun newEmail(prefix: String): String = "$prefix.${System.currentTimeMillis()}.${(100..999).random()}@example.com"
+
+    /** Every Auth user with this address: its uid and sign-in providers. */
+    fun users(withEmail: String): List<Pair<String, List<String>>> {
+        val body = JSONObject().put("email", JSONArray().put(withEmail))
+        val (status, text) = request(
+            "POST", "$authBase/identitytoolkit.googleapis.com/v1/projects/$projectId/accounts:lookup", body
+        )
+        check(status in 200..299) { "accounts:lookup failed: $status $text" }
+        val users = JSONObject(text).optJSONArray("users") ?: return emptyList()
+        return (0 until users.length()).map { index ->
+            val user = users.getJSONObject(index)
+            val info = user.optJSONArray("providerUserInfo") ?: JSONArray()
+            user.optString("localId") to (0 until info.length()).map { info.getJSONObject(it).optString("providerId") }
+        }
+    }
+
     // Firestore
+
+    /** The document's fields in Firestore's REST encoding, or null if it does
+     *  not exist — for values `strings` cannot show, such as maps. */
+    fun fields(path: String): JSONObject? {
+        val (status, text) = request("GET", "$firestoreBase/$path", null)
+        if (status == 404) return null
+        check(status in 200..299) { "GET $path failed: $status $text" }
+        return JSONObject(text).optJSONObject("fields") ?: JSONObject()
+    }
 
     /** Merges `fields` into the document, creating it if needed. */
     fun merge(path: String, fields: Map<String, Any>) {

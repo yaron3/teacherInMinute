@@ -37,6 +37,8 @@ class ProTeacherAccountTest : ProTeacherEmulatorTest() {
     override val signsInAtStart = false
 
     private val dialogButton: BySelector = By.res("dialog_confirm_button")
+    /** "Incorrect email or password.", in either language. */
+    private val wrongPasswordMessages = listOf("Incorrect email or password.", "כתובת המייל או הסיסמה שגויים.")
 
     /** AND-A-03: three wrong passwords, each refused; then the right one. */
     @Test
@@ -45,7 +47,12 @@ class ProTeacherAccountTest : ProTeacherEmulatorTest() {
             submitLogin(appTeacher.email, "Wrong-$attempt-${appTeacher.password}")
             val ok = device.wait(Until.findObject(dialogButton), 30_000)
             assertNotNull("attempt $attempt: no error", ok)
-            println("[ProTeacherAccountTest] refusal $attempt: ${screenText()}")
+            val screen = screenText()
+            println("[ProTeacherAccountTest] refusal $attempt: $screen")
+            assertTrue(
+                "attempt $attempt: the error does not say the email or password is wrong: $screen",
+                wrongPasswordMessages.any { screen.contains(it) }
+            )
             ok.click()
             assertTrue("attempt $attempt: the error stayed", device.wait(Until.gone(dialogButton), 10_000))
             assertTrue("attempt $attempt: the login form is gone", device.hasObject(By.res("email_input")))

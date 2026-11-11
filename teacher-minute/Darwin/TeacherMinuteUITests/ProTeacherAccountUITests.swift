@@ -18,6 +18,9 @@ import XCTest
 
 final class ProTeacherAccountUITests: ProTeacherEmulatorTestCase {
 
+    /// "Incorrect email or password.", in either language.
+    private let wrongPasswordMessages = ["Incorrect email or password.", "כתובת המייל או הסיסמה שגויים."]
+
     /// IOS-A-03: three wrong passwords, each refused with a dialog over the
     /// form; then the right one signs in.
     @MainActor
@@ -29,9 +32,10 @@ final class ProTeacherAccountUITests: ProTeacherEmulatorTestCase {
         for attempt in 1...3 {
             submitLogin(email: appTeacher.email, password: "Wrong-\(attempt)-\(appTeacher.password)")
             XCTAssertTrue(dialogButton.waitForExistence(timeout: 30), "attempt \(attempt): no error")
-            let text = dialogText()
+            let text = app.debugDescription
             attach("refusal \(attempt)", text)
-            XCTAssertFalse(text.isEmpty, "attempt \(attempt): the error says nothing")
+            XCTAssertTrue(wrongPasswordMessages.contains { text.contains($0) },
+                          "attempt \(attempt): the error does not say the email or password is wrong")
             dialogButton.tap()
             XCTAssertTrue(waitForDisappearance(dialogButton, timeout: 10), "attempt \(attempt): the error stayed")
             XCTAssertTrue(app.textFields["email_input"].exists, "attempt \(attempt): the login form is gone")

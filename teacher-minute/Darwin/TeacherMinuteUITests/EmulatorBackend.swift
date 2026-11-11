@@ -104,7 +104,34 @@ struct EmulatorBackend {
         return (200..<300).contains(status)
     }
 
+    /// An address no account on the emulators has yet, for a test that signs up.
+    static func newEmail(prefix: String) -> String {
+        "\(prefix).\(Int(Date().timeIntervalSince1970 * 1000)).\(Int.random(in: 100...999))@example.com"
+    }
+
+    /// Every Auth user with this address: its uid and sign-in providers.
+    func users(withEmail email: String) async throws -> [(uid: String, providers: [String])] {
+        let json = try await send(
+            "POST",
+            "\(authBase)/identitytoolkit.googleapis.com/v1/projects/\(Self.projectID)/accounts:lookup",
+            body: ["email": [email]],
+            owner: true
+        )
+        let users = json?["users"] as? [[String: Any]] ?? []
+        return users.map { user in
+            let providers = (user["providerUserInfo"] as? [[String: Any]] ?? []).compactMap { $0["providerId"] as? String }
+            return (uid: user["localId"] as? String ?? "", providers: providers)
+        }
+    }
+
     // MARK: - Firestore
+
+    /// The document's fields in Firestore's REST encoding, or nil if it does
+    /// not exist — for values `strings` cannot show, such as maps.
+    func fields(_ path: String) async throws -> [String: Any]? {
+        guard let json = try await send("GET", "\(firestoreBase)/\(path)", owner: true, allowMissing: true) else { return nil }
+        return json["fields"] as? [String: Any] ?? [:]
+    }
 
     /// Merges `fields` into the document, creating it if needed.
     func merge(_ path: String, _ fields: [String: Any]) async throws {
