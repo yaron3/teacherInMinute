@@ -284,6 +284,20 @@ final class AuthService {
     try await user.delete()
   }
 
+  /// Deletes the account on the server, which removes everything it owns and
+  /// not just the profile and the login (`FunctionsService.deleteAccount`).
+  /// Call right after `reauthenticate(password:)`: the server wants a fresh
+  /// email/password sign-in. Presence goes first, as in `deleteCurrentUser`,
+  /// and the local session is dropped afterwards, since its Auth user is gone.
+  func deleteAccountOnServer() async throws {
+    guard Auth.auth().currentUser != nil else {
+      throw SettingsError.missingUser
+    }
+    clearPresenceBeforeSignOut()
+    try await FunctionsService.shared.deleteAccount()
+    try? Auth.auth().signOut()
+  }
+
   /// The sign-in provider backing the current user (e.g. "password", "google.com", "apple.com").
   ///
   /// `providerData` on both platforms: Android's `User.providerID` is always

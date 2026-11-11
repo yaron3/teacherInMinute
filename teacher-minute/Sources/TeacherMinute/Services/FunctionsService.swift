@@ -491,6 +491,15 @@ final class FunctionsService {
     )
   }
 
+  /// Deletes the signed-in account and everything it owns — profile, teacher
+  /// record, lessons, questions, purchases, uploads, presence — then its Auth
+  /// user (functions/src/accountDeletion.ts). The server accepts it only from
+  /// an email/password session re-authenticated in the last five minutes, and
+  /// refuses it during a search or a running lesson.
+  func deleteAccount() async throws {
+    _ = try await call(function: "deleteAccount", data: ["confirmDeletion": true])
+  }
+
   /// Deletes the anonymous account a student started with, after they signed
   /// in to one they already had. `idToken` is the anonymous session's, taken
   /// before signing in (functions/src/accountDeletion.ts).

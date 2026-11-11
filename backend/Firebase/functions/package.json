@@ -8,7 +8,7 @@
     "test:integration:presence": "node scripts/test-teacher-presence.js",
     "test:integration:lesson": "node scripts/test-full-lesson.js",
     "test:rules": "firebase emulators:exec --config ../firebase.json --only database --project demo-teacher-in-a-moment \"jest --config jest.emulator.config.js database.rules\"",
-    "emulators:app": "npm run build && firebase emulators:start --config ../firebase.json --only auth,firestore,database,functions --project demo-teacher-in-a-moment",
+    "emulators:app": "npm run build && firebase emulators:start --config ../firebase.json --only auth,firestore,database,storage,functions --project demo-teacher-in-a-moment",
     "test:emulator":"firebase emulators:exec --config ../firebase.json --only database,firestore --project demo-teacher-in-a-moment \"jest --config jest.emulator.config.js\""
   },
   "engines": {
