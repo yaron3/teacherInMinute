@@ -317,7 +317,7 @@ final class AuthService {
   /// raised for sensitive actions (like account deletion) when the session is stale.
   func isRecentLoginRequired(_ error: Error) -> Bool {
     // AuthErrorCode.requiresRecentLogin == 17014
-    (error as NSError).code == 17014
+    firebaseAuthErrorCode(error) == 17014
   }
 
   /// Re-authenticates the current user so sensitive actions are allowed again after
@@ -422,6 +422,23 @@ private func androidAuthErrorMessage(_ error: Error) -> String? {
 }
 #endif
 
+/// The Firebase Auth error code (`FIRAuthErrorCode`'s raw value) behind
+/// `error`. On Android, skip-firebase builds the error with Apple's code, but
+/// it reaches native Swift as a wrapper whose `NSError` code is not that one —
+/// a taken address read as "an unexpected error" — while its description
+/// still says `FIRAuthErrorDomain Code=17007`. So the code is read from the
+/// domain when it is there, and from the description otherwise.
+func firebaseAuthErrorCode(_ error: Error) -> Int {
+    let nsError = error as NSError
+    if nsError.domain == "FIRAuthErrorDomain" { return nsError.code }
+    let text = String(describing: error)
+    if let range = text.range(of: "FIRAuthErrorDomain Code=[0-9]+", options: .regularExpression),
+       let code = Int(text[range].split(separator: "=").last ?? "") {
+        return code
+    }
+    return nsError.code
+}
+
 /// Maps a Firebase Auth error code to a localized, user-visible message.
 /// Firebase's `localizedDescription` always returns English strings from the SDK;
 /// this function translates the numeric code into a key that LocalizationSupport can look up.
@@ -431,10 +448,12 @@ func localizedAuthErrorMessage(_ error: Error) -> String {
         return message
     }
 #endif
-    switch (error as NSError).code {
+    switch firebaseAuthErrorCode(error) {
     case 17007: return LocalizationSupport.localized("This email address is already in use.")
     case 17008: return LocalizationSupport.localized("Please enter a valid email address.")
-    case 17009, 17011: return LocalizationSupport.localized("Incorrect email or password.")
+    // 17004 is what a wrong password or unknown address becomes once email
+    // enumeration protection is on, on both platforms.
+    case 17004, 17009, 17011: return LocalizationSupport.localized("Incorrect email or password.")
     case 17010: return LocalizationSupport.localized("Too many failed attempts. Please try again later.")
     case 17020: return LocalizationSupport.localized("A network error occurred. Please try again.")
     default:    return LocalizationSupport.localized("An unexpected error occurred. Please try again.")

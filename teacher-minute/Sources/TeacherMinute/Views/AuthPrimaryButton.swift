@@ -123,6 +123,7 @@ struct SubjectChip: View {
       }
     }
     .buttonStyle(.plain)
+    .accessibilityIdentifier("subject_chip_\(subject.key)")
   }
 }
 

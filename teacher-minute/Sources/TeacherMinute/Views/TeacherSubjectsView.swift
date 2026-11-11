@@ -149,6 +149,7 @@ struct TeacherSubjectsView: View {
       trackTap("teacher_subjects_continue")
       viewModel.continueOnboarding()
     }
+    .accessibilityIdentifier("teacher_subjects_continue")
     .padding(.top, 8)
   }
 
@@ -199,5 +200,6 @@ struct SubjectAreaChip: View {
       }
     }
     .buttonStyle(.plain)
+    .accessibilityIdentifier("teacher_subject_area_\(area.id)")
   }
 }

@@ -165,6 +165,7 @@ final class CreateAccountViewModel {
 	  // onboarding step for this app's role.
 	  destination = UserService.shared.onboardingStart
 	} catch {
+	  logger.error("[CreateAccount] email sign-up failed: \(String(describing: error))")
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": error.localizedDescription])
 	  AnalyticsService.shared.recordError(error, context: "signup")
 	  alertMessage = localizedAuthErrorMessage(error)
