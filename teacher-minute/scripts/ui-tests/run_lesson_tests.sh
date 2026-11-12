@@ -16,6 +16,11 @@
 #   out-of-minutes  a student with 2 minutes: the warning, the hold at
 #                 nothing left, the teacher waiting, then the student ends
 #                 (IOS-L-05)
+#   never-joined  the teacher takes it and the student's app is gone at once:
+#                 the abandoned-lesson check closes it, nothing billed (IOS-L-06)
+#   dropped-out   the student's app is gone 40 s in: the teacher sees it
+#                 reconnecting, then the lesson ends, billed for the time
+#                 talked (IOS-L-07)
 #   two-phones    the teacher signed in on both simulators at once, both
 #                 online; both tap Accept on one question together and only
 #                 one gets the lesson (IOS-E-03). Not part of a full run.
@@ -93,6 +98,8 @@ PAIRS=(
   "teacher-ends|ProTeacherLessonUITests/testTeachingALessonAndEndingIt|StudentAskUITests/testTakingALessonTheTeacherEndsThenSkippingTheRating"
   "report|ProTeacherLessonUITests/testTeachingALessonTheStudentEndsAndReports|StudentAskUITests/testEndingALessonThenReportingAndBlockingTheTeacher"
   "out-of-minutes|ProTeacherLessonUITests/testTeachingUntilTheStudentRunsOut|StudentAskUITests/testRunningOutOfMinutesHoldsThenEndsTheLesson"
+  "never-joined|ProTeacherLessonUITests/testWaitingForAStudentWhoNeverJoins|StudentAskUITests/testLeavingRightAfterTheAcceptIsNotBilled"
+  "dropped-out|ProTeacherLessonUITests/testTheStudentDropsOutAndDoesNotReturn|StudentAskUITests/testDroppingOutMidLessonBillsOnlyTheTimeTalked"
   "two-phones|ProTeacherTwoPhonesUITests/testOneTeacherOnTwoPhones|ProTeacherTwoPhonesUITests/testOneTeacherOnTwoPhones"
 )
 status=0

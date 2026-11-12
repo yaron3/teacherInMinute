@@ -343,9 +343,13 @@ class ProTeacherEmulatorTestCase: XCTestCase {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.04)).tap()
         if waitForDisappearance(app.keyboards.firstMatch, timeout: 3) { return }
         // On a phone without a notch (an SE) that tap lands on the status bar,
-        // which leaves the keyboard up: tapped again below it, clear of the
-        // controls.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+        // which leaves the keyboard up: its own Done key closes it. (Not a
+        // second tap on the screen: lower down it can land on a control, such
+        // as the lesson's Chat/Board switch.)
+        for key in ["Done", "done"] where app.keyboards.buttons[key].exists {
+            app.keyboards.buttons[key].tap()
+            break
+        }
         _ = waitForDisappearance(app.keyboards.firstMatch, timeout: 3)
     }
 

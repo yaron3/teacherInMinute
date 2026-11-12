@@ -385,6 +385,66 @@ final class StudentAskUITests: XCTestCase {
         XCTAssertEqual(left ?? -1, 0, "a 2-minute student ended with \(left.map(String.init) ?? "none") minutes")
     }
 
+    /// IOS-L-06 — pairs with ProTeacherLessonUITests'
+    /// testWaitingForAStudentWhoNeverJoins. The teacher takes the question and
+    /// the student's app is gone that moment (swiped away before connecting):
+    /// the backend's abandoned-lesson check closes the lesson, and the student
+    /// is not billed.
+    @MainActor
+    func testLeavingRightAfterTheAcceptIsNotBilled() async throws {
+        let (_, student, qid) = try await askForATextLesson(minutes: 60)
+        var status = ""
+        for _ in 0..<600 where !["accepted", "in_progress"].contains(status) {
+            status = stringValue(try await backend.fields("questions/\(qid)")?["status"]) ?? ""
+            if !["accepted", "in_progress"].contains(status) { try await Task.sleep(nanoseconds: 200_000_000) }
+        }
+        try require(["accepted", "in_progress"].contains(status), "the teacher's half never took the question (\(status))")
+        app.terminate()
+
+        // Within the 2-minute grace, or the 5-minute check for a lesson that
+        // never started if the app had joined before it went.
+        var question: [String: Any] = [:]
+        let deadline = Date().addingTimeInterval(400)
+        repeat {
+            question = try await backend.fields("questions/\(qid)") ?? [:]
+            if stringValue(question["status"]) != "cancelled" { try await Task.sleep(nanoseconds: 2_000_000_000) }
+        } while stringValue(question["status"]) != "cancelled" && Date() < deadline
+        attach("closed", "status=\(stringValue(question["status"]) ?? "") endedBy=\(stringValue(question["endedBy"]) ?? "") reason=\(stringValue(question["endedReason"]) ?? "")")
+        XCTAssertEqual(stringValue(question["status"]), "cancelled", "the lesson nobody joined was never closed")
+        XCTAssertEqual(stringValue(question["endedBy"]), "system")
+        let billed = (question["billedSeconds"] as? [String: Any])?["integerValue"] as? String
+        XCTAssertEqual(billed, "0", "a lesson the student never joined was billed")
+        let left = Int(((try await backend.fields("users/\(student.uid)")?["remainingMinutes"]) as? [String: Any])?["integerValue"] as? String ?? "")
+        XCTAssertEqual(left, 60, "the student was charged for a lesson never joined")
+    }
+
+    /// IOS-L-07 — pairs with ProTeacherLessonUITests'
+    /// testTheStudentDropsOutAndDoesNotReturn. About 40 s into the lesson the
+    /// student's app is gone (as a lost connection): the teacher sees it
+    /// reconnecting, and when it does not come back the lesson ends, billed
+    /// for the time talked only.
+    @MainActor
+    func testDroppingOutMidLessonBillsOnlyTheTimeTalked() async throws {
+        let (_, student, qid) = try await joinALesson()
+        pause(seconds: 40)
+        app.terminate()
+
+        var question: [String: Any] = [:]
+        let deadline = Date().addingTimeInterval(180)
+        repeat {
+            question = try await backend.fields("questions/\(qid)") ?? [:]
+            if stringValue(question["status"]) != "completed" { try await Task.sleep(nanoseconds: 2_000_000_000) }
+        } while stringValue(question["status"]) != "completed" && Date() < deadline
+        let seconds = Int((question["lessonSeconds"] as? [String: Any])?["integerValue"] as? String ?? "") ?? -1
+        attach("ended", "status=\(stringValue(question["status"]) ?? "") endedBy=\(stringValue(question["endedBy"]) ?? "") lessonSeconds=\(seconds)")
+        XCTAssertEqual(stringValue(question["status"]), "completed", "the lesson did not end after the student dropped out")
+        // About 40 s talked; not the 30 s of grace after it, nor the wait.
+        XCTAssertTrue((30...65).contains(seconds), "the lesson was billed \(seconds) s for about 40 s talked")
+        let left = Int(((try await backend.fields("users/\(student.uid)")?["remainingMinutes"]) as? [String: Any])?["integerValue"] as? String ?? "")
+        let expected = 60 - (seconds < 30 ? 0 : max(1, seconds / 60 + (seconds % 60 > 30 ? 1 : 0)))
+        XCTAssertEqual(left, expected, "charged otherwise than for the time talked")
+    }
+
     /// IOS-R-03, IOS-R-04 — pairs with testTeachingALessonTheStudentEnds. From
     /// the rating screen the student reports the teacher, blocking them too:
     /// the report is stored and the teacher is on their blocked list. Then
@@ -481,7 +541,7 @@ final class StudentAskUITests: XCTestCase {
     /// A signed-in student who asks; the teacher's half takes it; returns once
     /// the student is in the text lesson.
     @MainActor
-    private func joinALesson(minutes: Int = 60) async throws -> (teacher: String, student: EmulatorBackend.Account, qid: String) {
+    private func askForATextLesson(minutes: Int) async throws -> (teacher: String, student: EmulatorBackend.Account, qid: String) {
         guard let teacher = ProcessInfo.processInfo.environment["LESSON_TEACHER_UID"] else {
             throw XCTSkip("run through scripts/ui-tests/run_lesson_tests.sh, which starts the teacher's half too")
         }
@@ -519,7 +579,14 @@ final class StudentAskUITests: XCTestCase {
             if chosen != "text" { try await Task.sleep(nanoseconds: 500_000_000) }
         }
         try require(chosen == "text", "choosing text did not reach the question (\(chosen))")
+        return (teacher, student, qid)
+    }
 
+    /// As far as a text lesson asked for and the teacher's half about to take
+    /// it; then into the lesson.
+    @MainActor
+    private func joinALesson(minutes: Int = 60) async throws -> (teacher: String, student: EmulatorBackend.Account, qid: String) {
+        let (teacher, student, qid) = try await askForATextLesson(minutes: minutes)
         let end = app.buttons["session_end_button"]
         let textOnly = app.buttons["connection_setup_continue_as_text"]
         let entered = waitForAny([end, textOnly], timeout: 300)

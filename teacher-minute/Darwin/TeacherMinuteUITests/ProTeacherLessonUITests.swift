@@ -42,6 +42,51 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         try await waitForTheStudentToEnd(uid: uid, qid: qid)
     }
 
+    /// IOS-L-06 — pairs with the student's
+    /// testLeavingRightAfterTheAcceptIsNotBilled: the teacher takes the
+    /// question and waits for the student, who never arrives; when the backend
+    /// closes the lesson the teacher is told and freed.
+    @MainActor
+    func testWaitingForAStudentWhoNeverJoins() async throws {
+        let (uid, _) = try await joinTheStudentsLesson(untilInTheLesson: false)
+        // The teacher waits for the student, until the lesson is written off
+        // and they are told so.
+        let waiting = app.descendants(matching: .any)["connection_setup_connecting"]
+        let lesson = app.buttons["session_end_button"]
+        try require(waitForAny([waiting, lesson], timeout: 60) != nil, "taking the question led nowhere")
+        let notice = app.buttons["dialog_confirm_button"]
+        try require(notice.waitForExistence(timeout: 420), "the teacher was never told the student did not come")
+        attach("notice", dialogText())
+        notice.tap()
+        try await expectFreeOnTheDashboard(uid)
+    }
+
+    /// IOS-L-07 — pairs with the student's
+    /// testDroppingOutMidLessonBillsOnlyTheTimeTalked: the student drops out;
+    /// the teacher sees them reconnecting, and when they do not return the
+    /// lesson ends and the teacher is freed.
+    @MainActor
+    func testTheStudentDropsOutAndDoesNotReturn() async throws {
+        let (uid, _) = try await joinTheStudentsLesson()
+        let reconnecting = app.staticTexts["session_banner_peer_reconnecting"]
+        try require(reconnecting.waitForExistence(timeout: 150), "the teacher was not shown the student reconnecting")
+        attach("reconnecting", reconnecting.label)
+        try await waitForTheLessonToEnd(timeout: 120)
+        try await expectFreeOnTheDashboard(uid)
+    }
+
+    /// Until the lesson screen is gone, closing any note it shows on the way.
+    @MainActor
+    private func waitForTheLessonToEnd(timeout: TimeInterval) async throws {
+        let end = app.buttons["session_end_button"]
+        let deadline = Date().addingTimeInterval(timeout)
+        while end.exists && Date() < deadline {
+            _ = tapIfPresent(app.buttons["chat_end_prompt_primary"])
+            pause(seconds: 2)
+        }
+        try require(!end.exists, "the lesson never ended for the teacher")
+    }
+
     /// IOS-L-05 — pairs with the student's
     /// testRunningOutOfMinutesHoldsThenEndsTheLesson: the student runs out;
     /// the teacher is told, chooses to wait under the notice, and is freed
@@ -107,7 +152,7 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
     /// text question and takes it; returns the teacher's uid and the
     /// question once in the lesson.
     @MainActor
-    private func joinTheStudentsLesson() async throws -> (uid: String, qid: String) {
+    private func joinTheStudentsLesson(untilInTheLesson: Bool = true) async throws -> (uid: String, qid: String) {
         let env = ProcessInfo.processInfo.environment
         guard let email = env["LESSON_TEACHER_EMAIL"], let password = env["LESSON_TEACHER_PASSWORD"],
               let uid = env["LESSON_TEACHER_UID"] else {
@@ -176,6 +221,7 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         // a test left searching; this one becomes a lesson the student's half
         // still checks, so it must not be touched.
         currentQid = ""
+        if !untilInTheLesson { return (uid, qid) }
 
         let end = app.buttons["session_end_button"]
         let textOnly = app.buttons["connection_setup_continue_as_text"]
@@ -205,6 +251,8 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         field.typeText(Self.teacherMessage)
         try require(tapWhenHittable(app.buttons["chat_send_button"], "Send"), "the message could not be sent")
         dismissKeyboard()
+        // Still on the chat, whatever closing the keyboard touched.
+        _ = tapIfPresent(chat)
 
         let mine = app.staticTexts[Self.teacherMessage]
         let reply = app.staticTexts[Self.studentReply]
