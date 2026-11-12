@@ -108,6 +108,7 @@ struct TeacherIdentityVerificationView: View {
           action: {}
         )
       }
+      .accessibilityIdentifier("identity_front_upload")
 #else
       Button {
         trackTap("identity_front_pick")
@@ -147,6 +148,7 @@ struct TeacherIdentityVerificationView: View {
         viewModel.submitForReview()
       }
     }
+    .accessibilityIdentifier("identity_submit")
     .padding(.top, 8)
 
     BrandSecondaryButton(title: viewModel.continueUploadLaterLabel) {
@@ -155,6 +157,7 @@ struct TeacherIdentityVerificationView: View {
         viewModel.onSubmit?()
       }
     }
+    .accessibilityIdentifier("identity_upload_later")
   }
 
   // MARK: - Picker label helpers (Android / preview)
@@ -300,6 +303,7 @@ struct TeacherIdentityVerificationView: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
       BrandCheckbox(isOn: $viewModel.acceptedTerms)
+        .accessibilityIdentifier("identity_terms")
     }
   }
 

@@ -117,9 +117,9 @@ class ProTeacherEmulatorTestCase: XCTestCase {
     /// the welcome screen whatever an earlier run left signed in; without it
     /// the app restores the session it had.
     @MainActor
-    func launchApp(signedOut: Bool = true) {
+    func launchApp(signedOut: Bool = true, extraArguments: [String] = []) {
         app = XCUIApplication(bundleIdentifier: "com.yaronj.tim")
-        app.launchArguments = ["-firebaseEmulatorHost", EmulatorBackend.host]
+        app.launchArguments = ["-firebaseEmulatorHost", EmulatorBackend.host] + extraArguments
         if signedOut { app.launchArguments += ["-firebaseEmulatorSignOut", "YES"] }
         app.launch()
     }

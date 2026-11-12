@@ -8,6 +8,10 @@
 //   IOS-T-01  email sign-up through every onboarding step reaches the
 //             dashboard: one new Auth user (password), users/{uid}.role
 //             teacher, with the name and phone typed
+//   IOS-T-04  with teacher_identity_onboarding on (the app's debug override),
+//             the ID step comes first; the front alone, from the library, is
+//             recorded as govId_{uid}_front and is enough to go on to the
+//             subjects
 //   IOS-T-05  with teacher_identity_onboarding off — its default, and the
 //             emulators have no Remote Config — sign-up goes straight to the
 //             profile, with no ID step
@@ -64,6 +68,58 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
         XCTAssertEqual(profile["role"], "teacher")
         XCTAssertEqual(profile["fullName"], "Signup Teacher")
         XCTAssertEqual(profile["phoneNumber"], "0521234567")
+    }
+
+    /// IOS-T-04: with teacher_identity_onboarding on, sign-up asks for an ID
+    /// first; the front alone, from the library, is enough to go on, and it is
+    /// recorded as govId_{uid}_front. The switch is set for this launch only,
+    /// with the app's debug override: the emulators have no Remote Config.
+    @MainActor
+    func testTheIDStepTakesTheFrontAlone() async throws {
+        try await createAccounts()
+        let email = EmulatorBackend.newEmail(prefix: "id.teacher")
+        let password = "Emulator-\(Int.random(in: 100_000...999_999))"
+        launchApp(extraArguments: ["-rcOverride.teacher_identity_onboarding", "YES"])
+        openSignUpForm()
+        fillSignUp(email: email, password: password, confirmation: password, agreeToTerms: true)
+        submitSignUp()
+
+        let front = app.buttons["identity_front_upload"]
+        XCTAssertTrue(front.waitForExistence(timeout: 60), "signing up did not reach the ID step")
+        XCTAssertFalse(nameField.exists, "the profile came before the ID step")
+        let submit = app.buttons["identity_submit"]
+        XCTAssertFalse(submit.isEnabled, "the ID step could be sent with nothing uploaded")
+
+        // The front, from the library: a simulator has no camera.
+        XCTAssertTrue(tapWhenHittable(front, "the ID front"), "the ID front could not be tapped")
+        let library = app.buttons.containing(NSPredicate(format: "label CONTAINS[c] 'library' OR label CONTAINS 'גלריה' OR label CONTAINS 'ספרי'")).firstMatch
+        XCTAssertTrue(tapWhenHittable(library, "Choose from Library", timeout: 15), "the ID front offered no library")
+        pause(seconds: 3) // the picker sliding up
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.165, dy: 0.43)).tap()
+
+        let signedUp = try await backend.users(withEmail: email)
+        let uid = try XCTUnwrap(signedUp.first?.uid, "no Auth user for the sign-up")
+        var documents: [String] = []
+        for _ in 0..<60 where !documents.contains("govId_\(uid)_front") {
+            let fields = try await backend.fields("users/\(uid)") ?? [:]
+            documents = (((fields["uploadedDocuments"] as? [String: Any])?["arrayValue"] as? [String: Any])?["values"]
+                as? [[String: Any]])?.compactMap { $0["stringValue"] as? String } ?? []
+            if !documents.contains("govId_\(uid)_front") { pause(seconds: 0.5) }
+        }
+        XCTAssertEqual(documents, ["govId_\(uid)_front"], "the uploaded documents are \(documents)")
+
+        // Front only, no back and no selfie: with the declaration ticked, on.
+        let terms = app.descendants(matching: .any)["identity_terms"]
+        scrollToHittable(terms)
+        XCTAssertTrue(tapWhenHittable(terms, "the declaration"), "the declaration could not be ticked")
+        scrollToHittable(submit)
+        let deadline = Date().addingTimeInterval(10)
+        while !submit.isEnabled && Date() < deadline { pause(seconds: 0.5) }
+        XCTAssertTrue(submit.isEnabled, "the front alone does not let the teacher go on")
+        XCTAssertTrue(tapWhenHittable(submit, "Submit for review"), "Submit for review was never tappable")
+        // The ID step leads on to the subjects (TeacherIdentityVerificationView).
+        XCTAssertTrue(app.buttons["teacher_subjects_continue"].waitForExistence(timeout: 30),
+                      "the ID step did not lead on to the subjects")
     }
 
     /// IOS-T-07: the profile's Continue stays off until there is a name and
