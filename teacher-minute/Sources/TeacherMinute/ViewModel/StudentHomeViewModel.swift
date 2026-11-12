@@ -811,6 +811,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
         conversationType: conversationType
       )
 	  logger.info("TeacherMinute askTeacher created questionId=\(result.questionId)")
+      // The student closed the search while the question was being created:
+      // cancelSearch had no id to cancel then, so cancel it now, rather than
+      // reopening a search they left and sending it out to teachers.
+      guard isSendingQuestion else {
+        logger.info("TeacherMinute askTeacher closed while sending; cancelling questionId=\(result.questionId)")
+        await attempt({ try await FunctionsService.shared.cancelQuestion(questionId: result.questionId) })
+        return
+      }
       activeQuestionText = text
       createdQuestion = result
       searchState = .searching(questionId: result.questionId)
@@ -818,6 +826,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       // Whatever the student chose while the question was being created.
       flushSearchDetails()
     } catch let err as FunctionsError {
+      // Closed while sending: nothing to show for a question they left.
+      guard isSendingQuestion else {
+        logger.info("TeacherMinute askTeacher failed after the search was closed error=\(err)")
+        return
+      }
       if case .serverError(_, _, let details) = err,
          details?.reason == ServerErrorDetails.rateLimited {
         // Checked before the balance branch below: both refusals arrive as
@@ -850,8 +863,16 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       }
     } catch {
 	  logger.error("TeacherMinute askTeacher failed error=\(error)")
+      guard isSendingQuestion else { return }
       searchState = .error(error.localizedDescription)
     }
+  }
+
+  /// A question is on its way to the backend and the student is still waiting
+  /// for it: the search is open, with no question id yet.
+  private var isSendingQuestion: Bool {
+    if case .searching(let questionId) = searchState { return questionId.isEmpty }
+    return false
   }
 
   func cancelSearch() async {
