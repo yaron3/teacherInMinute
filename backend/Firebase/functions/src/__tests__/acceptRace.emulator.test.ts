@@ -202,3 +202,30 @@ describe("teachers who accept the same question at the same moment", () => {
     expect(after?.acceptedByTeacher).toBe(question?.acceptedByTeacher);
   });
 });
+
+// IOS-E-03 / AND-E-03: one teacher signed in on two phones, both online, taps
+// Accept on both at once.
+describe("the same teacher accepting on two phones at the same moment", () => {
+  jest.setTimeout(60_000);
+
+  test.each([1, 2, 3])("gets the lesson once, and the other phone is told it is taken (run %i)", async () => {
+    const { qid, teachers } = await questionInvitedTo(1);
+    const [teacher] = teachers;
+
+    const results = await Promise.allSettled([
+      acceptInvite({ auth: { uid: teacher }, data: { questionId: qid } }),
+      acceptInvite({ auth: { uid: teacher }, data: { questionId: qid } }),
+    ]);
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const [loss] = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    expect((loss.reason as Rejection).details?.reason).toBe("question_unavailable");
+
+    const question = (await firestore.collection("questions").doc(qid).get()).data();
+    expect(question).toMatchObject({ status: "accepted", acceptedByTeacher: teacher });
+    const busy = (await rtdb.ref(`teachers/${teacher}/busy`).once("value")).val();
+    expect(busy?.questionId).toBe(qid);
+    const lessons = await firestore.collection("lessons").where("questionId", "==", qid).get();
+    expect(lessons.size).toBeLessThanOrEqual(1);
+  });
+});

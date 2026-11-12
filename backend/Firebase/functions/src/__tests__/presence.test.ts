@@ -111,3 +111,26 @@ describe("busy in the public online-teacher entry", () => {
     expect(entry("teacher-anna")).toMatchObject({ busy: true });
   });
 });
+
+// QA test plan IOS-G-07 / AND-G-07: "Show my profile image" off.
+describe("the photo in the public online-teacher entry", () => {
+  test("is the teacher's profile image by default", async () => {
+    fakeFirestore.write("users/teacher-anna", { fullName: "Anna", profileImageURL: "https://img/anna.jpg" }, false);
+
+    await republishTeacherPresence("teacher-anna");
+
+    expect(entry("teacher-anna")).toMatchObject({ displayName: "Anna", photoUrl: "https://img/anna.jpg" });
+  });
+
+  test("is left out when the teacher turned off Show my profile image", async () => {
+    fakeFirestore.write(
+      "users/teacher-anna",
+      { fullName: "Anna", profileImageURL: "https://img/anna.jpg", showProfileImage: false },
+      false
+    );
+
+    await republishTeacherPresence("teacher-anna");
+
+    expect(entry("teacher-anna")).toMatchObject({ displayName: "Anna", photoUrl: "" });
+  });
+});

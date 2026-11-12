@@ -94,7 +94,12 @@ jest.mock("../lessons", () => ({
   enqueueAbandonedLessonCheck: jest.fn(async () => undefined),
 }));
 
-import { backfillPendingQuestionsForTeacher, evaluateWave, questionWatchdog } from "../dispatch";
+import {
+  backfillPendingQuestionsForTeacher,
+  evaluateWave,
+  onTeacherStatusChange,
+  questionWatchdog,
+} from "../dispatch";
 import { createQuestion, acceptInvite, cancelQuestion } from "../questions";
 import { getSearchTimeoutSeconds } from "../questionLimits";
 import { readRcBoolean } from "../remoteConfig";
@@ -156,10 +161,10 @@ const TASK_HANDLERS: Record<string, TaskHandler> = {
   questionWatchdog: questionWatchdog as unknown as TaskHandler,
 };
 
-async function ask(studentUid: string): Promise<string> {
+async function ask(studentUid: string, topic = "algebra"): Promise<string> {
   const result = await (createQuestion as unknown as Callable)({
     auth: { uid: studentUid },
-    data: { topic: "algebra", text: "How do I solve 2x + 3 = 11?", conversationType: "text" },
+    data: { topic, text: "How do I solve 2x + 3 = 11?", conversationType: "text" },
   });
   return result.questionId as string;
 }
@@ -704,5 +709,169 @@ describe("with use_wave_question off", () => {
 
     expect(fakeRtdb.read(`teacherInvites/${anna}/${q2}`)).toBeUndefined();
     expect(invitesFor(q2)[anna]).toBeUndefined();
+  });
+});
+
+// ─── QA test plan rows ───────────────────────────────────────────────────────
+
+type StatusTrigger = (event: {
+  params: { uid: string };
+  data: { before: { val: () => unknown }; after: { val: () => unknown } };
+}) => Promise<void>;
+
+/** What RTDB does when the app writes teachers/{uid}/status. */
+async function statusWritten(uid: string, before: string | null, after: string): Promise<void> {
+  const record = (fakeRtdb.read(`teachers/${uid}`) ?? {}) as Record<string, unknown>;
+  fakeRtdb.write(`teachers/${uid}`, { ...record, status: after });
+  await (onTeacherStatusChange as unknown as StatusTrigger)({
+    params: { uid },
+    data: { before: { val: () => before }, after: { val: () => after } },
+  });
+}
+
+// IOS-D-20 / AND-D-20
+describe("a teacher who comes online while a question is searching", () => {
+  function seedOffline(uid: string, subjects = ["algebra"]): void {
+    fakeRtdb.write(`teachers/${uid}`, {
+      status: "offline",
+      subjects,
+      ratingAvg: 4.0,
+      ratingCount: 20,
+      displayName: uid,
+      fcmToken: `fcm-${uid}`,
+    });
+  }
+
+  test("is sent the question at once, in the wave that is open", async () => {
+    const qid = await ask("student-maya");
+    seedOffline("teacher-kim");
+
+    await statusWritten("teacher-kim", "offline", "online");
+
+    expect(fakeRtdb.read(`teacherInvites/teacher-kim/${qid}`)).toBeDefined();
+    expect(invitesFor(qid)["teacher-kim"]).toMatchObject({ wave: 1, response: "pending" });
+    expect(question(qid).alreadyInvited).toContain("teacher-kim");
+  });
+
+  test("a keep-alive from a teacher already online sends nothing new", async () => {
+    seedOffline("teacher-kim");
+    await statusWritten("teacher-kim", "offline", "online");
+    const qid = await ask("student-maya");
+
+    await statusWritten("teacher-kim", "online", "online");
+
+    expect(invitesFor(qid)["teacher-kim"]).toBeUndefined();
+  });
+
+  test("going offline sends nothing", async () => {
+    const qid = await ask("student-maya");
+    seedOffline("teacher-kim");
+
+    await statusWritten("teacher-kim", "online", "offline");
+
+    expect(invitesFor(qid)["teacher-kim"]).toBeUndefined();
+  });
+
+  test("is not sent a question in a subject they do not teach, once three others do", async () => {
+    for (const uid of RANKED.slice(0, 3)) {
+      fakeRtdb.write(`teachers/${uid}/subjects`, ["algebra", "geometry"]);
+    }
+    const qid = await ask("student-maya", "geometry");
+    seedOffline("teacher-kim", ["algebra"]);
+
+    await statusWritten("teacher-kim", "offline", "online");
+
+    expect(invitesFor(qid)["teacher-kim"]).toBeUndefined();
+    expect(fakeRtdb.read(`teacherInvites/teacher-kim/${qid}`)).toBeUndefined();
+  });
+
+  test("is not sent a question that has already been taken", async () => {
+    const qid = await ask("student-maya");
+    await accept(RANKED[0], qid);
+    seedOffline("teacher-kim");
+
+    await statusWritten("teacher-kim", "offline", "online");
+
+    expect(invitesFor(qid)["teacher-kim"]).toBeUndefined();
+  });
+});
+
+// IOS-D-24 / AND-D-24
+describe("a question in a subject only some teachers teach", () => {
+  test("taught by three or more, it reaches only them, in every wave", async () => {
+    const geometry = [RANKED[2], RANKED[5], RANKED[8]];
+    for (const uid of geometry) fakeRtdb.write(`teachers/${uid}/subjects`, ["algebra", "geometry"]);
+
+    const qid = await ask("student-maya", "geometry");
+    await advanceTo(30);
+
+    expect(Object.keys(invitesFor(qid)).sort(byRank)).toEqual(geometry);
+    expect(dashboardsShowing(qid)).toEqual(geometry);
+  });
+
+  test("taught by fewer than three, it is not narrowed: its teachers come first, then everyone", async () => {
+    // Narrowing to one or two teachers would leave the student waiting on
+    // them alone; see subjectNarrows.
+    const [only] = [RANKED[6]];
+    fakeRtdb.write(`teachers/${only}/subjects`, ["algebra", "geometry"]);
+
+    const qid = await ask("student-maya", "geometry");
+
+    expect(pendingInWave(qid, 1)).toContain(only);
+    expect(pendingInWave(qid, 1)).toHaveLength(3);
+    await advanceTo(30);
+    expect(dashboardsShowing(qid)).toEqual(RANKED);
+  });
+});
+
+// IOS-G-07 / AND-G-07
+describe("Show my profile image turned off", () => {
+  test("a student's photo is not on the teachers' cards or the question", async () => {
+    fakeFirestore.write(
+      "users/student-maya",
+      { fullName: "Maya", remainingMinutes: 60, profileImageURL: "https://img/maya.jpg", showProfileImage: false },
+      false
+    );
+    const qid = await ask("student-maya");
+
+    expect(question(qid).studentImageURL).toBe("");
+    for (const uid of dashboardsShowing(qid)) {
+      expect(fakeRtdb.read(`teacherInvites/${uid}/${qid}`)).toMatchObject({ studentImageURL: "" });
+    }
+  });
+
+  test("a student who keeps it on is shown with their photo", async () => {
+    fakeFirestore.write(
+      "users/student-maya",
+      { fullName: "Maya", remainingMinutes: 60, profileImageURL: "https://img/maya.jpg" },
+      false
+    );
+    const qid = await ask("student-maya");
+
+    expect(question(qid).studentImageURL).toBe("https://img/maya.jpg");
+  });
+
+  test("the teacher's photo is not passed to the student when they accept", async () => {
+    const [anna] = RANKED;
+    fakeFirestore.write(
+      `users/${anna}`,
+      { fullName: "Anna", profileImageURL: "https://img/anna.jpg", showProfileImage: false },
+      false
+    );
+    const qid = await ask("student-maya");
+
+    await accept(anna, qid);
+
+    expect(question(qid)).toMatchObject({ teacherName: "Anna", teacherImageURL: "" });
+  });
+
+  test("a teacher who keeps it on is passed with their photo", async () => {
+    const [anna] = RANKED;
+    fakeFirestore.write(`users/${anna}`, { fullName: "Anna", profileImageURL: "https://img/anna.jpg" }, false);
+    const qid = await ask("student-maya");
+
+    await accept(anna, qid);
+
+    expect(question(qid).teacherImageURL).toBe("https://img/anna.jpg");
   });
 });

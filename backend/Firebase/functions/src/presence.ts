@@ -107,11 +107,15 @@ export async function republishTeacherPresence(uid: string): Promise<boolean> {
   const userSnap = await firestore.collection("users").doc(uid).get();
   const user = userSnap.data() ?? {};
   const displayName = typeof user.fullName === "string" ? user.fullName : "";
+  // A teacher who turned off "Show my profile image" is listed without one,
+  // as createQuestion and acceptInvite already do for the lesson itself.
   const photoUrl =
-    (typeof user.profileImageURL === "string" && user.profileImageURL) ||
-    (typeof user.profilePhotoURL === "string" && user.profilePhotoURL) ||
-    (typeof user.photoURL === "string" && user.photoURL) ||
-    "";
+    user.showProfileImage === false
+      ? ""
+      : (typeof user.profileImageURL === "string" && user.profileImageURL) ||
+        (typeof user.profilePhotoURL === "string" && user.profilePhotoURL) ||
+        (typeof user.photoURL === "string" && user.photoURL) ||
+        "";
 
   // Preserve the original `since` while a teacher stays online, so a subjects
   // edit does not make them look newly available.
