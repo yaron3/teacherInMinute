@@ -315,7 +315,8 @@ final class StudentAskUITests: XCTestCase {
 
     /// IOS-R-03, IOS-R-04 — pairs with testTeachingALessonTheStudentEnds. From
     /// the rating screen the student reports the teacher, blocking them too:
-    /// the report is stored and the teacher is on their blocked list.
+    /// the report is stored and the teacher is on their blocked list. Then
+    /// Settings → Privacy Controls lists them, and unblocking there lifts it.
     @MainActor
     func testEndingALessonThenReportingAndBlockingTheTeacher() async throws {
         let (teacher, student, qid) = try await joinALesson()
@@ -351,7 +352,33 @@ final class StudentAskUITests: XCTestCase {
             if !(reported && blocked) { try await Task.sleep(nanoseconds: 500_000_000) }
         } while !(reported && blocked) && Date() < deadline
         XCTAssertTrue(reported, "the report was not stored")
-        XCTAssertTrue(blocked, "the teacher is not on the student's blocked list")
+        try require(blocked, "the teacher is not on the student's blocked list")
+
+        // IOS-R-04's other half: the block shows in Settings → Privacy
+        // Controls, and unblocking there lifts it.
+        try require(waitForHome(timeout: 30), "not back home after the report")
+        try require(tapWhenHittable(app.buttons["side_menu_button"], "the menu"), "no menu button")
+        try require(tapWhenHittable(app.buttons["side_menu_item_settings"], "Settings"), "no Settings in the menu")
+        // A tap while the menu is still closing does not open the row, so it
+        // is tapped until the page comes up.
+        let privacy = app.buttons["settings_row_privacyControls"]
+        let unblock = app.buttons["unblock_teacher_\(teacher)"]
+        for _ in 0..<3 where !unblock.exists {
+            if privacy.exists && privacy.isHittable { privacy.tap() }
+            _ = unblock.waitForExistence(timeout: 10)
+        }
+        for _ in 0..<3 where !(unblock.exists && unblock.isHittable) { app.swipeUp() }
+        try require(unblock.exists, "the blocked teacher is not listed in Privacy Controls")
+        try require(app.staticTexts["Lesson Teacher"].exists, "the blocked teacher is listed without their name")
+        try require(tapWhenHittable(unblock, "Unblock"), "Unblock could not be tapped")
+        try require(waitForDisappearance(unblock, timeout: 20), "the teacher stayed listed after unblocking")
+        var stillBlocked = true
+        let lifted = Date().addingTimeInterval(20)
+        repeat {
+            stillBlocked = try await backend.fields("users/\(student.uid)/blockedTeachers/\(teacher)") != nil
+            if stillBlocked { try await Task.sleep(nanoseconds: 500_000_000) }
+        } while stillBlocked && Date() < lifted
+        XCTAssertFalse(stillBlocked, "unblocking left the teacher on the blocked list")
     }
 
     /// A signed-in student who asks; the teacher's half takes it; returns once
