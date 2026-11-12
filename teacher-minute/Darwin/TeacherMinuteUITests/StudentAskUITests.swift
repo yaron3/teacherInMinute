@@ -290,7 +290,7 @@ final class StudentAskUITests: XCTestCase {
         XCTAssertEqual((rating["studentRate"] as? [String: Any])?["integerValue"] as? String, "4", "the rating was not saved: \(rating)")
         XCTAssertEqual(stringValue(rating["studentComment"]), "Clear and patient.")
 
-        try expectInHistory("Lesson Teacher")
+        try await expectInHistory("Lesson Teacher", qid: qid)
     }
 
     /// IOS-L-04, IOS-R-02 — pairs with testTeachingALessonAndEndingIt. The
@@ -310,7 +310,7 @@ final class StudentAskUITests: XCTestCase {
         try await expectTheLessonOver(qid, teacher: teacher)
         let rating = try await backend.fields("teachers/\(teacher)/ratings/\(qid)")
         XCTAssertNil(rating, "closing the rating saved one")
-        try expectInHistory("Lesson Teacher")
+        try await expectInHistory("Lesson Teacher", qid: qid)
     }
 
     /// IOS-R-03, IOS-R-04 — pairs with testTeachingALessonTheStudentEnds. From
@@ -454,14 +454,26 @@ final class StudentAskUITests: XCTestCase {
         XCTAssertNil(busy, "the teacher is still busy after the lesson ended")
     }
 
-    /// The lesson, listed by the teacher's name, in the menu's Activity.
+    /// IOS-R-05, the student's side: the lesson in the menu's Activity, by
+    /// the teacher's name, with the minutes it was charged; its detail shows
+    /// the length the backend settled it at.
     @MainActor
-    private func expectInHistory(_ teacherName: String) throws {
+    private func expectInHistory(_ teacherName: String, qid: String) async throws {
+        let settled = SettledLesson(try await backend.fields("questions/\(qid)") ?? [:])
+        try require(settled != nil, "the lesson was settled without its length")
         try require(waitForHome(timeout: 30), "not back home after the lesson")
         try require(tapWhenHittable(app.buttons["side_menu_button"], "the menu"), "no menu button")
         try require(tapWhenHittable(app.buttons["side_menu_item_activity"], "Activity"), "no Activity in the menu")
-        let row = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", teacherName)).firstMatch
-        try require(row.waitForExistence(timeout: 20), "the lesson with \(teacherName) is not in the history")
+        let row = app.buttons["activity_lesson_\(qid)"]
+        try require(row.waitForExistence(timeout: 20), "the lesson is not in the history")
+        attach("history row", row.label)
+        XCTAssertTrue(row.label.contains(teacherName), "the history row does not name \(teacherName): \(row.label)")
+        XCTAssertTrue(row.label.contains(settled!.billedMinutesText),
+                      "the history row does not show the \(settled!.billedMinutesText) charged: \(row.label)")
+        try require(tapWhenHittable(row, "the lesson"), "the lesson could not be opened")
+        let duration = app.staticTexts[settled!.durationText]
+        XCTAssertTrue(duration.waitForExistence(timeout: 10),
+                      "the lesson's detail does not show its length \(settled!.durationText)")
     }
 
     // MARK: - Steps

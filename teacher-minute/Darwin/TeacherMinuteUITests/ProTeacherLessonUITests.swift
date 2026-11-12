@@ -32,11 +32,11 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
     /// lesson in Lessons.
     @MainActor
     func testTeachingALessonTheStudentEnds() async throws {
-        let uid = try await joinTheStudentsLesson()
+        let (uid, qid) = try await joinTheStudentsLesson()
         let end = app.buttons["session_end_button"]
         try require(waitForDisappearance(end, timeout: 300), "the lesson never ended for the teacher")
         try await expectFreeOnTheDashboard(uid)
-        try expectInLessons("Asking Student")
+        try await expectInLessons("Asking Student", qid: qid)
     }
 
     /// IOS-L-04 — pairs with the student's
@@ -45,7 +45,7 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
     /// a rating) and is free again.
     @MainActor
     func testTeachingALessonAndEndingIt() async throws {
-        let uid = try await joinTheStudentsLesson()
+        let (uid, _) = try await joinTheStudentsLesson()
         pause(seconds: 35)
         let end = app.buttons["session_end_button"]
         try require(tapWhenHittable(end, "End"), "End was never tappable")
@@ -57,10 +57,10 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
     // MARK: - Steps
 
     /// Signs in as the run's teacher, comes online, waits for the student's
-    /// text question and takes it; returns the teacher's uid once in the
-    /// lesson.
+    /// text question and takes it; returns the teacher's uid and the
+    /// question once in the lesson.
     @MainActor
-    private func joinTheStudentsLesson() async throws -> String {
+    private func joinTheStudentsLesson() async throws -> (uid: String, qid: String) {
         let env = ProcessInfo.processInfo.environment
         guard let email = env["LESSON_TEACHER_EMAIL"], let password = env["LESSON_TEACHER_PASSWORD"],
               let uid = env["LESSON_TEACHER_UID"] else {
@@ -135,7 +135,7 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         let entered = waitForAny([end, textOnly], timeout: 90) { [self] in _ = dismissSystemPromptIfPresent() }
         if entered == textOnly { _ = tapWhenHittable(textOnly, "Continue with text only") }
         try require(end.waitForExistence(timeout: 90), "the teacher never entered the lesson")
-        return uid
+        return (uid, qid)
     }
 
     /// No busy mark, and past whatever summary follows, the dashboard.
@@ -156,13 +156,27 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         try require(home != nil, "the teacher did not get back to the dashboard")
     }
 
-    /// IOS-R-05, the teacher's side: the lesson, by the student's name, in
-    /// the Lessons tab.
+    /// IOS-R-05, the teacher's side: the lesson in the Lessons tab, by the
+    /// student's name, with the length and the earnings the backend settled
+    /// it at.
     @MainActor
-    private func expectInLessons(_ studentName: String) throws {
+    private func expectInLessons(_ studentName: String, qid: String) async throws {
+        var settled: SettledLesson?
+        let deadline = Date().addingTimeInterval(30)
+        repeat {
+            settled = SettledLesson(try await backend.fields("questions/\(qid)") ?? [:])
+            if settled == nil { pause(seconds: 0.5) }
+        } while settled == nil && Date() < deadline
+        try require(settled != nil, "the lesson was settled without its length")
         try require(tapWhenHittable(app.buttons["tab_item_lessons"], "the Lessons tab"), "no Lessons tab")
-        let row = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", studentName)).firstMatch
+        let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", studentName)).firstMatch
         try require(row.waitForExistence(timeout: 20), "the lesson with \(studentName) is not in Lessons")
+        attach("lessons row", row.label)
+        XCTAssertTrue(row.label.contains(settled!.durationText),
+                      "the Lessons row does not show the length \(settled!.durationText): \(row.label)")
+        XCTAssertGreaterThan(settled!.earningsCents, 0, "the lesson earned the teacher nothing")
+        XCTAssertTrue(row.label.contains(settled!.earningsNumberText),
+                      "the Lessons row does not show the earnings \(settled!.earningsNumberText): \(row.label)")
     }
 
     @MainActor

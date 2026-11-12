@@ -334,3 +334,39 @@ struct EmulatorBackend {
         }
     }
 }
+
+/// What the backend settled a finished lesson at (questions/{qid}), and the
+/// texts the history screens make of it (LessonFormatting).
+struct SettledLesson {
+    let seconds: Int
+    let earningsCents: Int
+
+    init?(_ fields: [String: Any]) {
+        func number(_ key: String) -> Double? {
+            guard let value = fields[key] as? [String: Any] else { return nil }
+            if let text = value["integerValue"] as? String { return Double(text) }
+            return value["doubleValue"] as? Double
+        }
+        guard let seconds = number("lessonSeconds") else { return nil }
+        self.seconds = Int(seconds)
+        earningsCents = Int(((number("teacherEarnings") ?? 0) * 100).rounded())
+    }
+
+    /// "0:37", as both apps show a lesson's length.
+    var durationText: String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
+
+    /// "1 min", the minutes the student was charged, as their Activity shows.
+    var billedMinutesText: String {
+        let minutes = seconds < 30 ? 0 : max(1, seconds / 60 + (seconds % 60 > 30 ? 1 : 0))
+        return "\(minutes) min"
+    }
+
+    /// The teacher's earnings as a number, "1.5", without the currency sign.
+    var earningsNumberText: String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: Double(earningsCents) / 100)) ?? ""
+    }
+}
