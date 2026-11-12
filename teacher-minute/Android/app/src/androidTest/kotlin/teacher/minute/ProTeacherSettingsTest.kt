@@ -22,6 +22,7 @@ import java.util.Date
  *             it read (readTimestamp)
  *   AND-G-10  About → Terms and About → Privacy Policy each open the page in
  *             the browser
+ *   AND-G-06  editing the profile saves a new name and phone, and shows them
  */
 @RunWith(AndroidJUnit4::class)
 class ProTeacherSettingsTest : ProTeacherEmulatorTest() {
@@ -81,6 +82,37 @@ class ProTeacherSettingsTest : ProTeacherEmulatorTest() {
             }
             tapId("brand_back_button", "Back")
         }
+    }
+
+    /** AND-G-06: a new name and phone are saved to the profile and shown. */
+    @Test
+    fun editingTheProfileSavesNameAndPhone() {
+        signIn()
+        tapId("tab_item_profile", "the Profile tab")
+        tapId("profile_edit_button", "Edit profile")
+        val name = "Renamed Teacher ${(100..999).random()}"
+        typeInto("profile_field_name", name)
+        typeInto("profile_field_phone", "0529876543")
+        val save = findScrolling(By.res("profile_save_button")) ?: failWith("save", "no Save in the profile editor")
+        save.click()
+        if (!device.wait(Until.gone(By.res("profile_save_button")), 20_000)) failWith("save", "saving did not close the editor")
+
+        var saved = emptyMap<String, String>()
+        val deadline = System.currentTimeMillis() + 20_000
+        while (System.currentTimeMillis() < deadline && saved["fullName"] != name) {
+            saved = backend.strings("users/${appTeacher.uid}") ?: emptyMap()
+            if (saved["fullName"] != name) Thread.sleep(500)
+        }
+        assertTrue("the new name was not saved: $saved", saved["fullName"] == name)
+        assertTrue("the new phone was not saved: $saved", saved["phoneNumber"] == "0529876543")
+        assertTrue("the profile does not show the new name", device.wait(Until.hasObject(By.text(name)), 10_000))
+    }
+
+    private fun typeInto(id: String, text: String) {
+        val tagged = findScrolling(By.res(id)) ?: failWith(id, "no $id in the profile editor")
+        val field = tagged.findObject(By.clazz("android.widget.EditText")) ?: tagged
+        field.click()
+        field.text = text
     }
 
     // Steps

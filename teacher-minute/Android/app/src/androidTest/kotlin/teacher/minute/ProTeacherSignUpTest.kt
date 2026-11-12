@@ -229,6 +229,84 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertFalse("Create account offers Apple on Android", device.hasObject(By.res("sign_up_apple")))
     }
 
+    /** AND-G-11: the Terms and Privacy links under the agreement each open
+     *  their own page. */
+    @Test
+    fun signUpAgreementLinksOpenTheirPages() {
+        openSignUpForm()
+        val pages = mutableMapOf<String, List<String>>()
+        val marks = Regex("[\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]")
+        for (link in listOf("sign_up_terms_link", "sign_up_privacy_link")) {
+            val button = findScrolling(By.res(link)) ?: run { capture(link); fail("no $link under the agreement"); return }
+            val title = (button.findObject(By.textContains(""))?.text ?: button.text ?: "").replace(marks, "").trim()
+            button.click()
+            val open = device.wait(Until.findObject(By.res("about_open_link")), 15_000)
+            assertNotNull("$link opened no page", open)
+            val shown = device.findObjects(By.textContains("")).mapNotNull { runCatching { it.text }.getOrNull() }
+                .map { it.replace(marks, "").trim() }.filter { it.isNotEmpty() && !Regex("^\\d{1,2}:\\d{2}$").matches(it) }
+            pages[link] = shown
+            // The Terms page is titled with the EULA string, not the link's
+            // "Terms of Service": the same page under two names. Privacy is
+            // titled as its link.
+            if (link == "sign_up_privacy_link") assertTrue("$link opened a page not titled \"$title\": $shown", title in shown)
+            open!!.click()
+            assertTrue("$link's page did not open in the browser",
+                device.wait(Until.gone(By.pkg(context.packageName).depth(0)), 15_000))
+            device.pressBack()
+            assertTrue("Back from the browser did not return", device.wait(Until.hasObject(By.res("about_open_link")), 15_000))
+            device.pressBack() // the page, back to sign-up
+            assertTrue("Back from the page did not return to sign-up", device.wait(Until.hasObject(By.res("sign_up_email")), 15_000))
+        }
+        assertTrue("Terms and Privacy opened the same page: $pages", pages["sign_up_terms_link"] != pages["sign_up_privacy_link"])
+    }
+
+    /** AND-T-16: Back on a later step goes one step back; on the first step it
+     *  asks before signing out, and only then returns to the welcome screen. */
+    @Test
+    fun backInOnboardingStepsBackAndAsksBeforeSigningOut() {
+        val email = backend.newEmail("signup.back")
+        val password = "Emulator-${(100_000..999_999).random()}"
+        openSignUpForm()
+        fillSignUp(email, password, password, agreeToTerms = true)
+        submitSignUp()
+        reachProfile()
+
+        // The first step asks; Cancel stays.
+        pressBackForDialog("the profile step")
+        device.findObject(By.res("dialog_cancel_button")).click()
+        assertTrue("Cancel left the profile step", device.wait(Until.hasObject(By.res("complete_profile_full_name")), 10_000))
+        assertNotNull("cancelling signed the teacher out", FirebaseAuth.getInstance().currentUser)
+
+        // A later step goes back one step.
+        type("Back Teacher", into = "complete_profile_full_name")
+        type("0521234567", into = "complete_profile_phone")
+        findScrolling(By.res("complete_profile_continue"))!!.click()
+        device.wait(Until.findObject(dialogButton), 15_000)?.click() // no payout method yet: go on
+        assertTrue("finishing the profile did not leave it",
+            device.wait(Until.gone(By.res("complete_profile_full_name")), 30_000))
+        device.pressBack()
+        assertTrue("Back on the next step did not return to the profile",
+            device.wait(Until.hasObject(By.res("complete_profile_full_name")), 15_000))
+
+        // And on the first step, confirming signs out to the welcome screen.
+        pressBackForDialog("the profile step again")
+        device.findObject(dialogButton).click()
+        assertTrue("confirming did not return to the welcome screen",
+            device.wait(Until.hasObject(By.res("welcome_log_in")), 20_000))
+        assertNull("still signed in on the welcome screen", FirebaseAuth.getInstance().currentUser)
+    }
+
+    /** Back until the sign-out question shows: the first Back may only close
+     *  the keyboard. */
+    private fun pressBackForDialog(where: String) {
+        repeat(2) {
+            device.pressBack()
+            if (device.wait(Until.hasObject(By.res("dialog_cancel_button")), 4_000)) return
+        }
+        capture("back-dialog")
+        fail("Back on $where did not ask before signing out: ${screenText()}")
+    }
+
     // Steps
 
     /** From the login form, back to the welcome screen and on to sign-up. */

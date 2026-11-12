@@ -11,6 +11,7 @@
 //             it read (readTimestamp)
 //   IOS-G-10  About → Terms and About → Privacy Policy each open a page that
 //             loads
+//   IOS-G-06  editing the profile saves a new name and phone, and shows them
 //
 //  The look of the right-to-left layout stays a manual check; this checks only
 //  that it flips. Start the emulators as for ProTeacherAcceptRaceUITests.
@@ -92,6 +93,39 @@ final class ProTeacherSettingsUITests: ProTeacherEmulatorTestCase {
             try require(loaded, "the \(row) page never loaded any text")
             try require(tapWhenHittable(app.buttons["brand_back_button"], "Back"), "no way back from \(row)")
         }
+    }
+
+    /// IOS-G-06: a new name and phone are saved to the profile and shown.
+    @MainActor
+    func testEditingTheProfileSavesNameAndPhone() async throws {
+        try await signInAsNewTeacher()
+        settleAfterSignIn()
+        try require(tapWhenHittable(app.buttons["tab_item_profile"], "the Profile tab"), "no Profile tab")
+        try require(tapWhenHittable(app.buttons["profile_edit_button"], "Edit profile"), "no Edit on the profile")
+
+        let name = "Renamed Teacher \(Int.random(in: 100...999))"
+        let nameField = app.textFields["profile_field_name"]
+        try require(nameField.waitForExistence(timeout: 15), "the profile editor has no name field")
+        clear(nameField)
+        type(name, into: nameField, "the name field")
+        let phoneField = app.textFields["profile_field_phone"]
+        clear(phoneField)
+        type("0529876543", into: phoneField, "the phone field")
+        dismissKeyboard()
+        let save = app.buttons["profile_save_button"]
+        for _ in 0..<4 where !(save.exists && save.isHittable) { app.swipeUp() }
+        try require(tapWhenHittable(save, "Save"), "no Save in the profile editor")
+        try require(waitForDisappearance(save, timeout: 20), "saving did not close the editor")
+
+        var saved: [String: String] = [:]
+        let deadline = Date().addingTimeInterval(20)
+        repeat {
+            saved = try await backend.strings("users/\(appTeacher.uid)") ?? [:]
+            if saved["fullName"] != name { pause(seconds: 0.5) }
+        } while saved["fullName"] != name && Date() < deadline
+        XCTAssertEqual(saved["fullName"], name, "the new name was not saved")
+        XCTAssertEqual(saved["phoneNumber"], "0529876543", "the new phone was not saved")
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10), "the profile does not show the new name")
     }
 
     // MARK: - Steps

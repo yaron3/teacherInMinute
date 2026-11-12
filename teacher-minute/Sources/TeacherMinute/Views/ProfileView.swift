@@ -543,6 +543,7 @@ struct ProfileEditView: View {
             trackTap("profile_save")
             viewModel.saveProfileEdits()
           }
+          .accessibilityIdentifier("profile_save_button")
         }
         .brandCard()
       }
@@ -917,6 +918,17 @@ struct ProfileEditInfoRow: View {
       errorMessage: errorMessage
     )
 	.disabled(textContentType == .emailAddress)
+	.accessibilityIdentifier("profile_field_\(fieldKey)")
+  }
+
+  /// Stable across languages, unlike the row's title: the row's symbol.
+  private var fieldKey: String {
+    switch parameter.image {
+    case "person.fill": "name"
+    case "envelope.fill": "email"
+    case "phone.fill": "phone"
+    default: parameter.image.replacingOccurrences(of: ".fill", with: "")
+    }
   }
 
   private var keyboardType: UIKeyboardType {

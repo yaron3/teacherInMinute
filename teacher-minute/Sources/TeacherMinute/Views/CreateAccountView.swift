@@ -215,12 +215,14 @@ struct CreateAccountView: View {
             .foregroundStyle(theme.brandActionBackground)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("sign_up_terms_link")
         Button { trackTap("sign_up_privacy"); viewModel.openPrivacy() } label: {
           Text(viewModel.privacyPolicyTitle)
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(theme.brandActionBackground)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("sign_up_privacy_link")
       }
     }
 #else
