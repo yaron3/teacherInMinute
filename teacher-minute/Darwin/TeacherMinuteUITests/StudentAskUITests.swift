@@ -266,6 +266,7 @@ final class StudentAskUITests: XCTestCase {
     @MainActor
     func testTakingALessonThenEndingAndRatingIt() async throws {
         let (teacher, student, qid) = try await joinALesson()
+        try await chatAndSeeTheBoard(qid)
         try endTheLesson()
 
         let star = app.buttons["rate_session_star_4"]
@@ -381,6 +382,31 @@ final class StudentAskUITests: XCTestCase {
         XCTAssertFalse(stillBlocked, "unblocking left the teacher on the blocked list")
     }
 
+    /// IOS-L-02, the student's side: the teacher's message arrives, the
+    /// answer goes back below it, and the teacher's stroke reaches the board.
+    @MainActor
+    private func chatAndSeeTheBoard(_ qid: String) async throws {
+        _ = tapIfPresent(app.buttons["session_tab_chat"])
+        let theirs = app.staticTexts["Let's start with the x terms."]
+        try require(theirs.waitForExistence(timeout: 120), "the teacher's message never reached the student")
+        let field = app.textFields["chat_message_field"]
+        try require(tapWhenHittable(field, "the message field"), "no message field in the lesson")
+        let reply = "OK, I moved them to one side."
+        field.typeText(reply)
+        try require(tapWhenHittable(app.buttons["chat_send_button"], "Send"), "the reply could not be sent")
+        dismissKeyboard()
+        let mine = app.staticTexts[reply]
+        try require(mine.waitForExistence(timeout: 20), "the reply is not in the student's chat")
+        XCTAssertLessThan(theirs.frame.minY, mine.frame.minY, "the messages are out of order")
+
+        var strokes: [String] = []
+        for _ in 0..<120 where strokes.isEmpty {
+            strokes = try await backend.childKeys("questions/\(qid)/board/strokes")
+            if strokes.isEmpty { pause(seconds: 0.5) }
+        }
+        XCTAssertFalse(strokes.isEmpty, "the teacher's stroke never reached the student's board")
+    }
+
     /// A signed-in student who asks; the teacher's half takes it; returns once
     /// the student is in the text lesson.
     @MainActor
@@ -438,6 +464,9 @@ final class StudentAskUITests: XCTestCase {
         pause(seconds: 35)
         try require(tapWhenHittable(app.buttons["session_end_button"], "End"), "End was never tappable")
         try require(tapWhenHittable(app.buttons["chat_end_prompt_primary"], "the end confirmation"), "ending asked nothing")
+        // With something on the board, ending first offers to save it.
+        let chatOnly = app.buttons["Save to chat only"]
+        if chatOnly.waitForExistence(timeout: 5) { chatOnly.tap() }
     }
 
     /// The question completed and the teacher free.

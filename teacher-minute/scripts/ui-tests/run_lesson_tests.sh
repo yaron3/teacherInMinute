@@ -6,8 +6,10 @@
 # at the same time and meets only through the emulators; the pairs run one
 # after another, all with the same teacher:
 #
-#   student-ends  the student ends, rates, finds it in history
-#                 (IOS-L-03, R-01, R-05)
+#   student-ends  a message each way and a stroke on the board, then the
+#                 student ends, rates, finds it in history; the teacher finds
+#                 it in Lessons and Earnings (IOS-D-12, L-02, L-03, R-01, R-05,
+#                 M-07)
 #   teacher-ends  the teacher ends; the student closes the rating (L-04, R-02)
 #   report        the student ends, then reports and blocks the teacher
 #                 (R-03, R-04)
@@ -82,7 +84,7 @@ run_half() {
 PAIRS=(
   "student-ends|ProTeacherLessonUITests/testTeachingALessonTheStudentEnds|StudentAskUITests/testTakingALessonThenEndingAndRatingIt"
   "teacher-ends|ProTeacherLessonUITests/testTeachingALessonAndEndingIt|StudentAskUITests/testTakingALessonTheTeacherEndsThenSkippingTheRating"
-  "report|ProTeacherLessonUITests/testTeachingALessonTheStudentEnds|StudentAskUITests/testEndingALessonThenReportingAndBlockingTheTeacher"
+  "report|ProTeacherLessonUITests/testTeachingALessonTheStudentEndsAndReports|StudentAskUITests/testEndingALessonThenReportingAndBlockingTheTeacher"
 )
 status=0
 for pair in "${PAIRS[@]}"; do

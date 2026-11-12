@@ -12,6 +12,10 @@
 //             lesson in Lessons (IOS-R-05), and in this month's earnings
 //             (IOS-M-07)
 //   IOS-L-04  the teacher ends the lesson and is free again
+//   IOS-D-12  taking the card: in the lesson, the question accepted by this
+//             teacher in Firestore and in the live question
+//   IOS-L-02  in the first: a message each way, in order, and the teacher's
+//             stroke on the board reaching the student
 //
 //  The two halves meet only through the emulators: this one signs in, goes
 //  online, accepts the first card that reaches it, and stays in the lesson
@@ -34,6 +38,22 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
     @MainActor
     func testTeachingALessonTheStudentEnds() async throws {
         let (uid, qid) = try await joinTheStudentsLesson()
+        try await chatThenDraw(qid)
+        try await waitForTheStudentToEnd(uid: uid, qid: qid)
+    }
+
+    /// Pairs with the student's
+    /// testEndingALessonThenReportingAndBlockingTheTeacher: as
+    /// testTeachingALessonTheStudentEnds, without the chat, which that half
+    /// does not hold.
+    @MainActor
+    func testTeachingALessonTheStudentEndsAndReports() async throws {
+        let (uid, qid) = try await joinTheStudentsLesson()
+        try await waitForTheStudentToEnd(uid: uid, qid: qid)
+    }
+
+    @MainActor
+    private func waitForTheStudentToEnd(uid: String, qid: String) async throws {
         let end = app.buttons["session_end_button"]
         try require(waitForDisappearance(end, timeout: 300), "the lesson never ended for the teacher")
         try await expectFreeOnTheDashboard(uid)
@@ -137,8 +157,51 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         let entered = waitForAny([end, textOnly], timeout: 90) { [self] in _ = dismissSystemPromptIfPresent() }
         if entered == textOnly { _ = tapWhenHittable(textOnly, "Continue with text only") }
         try require(end.waitForExistence(timeout: 90), "the teacher never entered the lesson")
+        // IOS-D-12: the accept is this teacher's, in both stores.
+        let accepted = try await backend.fields("questions/\(qid)") ?? [:]
+        XCTAssertEqual((accepted["acceptedByTeacher"] as? [String: Any])?["stringValue"] as? String, uid,
+                       "the question is not recorded as accepted by this teacher")
+        let status = (accepted["status"] as? [String: Any])?["stringValue"] as? String ?? ""
+        XCTAssertFalse(["searching", "unanswered", "cancelled", ""].contains(status), "the accepted question is \(status)")
+        let live = try await backend.strings("questions/\(qid)") ?? [:]
+        XCTAssertEqual(live["acceptedByTeacher"], uid, "the live question does not name this teacher")
         return (uid, qid)
     }
+
+    /// IOS-L-02, the teacher's side: a message to the student, the student's
+    /// answer back below it, then a stroke on the board, which reaches the
+    /// lesson's board for the student to see.
+    @MainActor
+    private func chatThenDraw(_ qid: String) async throws {
+        let chat = app.buttons["session_tab_chat"]
+        _ = tapIfPresent(chat)
+        let field = app.textFields["chat_message_field"]
+        try require(tapWhenHittable(field, "the message field"), "no message field in the lesson")
+        field.typeText(Self.teacherMessage)
+        try require(tapWhenHittable(app.buttons["chat_send_button"], "Send"), "the message could not be sent")
+        dismissKeyboard()
+
+        let mine = app.staticTexts[Self.teacherMessage]
+        let reply = app.staticTexts[Self.studentReply]
+        try require(reply.waitForExistence(timeout: 120), "the student's reply never reached the teacher")
+        XCTAssertTrue(mine.exists && mine.frame.minY < reply.frame.minY, "the messages are out of order")
+
+        try require(tapWhenHittable(app.buttons["session_tab_board"], "the Board tab"), "no Board tab in the lesson")
+        pause(seconds: 1)
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.45))
+        from.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.55)))
+        var strokes: [String] = []
+        for _ in 0..<20 where strokes.isEmpty {
+            strokes = try await backend.childKeys("questions/\(qid)/board/strokes")
+            if strokes.isEmpty { pause(seconds: 0.5) }
+        }
+        XCTAssertFalse(strokes.isEmpty, "the teacher's stroke never reached the board")
+        _ = tapIfPresent(chat)
+    }
+
+    /// What the two halves say to each other (the student's half has the same).
+    static let teacherMessage = "Let's start with the x terms."
+    static let studentReply = "OK, I moved them to one side."
 
     /// No busy mark, and past whatever summary follows, the dashboard.
     @MainActor

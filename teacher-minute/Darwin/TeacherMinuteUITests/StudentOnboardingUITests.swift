@@ -15,6 +15,8 @@
 //   IOS-S-07  with the sign-up reward on, a guest gets nothing; signing up
 //             credits it once, and the kept question goes out on it
 //   IOS-S-08  a +variant of a rewarded address gets no second reward
+//   IOS-G-02  a first launch follows the device language: Hebrew right to
+//             left, English left to right (the layout; the words are Remote Config)
 //   IOS-S-09  a guest who logs in to an existing account is signed in to it,
 //             and the guest account and its profile are deleted
 //   IOS-S-11  a guest signing up with an address in use is refused, with no
@@ -284,6 +286,46 @@ final class StudentOnboardingUITests: XCTestCase {
         }
         XCTAssertEqual(offered?.identifier, "not_enough_minutes_primary", "the second account could ask without minutes")
         try await turnOffTheSignupReward()
+    }
+
+    /// IOS-G-02: a first launch follows the device's language — Hebrew lays
+    /// the app out right to left, English left to right — when nothing has
+    /// been chosen in the app. The words come from Remote Config, which the
+    /// emulators cannot serve, so only the layout is checked.
+    @MainActor
+    func testAFirstLaunchFollowsTheDeviceLanguage() async throws {
+        for (language, locale, rightToLeft) in [("he", "he_IL", true), ("en", "en_US", false)] {
+            app = XCUIApplication()
+            app.launchArguments = [
+                "-firebaseEmulatorHost", EmulatorBackend.host, "-firebaseEmulatorSignOut", "YES",
+                "-tutorial.student.hidden", "YES",
+                // As on a first launch: no language chosen in the app, and the
+                // device set to this one.
+                "-settings.language.preference", "system",
+                "-AppleLanguages", "(\(language))", "-AppleLocale", locale,
+            ]
+            app.launch()
+            let start = app.buttons["student_intro_start"]
+            XCTAssertTrue(tapWhenHittable(start, "the intro's Start", timeout: 60), "[\(language)] the intro's Start never appeared")
+            let deadline = Date().addingTimeInterval(30)
+            while Date() < deadline, start.exists {
+                pause(seconds: 3)
+                _ = tapIfPresent(start)
+            }
+            XCTAssertTrue(waitForHome(timeout: 60), "[\(language)] Start did not reach home")
+            // The tab bar runs with the language (home's Photo/Text toggle is
+            // left to right in both, by design). Home has none, so it is read
+            // on Settings.
+            openSideMenu()
+            XCTAssertTrue(tapWhenHittable(app.buttons["side_menu_item_settings"], "Settings"), "[\(language)] no Settings in the menu")
+            let ask = app.buttons["tab_item_ask"]
+            let settings = app.buttons["tab_item_settings"]
+            XCTAssertTrue(ask.waitForExistence(timeout: 10) && settings.exists, "[\(language)] no tab bar at home")
+            attach("\(language) tabs", "Ask \(ask.frame) \(ask.label); Settings \(settings.frame) \(settings.label)")
+            XCTAssertEqual(ask.frame.minX > settings.frame.minX, rightToLeft,
+                           "[\(language)] the app is laid out \(rightToLeft ? "left to right" : "right to left") on a \(language) device")
+            app.terminate()
+        }
     }
 
     /// IOS-S-09: logging in to an existing account deletes the guest.
