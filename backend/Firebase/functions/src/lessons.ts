@@ -1277,8 +1277,15 @@ export const rateTeacher = onCall(async (req) => {
   // transaction below fail on "Lesson must be completed" — is what lets the app
   // tell a race apart from a genuine refusal: RateSessionView retries only on a
   // failed-precondition whose message mentions finalizing.
+  //
+  // Only a live question counts — one that still has its `status`. The apps
+  // write a few lesson-screen nodes of their own under it (`chatPaused`, the
+  // board, media state), and one landing after the removal brings back a stub
+  // of just those: the teacher's app clearing `chatPaused` as it leaves did.
+  // Read as "still finalizing", that stub refused the student's rating for
+  // good.
   const liveQuestionSnap = await db.ref(`questions/${questionId}`).once("value");
-  if (liveQuestionSnap.exists()) {
+  if (liveQuestionSnap.exists() && liveQuestionSnap.child("status").exists()) {
     logger.info(`[lessons] rateTeacher deferred, lesson still finalizing qid=${questionId}`);
     throw new HttpsError(
       "failed-precondition",
