@@ -299,12 +299,11 @@ final class StudentAskUITests: XCTestCase {
     @MainActor
     func testTakingALessonTheTeacherEndsThenSkippingTheRating() async throws {
         let (teacher, _, qid) = try await joinALesson()
-        // The teacher's half ends it after 35 seconds.
-        let end = app.buttons["session_end_button"]
-        try require(waitForDisappearance(end, timeout: 180), "the teacher's ending never reached the student")
-
+        // The teacher's half ends it after 35 seconds. The rating comes up
+        // over the lesson screen, whose End stays in the hierarchy beneath it,
+        // so the rating itself is what shows the end arrived.
         let close = app.buttons["rate_session_close"]
-        try require(close.waitForExistence(timeout: 60), "the teacher ending the lesson showed the student no rating")
+        try require(close.waitForExistence(timeout: 180), "the teacher's ending never reached the student")
         try require(tapWhenHittable(close, "the rating's close"), "the rating could not be closed")
         try require(waitForHome(timeout: 30), "closing the rating did not return home")
 
