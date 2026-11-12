@@ -474,6 +474,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var isVerified = false
   var subjects: [String] = []
   private var subjectRawKeys: [String] = []
+  @ObservationIgnored private var subjectsSavedObserver: NSObjectProtocol?
   var todayEarningsCents = 0
   var todayMinutesTutored = 0
   var weekEarningsCents = 0
@@ -601,6 +602,13 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   // MARK: - Init
   
   init() {
+	// Subjects edited from Profile as well as from here: either way an online
+	// teacher's listing has to follow them.
+	subjectsSavedObserver = NotificationCenter.default.addObserver(
+	  forName: .teacherSubjectsSaved, object: nil, queue: .main
+	) { [weak self] _ in
+	  Task { @MainActor [weak self] in self?.reloadSubjects() }
+	}
 	authListenerHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
 	  guard let self else { return }
 	  if let uid = user?.uid {
@@ -1541,8 +1549,16 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	Task {
 	  if let data = await attempt({ try await UserService.shared.fetchRaw(uid: uid) }) {
 		let summary = UserProfileSummary(uid: uid, data: data)
+		let previousKeys = subjectRawKeys
 		subjects = summary?.subjects ?? []
 		subjectRawKeys = summary?.rawSubjectKeys ?? []
+		// Students see an online teacher, and dispatch reaches them, by the
+		// subjects in their presence, which otherwise kept the old ones until
+		// the teacher switched off and on again.
+		if isOnline, subjectRawKeys != previousKeys {
+		  logger.info("[VM] subjects changed while online; republishing presence")
+		  writePresence(online: true)
+		}
 	  }
 	}
   }

@@ -278,6 +278,9 @@ final class TeacherSubjectsViewModel {
 		  "subjectAreas": selectedAreaTitles,
 		  "subjectSelections": subjectSelections
 		], merge: true)
+		// The dashboard publishes the teacher's presence, and an online teacher
+		// is listed by their subjects: it rewrites them on this.
+		NotificationCenter.default.post(name: .teacherSubjectsSaved, object: nil)
 	  } catch {
 		logger.error("[TeacherSubjects] saving subjects failed: \(error.localizedDescription)")
 	  }
@@ -299,4 +302,9 @@ final class TeacherSubjectsViewModel {
   private func systemImage(for title: String) -> String {
 	SubjectPresentation.systemImage(for: title)
   }
+}
+
+extension Notification.Name {
+  /// A teacher's subjects were saved, from onboarding or from either editor.
+  static let teacherSubjectsSaved = Notification.Name("teacherSubjectsSaved")
 }
