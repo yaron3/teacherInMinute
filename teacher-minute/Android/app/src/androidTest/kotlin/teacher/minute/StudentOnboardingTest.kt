@@ -38,6 +38,9 @@ import org.junit.runner.RunWith
  *             now an email/password account, isAnonymous false
  *   AND-S-06  a guest's question is back after signing up from the offer, and
  *             goes out as written once there are minutes (the photo half manual)
+ *   AND-S-07  with the sign-up reward on, a guest gets nothing; signing up
+ *             credits it once, and the kept question goes out on it
+ *   AND-S-08  a +variant of a rewarded address gets no second reward
  *   AND-S-09  a guest who logs in to an existing account is signed in to it,
  *             and the guest account and its profile are deleted
  *   AND-S-11  a guest signing up with an address in use is refused, with no
@@ -194,6 +197,83 @@ class StudentOnboardingTest {
         assertEquals("the question went out with other words", text, stringValue(question, "text"))
         device.findObject(search)?.let { runCatching { it.click() } }
         backend.patch("teachers/$teacher", JSONObject().put("status", "offline"))
+    }
+
+    /** AND-S-07: with a sign-up reward on, a guest is credited nothing;
+     *  signing up from the offer credits it once, and the question the guest
+     *  wrote goes out on it. */
+    @Test
+    fun signingUpEarnsTheRewardOnce() {
+        turnOnTheSignupReward(15)
+        val guest = startAsGuest()
+        Thread.sleep(3_000) // time for any trigger on the guest's profile
+        val asGuest = savedProfile(guest.uid)
+        assertFalse("a guest was credited the sign-up reward", asGuest.has("emailRewards"))
+        assertEquals("a guest has minutes", 0, intValue(asGuest, "remainingMinutes") ?: 0)
+
+        askAndExpectTheOffer()
+        device.findObject(offer).click()
+        assertTrue("Create account did not open sign-up", device.wait(Until.hasObject(By.res("sign_up_email")), 20_000))
+        fillSignUp(backend.newEmail("reward"), "Emulator-${(100_000..999_999).random()}")
+        submitSignUp()
+        finishOnboarding("Rewarded Student")
+
+        val profile = rewardedProfile(guest.uid)
+        assertEquals("the reward was not credited once", 15, intValue(profile, "remainingMinutes"))
+        assertEquals(15, intValue(profile, "totalMinutes"))
+
+        // The question kept through sign-up goes out on the reward.
+        val teacher = bringATeacherOnline()
+        val search = By.res("search_details_cancel")
+        repeat(6) {
+            if (device.hasObject(search)) return@repeat
+            findScrolling(By.res("find_teacher"))?.click()
+            device.wait(Until.hasObject(search), 20_000)
+            if (!device.hasObject(search)) {
+                if (device.hasObject(offer)) failWithScreen("reward", "the reward did not reach home: the app offers minutes")
+                device.findObject(dialogButton)?.let { runCatching { it.click() } } // "Checking your balance"
+                Thread.sleep(3_000)
+            }
+        }
+        if (!device.hasObject(search)) failWithScreen("search", "the rewarded student's question did not go out")
+        device.findObject(search)?.let { runCatching { it.click() } }
+        backend.patch("teachers/$teacher", JSONObject().put("status", "offline"))
+        turnOffTheSignupReward()
+    }
+
+    /** AND-S-08: a mailbox already rewarded, signing up again under a
+     *  +variant of its address, gets no second reward. */
+    @Test
+    fun aVariantOfARewardedAddressGetsNoSecondReward() {
+        turnOnTheSignupReward(15)
+        val first = backend.createAccount("rewarded")
+        backend.merge("users/${first.uid}", mapOf("role" to "student", "fullName" to "First Account"))
+        assertEquals("the first account was not rewarded", 15, intValue(rewardedProfile(first.uid), "remainingMinutes"))
+
+        val variant = first.email.replace("@", "+again@")
+        val guest = startAsGuest()
+        askAndExpectTheOffer()
+        device.findObject(offer).click()
+        assertTrue("Create account did not open sign-up", device.wait(Until.hasObject(By.res("sign_up_email")), 20_000))
+        fillSignUp(variant, "Emulator-${(100_000..999_999).random()}")
+        submitSignUp()
+        finishOnboarding("Second Try")
+
+        Thread.sleep(8_000) // time for the sign-up trigger to have run
+        val profile = savedProfile(guest.uid)
+        assertEquals("the sign-up did not go through", false, profile.optJSONObject("isAnonymous")?.optBoolean("booleanValue"))
+        assertFalse("the variant address was rewarded again", profile.has("emailRewards"))
+        assertEquals("the variant address has minutes", 0, intValue(profile, "remainingMinutes") ?: 0)
+        // And the app says so: asking offers minutes.
+        findScrolling(By.res("find_teacher"))?.click()
+        val deadline = System.currentTimeMillis() + 20_000
+        while (System.currentTimeMillis() < deadline && !device.hasObject(offer) && !device.hasObject(By.res("search_details_cancel"))) {
+            device.findObject(dialogButton)?.let { runCatching { it.click() } }
+            Thread.sleep(1_000)
+        }
+        assertTrue("the second account was not offered minutes", device.hasObject(offer))
+        assertFalse("the second account could ask without minutes", device.hasObject(By.res("search_details_cancel")))
+        turnOffTheSignupReward()
     }
 
     /** AND-S-09: logging in to an existing account deletes the guest. */
@@ -486,6 +566,30 @@ class StudentOnboardingTest {
             Thread.sleep(1_000)
         }
         failWithScreen("side-menu", "the side-menu button never appeared")
+    }
+
+    /** The sign-up reward on the emulators, which have no Remote Config: the
+     *  functions read emulatorRemoteConfig/values there instead. */
+    private fun turnOnTheSignupReward(minutes: Int) {
+        backend.merge(
+            "emulatorRemoteConfig/values",
+            mapOf("signup_reward_student_minutes" to minutes, "signup_reward_student_slots" to 1_000_000)
+        )
+    }
+
+    private fun turnOffTheSignupReward() {
+        backend.merge("emulatorRemoteConfig/values", mapOf("signup_reward_student_minutes" to 0))
+    }
+
+    /** The profile once the sign-up reward has been recorded on it. */
+    private fun rewardedProfile(uid: String): JSONObject {
+        repeat(40) {
+            val profile = backend.fields("users/$uid") ?: JSONObject()
+            if (profile.has("emailRewards")) return profile
+            Thread.sleep(500)
+        }
+        fail("the sign-up reward was never recorded on users/$uid")
+        throw IllegalStateException()
     }
 
     /** One teacher online on the emulators, so the app has someone to ask;

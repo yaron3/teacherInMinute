@@ -12,6 +12,9 @@
 //             now an email/password account, isAnonymous false
 //   IOS-S-06  a guest's question, words and a photo, is back after signing up
 //             from the offer, and goes out as written once there are minutes
+//   IOS-S-07  with the sign-up reward on, a guest gets nothing; signing up
+//             credits it once, and the kept question goes out on it
+//   IOS-S-08  a +variant of a rewarded address gets no second reward
 //   IOS-S-09  a guest who logs in to an existing account is signed in to it,
 //             and the guest account and its profile are deleted
 //   IOS-S-11  a guest signing up with an address in use is refused, with no
@@ -201,6 +204,86 @@ final class StudentOnboardingUITests: XCTestCase {
                       "the photo is not in the student's folder: \(photos)")
         _ = tapWhenHittable(search, "the search's close button")
         try await backend.patch("teachers/\(teacher)", ["status": "offline"])
+    }
+
+    /// IOS-S-07: with a sign-up reward on, a guest is credited nothing; signing
+    /// up from the offer credits it once, and the question the guest wrote
+    /// goes out on it.
+    @MainActor
+    func testSigningUpEarnsTheRewardOnce() async throws {
+        try await turnOnTheSignupReward(minutes: 15)
+        let guest = try await startAsGuest()
+        pause(seconds: 3) // time for any trigger on the guest's profile
+        let asGuest = try await backend.fields("users/\(guest.uid)") ?? [:]
+        XCTAssertNil(asGuest["emailRewards"], "a guest was credited the sign-up reward")
+        XCTAssertEqual(intValue(asGuest["remainingMinutes"]) ?? 0, 0, "a guest has minutes")
+
+        askAndExpectTheOffer()
+        XCTAssertTrue(tapWhenHittable(app.buttons["not_enough_minutes_primary"], "Create account"),
+                      "the offer's Create account was never tappable")
+        XCTAssertTrue(app.textFields["sign_up_email"].waitForExistence(timeout: 20), "Create account did not open sign-up")
+        fillSignUp(email: EmulatorBackend.newEmail(prefix: "reward"), password: "Emulator-\(Int.random(in: 100_000...999_999))")
+        submitSignUp()
+        finishOnboarding(name: "Rewarded Student")
+
+        let profile = try await rewardedProfile(guest.uid)
+        XCTAssertEqual(intValue(profile["remainingMinutes"]), 15, "the reward was not credited once: \(profile["remainingMinutes"] ?? "none")")
+        XCTAssertEqual(intValue(profile["totalMinutes"]), 15)
+
+        // The question kept through sign-up goes out on the reward.
+        let teacher = try await bringATeacherOnline()
+        let search = app.buttons["search_details_cancel"]
+        let offer = app.buttons["not_enough_minutes_primary"]
+        for _ in 0..<6 where !search.exists {
+            XCTAssertTrue(tapWhenHittable(findTeacher, "Find a teacher"), "Find a teacher was never tappable")
+            if waitForAny([search, dialogButton, offer], timeout: 20) != search {
+                XCTAssertFalse(offer.exists, "the reward did not reach home: the app offers minutes")
+                if offer.exists { break }
+                _ = tapIfPresent(dialogButton) // "Checking your balance"
+                pause(seconds: 3)
+            }
+        }
+        XCTAssertTrue(search.exists, "the rewarded student's question did not go out")
+        _ = tapIfPresent(search)
+        try await backend.patch("teachers/\(teacher)", ["status": "offline"])
+        try await turnOffTheSignupReward()
+    }
+
+    /// IOS-S-08: a mailbox already rewarded, signing up again under a
+    /// +variant of its address, gets no second reward.
+    @MainActor
+    func testAVariantOfARewardedAddressGetsNoSecondReward() async throws {
+        try await turnOnTheSignupReward(minutes: 15)
+        // The first account, rewarded on becoming a student.
+        let first = try await backend.createAccount(prefix: "rewarded")
+        try await backend.merge("users/\(first.uid)", ["role": "student", "fullName": "First Account"])
+        let firstProfile = try await rewardedProfile(first.uid)
+        XCTAssertEqual(intValue(firstProfile["remainingMinutes"]), 15, "the first account was not rewarded")
+
+        // The same mailbox again, as user+again@….
+        let at = first.email.firstIndex(of: "@")!
+        let variant = first.email[..<at] + "+again" + first.email[at...]
+        let guest = try await startAsGuest()
+        askAndExpectTheOffer()
+        XCTAssertTrue(tapWhenHittable(app.buttons["not_enough_minutes_primary"], "Create account"),
+                      "the offer's Create account was never tappable")
+        XCTAssertTrue(app.textFields["sign_up_email"].waitForExistence(timeout: 20), "Create account did not open sign-up")
+        fillSignUp(email: String(variant), password: "Emulator-\(Int.random(in: 100_000...999_999))")
+        submitSignUp()
+        finishOnboarding(name: "Second Try")
+
+        pause(seconds: 8) // time for the sign-up trigger to have run
+        let profile = try await backend.fields("users/\(guest.uid)") ?? [:]
+        XCTAssertEqual(boolValue(profile["isAnonymous"]), false, "the sign-up did not go through")
+        XCTAssertNil(profile["emailRewards"], "the variant address was rewarded again")
+        XCTAssertEqual(intValue(profile["remainingMinutes"]) ?? 0, 0, "the variant address has minutes")
+        // And the app says so: asking offers minutes.
+        XCTAssertTrue(tapWhenHittable(findTeacher, "Find a teacher"), "Find a teacher was never tappable")
+        let offered = waitForAny([app.buttons["not_enough_minutes_primary"], app.buttons["search_details_cancel"]], timeout: 20) {
+            _ = tapIfPresent(dialogButton)
+        }
+        XCTAssertEqual(offered?.identifier, "not_enough_minutes_primary", "the second account could ask without minutes")
+        try await turnOffTheSignupReward()
     }
 
     /// IOS-S-09: logging in to an existing account deletes the guest.
@@ -446,6 +529,30 @@ final class StudentOnboardingUITests: XCTestCase {
             pause(seconds: 0.5)
         } while Date() < deadline
         return false
+    }
+
+    /// The sign-up reward on the emulators, which have no Remote Config: the
+    /// functions read `emulatorRemoteConfig/values` there instead.
+    private func turnOnTheSignupReward(minutes: Int) async throws {
+        try await backend.merge("emulatorRemoteConfig/values", [
+            "signup_reward_student_minutes": minutes, "signup_reward_student_slots": 1_000_000,
+        ])
+    }
+
+    private func turnOffTheSignupReward() async throws {
+        try await backend.merge("emulatorRemoteConfig/values", ["signup_reward_student_minutes": 0])
+    }
+
+    /// The profile once the sign-up reward has been recorded on it.
+    private func rewardedProfile(_ uid: String) async throws -> [String: Any] {
+        var profile: [String: Any] = [:]
+        for _ in 0..<40 {
+            profile = try await backend.fields("users/\(uid)") ?? [:]
+            if profile["emailRewards"] != nil { return profile }
+            try await Task.sleep(nanoseconds: 500_000_000)
+        }
+        XCTFail("the sign-up reward was never recorded on users/\(uid)")
+        return profile
     }
 
     /// One teacher online on the emulators, so the app has someone to ask;
