@@ -16,6 +16,8 @@
 //   IOS-D-04  under 2 minutes → the "not enough minutes" offer, nothing sent
 //   IOS-D-05  over the allowance of lessons a minute → "asking too quickly",
 //             nothing sent
+//   IOS-L-03  with ProTeacherLessonUITests on a second simulator: a lesson
+//   IOS-R-01  the student ends, then rates (scripts/run-lesson-tests.sh)
 //
 //  Sending is safe here, and only here: a debug build launched with
 //  `-firebaseEmulatorHost` talks to nothing but the emulators, and the only
@@ -244,6 +246,100 @@ final class StudentAskUITests: XCTestCase {
         try require(nil != waitForText(tooQuicklyMessages, timeout: 30), "asking too quickly showed no wait")
         let asked = try await backend.count("questions", where: "studentUid", is: student.uid)
         XCTAssertEqual(asked, 0, "a rate-limited question was sent")
+    }
+
+    /// IOS-L-03 / IOS-R-01, the student's half of a live lesson; the
+    /// teacher's half (ProTeacherLessonUITests) runs on a second simulator at
+    /// the same time. Run both with scripts/run-lesson-tests.sh, which sets
+    /// LESSON_TEACHER_UID; skipped otherwise. The student asks, the teacher
+    /// takes it, the lesson runs as text, the student ends it — completing the
+    /// question, charging minutes and freeing the teacher — and rates 4 stars.
+    @MainActor
+    func testTakingALessonThenEndingAndRatingIt() async throws {
+        guard let teacher = ProcessInfo.processInfo.environment["LESSON_TEACHER_UID"] else {
+            throw XCTSkip("run through scripts/run-lesson-tests.sh, which starts the teacher's half too")
+        }
+        let student = try await signedInStudent(minutes: 60)
+
+        // The teacher's half signs in meanwhile. Once it is online, it is made
+        // the only teacher online (on the emulators), so the question reaches it.
+        var listed = false
+        let online = Date().addingTimeInterval(240)
+        repeat {
+            listed = try await backend.exists("onlineTeachers/\(teacher)")
+            if !listed { pause(seconds: 1) }
+        } while !listed && Date() < online
+        try require(listed, "the teacher's half never came online")
+        for uid in try await backend.childKeys("teachers") where uid != teacher {
+            try await backend.patch("teachers/\(uid)", ["status": "offline"])
+        }
+
+        try ask("Help me with quadratic equations, please")
+        try require(searchCancel.waitForExistence(timeout: 30), "Find a teacher did not start a search")
+        let qid = try await waitForQuestion(of: student.uid)
+        attach("question", qid)
+
+        // A text lesson, chosen on the search screen's last step: there is no
+        // audio between simulators. The teacher's half waits for this choice
+        // before it accepts.
+        let text = app.buttons["search_choice_text"]
+        for _ in 0..<4 where !text.exists {
+            try require(tapWhenHittable(app.buttons["search_details_next"], "Next"), "the search screen has no Next")
+            _ = text.waitForExistence(timeout: 3)
+        }
+        try require(tapWhenHittable(text, "Text"), "the search screen offers no text lesson")
+        var chosen = ""
+        for _ in 0..<30 where chosen != "text" {
+            chosen = stringValue(try await backend.fields("questions/\(qid)")?["conversationType"]) ?? ""
+            if chosen != "text" { try await Task.sleep(nanoseconds: 500_000_000) }
+        }
+        try require(chosen == "text", "choosing text did not reach the question (\(chosen))")
+
+        // The lesson.
+        let end = app.buttons["session_end_button"]
+        let textOnly = app.buttons["connection_setup_continue_as_text"]
+        let entered = waitForAny([end, textOnly], timeout: 300)
+        if entered == textOnly { try require(tapWhenHittable(textOnly, "Continue with text only"), "text only was never tappable") }
+        try require(end.waitForExistence(timeout: 120), "the student never entered the lesson")
+        // The rating is offered only after a lesson of 30 seconds or more
+        // (ChatSessionView.closeWithOptionalRating).
+        pause(seconds: 35)
+        try require(tapWhenHittable(end, "End"), "End was never tappable")
+        try require(tapWhenHittable(app.buttons["chat_end_prompt_primary"], "the end confirmation"), "ending asked nothing")
+
+        let star = app.buttons["rate_session_star_4"]
+        try require(star.waitForExistence(timeout: 60), "ending the lesson showed no rating")
+        star.tap()
+        let comment = app.textViews["rate_session_comment"]
+        try require(tapWhenHittable(comment, "the comment box"), "no comment box after picking stars")
+        comment.typeText("Clear and patient.")
+        dismissKeyboard()
+        try require(tapWhenHittable(app.buttons["rate_session_send"], "Send"), "Send was never tappable")
+
+        // Over, charged, the teacher free, the rating on the teacher.
+        var status = ""
+        var busy: Any? = "busy"
+        let deadline = Date().addingTimeInterval(60)
+        repeat {
+            status = stringValue(try await backend.fields("questions/\(qid)")?["status"]) ?? ""
+            busy = try await backend.value("teachers/\(teacher)/busy")
+            if !(status == "completed" && busy == nil) { try await Task.sleep(nanoseconds: 500_000_000) }
+        } while !(status == "completed" && busy == nil) && Date() < deadline
+        XCTAssertEqual(status, "completed", "the question did not end")
+        XCTAssertNil(busy, "the teacher is still busy after the lesson ended")
+
+        let left = Int(((try await backend.fields("users/\(student.uid)")?["remainingMinutes"]) as? [String: Any])?["integerValue"] as? String ?? "")
+        attach("minutes left", "\(left.map(String.init) ?? "none") of 60")
+        XCTAssertNotNil(left, "the student's minutes are missing")
+        XCTAssertLessThan(left ?? 60, 60, "a lesson of about 35 seconds charged nothing")
+
+        var rating: [String: Any] = [:]
+        for _ in 0..<60 where rating.isEmpty {
+            rating = try await backend.fields("teachers/\(teacher)/ratings/\(qid)") ?? [:]
+            if rating.isEmpty { try await Task.sleep(nanoseconds: 500_000_000) }
+        }
+        XCTAssertEqual((rating["studentRate"] as? [String: Any])?["integerValue"] as? String, "4", "the rating was not saved: \(rating)")
+        XCTAssertEqual(stringValue(rating["studentComment"]), "Clear and patient.")
     }
 
     // MARK: - Steps

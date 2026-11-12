@@ -513,6 +513,7 @@ struct ChatSessionView: View {
           }
           .buttonStyle(.plain)
           .disabled(isEndingSession)
+          .accessibilityIdentifier("chat_end_prompt_primary")
 
           if prompt == .saveBoard {
             // "Save to chat only" is only meaningful for the local flow; when the
