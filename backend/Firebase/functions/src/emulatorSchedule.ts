@@ -19,6 +19,16 @@ import { logger } from "firebase-functions";
 
 const MAX_WAIT_MS = 45_000;
 
+/** A timer can fire a millisecond or so before the wall clock reaches the time
+ *  it waited for (timers run on a monotonic clock, Date.now on the wall
+ *  clock). A task this close to due is due: without the slack, a wait that
+ *  ended just short put the task back for a few milliseconds' time. */
+const DUE_SLACK_MS = 50;
+
+function isDue(due: number): boolean {
+  return due - Date.now() <= DUE_SLACK_MS;
+}
+
 /**
  * When the task was meant to run, in Unix ms, from the X-CloudTasks-TaskETA
  * header: seconds since the epoch in production, an ISO date or milliseconds
@@ -49,10 +59,10 @@ export async function deferredInEmulator(
 ): Promise<boolean> {
   if (!inEmulator()) return false;
   const due = scheduledTimeMillis(req.scheduledTime);
-  if (due === undefined || due <= Date.now()) return false;
+  if (due === undefined || isDue(due)) return false;
 
   await new Promise((resolve) => setTimeout(resolve, Math.min(due - Date.now(), MAX_WAIT_MS)));
-  if (due <= Date.now()) return false;
+  if (isDue(due)) return false;
 
   await getFunctions()
     .taskQueue(queueName)
