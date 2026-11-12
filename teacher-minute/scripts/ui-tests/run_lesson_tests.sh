@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 #
-# A live lesson between two simulators, against the local Firebase emulators:
-# Instant Teacher as the student on one (StudentAskUITests
-# .testTakingALessonThenEndingAndRatingIt), Pro Teacher as the teacher on the
-# other (ProTeacherLessonUITests.testTeachingALessonTheStudentEnds). The two
-# halves meet only through the emulators. QA test plan IOS-L-03 and IOS-R-01.
+# Live lessons between two simulators, against the local Firebase emulators:
+# Instant Teacher as the student on one (StudentAskUITests), Pro Teacher as
+# the teacher on the other (ProTeacherLessonUITests). Each pair of halves runs
+# at the same time and meets only through the emulators; the pairs run one
+# after another, all with the same teacher:
+#
+#   student-ends  the student ends, rates, finds it in history
+#                 (IOS-L-03, R-01, R-05)
+#   teacher-ends  the teacher ends; the student closes the rating (L-04, R-02)
+#   report        the student ends, then reports and blocks the teacher
+#                 (R-03, R-04)
 #
 # What it does:
 #   1. creates a teacher account on the emulators (Auth + its users/{uid});
@@ -18,7 +24,9 @@
 #     npm --prefix backend/Firebase/functions run emulators:app
 #
 # Usage:
-#   scripts/ui-tests/run_lesson_tests.sh <student-simulator-udid> <teacher-simulator-udid>
+#   scripts/ui-tests/run_lesson_tests.sh <student-simulator-udid> <teacher-simulator-udid> [pair]
+#
+# With a pair's name, only that pair runs.
 #
 # Both simulators must be booted and of the same device type. Results land in
 # $RESULTS_DIR (default: a temporary folder), one .xcresult per half.
@@ -27,6 +35,7 @@ set -euo pipefail
 
 STUDENT_SIM="${1:?student simulator UDID}"
 TEACHER_SIM="${2:?teacher simulator UDID}"
+ONLY="${3:-}"
 HOST="${EMULATOR_HOST:-127.0.0.1}"
 PROJECT="demo-teacher-in-a-moment"
 RESULTS_DIR="${RESULTS_DIR:-$(mktemp -d -t lesson-tests)}"
@@ -59,7 +68,7 @@ xcodebuild build-for-testing -workspace Project.xcworkspace -scheme "Instant Tea
   -destination "platform=iOS Simulator,id=$STUDENT_SIM" -skipMacroValidation SKIP_ACTION=none \
   > "$RESULTS_DIR/build.log" 2>&1 || { echo "build failed; see $RESULTS_DIR/build.log" >&2; exit 1; }
 
-# 3. Both halves at once.
+# 3. Each pair's halves at once, the pairs one after another.
 export TEST_RUNNER_LESSON_TEACHER_EMAIL="$TEACHER_EMAIL"
 export TEST_RUNNER_LESSON_TEACHER_PASSWORD="$TEACHER_PASSWORD"
 export TEST_RUNNER_LESSON_TEACHER_UID="$TEACHER_UID"
@@ -70,17 +79,25 @@ run_half() {
     -only-testing:"TeacherMinuteUITests/$test" -resultBundlePath "$RESULTS_DIR/$name.xcresult" \
     > "$RESULTS_DIR/$name.log" 2>&1
 }
-run_half "$TEACHER_SIM" "ProTeacherLessonUITests/testTeachingALessonTheStudentEnds" teacher &
-TEACHER_PID=$!
-run_half "$STUDENT_SIM" "StudentAskUITests/testTakingALessonThenEndingAndRatingIt" student &
-STUDENT_PID=$!
+PAIRS=(
+  "student-ends|ProTeacherLessonUITests/testTeachingALessonTheStudentEnds|StudentAskUITests/testTakingALessonThenEndingAndRatingIt"
+  "teacher-ends|ProTeacherLessonUITests/testTeachingALessonAndEndingIt|StudentAskUITests/testTakingALessonTheTeacherEndsThenSkippingTheRating"
+  "report|ProTeacherLessonUITests/testTeachingALessonTheStudentEnds|StudentAskUITests/testEndingALessonThenReportingAndBlockingTheTeacher"
+)
 status=0
-wait "$TEACHER_PID" || status=1
-wait "$STUDENT_PID" || status=1
-
-for name in teacher student; do
-  echo "== $name"
-  grep -E "error: |Test Case .*(passed|failed|skipped)" "$RESULTS_DIR/$name.log" | grep -v "^ *[0-9]* |" | sed 's/.*Tests //' || true
+for pair in "${PAIRS[@]}"; do
+  IFS='|' read -r name teacher_test student_test <<< "$pair"
+  [[ -n "$ONLY" && "$ONLY" != "$name" ]] && continue
+  run_half "$TEACHER_SIM" "$teacher_test" "$name-teacher" &
+  teacher_pid=$!
+  run_half "$STUDENT_SIM" "$student_test" "$name-student" &
+  student_pid=$!
+  wait "$teacher_pid" || status=1
+  wait "$student_pid" || status=1
+  for half in teacher student; do
+    echo "== $name, $half"
+    grep -E "error: |Test Case .*(passed|failed|skipped)" "$RESULTS_DIR/$name-$half.log" | grep -v "^ *[0-9]* |" | sed 's/.*Tests //' || true
+  done
 done
 echo "results in $RESULTS_DIR"
 exit "$status"

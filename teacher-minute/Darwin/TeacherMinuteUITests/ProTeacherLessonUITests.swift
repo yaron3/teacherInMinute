@@ -8,7 +8,9 @@
 //  teacher account, builds once and starts the two together. QA test plan:
 //
 //   IOS-L-03  the student ends the lesson: the teacher leaves it too and is
-//             free again (no busy mark), back on the dashboard
+//             free again (no busy mark), back on the dashboard, and finds the
+//             lesson in Lessons (IOS-R-05)
+//   IOS-L-04  the teacher ends the lesson and is free again
 //
 //  The two halves meet only through the emulators: this one signs in, goes
 //  online, accepts the first card that reaches it, and stays in the lesson
@@ -23,12 +25,46 @@ import XCTest
 
 final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
 
+    /// IOS-L-03 (and R-05) — pairs with the student's
+    /// testTakingALessonThenEndingAndRatingIt and
+    /// testEndingALessonThenReportingAndBlockingTheTeacher: the student ends
+    /// the lesson; the teacher is freed, back on the dashboard, and finds the
+    /// lesson in Lessons.
     @MainActor
     func testTeachingALessonTheStudentEnds() async throws {
+        let uid = try await joinTheStudentsLesson()
+        let end = app.buttons["session_end_button"]
+        try require(waitForDisappearance(end, timeout: 300), "the lesson never ended for the teacher")
+        try await expectFreeOnTheDashboard(uid)
+        try expectInLessons("Asking Student")
+    }
+
+    /// IOS-L-04 — pairs with the student's
+    /// testTakingALessonTheTeacherEndsThenSkippingTheRating: the teacher ends
+    /// the lesson after 35 seconds (long enough for the student to be offered
+    /// a rating) and is free again.
+    @MainActor
+    func testTeachingALessonAndEndingIt() async throws {
+        let uid = try await joinTheStudentsLesson()
+        pause(seconds: 35)
+        let end = app.buttons["session_end_button"]
+        try require(tapWhenHittable(end, "End"), "End was never tappable")
+        try require(tapWhenHittable(app.buttons["chat_end_prompt_primary"], "the end confirmation"), "ending asked nothing")
+        try require(waitForDisappearance(end, timeout: 60), "ending did not leave the lesson")
+        try await expectFreeOnTheDashboard(uid)
+    }
+
+    // MARK: - Steps
+
+    /// Signs in as the run's teacher, comes online, waits for the student's
+    /// text question and takes it; returns the teacher's uid once in the
+    /// lesson.
+    @MainActor
+    private func joinTheStudentsLesson() async throws -> String {
         let env = ProcessInfo.processInfo.environment
         guard let email = env["LESSON_TEACHER_EMAIL"], let password = env["LESSON_TEACHER_PASSWORD"],
               let uid = env["LESSON_TEACHER_UID"] else {
-            throw XCTSkip("run through scripts/run-lesson-tests.sh, which sets the lesson teacher's account")
+            throw XCTSkip("run through scripts/ui-tests/run_lesson_tests.sh, which sets the lesson teacher's account")
         }
         guard await backend.isRunning() else { throw XCTSkip("Firebase emulators not running") }
         addUIInterruptionMonitor(withDescription: "iOS system prompt") { [promptDismissLabels] alert in
@@ -94,17 +130,17 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         // still checks, so it must not be touched.
         currentQid = ""
 
-        // In the lesson: as text, since there is no audio between simulators.
         let end = app.buttons["session_end_button"]
         let textOnly = app.buttons["connection_setup_continue_as_text"]
         let entered = waitForAny([end, textOnly], timeout: 90) { [self] in _ = dismissSystemPromptIfPresent() }
         if entered == textOnly { _ = tapWhenHittable(textOnly, "Continue with text only") }
         try require(end.waitForExistence(timeout: 90), "the teacher never entered the lesson")
+        return uid
+    }
 
-        // Until the student ends it.
-        let left = waitForDisappearance(end, timeout: 300)
-        try require(left, "the lesson never ended for the teacher")
-
+    /// No busy mark, and past whatever summary follows, the dashboard.
+    @MainActor
+    private func expectFreeOnTheDashboard(_ uid: String) async throws {
         var busy: Any? = "busy"
         let deadline = Date().addingTimeInterval(30)
         repeat {
@@ -112,13 +148,21 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
             if busy != nil { pause(seconds: 0.5) }
         } while busy != nil && Date() < deadline
         XCTAssertNil(busy, "the teacher is still marked busy after the lesson")
-        // Past whatever summary follows, back on the dashboard.
         let home = waitForAny([app.buttons["availability_toggle"], app.switches["availability_toggle"]], timeout: 60) { [self] in
             for label in ["Done", "סיום", "OK", "אישור"] { _ = tapIfPresent(app.buttons[label]) }
             _ = tapIfPresent(app.buttons["dialog_confirm_button"])
         }
         if home == nil { attach("after the lesson", app.debugDescription) }
-        XCTAssertNotNil(home, "the teacher did not get back to the dashboard")
+        try require(home != nil, "the teacher did not get back to the dashboard")
+    }
+
+    /// IOS-R-05, the teacher's side: the lesson, by the student's name, in
+    /// the Lessons tab.
+    @MainActor
+    private func expectInLessons(_ studentName: String) throws {
+        try require(tapWhenHittable(app.buttons["tab_item_lessons"], "the Lessons tab"), "no Lessons tab")
+        let row = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", studentName)).firstMatch
+        try require(row.waitForExistence(timeout: 20), "the lesson with \(studentName) is not in Lessons")
     }
 
     @MainActor

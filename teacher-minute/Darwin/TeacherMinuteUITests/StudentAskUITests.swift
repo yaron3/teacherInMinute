@@ -16,8 +16,11 @@
 //   IOS-D-04  under 2 minutes → the "not enough minutes" offer, nothing sent
 //   IOS-D-05  over the allowance of lessons a minute → "asking too quickly",
 //             nothing sent
-//   IOS-L-03  with ProTeacherLessonUITests on a second simulator: a lesson
-//   IOS-R-01  the student ends, then rates (scripts/run-lesson-tests.sh)
+//   With ProTeacherLessonUITests on a second simulator, paired by
+//   scripts/ui-tests/run_lesson_tests.sh (see "Live lessons" below):
+//   IOS-L-03 / R-01 / R-05  the student ends, rates, finds it in history
+//   IOS-L-04 / R-02         the teacher ends; the student closes the rating
+//   IOS-R-03 / R-04         the student reports and blocks the teacher
 //
 //  Sending is safe here, and only here: a debug build launched with
 //  `-firebaseEmulatorHost` talks to nothing but the emulators, and the only
@@ -248,16 +251,116 @@ final class StudentAskUITests: XCTestCase {
         XCTAssertEqual(asked, 0, "a rate-limited question was sent")
     }
 
-    /// IOS-L-03 / IOS-R-01, the student's half of a live lesson; the
-    /// teacher's half (ProTeacherLessonUITests) runs on a second simulator at
-    /// the same time. Run both with scripts/run-lesson-tests.sh, which sets
-    /// LESSON_TEACHER_UID; skipped otherwise. The student asks, the teacher
-    /// takes it, the lesson runs as text, the student ends it — completing the
-    /// question, charging minutes and freeing the teacher — and rates 4 stars.
+    // MARK: - Live lessons
+    //
+    // The student's halves of a live lesson; the teacher's halves
+    // (ProTeacherLessonUITests) run on a second simulator at the same time.
+    // scripts/ui-tests/run_lesson_tests.sh pairs them and sets
+    // LESSON_TEACHER_UID; each is skipped otherwise. Every lesson runs as text:
+    // there is no audio between simulators.
+
+    /// IOS-L-03, IOS-R-01, IOS-R-05 — pairs with
+    /// testTeachingALessonTheStudentEnds. The student ends the lesson
+    /// (completed, a minute charged, the teacher free), rates 4 stars with a
+    /// comment, and finds the lesson in their history.
     @MainActor
     func testTakingALessonThenEndingAndRatingIt() async throws {
+        let (teacher, student, qid) = try await joinALesson()
+        try endTheLesson()
+
+        let star = app.buttons["rate_session_star_4"]
+        try require(star.waitForExistence(timeout: 60), "ending the lesson showed no rating")
+        star.tap()
+        let comment = app.textViews["rate_session_comment"]
+        try require(tapWhenHittable(comment, "the comment box"), "no comment box after picking stars")
+        comment.typeText("Clear and patient.")
+        dismissKeyboard()
+        try require(tapWhenHittable(app.buttons["rate_session_send"], "Send"), "Send was never tappable")
+
+        try await expectTheLessonOver(qid, teacher: teacher)
+        let left = Int(((try await backend.fields("users/\(student.uid)")?["remainingMinutes"]) as? [String: Any])?["integerValue"] as? String ?? "")
+        attach("minutes left", "\(left.map(String.init) ?? "none") of 60")
+        XCTAssertLessThan(left ?? 60, 60, "a lesson of about 35 seconds charged nothing")
+
+        var rating: [String: Any] = [:]
+        for _ in 0..<60 where rating.isEmpty {
+            rating = try await backend.fields("teachers/\(teacher)/ratings/\(qid)") ?? [:]
+            if rating.isEmpty { try await Task.sleep(nanoseconds: 500_000_000) }
+        }
+        XCTAssertEqual((rating["studentRate"] as? [String: Any])?["integerValue"] as? String, "4", "the rating was not saved: \(rating)")
+        XCTAssertEqual(stringValue(rating["studentComment"]), "Clear and patient.")
+
+        try expectInHistory("Lesson Teacher")
+    }
+
+    /// IOS-L-04, IOS-R-02 — pairs with testTeachingALessonAndEndingIt. The
+    /// teacher ends the lesson; the student is offered the rating, closes it
+    /// unrated, and the lesson is over and in their history all the same.
+    @MainActor
+    func testTakingALessonTheTeacherEndsThenSkippingTheRating() async throws {
+        let (teacher, _, qid) = try await joinALesson()
+        // The teacher's half ends it after 35 seconds.
+        let end = app.buttons["session_end_button"]
+        try require(waitForDisappearance(end, timeout: 180), "the teacher's ending never reached the student")
+
+        let close = app.buttons["rate_session_close"]
+        try require(close.waitForExistence(timeout: 60), "the teacher ending the lesson showed the student no rating")
+        try require(tapWhenHittable(close, "the rating's close"), "the rating could not be closed")
+        try require(waitForHome(timeout: 30), "closing the rating did not return home")
+
+        try await expectTheLessonOver(qid, teacher: teacher)
+        let rating = try await backend.fields("teachers/\(teacher)/ratings/\(qid)")
+        XCTAssertNil(rating, "closing the rating saved one")
+        try expectInHistory("Lesson Teacher")
+    }
+
+    /// IOS-R-03, IOS-R-04 — pairs with testTeachingALessonTheStudentEnds. From
+    /// the rating screen the student reports the teacher, blocking them too:
+    /// the report is stored and the teacher is on their blocked list.
+    @MainActor
+    func testEndingALessonThenReportingAndBlockingTheTeacher() async throws {
+        let (teacher, student, qid) = try await joinALesson()
+        try endTheLesson()
+
+        try require(tapWhenHittable(app.buttons["rating_report_teacher"], "Report"), "the rating screen offers no report")
+        try require(tapWhenHittable(app.buttons["report_reason_not_teaching"], "a reason"), "the report offers no reasons")
+        // "Also block" starts ticked (ReportTeacherViewModel.alsoBlock), so it
+        // is left as it is.
+        try require(app.descendants(matching: .any)["report_also_block"].waitForExistence(timeout: 10), "the report offers no block")
+        // The details last: the form has no way to close the keyboard, so
+        // Send is scrolled up above it.
+        let details = app.textViews["report_details"].exists ? app.textViews["report_details"] : app.textFields["report_details"]
+        if details.waitForExistence(timeout: 5) {
+            _ = tapWhenHittable(details, "the details box")
+            details.typeText("Did not explain anything.")
+        }
+        let send = app.buttons["report_send"]
+        for _ in 0..<3 where !(send.exists && send.isHittable) { app.swipeUp() }
+        try require(tapWhenHittable(send, "Send report"), "the report could not be sent")
+        try require(tapWhenHittable(app.buttons["report_done"], "Done"), "sending the report showed no confirmation")
+
+        var reported = false
+        var blocked = false
+        let deadline = Date().addingTimeInterval(30)
+        repeat {
+            let reports = try await backend.documentIDs("reports", where: "reporterUid", is: student.uid)
+            for id in reports where !reported {
+                let fields = try await backend.fields("reports/\(id)") ?? [:]
+                reported = stringValue(fields["reportedUid"]) == teacher && stringValue(fields["questionId"]) == qid
+            }
+            blocked = try await backend.fields("users/\(student.uid)/blockedTeachers/\(teacher)") != nil
+            if !(reported && blocked) { try await Task.sleep(nanoseconds: 500_000_000) }
+        } while !(reported && blocked) && Date() < deadline
+        XCTAssertTrue(reported, "the report was not stored")
+        XCTAssertTrue(blocked, "the teacher is not on the student's blocked list")
+    }
+
+    /// A signed-in student who asks; the teacher's half takes it; returns once
+    /// the student is in the text lesson.
+    @MainActor
+    private func joinALesson() async throws -> (teacher: String, student: EmulatorBackend.Account, qid: String) {
         guard let teacher = ProcessInfo.processInfo.environment["LESSON_TEACHER_UID"] else {
-            throw XCTSkip("run through scripts/run-lesson-tests.sh, which starts the teacher's half too")
+            throw XCTSkip("run through scripts/ui-tests/run_lesson_tests.sh, which starts the teacher's half too")
         }
         let student = try await signedInStudent(minutes: 60)
 
@@ -279,9 +382,8 @@ final class StudentAskUITests: XCTestCase {
         let qid = try await waitForQuestion(of: student.uid)
         attach("question", qid)
 
-        // A text lesson, chosen on the search screen's last step: there is no
-        // audio between simulators. The teacher's half waits for this choice
-        // before it accepts.
+        // A text lesson, chosen on the search screen's last step. The
+        // teacher's half waits for this choice before it accepts.
         let text = app.buttons["search_choice_text"]
         for _ in 0..<4 where !text.exists {
             try require(tapWhenHittable(app.buttons["search_details_next"], "Next"), "the search screen has no Next")
@@ -295,28 +397,25 @@ final class StudentAskUITests: XCTestCase {
         }
         try require(chosen == "text", "choosing text did not reach the question (\(chosen))")
 
-        // The lesson.
         let end = app.buttons["session_end_button"]
         let textOnly = app.buttons["connection_setup_continue_as_text"]
         let entered = waitForAny([end, textOnly], timeout: 300)
         if entered == textOnly { try require(tapWhenHittable(textOnly, "Continue with text only"), "text only was never tappable") }
         try require(end.waitForExistence(timeout: 120), "the student never entered the lesson")
-        // The rating is offered only after a lesson of 30 seconds or more
-        // (ChatSessionView.closeWithOptionalRating).
+        return (teacher, student, qid)
+    }
+
+    /// Ends the lesson after 35 seconds: the rating is offered only after 30
+    /// or more (ChatSessionView.closeWithOptionalRating).
+    @MainActor
+    private func endTheLesson() throws {
         pause(seconds: 35)
-        try require(tapWhenHittable(end, "End"), "End was never tappable")
+        try require(tapWhenHittable(app.buttons["session_end_button"], "End"), "End was never tappable")
         try require(tapWhenHittable(app.buttons["chat_end_prompt_primary"], "the end confirmation"), "ending asked nothing")
+    }
 
-        let star = app.buttons["rate_session_star_4"]
-        try require(star.waitForExistence(timeout: 60), "ending the lesson showed no rating")
-        star.tap()
-        let comment = app.textViews["rate_session_comment"]
-        try require(tapWhenHittable(comment, "the comment box"), "no comment box after picking stars")
-        comment.typeText("Clear and patient.")
-        dismissKeyboard()
-        try require(tapWhenHittable(app.buttons["rate_session_send"], "Send"), "Send was never tappable")
-
-        // Over, charged, the teacher free, the rating on the teacher.
+    /// The question completed and the teacher free.
+    private func expectTheLessonOver(_ qid: String, teacher: String) async throws {
         var status = ""
         var busy: Any? = "busy"
         let deadline = Date().addingTimeInterval(60)
@@ -327,19 +426,16 @@ final class StudentAskUITests: XCTestCase {
         } while !(status == "completed" && busy == nil) && Date() < deadline
         XCTAssertEqual(status, "completed", "the question did not end")
         XCTAssertNil(busy, "the teacher is still busy after the lesson ended")
+    }
 
-        let left = Int(((try await backend.fields("users/\(student.uid)")?["remainingMinutes"]) as? [String: Any])?["integerValue"] as? String ?? "")
-        attach("minutes left", "\(left.map(String.init) ?? "none") of 60")
-        XCTAssertNotNil(left, "the student's minutes are missing")
-        XCTAssertLessThan(left ?? 60, 60, "a lesson of about 35 seconds charged nothing")
-
-        var rating: [String: Any] = [:]
-        for _ in 0..<60 where rating.isEmpty {
-            rating = try await backend.fields("teachers/\(teacher)/ratings/\(qid)") ?? [:]
-            if rating.isEmpty { try await Task.sleep(nanoseconds: 500_000_000) }
-        }
-        XCTAssertEqual((rating["studentRate"] as? [String: Any])?["integerValue"] as? String, "4", "the rating was not saved: \(rating)")
-        XCTAssertEqual(stringValue(rating["studentComment"]), "Clear and patient.")
+    /// The lesson, listed by the teacher's name, in the menu's Activity.
+    @MainActor
+    private func expectInHistory(_ teacherName: String) throws {
+        try require(waitForHome(timeout: 30), "not back home after the lesson")
+        try require(tapWhenHittable(app.buttons["side_menu_button"], "the menu"), "no menu button")
+        try require(tapWhenHittable(app.buttons["side_menu_item_activity"], "Activity"), "no Activity in the menu")
+        let row = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", teacherName)).firstMatch
+        try require(row.waitForExistence(timeout: 20), "the lesson with \(teacherName) is not in the history")
     }
 
     // MARK: - Steps
@@ -409,7 +505,12 @@ final class StudentAskUITests: XCTestCase {
     /// Opens the text tab, writes `text` and taps Find a teacher.
     @MainActor
     private func ask(_ text: String) throws {
-        try require(tapWhenHittable(app.buttons["question_home_mode_text"], "the Text tab"), "no Text tab at home")
+        // A tap on the Text tab can miss while home is still settling: tapped
+        // again until the question field shows.
+        for _ in 0..<4 where !questionField.exists {
+            try require(tapWhenHittable(app.buttons["question_home_mode_text"], "the Text tab"), "no Text tab at home")
+            _ = questionField.waitForExistence(timeout: 5)
+        }
         try require(tapWhenHittable(questionField, "the question field"), "no question field")
         questionField.typeText(text)
         dismissKeyboard()
@@ -450,6 +551,9 @@ final class StudentAskUITests: XCTestCase {
             _ = tapIfPresent(app.buttons["permissions_setup_skip"])
             _ = tapIfPresent(app.buttons["student_tutorial_skip"])
             _ = tapIfPresent(app.buttons["verify_email_not_now"])
+            // After a first lesson the app explains notifications ("Stay in
+            // the loop") over home.
+            _ = tapIfPresent(app.buttons["Not now"])
             closeSavePasswordSheet()
             if textTab.exists && textTab.isHittable && !app.textFields["email_input"].exists { return true }
             pause(seconds: 0.5)
@@ -538,6 +642,12 @@ final class StudentAskUITests: XCTestCase {
         guard element.exists && element.isHittable else { return false }
         element.tap()
         return true
+    }
+
+    private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while element.exists && Date() < deadline { pause(seconds: 0.5) }
+        return !element.exists
     }
 
     private func waitForAny(_ elements: [XCUIElement], timeout: TimeInterval, whileWaiting: () -> Void = {}) -> XCUIElement? {
