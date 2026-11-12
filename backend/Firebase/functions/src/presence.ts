@@ -14,6 +14,7 @@
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onValueWritten } from "firebase-functions/v2/database";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 
 import { isTeacherBusy } from "./scoring";
 import { TeacherRecord } from "./types";
@@ -175,6 +176,38 @@ export const onTeacherPresenceBusyWritten = onValueWritten(
     }
   }
 );
+
+/** The profile fields the public entry is built from. */
+const PROFILE_FIELDS_SHOWN = ["fullName", "profileImageURL", "profilePhotoURL", "photoURL", "showProfileImage"];
+
+/** Whether an update to users/{uid} changes what the public entry shows. */
+export function changesPublishedProfile(
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown> | undefined
+): boolean {
+  return PROFILE_FIELDS_SHOWN.some((field) => before?.[field] !== after?.[field]);
+}
+
+/**
+ * Keeps an online teacher's name and photo current — in particular, takes the
+ * photo down as soon as they turn off "Show my profile image", rather than at
+ * their next status or subjects change.
+ *
+ * users/{uid} is written often (minutes, tokens, counters), so this returns
+ * before reading anything unless a shown field changed, and touches only a
+ * teacher who already has an entry.
+ */
+export const onTeacherProfileUpdated = onDocumentUpdated("users/{uid}", async (event) => {
+  const uid = event.params.uid;
+  if (!changesPublishedProfile(event.data?.before.data(), event.data?.after.data())) return;
+  try {
+    const entry = await database().ref(`${ONLINE_TEACHERS_PATH}/${uid}`).get();
+    if (!entry.exists()) return;
+    await republishTeacherPresence(uid);
+  } catch (err) {
+    logger.error(`[presence] failed publishing profile uid=${uid}`, err);
+  }
+});
 
 /**
  * Rebuilds every entry from the authoritative `teachers` node.
