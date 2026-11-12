@@ -13,6 +13,12 @@
 #   teacher-ends  the teacher ends; the student closes the rating (L-04, R-02)
 #   report        the student ends, then reports and blocks the teacher
 #                 (R-03, R-04)
+#   out-of-minutes  a student with 2 minutes: the warning, the hold at
+#                 nothing left, the teacher waiting, then the student ends
+#                 (IOS-L-05)
+#   two-phones    the teacher signed in on both simulators at once, both
+#                 online; both tap Accept on one question together and only
+#                 one gets the lesson (IOS-E-03). Not part of a full run.
 #
 # What it does:
 #   1. creates a teacher account on the emulators (Auth + its users/{uid});
@@ -74,6 +80,7 @@ xcodebuild build-for-testing -workspace Project.xcworkspace -scheme "Instant Tea
 export TEST_RUNNER_LESSON_TEACHER_EMAIL="$TEACHER_EMAIL"
 export TEST_RUNNER_LESSON_TEACHER_PASSWORD="$TEACHER_PASSWORD"
 export TEST_RUNNER_LESSON_TEACHER_UID="$TEACHER_UID"
+export TEST_RUNNER_SYNC_ID="run-$STAMP"
 run_half() {
   local sim="$1" test="$2" name="$3"
   xcodebuild test-without-building -workspace Project.xcworkspace -scheme "Instant Teacher" \
@@ -85,14 +92,18 @@ PAIRS=(
   "student-ends|ProTeacherLessonUITests/testTeachingALessonTheStudentEnds|StudentAskUITests/testTakingALessonThenEndingAndRatingIt"
   "teacher-ends|ProTeacherLessonUITests/testTeachingALessonAndEndingIt|StudentAskUITests/testTakingALessonTheTeacherEndsThenSkippingTheRating"
   "report|ProTeacherLessonUITests/testTeachingALessonTheStudentEndsAndReports|StudentAskUITests/testEndingALessonThenReportingAndBlockingTheTeacher"
+  "out-of-minutes|ProTeacherLessonUITests/testTeachingUntilTheStudentRunsOut|StudentAskUITests/testRunningOutOfMinutesHoldsThenEndsTheLesson"
+  "two-phones|ProTeacherTwoPhonesUITests/testOneTeacherOnTwoPhones|ProTeacherTwoPhonesUITests/testOneTeacherOnTwoPhones"
 )
 status=0
 for pair in "${PAIRS[@]}"; do
   IFS='|' read -r name teacher_test student_test <<< "$pair"
   [[ -n "$ONLY" && "$ONLY" != "$name" ]] && continue
-  run_half "$TEACHER_SIM" "$teacher_test" "$name-teacher" &
+  [[ -z "$ONLY" && "$name" == "two-phones" ]] && continue
+  # The two-phones pair runs the same test on both, as phone a and phone b.
+  TEST_RUNNER_PHONE=a run_half "$TEACHER_SIM" "$teacher_test" "$name-teacher" &
   teacher_pid=$!
-  run_half "$STUDENT_SIM" "$student_test" "$name-student" &
+  TEST_RUNNER_PHONE=b run_half "$STUDENT_SIM" "$student_test" "$name-student" &
   student_pid=$!
   wait "$teacher_pid" || status=1
   wait "$student_pid" || status=1

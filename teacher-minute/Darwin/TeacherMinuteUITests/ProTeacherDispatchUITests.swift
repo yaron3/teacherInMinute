@@ -212,4 +212,29 @@ final class ProTeacherDispatchUITests: ProTeacherEmulatorTestCase {
         } while Date() < deadline
         return false
     }
+
+    /// IOS-D-06, the teacher's side: a card whose question carries a formula,
+    /// as the student's algebra pad writes it, draws it as a formula — the
+    /// KaTeX view — with no raw $$ left on screen.
+    @MainActor
+    func testAFormulaOnACardIsDrawnAsAFormula() async throws {
+        try await createAccounts()
+        launchApp()
+        openLoginForm()
+        submitLogin(email: appTeacher.email, password: appTeacher.password)
+        XCTAssertTrue(waitForDashboard(timeout: 90), "signing in did not reach the dashboard")
+        let qid = try await seedQuestion()
+        var invite = card(for: qid)
+        invite["text"] = "Solve\n$$7+3$$"
+        try await backend.put("teacherInvites/\(appTeacher.uid)/\(qid)", invite)
+        XCTAssertNotNil(visibleAcceptButton(timeout: 60), "the card never showed")
+        pause(seconds: 3) // the formula drawing in
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), "the card draws no formula")
+        let raw = app.staticTexts.containing(NSPredicate(format: "label CONTAINS '$$'")).firstMatch
+        XCTAssertFalse(raw.exists, "the card shows the formula's raw LaTeX: \(raw.label)")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "card with a formula"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
 }

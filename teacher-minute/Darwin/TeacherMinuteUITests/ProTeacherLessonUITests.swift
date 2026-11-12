@@ -42,6 +42,31 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         try await waitForTheStudentToEnd(uid: uid, qid: qid)
     }
 
+    /// IOS-L-05 — pairs with the student's
+    /// testRunningOutOfMinutesHoldsThenEndsTheLesson: the student runs out;
+    /// the teacher is told, chooses to wait under the notice, and is freed
+    /// when the student ends from the hold.
+    @MainActor
+    func testTeachingUntilTheStudentRunsOut() async throws {
+        let (uid, _) = try await joinTheStudentsLesson()
+        let wait = app.buttons["chat_end_prompt_primary"]
+        try require(wait.waitForExistence(timeout: 240), "the teacher was not told the student ran out")
+        attach("told", wait.label)
+        try require(tapWhenHittable(wait, "Wait for the student"), "waiting could not be chosen")
+        try require(app.staticTexts["session_banner_student_out_of_minutes"].waitForExistence(timeout: 10),
+                    "waiting shows no notice of why the lesson paused")
+        // The student ends from the hold with a parting note, which the
+        // teacher reads and closes.
+        let end = app.buttons["session_end_button"]
+        let deadline = Date().addingTimeInterval(180)
+        while end.exists && Date() < deadline {
+            _ = tapIfPresent(app.buttons["chat_end_prompt_primary"])
+            pause(seconds: 1)
+        }
+        try require(!end.exists, "the lesson never ended for the teacher")
+        try await expectFreeOnTheDashboard(uid)
+    }
+
     /// Pairs with the student's
     /// testEndingALessonThenReportingAndBlockingTheTeacher: as
     /// testTeachingALessonTheStudentEnds, without the chat, which that half

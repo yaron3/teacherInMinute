@@ -129,6 +129,47 @@ final class StudentAskUITests: XCTestCase {
         try require(waitForHome(timeout: 20), "closing the search did not return home")
     }
 
+    /// IOS-D-06, the student's side: a formula keyed in on the algebra pad
+    /// goes out in the question, and onto the teacher's card, exactly as
+    /// written ($$…$$ around the editor's LaTeX). The teacher's side, the
+    /// card drawing it as a formula, is ProTeacherDispatchUITests'
+    /// testAFormulaOnACardIsDrawnAsAFormula.
+    @MainActor
+    func testAFormulaGoesToTheTeacherAsWritten() async throws {
+        let student = try await signedInStudent(minutes: 60)
+        try await bringATeacherOnline()
+        for _ in 0..<4 where !questionField.exists {
+            try require(tapWhenHittable(app.buttons["question_home_mode_text"], "the Text tab"), "no Text tab at home")
+            _ = questionField.waitForExistence(timeout: 5)
+        }
+        try require(tapWhenHittable(questionField, "the question field"), "no question field")
+        questionField.typeText("Solve")
+        try require(tapWhenHittable(app.buttons["keyboard_mode_algebra"], "the algebra pad"), "no algebra pad at home")
+        for key in ["7", "+", "3"] {
+            let button = app.buttons.matching(NSPredicate(format: "label == %@", key)).firstMatch
+            try require(tapWhenHittable(button, "the \(key) key"), "the algebra pad has no \(key) key")
+        }
+        try require(tapWhenHittable(findTeacher, "Find a teacher"), "Find a teacher was never tappable")
+        pause(seconds: 1)
+        if !searchCancel.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.02)).tap() }
+        try require(searchCancel.waitForExistence(timeout: 30), "a question with a formula did not start a search")
+
+        let qid = try await waitForQuestion(of: student.uid)
+        let text = stringValue(try await backend.fields("questions/\(qid)")?["text"]) ?? ""
+        attach("question text", text)
+        XCTAssertTrue(text.hasPrefix("Solve"), "the words were lost: \(text)")
+        XCTAssertTrue(text.contains("$$7+3$$"), "the formula did not go out as written: \(text)")
+        let invited = try await invitedTeachers(qid)
+        let first = try XCTUnwrap(invited.first, "the question was sent to no teacher")
+        var cardText = ""
+        for _ in 0..<20 where cardText.isEmpty {
+            cardText = (try await backend.value("teacherInvites/\(first)/\(qid)/text") as? String) ?? ""
+            if cardText.isEmpty { pause(seconds: 0.5) }
+        }
+        XCTAssertEqual(cardText, text, "the teacher's card carries other text than the question")
+        _ = tapWhenHittable(searchCancel, "the search's close button")
+    }
+
     /// IOS-D-02: a photo from the library and no words. A simulator has no
     /// camera, so Attach photo opens the library; the camera itself stays a
     /// manual check. Needs a photo in the simulator's library
@@ -314,6 +355,36 @@ final class StudentAskUITests: XCTestCase {
         try await expectInHistory("Lesson Teacher", qid: qid)
     }
 
+    /// IOS-L-05 — pairs with ProTeacherLessonUITests'
+    /// testTeachingUntilTheStudentRunsOut. A student with 2 minutes stays in:
+    /// a warning comes in the last minute; at nothing left the lesson holds,
+    /// offering more minutes or the end; ending from there, after a while on
+    /// hold, closes it with exactly the 2 minutes charged.
+    @MainActor
+    func testRunningOutOfMinutesHoldsThenEndsTheLesson() async throws {
+        let (teacher, student, qid) = try await joinALesson(minutes: 2)
+        let warning = app.staticTexts["session_banner_minutes_running_out"]
+        try require(warning.waitForExistence(timeout: 150), "no warning came before the minutes ran out")
+        attach("warning", warning.label)
+
+        let endCall = app.buttons["chat_end_call_farewell"]
+        let held = app.buttons["chat_end_prompt_primary"]
+        try require(endCall.waitForExistence(timeout: 120), "running out of minutes did not hold the lesson")
+        attach("held", "\(held.label) / \(endCall.label)")
+        XCTAssertTrue(app.buttons["session_end_button"].exists, "the lesson ended instead of holding")
+        // Held a while: the minutes are charged when the lesson is settled,
+        // and the hold itself must add nothing (checked at the end).
+        pause(seconds: 20)
+
+        try require(tapWhenHittable(endCall, "End the call"), "the hold offered no way to end")
+        try require(tapWhenHittable(app.buttons["chat_end_prompt_primary"], "Send and end"), "ending from the hold asked nothing")
+        let close = app.buttons["rate_session_close"]
+        if close.waitForExistence(timeout: 30) { close.tap() }
+        try await expectTheLessonOver(qid, teacher: teacher)
+        let left = Int(((try await backend.fields("users/\(student.uid)")?["remainingMinutes"]) as? [String: Any])?["integerValue"] as? String ?? "")
+        XCTAssertEqual(left ?? -1, 0, "a 2-minute student ended with \(left.map(String.init) ?? "none") minutes")
+    }
+
     /// IOS-R-03, IOS-R-04 — pairs with testTeachingALessonTheStudentEnds. From
     /// the rating screen the student reports the teacher, blocking them too:
     /// the report is stored and the teacher is on their blocked list. Then
@@ -410,11 +481,11 @@ final class StudentAskUITests: XCTestCase {
     /// A signed-in student who asks; the teacher's half takes it; returns once
     /// the student is in the text lesson.
     @MainActor
-    private func joinALesson() async throws -> (teacher: String, student: EmulatorBackend.Account, qid: String) {
+    private func joinALesson(minutes: Int = 60) async throws -> (teacher: String, student: EmulatorBackend.Account, qid: String) {
         guard let teacher = ProcessInfo.processInfo.environment["LESSON_TEACHER_UID"] else {
             throw XCTSkip("run through scripts/ui-tests/run_lesson_tests.sh, which starts the teacher's half too")
         }
-        let student = try await signedInStudent(minutes: 60)
+        let student = try await signedInStudent(minutes: minutes)
 
         // The teacher's half signs in meanwhile. Once it is online, it is made
         // the only teacher online (on the emulators), so the question reaches it.
