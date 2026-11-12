@@ -68,8 +68,10 @@ final class StudentOnboardingUITests: XCTestCase {
         }
     }
 
-    override func tearDown() async throws {
-        await MainActor.run { app?.terminate() }
+    // Synchronous on purpose: an async tearDown that quits the app through
+    // `await MainActor.run` hangs the whole run after a failed assertion.
+    override func tearDownWithError() throws {
+        MainActor.assumeIsolated { app?.terminate() }
     }
 
     // MARK: - Tests

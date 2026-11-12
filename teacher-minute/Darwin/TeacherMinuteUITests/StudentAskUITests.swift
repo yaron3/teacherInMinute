@@ -56,9 +56,7 @@ final class StudentAskUITests: XCTestCase {
     private var searchCancel: XCUIElement { app.buttons["search_details_cancel"] }
 
     override func setUp() async throws {
-        // A failed assertion with continueAfterFailure off can hang an async
-        // UI test; steps throw instead (see `require`), which ends it cleanly.
-        continueAfterFailure = true
+        continueAfterFailure = false
         guard await backend.isRunning() else {
             throw XCTSkip("Firebase emulators not running; see ProTeacherAcceptRaceUITests for how to start them")
         }
@@ -74,13 +72,21 @@ final class StudentAskUITests: XCTestCase {
         }
     }
 
-    override func tearDown() async throws {
-        await MainActor.run { app?.terminate() }
-        // Nobody stays online on the emulators after the suite.
-        if let teacherUid {
+    // Synchronous on purpose: an async tearDown that quits the app through
+    // `await MainActor.run` hangs the whole run after a failed assertion.
+    override func tearDownWithError() throws {
+        MainActor.assumeIsolated { app?.terminate() }
+        // Nobody stays online on the emulators after the suite. Waited for on a
+        // background queue, since XCTest's own waits hold the main thread.
+        guard let teacherUid else { return }
+        let done = DispatchSemaphore(value: 0)
+        let backend = backend
+        Task.detached {
             try? await backend.patch("teachers/\(teacherUid)", ["status": "offline"])
             try? await backend.delete("onlineTeachers/\(teacherUid)")
+            done.signal()
         }
+        _ = done.wait(timeout: .now() + 15)
     }
 
     // MARK: - Tests
