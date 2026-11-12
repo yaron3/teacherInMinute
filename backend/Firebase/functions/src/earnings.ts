@@ -406,7 +406,9 @@ export const updateTeacherPayoutMethod = onCall(async (req) => {
 
   await firestore.collection("users").doc(uid).set(
     { payoutMethod: { ...method, updatedAt: Timestamp.now() } },
-    { merge: true }
+    // The method replaces the one stored, whole: `merge: true` would merge
+    // into the old map, leaving a bank account behind after a switch to Bit.
+    { mergeFields: ["payoutMethod"] }
   );
 
   logger.info(`[earnings] payout method updated uid=${uid} type=${method.type}`);
@@ -447,7 +449,9 @@ export const verifyPayPalPayoutAccount = onCall(async (req) => {
   const method = verifiedPayPalPayoutMethod(email);
   await firestore.collection("users").doc(uid).set(
     { payoutMethod: { ...method, updatedAt: Timestamp.now() } },
-    { merge: true }
+    // The method replaces the one stored, whole: `merge: true` would merge
+    // into the old map, leaving a bank account behind after a switch to Bit.
+    { mergeFields: ["payoutMethod"] }
   );
 
   logger.info(`[earnings] PayPal payout account verified uid=${uid}`);

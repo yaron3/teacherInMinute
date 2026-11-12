@@ -51,6 +51,7 @@ struct TeacherPayoutMethodSheet: View {
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.danger)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("payout_method_error")
         }
 
         BrandPrimaryButton(
@@ -61,6 +62,7 @@ struct TeacherPayoutMethodSheet: View {
           trackTap("payout_method_save")
           onSave()
         }
+        .accessibilityIdentifier("payout_method_save")
         .padding(.top, 4)
       }
       .brandCard()
@@ -98,6 +100,7 @@ struct TeacherPayoutMethodSheet: View {
         text: $method.branchNumber,
         keyboardType: .numberPad
       )
+      .accessibilityIdentifier("payout_branch_number")
       AuthInputField(
         title: viewModel.accountNumberFieldTitle,
         placeholder: viewModel.accountNumberPlaceholder,
@@ -105,6 +108,7 @@ struct TeacherPayoutMethodSheet: View {
         text: $method.accountNumber,
         keyboardType: .numberPad
       )
+      .accessibilityIdentifier("payout_account_number")
       AuthInputField(
         title: viewModel.accountHolderFieldTitle,
         placeholder: viewModel.accountHolderPlaceholder,
@@ -113,6 +117,7 @@ struct TeacherPayoutMethodSheet: View {
         textContentType: .name,
         autocapitalization: .words
       )
+      .accessibilityIdentifier("payout_account_holder")
     }
   }
 
@@ -146,6 +151,7 @@ struct TeacherPayoutMethodSheet: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("payout_bank_\(bank.code)")
           }
         }
         .padding(.horizontal, 1)
@@ -176,6 +182,7 @@ struct TeacherPayoutMethodSheet: View {
         isValid: !showsPhoneError,
         errorMessage: viewModel.phoneErrorMessage
       )
+      .accessibilityIdentifier("payout_bit_phone")
 
       if !profilePhone.isEmpty, method.phone.trimmingCharacters(in: .whitespacesAndNewlines) != profilePhone {
         Button {
@@ -219,6 +226,7 @@ struct TeacherPayoutMethodSheet: View {
         isValid: !showsPayPalEmailError,
         errorMessage: viewModel.payPalEmailErrorMessage
       )
+      .accessibilityIdentifier("payout_paypal_email")
 
 //      if method.isPayPalVerified, !method.email.isEmpty {
 //        HStack(spacing: 12) {

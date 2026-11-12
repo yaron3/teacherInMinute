@@ -9,7 +9,8 @@
 //
 //   IOS-L-03  the student ends the lesson: the teacher leaves it too and is
 //             free again (no busy mark), back on the dashboard, and finds the
-//             lesson in Lessons (IOS-R-05)
+//             lesson in Lessons (IOS-R-05), and in this month's earnings
+//             (IOS-M-07)
 //   IOS-L-04  the teacher ends the lesson and is free again
 //
 //  The two halves meet only through the emulators: this one signs in, goes
@@ -37,6 +38,7 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         try require(waitForDisappearance(end, timeout: 300), "the lesson never ended for the teacher")
         try await expectFreeOnTheDashboard(uid)
         try await expectInLessons("Asking Student", qid: qid)
+        try await expectInEarnings(uid)
     }
 
     /// IOS-L-04 — pairs with the student's
@@ -177,6 +179,36 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         XCTAssertGreaterThan(settled!.earningsCents, 0, "the lesson earned the teacher nothing")
         XCTAssertTrue(row.label.contains(settled!.earningsNumberText),
                       "the Lessons row does not show the earnings \(settled!.earningsNumberText): \(row.label)")
+    }
+
+    /// IOS-M-07: Earnings shows this month's total, the lesson included —
+    /// every lesson this run's teacher has had, as the backend settled them
+    /// (the pairs of a run share one teacher).
+    @MainActor
+    private func expectInEarnings(_ uid: String) async throws {
+        var cents = 0
+        for qid in try await backend.documentIDs("questions", where: "teacherUid", is: uid) {
+            let fields = try await backend.fields("questions/\(qid)") ?? [:]
+            guard (fields["status"] as? [String: Any])?["stringValue"] as? String == "completed",
+                  let settled = SettledLesson(fields) else { continue }
+            cents += settled.earningsCents
+        }
+        XCTAssertGreaterThan(cents, 0, "the teacher's lessons earned nothing")
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.maximumFractionDigits = 2
+        let expected = formatter.string(from: NSNumber(value: Double(cents) / 100)) ?? ""
+
+        let total = app.staticTexts["earnings_month_total"]
+        for _ in 0..<4 where !total.exists {
+            try require(tapWhenHittable(app.buttons["tab_item_earnings"], "the Earnings tab"), "no Earnings tab")
+            _ = total.waitForExistence(timeout: 10)
+        }
+        try require(total.exists, "Earnings shows no total for the month")
+        let deadline = Date().addingTimeInterval(20)
+        while !total.label.contains(expected) && Date() < deadline { pause(seconds: 0.5) }
+        attach("earnings", total.label)
+        XCTAssertTrue(total.label.contains(expected), "Earnings shows \(total.label) for the month, not \(expected)")
     }
 
     @MainActor

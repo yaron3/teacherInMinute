@@ -63,5 +63,6 @@ struct PayoutMethodTypePicker: View {
       .tappableFrame()
     }
     .buttonStyle(.plain)
+    .accessibilityIdentifier("payout_method_type_\(type)")
   }
 }
