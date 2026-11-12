@@ -10,6 +10,8 @@
 //   IOS-S-02  a guest who asks is offered an account, and nothing is sent
 //   IOS-S-03  a guest who signs up from that offer keeps the guest's uid,
 //             now an email/password account, isAnonymous false
+//   IOS-S-06  a guest's question, words and a photo, is back after signing up
+//             from the offer, and goes out as written once there are minutes
 //   IOS-S-09  a guest who logs in to an existing account is signed in to it,
 //             and the guest account and its profile are deleted
 //   IOS-S-11  a guest signing up with an address in use is refused, with no
@@ -119,6 +121,86 @@ final class StudentOnboardingUITests: XCTestCase {
         XCTAssertEqual(stringValue(profile["role"]), "student")
         let anonymousSince = try await anonymousUsers(since: guest.createdAt)
         XCTAssertTrue(anonymousSince.isEmpty, "signing up left another anonymous user")
+    }
+
+    /// IOS-S-06: a guest's question, words and a photo, waits through
+    /// sign-up from the offer: after it, home has both back, and with the
+    /// minutes the new account brings it goes out as it was written.
+    @MainActor
+    func testAGuestsQuestionSurvivesSigningUp() async throws {
+        let guest = try await startAsGuest()
+        let text = "Draft through sign-up: solve 3x + 4 = 19"
+
+        // A simulator has no camera, so Attach photo opens the library.
+        XCTAssertTrue(tapWhenHittable(app.buttons["capture_question_photo"], "Attach photo"), "no Attach photo at home")
+        XCTAssertTrue(pickFirstLibraryPhoto(), "no photo could be picked from the library")
+        XCTAssertTrue(waitForEnabled(findTeacher, timeout: 60), "the guest's photo never finished uploading")
+        openTextTab()
+        let field = app.textViews["question_text"]
+        XCTAssertTrue(tapWhenHittable(field, "the question field"), "no question field at home")
+        field.typeText(text)
+        dismissKeyboard()
+
+        let offer = app.buttons["not_enough_minutes_primary"]
+        for _ in 0..<6 where !offer.exists {
+            XCTAssertTrue(tapWhenHittable(findTeacher, "Find a teacher"), "Find a teacher was never tappable")
+            if waitForAny([offer, dialogButton], timeout: 20) == dialogButton {
+                dialogButton.tap()
+                pause(seconds: 3)
+            }
+        }
+        XCTAssertTrue(tapWhenHittable(offer, "Create account"), "a guest asking was not offered an account")
+        let email = EmulatorBackend.newEmail(prefix: "guest.draft")
+        let password = "Emulator-\(Int.random(in: 100_000...999_999))"
+        XCTAssertTrue(app.textFields["sign_up_email"].waitForExistence(timeout: 20), "Create account did not open sign-up")
+        // The minutes a new account brings (the sign-up reward, which the
+        // emulators cannot serve from Remote Config), in place before the
+        // home after sign-up reads the balance, as the reward is. Sign-up
+        // keeps the guest's uid.
+        try await backend.merge("users/\(guest.uid)", ["remainingMinutes": 30, "totalMinutes": 30])
+        fillSignUp(email: email, password: password)
+        submitSignUp()
+        finishOnboarding(name: "Draft Keeping Student")
+
+        // Back home, the question as it was: its words and its photo.
+        let restored = app.textViews["question_text"]
+        XCTAssertTrue(restored.waitForExistence(timeout: 20), "home did not come back on the question")
+        XCTAssertEqual(restored.value as? String, text, "the question's words were not kept through sign-up")
+        XCTAssertTrue(app.buttons["delete_question_photo"].waitForExistence(timeout: 20),
+                      "the question's photo was not kept through sign-up")
+        XCTAssertFalse(app.staticTexts["Your question is back, but its photo could not be kept. Please attach it again."].exists,
+                       "the app says the photo was lost")
+
+        // With a teacher online, it goes out as written.
+        let teacher = try await bringATeacherOnline()
+        let search = app.buttons["search_details_cancel"]
+        for _ in 0..<6 where !search.exists {
+            XCTAssertTrue(waitForEnabled(findTeacher, timeout: 60), "Find a teacher never became tappable")
+            XCTAssertTrue(tapWhenHittable(findTeacher, "Find a teacher"), "Find a teacher was never tappable")
+            if waitForAny([search, dialogButton, offer], timeout: 20) != search {
+                // "Checking your balance" while the profile loads.
+                XCTAssertFalse(offer.exists, "the new account's minutes did not reach home")
+                _ = tapIfPresent(dialogButton)
+                pause(seconds: 3)
+            }
+        }
+        XCTAssertTrue(search.exists, "the kept question did not go out")
+
+        var qid = ""
+        for _ in 0..<40 where qid.isEmpty {
+            qid = try await backend.documentIDs("questions", where: "studentUid", is: guest.uid).first ?? ""
+            if qid.isEmpty { try await Task.sleep(nanoseconds: 500_000_000) }
+        }
+        XCTAssertFalse(qid.isEmpty, "no question was created")
+        let question = try await backend.fields("questions/\(qid)") ?? [:]
+        XCTAssertEqual(stringValue(question["text"]), text, "the question went out with other words")
+        let photos = (((question["photoUrls"] as? [String: Any])?["arrayValue"] as? [String: Any])?["values"]
+            as? [[String: Any]])?.compactMap { $0["stringValue"] as? String } ?? []
+        XCTAssertEqual(photos.count, 1, "the question went out with \(photos.count) photos")
+        XCTAssertTrue(photos.first?.contains("questionImages%2F\(guest.uid)%2F") ?? false,
+                      "the photo is not in the student's folder: \(photos)")
+        _ = tapWhenHittable(search, "the search's close button")
+        try await backend.patch("teachers/\(teacher)", ["status": "offline"])
     }
 
     /// IOS-S-09: logging in to an existing account deletes the guest.
@@ -343,6 +425,47 @@ final class StudentOnboardingUITests: XCTestCase {
         }
         XCTAssertTrue(offer.exists, "a guest asking was not offered an account")
         XCTAssertFalse(app.buttons["search_details_cancel"].exists, "a guest's question went out")
+    }
+
+    /// Taps the first photo in the system photo picker, which shows none of
+    /// its photos to XCUITest: by position, the first cell of its grid. A
+    /// single-selection picker closes on the tap. Needs a photo in the
+    /// simulator's library.
+    @MainActor
+    private func pickFirstLibraryPhoto() -> Bool {
+        pause(seconds: 3) // the picker sliding up
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.165, dy: 0.43)).tap()
+        return app.buttons["delete_question_photo"].waitForExistence(timeout: 15)
+    }
+
+    @MainActor
+    private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if element.exists && element.isEnabled { return true }
+            pause(seconds: 0.5)
+        } while Date() < deadline
+        return false
+    }
+
+    /// One teacher online on the emulators, so the app has someone to ask;
+    /// returns its uid.
+    private func bringATeacherOnline() async throws -> String {
+        let uid = "draft-teacher-\(Int(Date().timeIntervalSince1970 * 1000))"
+        try await backend.merge("users/\(uid)", ["role": "teacher", "fullName": "Emulator Teacher"])
+        try await backend.put("teachers/\(uid)", [
+            "status": "offline", "subjects": ["algebra", "calculus"], "displayName": "Emulator Teacher",
+        ])
+        try await backend.patch("teachers/\(uid)", [
+            "status": "online", "lastSeenAt": Int(Date().timeIntervalSince1970 * 1000),
+        ])
+        var listed = false
+        for _ in 0..<30 where !listed {
+            listed = try await backend.exists("onlineTeachers/\(uid)")
+            if !listed { try await Task.sleep(nanoseconds: 500_000_000) }
+        }
+        XCTAssertTrue(listed, "the emulator teacher was never listed online")
+        return uid
     }
 
     @MainActor

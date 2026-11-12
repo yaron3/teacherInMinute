@@ -13,6 +13,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import com.google.firebase.auth.FirebaseAuth
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,6 +36,8 @@ import org.junit.runner.RunWith
  *   AND-S-02  a guest who asks is offered an account, and nothing is sent
  *   AND-S-03  a guest who signs up from that offer keeps the guest's uid,
  *             now an email/password account, isAnonymous false
+ *   AND-S-06  a guest's question is back after signing up from the offer, and
+ *             goes out as written once there are minutes (the photo half manual)
  *   AND-S-09  a guest who logs in to an existing account is signed in to it,
  *             and the guest account and its profile are deleted
  *   AND-S-11  a guest signing up with an address in use is refused, with no
@@ -127,6 +130,70 @@ class StudentOnboardingTest {
         assertEquals("the profile still says anonymous", false, profile.optJSONObject("isAnonymous")?.optBoolean("booleanValue"))
         assertEquals("student", stringValue(profile, "role"))
         assertTrue("signing up left another anonymous user", anonymousUsers(guest.createdAt).isEmpty())
+    }
+
+    /** AND-S-06: a guest's question waits through sign-up from the offer:
+     *  after it, home has the words back, and with the minutes the new
+     *  account brings it goes out as written. The photo half is not covered: Attach photo
+     *  opens the camera or the system picker, which this test cannot drive. */
+    @Test
+    fun aGuestsQuestionSurvivesSigningUp() {
+        val guest = startAsGuest()
+        val text = "Draft through sign-up: solve 3x + 4 = 19"
+        openTextTab()
+        type(text, into = "question_text")
+        device.pressBack() // the keyboard
+        repeat(6) {
+            if (device.hasObject(offer)) return@repeat
+            findScrolling(By.res("find_teacher"))?.click()
+            device.wait(Until.hasObject(offer), 20_000)
+            if (!device.hasObject(offer)) device.findObject(dialogButton)?.let { it.click(); Thread.sleep(3_000) }
+        }
+        (device.findObject(offer) ?: failWithScreen("offer", "a guest asking was not offered an account")).click()
+        val email = backend.newEmail("guest.draft")
+        val password = "Emulator-${(100_000..999_999).random()}"
+        assertTrue("Create account did not open sign-up", device.wait(Until.hasObject(By.res("sign_up_email")), 20_000))
+        // The minutes a new account brings (the sign-up reward, which the
+        // emulators cannot serve from Remote Config), in place before the home
+        // after sign-up reads the balance, as the reward is. Sign-up keeps the
+        // guest's uid.
+        backend.merge("users/${guest.uid}", mapOf("remainingMinutes" to 30, "totalMinutes" to 30))
+        fillSignUp(email, password)
+        submitSignUp()
+        finishOnboarding("Draft Keeping Student")
+
+        // Back home, the question as it was.
+        val tagged = device.wait(Until.findObject(By.res("question_text")), 20_000)
+            ?: failWithScreen("restored", "home did not come back on the question")
+        val field = tagged.findObject(By.clazz("android.widget.EditText")) ?: tagged
+        assertEquals("the question's words were not kept through sign-up", text, field.text)
+
+        // With a teacher online, it goes out as written.
+        val teacher = bringATeacherOnline()
+        val search = By.res("search_details_cancel")
+        repeat(6) {
+            if (device.hasObject(search)) return@repeat
+            findScrolling(By.res("find_teacher"))?.click()
+            device.wait(Until.hasObject(search), 20_000)
+            if (!device.hasObject(search)) {
+                if (device.hasObject(offer)) failWithScreen("minutes", "the new account's minutes did not reach home")
+                // "Checking your balance" while the profile loads.
+                device.findObject(dialogButton)?.let { runCatching { it.click() } }
+                Thread.sleep(3_000)
+            }
+        }
+        if (!device.hasObject(search)) failWithScreen("search", "the kept question did not go out")
+        var qid: String? = null
+        repeat(40) {
+            if (qid == null) {
+                qid = backend.documentIds("questions", "studentUid", guest.uid).firstOrNull()
+                if (qid == null) Thread.sleep(500)
+            }
+        }
+        val question = backend.fields("questions/${qid ?: failWithScreen("question", "no question was created")}") ?: JSONObject()
+        assertEquals("the question went out with other words", text, stringValue(question, "text"))
+        device.findObject(search)?.let { runCatching { it.click() } }
+        backend.patch("teachers/$teacher", JSONObject().put("status", "offline"))
     }
 
     /** AND-S-09: logging in to an existing account deletes the guest. */
@@ -419,6 +486,28 @@ class StudentOnboardingTest {
             Thread.sleep(1_000)
         }
         failWithScreen("side-menu", "the side-menu button never appeared")
+    }
+
+    /** One teacher online on the emulators, so the app has someone to ask;
+     *  returns its uid. */
+    private fun bringATeacherOnline(): String {
+        val uid = "draft-teacher-${System.currentTimeMillis()}"
+        backend.merge("users/$uid", mapOf("role" to "teacher", "fullName" to "Emulator Teacher"))
+        backend.put(
+            "teachers/$uid",
+            JSONObject().put("status", "offline").put("subjects", JSONArray().put("algebra").put("calculus"))
+                .put("displayName", "Emulator Teacher")
+        )
+        backend.patch("teachers/$uid", JSONObject().put("status", "online").put("lastSeenAt", System.currentTimeMillis()))
+        var listed = false
+        repeat(30) {
+            if (!listed) {
+                listed = backend.exists("onlineTeachers/$uid")
+                if (!listed) Thread.sleep(500)
+            }
+        }
+        assertTrue("the emulator teacher was never listed online", listed)
+        return uid
     }
 
     private fun fillSignUp(email: String, password: String) {
