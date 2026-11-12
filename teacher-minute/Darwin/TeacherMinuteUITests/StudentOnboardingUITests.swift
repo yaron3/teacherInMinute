@@ -328,6 +328,77 @@ final class StudentOnboardingUITests: XCTestCase {
         }
     }
 
+    /// IOS-M-06: a new student who verifies their address gets the reward
+    /// minutes, once. The link in the mail cannot be followed here (only a
+    /// hash of its token is kept, and the emulators send no mail), so the test
+    /// does what following it does — verifies the address and claims, as
+    /// verifyEmailLink — then opens the app the way the link's page does.
+    @MainActor
+    func testVerifyingTheEmailCreditsTheRewardOnce() async throws {
+        try await backend.merge("emulatorRemoteConfig/values", [
+            "email_reward_student_minutes": 60, "email_reward_student_slots": 1_000_000,
+        ])
+        let guest = try await startAsGuest()
+        askAndExpectTheOffer()
+        XCTAssertTrue(tapWhenHittable(app.buttons["not_enough_minutes_primary"], "Create account"),
+                      "the offer's Create account was never tappable")
+        let email = EmulatorBackend.newEmail(prefix: "verify.reward")
+        let password = "Emulator-\(Int.random(in: 100_000...999_999))"
+        XCTAssertTrue(app.textFields["sign_up_email"].waitForExistence(timeout: 20), "Create account did not open sign-up")
+        fillSignUp(email: email, password: password)
+        submitSignUp()
+        finishOnboarding(name: "Verifying Student")
+        let before = intValue(try await backend.fields("users/\(guest.uid)")?["remainingMinutes"]) ?? 0
+
+        // What the link does on the server: the address verified, the reward claimed.
+        let student = try await backend.signIn(email: email, password: password)
+        try await backend.markEmailVerified(student.uid)
+        let claimed = try await backend.call("claimEmailReward", as: student, data: [:])
+        attach("claim", "\(claimed)")
+        XCTAssertEqual(claimed.result?["status"] as? String, "granted", "verifying did not earn the reward: \(claimed)")
+        let profile = try await backend.fields("users/\(guest.uid)") ?? [:]
+        XCTAssertEqual(intValue(profile["remainingMinutes"]), before + 60, "the reward did not add 60 minutes")
+        XCTAssertNotNil(profile["emailRewards"], "the reward is not recorded on the profile")
+
+        // Once only.
+        let again = try await backend.call("claimEmailReward", as: student, data: [:])
+        XCTAssertEqual(again.result?["status"] as? String, "already_granted", "a second claim: \(again)")
+        let after = intValue(try await backend.fields("users/\(guest.uid)")?["remainingMinutes"])
+        XCTAssertEqual(after, before + 60, "a second claim changed the minutes")
+
+        // The link's page opens the app with the outcome; the student can then
+        // ask on the new minutes.
+        // Through the system, as a tap in Mail would: XCUIApplication.open
+        // relaunches the app with this test's launch arguments, signing out.
+        XCUIDevice.shared.system.open(URL(string: "teacherminute://email-verified?status=granted&minutes=60")!)
+        // iOS asks before handing a link to an app.
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let openButton = springboard.buttons["Open"]
+        if openButton.waitForExistence(timeout: 5) { openButton.tap() }
+        XCTAssertTrue(dialogButton.waitForExistence(timeout: 15), "opening the app from the link said nothing")
+        attach("granted", app.staticTexts.allElementsBoundByIndex.map(\.label).filter { !$0.isEmpty }.suffix(4).joined(separator: " / "))
+        dialogButton.tap()
+        // Opened from the link, home is back on its photo tab; the question
+        // and Find a teacher are on the text tab.
+        if !findTeacher.exists { openTextTab() }
+        let teacher = try await bringATeacherOnline()
+        let search = app.buttons["search_details_cancel"]
+        let offer = app.buttons["not_enough_minutes_primary"]
+        for _ in 0..<4 where !search.exists {
+            XCTAssertTrue(tapWhenHittable(findTeacher, "Find a teacher"), "Find a teacher was never tappable")
+            let landed = waitForAny([search, dialogButton, offer], timeout: 20)
+            if landed == offer {
+                attach("screen", app.debugDescription)
+                XCTFail("the reward minutes did not reach the app: asking still offers minutes")
+                break
+            }
+            if landed == dialogButton { dialogButton.tap(); pause(seconds: 3) }
+        }
+        XCTAssertTrue(search.exists, "the student could not ask on the reward")
+        _ = tapIfPresent(search)
+        try await backend.patch("teachers/\(teacher)", ["status": "offline"])
+    }
+
     /// IOS-S-09: logging in to an existing account deletes the guest.
     @MainActor
     func testAGuestLoggingInDropsTheGuestAccount() async throws {

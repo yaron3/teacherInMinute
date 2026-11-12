@@ -130,6 +130,10 @@ class ProTeacherEmulatorTestCase: XCTestCase {
         // A tap while the welcome screen is still animating in does nothing,
         // so it is repeated until the form opens.
         let emailField = app.textFields["email_input"]
+        // On a small phone (an SE) the welcome's Log in sits below the fold.
+        let logIn = app.buttons["welcome_log_in"]
+        _ = logIn.waitForExistence(timeout: 30)
+        for _ in 0..<4 where logIn.exists && !logIn.isHittable { app.swipeUp() }
         for _ in 0..<5 where !emailField.exists {
             XCTAssertTrue(tapWhenHittable(app.buttons["welcome_log_in"], "the welcome screen's Log in"),
                           "the welcome screen's Log in never appeared")
@@ -146,7 +150,23 @@ class ProTeacherEmulatorTestCase: XCTestCase {
         clear(passwordField)
         type(password, into: passwordField, "the login password field")
         dismissKeyboard()
-        XCTAssertTrue(tapWhenHittable(app.buttons["login_submit"], "Log in"), "Log in was never tappable")
+        let submit = app.buttons["login_submit"]
+        if !waitForHittable(submit, timeout: 10), submit.exists, app.keyboards.firstMatch.exists {
+            // On a small phone (an SE) the keyboard stays up over the lower
+            // half of Log In, and a tap beside the form does not close it: the
+            // part still showing is tapped, as a user would.
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "login, keyboard over Log in"
+            shot.lifetime = .keepAlways
+            add(shot)
+            for key in ["Done", "done", "Return", "return"] where app.keyboards.buttons[key].exists {
+                app.keyboards.buttons[key].tap()
+                break
+            }
+            _ = waitForDisappearance(app.keyboards.firstMatch, timeout: 3)
+            attach("login, after the keyboard's Done", "keyboard up: \(app.keyboards.firstMatch.exists); Log in hittable: \(submit.isHittable)")
+        }
+        XCTAssertTrue(tapWhenHittable(submit, "Log in"), "Log in was never tappable")
     }
 
     /// Empties a text field that may hold an earlier attempt.
@@ -321,6 +341,11 @@ class ProTeacherEmulatorTestCase: XCTestCase {
     func dismissKeyboard() {
         guard app.keyboards.firstMatch.exists else { return }
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.04)).tap()
+        if waitForDisappearance(app.keyboards.firstMatch, timeout: 3) { return }
+        // On a phone without a notch (an SE) that tap lands on the status bar,
+        // which leaves the keyboard up: tapped again below it, clear of the
+        // controls.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
         _ = waitForDisappearance(app.keyboards.firstMatch, timeout: 3)
     }
 

@@ -30,6 +30,9 @@ struct StudentHomeView: View {
   /// opens for it.
   @Binding var purchaseScreenRequested: Bool
   @State var emailReward = EmailRewardViewModel()
+  /// A verification link opened the app: the reward minutes it credited on
+  /// the server are read back in, or asking would still say none are left.
+  @State var emailLink = EmailVerificationLinkViewModel.shared
   @Environment(\.openURL) var openURL
   @Environment(\.appRouter) var router
   @Environment(\.scenePhase) var scenePhase
@@ -157,6 +160,9 @@ struct StudentHomeView: View {
 	.onChange(of: scenePhase) { _, phase in
 	  guard phase == .active else { return }
 	  Task { await viewModel.handleAppActiveAfterCheckout() }
+	}
+	.onChange(of: emailLink.verifiedVersion) { _, _ in
+	  Task { await viewModel.refresh() }
 	}
 	.onChange(of: viewModel.couponStateKey) { _, _ in
 	  showingCouponAlert = viewModel.handleCouponStateChange()

@@ -237,4 +237,42 @@ final class ProTeacherDispatchUITests: ProTeacherEmulatorTestCase {
         shot.lifetime = .keepAlways
         add(shot)
     }
+
+    /// IOS-E-05, the teacher's side: a card with a very long student name and
+    /// a long question mixing Hebrew, English and emoji shows inside the
+    /// screen, and can still be taken.
+    @MainActor
+    func testALongMixedQuestionFitsTheCard() async throws {
+        try await createAccounts()
+        launchApp()
+        openLoginForm()
+        submitLogin(email: appTeacher.email, password: appTeacher.password)
+        XCTAssertTrue(waitForDashboard(timeout: 90), "signing in did not reach the dashboard")
+        let qid = try await seedQuestion()
+        var invite = card(for: qid)
+        invite["studentName"] = "אלכסנדרה-Maximiliana van der Berg-Montgomery 🎓✨"
+        invite["text"] = "שלום! I'm stuck on שאלה 7 🤔📐 — "
+            + String(repeating: "x² + 3x − 4 = 0 אבל למה? why does it not factor? 😅 ", count: 6)
+        try await backend.put("teacherInvites/\(appTeacher.uid)/\(qid)", invite)
+        let accept = visibleAcceptButton(timeout: 60)
+        XCTAssertNotNil(accept, "a card with long mixed text never showed")
+        pause(seconds: 2)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "card with long mixed text"
+        shot.lifetime = .keepAlways
+        add(shot)
+
+        let window = app.windows.firstMatch.frame
+        let texts = app.staticTexts.allElementsBoundByIndex.filter {
+            $0.exists && ($0.label.contains("שאלה") || $0.label.contains("Montgomery"))
+        }
+        XCTAssertFalse(texts.isEmpty, "the card shows neither the question nor the name")
+        for text in texts where text.isHittable {
+            XCTAssertGreaterThanOrEqual(text.frame.minX, window.minX - 1, "\(text.label.prefix(30)) runs off the left edge")
+            XCTAssertLessThanOrEqual(text.frame.maxX, window.maxX + 1, "\(text.label.prefix(30)) runs off the right edge")
+        }
+        if let accept {
+            XCTAssertTrue(window.contains(accept.frame), "Accept is pushed off the screen: \(accept.frame)")
+        }
+    }
 }

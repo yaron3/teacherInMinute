@@ -93,6 +93,31 @@ struct EmulatorBackend {
         return Account(uid: uid, email: email, password: password, idToken: token)
     }
 
+    /// Signs in with an address and password, as the app would: the account
+    /// with a fresh ID token, for calling functions as that user.
+    func signIn(email: String, password: String) async throws -> Account {
+        let json = try await send(
+            "POST",
+            "\(authBase)/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=emulator",
+            body: ["email": email, "password": password, "returnSecureToken": true]
+        )
+        guard let uid = json?["localId"] as? String, let token = json?["idToken"] as? String else {
+            throw Failure.badResponse("signInWithPassword: \(String(describing: json))")
+        }
+        return Account(uid: uid, email: email, password: password, idToken: token)
+    }
+
+    /// Marks the account's address verified, as following the verification
+    /// link does (verifyEmailLink), without the mail.
+    func markEmailVerified(_ uid: String) async throws {
+        _ = try await send(
+            "POST",
+            "\(authBase)/identitytoolkit.googleapis.com/v1/projects/\(Self.projectID)/accounts:update",
+            body: ["localId": uid, "emailVerified": true],
+            owner: true
+        )
+    }
+
     /// True when the Auth emulator accepts these credentials.
     func canSignIn(_ account: Account) async throws -> Bool {
         let (_, status) = try await raw(
