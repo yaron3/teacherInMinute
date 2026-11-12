@@ -124,7 +124,60 @@ struct EmulatorBackend {
         }
     }
 
+    /// An Auth user as the emulator reports it.
+    struct AuthUser {
+        let uid: String
+        let providers: [String]
+        /// When the account was created, in milliseconds since 1970.
+        let createdAt: Int
+        var isAnonymous: Bool { providers.isEmpty }
+    }
+
+    /// Every Auth user on the emulator.
+    func allUsers() async throws -> [AuthUser] {
+        let json = try await send(
+            "POST",
+            "\(authBase)/identitytoolkit.googleapis.com/v1/projects/\(Self.projectID)/accounts:query",
+            body: ["returnUserInfo": true],
+            owner: true
+        )
+        return (json?["userInfo"] as? [[String: Any]] ?? []).map(Self.authUser)
+    }
+
+    /// The Auth user with this uid, or nil if there is none.
+    func user(uid: String) async throws -> AuthUser? {
+        let json = try await send(
+            "POST",
+            "\(authBase)/identitytoolkit.googleapis.com/v1/projects/\(Self.projectID)/accounts:lookup",
+            body: ["localId": [uid]],
+            owner: true
+        )
+        return (json?["users"] as? [[String: Any]])?.first.map(Self.authUser)
+    }
+
+    private static func authUser(_ user: [String: Any]) -> AuthUser {
+        let providers = (user["providerUserInfo"] as? [[String: Any]] ?? []).compactMap { $0["providerId"] as? String }
+        let created = Int(user["createdAt"] as? String ?? "") ?? (user["createdAt"] as? Int ?? 0)
+        return AuthUser(uid: user["localId"] as? String ?? "", providers: providers, createdAt: created)
+    }
+
     // MARK: - Firestore
+
+    /// How many documents in `collection` have `field` equal to `value`.
+    func count(_ collection: String, where field: String, is value: String) async throws -> Int {
+        let body: [String: Any] = ["structuredQuery": [
+            "from": [["collectionId": collection]],
+            "where": ["fieldFilter": [
+                "field": ["fieldPath": field], "op": "EQUAL", "value": ["stringValue": value],
+            ]],
+        ]]
+        let (data, status) = try await raw("POST", "\(firestoreBase):runQuery", body: body, owner: true)
+        guard (200..<300).contains(status),
+              let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw Failure.badResponse("runQuery \(collection) → \(status) \(String(data: data, encoding: .utf8) ?? "")")
+        }
+        return rows.filter { $0["document"] != nil }.count
+    }
 
     /// The document's fields in Firestore's REST encoding, or nil if it does
     /// not exist — for values `strings` cannot show, such as maps.

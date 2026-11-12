@@ -85,7 +85,64 @@ class EmulatorBackend(private val host: String) {
         }
     }
 
+    /** An Auth user as the emulator reports it; `createdAt` is in ms. */
+    data class AuthUser(val uid: String, val providers: List<String>, val createdAt: Long) {
+        val isAnonymous: Boolean get() = providers.isEmpty()
+    }
+
+    /** Every Auth user on the emulator. */
+    fun allUsers(): List<AuthUser> {
+        val (status, text) = request(
+            "POST", "$authBase/identitytoolkit.googleapis.com/v1/projects/$projectId/accounts:query",
+            JSONObject().put("returnUserInfo", true)
+        )
+        check(status in 200..299) { "accounts:query failed: $status $text" }
+        val users = JSONObject(text).optJSONArray("userInfo") ?: return emptyList()
+        return (0 until users.length()).map { authUser(users.getJSONObject(it)) }
+    }
+
+    /** The Auth user with this uid, or null if there is none. */
+    fun user(uid: String): AuthUser? {
+        val (status, text) = request(
+            "POST", "$authBase/identitytoolkit.googleapis.com/v1/projects/$projectId/accounts:lookup",
+            JSONObject().put("localId", JSONArray().put(uid))
+        )
+        check(status in 200..299) { "accounts:lookup failed: $status $text" }
+        val users = JSONObject(text).optJSONArray("users") ?: return null
+        return if (users.length() == 0) null else authUser(users.getJSONObject(0))
+    }
+
+    private fun authUser(user: JSONObject): AuthUser {
+        val info = user.optJSONArray("providerUserInfo") ?: JSONArray()
+        return AuthUser(
+            user.optString("localId"),
+            (0 until info.length()).map { info.getJSONObject(it).optString("providerId") },
+            user.optString("createdAt").toLongOrNull() ?: 0L,
+        )
+    }
+
     // Firestore
+
+    /** How many documents in `collection` have `field` equal to `value`. */
+    fun count(collection: String, field: String, value: String): Int {
+        val query = JSONObject().put(
+            "structuredQuery",
+            JSONObject()
+                .put("from", JSONArray().put(JSONObject().put("collectionId", collection)))
+                .put(
+                    "where", JSONObject().put(
+                        "fieldFilter", JSONObject()
+                            .put("field", JSONObject().put("fieldPath", field))
+                            .put("op", "EQUAL")
+                            .put("value", JSONObject().put("stringValue", value))
+                    )
+                )
+        )
+        val (status, text) = request("POST", "$firestoreBase:runQuery", query)
+        check(status in 200..299) { "runQuery $collection failed: $status $text" }
+        val rows = JSONArray(text)
+        return (0 until rows.length()).count { rows.getJSONObject(it).has("document") }
+    }
 
     /** The document's fields in Firestore's REST encoding, or null if it does
      *  not exist — for values `strings` cannot show, such as maps. */

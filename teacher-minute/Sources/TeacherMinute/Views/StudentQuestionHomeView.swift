@@ -354,6 +354,7 @@ struct StudentQuestionHomeView: View {
       .tappableFrame()
     }
     .buttonStyle(.plain)
+    .accessibilityIdentifier("question_home_mode_\(segment)")
   }
 
   // MARK: - Photo tab
