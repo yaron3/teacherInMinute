@@ -472,6 +472,13 @@ struct StudentHomeView: View {
 		showingAccountForPurchase = false
 	  }
 	)
+	// Android's back closes the prompt, as its own dismiss does, instead of
+	// sending the app to the background with the prompt still up.
+	.onSystemBack {
+	  viewModel.notEnoughMinutesDismissed()
+	  showingLowBalanceAlert = false
+	  showingAccountForPurchase = false
+	}
   }
 
   /// The purchase screen the menu's Minutes asked for, as "Load minutes"
