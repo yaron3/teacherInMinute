@@ -86,6 +86,7 @@ struct AboutWebView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("about_open_link")
             .trackScreen(AnalyticsScreen.about)
         }
     }
