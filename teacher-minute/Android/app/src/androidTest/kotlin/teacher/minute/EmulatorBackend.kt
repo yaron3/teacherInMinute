@@ -124,7 +124,10 @@ class EmulatorBackend(private val host: String) {
     // Firestore
 
     /** How many documents in `collection` have `field` equal to `value`. */
-    fun count(collection: String, field: String, value: String): Int {
+    fun count(collection: String, field: String, value: String): Int = documentIds(collection, field, value).size
+
+    /** The ids of the documents in `collection` whose `field` equals `value`. */
+    fun documentIds(collection: String, field: String, value: String): List<String> {
         val query = JSONObject().put(
             "structuredQuery",
             JSONObject()
@@ -141,7 +144,9 @@ class EmulatorBackend(private val host: String) {
         val (status, text) = request("POST", "$firestoreBase:runQuery", query)
         check(status in 200..299) { "runQuery $collection failed: $status $text" }
         val rows = JSONArray(text)
-        return (0 until rows.length()).count { rows.getJSONObject(it).has("document") }
+        return (0 until rows.length()).mapNotNull {
+            rows.getJSONObject(it).optJSONObject("document")?.optString("name")?.substringAfterLast('/')
+        }
     }
 
     /** The document's fields in Firestore's REST encoding, or null if it does

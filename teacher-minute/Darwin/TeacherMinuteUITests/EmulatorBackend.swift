@@ -179,6 +179,23 @@ struct EmulatorBackend {
         return rows.filter { $0["document"] != nil }.count
     }
 
+    /// The ids of the documents in `collection` whose `field` equals `value`.
+    func documentIDs(_ collection: String, where field: String, is value: String) async throws -> [String] {
+        let body: [String: Any] = ["structuredQuery": [
+            "from": [["collectionId": collection]],
+            "where": ["fieldFilter": [
+                "field": ["fieldPath": field], "op": "EQUAL", "value": ["stringValue": value],
+            ]],
+        ]]
+        let (data, status) = try await raw("POST", "\(firestoreBase):runQuery", body: body, owner: true)
+        guard (200..<300).contains(status),
+              let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw Failure.badResponse("runQuery \(collection) → \(status) \(String(data: data, encoding: .utf8) ?? "")")
+        }
+        return rows.compactMap { ($0["document"] as? [String: Any])?["name"] as? String }
+            .map { String($0.split(separator: "/").last ?? "") }
+    }
+
     /// The document's fields in Firestore's REST encoding, or nil if it does
     /// not exist — for values `strings` cannot show, such as maps.
     func fields(_ path: String) async throws -> [String: Any]? {

@@ -31,6 +31,7 @@ import FirebaseCore
 import FirebaseAuth
 import FirebaseFirestore
 import FirebaseDatabase
+import FirebaseStorage
 import FirebaseAnalytics
 import FirebaseCrashlytics
 #endif
@@ -45,6 +46,7 @@ enum FirebaseEmulator {
   static let firestorePort = 8085
   static let databasePort = 9000
   static let functionsPort = 5001
+  static let storagePort = 9199
 
   /// Shaped like a real key, since the SDK checks the shape; the Auth emulator
   /// accepts any.
@@ -116,6 +118,9 @@ enum FirebaseEmulator {
     Firestore.firestore().settings = settings
 
     Database.database().useEmulator(withHost: host, port: databasePort)
+    // Question photos and profile images: without this an upload would go to
+    // the real Storage API, under a bucket name nothing owns.
+    Storage.storage().useEmulator(withHost: host, port: storagePort)
 
     logger.info("[Firebase] using the local emulators at \(host), project \(projectID)")
     return true

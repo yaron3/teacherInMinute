@@ -10,6 +10,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
+import com.google.firebase.storage.FirebaseStorage
 
 /**
  * Debug builds only: points the app at the local Firebase emulators instead of
@@ -40,6 +41,7 @@ object AndroidFirebaseEmulator {
     private const val FIRESTORE_PORT = 8085
     private const val DATABASE_PORT = 9000
     private const val FUNCTIONS_PORT = 5001
+    private const val STORAGE_PORT = 9199
 
     /** The Auth emulator accepts any key. */
     private const val API_KEY = "AIzaSyDemoEmulatorKeyForLocalTestsOnly0"
@@ -102,6 +104,9 @@ object AndroidFirebaseEmulator {
                 .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build())
                 .build()
         }
+        // Question photos and profile images: without this an upload would go
+        // to the real Storage API, under a bucket name nothing owns.
+        FirebaseStorage.getInstance().useEmulator(host, STORAGE_PORT)
 
         Log.i(TAG, "using the local emulators at $host, project $PROJECT_ID")
     }

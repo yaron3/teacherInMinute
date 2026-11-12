@@ -95,3 +95,44 @@ describe("isOwnQuestionImageUrl", () => {
     expect(isOwnQuestionImageUrl(downloadUrl("questionImages/student-1/1.jpg"), "")).toBe(false);
   });
 });
+
+describe("the Storage emulator's download URLs", () => {
+  const originalEnv = { ...process.env };
+  const path = "questionImages/student-1/1757000000000.jpg";
+  const emulatorUrl = (host: string, bucket = "demo-teacher-in-a-moment.appspot.com") =>
+    `http://${host}/v0/b/${bucket}/o/${encodeURIComponent(path)}?alt=media&token=t`;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv, GCLOUD_PROJECT: "demo-teacher-in-a-moment" };
+    delete process.env.STORAGE_BUCKET;
+    delete process.env.FUNCTIONS_EMULATOR;
+    delete process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  test("are accepted in the Functions emulator, from a simulator or an Android emulator", () => {
+    process.env.FUNCTIONS_EMULATOR = "true";
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
+
+    expect(storageObjectPath(emulatorUrl("127.0.0.1:9199"))).toBe(path);
+    expect(storageObjectPath(emulatorUrl("10.0.2.2:9199"))).toBe(path);
+    expect(isOwnQuestionImageUrl(emulatorUrl("127.0.0.1:9199"), "student-1")).toBe(true);
+  });
+
+  test("are refused outside the emulator, as any plain http URL is", () => {
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
+
+    expect(storageObjectPath(emulatorUrl("127.0.0.1:9199"))).toBeUndefined();
+  });
+
+  test("still need our bucket and the emulator's port", () => {
+    process.env.FUNCTIONS_EMULATOR = "true";
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
+
+    expect(storageObjectPath(emulatorUrl("127.0.0.1:9199", "someone-else.appspot.com"))).toBeUndefined();
+    expect(storageObjectPath(emulatorUrl("evil.example.com:8080"))).toBeUndefined();
+  });
+});
