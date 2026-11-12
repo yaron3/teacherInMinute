@@ -217,6 +217,18 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertNull("the student account stayed signed in", FirebaseAuth.getInstance().currentUser)
     }
 
+    /** AND-T-03: Log in and Create account offer Google, and no Apple. */
+    @Test
+    fun onlyGoogleIsOfferedNoApple() {
+        // The scene leaves the login form open.
+        assertNotNull("Log in offers no Google", findScrolling(By.res("log_in_google")))
+        assertFalse("Log in offers Apple on Android", device.hasObject(By.res("log_in_apple")))
+
+        openSignUpForm()
+        assertNotNull("Create account offers no Google", findScrolling(By.res("sign_up_google")))
+        assertFalse("Create account offers Apple on Android", device.hasObject(By.res("sign_up_apple")))
+    }
+
     // Steps
 
     /** From the login form, back to the welcome screen and on to sign-up. */

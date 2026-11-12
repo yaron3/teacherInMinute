@@ -42,6 +42,10 @@ import org.junit.runner.RunWith
  *   AND-S-14  a guest who taps Buy minutes is offered an account instead
  *   AND-S-16  a teacher account is turned away with the other app's notice,
  *             signed out, its presence untouched
+ *   AND-S-17  a guest's menu offers Log in; their profile offers an account
+ *   AND-S-05  a guest's sign-up offers email and Google, no Apple
+ *   AND-S-18  Back closes the offer; leaves sign-up for the intro (by design),
+ *             the guest kept; and on home backgrounds the app, the guest kept
  *
  * AND-S-12, a guest killed and relaunched, is not here: the test runs in the
  * app's own process and cannot start it cold.
@@ -89,7 +93,7 @@ class StudentOnboardingTest {
     @Test
     fun startingAsAGuestMakesOneAnonymousStudent() {
         val guest = startAsGuest()
-        val profile = backend.fields("users/${guest.uid}") ?: JSONObject()
+        val profile = savedProfile(guest.uid)
         assertEquals("student", stringValue(profile, "role"))
         assertEquals(true, profile.optJSONObject("isAnonymous")?.optBoolean("booleanValue"))
         assertEquals("a guest has minutes", 0, intValue(profile, "remainingMinutes") ?: 0)
@@ -119,7 +123,7 @@ class StudentOnboardingTest {
         val users = backend.users(email)
         assertEquals("the account is not the guest's uid", listOf(guest.uid), users.map { it.first })
         assertEquals(listOf("password"), users.first().second)
-        val profile = backend.fields("users/${guest.uid}") ?: JSONObject()
+        val profile = savedProfile(guest.uid)
         assertEquals("the profile still says anonymous", false, profile.optJSONObject("isAnonymous")?.optBoolean("booleanValue"))
         assertEquals("student", stringValue(profile, "role"))
         assertTrue("signing up left another anonymous user", anonymousUsers(guest.createdAt).isEmpty())
@@ -205,6 +209,88 @@ class StudentOnboardingTest {
         )
     }
 
+    /** AND-S-17: a guest's menu offers Log in, and their profile says they
+     *  have no account and offers one, with no empty name to fill. */
+    @Test
+    fun aGuestsMenuAndProfileOfferAnAccount() {
+        startAsGuest()
+        openSideMenu()
+        assertTrue("a guest's menu has no Log in", device.wait(Until.hasObject(By.res("side_menu_log_in")), 15_000))
+        (device.wait(Until.findObject(By.res("side_menu_item_profile")), 10_000)
+            ?: failWithScreen("menu-profile", "no Profile in a guest's menu")).click()
+        val create = findScrolling(By.res("profile_create_account_button"))
+            ?: failWithScreen("guest-profile", "a guest's profile offers no account")
+        assertFalse("a guest's profile has a field to fill", device.hasObject(By.clazz("android.widget.EditText")))
+        create.click()
+        if (!device.wait(Until.hasObject(By.res("sign_up_email")), 20_000)) failWithScreen("guest-sign-up", "Create account did not open sign-up")
+    }
+
+    /** AND-S-05: a guest's sign-up offers email and Google, and no Apple. */
+    @Test
+    fun aGuestsSignUpOffersEmailAndGoogleOnly() {
+        startAsGuest()
+        askAndExpectTheOffer()
+        device.findObject(offer).click()
+        if (!device.wait(Until.hasObject(By.res("sign_up_email")), 20_000)) failWithScreen("sign-up", "Create account did not open sign-up")
+        assertNotNull("sign-up offers no Google", findScrolling(By.res("sign_up_google")))
+        assertFalse("sign-up offers Apple on Android", device.hasObject(By.res("sign_up_apple")))
+    }
+
+    /** AND-S-18: Back closes the offer, leaves sign-up for the screen before
+     *  it, and on home sends the app to the background with the guest kept. */
+    @Test
+    fun backAsAGuestStepsBackAndKeepsTheGuest() {
+        val guest = startAsGuest()
+        askAndExpectTheOffer()
+        device.pressBack()
+        assertTrue("Back did not close the offer", device.wait(Until.gone(offer), 10_000))
+        if (!device.wait(Until.hasObject(By.res("question_home_mode_text")), 5_000)) {
+            failWithScreen("back-offer", "Back on the offer left home; foreground is ${device.currentPackageName}")
+        }
+
+        askAgainForTheOffer()
+        device.findObject(offer).click()
+        if (!device.wait(Until.hasObject(By.res("sign_up_email")), 20_000)) failWithScreen("back-sign-up", "Create account did not open sign-up")
+        device.pressBack()
+        // A Back that only closed the keyboard leaves the form up: press again.
+        if (!device.wait(Until.gone(By.res("sign_up_email")), 3_000)) device.pressBack()
+        assertTrue("Back did not leave sign-up", device.wait(Until.gone(By.res("sign_up_email")), 10_000))
+        // By design (AppRouter.startRegistration) sign-up sits on the welcome
+        // stack: backing out lands on the intro, still signed in as the guest,
+        // and Get started returns that same guest home.
+        val intro = device.wait(Until.findObject(By.res("student_intro_start")), 20_000)
+            ?: failWithScreen("back-sign-up", "Back from sign-up did not reach the intro; foreground is ${device.currentPackageName}")
+        assertEquals("backing out of sign-up signed the guest out", guest.uid, FirebaseAuth.getInstance().currentUser?.uid)
+        intro.click()
+        val introDeadline = System.currentTimeMillis() + 30_000
+        while (System.currentTimeMillis() < introDeadline && !device.wait(Until.gone(By.res("student_intro_start")), 3_000)) {
+            runCatching { device.findObject(By.res("student_intro_start"))?.click() }
+        }
+        if (!waitForHome(30_000)) failWithScreen("back-start", "Get started after backing out did not return home")
+        assertEquals("Get started made a new guest", guest.uid, FirebaseAuth.getInstance().currentUser?.uid)
+
+        device.pressBack()
+        assertTrue("Back on home did not send the app to the background",
+            device.wait(Until.gone(By.pkg(context.packageName).depth(0)), 10_000))
+        context.startActivity(
+            context.packageManager.getLaunchIntentForPackage(context.packageName)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        assertTrue("reopening did not return home", waitForHome(60_000))
+        assertEquals("reopening is not the same guest", guest.uid, FirebaseAuth.getInstance().currentUser?.uid)
+        assertTrue("the guest became someone else", backend.user(guest.uid)?.isAnonymous == true)
+    }
+
+    /** The offer again, after Back closed it: the question is still written. */
+    private fun askAgainForTheOffer() {
+        repeat(6) {
+            if (device.hasObject(offer)) return
+            findScrolling(By.res("find_teacher"))?.click()
+            device.wait(Until.hasObject(offer), 15_000)
+            if (!device.hasObject(offer)) device.findObject(dialogButton)?.let { it.click(); Thread.sleep(3_000) }
+        }
+        if (!device.hasObject(offer)) failWithScreen("offer-again", "asking again did not offer an account")
+    }
+
     // Steps
 
     /** Taps Start on the intro; returns the one anonymous user made since. */
@@ -228,6 +314,18 @@ class StudentOnboardingTest {
         }
         assertEquals("Start made ${guests.size} anonymous users", 1, guests.size)
         return guests.first()
+    }
+
+    /** The profile once it holds a role: the app saves it without waiting for
+     *  the write to land, so a read straight after Start can find nothing. */
+    private fun savedProfile(uid: String): JSONObject {
+        var profile = JSONObject()
+        repeat(30) {
+            profile = backend.fields("users/$uid") ?: JSONObject()
+            if (stringValue(profile, "role") != null) return profile
+            Thread.sleep(500)
+        }
+        return profile
     }
 
     private fun anonymousUsers(since: Long) = backend.allUsers().filter { it.isAnonymous && it.createdAt >= since }

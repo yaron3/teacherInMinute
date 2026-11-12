@@ -18,6 +18,8 @@
 //   IOS-S-14  a guest who taps Buy minutes is offered an account instead
 //   IOS-S-16  a teacher account is turned away with the other app's notice,
 //             signed out, its presence untouched
+//   IOS-S-17  a guest's menu offers Log in; their profile offers an account,
+//             with no empty name to fill
 //
 //  The app under test is the scheme's own, Instant Teacher, launched with
 //  `-firebaseEmulatorHost` so a debug build talks only to the emulators.
@@ -238,6 +240,22 @@ final class StudentOnboardingUITests: XCTestCase {
             XCTAssertTrue(app.buttons["side_menu_log_in"].waitForExistence(timeout: 10),
                           "the teacher account stayed signed in")
         }
+    }
+
+    /// IOS-S-17: a guest's menu offers Log in; their profile says they have
+    /// no account and offers one, with no empty name to fill.
+    @MainActor
+    func testAGuestsMenuAndProfileOfferAnAccount() async throws {
+        _ = try await startAsGuest()
+        openSideMenu()
+        XCTAssertTrue(app.buttons["side_menu_log_in"].waitForExistence(timeout: 15), "a guest's menu has no Log in")
+        XCTAssertTrue(tapWhenHittable(app.buttons["side_menu_item_profile"], "the menu's Profile"), "no Profile in a guest's menu")
+        let create = app.buttons["profile_create_account_button"]
+        XCTAssertTrue(create.waitForExistence(timeout: 20), "a guest's profile offers no account")
+        scrollToHittable(create)
+        XCTAssertEqual(app.textFields.count, 0, "a guest's profile has a field to fill")
+        XCTAssertTrue(tapWhenHittable(create, "Create account"), "Create account was never tappable")
+        XCTAssertTrue(app.textFields["sign_up_email"].waitForExistence(timeout: 20), "Create account did not open sign-up")
     }
 
     // MARK: - Steps
