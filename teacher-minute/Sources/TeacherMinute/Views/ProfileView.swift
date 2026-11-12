@@ -352,7 +352,8 @@ struct ProfileView: View {
       teachingCard(
         title: viewModel.gradeLevelsTaughtTitle,
         chips: viewModel.gradeLevelLabels,
-        includeAdd: viewModel.gradeLevels.isEmpty
+        includeAdd: viewModel.gradeLevels.isEmpty,
+        editIdentifier: "profile_grades_edit_button"
       ) {
         showProfileEditor()
       }
@@ -360,7 +361,8 @@ struct ProfileView: View {
       teachingCard(
         title: viewModel.subjectsSectionTitle,
         chips: viewModel.subjectsOrPlaceholder,
-        includeAdd: viewModel.subjects.isEmpty
+        includeAdd: viewModel.subjects.isEmpty,
+        editIdentifier: "profile_subjects_edit_button"
       ) {
         isShowingSubjectEditor = true
       }
@@ -373,6 +375,7 @@ struct ProfileView: View {
     title: String,
     chips: [String],
     includeAdd: Bool,
+    editIdentifier: String,
     edit: @escaping () -> Void
   ) -> some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -381,7 +384,7 @@ struct ProfileView: View {
           .font(.system(size: 15, weight: .bold))
           .foregroundStyle(theme.brandSecondaryText)
         Spacer()
-        editButton(identifier: "profile_teaching_edit_button") {
+        editButton(identifier: editIdentifier) {
           edit()
         }
       }

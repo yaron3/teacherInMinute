@@ -433,6 +433,7 @@ struct TeacherDashboardView: View {
 			FlatChip(title: viewModel.editSubjectsLabel, systemImage: "pencil", outlined: true)
 		  }
 		  .buttonStyle(.plain)
+		  .accessibilityIdentifier("dashboard_edit_subjects")
 		  Spacer()
 		}
 	  }
