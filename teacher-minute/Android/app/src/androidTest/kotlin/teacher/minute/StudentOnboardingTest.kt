@@ -291,6 +291,37 @@ class StudentOnboardingTest {
         if (!device.hasObject(offer)) failWithScreen("offer-again", "asking again did not offer an account")
     }
 
+    /** X-05 / X-06, the Android half: the account made on the iPhone
+     *  (StudentOnboardingUITests.testCrossPlatformSignUpOnTheIPhone) logged
+     *  into from an Android guest. Same uid, the iPhone's name and minutes
+     *  untouched, the Android guest deleted, no extra account. Skipped unless
+     *  the run passes `-e crossEmail … -e crossPassword …`. */
+    @Test
+    fun crossPlatformLogInFindsTheSameAccount() {
+        val args = InstrumentationRegistry.getArguments()
+        val email = args.getString("crossEmail")
+        val password = args.getString("crossPassword")
+        assumeTrue("pass crossEmail and crossPassword to run the cross-platform log-in", email != null && password != null)
+        val account = backend.users(email!!).singleOrNull()
+            ?: failWithScreen("cross", "no single account for $email: was the iPhone half run?")
+        val guest = startAsGuest()
+
+        logInFromTheMenu(email, password!!)
+        if (!waitForHome(90_000)) failWithScreen("cross-login", "logging in with the iPhone's account did not reach home")
+
+        assertEquals("not signed in to the iPhone's account", account.first, FirebaseAuth.getInstance().currentUser?.uid)
+        val profile = backend.fields("users/${account.first}") ?: JSONObject()
+        assertEquals("Cross Platform Student", stringValue(profile, "fullName"))
+        assertEquals("the minutes changed on logging in from Android", 37, intValue(profile, "remainingMinutes"))
+        var gone = false
+        repeat(30) {
+            if (!gone && backend.user(guest.uid) == null) gone = true
+            if (!gone) Thread.sleep(1_000)
+        }
+        assertTrue("the Android guest is still in Auth", gone)
+        assertEquals("the address has more than one account", 1, backend.users(email).size)
+    }
+
     // Steps
 
     /** Taps Start on the intro; returns the one anonymous user made since. */

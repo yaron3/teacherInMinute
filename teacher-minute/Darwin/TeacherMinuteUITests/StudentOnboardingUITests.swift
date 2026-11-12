@@ -258,6 +258,30 @@ final class StudentOnboardingUITests: XCTestCase {
         XCTAssertTrue(app.textFields["sign_up_email"].waitForExistence(timeout: 20), "Create account did not open sign-up")
     }
 
+    /// X-05 / X-06, the iPhone half: a guest signs up with the address and
+    /// password the cross-platform run hands in, and is given 37 minutes. The
+    /// Android half (StudentOnboardingTest.crossPlatformLogInFindsTheSameAccount)
+    /// then logs in with them. Skipped unless the run sets CROSS_EMAIL and
+    /// CROSS_PASSWORD (xcodebuild: TEST_RUNNER_CROSS_EMAIL, …).
+    @MainActor
+    func testCrossPlatformSignUpOnTheIPhone() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let email = env["CROSS_EMAIL"], let password = env["CROSS_PASSWORD"] else {
+            throw XCTSkip("set TEST_RUNNER_CROSS_EMAIL and TEST_RUNNER_CROSS_PASSWORD to run the cross-platform sign-up")
+        }
+        let guest = try await startAsGuest()
+        askAndExpectTheOffer()
+        XCTAssertTrue(tapWhenHittable(app.buttons["not_enough_minutes_primary"], "Create account"), "no Create account in the offer")
+        fillSignUp(email: email, password: password)
+        submitSignUp()
+        finishOnboarding(name: "Cross Platform Student")
+
+        let users = try await backend.users(withEmail: email)
+        XCTAssertEqual(users.map(\.uid), [guest.uid], "signing up on the iPhone did not keep the guest's uid")
+        try await backend.merge("users/\(guest.uid)", ["remainingMinutes": 37])
+        attach("cross-platform account", "\(email) uid=\(guest.uid)")
+    }
+
     // MARK: - Steps
 
     /// Launches the app signed out and taps Start; returns the guest account
