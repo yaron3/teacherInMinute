@@ -259,7 +259,7 @@ final class ProfileViewModel {
         if editedPhoneNumber.isEmpty {
             return roleType != .teacher
         }
-        return editedPhoneNumber.isValidPhoneNumber
+        return editedPhoneNumber.isValidProfilePhoneNumber
     }
 
     /// Unlike the onboarding form, this one opens on saved data with Save as
@@ -554,9 +554,10 @@ final class ProfileViewModel {
             } else if description == "Email" || description == LocalizationSupport.localized("Email") {
                 email = value
             } else if description == "Phone" || description == LocalizationSupport.localized("Phone") {
-                // Stored in the canonical local form so it matches what the
-                // payout backend accepts, whatever spelling was typed.
-                phoneNumber = value.normalizedPhoneNumber
+                // Stored in the canonical form whatever spelling was typed —
+                // local for an Israeli number, which the payout backend
+                // accepts; international for any other country's.
+                phoneNumber = value.normalizedProfilePhoneNumber
             } else if description == "Grade" || description == LocalizationSupport.localized("Grade") {
                 grade = value
             }

@@ -169,6 +169,9 @@ struct BrandTextField: View {
             .accessibilityHidden(true)
         }
         field
+        if isSecure {
+          revealButton
+        }
       }
       .padding(.horizontal, 12)
       .frame(height: 52)
@@ -188,14 +191,45 @@ struct BrandTextField: View {
     }
   }
 
+  /// A secure field's text shown, by its eye (IT-5, IT-2: Bug-001, Bug-008).
+  @State var isRevealed = false
+
+  /// Shows or hides a secure field's text, so what was typed can be checked.
+  private var revealButton: some View {
+    Button {
+      trackTap("password_visibility", detail: isRevealed ? "hide" : "show")
+      isRevealed.toggle()
+    } label: {
+      Image(isRevealed ? "brand-eye-off" : "brand-eye", bundle: .module)
+        .renderingMode(.template)
+        .resizable()
+        .foregroundStyle(theme.brandSecondaryText)
+        .frame(width: 22, height: 22)
+        .frame(width: 36, height: 44)
+        .tappableFrame()
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("password_visibility_toggle")
+  }
+
   @ViewBuilder
   private var field: some View {
-    if isSecure {
+    if isSecure && !isRevealed {
       SecureField("", text: $text, prompt: prompt)
         .font(.system(size: 16))
         .foregroundStyle(theme.onDarkFill)
         .tint(theme.brandActionBackground)
         .textFieldStyle(.plain)
+    } else if isSecure {
+      // The same password, shown: no capitals or corrections slipped into it.
+      TextField("", text: $text, prompt: prompt)
+        .font(.system(size: 16))
+        .foregroundStyle(theme.onDarkFill)
+        .tint(theme.brandActionBackground)
+        .textFieldStyle(.plain)
+        .textContentType(textContentType)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
     } else {
       TextField("", text: $text, prompt: prompt)
         .font(.system(size: 16))

@@ -92,7 +92,7 @@ struct TeacherDashboardView: View {
 		  }
 		}
 		.emailRewardDialogs(emailReward)
-		.sheet(isPresented: Binding(get: { viewModel.showsSubjectEditor }, set: { viewModel.showsSubjectEditor = $0 }), onDismiss: {
+		.brandSheet(isPresented: Binding(get: { viewModel.showsSubjectEditor }, set: { viewModel.showsSubjectEditor = $0 }), onDismiss: {
 		  viewModel.reloadSubjects()
 		}) {
 		  NavigationStack {
@@ -117,7 +117,7 @@ struct TeacherDashboardView: View {
 		  .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
 		  .id(languagePreference)
 		}
-		.sheet(isPresented: $showsDocuments) {
+		.brandSheet(isPresented: $showsDocuments) {
 		  NavigationStack {
 			TeacherDocumentsView()
 		  }

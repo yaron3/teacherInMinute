@@ -31,6 +31,7 @@ extension TeacherSubjectsViewModel {
         LocalizationSupport.localized("Choose one or more subjects to see subtopics.")
     }
     var searchPlaceholder: String { LocalizationSupport.localized("Search subjects or subtopics") }
+    var noSearchResultsText: String { LocalizationSupport.localized("No subject or subtopic matches your search.") }
 
     /// Display name of a subject area, which is stored in English.
     func areaTitle(_ area: TeachingSubjectArea) -> String {

@@ -15991,6 +15991,20 @@
         }
       },
       "valueType": "STRING"
+    },
+    "subject_subtopic_matches": {
+      "defaultValue": {
+        "value": "No subject or subtopic matches your search."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אף מקצוע או תת־נושא לא תואם לחיפוש."
+        },
+        "HebrewApp": {
+          "value": "אף מקצוע או תת־נושא לא תואם לחיפוש."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

@@ -86,6 +86,7 @@ struct TeacherSubjectsView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
 
     FlatSearchField(placeholder: viewModel.searchPlaceholder, text: $viewModel.searchText)
+      .accessibilityIdentifier("teacher_subjects_search")
 
     VStack(alignment: .leading, spacing: 14) {
       HStack {
@@ -110,13 +111,19 @@ struct TeacherSubjectsView: View {
     }
     .brandCard()
 
-    if viewModel.shouldShowSubtopicsPrompt {
+    if viewModel.hasNoSearchResults {
+      Text(viewModel.noSearchResultsText)
+        .font(.system(size: 14))
+        .foregroundStyle(theme.brandSecondaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("teacher_subjects_no_results")
+    } else if viewModel.shouldShowSubtopicsPrompt {
       Text(viewModel.noAreasSelectedText)
         .font(.system(size: 14))
         .foregroundStyle(theme.brandSecondaryText)
         .frame(maxWidth: .infinity, alignment: .leading)
     } else {
-      ForEach(viewModel.selectedAreas) { area in
+      ForEach(viewModel.subtopicSections) { area in
         VStack(alignment: .leading, spacing: 14) {
           HStack {
             Text(viewModel.subtopicsSectionTitle(for: area))

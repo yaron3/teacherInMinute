@@ -22,11 +22,15 @@ extension CompleteProfileViewModel {
     var backLabel: String { LocalizationSupport.localized("Back") }
 
     // MARK: Name
-    var fullNameFieldTitle: String { LocalizationSupport.localized("Full Name") }
+    /// A field that must be filled, marked as forms mark one (IT-7, Bug-004).
+    func requiredFieldTitle(_ title: String) -> String { "\(title) *" }
+
+    var fullNameFieldTitle: String { requiredFieldTitle(LocalizationSupport.localized("Full Name")) }
     var fullNamePlaceholder: String { LocalizationSupport.localized("place holder name") }
 
     // MARK: Email
-    var emailFieldTitle: String { LocalizationSupport.localized("Email") }
+    /// Shown only when the account has no address yet, and then required.
+    var emailFieldTitle: String { requiredFieldTitle(LocalizationSupport.localized("Email")) }
     var emailPlaceholder: String { LocalizationSupport.localized("Enter your email") }
 
     /// Why the link to a changed address could not be sent.
@@ -47,7 +51,7 @@ extension CompleteProfileViewModel {
     }
 
     // MARK: Phone
-    var phoneRequiredFieldTitle: String { LocalizationSupport.localized("Phone Number") }
+    var phoneRequiredFieldTitle: String { requiredFieldTitle(LocalizationSupport.localized("Phone Number")) }
     var phoneOptionalFieldTitle: String { LocalizationSupport.localized("Phone Number (Optional)") }
     var phonePlaceholder: String { LocalizationSupport.localized("place holder phone number") }
 

@@ -70,4 +70,35 @@ extension String {
     var isValidPhoneNumber: Bool {
         !normalizedPhoneNumber.isEmpty
     }
+
+    /// A phone number for the profile: an Israeli one in the local form
+    /// `normalizedPhoneNumber` gives, or any other country's in international
+    /// form — `+` (or `00`) and its country code, 8 to 15 digits in all, as the
+    /// English placeholder `+1 (555) 000-0000` shows. Empty when it is
+    /// neither. Only the profile takes these: a Bit payout number must be
+    /// Israeli, which is what `normalizedPhoneNumber` and the backend's
+    /// `requirePhone` hold it to (IT-9, Bug-002).
+    var normalizedProfilePhoneNumber: String {
+        let israeli = normalizedPhoneNumber
+        if !israeli.isEmpty { return israeli }
+        var kept = ""
+        for character in self where !" -().".contains(character) {
+            kept.append(character)
+        }
+        if kept.hasPrefix("00") {
+            kept = "+" + kept.dropFirst(2)
+        }
+        guard kept.hasPrefix("+") else { return "" }
+        let digits = String(kept.dropFirst())
+        guard digits.range(of: #"^[1-9][0-9]{7,14}$"#, options: .regularExpression) != nil else {
+            return ""
+        }
+        return "+" + digits
+    }
+
+    /// Whether the string is a phone number the profile accepts — see
+    /// `normalizedProfilePhoneNumber`.
+    var isValidProfilePhoneNumber: Bool {
+        !normalizedProfilePhoneNumber.isEmpty
+    }
 }

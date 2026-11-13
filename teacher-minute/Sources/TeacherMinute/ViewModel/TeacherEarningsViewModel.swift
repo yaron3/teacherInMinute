@@ -132,8 +132,11 @@ final class TeacherEarningsViewModel {
     var hasPayoutMethod: Bool { payoutMethod != nil }
 
     /// Whether the Bit form can offer the profile number instead of typing.
+    /// Only an Israeli number: Bit takes no other, though a profile may hold
+    /// one from abroad.
     var canUseProfilePhone: Bool {
-        !profilePhone.isEmpty && payoutMethodDraft.phone.trimmingCharacters(in: .whitespacesAndNewlines) != profilePhone
+        profilePhone.isValidPhoneNumber
+            && payoutMethodDraft.phone.trimmingCharacters(in: .whitespacesAndNewlines) != profilePhone
     }
 
     func useProfilePhone() {
@@ -357,7 +360,7 @@ final class TeacherEarningsViewModel {
             }
             // A profile number already on file: pre-fill it, so the common case
             // is one tap rather than retyping.
-            if !profilePhone.isEmpty {
+            if profilePhone.isValidPhoneNumber {
                 draft.phone = profilePhone
             }
         }

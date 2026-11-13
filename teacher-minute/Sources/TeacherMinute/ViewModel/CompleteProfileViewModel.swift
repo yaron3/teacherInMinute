@@ -62,7 +62,7 @@ final class CompleteProfileViewModel {
 	if trimmedPhone.isEmpty {
 	  return role == .student
 	}
-	return trimmedPhone.isValidPhoneNumber
+	return trimmedPhone.isValidProfilePhoneNumber
   }
 
   /// Stays quiet on an untouched field so the error only appears once there is
@@ -204,10 +204,11 @@ final class CompleteProfileViewModel {
   private func saveAndContinue() {
 	isLoading = true
 
-	// Store the canonical local form ("0521234567") whatever spelling was
-	// typed, so the payout sheet's "use my profile number" shortcut hands the
-	// backend a number it already accepts.
-	phoneNumber = phoneNumber.normalizedPhoneNumber
+	// Store the canonical form whatever spelling was typed: an Israeli number
+	// locally ("0521234567"), so the payout sheet's "use my profile number"
+	// shortcut hands the backend a number it already accepts; any other
+	// country's internationally ("+15550000000").
+	phoneNumber = phoneNumber.normalizedProfilePhoneNumber
 	// `canContinue` checks the trimmed name, so store the trimmed one too —
 	// otherwise a name typed with a stray space is saved with it.
 	fullName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
