@@ -154,7 +154,7 @@ struct SessionTopBar: View {
   let onSelect: (ChatSessionView.TAB_TYPE) -> Void
   let onClose: () -> Void
 
-  /// The bar's width, measured; zero until it is.
+  /// The width of the row inside the bar's margins, measured; zero until it is.
   @State var barWidth: CGFloat = 0
 
   /// The gap the design leaves between the toggle and the close button on its
@@ -169,26 +169,26 @@ struct SessionTopBar: View {
   /// A narrower screen narrows the toggle, never the gap.
   var toggleMaxWidth: CGFloat {
     guard barWidth > 0 else { return 266 }
-    return max(160, min(266, barWidth - 24 * 2 - Self.closeButtonGap - 44))
+    return max(160, min(266, barWidth - Self.closeButtonGap - 44))
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      Color.clear
-        .frame(maxWidth: .infinity)
-        .frame(height: 0)
-        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
-          barWidth = width
-        }
-      HStack(spacing: 12) {
-        SessionTabToggle(items: items, selected: selected, maxWidth: toggleMaxWidth, onSelect: onSelect)
-        Spacer(minLength: 0)
-        SessionCloseButton(accessibilityLabel: closeAccessibilityLabel, action: onClose)
-      }
-      .padding(.horizontal, 24)
-      .padding(.top, 4)
-      .padding(.bottom, 20)
+    HStack(spacing: 12) {
+      SessionTabToggle(items: items, selected: selected, maxWidth: toggleMaxWidth, onSelect: onSelect)
+      Spacer(minLength: 0)
+      SessionCloseButton(accessibilityLabel: closeAccessibilityLabel, action: onClose)
     }
+    // The row inside the margins is measured, not a zero-height layer beside
+    // it: on Android that layer never reported a width, so the toggle kept
+    // its full 266pt and the close button sat against it. The row holds a
+    // Spacer, so it takes all the room it is offered, and Compose keeps it to
+    // that room even when the toggle asks for more.
+    .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+      barWidth = width
+    }
+    .padding(.horizontal, 24)
+    .padding(.top, 4)
+    .padding(.bottom, 20)
   }
 }
 
