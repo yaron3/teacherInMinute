@@ -19,9 +19,19 @@ object AndroidImagePickerManager {
     private const val JPEG_QUALITY = 85
 
     /**
+     * The longer side documents, ID photos and profile photos are scaled to:
+     * an ID card or an A4 page stays sharp (about 300 dpi), and the JPEG
+     * stays a few megabytes. They used to come back as they were, and a phone
+     * with a 50 MP camera ran out of memory turning one into the base64
+     * string that crosses to Swift (AND-T-04: "image doesn't upload and the
+     * app crashes").
+     */
+    private const val DOCUMENT_MAX_DIMENSION = 3000
+
+    /**
      * [maxDimension] is the longer side the image is scaled to before it is
-     * returned, or 0 to return it as it is. Documents and ID photos keep
-     * every pixel; a question's photo only needs to read on a phone.
+     * returned, or 0 to return it as it is. A question's photo only needs to
+     * read on a phone and asks for less than documents do.
      */
     private data class PendingPick(
         val maxDimension: Int = 0,
@@ -35,7 +45,7 @@ object AndroidImagePickerManager {
     @Volatile private var pendingCaptureUri: Uri? = null
 
     @JvmStatic
-    fun pickImageBase64(): String = pickImageBase64(0)
+    fun pickImageBase64(): String = pickImageBase64(DOCUMENT_MAX_DIMENSION)
 
     /** A picked image as an upright JPEG, no larger than [maxDimension]. */
     @JvmStatic
@@ -70,7 +80,7 @@ object AndroidImagePickerManager {
     /// base64-encoded JPEG. Complements `pickImageBase64` (gallery) so the user
     /// can either take a picture or choose an existing one.
     @JvmStatic
-    fun captureImageBase64(): String = captureImageBase64(0)
+    fun captureImageBase64(): String = captureImageBase64(DOCUMENT_MAX_DIMENSION)
 
     /** A captured photo as an upright JPEG, no larger than [maxDimension]. */
     @JvmStatic

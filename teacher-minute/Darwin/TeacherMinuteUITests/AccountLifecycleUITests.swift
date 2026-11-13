@@ -36,6 +36,11 @@
 //
 //  `TIM_QA_EMAIL_DOMAIN` overrides the domain of the generated address.
 //
+//  With TEST_RUNNER_LIFECYCLE_EMULATOR_HOST=127.0.0.1 it runs against the local
+//  Firebase emulators instead (`npm run emulators:app` in
+//  backend/Firebase/functions): nothing reaches the live backend or a real
+//  teacher, so it can run unattended.
+//
 //  Controls are found by accessibility identifier wherever the app gives
 //  one, so the app's language does not matter.
 //
@@ -100,6 +105,12 @@ final class AccountLifecycleUITests: XCTestCase {
         app = XCUIApplication()
         // Keep the tutorial from opening over Home.
         app.launchArguments += ["-tutorial.student.hidden", "YES"]
+        // Against the local emulators instead, when the run names their host
+        // (xcodebuild: TEST_RUNNER_LIFECYCLE_EMULATOR_HOST=127.0.0.1): the
+        // account, the question and the deletion then stay on this machine.
+        if let host = emulatorHost {
+            app.launchArguments += ["-firebaseEmulatorHost", host, "-firebaseEmulatorSignOut", "YES"]
+        }
         app.launch()
     }
 
@@ -189,6 +200,12 @@ final class AccountLifecycleUITests: XCTestCase {
 
         XCTAssertTrue(tapWhenHittable(intro, "the intro's start button", timeout: 30),
                       "the intro's start button never appeared")
+        // Right after launch the intro can swallow the first tap.
+        let retry = Date().addingTimeInterval(30)
+        while Date() < retry, intro.exists, !menuButton.exists {
+            pause()
+            if intro.exists && intro.isHittable { intro.tap() }
+        }
         XCTAssertTrue(menuButton.waitForExistence(timeout: 60),
                       "starting without an account did not reach the home screen")
     }
@@ -220,8 +237,8 @@ final class AccountLifecycleUITests: XCTestCase {
     @MainActor
     private func signUp() {
         type(email, into: app.textFields["sign_up_email"], "the sign-up email field")
-        type(password, into: app.secureTextFields["sign_up_password"], "the sign-up password field")
-        type(password, into: app.secureTextFields["sign_up_confirm_password"], "the confirm-password field")
+        typeSecure(password, into: app.secureTextFields["sign_up_password"], "the sign-up password field")
+        typeSecure(password, into: app.secureTextFields["sign_up_confirm_password"], "the confirm-password field")
         dismissKeyboard()
 
         let terms = app.buttons["sign_up_terms"]
@@ -274,6 +291,8 @@ final class AccountLifecycleUITests: XCTestCase {
 
     @MainActor
     private func sendQuestionThenCancel() {
+        // Home opens on the photo tab; the question field is on the text tab.
+        XCTAssertTrue(tapWhenHittable(homeTextTab, "the Text tab"), "no Text tab at home")
         let field = app.textViews["question_text"]
         XCTAssertTrue(field.waitForExistence(timeout: 30), "no question field on the home screen")
         XCTAssertTrue(tapWhenHittable(field, "the question field"), "the question field was never tappable")
@@ -306,6 +325,13 @@ final class AccountLifecycleUITests: XCTestCase {
         }
 
         guard !outOfMinutes else {
+            // The emulators cannot serve Remote Config, so the sign-up reward
+            // never comes there and a new account always starts at none:
+            // the app offering minutes instead is the right outcome.
+            if onEmulators {
+                XCTContext.runActivity(named: "No minutes on the emulators: the app offered to buy some") { _ in }
+                return
+            }
             // Not a reason to stop: the account still has to be deleted.
             deferredFailures.append(
                 "the new account has no minutes, so no question could be sent — is the sign-up reward off in Remote Config, or out of slots?"
@@ -353,7 +379,7 @@ final class AccountLifecycleUITests: XCTestCase {
     @MainActor
     private func submitLogin() {
         type(email, into: app.textFields["email_input"], "the login email field")
-        type(password, into: app.secureTextFields["password_input"], "the login password field")
+        typeSecure(password, into: app.secureTextFields["password_input"], "the login password field")
         dismissKeyboard()
         let submit = app.buttons["login_submit"]
         scrollIntoView(submit)
@@ -368,7 +394,7 @@ final class AccountLifecycleUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(45)
         while Date() < deadline {
             if refusal.exists { break }
-            if app.buttons["find_teacher"].exists && !app.textFields["email_input"].exists {
+            if homeTextTab.exists && !app.textFields["email_input"].exists {
                 return XCTFail("the deleted account could still log in")
             }
             dismissSystemPromptIfPresent(timeout: 1)
@@ -379,7 +405,7 @@ final class AccountLifecycleUITests: XCTestCase {
         _ = tapWhenHittable(refusal, "the error's OK button", timeout: 10)
         XCTAssertTrue(app.textFields["email_input"].waitForExistence(timeout: 10),
                       "the login form is gone after a refused login")
-        XCTAssertFalse(app.buttons["find_teacher"].isHittable,
+        XCTAssertFalse(homeTextTab.isHittable,
                        "the home screen is reachable after a refused login")
     }
 
@@ -405,7 +431,7 @@ final class AccountLifecycleUITests: XCTestCase {
             XCTAssertTrue(menuButton.waitForExistence(timeout: 15),
                           "the \(section) section has no way back to the menu")
         }
-        XCTAssertTrue(app.buttons["find_teacher"].waitForExistence(timeout: 15),
+        XCTAssertTrue(homeTextTab.waitForExistence(timeout: 15),
                       "Ask did not return to the home screen")
     }
 
@@ -453,6 +479,19 @@ final class AccountLifecycleUITests: XCTestCase {
 
     // MARK: - Side menu
 
+    /// The emulators' host when the run is against them, nil for live.
+    private var emulatorHost: String? {
+        let host = ProcessInfo.processInfo.environment["LIFECYCLE_EMULATOR_HOST"] ?? ""
+        return host.isEmpty ? nil : host
+    }
+
+    private var onEmulators: Bool { emulatorHost != nil }
+
+    /// Home's Text tab: on screen only at home, whichever tab is showing.
+    private var homeTextTab: XCUIElement {
+        app.buttons["question_home_mode_text"]
+    }
+
     private var menuButton: XCUIElement {
         app.buttons["side_menu_button"]
     }
@@ -478,8 +517,11 @@ final class AccountLifecycleUITests: XCTestCase {
     private func waitForSignedInHome(timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            if app.buttons["find_teacher"].exists && menuButton.exists
+            if homeTextTab.exists && menuButton.exists
                 && !app.textFields["email_input"].exists {
+                // iOS offers to save the password a moment after a login,
+                // in a sheet over home that swallows the next tap.
+                _ = dismissSystemPromptIfPresent(timeout: 3)
                 return true
             }
             if timeout > 1 { dismissSystemPromptIfPresent(timeout: 1) }
@@ -508,6 +550,43 @@ final class AccountLifecycleUITests: XCTestCase {
         scrollIntoView(field)
         XCTAssertTrue(tapWhenHittable(field, described), "\(described) was never tappable")
         field.typeText(text)
+    }
+
+    /// A password field, past iOS's "Use Strong Password?" sheet, which can
+    /// come up over the form on a tap and cover the next field.
+    @MainActor
+    private func typeSecure(_ text: String, into field: XCUIElement, _ described: String) {
+        XCTAssertTrue(field.waitForExistence(timeout: 20), "no \(described)")
+        scrollIntoView(field)
+        for _ in 0..<3 {
+            _ = closeStrongPasswordSheet(wait: 0.5)
+            XCTAssertTrue(tapWhenHittable(field, described), "\(described) was never tappable")
+            if !closeStrongPasswordSheet() { break }
+        }
+        field.typeText(text)
+        _ = closeStrongPasswordSheet(wait: 0.5)
+    }
+
+    /// Closes the strong-password sheet if it is up; true when it was.
+    @MainActor
+    private func closeStrongPasswordSheet(wait: TimeInterval = 2) -> Bool {
+        // Asking a process that is not running retries for seconds per button.
+        let hosts = (systemPromptHosts + [app!]).filter { $0.state != .notRunning }
+        let deadline = Date().addingTimeInterval(wait)
+        repeat {
+            for host in hosts {
+                for label in ["xmark", "Close", "Choose My Own Password", "Not Now"] {
+                    let button = host.buttons[label]
+                    if button.exists && button.isHittable {
+                        button.tap()
+                        pause(seconds: 0.5)
+                        return true
+                    }
+                }
+            }
+            pause(seconds: 0.25)
+        } while Date() < deadline
+        return false
     }
 
     @MainActor

@@ -34,10 +34,33 @@ async function getRcTemplate(): Promise<admin.remoteConfig.RemoteConfigTemplate>
   return rcTemplateInFlight;
 }
 
+/** The Firestore document whose fields stand in for Remote Config on the
+ *  local emulators, which have no Remote Config to read: a test sets
+ *  `signup_reward_student_minutes` there, say, and clears it afterwards. */
+export const EMULATOR_RC_OVERRIDES_DOC = "emulatorRemoteConfig/values";
+
+/** A value set for `key` in EMULATOR_RC_OVERRIDES_DOC — only ever on the
+ *  emulators; deployed functions never read it. */
+async function emulatorOverride(key: string): Promise<string | undefined> {
+  if (process.env.FUNCTIONS_EMULATOR !== "true") return undefined;
+  try {
+    const value = (await admin.firestore().doc(EMULATOR_RC_OVERRIDES_DOC).get()).get(key);
+    return value == null ? undefined : String(value);
+  } catch (error) {
+    logger.warn(`[remoteConfig] failed reading the emulator override for ${key}`, error);
+    return undefined;
+  }
+}
+
 /** One numeric Remote Config parameter, or `undefined` when it is absent or
  *  unreadable — callers supply their own fallback rather than failing the
  *  request they are serving. */
 export async function readRcNumber(key: string): Promise<number | undefined> {
+  const override = await emulatorOverride(key);
+  if (override !== undefined) {
+    const parsed = Number(override);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
   try {
     const template = await getRcTemplate();
     const param = template.parameters?.[key] as
@@ -57,6 +80,9 @@ export async function readRcNumber(key: string): Promise<number | undefined> {
  *  when it is absent, unreadable or neither — callers supply their own
  *  fallback, as with readRcNumber. */
 export async function readRcBoolean(key: string): Promise<boolean | undefined> {
+  const override = (await emulatorOverride(key))?.trim().toLowerCase();
+  if (override === "true") return true;
+  if (override === "false") return false;
   try {
     const template = await getRcTemplate();
     const param = template.parameters?.[key] as

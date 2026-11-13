@@ -46,6 +46,16 @@ struct SessionTypeUITestHarness: View {
         }
         .buttonStyle(.bordered)
         .accessibilityIdentifier("uitest_peer_media_off")
+        Button {
+          viewModel.hasUnreadBoard = true
+        } label: {
+          Text(verbatim: "Board")
+            .font(.system(size: 11, weight: .semibold))
+            .frame(maxWidth: .infinity)
+            .frame(height: 32)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("uitest_peer_board")
       }
       .padding(8)
       .background(AppTheme(colorScheme: colorScheme).cardBackground)

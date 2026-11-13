@@ -309,6 +309,7 @@ describe("rateTeacher", () => {
 
     dbOnce.mockResolvedValueOnce({
       exists: () => true,
+      child: (key: string) => ({ exists: () => key === "status" }),
     });
 
     await expect(
@@ -322,6 +323,24 @@ describe("rateTeacher", () => {
       })
     ).rejects.toMatchObject({ code: "failed-precondition" });
     expect(runTransaction).not.toHaveBeenCalled();
+  });
+
+  test("rates past a stub a client wrote after the question was removed", async () => {
+    const { rateTeacher } = await import("../lessons");
+    const callRateTeacher = rateTeacher as unknown as (input: unknown) => Promise<unknown>;
+
+    // Just `chatPaused`, as the teacher's app writes it on leaving the lesson:
+    // no `status`, so not a live question.
+    dbOnce.mockResolvedValueOnce({
+      exists: () => true,
+      child: (key: string) => ({ exists: () => key === "chatPaused" }),
+    });
+
+    await callRateTeacher({
+      auth: { uid: "student-1" },
+      data: { questionId: "question-1", teacherId: "teacher-1", rating: 5 },
+    });
+    expect(runTransaction).toHaveBeenCalled();
   });
 
   test("accepts rating when lesson is completed even if question status lags", async () => {

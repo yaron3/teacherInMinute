@@ -474,6 +474,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   var isVerified = false
   var subjects: [String] = []
   private var subjectRawKeys: [String] = []
+  @ObservationIgnored private var subjectsSavedObserver: NSObjectProtocol?
   var todayEarningsCents = 0
   var todayMinutesTutored = 0
   var weekEarningsCents = 0
@@ -578,6 +579,15 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Questions whose accept the teacher backed out of while it was still on
   /// its way. See `cancelAcceptingInvite`.
   private var withdrawnQuestionIds: Set<String> = []
+  /// Questions `acceptInvite` refused as taken or cancelled, kept off the
+  /// dashboard until the invite list stops naming them.
+  ///
+  /// The backend has already removed their invites, but on a slow connection
+  /// the removal reaches the phone later than the refusal. Android re-reads its
+  /// cached invite list several times a second, so without this the dead card
+  /// would come straight back after the teacher closed the dialog, and could be
+  /// tapped again. See `setInvites`.
+  private var goneQuestionIds: Set<String> = []
   private var demoSimulationTask: Task<Void, Never>?
   private var didLoadProfile = false
   private var didApplyLaunchPresence = false
@@ -592,6 +602,13 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   // MARK: - Init
   
   init() {
+	// Subjects edited from Profile as well as from here: either way an online
+	// teacher's listing has to follow them.
+	subjectsSavedObserver = NotificationCenter.default.addObserver(
+	  forName: .teacherSubjectsSaved, object: nil, queue: .main
+	) { [weak self] _ in
+	  Task { @MainActor [weak self] in self?.reloadSubjects() }
+	}
 	authListenerHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
 	  guard let self else { return }
 	  if let uid = user?.uid {
@@ -1006,8 +1023,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	var conversationTypes: [String: String] = [:]
 	var struggles: [String: String] = [:]
 
+	// A refused question stays hidden only while the list still names it; once
+	// the removal arrives it is forgotten.
+	let listedIds = Set(rows.compactMap { $0["id"] as? String })
+	goneQuestionIds = goneQuestionIds.intersection(listedIds)
+
 	for row in rows {
 	  guard let id = row["id"] as? String,
+			!goneQuestionIds.contains(id),
 			let topic = row["topic"] as? String,
 			let text = row["text"] as? String else {
 		continue
@@ -1252,11 +1275,14 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		clearActiveCallState()
 		if Self.isCancelledByStudent(error) {
 		  studentCancelledBeforeStart = true
+		  goneQuestionIds.insert(questionId)
+		  inviteIDs = inviteIDs.filter { $0 != questionId }
 		  logger.info("[VM] acceptInvite — the student cancelled first questionId=\(questionId)")
 		  return
 		}
 		if Self.isQuestionUnavailable(error) {
 		  questionUnavailableBeforeStart = true
+		  goneQuestionIds.insert(questionId)
 		  inviteIDs = inviteIDs.filter { $0 != questionId }
 		  logger.info("[VM] acceptInvite — question no longer available questionId=\(questionId)")
 		  return
@@ -1523,8 +1549,16 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	Task {
 	  if let data = await attempt({ try await UserService.shared.fetchRaw(uid: uid) }) {
 		let summary = UserProfileSummary(uid: uid, data: data)
+		let previousKeys = subjectRawKeys
 		subjects = summary?.subjects ?? []
 		subjectRawKeys = summary?.rawSubjectKeys ?? []
+		// Students see an online teacher, and dispatch reaches them, by the
+		// subjects in their presence, which otherwise kept the old ones until
+		// the teacher switched off and on again.
+		if isOnline, subjectRawKeys != previousKeys {
+		  logger.info("[VM] subjects changed while online; republishing presence")
+		  writePresence(online: true)
+		}
 	  }
 	}
   }

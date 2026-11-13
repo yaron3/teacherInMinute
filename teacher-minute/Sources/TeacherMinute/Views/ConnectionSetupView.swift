@@ -174,6 +174,7 @@ struct ConnectionSetupView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("connection_setup_continue_as_text")
           }
 
           Button(action: { trackTap("connection_setup_cancel"); onCancel() }) {

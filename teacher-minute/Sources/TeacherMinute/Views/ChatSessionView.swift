@@ -216,13 +216,13 @@ struct ChatSessionView: View {
       if let secondsLeft = viewModel.peerSecondsToReconnect(at: displayDate) {
         // The other side's connection dropped. Unless it is back in time, the
         // lesson ends as of that moment — see PeerPresenceTracker.
-        holdBanner(viewModel.peerReconnectingText(secondsLeft: secondsLeft))
+        holdBanner(viewModel.peerReconnectingText(secondsLeft: secondsLeft), id: "session_banner_peer_reconnecting")
       } else if isStudent, viewModel.minutesHoldState(at: displayDate) == .warning {
-        holdBanner(viewModel.minutesRunningOutNotice)
+        holdBanner(viewModel.minutesRunningOutNotice, id: "session_banner_minutes_running_out")
       } else if !isStudent, viewModel.minutesHoldState(at: displayDate) == .held {
         // Stays up for a teacher who chose to wait, so the paused session
         // explains itself rather than just going quiet.
-        holdBanner(viewModel.studentOutOfMinutesTitle)
+        holdBanner(viewModel.studentOutOfMinutesTitle, id: "session_banner_student_out_of_minutes")
       }
 
       if let endSessionPrompt {
@@ -513,6 +513,7 @@ struct ChatSessionView: View {
           }
           .buttonStyle(.plain)
           .disabled(isEndingSession)
+          .accessibilityIdentifier("chat_end_prompt_primary")
 
           if prompt == .saveBoard {
             // "Save to chat only" is only meaningful for the local flow; when the
@@ -578,6 +579,7 @@ struct ChatSessionView: View {
               }
               .buttonStyle(.plain)
               .disabled(isEndingSession)
+              .accessibilityIdentifier("chat_end_call_farewell")
             }
           } else if prompt == .peerFarewell {
             // Nothing but OK: there is no decision here, only a note to read.
@@ -805,9 +807,10 @@ struct ChatSessionView: View {
     }
   }
 
-  func holdBanner(_ text: String) -> some View {
+  func holdBanner(_ text: String, id: String) -> some View {
     VStack {
       Text(text)
+        .accessibilityIdentifier(id)
         .font(.system(size: 12, weight: .semibold))
         .multilineTextAlignment(.center)
         .foregroundStyle(theme.onAccentText)

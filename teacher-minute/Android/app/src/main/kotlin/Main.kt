@@ -40,6 +40,10 @@ open class AndroidAppMain: Application {
 
     override fun onCreate() {
         super.onCreate()
+        // Starts Firebase in debug builds, on the local emulators when an
+        // instrumented test asks for them; release builds have started it
+        // already. Has to come before anything uses Firebase.
+        AndroidFirebaseEmulator.startFirebase(this)
         logger.info("starting app")
         ProcessInfo.launch(applicationContext)
         AndroidLocaleManager.initialize(this)

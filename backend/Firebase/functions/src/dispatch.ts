@@ -21,6 +21,7 @@ import {
   QuestionStruggle,
 } from "./types";
 import { readRcBoolean } from "./remoteConfig";
+import { deferredInEmulator } from "./emulatorSchedule";
 
 const db = admin.database();
 const firestore = admin.firestore();
@@ -603,13 +604,21 @@ export async function applyQuestionDetails(
   const droppedUids = new Set(dropped.map((invite) => invite.teacherUid));
   const kept = pending.filter((invite) => !droppedUids.has(invite.teacherUid));
 
-  // Written through transactions that stand down on a missing node, so a
+  // Written through transactions that leave a missing node missing, so a
   // card cleared meanwhile — the teacher declined, or the question was taken —
   // is not brought back without its question.
+  //
+  // Never aborts (`undefined`): the first pass runs against the local cache,
+  // which on a server is empty, so it sees null even when the card exists.
+  // Aborting there never retried, and every change a student made after
+  // asking — the lesson type above all — stopped short of the teachers' cards:
+  // a teacher could accept an audio lesson for a student waiting in text.
+  // Handing back null writes nothing for a card that is really gone, and for
+  // one that is there it fails the hash check and the retry sees the card.
   const patchIfPresent = (current: unknown) =>
     current && typeof current === "object"
       ? { ...(current as Record<string, unknown>), ...details }
-      : undefined;
+      : current ?? null;
   await Promise.all([
     db.ref(`questions/${qid}`).transaction(patchIfPresent),
     ...kept.map((invite) => db.ref(`teacherInvites/${invite.teacherUid}/${qid}`).transaction(patchIfPresent)),
@@ -789,6 +798,7 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
     rateLimits: { maxConcurrentDispatches: 50 },
   },
   async (req) => {
+    if (await deferredInEmulator("evaluateWave", req)) return;
     const { questionId: qid, wave } = req.data;
 
     logger.info(`[evaluateWave] start qid=${qid} wave=${wave}`);
@@ -870,6 +880,7 @@ export const questionWatchdog = onTaskDispatched<{ questionId: string }>(
     rateLimits: { maxConcurrentDispatches: 50 },
   },
   async (req) => {
+    if (await deferredInEmulator("questionWatchdog", req)) return;
     const { questionId: qid } = req.data;
 
     logger.info(`[watchdog] fired qid=${qid}`);

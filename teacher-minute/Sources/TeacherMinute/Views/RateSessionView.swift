@@ -58,6 +58,7 @@ struct RateSessionView: View {
             .clipShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("rate_session_close")
       }
       .padding(.horizontal, 18)
       .padding(.top, 12)
@@ -142,6 +143,7 @@ struct RateSessionView: View {
                       .foregroundStyle(index <= rating ? theme.ratingStar : theme.secondaryText)
                   }
                   .buttonStyle(.plain)
+                  .accessibilityIdentifier("rate_session_star_\(index)")
                 }
               }
 
@@ -151,6 +153,7 @@ struct RateSessionView: View {
               if rating > 0 {
                 VStack(alignment: .leading, spacing: 6) {
                   TextEditor(text: $comment)
+                    .accessibilityIdentifier("rate_session_comment")
                     .textInputAutocapitalization(.sentences)
                     .font(.system(size: 14))
                     .multilineTextAlignment(.leading)
@@ -228,6 +231,7 @@ struct RateSessionView: View {
       }
       .buttonStyle(.plain)
       .disabled(rating == 0 || isSending)
+      .accessibilityIdentifier("rate_session_send")
       .padding(.horizontal, 18)
       .padding(.bottom, 24)
     }

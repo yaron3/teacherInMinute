@@ -620,6 +620,12 @@ object AndroidChatManager {
                     ?: 75.0
             )
             .put("conversationType", snapshot.firstString("conversationType"))
+            // A live question always has its status, and ChatSessionService
+            // reads a node without one as a stub left after the lesson ended.
+            // Leaving it out made every live lesson read as ended the moment
+            // the Android side connected. Null leaves the key out, so a stub
+            // still reads as ended.
+            .put("status", snapshot.child("status").value?.toString())
             .toString()
     }
 

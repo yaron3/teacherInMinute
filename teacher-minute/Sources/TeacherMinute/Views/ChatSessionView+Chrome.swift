@@ -133,8 +133,11 @@ extension ChatSessionView {
         timeText: viewModel.sessionTimeText(at: sessionFrozenDate ?? displayDate),
         label: viewModel.sessionTimeLabel
       ),
-      // Three 24pt buttons stand taller than the button they replace.
-      extraHeight: isMediaPillExpanded && !mediaActions.isEmpty ? 54 : 0
+      // What stands above the strip's 72pt gets room of its own, so it never
+      // lies over the message field: three 24pt buttons stand taller than the
+      // button they replace, and in a lesson with sound the microphone badges
+      // ride on a line 24pt above the people (Bug-017).
+      extraHeight: max(isMediaPillExpanded && !mediaActions.isEmpty ? 54 : 0, hasAudio ? 46 : 0)
     )
   }
 

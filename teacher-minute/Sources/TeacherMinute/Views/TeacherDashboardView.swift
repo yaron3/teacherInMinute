@@ -433,6 +433,7 @@ struct TeacherDashboardView: View {
 			FlatChip(title: viewModel.editSubjectsLabel, systemImage: "pencil", outlined: true)
 		  }
 		  .buttonStyle(.plain)
+		  .accessibilityIdentifier("dashboard_edit_subjects")
 		  Spacer()
 		}
 	  }
@@ -914,6 +915,9 @@ struct TeacherDashboardView: View {
 	var actions: some View {
 	  VStack(spacing: 10) {
 		FlatPrimaryButton(title: viewModel.acceptQuestionLabel, action: { trackTap("invite_accept"); accept() })
+		  // Per question: the dashboard can hold several cards, and the
+		  // incoming-question overlay repeats the newest one.
+		  .accessibilityIdentifier("invite_accept_\(id)")
 
 		Button(action: { trackTap("invite_decline"); decline() }) {
 		  Text(viewModel.declineLabel)
@@ -923,6 +927,7 @@ struct TeacherDashboardView: View {
 			.frame(height: 36)
 		}
 		.buttonStyle(.plain)
+		.accessibilityIdentifier("invite_decline_\(id)")
 	  }
 	  .padding(.horizontal, 16)
 	  .padding(.bottom, 16)

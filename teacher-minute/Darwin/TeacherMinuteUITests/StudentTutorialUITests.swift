@@ -72,7 +72,7 @@ final class StudentTutorialUITests: XCTestCase {
     }
 
     /// Walking every page by Next reaches a last page with Let's start and
-    /// the don't-show-again check box, Back but no Skip and no Next.
+    /// the don't-show-again check box, and no Back, Skip or Next.
     @MainActor
     func testTheLastPageHasStartAndHideButNoSkipOrNext() throws {
         for _ in 0..<9 {
@@ -83,7 +83,9 @@ final class StudentTutorialUITests: XCTestCase {
             "the last page has no Let's start button"
         )
         XCTAssertTrue(hideCheckbox.exists, "the last page has no don't-show-again check box")
-        XCTAssertTrue(backButton.exists, "the last page has no Back button")
+        // The last page trades the Back/Next row for Let's start, as it has
+        // since the tutorial was added (StudentTutorialView.controls).
+        XCTAssertFalse(backButton.exists, "the last page still has a Back button")
         XCTAssertFalse(skipButton.exists, "the last page still has a Skip button")
         XCTAssertFalse(nextButton.exists, "the last page still has a Next button")
     }
@@ -109,14 +111,24 @@ final class StudentTutorialUITests: XCTestCase {
 
     @MainActor
     private func assertPagerFillsTheWindow() {
-        let windowWidth = app.windows.firstMatch.frame.width
-        let pagerWidth = pager.frame.width
-        XCTAssertGreaterThan(windowWidth, 0, "the window has no width to compare against")
-        XCTAssertEqual(
-            pagerWidth, windowWidth, accuracy: 2,
-            "the current page is \(pagerWidth) points wide, the window \(windowWidth) — "
-                + "cut off at the edges if wider, squeezed into a column if narrower"
-        )
+        // The strip's identifier is handed down to the current page's
+        // elements (iOS 26), and the strip as a whole spans every page, the
+        // off-screen ones too. So the page is judged by what it puts on
+        // screen: all of it inside the window, and its widest part across
+        // most of it — a page squeezed into a column, or cut off at the
+        // edges, fails one or the other.
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(window.width, 0, "the window has no width to compare against")
+        let parts = app.descendants(matching: .any).matching(identifier: "student_tutorial_pager")
+            .allElementsBoundByIndex.map(\.frame).filter { $0.width > 0 && $0.intersects(window) }
+        XCTAssertFalse(parts.isEmpty, "the current page shows nothing")
+        for part in parts {
+            XCTAssertTrue(part.minX >= window.minX - 2 && part.maxX <= window.maxX + 2,
+                          "part of the current page, \(part), reaches past the window \(window) — cut off at the edges")
+        }
+        let widest = parts.map(\.width).max() ?? 0
+        XCTAssertGreaterThan(widest, window.width * 0.75,
+                             "the current page is at most \(widest) points wide in a \(window.width)-point window — squeezed into a column")
     }
 
     @MainActor

@@ -370,6 +370,10 @@ struct BrandTabBar: View {
           .accessibilityIdentifier("tab_item_\(item.identifier)")
         }
       }
+      // Kept off the screen's edges: on a 360 dp phone the five tabs filled
+      // the width, the selected box against one edge and "Settings" against
+      // the other (Bug-014).
+      .padding(.horizontal, 8)
       .padding(.bottom, 10)
       // The bar is 74pt; the box of the tab on screen stands above it.
       .background(alignment: .bottom) {

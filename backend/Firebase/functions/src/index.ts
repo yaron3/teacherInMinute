@@ -34,6 +34,7 @@ export {
   onTeacherPresenceStatusWritten,
   onTeacherPresenceSubjectsWritten,
   onTeacherPresenceBusyWritten,
+  onTeacherProfileUpdated,
 } from "./presence";
 
 // Takes offline teachers whose app stopped sending keep-alives and who have no

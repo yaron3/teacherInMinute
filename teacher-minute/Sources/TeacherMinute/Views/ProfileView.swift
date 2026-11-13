@@ -352,7 +352,8 @@ struct ProfileView: View {
       teachingCard(
         title: viewModel.gradeLevelsTaughtTitle,
         chips: viewModel.gradeLevelLabels,
-        includeAdd: viewModel.gradeLevels.isEmpty
+        includeAdd: viewModel.gradeLevels.isEmpty,
+        editIdentifier: "profile_grades_edit_button"
       ) {
         showProfileEditor()
       }
@@ -360,7 +361,8 @@ struct ProfileView: View {
       teachingCard(
         title: viewModel.subjectsSectionTitle,
         chips: viewModel.subjectsOrPlaceholder,
-        includeAdd: viewModel.subjects.isEmpty
+        includeAdd: viewModel.subjects.isEmpty,
+        editIdentifier: "profile_subjects_edit_button"
       ) {
         isShowingSubjectEditor = true
       }
@@ -373,6 +375,7 @@ struct ProfileView: View {
     title: String,
     chips: [String],
     includeAdd: Bool,
+    editIdentifier: String,
     edit: @escaping () -> Void
   ) -> some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -381,7 +384,7 @@ struct ProfileView: View {
           .font(.system(size: 15, weight: .bold))
           .foregroundStyle(theme.brandSecondaryText)
         Spacer()
-        editButton(identifier: "profile_teaching_edit_button") {
+        editButton(identifier: editIdentifier) {
           edit()
         }
       }
@@ -540,6 +543,7 @@ struct ProfileEditView: View {
             trackTap("profile_save")
             viewModel.saveProfileEdits()
           }
+          .accessibilityIdentifier("profile_save_button")
         }
         .brandCard()
       }
@@ -914,6 +918,17 @@ struct ProfileEditInfoRow: View {
       errorMessage: errorMessage
     )
 	.disabled(textContentType == .emailAddress)
+	.accessibilityIdentifier("profile_field_\(fieldKey)")
+  }
+
+  /// Stable across languages, unlike the row's title: the row's symbol.
+  private var fieldKey: String {
+    switch parameter.image {
+    case "person.fill": "name"
+    case "envelope.fill": "email"
+    case "phone.fill": "phone"
+    default: parameter.image.replacingOccurrences(of: ".fill", with: "")
+    }
   }
 
   private var keyboardType: UIKeyboardType {

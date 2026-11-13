@@ -19,6 +19,7 @@ extension CreateAccountViewModel {
     var eulaTitle: String { LocalizationSupport.localized("EULA") }
     var privacyPolicyTitle: String { LocalizationSupport.localized("Privacy Policy") }
     var termsOfServiceTitle: String { LocalizationSupport.localized("Terms of Service") }
+    var acceptTermsHint: String { LocalizationSupport.localized("Accept the terms to continue") }
     var agreementMarkdown: String {
         LocalizationSupport.localized("I agree to the [Terms of Service](teacherminute://terms) and [Privacy Policy.](teacherminute://privacy)")
     }

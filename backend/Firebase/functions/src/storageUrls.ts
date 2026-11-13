@@ -34,6 +34,15 @@ function acceptedBuckets(): Set<string> {
   return buckets;
 }
 
+/** The Storage emulator's port, when running in the Functions emulator with
+ *  one; undefined in production, where neither variable is ever set. */
+function storageEmulatorPort(): string | undefined {
+  if (process.env.FUNCTIONS_EMULATOR !== "true") return undefined;
+  const host = process.env.FIREBASE_STORAGE_EMULATOR_HOST?.trim();
+  const port = host?.split(":").pop();
+  return port && /^[0-9]+$/.test(port) ? port : undefined;
+}
+
 function safeDecode(value: string): string | undefined {
   try {
     return decodeURIComponent(value);
@@ -58,11 +67,24 @@ export function storageObjectPath(rawUrl: unknown): string | undefined {
     return undefined;
   }
 
+  const buckets = acceptedBuckets();
+
+  // The Storage emulator, when — and only when — this code is itself running
+  // in the Functions emulator. Its download URLs are plain http on the
+  // emulator's port, at whatever address the device reaches the Mac by
+  // (127.0.0.1 from a simulator, 10.0.2.2 from an Android emulator).
+  const emulatorPort = storageEmulatorPort();
+  if (emulatorPort && url.protocol === "http:" && url.port === emulatorPort) {
+    const match = /^\/v0\/b\/([^/]+)\/o\/(.+)$/.exec(url.pathname);
+    if (!match) return undefined;
+    const bucket = safeDecode(match[1]);
+    if (!bucket || !buckets.has(bucket)) return undefined;
+    return safeDecode(match[2]);
+  }
+
   // Plain http would be downgraded in transit; every URL the app produces is
   // https.
   if (url.protocol !== "https:") return undefined;
-
-  const buckets = acceptedBuckets();
 
   // Firebase download URL: /v0/b/<bucket>/o/<percent-encoded object>
   if (url.hostname === "firebasestorage.googleapis.com") {

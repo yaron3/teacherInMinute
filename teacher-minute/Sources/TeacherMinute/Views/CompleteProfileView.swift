@@ -160,6 +160,7 @@ struct CompleteProfileView: View {
       )
       .focused($focusedField, equals: .phone)
       .submitLabel(.done)
+      .accessibilityIdentifier("complete_profile_phone")
 
       if viewModel.role == .teacher {
         payoutMethodSection

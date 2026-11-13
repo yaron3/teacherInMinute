@@ -14,7 +14,23 @@ struct ChatBubble: View {
   var theme: AppTheme {
 	AppTheme(colorScheme: colorScheme)
   }
+  /// The row's width, measured; zero until it is.
+  @State var rowWidth: CGFloat = 0
+
   var body: some View {
+    // The row is measured, not a full-width layer beside it: it holds a
+    // Spacer, so it takes all the room it is offered, and Compose keeps it to
+    // that room even when a part inside asks for more. A full-width layer
+    // measured the list's width without the row's side padding on Android.
+    // On Android a `maxWidth` cap is a required width that ignores the parent
+    // (see `contentMaxWidth`), so the cap has to be worked out from this.
+    row
+      .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+        rowWidth = width
+      }
+  }
+
+  private var row: some View {
     HStack(alignment: .bottom, spacing: 8) {
       if message.isMine { Spacer(minLength: hasFormulaContent ? 0 : 54) }
 
@@ -86,8 +102,18 @@ struct ChatBubble: View {
     Self.containsFormula(Self.readableText(message.text))
   }
 
+  /// The widest the bubble's content may be: 280 (300 with a formula), or
+  /// less when the row cannot hold that beside the avatar, the gap kept on the
+  /// far side and the bubble's padding. On Android `.frame(maxWidth:)` lays
+  /// the content out at the cap whatever the room, so on a 360 dp phone long
+  /// words ran past the bubble and were cut off at its edge (Bug-015).
   private var contentMaxWidth: CGFloat {
-    hasFormulaContent ? 300 : 280
+    let cap: CGFloat = hasFormulaContent ? 300 : 280
+    guard rowWidth > 0 else { return cap }
+    let avatarRoom: CGFloat = message.isMine ? 0 : 32 + 8
+    let farGap: CGFloat = hasFormulaContent ? 0 : 54 + 8
+    let bubblePadding: CGFloat = 12 * 2
+    return max(120, min(cap, rowWidth - avatarRoom - farGap - bubblePadding))
   }
 
   var avatar: some View {
@@ -105,7 +131,9 @@ struct ChatBubble: View {
       text: message.text,
       textColor: message.isMine ? theme.outgoingBubbleText : theme.incomingBubbleText,
       font: .system(size: 14, weight: message.isMine ? .semibold : .medium),
-      lineSpacing: 3
+      lineSpacing: 3,
+      formulaMinWidth: min(220, contentMaxWidth),
+      formulaMaxWidth: contentMaxWidth
     )
   }
 

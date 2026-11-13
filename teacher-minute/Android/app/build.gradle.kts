@@ -163,6 +163,10 @@ android {
         // applicationId = ANDROID_APPLICATION_ID ?? PRODUCT_BUNDLE_IDENTIFIER
         // versionCode = CURRENT_PROJECT_VERSION
         // versionName = MARKETING_VERSION
+
+        // Instrumented UI tests (src/androidTest) run on the local Firebase
+        // emulators; this runner switches a debug build over before it starts.
+        testInstrumentationRunner = "teacher.minute.EmulatorTestRunner"
     }
 
     // Two apps from one codebase, the same pair as the Xcode targets: Instant
@@ -402,6 +406,14 @@ tasks.configureEach {
 
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.14.1"))
+
+    // Instrumented UI tests, driven through UiAutomator against the same
+    // accessibility identifiers the iOS UI tests use (SkipUI exposes each one
+    // as a resource id). See src/androidTest.
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")

@@ -164,11 +164,19 @@ struct CreateAccountView: View {
       consentRow(isOn: $viewModel.agreedToTerms, identifier: "sign_up_terms") {
         agreementText
       }
+      if viewModel.showsAcceptTermsHint {
+        Text(viewModel.acceptTermsHint)
+          .font(.system(size: 12))
+          .foregroundStyle(theme.danger)
+          .accessibilityIdentifier("sign_up_terms_hint")
+      }
       consentRow(isOn: $viewModel.sendUpdates, identifier: "sign_up_updates") {
         consentText(viewModel.marketingOptInText)
       }
 
-      BrandPrimaryButton(title: viewModel.continueLabel, isLoading: viewModel.isLoading) {
+      // Off until the form is right, as on the login form: what is wrong
+      // shows under its own field, where a dialog would cover it.
+      BrandPrimaryButton(title: viewModel.continueLabel, isLoading: viewModel.isLoading, isEnabled: viewModel.canSubmit) {
         trackTap("sign_up_continue")
         Task { await viewModel.signup() }
       }
@@ -215,12 +223,14 @@ struct CreateAccountView: View {
             .foregroundStyle(theme.brandActionBackground)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("sign_up_terms_link")
         Button { trackTap("sign_up_privacy"); viewModel.openPrivacy() } label: {
           Text(viewModel.privacyPolicyTitle)
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(theme.brandActionBackground)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("sign_up_privacy_link")
       }
     }
 #else

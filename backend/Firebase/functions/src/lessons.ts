@@ -24,6 +24,7 @@ import { stampAuthoritativeRating } from "./presence";
 import { releaseTeacherBusy } from "./busy";
 import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
 import { readTeacherBonus } from "./emailRewards";
+import { deferredInEmulator } from "./emulatorSchedule";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -1276,8 +1277,15 @@ export const rateTeacher = onCall(async (req) => {
   // transaction below fail on "Lesson must be completed" — is what lets the app
   // tell a race apart from a genuine refusal: RateSessionView retries only on a
   // failed-precondition whose message mentions finalizing.
+  //
+  // Only a live question counts — one that still has its `status`. The apps
+  // write a few lesson-screen nodes of their own under it (`chatPaused`, the
+  // board, media state), and one landing after the removal brings back a stub
+  // of just those: the teacher's app clearing `chatPaused` as it leaves did.
+  // Read as "still finalizing", that stub refused the student's rating for
+  // good.
   const liveQuestionSnap = await db.ref(`questions/${questionId}`).once("value");
-  if (liveQuestionSnap.exists()) {
+  if (liveQuestionSnap.exists() && liveQuestionSnap.child("status").exists()) {
     logger.info(`[lessons] rateTeacher deferred, lesson still finalizing qid=${questionId}`);
     throw new HttpsError(
       "failed-precondition",
@@ -1415,6 +1423,7 @@ export const endAbandonedLesson = onTaskDispatched<{ questionId: string; unstart
     rateLimits: { maxConcurrentDispatches: 20 },
   },
   async (req) => {
+    if (await deferredInEmulator("endAbandonedLesson", req)) return;
     const { questionId, unstarted } = req.data;
     if (!questionId) {
       logger.warn("[lessons] endAbandonedLesson missing questionId payload");
@@ -1523,6 +1532,7 @@ export const forceEndLesson = onTaskDispatched<{ lessonId: string }>(
     rateLimits: { maxConcurrentDispatches: 20 },
   },
   async (req) => {
+    if (await deferredInEmulator("forceEndLesson", req)) return;
     const { lessonId } = req.data;
     logger.info(`[lessons] forceEndLesson fired lessonId=${lessonId}`);
 
@@ -1620,6 +1630,7 @@ export const endLostLesson = onTaskDispatched<{
     rateLimits: { maxConcurrentDispatches: 20 },
   },
   async (req) => {
+    if (await deferredInEmulator("endLostLesson", req)) return;
     const { questionId, role, lostAt } = req.data;
     if (!questionId || (role !== "student" && role !== "teacher")) {
       logger.warn("[lessons] endLostLesson missing questionId or role");

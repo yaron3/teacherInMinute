@@ -306,7 +306,21 @@ final class RemoteConfigService {
         Double(getString(key)) ?? 0
     }
 
+    /// A switch set for this launch by `-rcOverride.<key> YES|NO`, for the UI
+    /// tests: the emulators have no Remote Config, and the app reads the live
+    /// project's, so a step behind a switch that is off there could not be
+    /// reached. Always nil in a release build, whatever the launch arguments.
+    static func debugBoolOverride(_ key: String) -> Bool? {
+#if DEBUG
+        guard UserDefaults.standard.object(forKey: "rcOverride.\(key)") != nil else { return nil }
+        return UserDefaults.standard.bool(forKey: "rcOverride.\(key)")
+#else
+        return nil
+#endif
+    }
+
     func getBool(_ key: String) -> Bool {
+        if let override = Self.debugBoolOverride(key) { return override }
         #if !os(Android)
         guard FirebaseApp.app() != nil else { return false }
         #endif
@@ -319,6 +333,7 @@ final class RemoteConfigService {
     /// feature-style flags that should default on/off client-side until
     /// someone explicitly sets them remotely.
     func getBool(_ key: String, default defaultValue: Bool) -> Bool {
+        if let override = Self.debugBoolOverride(key) { return override }
         #if !os(Android)
         guard FirebaseApp.app() != nil else { return defaultValue }
         #endif
@@ -331,6 +346,7 @@ final class RemoteConfigService {
     /// false": an absent key yields `fallback` rather than `false`. Use it for
     /// switches that should stay on until someone deliberately turns them off.
     func getBool(_ key: String, fallback: Bool) -> Bool {
+        if let override = Self.debugBoolOverride(key) { return override }
         let value = RemoteConfig.remoteConfig().configValue(forKey: key)
         return value.source == .static ? fallback : value.boolValue
     }

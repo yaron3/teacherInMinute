@@ -119,6 +119,7 @@ struct TeacherEarningsView: View {
                                 .foregroundStyle(theme.brandActionBackground)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("earnings_payout_method_edit")
                     }
                 }
 
@@ -135,6 +136,7 @@ struct TeacherEarningsView: View {
                                 .font(.system(size: 13))
                                 .foregroundStyle(theme.brandSecondaryText)
                                 .lineLimit(1)
+                                .accessibilityIdentifier("earnings_payout_method_summary")
                         }
                         Spacer()
                     }
@@ -300,6 +302,7 @@ struct TeacherEarningsView: View {
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(theme.brandActionBackground)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("earnings_month_total")
 
                 Text(viewModel.monthSummaryText(minutes: month.minutesCount, lessons: month.lessonCount))
                     .font(.system(size: 13))

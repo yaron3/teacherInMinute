@@ -1,6 +1,8 @@
 /**
- * The suites that need a Firebase emulator running. `npm run test:rules` starts
- * one and points this at it; plain `npm test` skips them.
+ * The suites that need a Firebase emulator running. `npm run test:emulator`
+ * starts the database and Firestore emulators and runs them all;
+ * `npm run test:rules` runs only the database rules suite. Plain `npm test`
+ * skips them.
  *
  * @type {import('jest').Config}
  */

@@ -88,16 +88,43 @@ final class StudentIntroViewModel {
 
     // The home screen does not need the profile to open, and the next launch
     // writes it again if it is missing (UserService.resumeRoute), so a failed
-    // write is logged rather than stopping the student at the door.
-    do {
-      try await UserService.shared.saveAnonymousStudentProfile(uid: uid)
-    } catch {
-      logger.warning("[Intro] could not save the anonymous student profile: \(error)")
-      AnalyticsService.shared.recordError(error, context: "anonymousStartProfile")
+    // write is logged rather than stopping the student at the door. Nor may a
+    // slow one: the write waits for the server to acknowledge it, which on a
+    // poor connection can take indefinitely, and the student stayed on this
+    // screen with Start doing nothing. It gets a few seconds, then carries on
+    // in the background while the student goes home.
+    let saved = ProfileSaveFlag()
+    Task {
+      defer { saved.isDone = true }
+      do {
+        try await UserService.shared.saveAnonymousStudentProfile(uid: uid)
+      } catch {
+        logger.warning("[Intro] could not save the anonymous student profile: \(error)")
+        AnalyticsService.shared.recordError(error, context: "anonymousStartProfile")
+      }
+    }
+    var waited = 0
+    while !saved.isDone && waited < Self.profileSaveWaitSteps {
+      try? await Task.sleep(nanoseconds: 100_000_000)
+      waited += 1
+    }
+    if !saved.isDone {
+      logger.warning("[Intro] the anonymous student profile is still saving; going home")
     }
 
     AnalyticsService.shared.setUser(uid: uid)
     AnalyticsService.shared.logEvent(AnalyticsEvent.anonymousStartSuccess)
     destination = .home(role: .student)
   }
+}
+
+extension StudentIntroViewModel {
+  /// How long Start waits for the profile write, in 0.1 s steps.
+  fileprivate static let profileSaveWaitSteps = 50
+}
+
+/// Set once the anonymous profile write has finished, either way.
+@MainActor
+private final class ProfileSaveFlag {
+  var isDone = false
 }

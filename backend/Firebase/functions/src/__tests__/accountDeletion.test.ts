@@ -60,6 +60,34 @@ it("does not delete any data during an active lesson", async () => {
   expect(mockRecursiveDelete).not.toHaveBeenCalled();
   expect(mockDeleteFiles).not.toHaveBeenCalled();
 });
+// QA test plan IOS-A-10 / AND-A-10. The plan expected the search to be
+// cancelled; the backend instead refuses until the student cancels it, so
+// teachers never hold a card for a question whose student is gone.
+it.each(["searching", "accepted"])("refuses while the student's question is %s, touching nothing", async status => {
+  mockRecords.set("questions:studentUid:owner", [{ id: "q1", data: () => ({ status }), ref: { path: "questions/q1" } }]);
+  await expect(deleteAccountData("owner")).rejects.toMatchObject({
+    code: "failed-precondition",
+    message: expect.stringContaining("cancel your search"),
+  });
+  expect(mockRemove).not.toHaveBeenCalled();
+  expect(mockRecursiveDelete).not.toHaveBeenCalled();
+  expect(mockDeleteFiles).not.toHaveBeenCalled();
+});
+it("refuses for a teacher who has accepted a question, and leaves Auth alone", async () => {
+  mockRecords.set("questions:acceptedByTeacher:owner", [{ id: "q1", data: () => ({ status: "in_progress" }), ref: { path: "questions/q1" } }]);
+  await expect((deleteAccount as any)(request())).rejects.toMatchObject({ code: "failed-precondition" });
+  expect(mockRecursiveDelete).not.toHaveBeenCalled();
+  expect(mockDeleteUser).not.toHaveBeenCalled();
+});
+it("goes ahead once the search is cancelled", async () => {
+  mockRecords.set("questions:studentUid:owner", [{
+    id: "q1", data: () => ({ status: "cancelled" }),
+    ref: { path: "questions/q1", collection: () => ({ listDocuments: async () => [{ id: "teacher-1" }] }) },
+  }]);
+  await deleteAccountData("owner");
+  expect(mockRecursiveDelete).toHaveBeenCalledWith(expect.objectContaining({ path: "questions/q1" }));
+  expect(mockRecursiveDelete).toHaveBeenCalledWith(expect.objectContaining({ path: "users/owner" }));
+});
 it("removes nested user data and uploads before deleting Auth", async () => {
   await (deleteAccount as any)(request());
   expect(mockRecursiveDelete).toHaveBeenCalledWith(expect.objectContaining({ path: "users/owner" }));

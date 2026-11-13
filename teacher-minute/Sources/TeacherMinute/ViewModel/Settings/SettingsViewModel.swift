@@ -153,9 +153,13 @@ class SettingsViewModel: SettingsViewModeling {
         return await performAccountDeletion(password: password)
     }
 
-    /// Re-authenticates the user, then deletes their profile data and Firebase account.
-    /// Deleting the profile data must happen while still authenticated (Firestore rules),
-    /// so re-authentication comes first to guarantee a fresh session for the account deletion.
+    /// Re-authenticates the user, then deletes the account.
+    ///
+    /// An email/password account is deleted by the server, which removes
+    /// everything it owns: lessons, questions, purchases, uploads and the
+    /// teacher record, not just the profile. The server accepts only a fresh
+    /// email/password sign-in, so a Google or Apple account still deletes its
+    /// profile and Auth user from here, while authenticated (Firestore rules).
     private func performAccountDeletion(password: String? = nil) async -> Bool {
         guard let uid = authService.currentUserID else {
             present(message: SettingsError.missingUser.localizedDescription)
@@ -167,8 +171,12 @@ class SettingsViewModel: SettingsViewModeling {
 
         do {
             try await authService.reauthenticate(password: password)
-            try await UserService.shared.deleteUserData(uid: uid)
-            try await authService.deleteCurrentUser()
+            if authService.requiresPasswordForReauth {
+                try await authService.deleteAccountOnServer()
+            } else {
+                try await UserService.shared.deleteUserData(uid: uid)
+                try await authService.deleteCurrentUser()
+            }
             return true
         } catch (let error){
             logger.error("[SettingsViewModel] \(error.localizedDescription)")

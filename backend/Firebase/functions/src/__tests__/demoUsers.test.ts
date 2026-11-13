@@ -19,7 +19,10 @@ jest.mock("firebase-functions/v2/https", () => ({
   onCall: (a: unknown, b?: unknown) => b ?? a,
   HttpsError: class extends Error { constructor(public code: string, message: string) { super(message); } },
 }));
-jest.mock("firebase-functions/v2/firestore", () => ({ onDocumentWritten: (_p: string, h: unknown) => h }));
+jest.mock("firebase-functions/v2/firestore", () => ({
+  onDocumentWritten: (_p: string, h: unknown) => h,
+  onDocumentUpdated: (_p: string, h: unknown) => h,
+}));
 jest.mock("firebase-functions/v2/database", () => ({ onValueWritten: (_p: string, h: unknown) => h }));
 jest.mock("firebase-functions/v2/scheduler", () => ({ onSchedule: (_s: unknown, h: unknown) => h }));
 jest.mock("../accountDeletion", () => ({}));

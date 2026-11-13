@@ -174,9 +174,11 @@ final class ChatSessionService {
     let json = try await Task.detached(priority: .userInitiated) {
       try AndroidChatBridge.fetchSessionDetails(questionId: self.questionId)
     }.value
+    // No status: a stub written after the end removed the question, not a
+    // live lesson (see startSessionListening).
     guard let data = json.data(using: .utf8),
           let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-          !dict.isEmpty else {
+          !dict.isEmpty, dict["status"] != nil else {
       return nil
     }
     return Self.details(from: dict)
@@ -223,7 +225,10 @@ final class ChatSessionService {
   func startSessionListening(onEnded: @escaping () -> Void, onUpdate: @escaping (ChatSessionDetails) -> Void = { _ in }) {
 #if !os(Android)
     sessionHandle = questionRef.observe(.value) { snapshot in
-      if !snapshot.exists() {
+      // A live question always has its status. A node without one is a stub
+      // an app wrote under it after the end removed it (older versions did,
+      // on leaving): the lesson is over.
+      if !snapshot.exists() || !snapshot.hasChild("status") {
         onEnded()
         return
       }
@@ -2561,7 +2566,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   func setSelfChatPaused(_ paused: Bool) {
-    if lastSentChatPaused == paused { return }
+    // Nothing once the lesson is over: see endLesson. Never set counts as
+    // not paused, as for setSelfMediaPending.
+    guard !isLeaving, !hasHandledSessionEnd else { return }
+    if (lastSentChatPaused ?? false) == paused { return }
     lastSentChatPaused = paused
     let selfKey = roleKey(role)
     chatPausedStates[selfKey] = paused
@@ -2586,6 +2594,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   /// still connecting, or started by chat instead — so they type rather than
   /// talk. Nothing is written until there is something to say.
   func setSelfMediaPending(_ pending: Bool) {
+    guard !isLeaving, !hasHandledSessionEnd else { return }
     if (lastSentMediaPending ?? false) == pending { return }
     lastSentMediaPending = pending
     mediaPendingStates[roleKey(role)] = pending
@@ -2781,8 +2790,21 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   func endLesson() async {
     isLeaving = true
     markLeavingLesson()
-    setSelfChatPaused(false)
-    setSelfMediaPending(false)
+    // Cleared — only if set — and waited for before the end is reported. The
+    // end removes the question's live node, and a write under it landing
+    // afterwards brought it back as a stub with no status: the other side
+    // read that as a lesson still going and stayed in it, and rateTeacher as
+    // one still finalizing and refused the rating.
+    if lastSentChatPaused == true {
+      lastSentChatPaused = false
+      chatPausedStates[roleKey(role)] = false
+      await attempt({ try await self.service.setChatPaused(false, role: self.role) })
+    }
+    if lastSentMediaPending == true {
+      lastSentMediaPending = false
+      mediaPendingStates[roleKey(role)] = false
+      await attempt({ try await self.service.setMediaPending(false, role: self.role) })
+    }
     await reportLessonEnded()
     await LiveKitService.shared.disconnect()
     stop()

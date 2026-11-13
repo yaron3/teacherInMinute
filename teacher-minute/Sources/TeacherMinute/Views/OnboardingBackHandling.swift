@@ -69,6 +69,31 @@ final class OnboardingBackCoordinator {
 }
 
 extension View {
+    /// Hands the Android system back button to this view while it is on
+    /// screen. For an overlay drawn over a screen: back otherwise skips it and
+    /// acts on what is beneath — on the tabs, sending the app to the
+    /// background with the overlay still up.
+    func onSystemBack(perform action: @escaping () -> Void) -> some View {
+        modifier(SystemBackModifier(action: action))
+    }
+}
+
+struct SystemBackModifier: ViewModifier {
+    let action: () -> Void
+    @State var id = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                OnboardingBackCoordinator.shared.register(id: id) { action() }
+            }
+            .onDisappear {
+                OnboardingBackCoordinator.shared.unregister(id: id)
+            }
+    }
+}
+
+extension View {
     /// Gives an onboarding step a back button that walks the flow backwards,
     /// and takes over the Android system back button while it is on screen.
     ///
