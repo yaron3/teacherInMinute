@@ -87,6 +87,16 @@ final class LessonChromeUITests: XCTestCase {
             guard element.exists else { continue }
             XCTAssertTrue(bounds.contains(element.frame), "[\(state)] \(id) is cut off: \(element.frame) in \(window)")
         }
+        // The top bar keeps room round the close button (Bug-019, IT-17): the
+        // design's gap to the tabs, and a margin to the screen's edge.
+        let end = app.buttons["session_end_button"]
+        let tabs = ["session_tab_chat", "session_tab_board", "session_tab_images"]
+            .map { app.buttons[$0] }.filter { $0.exists }
+        if end.exists, let lastTab = tabs.max(by: { $0.frame.maxX < $1.frame.maxX }) {
+            let gap = end.frame.minX - lastTab.frame.maxX
+            XCTAssertGreaterThanOrEqual(gap, 28, "[\(state)] the close button is \(gap)pt from the tabs")
+            XCTAssertGreaterThanOrEqual(window.maxX - end.frame.maxX, 20, "[\(state)] the close button is against the screen's edge")
+        }
         // The field is clear of everything the strip draws above its own top:
         // the people's badges stand on a line 24pt over the portraits, and the
         // strip now keeps that room. The media control's label is the

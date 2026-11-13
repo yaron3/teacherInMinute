@@ -157,13 +157,19 @@ struct SessionTopBar: View {
   /// The bar's width, measured; zero until it is.
   @State var barWidth: CGFloat = 0
 
+  /// The gap the design leaves between the toggle and the close button on its
+  /// 402pt screen (24 + 266 + 32 + 44 + 24).
+  static let closeButtonGap: CGFloat = 32
+
   /// The toggle's cap: 266pt, or what the bar leaves beside the close button
-  /// (24pt margins, a 12pt gap and the 44pt button). On Android a `maxWidth`
-  /// is a required width, so the full 266pt on a 360 dp phone pushed the
-  /// close button against the screen's edge (Bug-019).
+  /// with the design's 24pt margins and 32pt gap kept. On Android a
+  /// `maxWidth` is a required width, so the full 266pt on a 360 dp phone
+  /// pushed the close button against the screen's edge; capping it to the
+  /// bare room left a 12pt gap that still looked cramped (Bug-019, IT-17).
+  /// A narrower screen narrows the toggle, never the gap.
   var toggleMaxWidth: CGFloat {
     guard barWidth > 0 else { return 266 }
-    return max(160, min(266, barWidth - 24 * 2 - 12 - 44))
+    return max(160, min(266, barWidth - 24 * 2 - Self.closeButtonGap - 44))
   }
 
   var body: some View {
