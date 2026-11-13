@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -363,8 +364,10 @@ internal fun PresentationRootView(context: ComposeContext) {
         // No status-bar inset here: SkipUI's `PresentationRoot` has already
         // padded this content by `WindowInsets.safeDrawing`, so adding one
         // leaves an empty status-bar-tall band above every screen.
+        // Lifts the screen above a keyboard the window insets did not report
+        // (IT-10); zero wherever they do.
         Box(
-            modifier = ctx.modifier.fillMaxSize(),
+            modifier = ctx.modifier.fillMaxSize().padding(bottom = keyboardShortfall()),
             contentAlignment = Alignment.Center
         ) {
             AppRootView().Compose(context = contentContext)
