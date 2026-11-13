@@ -177,6 +177,8 @@ class SettingsViewModel: SettingsViewModeling {
                 try await UserService.shared.deleteUserData(uid: uid)
                 try await authService.deleteCurrentUser()
             }
+            // A question held for this account must not greet the next one.
+            QuestionDraftStore.shared.discard()
             return true
         } catch (let error){
             logger.error("[SettingsViewModel] \(error.localizedDescription)")
@@ -196,6 +198,8 @@ class SettingsViewModel: SettingsViewModeling {
     func logOut() -> Bool {
         do {
             try authService.signOut()
+            // A question held for this account must not greet the next one.
+            QuestionDraftStore.shared.discard()
             return true
         } catch {
             logger.error("[SettingsViewModel] \(error.localizedDescription)")

@@ -585,6 +585,9 @@ final class StudentOnboardingUITests: XCTestCase {
     @MainActor
     private func startAsGuest() async throws -> EmulatorBackend.AuthUser {
         let before = Int(Date().timeIntervalSince1970 * 1000) - 2_000
+        // The window reaches back two seconds for clock skew, which can take
+        // in the guest of a test that ended moments ago; only a new uid counts.
+        let earlier = Set(try await anonymousUsers(since: before).map(\.uid))
         launch(signedOut: true)
         let start = app.buttons["student_intro_start"]
         XCTAssertTrue(tapWhenHittable(start, "the intro's Start", timeout: 60), "the intro's Start never appeared")
@@ -597,7 +600,7 @@ final class StudentOnboardingUITests: XCTestCase {
         XCTAssertTrue(waitForHome(timeout: 60), "Start did not reach home")
         var guests: [EmulatorBackend.AuthUser] = []
         for _ in 0..<20 {
-            guests = try await anonymousUsers(since: before)
+            guests = try await anonymousUsers(since: before).filter { !earlier.contains($0.uid) }
             if !guests.isEmpty { break }
             try await Task.sleep(nanoseconds: 500_000_000)
         }

@@ -86,6 +86,12 @@ final class StudentIntroViewModel {
       return
     }
 
+    // A question held for sign-up belongs to the account that wrote it, and a
+    // new guest is never that account: left on disk, an earlier guest's draft
+    // (one who was offered an account and then left another way) filled this
+    // guest's composer.
+    QuestionDraftStore.shared.discard()
+
     // The home screen does not need the profile to open, and the next launch
     // writes it again if it is missing (UserService.resumeRoute), so a failed
     // write is logged rather than stopping the student at the door. Nor may a
