@@ -1165,6 +1165,9 @@ struct ChatSessionView: View {
       onClear: {
         viewModel.clearBoard()
       },
+      onEraseStrokes: { ids in
+        viewModel.eraseBoardStrokes(ids)
+      },
       onViewportChanged: { rect in
         // Don't emit viewport updates once the session is ending — the RTDB
         // question node is being finalized and a late write would be rejected.

@@ -162,6 +162,25 @@ object AndroidChatManager {
         Tasks.await(ref.setValue(payload), TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
+    /** Removes the given strokes in one update, so the peer sees them go together. */
+    @JvmStatic
+    fun eraseStrokes(questionId: String, idsJson: String) {
+        val ids = JSONArray(idsJson)
+        val removals = HashMap<String, Any?>()
+        for (index in 0 until ids.length()) {
+            val id = ids.optString(index)
+            if (id.isNotEmpty()) removals[id] = null
+        }
+        if (removals.isEmpty()) return
+        val ref = FirebaseDatabase.getInstance()
+            .getReference("questions")
+            .child(questionId)
+            .child("board")
+            .child("strokes")
+        Log.i(TAG, "Erasing board strokes questionId=$questionId count=${removals.size}")
+        Tasks.await(ref.updateChildren(removals), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
     @JvmStatic
     fun clearBoard(questionId: String) {
         val ref = FirebaseDatabase.getInstance()

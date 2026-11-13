@@ -26,7 +26,7 @@
           "strokes": {
             ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid)",
             "$strokeId": {
-              ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid) && newData.exists() && !data.exists()"
+              ".write": "auth != null && (root.child('questions').child($qid).child('teacherUid').val() == auth.uid || root.child('questions').child($qid).child('studentUid').val() == auth.uid || root.child('questions').child($qid).child('teacherId').val() == auth.uid || root.child('questions').child($qid).child('studentId').val() == auth.uid) && ((newData.exists() && !data.exists()) || (!newData.exists() && data.child('senderUid').val() == auth.uid))"
             }
           }
         },

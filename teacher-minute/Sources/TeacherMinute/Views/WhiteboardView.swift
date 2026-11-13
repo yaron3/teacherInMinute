@@ -4,7 +4,7 @@ import UIKit
 #endif
 
 enum DrawingTool: CaseIterable, Hashable {
-  case pen, line, triangle, circle, rectangle
+  case pen, line, triangle, circle, rectangle, eraser
 
   var iconName: String {
 	switch self {
@@ -13,7 +13,14 @@ enum DrawingTool: CaseIterable, Hashable {
 	case .triangle: return "triangle"
 	case .circle: return "circle"
 	case .rectangle: return "square"
+	case .eraser: return "eraser"
 	}
+  }
+
+  /// Bundled art for tools SF Symbols cannot draw on Android, where icons are
+  /// glyphs and there is no eraser glyph.
+  var bundledImageName: String? {
+	self == .eraser ? "brand-eraser" : nil
   }
 }
 
@@ -64,6 +71,7 @@ struct WhiteboardView: View {
   let revision: String
   let onStrokeFinished: ([CGPoint]) -> Void
   let onClear: () -> Void
+  let onEraseStrokes: ([String]) -> Void
   let onViewportChanged: (CGRect) -> Void
   let peerViewport: CGRect?
   let role: String
@@ -83,6 +91,9 @@ struct WhiteboardView: View {
   @State var isAskToDrawPresented = false
   /// The gesture under way began without leave to draw, so none of it draws.
   @State var isDrawGestureBlocked = false
+  /// Strokes this side has rubbed out, so their removal is not mistaken for
+  /// the other side clearing the board.
+  @State var locallyErasedIDs: Set<String> = []
   
   @Environment(\.horizontalSizeClass) var hSizeClass
   @Environment(\.colorScheme) var colorScheme
@@ -93,6 +104,7 @@ struct WhiteboardView: View {
 	revision: String,
 	onStrokeFinished: @escaping ([CGPoint]) -> Void,
 	onClear: @escaping () -> Void,
+	onEraseStrokes: @escaping ([String]) -> Void = { _ in },
 	onViewportChanged: @escaping (CGRect) -> Void = { _ in },
 	peerViewport: CGRect? = nil,
 	isMaximized: Binding<Bool> = .constant(false),
@@ -103,6 +115,7 @@ struct WhiteboardView: View {
 	self.revision = revision
 	self.onStrokeFinished = onStrokeFinished
 	self.onClear = onClear
+	self.onEraseStrokes = onEraseStrokes
 	self.onViewportChanged = onViewportChanged
 	self.peerViewport = peerViewport
 	self._isMaximized = isMaximized
@@ -120,6 +133,65 @@ struct WhiteboardView: View {
   /// destroys the explanation they asked for, and the other side only finds out
   /// afterwards.
   var canClearBoard: Bool { isTeacher }
+
+  /// The eraser follows the same line as Clear: the teacher may rub out
+  /// anything on the board, the student only what they drew themselves.
+  func canErase(_ stroke: BoardStroke) -> Bool {
+	isTeacher || stroke.isMine
+  }
+
+  /// How close, in screen points, the finger must pass to a stroke to rub it
+  /// out — about a fingertip, so a stroke is caught without precise aim.
+  static let eraserRadius: CGFloat = 14
+
+  /// Rubs out every stroke the finger passes over. A stroke goes whole: the
+  /// board is made of strokes, and half a stroke has no meaning to the peer.
+  func erase(at viewPoint: CGPoint, viewSize: CGSize) {
+	guard viewSize.width > 0 else { return }
+	let logical = viewToLogical(viewPoint, viewSize: viewSize)
+	let radius = Self.eraserRadius * viewport.width / viewSize.width
+	let hits = strokes
+	  .filter { !locallyErasedIDs.contains($0.id) && canErase($0) }
+	  .filter { Self.stroke($0.points, passesWithin: radius, of: logical) }
+	  .map(\.id)
+	guard !hits.isEmpty else { return }
+	locallyErasedIDs.formUnion(hits)
+	onEraseStrokes(hits)
+  }
+
+  static func stroke(_ points: [BoardPoint], passesWithin radius: CGFloat, of point: CGPoint) -> Bool {
+	let limit = Double(radius * radius)
+	guard let first = points.first else { return false }
+	if points.count == 1 {
+	  let dx = first.x - Double(point.x), dy = first.y - Double(point.y)
+	  return dx * dx + dy * dy <= limit
+	}
+	for index in 1..<points.count {
+	  if squaredDistance(from: point, toSegment: points[index - 1], points[index]) <= limit { return true }
+	}
+	return false
+  }
+
+  static func squaredDistance(from point: CGPoint, toSegment a: BoardPoint, _ b: BoardPoint) -> Double {
+	let px = Double(point.x), py = Double(point.y)
+	let dx = b.x - a.x, dy = b.y - a.y
+	let lengthSquared = dx * dx + dy * dy
+	var t = 0.0
+	if lengthSquared > 0 {
+	  t = max(0, min(1, ((px - a.x) * dx + (py - a.y) * dy) / lengthSquared))
+	}
+	let cx = a.x + t * dx - px, cy = a.y + t * dy - py
+	return cx * cx + cy * cy
+  }
+
+  /// True when the strokes that vanished look like the other side wiping the
+  /// board, not strokes rubbed out: more than one went at once, none of them
+  /// to this side's eraser.
+  func isRemoteClear(from oldStrokes: [BoardStroke], to newStrokes: [BoardStroke]) -> Bool {
+	guard !oldStrokes.isEmpty, newStrokes.isEmpty else { return false }
+	let vanished = oldStrokes.map(\.id).filter { !locallyErasedIDs.contains($0) }
+	return vanished.count > 1
+  }
 
   var clearDialogTitle: String {
 	switch clearDialogReason {
@@ -297,12 +369,15 @@ struct WhiteboardView: View {
 	  if !oldStrokes.isEmpty && newStrokes.isEmpty {
 		if localClearInitiated {
 		  localClearInitiated = false
-		} else {
+		} else if isRemoteClear(from: oldStrokes, to: newStrokes) {
 		  pendingClearSnapshot = oldStrokes
 		  clearDialogReason = .remote
 		  isClearDialogPresented = true
 		}
 	  }
+	  // A stroke back on the board was not erased after all (the write was
+	  // refused), so the eraser may take it again.
+	  locallyErasedIDs.subtract(newStrokes.map(\.id))
 	}
 	.trackScreen(AnalyticsScreen.whiteboard)
   }
@@ -411,17 +486,26 @@ struct WhiteboardView: View {
 		lastMoveDragTranslation = .zero
 	  }
 	} label: {
-	  PlatformIcon(
-		systemName: tool.iconName,
-		size: 14,
-		weight: .semibold,
-		color: isActive ? theme.onAccentText : theme.primaryText
-	  )
+	  toolIcon(tool, color: isActive ? theme.onAccentText : theme.primaryText)
 	  .frame(width: 28, height: 28)
 	  .background(isActive ? theme.accent : Color.clear)
 	  .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 	}
 	.buttonStyle(.plain)
+	.accessibilityIdentifier("whiteboard_tool_\(tool)")
+  }
+
+  @ViewBuilder
+  func toolIcon(_ tool: DrawingTool, color: Color) -> some View {
+	if let name = tool.bundledImageName {
+	  Image(name, bundle: .module)
+		.renderingMode(.template)
+		.resizable()
+		.foregroundStyle(color)
+		.frame(width: 16, height: 16)
+	} else {
+	  PlatformIcon(systemName: tool.iconName, size: 14, weight: .semibold, color: color)
+	}
   }
 
   func performClear() {
@@ -480,7 +564,7 @@ struct WhiteboardView: View {
 
   func shapePoints(from start: CGPoint, to end: CGPoint, tool: DrawingTool) -> [CGPoint] {
 	switch tool {
-	case .pen, .line:
+	case .pen, .line, .eraser:
 	  return [start, end]
 	case .rectangle:
 	  return [
@@ -578,6 +662,7 @@ struct WhiteboardView: View {
 	.overlay(alignment: .bottomTrailing) {
 	  jumpToPeerButton(viewSize: viewSize)
 	}
+	.boardCanvasIdentifier()
   }
   
   @ViewBuilder
@@ -587,6 +672,10 @@ struct WhiteboardView: View {
 	  allowPanZoom: usesScrollableViewport(viewSize: viewSize),
 	  isMoveMode: isMoveMode,
 	  onDrawBegin: { viewPoint in
+		if selectedTool == .eraser {
+		  erase(at: viewPoint, viewSize: viewSize)
+		  return
+		}
 		guard mayStartStroke() else { return }
 		let logical = viewToLogical(viewPoint, viewSize: viewSize)
 		if selectedTool == .pen {
@@ -597,6 +686,10 @@ struct WhiteboardView: View {
 		}
 	  },
 	  onDrawChanged: { viewPoint in
+		if selectedTool == .eraser {
+		  erase(at: viewPoint, viewSize: viewSize)
+		  return
+		}
 		guard !isDrawGestureBlocked else { return }
 		let logical = viewToLogical(viewPoint, viewSize: viewSize)
 		if selectedTool == .pen {
@@ -644,6 +737,10 @@ struct WhiteboardView: View {
 			  return
 			}
 
+			if selectedTool == .eraser {
+			  erase(at: value.location, viewSize: viewSize)
+			  return
+			}
 			guard !isDrawGestureBlocked else { return }
 			let isStarting = selectedTool == .pen ? activeStroke.isEmpty : shapeStartLogical == nil
 			if isStarting && !mayStartStroke() { return }
@@ -812,6 +909,19 @@ struct WhiteboardView: View {
 	r.origin.x = min(max(r.origin.x, bounds.minX), maxX)
 	r.origin.y = min(max(r.origin.y, bounds.minY), maxY)
 	return r
+  }
+}
+
+extension View {
+  /// Names the board for UI tests. SkipUI has no `accessibilityElement`, so
+  /// Android takes the identifier alone.
+  @ViewBuilder
+  func boardCanvasIdentifier() -> some View {
+#if os(Android)
+	self.accessibilityIdentifier("whiteboard_canvas")
+#else
+	self.accessibilityElement(children: .contain).accessibilityIdentifier("whiteboard_canvas")
+#endif
   }
 }
 
