@@ -176,6 +176,24 @@ final class StudentOnboardingUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Your question is back, but its photo could not be kept. Please attach it again."].exists,
                        "the app says the photo was lost")
 
+        // Home built again before the question goes out — here by leaving
+        // for Profile and coming back, as a language applied with the new
+        // account rebuilds it too: the question is still there (Bug-011,
+        // IT-4). It used to be put back only into the first home built.
+        for section in ["profile", "ask"] {
+            XCTAssertTrue(tapWhenHittable(app.buttons["side_menu_button"], "the menu button"), "no menu button")
+            XCTAssertTrue(tapWhenHittable(app.buttons["side_menu_item_\(section)"], "the \(section) menu row"),
+                          "the menu has no \(section) row")
+            let close = app.buttons["side_menu_close"]
+            for _ in 0..<20 where close.exists { pause(seconds: 0.5) }
+            XCTAssertFalse(close.exists, "the menu stayed open")
+        }
+        let rebuilt = app.textViews["question_text"]
+        XCTAssertTrue(rebuilt.waitForExistence(timeout: 20), "home did not come back on the question after Profile")
+        XCTAssertEqual(rebuilt.value as? String, text, "the question's words were lost when home was built again")
+        XCTAssertTrue(app.buttons["delete_question_photo"].waitForExistence(timeout: 20),
+                      "the question's photo was lost when home was built again")
+
         // With a teacher online, it goes out as written.
         let teacher = try await bringATeacherOnline()
         let search = app.buttons["search_details_cancel"]

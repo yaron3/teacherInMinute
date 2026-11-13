@@ -62,14 +62,19 @@ final class QuestionDraftStore {
     }
   }
 
-  /// The held draft and its photo's bytes, which are then no longer held.
-  func take() -> (draft: QuestionDraft, photoData: Data?)? {
+  /// The held draft and its photo's bytes. It stays held until the question
+  /// goes out or is dropped (`discard`): the home it is put back into can be
+  /// built again before the student sends it — a language applied with the
+  /// new account rebuilds the whole app, for one — and a held draft that was
+  /// already gone left the rebuilt home empty (Bug-011, IT-4).
+  func held() -> (draft: QuestionDraft, photoData: Data?)? {
     guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
-    let photoData = try? Data(contentsOf: photoFile)
-    discard()
     guard let stored = try? JSONDecoder().decode(Stored.self, from: data),
-          Date().timeIntervalSince(stored.savedAt) < maxAge else { return nil }
-    return (stored.draft, photoData)
+          Date().timeIntervalSince(stored.savedAt) < maxAge else {
+      discard()
+      return nil
+    }
+    return (stored.draft, try? Data(contentsOf: photoFile))
   }
 
   func discard() {

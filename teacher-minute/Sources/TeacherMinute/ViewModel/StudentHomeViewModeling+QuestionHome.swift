@@ -203,9 +203,10 @@ extension StudentHomeViewModeling {
   }
 
   /// The question kept from before the student registered or logged in, if
-  /// any. Taking it drops it, so it is restored once.
-  func takeQuestionDraft() -> (draft: QuestionDraft, photoData: Data?)? {
-    guard let held = QuestionDraftStore.shared.take() else { return nil }
+  /// any. It stays kept until it is sent or dropped, so a home that is built
+  /// again before then gets it back too.
+  func heldQuestionDraft() -> (draft: QuestionDraft, photoData: Data?)? {
+    guard let held = QuestionDraftStore.shared.held() else { return nil }
     AnalyticsService.shared.logEvent(AnalyticsEvent.questionDraftRestored, parameters: [
       "has_photo": held.draft.photoURL != nil ? 1 : 0
     ])

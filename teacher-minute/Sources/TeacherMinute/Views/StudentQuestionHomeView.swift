@@ -934,6 +934,10 @@ struct StudentQuestionHomeView: View {
       )
       isSubmitting = false
       submitErrorMessage = error
+      // Out to the teachers: a question kept through sign-up is done with.
+      if error == nil {
+        viewModel.discardQuestionDraft()
+      }
     }
   }
 
@@ -947,9 +951,13 @@ struct StudentQuestionHomeView: View {
   }
 
   /// Puts back the question the student was sending before they registered
-  /// or logged in for minutes, so it need not be asked again.
+  /// or logged in for minutes, so it need not be asked again. Into an empty
+  /// composer only — a new home's, however many times the home is built
+  /// before the question goes out — never over what is being written.
   func restoreHeldQuestion() {
-    guard let held = viewModel.takeQuestionDraft() else { return }
+    guard questionText.isEmpty, attachedFormulas.isEmpty, pendingFormulaLatex.isEmpty,
+          photoURL == nil, !isUploadingPhoto,
+          let held = viewModel.heldQuestionDraft() else { return }
     questionText = held.draft.text
     attachedFormulas = held.draft.formulas
     pendingFormulaLatex = held.draft.pendingFormula
