@@ -120,14 +120,27 @@ describe.each(SHAPES)("database rules (%s)", (_name, people) => {
   });
 
   it("refuses to let the student clear it one stroke at a time", async () => {
-    // Including their own: an undo would be a separate decision, and looping
-    // over `strokes` is the same wipe by another name.
+    // Looping over `strokes` is the same wipe by another name, so the
+    // teacher's strokes stay out of the student's reach one by one too.
     await assertFails(
       remove(ref(db(STUDENT), `questions/${QID}/board/strokes/stroke-teacher`))
     );
-    await assertFails(
+  });
+
+  it("lets the student erase their own stroke", async () => {
+    // The eraser (IT-1): a student takes back what they drew, and only that.
+    await assertSucceeds(
       remove(ref(db(STUDENT), `questions/${QID}/board/strokes/stroke-student`))
     );
+  });
+
+  it("refuses to let the student erase a stroke they forged in the teacher's name", async () => {
+    // Deleting goes by the stroke's sender: one created claiming the teacher
+    // is the teacher's to erase, not the student's.
+    await assertSucceeds(
+      set(ref(db(STUDENT), `questions/${QID}/board/strokes/forged`), stroke(TEACHER))
+    );
+    await assertFails(remove(ref(db(STUDENT), `questions/${QID}/board/strokes/forged`)));
   });
 
   it("refuses to let the student overwrite a stroke", async () => {
