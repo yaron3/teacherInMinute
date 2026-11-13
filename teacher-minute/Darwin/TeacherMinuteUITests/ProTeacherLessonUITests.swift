@@ -211,9 +211,9 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         let chosen = Date().addingTimeInterval(120)
         repeat {
             type = (try await backend.strings("questions/\(qid)"))?["conversationType"] ?? ""
-            if type != "text" { pause(seconds: 1) }
-        } while type != "text" && Date() < chosen
-        try require(type == "text", "the student never chose a text lesson (\(type))")
+            if type != Self.lessonType { pause(seconds: 1) }
+        } while type != Self.lessonType && Date() < chosen
+        try require(type == Self.lessonType, "the student never chose a \(Self.lessonType) lesson (\(type))")
         let accept = visibleAcceptButton(timeout: 60)
         try require(accept != nil, "the question's card never showed")
         accept?.tap()
@@ -242,6 +242,8 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
     /// IOS-L-02, the teacher's side: a message to the student, the student's
     /// answer back below it, then a stroke on the board, which reaches the
     /// lesson's board for the student to see.
+
+
     @MainActor
     private func chatThenDraw(_ qid: String) async throws {
         let chat = app.buttons["session_tab_chat"]
@@ -258,6 +260,7 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         let reply = app.staticTexts[Self.studentReply]
         try require(reply.waitForExistence(timeout: 120), "the student's reply never reached the teacher")
         XCTAssertTrue(mine.exists && mine.frame.minY < reply.frame.minY, "the messages are out of order")
+        try await expectBothSidesConnected(qid)
 
         try require(tapWhenHittable(app.buttons["session_tab_board"], "the Board tab"), "no Board tab in the lesson")
         pause(seconds: 1)
@@ -272,7 +275,29 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         _ = tapIfPresent(chat)
     }
 
+    /// Both sides are in the lesson as far as either can tell: the banner that
+    /// says the other side is reconnecting is not up, and `lessonPresence`
+    /// holds a live connection for each.
+    @MainActor
+    private func expectBothSidesConnected(_ qid: String) async throws {
+        try await Task.sleep(nanoseconds: 3_000_000_000)
+        let presence = try await backend.value("lessonPresence/\(qid)")
+        attach("lessonPresence", "\(presence ?? "nil")")
+        attach("screen in the lesson", app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["session_banner_peer_reconnecting"].exists,
+                       "the other side is shown as disconnected mid-lesson; lessonPresence: \(presence ?? "nil")")
+        let sides = presence as? [String: Any] ?? [:]
+        for role in ["student", "teacher"] {
+            let side = sides[role] as? [String: Any] ?? [:]
+            let connections = side["connections"] as? [String: Any] ?? [:]
+            XCTAssertFalse(connections.isEmpty, "the \(role) has no live connection in lessonPresence: \(side)")
+        }
+    }
+
     /// What the two halves say to each other (the student's half has the same).
+    /// The kind of lesson the pair runs: text unless the run sets
+    /// LESSON_TYPE (audio or video).
+    static var lessonType: String { ProcessInfo.processInfo.environment["LESSON_TYPE"] ?? "text" }
     static let teacherMessage = "Let's start with the x terms."
     static let studentReply = "OK, I moved them to one side."
 

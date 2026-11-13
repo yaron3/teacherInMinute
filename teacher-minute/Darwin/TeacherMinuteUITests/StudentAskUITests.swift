@@ -515,6 +515,8 @@ final class StudentAskUITests: XCTestCase {
 
     /// IOS-L-02, the student's side: the teacher's message arrives, the
     /// answer goes back below it, and the teacher's stroke reaches the board.
+
+
     @MainActor
     private func chatAndSeeTheBoard(_ qid: String) async throws {
         _ = tapIfPresent(app.buttons["session_tab_chat"])
@@ -529,6 +531,7 @@ final class StudentAskUITests: XCTestCase {
         let mine = app.staticTexts[reply]
         try require(mine.waitForExistence(timeout: 20), "the reply is not in the student's chat")
         XCTAssertLessThan(theirs.frame.minY, mine.frame.minY, "the messages are out of order")
+        try await expectBothSidesConnected(qid)
 
         var strokes: [String] = []
         for _ in 0..<120 where strokes.isEmpty {
@@ -536,6 +539,25 @@ final class StudentAskUITests: XCTestCase {
             if strokes.isEmpty { pause(seconds: 0.5) }
         }
         XCTAssertFalse(strokes.isEmpty, "the teacher's stroke never reached the student's board")
+    }
+
+    /// Both sides are in the lesson as far as either can tell: the banner that
+    /// says the other side is reconnecting is not up, and `lessonPresence`
+    /// holds a live connection for each.
+    @MainActor
+    private func expectBothSidesConnected(_ qid: String) async throws {
+        try await Task.sleep(nanoseconds: 3_000_000_000)
+        let presence = try await backend.value("lessonPresence/\(qid)")
+        attach("lessonPresence", "\(presence ?? "nil")")
+        attach("screen in the lesson", app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["session_banner_peer_reconnecting"].exists,
+                       "the other side is shown as disconnected mid-lesson; lessonPresence: \(presence ?? "nil")")
+        let sides = presence as? [String: Any] ?? [:]
+        for role in ["student", "teacher"] {
+            let side = sides[role] as? [String: Any] ?? [:]
+            let connections = side["connections"] as? [String: Any] ?? [:]
+            XCTAssertFalse(connections.isEmpty, "the \(role) has no live connection in lessonPresence: \(side)")
+        }
     }
 
     /// A signed-in student who asks; the teacher's half takes it; returns once
@@ -567,18 +589,20 @@ final class StudentAskUITests: XCTestCase {
 
         // A text lesson, chosen on the search screen's last step. The
         // teacher's half waits for this choice before it accepts.
-        let text = app.buttons["search_choice_text"]
+        // The run can ask for audio or video instead (LESSON_TYPE).
+        let type = ProcessInfo.processInfo.environment["LESSON_TYPE"] ?? "text"
+        let text = app.buttons["search_choice_\(type)"]
         for _ in 0..<4 where !text.exists {
             try require(tapWhenHittable(app.buttons["search_details_next"], "Next"), "the search screen has no Next")
             _ = text.waitForExistence(timeout: 3)
         }
-        try require(tapWhenHittable(text, "Text"), "the search screen offers no text lesson")
+        try require(tapWhenHittable(text, type), "the search screen offers no \(type) lesson")
         var chosen = ""
-        for _ in 0..<30 where chosen != "text" {
+        for _ in 0..<30 where chosen != type {
             chosen = stringValue(try await backend.fields("questions/\(qid)")?["conversationType"]) ?? ""
-            if chosen != "text" { try await Task.sleep(nanoseconds: 500_000_000) }
+            if chosen != type { try await Task.sleep(nanoseconds: 500_000_000) }
         }
-        try require(chosen == "text", "choosing text did not reach the question (\(chosen))")
+        try require(chosen == type, "choosing \(type) did not reach the question (\(chosen))")
         return (teacher, student, qid)
     }
 
