@@ -1,5 +1,6 @@
 package teacher.minute
 
+import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
@@ -81,6 +82,85 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertEquals("teacher", profile["role"])
         assertEquals("Signup Teacher", profile["fullName"])
         assertEquals("0521234567", profile["phoneNumber"])
+    }
+
+    /** AND-T-04: with the ID step on (the debug Remote Config override
+     *  `rcOverride.teacher_identity_onboarding`), sign-up leads to it; the
+     *  front alone, picked from the gallery, uploads as `govId_<uid>_front` and
+     *  lets the teacher go on to the subjects. The photo is a full-size 50 MP
+     *  picture (8160 × 6144) — what the testers' phone takes — which the run
+     *  pushes to /sdcard/Pictures/id-50mp.jpg; skipped without it. */
+    @Test
+    fun theIDStepTakesTheFrontAlone() {
+        val photo = "id-50mp"
+        val prefs = context.getSharedPreferences("defaults", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("rcOverride.teacher_identity_onboarding", true).commit()
+        try {
+            val email = backend.newEmail("signup.identity")
+            val password = "Emulator-${(100_000..999_999).random()}"
+            openSignUpForm()
+            fillSignUp(email, password, password, agreeToTerms = true)
+            submitSignUp()
+
+            val front = device.wait(Until.findObject(By.res("identity_front_upload")), 60_000)
+            if (front == null) {
+                capture("identity-step")
+                fail("signing up did not reach the ID step: ${screenText()}")
+            }
+            assertFalse("the profile came before the ID step", device.hasObject(By.res("complete_profile_full_name")))
+            front!!.click()
+            val library = device.wait(Until.findObject(By.text(Pattern.compile("Choose from Library|בחר מהספרייה"))), 15_000)
+            assertNotNull("the ID front offered no gallery", library)
+            library!!.click()
+
+            // The system's document picker: the photo by its name, which a
+            // grid tile carries in its description and a list row as text.
+            val byName = { device.findObject(By.descStartsWith(photo)) ?: device.findObject(By.textContains(photo)) }
+            var picked: UiObject2? = null
+            val pickerDeadline = System.currentTimeMillis() + 20_000
+            while (picked == null && System.currentTimeMillis() < pickerDeadline) {
+                picked = byName()
+                if (picked == null) Thread.sleep(500)
+            }
+            if (picked == null) {
+                capture("identity-picker")
+                fail("the picker did not show $photo: ${screenText()}")
+            }
+            picked!!.click()
+
+            // Back in the app, the upload lands on the user.
+            val back = device.wait(Until.hasObject(By.pkg(context.packageName).depth(0)), 30_000)
+            assertTrue("the app did not come back from the picker (crashed?)", back)
+            var uid = ""
+            var documents = emptyList<String>()
+            val deadline = System.currentTimeMillis() + 120_000
+            while (System.currentTimeMillis() < deadline) {
+                if (uid.isEmpty()) uid = backend.users(email).firstOrNull()?.first ?: ""
+                if (uid.isNotEmpty()) {
+                    documents = backend.stringArray("users/$uid", "uploadedDocuments")
+                    if (documents.contains("govId_${uid}_front")) break
+                }
+                if (!device.hasObject(By.pkg(context.packageName).depth(0))) {
+                    capture("identity-gone")
+                    fail("the app left the screen while uploading (crashed?)")
+                }
+                Thread.sleep(1_000)
+            }
+            println("[ProTeacherSignUpTest] ID step: ${screenText()}")
+            assertEquals("the uploaded documents are $documents", listOf("govId_${uid}_front"), documents)
+
+            // Front only: with the declaration ticked, Submit leads on.
+            findScrolling(By.res("identity_terms"))?.click()
+            // Found afresh: ticking redraws the step.
+            assertNotNull("no Submit for review", findScrolling(By.res("identity_submit")))
+            assertTrue("the front alone does not let the teacher go on",
+                device.wait(Until.hasObject(By.res("identity_submit").enabled(true)), 10_000))
+            device.findObject(By.res("identity_submit")).click()
+            assertTrue("the ID step did not lead on to the subjects",
+                device.wait(Until.hasObject(By.res("teacher_subjects_continue")), 30_000))
+        } finally {
+            prefs.edit().remove("rcOverride.teacher_identity_onboarding").commit()
+        }
     }
 
     /** AND-T-07: the profile's Continue stays off until there is a name and a

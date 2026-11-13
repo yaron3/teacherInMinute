@@ -118,6 +118,7 @@ struct TeacherIdentityVerificationView: View {
         idFrontPickerLabel
       }
       .buttonStyle(.plain)
+      .accessibilityIdentifier("identity_front_upload")
 #endif
     }
     .brandCard()

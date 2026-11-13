@@ -158,6 +158,14 @@ class EmulatorBackend(private val host: String) {
         return JSONObject(text).optJSONObject("fields") ?: JSONObject()
     }
 
+    /** The strings in the document's array field `field`; empty when either
+     *  is missing. */
+    fun stringArray(path: String, field: String): List<String> {
+        val values = fields(path)?.optJSONObject(field)?.optJSONObject("arrayValue")?.optJSONArray("values")
+            ?: return emptyList()
+        return (0 until values.length()).mapNotNull { values.getJSONObject(it).optString("stringValue", "").ifEmpty { null } }
+    }
+
     /** Merges `fields` into the document, creating it if needed. */
     fun merge(path: String, fields: Map<String, Any>) {
         val mask = fields.keys.joinToString("&") { "updateMask.fieldPaths=$it" }
