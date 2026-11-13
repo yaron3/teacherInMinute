@@ -35,7 +35,14 @@ enum RootScreen: Hashable {
 @Observable
 final class AppRouter: @unchecked Sendable {
   var rootScreen: RootScreen = .welcome
-  var path = NavigationPath()
+  var path = NavigationPath() {
+	didSet { returnGuestHomeIfBackedOut() }
+  }
+  /// A guest was taken from home to sign-up or login (`startRegistration`,
+  /// `startLogin`). Backing out of every screen from there returns them home,
+  /// one screen back as Back promises, rather than to the intro behind the
+  /// welcome stack.
+  private var guestLeftHome = false
   /// The role of an account just turned away because it belongs to the other
   /// app. The welcome screen says which app that is, then clears it.
   var otherAppAccountRole: AuthRole?
@@ -71,25 +78,41 @@ final class AppRouter: @unchecked Sendable {
   /// in the same breath as swapping the stack out from under it left the login
   /// screen on top of the new root on Android.
   func enterMainTabs(role: AuthRole) {
+	guestLeftHome = false
 	path = NavigationPath()
 	rootScreen = .mainTabs(role: role)
   }
 
   func signOut() {
+	guestLeftHome = false
 	path = NavigationPath()
 	rootScreen = .welcome
+  }
+
+  /// The guest's way back home once they have backed out of the last screen.
+  /// It waits a turn: `replace(with:)` empties the path on its way to the next
+  /// step, and a pop is still animating when the path changes.
+  private func returnGuestHomeIfBackedOut() {
+	guard guestLeftHome, path.isEmpty, rootScreen == .welcome else { return }
+	Task { @MainActor [weak self] in
+	  guard let self, self.guestLeftHome, self.path.isEmpty, self.rootScreen == .welcome,
+			Auth.auth().currentUser?.isAnonymous == true else { return }
+	  logger.info("[Router] the guest backed out of sign-up; back home")
+	  self.enterMainTabs(role: .student)
+	}
   }
 
   /// Takes a student who started without an account to sign-up: the welcome
   /// stack, with the account form on top. They stay signed in anonymously
   /// until the form signs them into an account of their own, so backing out
-  /// and tapping "Get started" returns them to the same one; the form's "Log
-  /// in" is there for a student who has an account already.
+  /// returns them home as the same guest; the form's "Log in" is there for a
+  /// student who has an account already.
   func startRegistration() {
 	var registration = NavigationPath()
 	registration.append(AppRoute.createAccount)
 	path = registration
 	rootScreen = .welcome
+	guestLeftHome = true
   }
 
   /// Takes a student who started without an account to the login form, from
@@ -100,6 +123,7 @@ final class AppRouter: @unchecked Sendable {
 	login.append(AppRoute.login)
 	path = login
 	rootScreen = .welcome
+	guestLeftHome = true
   }
 
   /// Returns to sign-in whenever Firebase has no user while the tab bar is up.

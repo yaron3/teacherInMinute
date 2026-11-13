@@ -175,8 +175,14 @@ class ProTeacherEmulatorTestCase: XCTestCase {
         guard field.waitForExistence(timeout: 10),
               let value = field.value as? String, !value.isEmpty,
               value != field.placeholderValue else { return }
-        field.tap()
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count + 2))
+        // A plain tap leaves the caret where it lands, mid-text, and the
+        // deletes then take only what is before it: tap each end in turn
+        // until the field is empty.
+        for end in [0.98, 0.02, 0.98] {
+            guard let left = field.value as? String, !left.isEmpty, left != field.placeholderValue else { return }
+            field.coordinate(withNormalizedOffset: CGVector(dx: end, dy: 0.5)).tap()
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: left.count + 2))
+        }
     }
 
     /// Waits for the teacher dashboard, getting past the first-run prompts.

@@ -254,9 +254,12 @@ abstract class ProTeacherEmulatorTest {
      * EditText inside it, and only that takes text.
      */
     protected fun type(text: String, into: String) {
-        val tagged = device.findObject(By.res(into))
+        // The text box under the tag: a field's error line carries the same
+        // tag, and setting text on that label does nothing.
+        val editText = device.findObject(By.clazz("android.widget.EditText").hasAncestor(By.res(into)))
+        val tagged = editText ?: device.findObject(By.res(into))
         assertNotNull("no $into", tagged)
-        val field = tagged.findObject(By.clazz("android.widget.EditText")) ?: tagged
+        val field = editText ?: tagged.findObject(By.clazz("android.widget.EditText")) ?: tagged
         field.click()
         field.text = text
     }

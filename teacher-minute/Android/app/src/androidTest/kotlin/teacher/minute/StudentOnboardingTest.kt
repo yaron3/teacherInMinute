@@ -50,7 +50,7 @@ import org.junit.runner.RunWith
  *             signed out, its presence untouched
  *   AND-S-17  a guest's menu offers Log in; their profile offers an account
  *   AND-S-05  a guest's sign-up offers email and Google, no Apple
- *   AND-S-18  Back closes the offer; leaves sign-up for the intro (by design),
+ *   AND-S-18  Back closes the offer; leaves sign-up for home, one screen back,
  *             the guest kept; and on home backgrounds the app, the guest kept
  *
  * AND-S-12, a guest killed and relaunched, is not here: the test runs in the
@@ -402,19 +402,11 @@ class StudentOnboardingTest {
         // A Back that only closed the keyboard leaves the form up: press again.
         if (!device.wait(Until.gone(By.res("sign_up_email")), 3_000)) device.pressBack()
         assertTrue("Back did not leave sign-up", device.wait(Until.gone(By.res("sign_up_email")), 10_000))
-        // By design (AppRouter.startRegistration) sign-up sits on the welcome
-        // stack: backing out lands on the intro, still signed in as the guest,
-        // and Get started returns that same guest home.
-        val intro = device.wait(Until.findObject(By.res("student_intro_start")), 20_000)
-            ?: failWithScreen("back-sign-up", "Back from sign-up did not reach the intro; foreground is ${device.currentPackageName}")
-        assertEquals("backing out of sign-up signed the guest out", guest.uid, FirebaseAuth.getInstance().currentUser?.uid)
-        intro.click()
-        val introDeadline = System.currentTimeMillis() + 30_000
-        while (System.currentTimeMillis() < introDeadline && !device.wait(Until.gone(By.res("student_intro_start")), 3_000)) {
-            runCatching { device.findObject(By.res("student_intro_start"))?.click() }
-        }
-        if (!waitForHome(30_000)) failWithScreen("back-start", "Get started after backing out did not return home")
-        assertEquals("Get started made a new guest", guest.uid, FirebaseAuth.getInstance().currentUser?.uid)
+        // One screen back: the guest's home, not the intro behind the
+        // welcome stack sign-up sits on (AppRouter.returnGuestHomeIfBackedOut).
+        if (!waitForHome(30_000)) failWithScreen("back-sign-up", "Back from sign-up did not return home; foreground is ${device.currentPackageName}")
+        assertFalse("Back from sign-up showed the intro", device.hasObject(By.res("student_intro_start")))
+        assertEquals("backing out of sign-up changed the guest", guest.uid, FirebaseAuth.getInstance().currentUser?.uid)
 
         device.pressBack()
         assertTrue("Back on home did not send the app to the background",

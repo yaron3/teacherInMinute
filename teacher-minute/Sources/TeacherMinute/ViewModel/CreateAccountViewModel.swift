@@ -99,31 +99,44 @@ final class CreateAccountViewModel {
   var canSubmit: Bool {
 	isEmailValid && isPasswordValid && doPasswordsMatch && agreedToTerms && !isLoading
   }
-  
-  func openTerms() {
-	termsURL = URL(string: RemoteConfigService.getLocalizedString(for: .eulaURL))
-	if termsURL != nil {
-	  showingTerms = true
-	  return
-	}
-	
-	legalAlertMessage = SettingsError.missingLegalURL("EULA").localizedDescription
-	showLegalAlert = true
+
+  /// The fields are right and only the terms are missing: the one reason the
+  /// disabled Continue has that no field already shows.
+  var showsAcceptTermsHint: Bool {
+	isEmailValid && isPasswordValid && doPasswordsMatch && !agreedToTerms
   }
-  
-   func openPrivacy() {
-	privacyURL = URL(string: RemoteConfigService.getLocalizedString(for: .privacyPolicyURL))
-	if privacyURL != nil {
-	  showingPrivacy = true
-	  return
+
+  func openTerms() {
+	Task {
+	  termsURL = await legalURL(for: .eulaURL, page: "eula")
+	  showingTerms = true
 	}
-	
-	legalAlertMessage = SettingsError.missingLegalURL(LocalizationSupport.localized("Privacy Policy")).localizedDescription
-	showLegalAlert = true
+  }
+
+  func openPrivacy() {
+	Task {
+	  privacyURL = await legalURL(for: .privacyPolicyURL, page: "privacypolicy")
+	  showingPrivacy = true
+	}
+  }
+
+  /// The published page for `key`. On a first launch whose Remote Config
+  /// fetch outlasted the launch gate the value is not there yet, so the link
+  /// waits for the fetch, and failing that opens the page on the site, which
+  /// is where Remote Config points anyway (`<page>.html`, `<page>_he.html`).
+  private func legalURL(for key: RemoteConfigKey, page: String) async -> URL {
+	if let url = URL(string: RemoteConfigService.getLocalizedString(for: key)) { return url }
+	await RemoteConfigService.shared.ready()
+	if let url = URL(string: RemoteConfigService.getLocalizedString(for: key)) { return url }
+	logger.info("[CreateAccount] no Remote Config value for \(key.rawValue); opening the site's page")
+	let suffix = LocalizationSupport.currentLanguageCode == "he" ? "_he" : ""
+	return URL(string: "https://teacher-in-a-moment.web.app/\(page)\(suffix).html")!
   }
   // MARK: - Signup
   
   func signup() async {
+	// A second tap queued before the first got here.
+	guard !isLoading else { return }
 	// Validate in order and surface first failure
 	if !isEmailValid {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "invalid_email"])

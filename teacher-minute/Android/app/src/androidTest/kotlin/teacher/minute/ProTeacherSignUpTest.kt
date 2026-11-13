@@ -170,26 +170,37 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertTrue("the existing account no longer signs in", backend.canSignIn(appTeacher))
     }
 
-    /** AND-T-12: each invalid form is refused on Continue with a message, and
-     *  none of them creates an account. */
+    /** AND-T-12: each invalid form keeps Continue off and says why under the
+     *  field (or the terms box), with no dialog over it; tapping the disabled
+     *  Continue does nothing, and none of them creates an account. */
     @Test
     fun invalidSignUpsAreRefused() {
         val email = backend.newEmail("signup.invalid")
         openSignUpForm()
+        // Each message in English and in Hebrew, whichever the app runs in.
         val cases = listOf(
-            listOf("a bad address", "not-an-address", "Emulator-123456", "Emulator-123456", "yes"),
-            listOf("a short password", email, "12345", "12345", "yes"),
-            listOf("a mismatched confirmation", email, "Emulator-123456", "Emulator-654321", "yes"),
-            listOf("unaccepted terms", email, "Emulator-123456", "Emulator-123456", "no"),
+            listOf("a bad address", "not-an-address", "Emulator-123456", "Emulator-123456", "yes",
+                "Enter a valid email address.", "הזן כתובת אימייל תקינה."),
+            listOf("a short password", email, "12345", "12345", "yes",
+                "Must be at least 6 characters.", "חייב להכיל לפחות 6 תווים."),
+            listOf("a mismatched confirmation", email, "Emulator-123456", "Emulator-654321", "yes",
+                "Passwords do not match.", "הסיסמאות אינן תואמות."),
+            listOf("unaccepted terms", email, "Emulator-123456", "Emulator-123456", "no",
+                "Accept the terms to continue", "יש לאשר את התנאים כדי להמשיך"),
         )
-        for ((described, address, password, confirmation, agree) in cases) {
+        for (case in cases) {
+            val (described, address, password, confirmation, agree) = case
+            val message = Pattern.compile(Pattern.quote(case[5]) + "|" + Pattern.quote(case[6]))
             fillSignUp(address, password, confirmation, agreeToTerms = agree == "yes")
-            submitSignUp()
-            val ok = device.wait(Until.findObject(dialogButton), 15_000)
-            assertNotNull("$described: no error", ok)
             println("[ProTeacherSignUpTest] $described: ${screenText()}")
-            ok.click()
-            assertTrue("$described: the error stayed", device.wait(Until.gone(dialogButton), 10_000))
+            // The message can sit above the part of the form left in view.
+            val shown = findScrolling(By.text(message)) ?: findScrolling(By.text(message), Direction.UP)
+            assertNotNull("$described: no \"${case[5]}\" on the form", shown)
+            val continueButton = findScrolling(By.res("sign_up_continue"))
+            assertNotNull("$described: no Continue", continueButton)
+            assertFalse("$described: Continue was on", continueButton!!.isEnabled)
+            continueButton.click()
+            assertNull("$described: a dialog covered the form", device.wait(Until.findObject(dialogButton), 3_000))
             assertFalse("$described: went on to the profile", device.hasObject(By.res("complete_profile_full_name")))
         }
         assertTrue("an invalid sign-up created an account", backend.users(email).isEmpty())
@@ -322,6 +333,8 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
     }
 
     private fun fillSignUp(email: String, password: String, confirmation: String, agreeToTerms: Boolean) {
+        // A previous case can leave the form scrolled past the address.
+        findScrolling(By.clazz("android.widget.EditText").hasAncestor(By.res("sign_up_email")), Direction.UP)
         type(email, into = "sign_up_email")
         type(password, into = "sign_up_password")
         type(confirmation, into = "sign_up_confirm_password")

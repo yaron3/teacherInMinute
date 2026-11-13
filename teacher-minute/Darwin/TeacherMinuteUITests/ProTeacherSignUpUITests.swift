@@ -235,8 +235,9 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
         XCTAssertTrue(canSignIn, "the existing account no longer signs in with its own password")
     }
 
-    /// IOS-T-12: each invalid form is refused on Continue with a message, and
-    /// none of them creates an account.
+    /// IOS-T-12: each invalid form keeps Continue off and says why under the
+    /// field (or the terms box), with no dialog over it; tapping the disabled
+    /// Continue does nothing, and none of them creates an account.
     @MainActor
     func testInvalidSignUpsAreRefused() async throws {
         try await createAccounts()
@@ -244,19 +245,27 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
         launchApp()
         openSignUpForm()
 
-        let cases: [(String, String, String, String, Bool)] = [
-            ("a bad address", "not-an-address", "Emulator-123456", "Emulator-123456", true),
-            ("a short password", email, "12345", "12345", true),
-            ("a mismatched confirmation", email, "Emulator-123456", "Emulator-654321", true),
-            ("unaccepted terms", email, "Emulator-123456", "Emulator-123456", false),
+        // Each message in English and in Hebrew, whichever the app runs in.
+        let cases: [(String, String, String, String, Bool, [String])] = [
+            ("a bad address", "not-an-address", "Emulator-123456", "Emulator-123456", true,
+             ["Enter a valid email address.", "הזן כתובת אימייל תקינה."]),
+            ("a short password", email, "12345", "12345", true,
+             ["Must be at least 6 characters.", "חייב להכיל לפחות 6 תווים."]),
+            ("a mismatched confirmation", email, "Emulator-123456", "Emulator-654321", true,
+             ["Passwords do not match.", "הסיסמאות אינן תואמות."]),
+            ("unaccepted terms", email, "Emulator-123456", "Emulator-123456", false,
+             ["Accept the terms to continue", "יש לאשר את התנאים כדי להמשיך"]),
         ]
-        for (described, address, password, confirmation, agree) in cases {
+        let continueButton = app.buttons["sign_up_continue"]
+        for (described, address, password, confirmation, agree, messages) in cases {
             fillSignUp(email: address, password: password, confirmation: confirmation, agreeToTerms: agree)
-            submitSignUp()
-            XCTAssertTrue(dialogButton.waitForExistence(timeout: 15), "\(described): no error")
+            dismissKeyboard()
             attach(described, app.debugDescription)
-            dialogButton.tap()
-            XCTAssertTrue(waitForDisappearance(dialogButton, timeout: 10), "\(described): the error stayed")
+            let message = app.staticTexts.matching(NSPredicate(format: "label IN %@", messages)).firstMatch
+            XCTAssertTrue(message.waitForExistence(timeout: 10), "\(described): no \"\(messages[0])\" on the form")
+            XCTAssertFalse(continueButton.isEnabled, "\(described): Continue was on")
+            if continueButton.isHittable { continueButton.tap() }
+            XCTAssertFalse(dialogButton.waitForExistence(timeout: 3), "\(described): a dialog covered the form")
             XCTAssertFalse(nameField.exists, "\(described): went on to the profile")
         }
         let users = try await backend.users(withEmail: email)
@@ -374,6 +383,9 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
     /// The checkbox reports its state as its value or as selection.
     private func isChecked(_ box: XCUIElement) -> Bool {
         if box.isSelected { return true }
+        // BrandCheckbox draws its tick as the "brand-check" image, which is
+        // all its label is once ticked.
+        if box.label == "brand-check" { return true }
         let value = (box.value as? String)?.lowercased() ?? ""
         return value == "1" || value == "checked" || value == "on" || value == "true"
     }
