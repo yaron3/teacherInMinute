@@ -100,7 +100,13 @@ abstract class ProTeacherEmulatorTest {
         // A tap while the welcome screen is still animating in does nothing.
         repeat(5) {
             if (device.hasObject(By.res("email_input"))) return@repeat
-            device.wait(Until.findObject(By.res("welcome_log_in")), 30_000)?.click()
+            // On a narrow phone (360 dp) the welcome screen's Log in sits
+            // below the fold: scroll to it.
+            val logIn = device.wait(Until.findObject(By.res("welcome_log_in")), 15_000) ?: run {
+                device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 20)
+                device.wait(Until.findObject(By.res("welcome_log_in")), 10_000)
+            }
+            logIn?.click()
             device.wait(Until.hasObject(By.res("email_input")), 5_000)
         }
         assertNotNull("the login form never opened", device.wait(Until.findObject(By.res("email_input")), 10_000))

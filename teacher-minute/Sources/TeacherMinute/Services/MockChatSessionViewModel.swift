@@ -28,7 +28,8 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   var isConnecting: Bool
   private(set) var isInSetup: Bool
   let hasUnreadChat = false
-  let hasUnreadBoard = false
+  /// Settable so the UI test harness can have the mascot point at the board.
+  var hasUnreadBoard = false
   let incomingFormulaCount = 0
   var isMicMuted = false
   var isCameraOff = false

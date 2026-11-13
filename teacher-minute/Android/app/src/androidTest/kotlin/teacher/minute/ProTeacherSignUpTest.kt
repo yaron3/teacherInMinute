@@ -73,6 +73,8 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertNotNull("the missing-payout question did not appear", continueAnyway)
         continueAnyway.click()
         reachDashboard("finishing the profile")
+        // Kept for a look at the dashboard and its tab bar (Bug-014).
+        capture("dashboard")
 
         val users = backend.users(email)
         assertEquals("signing up made ${users.size} Auth users", 1, users.size)

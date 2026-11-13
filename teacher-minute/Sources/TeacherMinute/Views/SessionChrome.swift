@@ -24,6 +24,8 @@ struct SessionToggleItem: Identifiable {
 struct SessionTabToggle: View {
   let items: [SessionToggleItem]
   let selected: ChatSessionView.TAB_TYPE
+  /// The design's 266pt, or less where the bar has no room for it.
+  var maxWidth: CGFloat = 266
   let onSelect: (ChatSessionView.TAB_TYPE) -> Void
 
   @Environment(\.colorScheme) var colorScheme
@@ -38,7 +40,7 @@ struct SessionTabToggle: View {
       }
     }
     .padding(4)
-    .frame(maxWidth: 266)
+    .frame(maxWidth: maxWidth)
     .background(theme.brandBackgroundTop)
     .clipShape(RoundedRectangle(cornerRadius: 14))
     .overlay {
@@ -152,15 +154,35 @@ struct SessionTopBar: View {
   let onSelect: (ChatSessionView.TAB_TYPE) -> Void
   let onClose: () -> Void
 
+  /// The bar's width, measured; zero until it is.
+  @State var barWidth: CGFloat = 0
+
+  /// The toggle's cap: 266pt, or what the bar leaves beside the close button
+  /// (24pt margins, a 12pt gap and the 44pt button). On Android a `maxWidth`
+  /// is a required width, so the full 266pt on a 360 dp phone pushed the
+  /// close button against the screen's edge (Bug-019).
+  var toggleMaxWidth: CGFloat {
+    guard barWidth > 0 else { return 266 }
+    return max(160, min(266, barWidth - 24 * 2 - 12 - 44))
+  }
+
   var body: some View {
-    HStack(spacing: 12) {
-      SessionTabToggle(items: items, selected: selected, onSelect: onSelect)
-      Spacer(minLength: 0)
-      SessionCloseButton(accessibilityLabel: closeAccessibilityLabel, action: onClose)
+    VStack(spacing: 0) {
+      Color.clear
+        .frame(maxWidth: .infinity)
+        .frame(height: 0)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+          barWidth = width
+        }
+      HStack(spacing: 12) {
+        SessionTabToggle(items: items, selected: selected, maxWidth: toggleMaxWidth, onSelect: onSelect)
+        Spacer(minLength: 0)
+        SessionCloseButton(accessibilityLabel: closeAccessibilityLabel, action: onClose)
+      }
+      .padding(.horizontal, 24)
+      .padding(.top, 4)
+      .padding(.bottom, 20)
     }
-    .padding(.horizontal, 24)
-    .padding(.top, 4)
-    .padding(.bottom, 20)
   }
 }
 
@@ -502,21 +524,34 @@ struct SessionBottomBar: View {
   /// Room the open media pill needs above the bar's own height.
   var extraHeight: CGFloat = 0
 
+  /// The strip's width at the design's sizes: 12 + media 60 + 8 + people 117
+  /// + 8 + mascot 98 − 18 + 8 + clock 79 + 12, and 64 more while the mascot's
+  /// bubble stands beside it.
+  static func designWidth(hasMascotMessage: Bool) -> CGFloat {
+    hasMascotMessage ? 448 : 384
+  }
+
   var body: some View {
     GeometryReader { proxy in
-      let scale = min(1, proxy.size.width / 402)
+      // Laid out at the design's sizes, then the whole strip scaled down to
+      // the screen when it is narrower. Only the mascot and the clock used to
+      // shrink, so on a 390pt iPhone the strip with the mascot's bubble was
+      // wider than the screen and cut off at both edges (Bug-018).
+      let fit = min(1, proxy.size.width / Self.designWidth(hasMascotMessage: mascotMessage != nil))
       HStack(alignment: .bottom, spacing: 8) {
         media
         people
         Spacer(minLength: 0)
         // The mascot's picture has room round it, so it may overlap the clock.
-        SessionMascot(message: mascotMessage, scale: scale)
-          .padding(.trailing, -18 * scale)
+        SessionMascot(message: mascotMessage, scale: 1)
+          .padding(.trailing, -18)
         timer
-          .frame(width: 79 * scale)
+          .frame(width: 79)
       }
       .padding(.horizontal, 12)
       .padding(.bottom, 6)
+      .frame(width: proxy.size.width / fit, height: proxy.size.height / fit, alignment: .bottom)
+      .scaleEffect(fit, anchor: .bottom)
       .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
     }
     .frame(height: 72 + extraHeight)
