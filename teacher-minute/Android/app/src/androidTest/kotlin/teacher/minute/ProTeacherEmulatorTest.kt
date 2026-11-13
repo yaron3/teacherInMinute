@@ -95,6 +95,19 @@ abstract class ProTeacherEmulatorTest {
         if (signsInAtStart) signIn()
     }
 
+    /** Waits for the welcome screen, by its Log in. On a phone shorter than
+     *  about 900 dp the buttons sit below the fold, where UI Automator cannot
+     *  see them, so it scrolls to them once the screen has had time to come. */
+    protected fun waitForWelcome(timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (device.wait(Until.hasObject(By.res("welcome_log_in")), 5_000)) return true
+            // Only a scroll: harmless on whatever screen is still on its way out.
+            device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 20)
+        }
+        return device.hasObject(By.res("welcome_log_in"))
+    }
+
     /** From the welcome screen to the login form. */
     protected fun openLoginForm() {
         // A tap while the welcome screen is still animating in does nothing.
