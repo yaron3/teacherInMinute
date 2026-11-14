@@ -3,7 +3,11 @@
 //  teacher-minute
 //
 //  The preferences, as Instant Teacher's design draws them: the session type a
-//  student's question starts with, the currency, and the appearance.
+//  student's question starts with, and the currency.
+//
+//  There is no appearance choice: both apps are drawn on the brand's dark
+//  ground throughout (see TeacherMinuteApp), so a Light/Dark/System picker
+//  saved a value nothing read (IT-26, IT-27).
 //
 
 import SwiftUI
@@ -11,7 +15,6 @@ import SwiftUI
 struct AppPreferencesSettingsView: View {
   let viewModel: any SettingsViewModeling
   @AppStorage(SessionPreferences.defaultQuestionTypeKey) var defaultQuestionType = ConversationType.audio.rawValue
-  @AppStorage("appearanceMode") var appearanceMode = "system"
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -52,20 +55,6 @@ struct AppPreferencesSettingsView: View {
         .frame(height: 52)
         footnote(viewModel.currencyFooterText)
       }
-
-      BrandRule()
-
-      VStack(alignment: .leading, spacing: 8) {
-        sectionTitle(viewModel.appearanceSectionTitle, size: 17)
-        BrandOptionPicker(
-          options: ["system", "light", "dark"],
-          selection: appearanceMode,
-          title: appearanceTitle,
-          outlinesUnselected: false
-        ) { mode in
-          appearanceMode = mode
-        }
-      }
     }
     .brandCard()
   }
@@ -81,14 +70,6 @@ struct AppPreferencesSettingsView: View {
         defaultQuestionType = type.rawValue
       }
       footnote(viewModel.defaultSessionTypeFooterText)
-    }
-  }
-
-  private func appearanceTitle(_ mode: String) -> String {
-    switch mode {
-    case "light": viewModel.appearanceLightLabel
-    case "dark": viewModel.appearanceDarkLabel
-    default: viewModel.appearanceSystemLabel
     }
   }
 

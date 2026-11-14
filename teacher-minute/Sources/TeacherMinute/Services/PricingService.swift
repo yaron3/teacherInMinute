@@ -32,7 +32,24 @@ final class PricingService {
                 options.append(option)
             }
         }
-        return options.sorted { $0.sortOrder < $1.sortOrder }
+        return Self.uniquePackages(options.sorted { $0.sortOrder < $1.sortOrder })
+    }
+
+    /// One entry per package. Admin-created packages get random document IDs,
+    /// so the same package saved twice shows up twice; the first one in sort
+    /// order is kept, and anything with the same name, minutes, price and
+    /// currency is the same thing to a buyer.
+    static func uniquePackages(_ options: [PricingOption]) -> [PricingOption] {
+        var seen = Set<String>()
+        return options.filter { option in
+            let key = [
+                option.name,
+                String(option.minutesGranted ?? -1),
+                String(option.priceCents),
+                option.currency,
+            ].joined(separator: "|")
+            return seen.insert(key).inserted
+        }
     }
 
     private static func makeOption(id: String, data: [String: Any]) -> PricingOption? {

@@ -269,6 +269,24 @@ describe("teachers whose app has gone quiet", () => {
     expect(isTeacherReachable(teacher({ lastSeenAt: NOW - 10 * MINUTE, fcmToken: "" }))).toBe(false);
   });
 
+  // IT-28: questions are pushed only to a teacher who lets them through.
+  test("a silent teacher who turned question notifications off is not reached", () => {
+    const silent = { lastSeenAt: NOW - 10 * MINUTE, fcmToken: "fcm-token" };
+    expect(isTeacherReachable(teacher({ ...silent, notificationPreferences: { incomingMessages: false } }))).toBe(false);
+    expect(order({ off: teacher({ ...silent, notificationPreferences: { incomingMessages: false } }) })).toEqual([]);
+    // Announcements off says nothing about questions; absent choices are on.
+    expect(isTeacherReachable(teacher({ ...silent, notificationPreferences: { announcements: false } }))).toBe(true);
+    expect(isTeacherReachable(teacher({ ...silent, notificationPreferences: {} }))).toBe(true);
+  });
+
+  test("a running app hears questions whatever its notification choices", () => {
+    expect(
+      isTeacherReachable(
+        teacher({ lastSeenAt: NOW - 30_000, fcmToken: "fcm-token", notificationPreferences: { incomingMessages: false } })
+      )
+    ).toBe(true);
+  });
+
   // Installed apps update on their own schedule. One that has never sent a
   // keep-alive must not be read as one that stopped sending them.
   test("an app from before the keep-alive is judged on status alone", () => {

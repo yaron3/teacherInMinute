@@ -34,6 +34,16 @@ enum SignupValidationError: LocalizedError {
 	}
   }
   
+  /// The reason reported to analytics for a failed sign-up.
+  var analyticsReason: String {
+	switch self {
+	  case .invalidEmail:         return "invalid_email"
+	  case .passwordTooShort:     return "password_too_short"
+	  case .passwordsDoNotMatch:  return "passwords_do_not_match"
+	  case .termsNotAccepted:     return "terms_not_accepted"
+	}
+  }
+
   /// Which field to focus after showing the alert
   var focusField: SignupField? {
 	switch self {
@@ -137,25 +147,13 @@ final class CreateAccountViewModel {
   func signup() async {
 	// A second tap queued before the first got here.
 	guard !isLoading else { return }
-	// Validate in order and surface first failure
-	if !isEmailValid {
-	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "invalid_email"])
-	  present(error: .invalidEmail)
-	  return
-	}
-	if !isPasswordValid {
-	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "password_too_short"])
-	  present(error: .passwordTooShort)
-	  return
-	}
-	if !doPasswordsMatch {
-	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "passwords_do_not_match"])
-	  present(error: .passwordsDoNotMatch)
-	  return
-	}
-	if !agreedToTerms {
-	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": "terms_not_accepted"])
-	  present(error: .termsNotAccepted)
+	// Report every failing rule at once, so the user fixes them in one pass.
+	let errors = validationErrors()
+	if let first = errors.first {
+	  for error in errors {
+		AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": error.analyticsReason])
+	  }
+	  present(errors: errors, first: first)
 	  return
 	}
 
@@ -291,9 +289,21 @@ final class CreateAccountViewModel {
   
   // MARK: - Helpers
   
-  private func present(error: SignupValidationError) {
-	alertMessage = error.errorDescription
+  /// Every rule the form currently breaks, in the order the fields appear.
+  func validationErrors() -> [SignupValidationError] {
+	var errors: [SignupValidationError] = []
+	if !isEmailValid { errors.append(.invalidEmail) }
+	if !isPasswordValid { errors.append(.passwordTooShort) }
+	if !doPasswordsMatch { errors.append(.passwordsDoNotMatch) }
+	if !agreedToTerms { errors.append(.termsNotAccepted) }
+	return errors
+  }
+
+  /// One alert listing every failing rule; focus goes to the first field
+  /// that is wrong.
+  private func present(errors: [SignupValidationError], first: SignupValidationError) {
+	alertMessage = errors.compactMap(\.errorDescription).joined(separator: "\n")
 	showAlert    = true
-	focusField   = error.focusField
+	focusField   = first.focusField
   }
 }

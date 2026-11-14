@@ -66,11 +66,11 @@ enum QuestionCamera {
   /// last one is cleared first, and each takes a new name, so the image
   /// loader never shows a cached earlier photo in its place.
   static func previewFile(for data: Data) -> URL? {
-    let directory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("QuestionPhotoPreview", isDirectory: true)
-    try? FileManager.default.removeItem(at: directory)
+    let directory = ScratchFiles.directory("QuestionPhotoPreview")
+    for old in (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] {
+      try? FileManager.default.removeItem(at: old)
+    }
     do {
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
       let file = directory.appendingPathComponent("\(UUID().uuidString).jpg")
       try data.write(to: file)
       return file

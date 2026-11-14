@@ -64,6 +64,8 @@ enum AnalyticsEvent {
     static let questionPhotoAttached = "question_photo_attached"
     static let questionDraftRestored = "question_draft_restored"
     static let questionPhotoFailed   = "question_photo_failed"
+    /// Settings → Notifications: a choice of which notifications to receive.
+    static let notificationPreferencesChanged = "notification_preferences_changed"
     static let notEnoughMinutesShown = "not_enough_minutes_shown"
     static let notEnoughMinutesAction = "not_enough_minutes_action"
     static let purchaseScreenShown   = "purchase_screen_shown"

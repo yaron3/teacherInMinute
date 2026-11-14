@@ -73,10 +73,6 @@ extension SettingsViewModeling {
         LocalizationSupport.localized("Your currency is set to Israeli Shekel (ILS) and cannot be changed for now.")
     }
     var currencyValueLabel: String { LocalizationSupport.localized("ILS") }
-    var appearanceSectionTitle: String { LocalizationSupport.localized("Appearance") }
-    var appearanceSystemLabel: String { LocalizationSupport.localized("System") }
-    var appearanceLightLabel: String { LocalizationSupport.localized("Light") }
-    var appearanceDarkLabel: String { LocalizationSupport.localized("Dark") }
 
     // MARK: Privacy controls
     var privacySectionTitle: String { LocalizationSupport.localized("Privacy") }

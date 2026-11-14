@@ -26,6 +26,25 @@ object AndroidPushTokenManager {
         writeTokenToDatabase(token, uid, isTeacher)
     }
 
+    /**
+     * The user's choices in Settings → Notifications, next to the push token,
+     * where the backend reads them before sending a push (IT-28). A teacher's
+     * go on the teacher record too, which dispatch reads anyway.
+     */
+    @JvmStatic
+    fun writeNotificationPreferences(uid: String, isTeacher: Boolean, incomingMessages: Boolean, announcements: Boolean) {
+        val updates = mapOf<String, Any>(
+            "notificationPreferences" to mapOf(
+                "incomingMessages" to incomingMessages,
+                "announcements" to announcements
+            )
+        )
+        write("users/$uid", updates)
+        if (isTeacher) {
+            write("teachers/$uid", updates)
+        }
+    }
+
     @JvmStatic
     fun writeRefreshedToken(token: String) {
         val registration = currentRegistration()

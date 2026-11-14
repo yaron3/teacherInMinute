@@ -91,8 +91,9 @@ live lesson (one teacher, one student) — create both at the same device type.
   language's strings. Switch in the app instead — Settings → Language, pick the
   other language and then the one you want — and check a screen before
   capturing.
-- **Appearance**: `xcrun simctl ui <udid> appearance light|dark`, with the app's
-  `appearanceMode` left on `system` so the capture is what a real user sees.
+- **Appearance**: `xcrun simctl ui <udid> appearance light|dark`. The app has no
+  appearance setting of its own: it is drawn dark throughout, whatever the
+  system says (`AppearanceUITests` checks the two give the same picture).
 - **Status bar**: always override before capturing.
   ```bash
   xcrun simctl status_bar <udid> override --time "9:41" --dataNetwork wifi \

@@ -562,6 +562,7 @@ struct StudentQuestionHomeView: View {
           .tappableFrame()
       }
       .buttonStyle(.plain)
+      .accessibilityIdentifier("add_question_photo")
     }
   }
 

@@ -456,6 +456,25 @@ describe("wave 1 with teachers whose app is not running", () => {
     expect(pendingInWave(qid, 1)).toEqual([anna, ben, carmen, dan]);
   });
 
+  // IT-28: a teacher who turned question notifications off is not pushed one,
+  // and once their app is gone they are out of reach and out of the wave.
+  test("a teacher who turned question notifications off is pushed nothing", async () => {
+    const { sendInvitePush } = jest.requireMock("../fcm") as { sendInvitePush: jest.Mock };
+    const [anna, ben, carmen, dan] = RANKED;
+    terminate(anna);
+    fakeRtdb.write(`teachers/${anna}/notificationPreferences`, { incomingMessages: false });
+    fakeRtdb.write(`teachers/${ben}/notificationPreferences`, { incomingMessages: false });
+    sendInvitePush.mockClear();
+
+    const qid = await ask("student-maya");
+
+    // Anna's app is gone and she will not be pushed: she is skipped.
+    expect(pendingInWave(qid, 1)).toEqual([ben, carmen, dan]);
+    // Ben's app is running, so he hears of it on his dashboard, without a push.
+    const pushed = sendInvitePush.mock.calls.map(([p]) => p.teacherUid);
+    expect(pushed.sort(byRank)).toEqual([carmen, dan]);
+  });
+
   test("with every app running, wave 1 is the 3 best teachers as before", async () => {
     terminate();
 

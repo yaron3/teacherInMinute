@@ -14,6 +14,7 @@ import { deleteAccountData } from "./accountDeletion";
 import { sendMail, supportSmtpConfig } from "./mailer";
 import { readSupportSettings, supportCaseUrl, writeSupportSettings } from "./supportSettings";
 import { sendAdminPush } from "./fcm";
+import { wantsPush } from "./scoring";
 import {
   isPlausibleEmail,
   parseRecipients,
@@ -1881,6 +1882,13 @@ async function pushTokensOf(uid: string): Promise<string[]> {
   return [...tokens];
 }
 
+/** Whether the user lets admin announcements through (Settings →
+ *  Notifications). Absent means yes; see NotificationPreferences. */
+async function wantsAnnouncements(uid: string): Promise<boolean> {
+  const prefs = (await db.ref(`users/${uid}/notificationPreferences`).get()).val();
+  return wantsPush(prefs, "announcements");
+}
+
 function pushUids(value: unknown): string[] {
   if (!Array.isArray(value) || value.length === 0 || !value.every((u) => typeof u === "string" && u)) {
     throw new HttpsError("invalid-argument", "uids must be a non-empty list");
@@ -1921,7 +1929,14 @@ export const adminSendPush = onCall({ timeoutSeconds: 300 }, async (req) => {
   if (b.length > PUSH_BODY_MAX_CHARS) throw new HttpsError("invalid-argument", `Message is over ${PUSH_BODY_MAX_CHARS} characters`);
   const extra = pushData(data);
 
-  const tokensByUid = new Map(await Promise.all(unique.map(async (uid) => [uid, await pushTokensOf(uid)] as const)));
+  // A user who turned announcements off in Settings is not sent one.
+  const optedOutUids = new Set(
+    (await Promise.all(unique.map(async (uid) => [uid, await wantsAnnouncements(uid)] as const)))
+      .filter(([, wants]) => !wants)
+      .map(([uid]) => uid)
+  );
+  const recipients = unique.filter((uid) => !optedOutUids.has(uid));
+  const tokensByUid = new Map(await Promise.all(recipients.map(async (uid) => [uid, await pushTokensOf(uid)] as const)));
   const tokens = [...new Set([...tokensByUid.values()].flat())];
   const { sent, dead, failed } = await sendAdminPush({ tokens, title: t, body: b || undefined, data: extra });
 
@@ -1936,10 +1951,17 @@ export const adminSendPush = onCall({ timeoutSeconds: 300 }, async (req) => {
   }
 
   logger.info(
-    `[admin] push "${t}": users=${unique.length} reached=${reached} withoutToken=${withoutToken} unreachable=${unreachable} ` +
+    `[admin] push "${t}": users=${unique.length} reached=${reached} withoutToken=${withoutToken} unreachable=${unreachable} optedOut=${optedOutUids.size} ` +
       `devices=${sent}/${tokens.length} dead=${dead.length} by=${req.auth?.token?.email}`
   );
-  return { reached, withoutToken, unreachable, devicesSent: sent, devicesFailed: failed.length + dead.length };
+  return {
+    reached,
+    withoutToken,
+    unreachable,
+    optedOut: optedOutUids.size,
+    devicesSent: sent,
+    devicesFailed: failed.length + dead.length,
+  };
 });
 
 // ─── Daily summary email ───────────────────────────────────────────────────────

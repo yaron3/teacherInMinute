@@ -32,7 +32,7 @@ import {
 } from "./dispatch";
 import { enqueueAbandonedLessonCheck } from "./lessons";
 import { markTeacherBusy, releaseTeacherBusy } from "./busy";
-import { ANY_TOPIC, isTeacherBusy } from "./scoring";
+import { ANY_TOPIC, isTeacherBusy, wantsPush } from "./scoring";
 import { blockedTeacherUids } from "./moderation";
 
 const db = admin.database();
@@ -599,9 +599,10 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
   // Snapshot both participants' name+image so lesson history can render without
   // cross-user reads (Firestore rules block students from reading teacher docs
   // and vice versa). These fields are frozen at accept-time on purpose.
-  const [teacherRecord, studentFcmToken, teacherUserSnap, studentUserSnap] = await Promise.all([
+  const [teacherRecord, studentFcmToken, studentPrefs, teacherUserSnap, studentUserSnap] = await Promise.all([
     db.ref(`teachers/${teacherUid}`).once("value").then((s) => s.val()),
     db.ref(`users/${studentUid}/fcmToken`).once("value").then((s) => s.val() as string | null),
+    db.ref(`users/${studentUid}/notificationPreferences`).once("value").then((s) => s.val()),
     firestore.collection("users").doc(teacherUid).get(),
     firestore.collection("users").doc(studentUid).get(),
   ]);
@@ -618,7 +619,8 @@ export const acceptInvite = onCall(HOT_PATH, async (req) => {
   const pickSharedImage = (u: FirebaseFirestore.DocumentData): string =>
     u.showProfileImage === false ? "" : pickImage(u);
 
-  if (studentFcmToken) {
+  // Not when the student turned lesson notifications off in Settings.
+  if (studentFcmToken && wantsPush(studentPrefs, "incomingMessages")) {
     await sendAcceptedPush({
       fcmToken: studentFcmToken,
       teacherName: teacherRecord?.displayName ?? "Your teacher",

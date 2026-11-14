@@ -73,6 +73,21 @@ export const ROUND_UP_SECONDS = 30;
 // Written by the mobile app (goOnline / profile update).
 // Dispatcher reads this collection to find eligible online teachers.
 
+/**
+ * The notifications a user chose in Settings → Notifications, written by the
+ * app to `users/{uid}/notificationPreferences` and, for a teacher, to
+ * `teachers/{uid}/notificationPreferences` as well. A choice that is absent is
+ * on: older apps never write these, and their users keep every notification.
+ *
+ *   incomingMessages  what the lesson flow sends: a teacher's question invites,
+ *                     a student's "teacher found" and "no teacher available"
+ *   announcements     what the admin console sends
+ */
+export interface NotificationPreferences {
+  incomingMessages?: boolean;
+  announcements?: boolean;
+}
+
 export interface TeacherRecord {
   status: "online" | "offline";
   /** What the teacher asked for, as opposed to `status`, which ./keepAlive
@@ -99,6 +114,9 @@ export interface TeacherRecord {
    *  the keep-alive, which are judged on `status` alone. See ./keepAlive. */
   lastSeenAt?: number;
   fcmToken?: string;        // registered by the app on login
+  /** The teacher's choices in Settings → Notifications, mirrored here so
+   *  dispatch reads them with the record it already has. See ./fcm. */
+  notificationPreferences?: NotificationPreferences;
   displayName: string;
   /** Set by the backend alone while the teacher is in a session — from the
    *  moment they accept a question until it ends however it ends — and absent
