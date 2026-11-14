@@ -2920,6 +2920,76 @@
       },
       "valueType": "STRING"
     },
+    "add_image": {
+      "defaultValue": {
+        "value": "Add image"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוסף תמונה"
+        },
+        "HebrewApp": {
+          "value": "הוסף תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "add_screenshots_photos": {
+      "defaultValue": {
+        "value": "Add up to 3 screenshots or photos."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אפשר לצרף עד 3 צילומי מסך או תמונות."
+        },
+        "HebrewApp": {
+          "value": "אפשר לצרף עד 3 צילומי מסך או תמונות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "attachments": {
+      "defaultValue": {
+        "value": "Attachments"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "קבצים מצורפים"
+        },
+        "HebrewApp": {
+          "value": "קבצים מצורפים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "could_not_attach": {
+      "defaultValue": {
+        "value": "Could not attach this image."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא ניתן לצרף את התמונה הזו."
+        },
+        "HebrewApp": {
+          "value": "לא ניתן לצרף את התמונה הזו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "remove_image": {
+      "defaultValue": {
+        "value": "Remove image"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הסר תמונה"
+        },
+        "HebrewApp": {
+          "value": "הסר תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "too_many_failed": {
       "defaultValue": {
         "value": "Too many failed attempts. Please try again later."

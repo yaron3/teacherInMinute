@@ -38,6 +38,7 @@ class SettingsViewModel: SettingsViewModeling {
     var contactSupportTitleMaxLength = 50
     var contactSupportDescriptionMaxLength = 1024
     var contactSupportPreview: ContactSupportRequest?
+    var contactSupportAttachments: [Data] = []
     var selectedLanguage: SettingsLanguageChoice
     private let authService: AuthService
     private let remoteConfigService: SettingsRemoteConfigService
@@ -221,6 +222,65 @@ class SettingsViewModel: SettingsViewModeling {
         contactSupportDescription = String(value.prefix(contactSupportDescriptionMaxLength))
     }
 
+    func addContactSupportAttachment(_ data: Data) {
+        guard canAddContactSupportAttachment else { return }
+        do {
+#if os(iOS)
+            // Library images can be HEIC or PNG and full size; the rules
+            // take JPEG only.
+            let prepared = try QuestionCamera.preparedForUpload(
+                data,
+                maxPixelSize: ContactSupportService.attachmentMaxDimension
+            )
+#else
+            // Android's picker already hands back a scaled JPEG.
+            let prepared = data
+#endif
+            contactSupportAttachments.append(prepared)
+            AnalyticsService.shared.logEvent(AnalyticsEvent.contactSupportAttachmentAdded, parameters: [
+                "role": roleAnalyticsValue,
+                "count": contactSupportAttachments.count
+            ])
+        } catch {
+            logger.error("[SettingsViewModel] could not attach image: \(error.localizedDescription)")
+            present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Could not attach this image."))
+        }
+    }
+
+    func removeContactSupportAttachment(at index: Int) {
+        guard contactSupportAttachments.indices.contains(index) else { return }
+        contactSupportAttachments.remove(at: index)
+    }
+
+#if os(Android)
+    func pickContactSupportAttachment(fromCamera: Bool) async {
+        if fromCamera {
+            let cameraState = await PermissionService.shared.resolveCapturePermission(for: .camera)
+            guard cameraState.isGranted else {
+                present(title: cameraDisabledTitle, message: cameraDisabledMessage)
+                return
+            }
+        }
+        do {
+            let base64 = try await Task.detached(priority: .userInitiated) {
+                fromCamera
+                    ? try AndroidProfileImagePickerBridge.captureImageBase64()
+                    : try AndroidProfileImagePickerBridge.pickImageBase64()
+            }.value
+            // Empty when the user backed out of the picker.
+            guard !base64.isEmpty else { return }
+            guard let data = Data(base64Encoded: base64) else {
+                present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Could not attach this image."))
+                return
+            }
+            addContactSupportAttachment(data)
+        } catch {
+            logger.error("[SettingsViewModel] could not pick an image: \(error.localizedDescription)")
+            present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Could not attach this image."))
+        }
+    }
+#endif
+
     func loadContactSupportLimits() async {
         let titleLimit = await remoteConfigService.fetchContactSupportTitleMaxLength()
         let descriptionLimit = await remoteConfigService.fetchContactSupportDescriptionMaxLength()
@@ -254,7 +314,8 @@ class SettingsViewModel: SettingsViewModeling {
                 userID: uid,
                 userName: name,
                 userEmail: authService.currentUserEmail ?? userData["email"] as? String ?? "",
-                role: role
+                role: role,
+                attachmentCount: contactSupportAttachments.count
             )
         }
     }
@@ -270,19 +331,25 @@ class SettingsViewModel: SettingsViewModeling {
         Task {
             defer { isSubmittingContactSupport = false }
             do {
-                try await ContactSupportService.shared.save(request)
+                try await ContactSupportService.shared.send(request, attachments: contactSupportAttachments)
                 AnalyticsService.shared.logEvent(AnalyticsEvent.contactSupportSubmitted, parameters: [
                     "role": roleAnalyticsValue,
-                    "request_id": request.id
+                    "request_id": request.id,
+                    "attachments": request.attachmentCount
                 ])
                 contactSupportPreview = nil
                 contactSupportTitle = ""
                 contactSupportDescription = ""
+                contactSupportAttachments = []
+#if os(Android)
+                QuestionCamera.clearPreviewFiles(directoryName: ContactSupportService.attachmentPreviewDirectory)
+#endif
                 if navigationPath.last == .contactUs {
                     navigationPath.removeLast()
                 }
                 present(title: LocalizationSupport.localized("Contact Us"), message: LocalizationSupport.localized("Your message was sent."))
             } catch {
+                logger.error("[SettingsViewModel] could not send contact request: \(error.localizedDescription)")
                 AnalyticsService.shared.logEvent(AnalyticsEvent.contactSupportFailed, parameters: [
                     "role": roleAnalyticsValue,
                     "reason": error.localizedDescription

@@ -34,6 +34,7 @@ final class MockSettingsViewModel: SettingsViewModeling {
     var contactSupportTitleMaxLength = 50
     var contactSupportDescriptionMaxLength = 1024
     var contactSupportPreview: ContactSupportRequest?
+    var contactSupportAttachments: [Data] = []
     var selectedLanguage: SettingsLanguageChoice
 
     init(
@@ -81,6 +82,20 @@ final class MockSettingsViewModel: SettingsViewModeling {
         contactSupportDescription = String(value.prefix(contactSupportDescriptionMaxLength))
     }
 
+    func addContactSupportAttachment(_ data: Data) {
+        guard canAddContactSupportAttachment else { return }
+        contactSupportAttachments.append(data)
+    }
+
+    func removeContactSupportAttachment(at index: Int) {
+        guard contactSupportAttachments.indices.contains(index) else { return }
+        contactSupportAttachments.remove(at: index)
+    }
+
+#if os(Android)
+    func pickContactSupportAttachment(fromCamera: Bool) async {}
+#endif
+
     func loadContactSupportLimits() async {}
 
     func previewContactSupport() {
@@ -90,7 +105,8 @@ final class MockSettingsViewModel: SettingsViewModeling {
             userID: "mock-user",
             userName: "Sarah Jenkins",
             userEmail: "sarah@example.com",
-            role: role
+            role: role,
+            attachmentCount: contactSupportAttachments.count
         )
     }
 
@@ -102,6 +118,7 @@ final class MockSettingsViewModel: SettingsViewModeling {
         contactSupportPreview = nil
         contactSupportTitle = ""
         contactSupportDescription = ""
+        contactSupportAttachments = []
         if navigationPath.last == .contactUs {
             navigationPath.removeLast()
         }

@@ -12,6 +12,12 @@
 //   IOS-G-10  About → Terms and About → Privacy Policy each open a page that
 //             loads
 //   IOS-G-06  editing the profile saves a new name and phone, and shows them
+//   IOS-G-08  Contact Us takes images from the photo library (IT-32): each
+//             shows on the form, one can be taken off again, and the preview
+//             lists them. It stops at the preview: sending mails the support
+//             team for real, even from the emulators, so that half stays a
+//             manual check (backend: contactSupport.test.ts and
+//             contactRequests.rules.emulator.test.ts)
 //
 //  The look of the right-to-left layout stays a manual check; this checks only
 //  that it flips. Start the emulators as for ProTeacherAcceptRaceUITests.
@@ -128,7 +134,91 @@ final class ProTeacherSettingsUITests: ProTeacherEmulatorTestCase {
         XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10), "the profile does not show the new name")
     }
 
+    /// IOS-G-08, up to the preview: images attach, come off, and are listed.
+    @MainActor
+    func testContactUsAttachesImagesAndListsThemInThePreview() async throws {
+        try await signInAsNewTeacher()
+        settleAfterSignIn()
+        try openSettingsRow("about")
+        try require(tapWhenHittable(app.buttons["settings_row_contactUs"], "Contact Us"), "no Contact Us row in About")
+
+        try attachImageFromLibrary()
+        try require(app.buttons["contact_support_remove_attachment_0"].waitForExistence(timeout: 15),
+                    "the first image did not show on the form")
+        try attachImageFromLibrary()
+        try require(app.buttons["contact_support_remove_attachment_1"].waitForExistence(timeout: 15),
+                    "the second image did not show on the form")
+        try require(app.staticTexts["2/3"].exists, "the form does not count two images")
+
+        try require(tapWhenHittable(app.buttons["contact_support_remove_attachment_1"], "remove image"),
+                    "no way to take an image off")
+        try require(waitForDisappearance(app.buttons["contact_support_remove_attachment_1"], timeout: 10),
+                    "the image stayed on the form")
+        try require(app.staticTexts["1/3"].waitForExistence(timeout: 5), "the form does not count one image")
+        keepScreenshot("contact-us-form")
+
+        let title = app.textFields.firstMatch
+        try require(title.waitForExistence(timeout: 10), "no title field on Contact Us")
+        type("Board froze", into: title, "the title field")
+        let description = app.textViews.firstMatch
+        try require(tapWhenHittable(description, "the description"), "no description on Contact Us")
+        description.typeText("The board froze mid-lesson; a screenshot is attached.")
+        dismissKeyboard()
+
+        let preview = app.buttons.matching(NSPredicate(
+            format: "label IN %@", ["Preview and Submit", "תצוגה מקדימה ושליחה"]
+        )).firstMatch
+        for _ in 0..<4 where !(preview.exists && preview.isHittable) { app.swipeUp() }
+        try require(tapWhenHittable(preview, "Preview and Submit"), "no Preview and Submit")
+
+        let close = app.buttons["brand_sheet_close"]
+        try require(close.waitForExistence(timeout: 20), "the preview did not open")
+        let attachmentsTitle = app.staticTexts.matching(NSPredicate(
+            format: "label IN %@", ["Attachments", "קבצים מצורפים"]
+        ))
+        // Once in the data rows (with its count) and once over the thumbnails.
+        try require(attachmentsTitle.firstMatch.waitForExistence(timeout: 10), "the preview does not list the attachments")
+        keepScreenshot("contact-us-preview")
+
+        // Never Send: that would email the support team for real.
+        try require(tapWhenHittable(close, "close the preview"), "no way to close the preview")
+        try require(waitForDisappearance(close, timeout: 10), "the preview did not close")
+        try require(app.buttons["contact_support_remove_attachment_0"].exists,
+                    "cancelling the preview dropped the image")
+    }
+
     // MARK: - Steps
+
+    /// Kept even when the test passes, for whoever reviews the run.
+    @MainActor
+    private func keepScreenshot(_ name: String) {
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// The add tile, "Choose from Library", and the first photo in the
+    /// system picker, which closes itself on a single pick.
+    @MainActor
+    private func attachImageFromLibrary() throws {
+        let add = app.buttons["contact_support_add_attachment"]
+        for _ in 0..<4 where !(add.exists && add.isHittable) { app.swipeUp() }
+        try require(tapWhenHittable(add, "add image"), "no add-image tile on Contact Us")
+        let library = app.buttons.matching(NSPredicate(
+            format: "label IN %@", ["Choose from Library", "בחר מהספרייה"]
+        )).firstMatch
+        try require(tapWhenHittable(library, "Choose from Library"), "no Choose from Library in the dialog")
+        let photo = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Photo'")).firstMatch
+        try require(photo.waitForExistence(timeout: 20), "the photo picker shows no photos")
+        // The picker slides up after its photos exist; tapped once it settles.
+        if waitForHittable(photo, timeout: 10) {
+            photo.tap()
+        } else {
+            photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        try require(waitForDisappearance(photo, timeout: 15), "picking a photo did not close the picker")
+    }
 
     /// iOS offers to save the password a moment after the dashboard appears,
     /// and the sheet swallows the next tap: waited for and closed first.

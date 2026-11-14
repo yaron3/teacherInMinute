@@ -16,6 +16,11 @@ struct LocalPhotoThumbnail: View {
   let data: Data
   /// The longer side the thumbnail is drawn at, in points.
   let maxPointSize: CGFloat
+  /// Android only: where the photo's preview file is written, and whether
+  /// writing it clears the earlier ones. A screen that shows several photos at
+  /// once keeps them, in a directory of its own.
+  var previewDirectory = "QuestionPhotoPreview"
+  var replacesEarlierPreviews = true
 
 #if os(iOS)
   @State var image: UIImage?
@@ -75,8 +80,10 @@ struct LocalPhotoThumbnail: View {
 
   private func load() async {
     let data = data
+    let directoryName = previewDirectory
+    let replacingEarlier = replacesEarlierPreviews
     fileURL = await Task.detached(priority: .userInitiated) {
-      QuestionCamera.previewFile(for: data)
+      QuestionCamera.previewFile(for: data, directoryName: directoryName, replacingEarlier: replacingEarlier)
     }.value
   }
 #endif

@@ -96,7 +96,7 @@ export async function deleteAccountData(uid: string): Promise<void> {
   });
   if (Object.keys(demoDeletes).length) await database.ref("demoStudent/requests").update(demoDeletes);
 
-  for (const prefix of ["profileImages", "documents", "questionImages"]) {
+  for (const prefix of ["profileImages", "documents", "questionImages", "contactAttachments"]) {
     await bucket.deleteFiles({ prefix: `${prefix}/${uid}/` });
   }
   for (const path of ["teachers", "onlineTeachers", "teacherInvites", "users"]) {

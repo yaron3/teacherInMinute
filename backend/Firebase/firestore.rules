@@ -162,7 +162,8 @@ service cloud.firestore {
           'deviceType',
           'osVersion',
           'locale',
-          'role'
+          'role',
+          'attachmentCount'
         ])
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
@@ -176,7 +177,13 @@ service cloud.firestore {
         && request.resource.data.deviceType is string
         && request.resource.data.osVersion is string
         && request.resource.data.locale is string
-        && request.resource.data.role in ['student', 'teacher'];
+        && request.resource.data.role in ['student', 'teacher']
+        // Images uploaded first to contactAttachments/{uid}/{requestId}/
+        // (storage.rules); the backend reads them by index (contactSupport.ts).
+        && (!('attachmentCount' in request.resource.data)
+          || (request.resource.data.attachmentCount is int
+            && request.resource.data.attachmentCount >= 0
+            && request.resource.data.attachmentCount <= 3));
 
       allow read, update, delete: if false;
     }

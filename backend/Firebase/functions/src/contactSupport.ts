@@ -12,13 +12,22 @@
 // unconfigured environments do not fail. The request document stays in
 // Firestore either way.
 
+import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as nodemailer from "nodemailer";
 
+import { contactAttachmentCount, contactAttachmentPaths } from "./contactAttachments";
 import { readSupportSettings, supportCaseUrl } from "./supportSettings";
 
 export { readContactRecipients, readSupportSettings, supportCaseUrl } from "./supportSettings";
+export { contactAttachmentCount, contactAttachmentPaths, MAX_CONTACT_ATTACHMENTS } from "./contactAttachments";
+
+export interface SupportEmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+}
 
 /** Strips CR/LF so user text cannot inject headers into the subject. */
 function oneLine(text: unknown): string {
@@ -32,10 +41,14 @@ export function buildContactEmail(
   const field = (key: string) => String(data[key] ?? "");
   const tag = data.sample === true ? "[TEST] " : "";
   const subject = `${tag}[Teacher in a Minute] ${oneLine(data.title) || "Contact request"}`;
+  const attachments = contactAttachmentCount(data);
   const text = [
     ...(caseUrl ? [`Open the case to reply: ${caseUrl}`, ""] : []),
     field("description"),
     "",
+    ...(attachments > 0
+      ? [`Attachments: ${attachments} image${attachments === 1 ? "" : "s"} (attached to this email${caseUrl ? " and on the case page" : ""})`, ""]
+      : []),
     "—",
     `From: ${field("userName")} <${field("userEmail")}>`,
     `Role: ${field("role")}`,
@@ -53,7 +66,12 @@ export function buildContactEmail(
  * logged it, when SMTP is not configured; throws if the send itself fails.
  * Also used for teacher reports (see moderation.ts).
  */
-export async function sendSupportEmail(subject: string, text: string, replyToAddress?: unknown): Promise<boolean> {
+export async function sendSupportEmail(
+  subject: string,
+  text: string,
+  replyToAddress?: unknown,
+  attachments: SupportEmailAttachment[] = []
+): Promise<boolean> {
   const { recipients } = await readSupportSettings();
   if (recipients.length === 0) {
     logger.warn(`[contactSupport] no support recipients set; not sending. subject=${subject}`);
@@ -86,9 +104,32 @@ export async function sendSupportEmail(subject: string, text: string, replyToAdd
     replyTo,
     subject,
     text,
+    ...(attachments.length ? { attachments } : {}),
   });
   logger.info(`[contactSupport] sent "${subject}" to ${recipients.length} recipient(s)`);
   return true;
+}
+
+/**
+ * Downloads a request's attachments for the alert email. One that cannot be
+ * read is left out, logged, rather than holding up the email: the case page
+ * still lists what was uploaded.
+ */
+export async function loadContactAttachments(
+  data: Record<string, unknown>,
+  bucket: { file(path: string): { download(): Promise<[Buffer]> } } = admin.storage().bucket()
+): Promise<SupportEmailAttachment[]> {
+  const attachments: SupportEmailAttachment[] = [];
+  const paths = contactAttachmentPaths(data);
+  for (const [index, path] of paths.entries()) {
+    try {
+      const [content] = await bucket.file(path).download();
+      attachments.push({ filename: `attachment-${index + 1}.jpg`, content, contentType: "image/jpeg" });
+    } catch (e) {
+      logger.warn(`[contactSupport] could not read attachment ${path}: ${e}`);
+    }
+  }
+  return attachments;
 }
 
 export const onContactRequestCreated = onDocumentCreated(
@@ -99,7 +140,8 @@ export const onContactRequestCreated = onDocumentCreated(
 
     const { subject, text } = buildContactEmail(data, supportCaseUrl(event.params.requestId));
     // Throwing lets Firestore retry if retries are enabled; otherwise it is logged.
-    const sent = await sendSupportEmail(subject, text, data.userEmail);
+    const attachments = await loadContactAttachments(data);
+    const sent = await sendSupportEmail(subject, text, data.userEmail, attachments);
     if (sent) logger.info(`[contactSupport] sent request ${event.params.requestId}`);
   }
 );

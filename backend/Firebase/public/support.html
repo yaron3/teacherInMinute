@@ -65,6 +65,12 @@
   .case-row .sub { font-size: 13px; color: var(--muted); }
   .actions { display: flex; justify-content: flex-end; gap: 10px; }
   .notice { font-size: 14px; color: var(--muted); }
+  .attachments { display: flex; flex-wrap: wrap; gap: 10px; }
+  .attachments a, .attachments .missing { display: block; width: 120px; height: 160px; border-radius: 8px; overflow: hidden;
+                                          border: 1px solid var(--border); background: var(--card); }
+  .attachments img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .attachments .missing { display: flex; align-items: center; justify-content: center; padding: 8px;
+                          font-size: 12px; color: var(--muted); text-align: center; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -110,6 +116,7 @@
       <h1 id="case-title" dir="auto"></h1>
       <div id="case-fields"></div>
       <div class="message" id="case-message" dir="auto"></div>
+      <div id="case-attachments"></div>
       <div id="case-responses"></div>
     </div>
     <div class="panel">
@@ -230,6 +237,13 @@ function renderCase() {
     field("Case", `<span class="mono">${esc(r.id)}</span>`),
   ].join("");
   $("case-message").textContent = r.description || "";
+  // Signed links that last an hour (adminGetContactRequest); null for a file
+  // the server could not find.
+  const attachments = r.attachmentUrls || [];
+  $("case-attachments").innerHTML = attachments.length ? `<h2>Attachments (${attachments.length})</h2><div class="attachments">` +
+    attachments.map((url, i) => url
+      ? `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="Attachment ${i + 1}"></a>`
+      : `<div class="missing">Attachment ${i + 1} could not be loaded</div>`).join("") + `</div>` : "";
   $("case-responses").innerHTML = replies.length ? `<h2>Responses</h2>` + replies.map(x => `
     <div class="response">
       <div class="meta">${fmt(x.sentAt)} · to ${esc(x.to || "—")} · by ${esc(x.sentBy || "—")}</div>

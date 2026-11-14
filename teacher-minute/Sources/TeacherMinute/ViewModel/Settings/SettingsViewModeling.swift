@@ -8,7 +8,7 @@
 import Foundation
 
 @MainActor
-protocol SettingsViewModeling: AnyObject {
+protocol SettingsViewModeling: AnyObject, PhotoSourceViewModeling {
     var role: AppUserMode { get }
 
     var navigationPath: [SettingsDestination] { get set }
@@ -27,6 +27,8 @@ protocol SettingsViewModeling: AnyObject {
     var contactSupportTitleMaxLength: Int { get set }
     var contactSupportDescriptionMaxLength: Int { get set }
     var contactSupportPreview: ContactSupportRequest? { get set }
+    /// Screenshots or photos to send with the request, as JPEG.
+    var contactSupportAttachments: [Data] { get set }
     var selectedLanguage: SettingsLanguageChoice { get set }
 
     func select(_ row: SettingsRow)
@@ -40,6 +42,11 @@ protocol SettingsViewModeling: AnyObject {
     func contactSupportAppeared()
     func updateContactSupportTitle(_ value: String)
     func updateContactSupportDescription(_ value: String)
+    func addContactSupportAttachment(_ data: Data)
+    func removeContactSupportAttachment(at index: Int)
+    #if os(Android)
+    func pickContactSupportAttachment(fromCamera: Bool) async
+    #endif
     func loadContactSupportLimits() async
     func previewContactSupport()
     func cancelContactSupportPreview()

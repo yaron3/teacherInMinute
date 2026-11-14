@@ -114,6 +114,7 @@ enum AnalyticsEvent {
     static let contactSupportCancelled = "contact_support_cancelled"
     static let contactSupportSubmitted = "contact_support_submitted"
     static let contactSupportFailed    = "contact_support_failed"
+    static let contactSupportAttachmentAdded = "contact_support_attachment_added"
 
     // Student tutorial
     static let tutorialShown     = "tutorial_shown"

@@ -49,6 +49,20 @@ service firebase.storage {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Screenshots and photos sent with a Contact Us request, uploaded before
+    // the request document that counts them (see firestore.rules). Owner-only:
+    // support reads them server-side, as email attachments and through
+    // short-lived signed URLs on the support page. At most three JPEGs of up
+    // to 10 MB each, named by their index.
+    match /contactAttachments/{uid}/{requestId}/{file} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && file.matches('[0-2][.]jpg')
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size < 10 * 1024 * 1024;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }
