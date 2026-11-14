@@ -14,8 +14,17 @@
 # that file is left alone, and so is the UI-test target. Both apps get the same
 # number. The bump stays in the working tree for you to commit.
 #
-# Signing is automatic with team 5WRH6356JL, through the Apple account signed
-# in to Xcode (Settings → Accounts).
+# Signing is automatic with team 5WRH6356JL. xcodebuild talks to Apple with an
+# App Store Connect API key when these are set (put them in ~/.zshrc):
+#
+#   ASC_KEY_PATH   the AuthKey_<id>.p8 file, kept outside the repo
+#   ASC_KEY_ID     its Key ID
+#   ASC_ISSUER_ID  the Issuer ID shown above the keys list
+#
+# (App Store Connect → Users and Access → Integrations → Team Keys, role App
+# Manager or Admin). Without them it falls back to the Apple account signed in
+# to Xcode (Settings → Accounts), whose sign-in expires every so often and then
+# fails the upload with "missing Xcode-Token".
 #
 # UPLOAD=0 exports the .ipa files into build/ios-archives instead of uploading.
 # The Android build is switched off for the archive (SKIP_ACTION=none).
@@ -41,6 +50,17 @@ case "$WHICH" in
   teacher) SCHEMES=("Pro Teacher") ;;
   *) echo "usage: $0 [both|student|teacher]" >&2; exit 2 ;;
 esac
+
+# Sign in to Apple with the API key when one is configured; check it before
+# the build number moves.
+AUTH=()
+if [[ -n "${ASC_KEY_PATH:-}${ASC_KEY_ID:-}${ASC_ISSUER_ID:-}" ]]; then
+  [[ -n "${ASC_KEY_PATH:-}" && -n "${ASC_KEY_ID:-}" && -n "${ASC_ISSUER_ID:-}" ]] \
+    || { echo "set all three of ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID, or none" >&2; exit 1; }
+  [[ -f "$ASC_KEY_PATH" ]] || { echo "ASC_KEY_PATH points to $ASC_KEY_PATH, which does not exist" >&2; exit 1; }
+  AUTH=(-authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID"
+        -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+fi
 
 # 1. Bump the build number of the app configurations.
 say "iOS: started $(date '+%Y-%m-%d %H:%M')"
@@ -77,6 +97,8 @@ print(current, new, ",".join(sorted(versions)))
 PY
 read -r OLD NEW VERSION < "$BUMP"; rm -f "$BUMP"
 say "iOS: build number $OLD → $NEW (version $VERSION)"
+if [[ ${#AUTH[@]} -gt 0 ]]; then say "iOS: signing in to Apple with API key $ASC_KEY_ID"
+else say "iOS: signing in to Apple with the account in Xcode (no ASC_KEY_* set)"; fi
 
 # 2. Archive and export (or upload) each app.
 mkdir -p "$OUT"
@@ -94,13 +116,13 @@ for scheme in "${SCHEMES[@]}"; do
   say "iOS: $scheme archiving (log: $OUT/$name-archive.log)…"
   xcodebuild archive -workspace Project.xcworkspace -scheme "$scheme" \
     -destination "generic/platform=iOS" -archivePath "$archive" \
-    -skipMacroValidation -allowProvisioningUpdates SKIP_ACTION=none \
+    -skipMacroValidation -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} SKIP_ACTION=none \
     > "$OUT/$name-archive.log" 2>&1 \
     || { say "iOS: $scheme archive FAILED; see $OUT/$name-archive.log" >&2; exit 1; }
   say "iOS: $scheme archive complete"
   if [[ "${UPLOAD:-1}" == "0" ]]; then say "iOS: $scheme exporting…"; else say "iOS: $scheme uploading to App Store Connect…"; fi
   xcodebuild -exportArchive -archivePath "$archive" -exportOptionsPlist "$OPTIONS" \
-    -exportPath "$OUT/$name-$VERSION-$NEW" -allowProvisioningUpdates \
+    -exportPath "$OUT/$name-$VERSION-$NEW" -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} \
     > "$OUT/$name-export.log" 2>&1 \
     || { say "iOS: $scheme export/upload FAILED; see $OUT/$name-export.log" >&2; exit 1; }
   if [[ "${UPLOAD:-1}" == "0" ]]; then say "iOS: $scheme exported"; else say "iOS: $scheme uploaded"; fi
