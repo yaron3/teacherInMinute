@@ -16,6 +16,9 @@
 # Needs PLAY_JSON_KEY (see bundle-android.sh), so a run never builds the
 # Android bundles without uploading them.
 
+# The body sits in one { } block, so bash reads the whole file before it
+# runs any of it: editing the script during a run cannot break that run.
+{
 set -euo pipefail
 
 WHICH="${1:-both}"
@@ -32,10 +35,22 @@ if [[ -z "${PLAY_JSON_KEY:-}" || ! -f "$PLAY_JSON_KEY" ]]; then
 fi
 
 start=$(date +%s)
-echo "######## Android ########"
-"$HERE/bundle-android.sh" "$WHICH"
+stamp() { echo "[$(date +%H:%M:%S) +$(( ($(date +%s) - start) / 60 ))m] $*"; }
+stamp "Release of $WHICH started $(date '+%Y-%m-%d %H:%M')"
+
 echo
-echo "######## iOS ########"
-"$HERE/archive-ios.sh" "$WHICH"
+echo "######## 1/2 Android ########"
+stamp "Starting Android…"
+"$HERE/bundle-android.sh" "$WHICH" || { stamp "Android FAILED; iOS was not started."; exit 1; }
+stamp "Android complete."
+
 echo
-echo "All done in $(( ($(date +%s) - start) / 60 )) min: Android on Play's ${PLAY_TRACK:-internal} track, iOS on App Store Connect."
+echo "######## 2/2 iOS ########"
+stamp "Starting iOS…"
+"$HERE/archive-ios.sh" "$WHICH" || { stamp "iOS FAILED (Android was already uploaded)."; exit 1; }
+stamp "iOS complete."
+
+echo
+stamp "All done in $(( ($(date +%s) - start) / 60 )) min: Android on Play's ${PLAY_TRACK:-internal} track, iOS on App Store Connect."
+exit
+}

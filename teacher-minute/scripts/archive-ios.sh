@@ -20,7 +20,14 @@
 # UPLOAD=0 exports the .ipa files into build/ios-archives instead of uploading.
 # The Android build is switched off for the archive (SKIP_ACTION=none).
 
+# The body sits in one { } block, so bash reads the whole file before it
+# runs any of it: editing the script during a run cannot break that run.
+{
 set -euo pipefail
+
+START=$(date +%s)
+# Progress line with the clock time and the minutes since this script started.
+say() { echo "[$(date +%H:%M:%S) +$(( ($(date +%s) - START) / 60 ))m] $*"; }
 
 WHICH="${1:-both}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,6 +43,7 @@ case "$WHICH" in
 esac
 
 # 1. Bump the build number of the app configurations.
+say "iOS: started $(date '+%Y-%m-%d %H:%M')"
 BUMP="$(mktemp -t archive-ios)"
 python3 - "$PBXPROJ" > "$BUMP" <<'PY'
 import re, sys
@@ -68,7 +76,7 @@ versions = {re.search(r"MARKETING_VERSION = (\S+);", l).group(1)
 print(current, new, ",".join(sorted(versions)))
 PY
 read -r OLD NEW VERSION < "$BUMP"; rm -f "$BUMP"
-echo "build number $OLD → $NEW (version $VERSION)"
+say "iOS: build number $OLD → $NEW (version $VERSION)"
 
 # 2. Archive and export (or upload) each app.
 mkdir -p "$OUT"
@@ -83,23 +91,26 @@ cd "$ROOT"
 for scheme in "${SCHEMES[@]}"; do
   name="${scheme// /}"
   archive="$OUT/$name-$VERSION-$NEW.xcarchive"
-  echo "== $scheme: archiving…"
+  say "iOS: $scheme archiving (log: $OUT/$name-archive.log)…"
   xcodebuild archive -workspace Project.xcworkspace -scheme "$scheme" \
     -destination "generic/platform=iOS" -archivePath "$archive" \
     -skipMacroValidation -allowProvisioningUpdates SKIP_ACTION=none \
     > "$OUT/$name-archive.log" 2>&1 \
-    || { echo "archive failed; see $OUT/$name-archive.log" >&2; exit 1; }
-  if [[ "${UPLOAD:-1}" == "0" ]]; then echo "== $scheme: exporting…"; else echo "== $scheme: uploading…"; fi
+    || { say "iOS: $scheme archive FAILED; see $OUT/$name-archive.log" >&2; exit 1; }
+  say "iOS: $scheme archive complete"
+  if [[ "${UPLOAD:-1}" == "0" ]]; then say "iOS: $scheme exporting…"; else say "iOS: $scheme uploading to App Store Connect…"; fi
   xcodebuild -exportArchive -archivePath "$archive" -exportOptionsPlist "$OPTIONS" \
     -exportPath "$OUT/$name-$VERSION-$NEW" -allowProvisioningUpdates \
     > "$OUT/$name-export.log" 2>&1 \
-    || { echo "export failed; see $OUT/$name-export.log" >&2; exit 1; }
-  echo "== $scheme: done"
+    || { say "iOS: $scheme export/upload FAILED; see $OUT/$name-export.log" >&2; exit 1; }
+  if [[ "${UPLOAD:-1}" == "0" ]]; then say "iOS: $scheme exported"; else say "iOS: $scheme uploaded"; fi
 done
 
 if [[ "${UPLOAD:-1}" == "0" ]]; then
-  echo "Exported $VERSION ($NEW) to $OUT; nothing was uploaded."
+  say "iOS: done, exported $VERSION ($NEW) to $OUT; nothing was uploaded."
 else
-  echo "Uploaded $VERSION ($NEW); it appears in TestFlight once App Store Connect has processed it."
+  say "iOS: done, uploaded $VERSION ($NEW); it appears in TestFlight once App Store Connect has processed it."
 fi
 echo "Commit the build number bump in $PBXPROJ."
+exit
+}
