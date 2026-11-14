@@ -5,6 +5,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -106,6 +107,22 @@ class ProTeacherSettingsTest : ProTeacherEmulatorTest() {
         assertTrue("the new name was not saved: $saved", saved["fullName"] == name)
         assertTrue("the new phone was not saved: $saved", saved["phoneNumber"] == "0529876543")
         assertTrue("the profile does not show the new name", device.wait(Until.hasObject(By.text(name)), 10_000))
+    }
+
+    /**
+     * IT-26 / IT-27: Preferences offers no Light/Dark/System choice. The app is
+     * dark throughout, and the picker saved a value nothing read.
+     */
+    @Test
+    fun preferencesOffersNoAppearanceChoice() {
+        signIn()
+        openSettingsRow("appPreferences")
+        if (!device.wait(Until.hasObject(By.text("ILS")), 15_000)) failWith("preferences", "Preferences did not open")
+        val dir = context.getExternalFilesDir(null) ?: context.filesDir
+        device.takeScreenshot(java.io.File(dir, "it27-preferences.png"))
+        for (label in listOf("Appearance", "Light", "Dark", "System")) {
+            assertFalse("Preferences still shows \"$label\"", device.hasObject(By.text(label)))
+        }
     }
 
     private fun typeInto(id: String, text: String) {

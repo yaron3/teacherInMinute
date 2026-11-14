@@ -293,6 +293,9 @@ struct SessionPeople: View {
       }
       .padding(.bottom, 2)
 
+      badgeRow(identity)
+        .padding(.bottom, 4)
+
       Text(identity.name)
         .font(.system(size: 14, weight: .bold))
         .foregroundStyle(theme.onDarkFill)
@@ -310,24 +313,24 @@ struct SessionPeople: View {
   /// The line over the people. It starts 24pt above their portraits, where the
   /// badges ride on it, and drops to the middle of each.
   var bracket: some View {
-    ZStack(alignment: .top) {
-      SessionBracket()
-        .stroke(theme.brandActionBackground.opacity(0.47), lineWidth: 2)
-        .frame(width: sessionIdentityWidth + sessionIdentityGap, height: 24)
-      HStack(spacing: 0) {
-        ForEach(identities) { identity in
-          HStack(spacing: 2) {
-            ForEach(identity.badges) { badge in
-              badgeView(badge)
-            }
-          }
-          .frame(width: sessionIdentityWidth + sessionIdentityGap)
+    SessionBracket()
+      .stroke(theme.brandActionBackground.opacity(0.47), lineWidth: 2)
+      .frame(width: sessionIdentityWidth * 2 + sessionIdentityGap, height: 24)
+      .offset(y: -24)
+  }
+
+  /// One participant's status badges, inside their card under the portrait.
+  /// Two badges fit the card's width, so they never reach a neighbour's.
+  @ViewBuilder
+  func badgeRow(_ identity: SessionIdentity) -> some View {
+    if showsBadges && !identity.badges.isEmpty {
+      HStack(spacing: 2) {
+        ForEach(identity.badges) { badge in
+          badgeView(badge)
         }
       }
-      .offset(y: -12)
+      .frame(width: sessionIdentityWidth)
     }
-    .offset(y: -24)
-    .frame(width: sessionIdentityWidth * 2 + sessionIdentityGap)
   }
 
   func badgeView(_ badge: SessionStatusBadge) -> some View {
@@ -339,6 +342,7 @@ struct SessionPeople: View {
       .frame(width: 25, height: 25)
       .background(badge.isOn ? theme.brandLive : theme.brandPaused)
       .clipShape(Circle())
+      .accessibilityIdentifier("session_badge_\(badge.iconName)")
   }
 }
 
@@ -570,11 +574,13 @@ struct SessionBottomBar: View {
 /// the switch to the math pad inside it.
 struct SessionMessageComposer: View {
   let placeholder: String
+  /// Owned by the chat screen, not by this view: the thread re-renders as
+  /// messages arrive, and a draft kept here is rebuilt empty along with it.
+  @Binding var draft: String
   let isFocused: FocusState<Bool>.Binding
   let onSend: (String) -> Void
   let onMath: () -> Void
 
-  @State var draft = ""
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)

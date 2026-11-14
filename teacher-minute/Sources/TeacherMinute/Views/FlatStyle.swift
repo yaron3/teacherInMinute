@@ -339,11 +339,14 @@ extension FlatSectionHeader where Trailing == EmptyView {
 
 /// The bell that opens the messages sent to the user, in a section's header
 /// beside the menu button, with a dot when there is something unread.
+///
+/// The button only reports the tap: the screen presents the messages sheet.
+/// A sheet attached here, inside a header's row, left a full-size host behind
+/// on Android once it closed, and the header grew around it (IT-29).
 struct BrandMessagesButton: View {
   var showsBadge = false
-  var onMessagesDismissed: (() -> Void)?
+  let onOpen: () -> Void
 
-  @State var showsMessages = false
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
     AppTheme(colorScheme: colorScheme)
@@ -352,7 +355,7 @@ struct BrandMessagesButton: View {
   var body: some View {
     Button {
       trackTap("messages_bell")
-      showsMessages = true
+      onOpen()
     } label: {
       Image(systemName: "bell")
         .resizable()
@@ -375,10 +378,5 @@ struct BrandMessagesButton: View {
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier("messages_button")
-    .sheet(isPresented: $showsMessages, onDismiss: {
-      onMessagesDismissed?()
-    }) {
-      NotificationMessagesView()
-    }
   }
 }

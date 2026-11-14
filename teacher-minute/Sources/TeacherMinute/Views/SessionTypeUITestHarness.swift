@@ -73,6 +73,19 @@ struct SessionTypeUITestHarness: View {
         }
         .buttonStyle(.bordered)
         .accessibilityIdentifier("uitest_peer_draw")
+        Button {
+          viewModel.messages.append(Self.peerMessage(
+            id: "peer-msg-\(viewModel.messages.count)",
+            role: viewModel.role == "teacher" ? "student" : "teacher"
+          ))
+        } label: {
+          Text(verbatim: "Message")
+            .font(.system(size: 11, weight: .semibold))
+            .frame(maxWidth: .infinity)
+            .frame(height: 32)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("uitest_peer_message")
       }
       .padding(8)
       .overlay(alignment: .topLeading) {
@@ -84,6 +97,18 @@ struct SessionTypeUITestHarness: View {
       }
       .background(AppTheme(colorScheme: colorScheme).cardBackground)
     }
+  }
+
+  /// A message from the other side, as it arrives in the thread.
+  static func peerMessage(id: String, role: String) -> ChatMessage {
+    ChatMessage(
+      id: id,
+      text: "Peer message \(id)",
+      senderUid: "uitest-peer",
+      senderRole: role,
+      createdAt: Date().timeIntervalSince1970 * 1000,
+      isMine: false
+    )
   }
 
   /// A line by the other side straight across the whole board, a sixth of the

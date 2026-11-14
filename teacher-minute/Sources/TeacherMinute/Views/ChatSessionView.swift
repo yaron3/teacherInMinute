@@ -41,6 +41,13 @@ struct ChatSessionView: View {
   }
   @State var viewModel: any ChatSessionViewModeling
   @State var composerMode: ChatComposerMode = .regular
+  /// The unsent message. Lives on this screen so it survives the thread
+  /// re-rendering when someone else's message arrives.
+  @State var messageDraft = ""
+#if os(Android)
+  /// Whether the system keyboard is on screen; see `followAndroidKeyboard`.
+  @State var isAndroidKeyboardShown = false
+#endif
   @State var selectedTab:TAB_TYPE = .CHAT
   @State var displayDate = Date()
   @State var isBoardMaximized = false
@@ -1128,6 +1135,13 @@ struct ChatSessionView: View {
               scrollChatForKeyboardMode(.regular, proxy: proxy)
             }
           }
+#if os(Android)
+          // The composer is the thread's last item here: when the bottom bar
+          // comes or goes, the end of the thread moves, so follow it.
+          .onChange(of: isChatKeyboardUp) { _, _ in
+            scrollChatForKeyboardMode(composerMode, proxy: proxy)
+          }
+#endif
         }
 
 #if !os(Android)
@@ -1144,13 +1158,46 @@ struct ChatSessionView: View {
         }
       }
     }
+#if os(Android)
+    .task(id: isMessageFieldFocused) {
+      await followAndroidKeyboard()
+    }
+#endif
   }
 
-  /// Whether the math pad is up. The system keyboard is left to lift the
-  /// composer and the bar together; the pad is tall enough to need the room.
+  /// Whether a keyboard is up over the chat: the math pad, or the system
+  /// keyboard while the message field has focus. The lesson's bottom bar steps
+  /// aside for either, instead of riding up on top of the keyboard and taking
+  /// the room the thread needs (IT-22).
   var isChatKeyboardUp: Bool {
-    composerMode == .algebra
+#if os(Android)
+    // On Android, Back puts the keyboard away but leaves the field focused, so
+    // focus alone would keep the bar hidden with no keyboard in its place.
+    composerMode == .algebra || (isMessageFieldFocused && isAndroidKeyboardShown)
+#else
+    composerMode == .algebra || isMessageFieldFocused
+#endif
   }
+
+#if os(Android)
+  /// Follows the system keyboard while the message field has focus. Android
+  /// has no SwiftUI signal for it, so it is polled, as AskTeacherSheet does.
+  /// Where the keyboard cannot be observed (Android 10 and older) the bar is
+  /// left in place, as before IT-22.
+  func followAndroidKeyboard() async {
+    guard isMessageFieldFocused, SoftKeyboard.isVisibilityObservable else {
+      isAndroidKeyboardShown = false
+      return
+    }
+    while !Task.isCancelled {
+      let shown = SoftKeyboard.isVisible
+      if shown != isAndroidKeyboardShown {
+        isAndroidKeyboardShown = shown
+      }
+      try? await Task.sleep(nanoseconds: 250_000_000)
+    }
+  }
+#endif
 
 
   var whiteboard: some View {
@@ -1315,6 +1362,7 @@ struct ChatSessionView: View {
       } else {
         SessionMessageComposer(
           placeholder: viewModel.messagePlaceholder,
+          draft: $messageDraft,
           isFocused: $isMessageFieldFocused,
           onSend: { text in sendComposed(text) },
           onMath: {
@@ -1379,16 +1427,30 @@ struct ChatSessionView: View {
 
   func scrollChatForKeyboardMode(_ mode: ChatComposerMode, proxy: ScrollViewProxy) {
 #if os(Android)
-    let target = viewModel.messages.last?.id ?? Self.chatInitialScrollID
+    // With the system keyboard the end of the thread is the target: the
+    // composer is the list's last item there, and a scroll to the end marker
+    // is clamped so the composer sits right above the keyboard (IT-22).
+    let target = mode == .algebra
+      ? (viewModel.messages.last?.id ?? Self.chatInitialScrollID)
+      : Self.chatBottomScrollID
     let anchor: UnitPoint = .top
+    // Once now, and again after the keyboard has finished sliding in and the
+    // bottom bar has stepped aside: the first scroll lands against the taller
+    // viewport and leaves the composer half under the keyboard.
+    let delays: [UInt64] = [80_000_000, 450_000_000]
 #else
     let target = mode == .algebra ? Self.chatComposerScrollID : Self.chatBottomScrollID
     let anchor: UnitPoint = .bottom
+    let delays: [UInt64] = [80_000_000]
 #endif
     Task { @MainActor in
-      try? await Task.sleep(nanoseconds: 80_000_000)
-      withAnimation(.easeInOut(duration: 0.25)) {
-        proxy.scrollTo(target, anchor: anchor)
+      var waited: UInt64 = 0
+      for delay in delays {
+        try? await Task.sleep(nanoseconds: delay - waited)
+        waited = delay
+        withAnimation(.easeInOut(duration: 0.25)) {
+          proxy.scrollTo(target, anchor: anchor)
+        }
       }
     }
   }

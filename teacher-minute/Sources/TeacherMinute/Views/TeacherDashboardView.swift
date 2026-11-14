@@ -21,6 +21,7 @@ struct TeacherDashboardView: View {
   @State var showsDocumentsSuggestion = false
   @State var showsDocuments = false
   @State var showsQuestionSimulator = false
+  @State var showsMessages = false
   @State  var isDemoEnabled = DemoStudentService.isEnabled
   @State var emailReward = EmailRewardViewModel()
   @AppStorage(LocalizationSupport.languagePreferenceKey) var languagePreference = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? "en" : SettingsLanguageChoice.system.rawValue
@@ -72,7 +73,7 @@ struct TeacherDashboardView: View {
 		VStack(spacing: 0) {
 		  BrandPageHeader(label: viewModel.teacherEyebrow, title: viewModel.teacherName) {
 			HStack(spacing: 8) {
-			  BrandMessagesButton()
+			  BrandMessagesButton { showsMessages = true }
 			  BrandMenuButton()
 			}
 		  }
@@ -90,6 +91,11 @@ struct TeacherDashboardView: View {
 		  if showsIncomingOverlay, let inviteID = viewModel.inviteIDs.first {
 			TeacherIncomingQuestionOverlay(inviteID: inviteID, viewModel: viewModel)
 		  }
+		}
+		// Presented by the screen, not by the bell inside the header row; see
+		// BrandMessagesButton.
+		.sheet(isPresented: $showsMessages) {
+		  NotificationMessagesView()
 		}
 		.emailRewardDialogs(emailReward)
 		.brandSheet(isPresented: Binding(get: { viewModel.showsSubjectEditor }, set: { viewModel.showsSubjectEditor = $0 }), onDismiss: {

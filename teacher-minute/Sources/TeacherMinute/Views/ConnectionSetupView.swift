@@ -272,7 +272,11 @@ struct ConnectionSetupView: View {
         .fill(theme.cardBackground)
         .frame(width: 70, height: 70)
         .overlay {
-          PlatformIcon(systemName: "person.crop.circle.fill", size: 62, color: theme.secondaryText)
+          // Sized to sit well inside the circle, and clipped to it, so the
+          // glyph can't spill past the edge.
+          PlatformIcon(systemName: "person.crop.circle.fill", size: 44, color: theme.secondaryText)
+            .frame(width: 70, height: 70)
+            .clipShape(Circle())
         }
         .overlay {
           Circle().stroke(theme.screenBackground, lineWidth: 4)

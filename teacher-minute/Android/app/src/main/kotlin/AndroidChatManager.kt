@@ -613,6 +613,12 @@ object AndroidChatManager {
             .put("teacherId", snapshot.firstString("teacherId", "teacherUID", "teacherId"))
             .put("studentName", snapshot.firstString("studentName", "studentFullName", "studentDisplayName", "name"))
             .put("teacherName", snapshot.firstString("teacherName", "teacherFullName", "teacherDisplayName"))
+            // Each side's shared picture, snapshotted by acceptInvite. The lesson
+            // can only get the other side's picture from here — Firestore rules
+            // keep users from reading each other's profiles — and without these
+            // two keys Android showed the blank avatar for the other side (IT-31).
+            .put("studentImageURL", snapshot.firstString("studentImageURL", "studentProfileImageURL", "studentPhotoURL"))
+            .put("teacherImageURL", snapshot.firstString("teacherImageURL", "teacherProfileImageURL", "teacherPhotoURL"))
             .put("text", snapshot.firstString("text", "questionText", "originalQuestion", "message", "topic"))
             .put("createdAt", snapshot.child("createdAt").value.asDoubleOrNull() ?: 0.0)
             .put(
