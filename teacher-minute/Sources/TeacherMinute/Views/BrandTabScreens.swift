@@ -201,6 +201,25 @@ struct BrandSheet<Content: View>: View {
   }
 }
 
+extension View {
+  /// How a `BrandSheet` is put on screen: as a sheet on iOS, and full screen
+  /// on Android. There a sheet is a bottom sheet that leaves a strip of the
+  /// screen it came from showing above it — Profile's, under "Complete your
+  /// documents" (IT-6, Bug-003). Every BrandSheet carries its own close
+  /// button, so it needs no swipe to leave.
+  func brandSheet<Content: View>(
+    isPresented: Binding<Bool>,
+    onDismiss: (() -> Void)? = nil,
+    @ViewBuilder content: @escaping () -> Content
+  ) -> some View {
+#if os(Android)
+    fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
+#else
+    sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+#endif
+  }
+}
+
 /// The square close button of a brand sheet's header: a crossed circle on
 /// the card's surface.
 struct BrandCloseButton: View {

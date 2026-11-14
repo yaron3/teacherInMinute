@@ -84,16 +84,19 @@ struct ProfileView: View {
       }
       // On a plain stack inside the screen, not on `BrandTabScreen`; see
       // there.
+      // Every time Profile opens. Loading only when nothing was loaded kept the
+      // first copy for good — and the main screen's menu loads it as soon as
+      // that screen appears, which right after sign-up can be before the new
+      // profile's role and name can be read: a new teacher's Profile then
+      // said "Student", without their documents, until the app restarted.
       .task {
-        if !viewModel.hasDisplayableProfileData {
-          await viewModel.loadProfile()
-        }
+        await viewModel.loadProfile()
       }
       .onChange(of: scenePhase) { _, phase in
         guard phase == .active else { return }
         Task { await viewModel.refreshPermissionStates() }
       }
-      .sheet(isPresented: $isShowingProfileEditor, onDismiss: {
+      .brandSheet(isPresented: $isShowingProfileEditor, onDismiss: {
         viewModel.cancelProfileEditing()
       }) {
         NavigationStack {
@@ -103,7 +106,7 @@ struct ProfileView: View {
         .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
         .id(languagePreference)
       }
-      .sheet(isPresented: $isShowingSubjectEditor, onDismiss: {
+      .brandSheet(isPresented: $isShowingSubjectEditor, onDismiss: {
         Task { await viewModel.loadProfile() }
       }) {
         NavigationStack {
@@ -113,7 +116,7 @@ struct ProfileView: View {
         .environment(\.layoutDirection, LocalizationSupport.layoutDirection(languagePreference: languagePreference))
         .id(languagePreference)
       }
-      .sheet(isPresented: $isShowingDocuments, onDismiss: {
+      .brandSheet(isPresented: $isShowingDocuments, onDismiss: {
         // Refresh the "Complete Your Documents" prompt after the teacher
         // may have uploaded a missing document (bug #24).
         Task { await viewModel.loadProfile() }

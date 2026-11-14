@@ -284,6 +284,11 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
     boardStrokes.removeAll()
   }
 
+  func eraseBoardStrokes(_ ids: [String]) {
+    let erased = Set(ids)
+    boardStrokes.removeAll { erased.contains($0.id) }
+  }
+
   func updateBoardViewport(_ viewport: BoardViewport) {
     boardViewports[role.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] = viewport
   }

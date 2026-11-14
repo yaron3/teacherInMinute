@@ -549,6 +549,27 @@ final class ChatSessionService {
 #endif
   }
 
+  /// Removes single strokes in one write, so a sweep of the eraser lands on
+  /// the peer's board together.
+  func eraseStrokes(_ ids: [String]) async throws {
+    guard !ids.isEmpty else { return }
+#if os(Android)
+    let idsJson = String(data: try JSONSerialization.data(withJSONObject: ids), encoding: .utf8) ?? "[]"
+    try await Task.detached(priority: .userInitiated) {
+      try AndroidChatBridge.eraseStrokes(questionId: self.questionId, idsJson: idsJson)
+    }.value
+#else
+    var removals: [String: Any] = [:]
+    for id in ids { removals[id] = NSNull() }
+    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+      boardRef.updateChildValues(removals) { error, _ in
+        if let error { cont.resume(throwing: error); return }
+        cont.resume(returning: ())
+      }
+    }
+#endif
+  }
+
   func clearBoard() async throws {
 #if os(Android)
     try await Task.detached(priority: .userInitiated) {
@@ -1216,6 +1237,7 @@ protocol ChatSessionViewModeling: AnyObject {
   func sendQuestionFormula(_ formulaText: String)
   func sendStroke(_ points: [BoardPoint])
   func clearBoard()
+  func eraseBoardStrokes(_ ids: [String])
   func updateBoardViewport(_ viewport: BoardViewport)
   func setSelfChatPaused(_ paused: Bool)
   func peerChatPaused() -> Bool
@@ -1853,6 +1875,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   let role: String
   var messages: [ChatMessage] = []
   var boardStrokes: [BoardStroke] = []
+  /// Strokes this side rubbed out whose removal the server has not echoed yet.
+  var pendingErasedStrokeIDs: Set<String> = []
   var boardViewports: [String: BoardViewport] = [:]
   var chatPausedStates: [String: Bool] = [:]
   var mediaPendingStates: [String: Bool] = [:]
@@ -2265,7 +2289,12 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     noteFarewell(in: rows)
   }
 
-  private func receiveBoardStrokes(_ strokes: [BoardStroke]) {
+  private func receiveBoardStrokes(_ incoming: [BoardStroke]) {
+    // A poll that left before the eraser's write landed still carries the
+    // rubbed-out strokes; keep them off the board until the server agrees.
+    let incomingIDs = Set(incoming.map(\.id))
+    pendingErasedStrokeIDs.formIntersection(incomingIDs)
+    let strokes = incoming.filter { !pendingErasedStrokeIDs.contains($0.id) }
     guard strokes != boardStrokes else { return }
     let previousIDs = Set(boardStrokes.map(\.id))
     if !isBoardVisible, strokes.contains(where: { !$0.isMine && !previousIDs.contains($0.id) }) {
@@ -2527,6 +2556,25 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         ownBoardDrawRequestId = nil
         boardDrawRequestState = .none
         isBoardDrawDeclined = true
+      }
+    }
+  }
+
+  func eraseBoardStrokes(_ ids: [String]) {
+    guard !ids.isEmpty, !hasReportedLessonEnd else { return }
+    errorMessage = nil
+    let erased = Set(ids)
+    pendingErasedStrokeIDs.formUnion(erased)
+    boardStrokes.removeAll { erased.contains($0.id) }
+    Task {
+      do {
+        try await service.eraseStrokes(ids)
+      } catch {
+        // The write was refused, so the strokes are still on the board: let
+        // the next update bring them back rather than hide them for good.
+        pendingErasedStrokeIDs.subtract(erased)
+        errorMessage = error.localizedDescription
+        logger.error("[ChatSession] Board erase failed: \(error.localizedDescription)")
       }
     }
   }
@@ -3323,6 +3371,10 @@ private enum AndroidChatBridge {
     name: "sendStroke",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
   )!
+  private static let eraseStrokesMethod = managerClass.getStaticMethodID(
+    name: "eraseStrokes",
+    sig: "(Ljava/lang/String;Ljava/lang/String;)V"
+  )!
   private static let clearBoardMethod = managerClass.getStaticMethodID(
     name: "clearBoard",
     sig: "(Ljava/lang/String;)V"
@@ -3460,6 +3512,19 @@ private enum AndroidChatBridge {
         args: [
           questionId.toJavaParameter(options: [.kotlincompat]),
           pointsJson.toJavaParameter(options: [.kotlincompat])
+        ]
+      )
+    }
+  }
+
+  static func eraseStrokes(questionId: String, idsJson: String) throws {
+    try jniContext {
+      try managerClass.callStatic(
+        method: eraseStrokesMethod,
+        options: [.kotlincompat],
+        args: [
+          questionId.toJavaParameter(options: [.kotlincompat]),
+          idsJson.toJavaParameter(options: [.kotlincompat])
         ]
       )
     }

@@ -582,7 +582,9 @@ final class StudentAskUITests: XCTestCase {
             try await backend.patch("teachers/\(uid)", ["status": "offline"])
         }
 
-        try ask("Help me with quadratic equations, please")
+        // A run can word the question itself (QUESTION_TEXT), as the
+        // cross-platform sanity run does.
+        try ask(ProcessInfo.processInfo.environment["QUESTION_TEXT"] ?? "Help me with quadratic equations, please")
         try require(searchCancel.waitForExistence(timeout: 30), "Find a teacher did not start a search")
         let qid = try await waitForQuestion(of: student.uid)
         attach("question", qid)

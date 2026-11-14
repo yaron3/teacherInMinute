@@ -636,6 +636,7 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Loading...": "טוען...",
         "No payments yet": "אין עדיין תשלומים",
         "No subjects selected": "לא נבחרו מקצועות",
+        "No subject or subtopic matches your search.": "אף מקצוע או תת־נושא לא תואם לחיפוש.",
         "Payment History": "היסטוריית תשלומים",
         "Please sign out and sign in again before deleting your account.": "התנתקו והתחברו מחדש לפני מחיקת החשבון.",
         "Stay in the loop": "הישארו מעודכנים",

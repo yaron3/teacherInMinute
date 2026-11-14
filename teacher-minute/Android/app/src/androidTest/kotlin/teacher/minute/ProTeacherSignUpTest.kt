@@ -165,6 +165,84 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         }
     }
 
+    /** The testers' YouTrack fixes along one sign-up:
+     *  - IT-5 / IT-2: the password field's eye shows what was typed;
+     *  - IT-7: the profile marks its required fields with an asterisk;
+     *  - IT-9: a US number, in the international form the placeholder shows,
+     *    is a valid profile phone;
+     *  - IT-6: Profile's "Complete your documents" opens full screen, not as
+     *    a bottom sheet leaving Profile showing above it;
+     *  - IT-8: searching the subjects for a subtopic lists that subtopic,
+     *    and a search matching nothing says so. */
+    @Test
+    fun theTestersSignUpAndProfileFixes() {
+        val email = backend.newEmail("signup.fixes")
+        val password = "Emulator-${(100_000..999_999).random()}"
+        openSignUpForm()
+
+        // IT-5: the eye shows the password as typed.
+        type(password, into = "sign_up_password")
+        val eye = findScrolling(By.res("password_visibility_toggle"))
+        assertNotNull("the password field has no eye", eye)
+        eye!!.click()
+        val shown = device.wait(Until.findObject(By.clazz("android.widget.EditText").hasAncestor(By.res("sign_up_password")).text(password)), 5_000)
+        assertNotNull("the eye did not show the password", shown)
+        fillSignUp(email, password, password, agreeToTerms = true)
+        submitSignUp()
+        reachProfile()
+
+        // IT-7: the required fields say so.
+        val starred = device.findObjects(By.text(Pattern.compile(".+ \\*")))
+        println("[ProTeacherSignUpTest] required titles: ${starred.map { it.text }}")
+        assertTrue("the profile marks ${starred.size} fields required, not the name and the phone", starred.size >= 2)
+
+        // IT-9: a US number in international form.
+        type("Fixes Teacher", into = "complete_profile_full_name")
+        type("+1 (555) 123-4567", into = "complete_profile_phone")
+        assertTrue("Continue stayed off with a US number", profileContinueEnabled())
+        findScrolling(By.res("complete_profile_continue"))!!.click()
+        device.wait(Until.findObject(dialogButton), 15_000)?.click()
+        reachDashboard("finishing the profile")
+        val uid = backend.users(email).first().first
+        assertEquals("+15551234567", backend.strings("users/$uid")?.get("phoneNumber"))
+
+        // IT-6: the documents page covers Profile.
+        // A tap while the dashboard is still settling can be lost: tap again.
+        var documents: UiObject2? = null
+        repeat(3) {
+            if (documents != null) return@repeat
+            device.wait(Until.findObject(By.res("tab_item_profile")), 15_000)?.click()
+            // Profile shows the documents only once it has loaded a teacher.
+            documents = device.wait(Until.findObject(By.res("profile_documents_button")), 20_000)
+                ?: findScrolling(By.res("profile_documents_button"))
+        }
+        if (documents == null) {
+            capture("profile-tab")
+            fail("Profile shows no documents button: ${screenText()}")
+        }
+        documents!!.click()
+        val close = device.wait(Until.findObject(By.res("brand_sheet_close")), 15_000)
+        assertNotNull("Complete your documents did not open", close)
+        capture("documents-open")
+        assertTrue("the documents page starts ${close!!.visibleBounds.top}px down, below Profile",
+            close.visibleBounds.top < device.displayHeight * 0.15)
+        close.click()
+        assertTrue("the documents page did not close", device.wait(Until.gone(By.res("brand_sheet_close")), 10_000))
+
+        // IT-8: a subtopic found by search is listed; nothing found is said.
+        findScrolling(By.res("profile_subjects_edit_button"))!!.click()
+        val search = device.wait(Until.findObject(By.clazz("android.widget.EditText").hasAncestor(By.res("teacher_subjects_search"))), 15_000)
+            ?: device.wait(Until.findObject(By.res("teacher_subjects_search")), 5_000)
+        assertNotNull("the subjects editor has no search", search)
+        search!!.click()
+        search.text = "Geometry"
+        assertNotNull("searching for Geometry did not list it",
+            device.wait(Until.findObject(By.res(Pattern.compile("subject_chip_(?i)geometry"))), 10_000))
+        search.text = "zzzz"
+        assertNotNull("a search matching nothing said nothing",
+            device.wait(Until.findObject(By.res("teacher_subjects_no_results")), 10_000))
+    }
+
     /** AND-T-07: the profile's Continue stays off until there is a name and a
      *  valid phone, which a teacher must give. */
     @Test

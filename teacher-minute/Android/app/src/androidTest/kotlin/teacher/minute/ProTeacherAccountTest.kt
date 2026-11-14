@@ -154,7 +154,7 @@ class ProTeacherAccountTest : ProTeacherEmulatorTest() {
         confirm.click()
         assertTrue(
             "logging out did not return to the welcome screen",
-            device.wait(Until.hasObject(By.res("welcome_log_in")), 30_000)
+            waitForWelcome(30_000)
         )
     }
 
@@ -176,14 +176,16 @@ class ProTeacherAccountTest : ProTeacherEmulatorTest() {
         device.findObject(dialogButton).click()
 
         val deadline = System.currentTimeMillis() + 60_000
-        while (System.currentTimeMillis() < deadline && !device.hasObject(By.res("welcome_log_in"))) {
+        // The welcome screen's title is up before its buttons are in view.
+        while (System.currentTimeMillis() < deadline && !device.hasObject(By.res("welcome_log_in"))
+            && !device.hasObject(By.res("welcome_sign_up")) && !device.hasObject(By.textContains("Pro Teacher"))) {
             if (device.hasObject(dialogButton) && !device.hasObject(By.res("dialog_secure_input"))) {
                 capture("delete-account")
                 fail("deleting the account failed: ${screenText()}")
             }
             Thread.sleep(1_000)
         }
-        if (!device.hasObject(By.res("welcome_log_in"))) {
+        if (!waitForWelcome(30_000)) {
             capture("delete-account")
             fail("deleting the account did not return to the welcome screen: ${screenText()}")
         }

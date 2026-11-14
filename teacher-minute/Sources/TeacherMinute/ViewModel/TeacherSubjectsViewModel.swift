@@ -122,7 +122,27 @@ final class TeacherSubjectsViewModel {
   }
   
   var shouldShowSubtopicsPrompt: Bool {
-	selectedAreaIDs.isEmpty
+	!isSearching && selectedAreaIDs.isEmpty
+  }
+
+  var isSearching: Bool {
+	!searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  /// The subjects whose subtopics are listed below the chips. Normally the
+  /// selected ones. While searching, every subject with a matching subtopic,
+  /// so what the teacher typed shows up as the subtopic itself — a search for
+  /// "Geometry" used to leave only the Math chip, looking like nothing
+  /// happened, with its subtopics hidden until Math was picked (IT-8,
+  /// Bug-006).
+  var subtopicSections: [TeachingSubjectArea] {
+	guard isSearching else { return selectedAreas }
+	return subjectAreas.filter { !visibleSubtopics(for: $0).isEmpty }
+  }
+
+  /// Searching found nothing at all.
+  var hasNoSearchResults: Bool {
+	isSearching && visibleAreas.isEmpty
   }
   
   // MARK: - Auto-advance
@@ -236,6 +256,8 @@ final class TeacherSubjectsViewModel {
 	  selectedTitles.remove(subtopic.title)
 	} else {
 	  selectedTitles.insert(subtopic.title)
+	  // Picked from a search, its subject may not be picked yet.
+	  selectedAreaIDs.insert(area.id)
 	}
 	selectedSubtopicTitlesByArea[area.id] = selectedTitles
   }
