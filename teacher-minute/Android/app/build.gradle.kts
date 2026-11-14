@@ -364,6 +364,16 @@ tasks.configureEach {
     }
 }
 
+// unstrippedNativeLibsDir points Crashlytics at mergeXReleaseNativeLibs's
+// output, but the plugin does not declare that it reads it. Gradle 9 fails the
+// build over the undeclared dependency, so declare it here.
+tasks.configureEach {
+    val variant = name.removePrefix("generateCrashlyticsSymbolFile")
+    if (variant != name && variant.isNotEmpty()) {
+        dependsOn("merge${variant}NativeLibs")
+    }
+}
+
 gradle.taskGraph.whenReady {
     val isReleaseBuild = allTasks.any { task ->
         task.name.contains("Release", ignoreCase = true)

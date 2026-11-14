@@ -27,7 +27,14 @@
 #     Play Console. Without it, the bundles wait in build/android-bundles for
 #     you to upload in Play Console.
 
+# The body sits in one { } block, so bash reads the whole file before it
+# runs any of it: editing the script during a run cannot break that run.
+{
 set -euo pipefail
+
+START=$(date +%s)
+# Progress line with the clock time and the minutes since this script started.
+say() { echo "[$(date +%H:%M:%S) +$(( ($(date +%s) - START) / 60 ))m] $*"; }
 
 WHICH="${1:-both}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -57,7 +64,8 @@ VERSION=$(sed -n 's/^MARKETING_VERSION *= *\([^ ]*\).*/\1/p' "$SKIP_ENV")
 NEW=$((OLD + 1))
 sed -i '' "s/^CURRENT_PROJECT_VERSION *= *$OLD\$/CURRENT_PROJECT_VERSION = $NEW/" "$SKIP_ENV"
 grep -q "^CURRENT_PROJECT_VERSION = $NEW\$" "$SKIP_ENV" || { echo "could not update $SKIP_ENV" >&2; exit 1; }
-echo "version code $OLD → $NEW (version $VERSION)"
+say "Android: started $(date '+%Y-%m-%d %H:%M')"
+say "Android: version code $OLD → $NEW (version $VERSION)"
 
 # 2. Build the bundles (and upload their symbols).
 mkdir -p "$OUT"
@@ -71,34 +79,38 @@ for flavor in "${FLAVORS[@]}"; do
   TASKS+=(":app:bundle$variant")
   [[ "${CRASHLYTICS:-1}" == "0" ]] || TASKS+=(":app:uploadCrashlyticsSymbolFile$variant")
 done
-echo "== building ${FLAVORS[*]}…"
+say "Android: building ${FLAVORS[*]} (about 10 minutes; log: $OUT/gradle.log)…"
 (cd "$ROOT/Android" && ./gradlew "${TASKS[@]}") > "$OUT/gradle.log" 2>&1 \
-  || { echo "build failed; see $OUT/gradle.log" >&2; exit 1; }
+  || { say "Android: build FAILED; see $OUT/gradle.log" >&2; exit 1; }
+say "Android: build complete"
 
 # 3. Check, collect and upload each bundle.
 for flavor in "${FLAVORS[@]}"; do
   built="$BUNDLES/${flavor}Release/app-$flavor-release.aab"
   aab="$OUT/$(name_of "$flavor")-$VERSION-$NEW.aab"
   code=$(bundletool dump manifest --bundle "$built" --xpath /manifest/@android:versionCode)
-  [[ "$code" == "$NEW" ]] || { echo "$built has version code $code, not $NEW" >&2; exit 1; }
+  [[ "$code" == "$NEW" ]] || { say "Android: $built has version code $code, not $NEW" >&2; exit 1; }
   cp "$built" "$aab"
-  echo "== $(name_of "$flavor"): $aab"
+  say "Android: $(name_of "$flavor") bundle ready: $aab"
 
   if [[ -n "${PLAY_JSON_KEY:-}" ]]; then
-    echo "== $(name_of "$flavor"): uploading to Play (${PLAY_TRACK:-internal}, ${PLAY_RELEASE_STATUS:-draft})…"
+    say "Android: $(name_of "$flavor") uploading to Play (${PLAY_TRACK:-internal}, ${PLAY_RELEASE_STATUS:-draft})…"
     fastlane run upload_to_play_store \
       package_name:"$(package_of "$flavor")" aab:"$aab" json_key:"$PLAY_JSON_KEY" \
       track:"${PLAY_TRACK:-internal}" release_status:"${PLAY_RELEASE_STATUS:-draft}" \
       skip_upload_apk:true skip_upload_metadata:true skip_upload_changelogs:true \
       skip_upload_images:true skip_upload_screenshots:true \
       > "$OUT/$(name_of "$flavor")-upload.log" 2>&1 \
-      || { echo "upload failed; see $OUT/$(name_of "$flavor")-upload.log" >&2; exit 1; }
+      || { say "Android: $(name_of "$flavor") upload FAILED; see $OUT/$(name_of "$flavor")-upload.log" >&2; exit 1; }
+    say "Android: $(name_of "$flavor") uploaded"
   fi
 done
 
 if [[ -n "${PLAY_JSON_KEY:-}" ]]; then
-  echo "Uploaded $VERSION ($NEW) to Play's ${PLAY_TRACK:-internal} track."
+  say "Android: done, uploaded $VERSION ($NEW) to Play's ${PLAY_TRACK:-internal} track."
 else
-  echo "Built $VERSION ($NEW). Upload the .aab files in $OUT in Play Console, or set PLAY_JSON_KEY to upload them."
+  say "Android: done, built $VERSION ($NEW). Upload the .aab files in $OUT in Play Console, or set PLAY_JSON_KEY to upload them."
 fi
 echo "Commit the version code bump in $SKIP_ENV."
+exit
+}
