@@ -34,6 +34,16 @@ if [[ -z "${PLAY_JSON_KEY:-}" || ! -f "$PLAY_JSON_KEY" ]]; then
   exit 1
 fi
 
+# Check the App Store Connect key now, not after the Android half has run.
+if [[ -n "${ASC_KEY_PATH:-}${ASC_KEY_ID:-}${ASC_ISSUER_ID:-}" ]]; then
+  if [[ -z "${ASC_KEY_PATH:-}" || -z "${ASC_KEY_ID:-}" || -z "${ASC_ISSUER_ID:-}" || ! -f "${ASC_KEY_PATH:-}" ]]; then
+    echo "ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID must all be set, and ASC_KEY_PATH must exist (see archive-ios.sh)." >&2
+    exit 1
+  fi
+else
+  echo "Note: no ASC_KEY_* set; the iOS upload will use the Apple account signed in to Xcode." >&2
+fi
+
 start=$(date +%s)
 stamp() { echo "[$(date +%H:%M:%S) +$(( ($(date +%s) - start) / 60 ))m] $*"; }
 stamp "Release of $WHICH started $(date '+%Y-%m-%d %H:%M')"
