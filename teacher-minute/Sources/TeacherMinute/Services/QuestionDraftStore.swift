@@ -41,7 +41,7 @@ final class QuestionDraftStore {
 
   private let key = "pendingQuestionDraft"
   private var photoFile: URL {
-    FileManager.default.temporaryDirectory.appendingPathComponent("pending-question-photo.jpg")
+    ScratchFiles.directory("QuestionDraft").appendingPathComponent("pending-question-photo.jpg")
   }
   /// Long enough for any sign-up, short enough that a question from another
   /// day does not reappear unasked.
