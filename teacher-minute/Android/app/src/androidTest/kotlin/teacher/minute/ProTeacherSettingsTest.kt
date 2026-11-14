@@ -125,6 +125,50 @@ class ProTeacherSettingsTest : ProTeacherEmulatorTest() {
         }
     }
 
+    /**
+     * IT-28: turning both notification choices off reaches the backend, which
+     * sends the pushes that arrive while the app is closed. It reads them from
+     * the teacher's record (question invites) and their user record
+     * (announcements); see functions/src/types.ts.
+     */
+    @Test
+    fun turningNotificationsOffReachesTheBackend() {
+        signIn()
+        openSettingsRow("notifications")
+        for (id in listOf("incoming_message", "general_announcements")) {
+            tapId("notification_toggle_$id", id)
+            Thread.sleep(500)
+        }
+        val dir = context.getExternalFilesDir(null) ?: context.filesDir
+        device.takeScreenshot(java.io.File(dir, "it28-notifications-off.png"))
+
+        val off = mapOf("incomingMessages" to false, "announcements" to false)
+        for (path in listOf("teachers/${appTeacher.uid}", "users/${appTeacher.uid}")) {
+            var stored: Map<String, Any?> = emptyMap()
+            val deadline = System.currentTimeMillis() + 15_000
+            while (System.currentTimeMillis() < deadline && stored != off) {
+                val value = backend.value("$path/notificationPreferences") as? org.json.JSONObject
+                stored = value?.let { v -> v.keys().asSequence().associateWith { v.opt(it) } } ?: emptyMap()
+                if (stored != off) Thread.sleep(500)
+            }
+            assertTrue("$path/notificationPreferences is $stored, not both off", stored == off)
+        }
+
+        // And back on, so the account is left as it started.
+        for (id in listOf("incoming_message", "general_announcements")) {
+            tapId("notification_toggle_$id", id)
+            Thread.sleep(500)
+        }
+        var back: Any? = null
+        val deadline = System.currentTimeMillis() + 15_000
+        while (System.currentTimeMillis() < deadline && back != true) {
+            back = (backend.value("teachers/${appTeacher.uid}/notificationPreferences") as? org.json.JSONObject)
+                ?.opt("incomingMessages")
+            if (back != true) Thread.sleep(500)
+        }
+        assertTrue("turning question notifications back on did not reach the backend", back == true)
+    }
+
     private fun typeInto(id: String, text: String) {
         val tagged = findScrolling(By.res(id)) ?: failWith(id, "no $id in the profile editor")
         val field = tagged.findObject(By.clazz("android.widget.EditText")) ?: tagged

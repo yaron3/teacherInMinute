@@ -1588,14 +1588,15 @@ async function sendBulkPush() {
   if (!uids.length) { showToast("None of the selected users is registered for push", "error"); return; }
   if (!confirm(`Send "${title}" as a push notification to ${uids.length} user${uids.length === 1 ? "" : "s"}?`)) return;
   const CHUNK = 100;
-  let reached = 0, withoutToken = 0, unreachable = 0;
+  let reached = 0, withoutToken = 0, unreachable = 0, optedOut = 0;
   try {
     for (let i = 0; i < uids.length; i += CHUNK) {
       const d = await call("adminSendPush", { uids: uids.slice(i, i + CHUNK), title, body, data });
-      reached += d.reached; withoutToken += d.withoutToken; unreachable += d.unreachable;
+      reached += d.reached; withoutToken += d.withoutToken; unreachable += d.unreachable; optedOut += d.optedOut || 0;
     }
     closeModal("push-modal");
-    showToast(`Reached ${reached}` + (withoutToken ? ` · ${withoutToken} without notifications` : "") + (unreachable ? ` · ${unreachable} unreachable` : ""),
+    showToast(`Reached ${reached}` + (withoutToken ? ` · ${withoutToken} without notifications` : "") + (unreachable ? ` · ${unreachable} unreachable` : "") +
+      (optedOut ? ` · ${optedOut} turned announcements off` : ""),
       reached ? "success" : "error");
   } catch (e) {
     showToast("Push failed: " + e.message, "error");

@@ -2,8 +2,8 @@
 //  NotificationSettingsViewModel.swift
 //  teacher-minute
 //
-//  The notification permission behind the switch on the notification
-//  settings.
+//  The notification settings: the system's permission behind the first
+//  switch, and the user's own choices of which notifications they want.
 //
 
 import Foundation
@@ -14,6 +14,12 @@ import SkipFuse
 @MainActor
 final class NotificationSettingsViewModel {
   var state: PermissionState = .notDetermined
+
+  /// Lesson notifications: a teacher's question invites, a student's "teacher
+  /// found" and "no teacher available".
+  var notifyIncomingMessages = NotificationPreferences.current.incomingMessages
+  /// Announcements sent from the admin console.
+  var notifyGeneralAnnouncements = NotificationPreferences.current.announcements
 
   /// Reads the permission, and asks for it when it has never been asked, as
   /// the standard notification settings do on opening.
@@ -38,5 +44,31 @@ final class NotificationSettingsViewModel {
     } else {
       PermissionService.shared.openAppSettings()
     }
+  }
+
+  /// IT-28: the choice is the backend's to honour, since it sends the pushes
+  /// that arrive while the app is closed. Kept on the device, and written next
+  /// to the push token, where the backend reads it before each send.
+  func toggleIncomingMessages() {
+    notifyIncomingMessages.toggle()
+    save()
+  }
+
+  func toggleGeneralAnnouncements() {
+    notifyGeneralAnnouncements.toggle()
+    save()
+  }
+
+  private func save() {
+    let preferences = NotificationPreferences(
+      incomingMessages: notifyIncomingMessages,
+      announcements: notifyGeneralAnnouncements
+    )
+    preferences.store()
+    AnalyticsService.shared.logEvent(AnalyticsEvent.notificationPreferencesChanged, parameters: [
+      "incoming_messages": notifyIncomingMessages ? "on" : "off",
+      "announcements": notifyGeneralAnnouncements ? "on" : "off",
+    ])
+    PushNotificationService.shared.writeNotificationPreferences(preferences)
   }
 }

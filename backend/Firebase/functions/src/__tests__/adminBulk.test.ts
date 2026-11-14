@@ -251,7 +251,7 @@ describe("adminSendPush", () => {
     const { tokens, title, body } = mockSendAdminPush.mock.calls[0][0];
     expect([...tokens].sort()).toEqual(["tok-a-phone", "tok-a-tablet", "tok-b"]);
     expect({ title, body }).toEqual({ title: "New teachers", body: "Come and ask" });
-    expect(d).toEqual({ reached: 2, withoutToken: 1, unreachable: 0, devicesSent: 3, devicesFailed: 0 });
+    expect(d).toEqual({ reached: 2, withoutToken: 1, unreachable: 0, optedOut: 0, devicesSent: 3, devicesFailed: 0 });
   });
 
   it("counts a user reached when any one of their devices took it", async () => {
@@ -261,7 +261,21 @@ describe("adminSendPush", () => {
 
     const d = await call(adminSendPush, { uids: ["a", "b"], title: "t", body: "b" });
 
-    expect(d).toEqual({ reached: 1, withoutToken: 0, unreachable: 1, devicesSent: 1, devicesFailed: 2 });
+    expect(d).toEqual({ reached: 1, withoutToken: 0, unreachable: 1, optedOut: 0, devicesSent: 1, devicesFailed: 2 });
+  });
+
+  it("skips a user who turned announcements off (IT-28)", async () => {
+    mockRtdb.set("users/a/fcmToken", "tok-a");
+    mockRtdb.set("users/b/fcmToken", "tok-b");
+    mockRtdb.set("users/b/notificationPreferences", { incomingMessages: true, announcements: false });
+    // Lesson notifications off says nothing about announcements.
+    mockRtdb.set("users/a/notificationPreferences", { incomingMessages: false });
+    mockSendAdminPush.mockResolvedValue({ sent: 1, dead: [], failed: [] });
+
+    const d = await call(adminSendPush, { uids: ["a", "b"], title: "t", body: "b" });
+
+    expect(mockSendAdminPush.mock.calls[0][0].tokens).toEqual(["tok-a"]);
+    expect(d).toEqual({ reached: 1, withoutToken: 0, unreachable: 0, optedOut: 1, devicesSent: 1, devicesFailed: 0 });
   });
 
   it("refuses a caller without admin rights", async () => {

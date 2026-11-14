@@ -6,7 +6,15 @@ import { onValueWritten } from "firebase-functions/v2/database";
 import { getFunctions } from "firebase-admin/functions";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
-import { isTeacherLive, rankTeachers, ScoredTeacher, subjectNarrows, teachesTopic } from "./scoring";
+import {
+  hasPushToken,
+  isTeacherLive,
+  rankTeachers,
+  ScoredTeacher,
+  subjectNarrows,
+  teachesTopic,
+  wantsPush,
+} from "./scoring";
 import { sendInvitePush, sendNoMatchPush } from "./fcm";
 import {
   TeacherRecord,
@@ -236,7 +244,8 @@ async function sendWave(
   const pushes = Promise.all(
     batch.map(async ({ uid }) => {
       const t = teachers[uid];
-      if (!t?.fcmToken) return;
+      // No token, or question notifications turned off in Settings.
+      if (!t || !hasPushToken(t) || !t.fcmToken) return;
       await sendInvitePush({
         teacherUid: uid,
         fcmToken: t.fcmToken,
@@ -418,7 +427,7 @@ async function tryInviteTeacherForQuestionWave(
     ...(invitePayload.struggle ? { struggle: invitePayload.struggle } : {}),
   });
 
-  if (teacher.fcmToken) {
+  if (hasPushToken(teacher) && teacher.fcmToken) {
     await sendInvitePush({
       teacherUid,
       fcmToken: teacher.fcmToken,
@@ -901,11 +910,11 @@ export const questionWatchdog = onTaskDispatched<{ questionId: string }>(
     const archived = await archiveUnanswered(qid, data.alreadyInvited ?? []);
 
     if (archived) {
-      const studentFcmToken = await db
-        .ref(`users/${data.studentUid}/fcmToken`)
-        .once("value")
-        .then((s) => s.val() as string | null);
-      if (studentFcmToken) {
+      const [studentFcmToken, studentPrefs] = await Promise.all([
+        db.ref(`users/${data.studentUid}/fcmToken`).once("value").then((s) => s.val() as string | null),
+        db.ref(`users/${data.studentUid}/notificationPreferences`).once("value").then((s) => s.val()),
+      ]);
+      if (studentFcmToken && wantsPush(studentPrefs, "incomingMessages")) {
         await sendNoMatchPush({ fcmToken: studentFcmToken, questionId: qid });
       }
     }

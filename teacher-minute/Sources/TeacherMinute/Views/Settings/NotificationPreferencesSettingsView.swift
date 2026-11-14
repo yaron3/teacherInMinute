@@ -11,8 +11,6 @@ import SwiftUI
 struct NotificationPreferencesSettingsView: View {
   let viewModel: any SettingsViewModeling
   @State var permission = NotificationSettingsViewModel()
-  @AppStorage("notifyIncomingTeacherMessage") var notifyIncomingTeacherMessage = true
-  @AppStorage("notifyGeneralAnnouncements") var notifyGeneralAnnouncements = true
   @Environment(\.scenePhase) var scenePhase
 
   @Environment(\.colorScheme) var colorScheme
@@ -65,20 +63,20 @@ struct NotificationPreferencesSettingsView: View {
         toggleRow(
           viewModel.incomingMessageNotificationLabel,
           size: 16,
-          isOn: notifyIncomingTeacherMessage,
+          isOn: permission.notifyIncomingMessages,
           isEnabled: permission.state.isGranted,
           identifier: "incoming_message"
         ) {
-          notifyIncomingTeacherMessage.toggle()
+          permission.toggleIncomingMessages()
         }
         toggleRow(
           viewModel.generalAnnouncementsNotificationLabel,
           size: 16,
-          isOn: notifyGeneralAnnouncements,
+          isOn: permission.notifyGeneralAnnouncements,
           isEnabled: permission.state.isGranted,
           identifier: "general_announcements"
         ) {
-          notifyGeneralAnnouncements.toggle()
+          permission.toggleGeneralAnnouncements()
         }
       }
     }

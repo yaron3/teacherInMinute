@@ -3,6 +3,7 @@ import {
   BUSY_STALE_AFTER_MINUTES,
   KEEPALIVE_TIMEOUT_SECONDS,
   MIN_SUBJECT_TEACHERS,
+  NotificationPreferences,
   TeacherRecord,
 } from "./types";
 
@@ -79,10 +80,22 @@ export function isTeacherBusy(teacher: TeacherRecord, now = Date.now()): boolean
   return now - since < BUSY_STALE_AFTER_MINUTES * 60_000;
 }
 
-/** Whether the teacher has a push token, which is the only way a question
- *  reaches them once their app is no longer running. */
+/** Whether a question can be pushed to the teacher, which is the only way it
+ *  reaches them once their app is no longer running: they have a push token,
+ *  and have not turned question notifications off. */
 export function hasPushToken(teacher: TeacherRecord): boolean {
-  return typeof teacher.fcmToken === "string" && teacher.fcmToken.length > 0;
+  return (
+    typeof teacher.fcmToken === "string" &&
+    teacher.fcmToken.length > 0 &&
+    wantsPush(teacher.notificationPreferences, "incomingMessages")
+  );
+}
+
+/** Whether the user's notification choices let a push of `kind` through.
+ *  Absent choices are on; see NotificationPreferences. */
+export function wantsPush(prefs: unknown, kind: keyof NotificationPreferences): boolean {
+  if (!prefs || typeof prefs !== "object") return true;
+  return (prefs as NotificationPreferences)[kind] !== false;
 }
 
 /**

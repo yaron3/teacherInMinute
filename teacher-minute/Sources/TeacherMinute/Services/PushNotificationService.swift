@@ -70,6 +70,9 @@ public final class PushNotificationService: NSObject {
         registeredUID = uid
         registeredRole = role
 	  logger.info("[Push] registerCurrentDevice uid=\(uid) role=\(role.rawValue)")
+        // Whatever the permission: a choice made on an earlier version of the
+        // app, which kept it on the device only, reaches the backend too.
+        writeNotificationPreferences(.current)
 
         Task {
             // Do NOT prompt here. Notification permission is requested only after
@@ -120,6 +123,30 @@ public final class PushNotificationService: NSObject {
         } catch {
             logger.error("[Push] ❌ FCM token registration failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Writes the user's notification choices next to their push token, where
+    /// the backend reads them before each push (IT-28). A teacher's are written
+    /// on their teacher record as well, which dispatch reads anyway.
+    func writeNotificationPreferences(_ preferences: NotificationPreferences) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let isTeacher = (registeredRole ?? AppUserMode(role: AuthRole.appRole)) == .teacher
+#if !os(Android)
+        Task {
+            do {
+                let updates: [String: Any] = ["notificationPreferences": preferences.databaseValue]
+                try await setValues(updates, path: "users/\(uid)")
+                if isTeacher {
+                    try await setValues(updates, path: "teachers/\(uid)")
+                }
+                logger.info("[Push] notification preferences written uid=\(uid) incoming=\(preferences.incomingMessages) announcements=\(preferences.announcements)")
+            } catch {
+                logger.error("[Push] could not write notification preferences: \(error.localizedDescription)")
+            }
+        }
+#else
+        AndroidPushTokenWriter.writeNotificationPreferences(preferences, uid: uid, isTeacher: isTeacher)
+#endif
     }
 
     private func writeToken(_ token: String, uid: String, role: AppUserMode) async throws {
