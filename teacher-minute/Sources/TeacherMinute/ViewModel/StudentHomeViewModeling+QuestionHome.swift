@@ -436,8 +436,34 @@ extension StudentHomeViewModeling {
     }
   }
 
+  /// What lies behind an error: Storage wraps the error that stopped it (an
+  /// Auth token it could not get, say) inside its own, twice over, under a
+  /// description that says little.
+  static func errorCause(_ error: Error) -> String {
+    var parts: [String] = []
+    var current: NSError? = error as NSError
+    var depth = 0
+    while let nsError = current, depth < 4 {
+      let info = nsError.userInfo
+      var part = "\(nsError.domain) \(nsError.code)"
+      if let domain = info["ResponseErrorDomain"], let code = info["ResponseErrorCode"] {
+        part += " (from \(domain) \(code))"
+      }
+      if let body = info["ResponseBody"] { part += " body=\(body)" }
+      // An HTTP failure carries the server's reply as data.
+      if let data = info["data"] as? Data, let reply = String(data: data, encoding: .utf8) {
+        part += " reply=\(reply.prefix(300))"
+      }
+      if let name = info["FIRAuthErrorUserInfoNameKey"] { part += " \(name)" }
+      parts.append(part)
+      current = info[NSUnderlyingErrorKey] as? NSError
+      depth += 1
+    }
+    return parts.joined(separator: " <- ")
+  }
+
   private func logQuestionPhotoFailure(_ error: Error, source: QuestionPhotoSource) {
-    logger.warning("[QuestionHome] photo from \(source.rawValue) failed: \(error.localizedDescription)")
+    logger.warning("[QuestionHome] photo from \(source.rawValue) failed: \(error.localizedDescription) \(Self.errorCause(error))")
     AnalyticsService.shared.logEvent(AnalyticsEvent.questionPhotoFailed, parameters: [
       "source": source.rawValue
     ])

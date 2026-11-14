@@ -177,6 +177,12 @@ let logger = AppLogger(subsystem: "com.yaronj.tim", category: "TeacherMinute")
 	router.followAuthState()
 	guard router.path.isEmpty else { return }
 	guard let uid = Auth.auth().currentUser?.uid else { return }
+	// A session whose account is gone would otherwise go home and fail at
+	// every call that needs a token.
+	if await StoredSession.endIfDead() {
+	  router.signOut()
+	  return
+	}
 	do {
 	  let resume = try await UserService.shared.resumeRoute(uid: uid)
 	  if case .otherApp(let role) = resume {
