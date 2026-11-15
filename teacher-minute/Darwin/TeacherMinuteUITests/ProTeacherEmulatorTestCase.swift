@@ -34,6 +34,9 @@ class ProTeacherEmulatorTestCase: XCTestCase {
     /// The dialog's message in either language; the app may run with Remote
     /// Config's Hebrew copy cached or on its English defaults.
     let takenMessages = ["Another teacher already answered it", "מורה אחר/ת כבר ענה/תה עליה"]
+    /// What the verify-email banner's Resend answers, in either language:
+    /// sent, or not (the emulators have no mail server, so never sent there).
+    let resendOutcomeMessages = ["Email sent", "המייל נשלח", "Couldn't send the email", "לא הצלחנו לשלוח את המייל"]
     /// The "student cancelled" dialog's title, in either language.
     let cancelledMessages = ["The student cancelled the session", "התלמיד/ה ביטל/ה את השיעור"]
 

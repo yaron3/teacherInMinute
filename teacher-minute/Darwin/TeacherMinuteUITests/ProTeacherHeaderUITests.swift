@@ -44,11 +44,18 @@ final class ProTeacherHeaderUITests: ProTeacherEmulatorTestCase {
         }
         XCTAssertTrue(bell.isHittable, "the bell stayed covered")
         XCTAssertTrue(tapWhenHittable(bell, "the bell"), "the bell was never tappable")
-        XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 10), "the bell did not open the messages panel")
+        // The panel is the app's own sheet (BrandSheet), which accessibility
+        // does not report as a system Sheet: found by its Done button.
+        let panelDone = app.buttons["brand_sheet_close"]
+        XCTAssertTrue(panelDone.waitForExistence(timeout: 10), "the bell did not open the messages panel")
         pause(seconds: 2)
         keep("IT-29 messages panel open")
         dismissMessagesPanel()
-        XCTAssertTrue(waitForDisappearance(app.sheets.firstMatch, timeout: 10), "the messages panel did not close")
+        if panelDone.exists {
+            // A drag the sheet did not take: closed with Done instead.
+            _ = tapWhenHittable(panelDone, "the panel's Done")
+        }
+        XCTAssertTrue(waitForDisappearance(panelDone, timeout: 10), "the messages panel did not close")
         pause(seconds: 2)
         keep("IT-29 header after the messages panel")
 
