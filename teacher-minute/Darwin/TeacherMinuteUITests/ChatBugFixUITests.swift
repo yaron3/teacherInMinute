@@ -72,8 +72,16 @@ final class ChatBugFixUITests: XCTestCase {
             field.frame.maxY, screen.maxY,
             "the chat input drifted below the screen (field bottom \(field.frame.maxY), screen bottom \(screen.maxY))"
         )
-        // The lesson's bottom bar stays behind the keyboard, not on top of it.
-        XCTAssertFalse(app.staticTexts["Session Time"].exists, "the lesson's bottom bar rose with the keyboard")
+        // The lesson's controls sit right under the input, above the keyboard.
+        let timer = app.staticTexts["Session Time"]
+        XCTAssertTrue(timer.exists, "the lesson's bottom bar is hidden while typing")
+        let keyboardTop = app.keyboards.firstMatch.frame.minY
+        XCTAssertGreaterThanOrEqual(timer.frame.minY, field.frame.maxY,
+                                    "the bottom bar is not below the input (timer top \(timer.frame.minY), field bottom \(field.frame.maxY))")
+        XCTAssertLessThanOrEqual(timer.frame.maxY, keyboardTop,
+                                 "the bottom bar is under the keyboard (timer bottom \(timer.frame.maxY), keyboard top \(keyboardTop))")
+        XCTAssertLessThanOrEqual(timer.frame.minY - field.frame.maxY, 120,
+                                 "the bottom bar is not next to the input (gap \(timer.frame.minY - field.frame.maxY))")
         keep("IT-22 long thread, keyboard up")
     }
 

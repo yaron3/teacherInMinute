@@ -1064,11 +1064,14 @@ struct ChatSessionView: View {
   /// The chat as one scrolling column inside the lesson's frame.
   ///
   /// The question and the thread scroll together, with the composer pinned
-  /// below them where it can always be tapped: a short viewport with the
-  /// keyboard up used to push a pinned composer off the screen, so the frame's
-  /// bottom bar steps aside for the keyboard instead.
+  /// below them where it can always be tapped. The frame's bottom bar (media,
+  /// people, session time) sits right under the composer, keyboard or not:
+  /// with the system keyboard up it rides above it, so the lesson's controls
+  /// stay in reach from the moment the lesson opens with the field focused.
+  /// Only the math pad, which is drawn under the composer itself, sends the
+  /// bar away (IT-22).
   var scrollingChatLayout: some View {
-    sessionFrame(showsBottomBar: !isChatKeyboardUp) {
+    sessionFrame(showsBottomBar: composerMode != .algebra) {
       VStack(spacing: 0) {
         ScrollViewReader { proxy in
           ScrollView(.vertical, showsIndicators: false) {
@@ -1136,8 +1139,9 @@ struct ChatSessionView: View {
             }
           }
 #if os(Android)
-          // The composer is the thread's last item here: when the bottom bar
-          // comes or goes, the end of the thread moves, so follow it.
+          // The composer is the thread's last item here: when the keyboard or
+          // the math pad comes or goes, the end of the thread moves, so follow
+          // it.
           .onChange(of: isChatKeyboardUp) { _, _ in
             scrollChatForKeyboardMode(composerMode, proxy: proxy)
           }
@@ -1166,9 +1170,9 @@ struct ChatSessionView: View {
   }
 
   /// Whether a keyboard is up over the chat: the math pad, or the system
-  /// keyboard while the message field has focus. The lesson's bottom bar steps
-  /// aside for either, instead of riding up on top of the keyboard and taking
-  /// the room the thread needs (IT-22).
+  /// keyboard while the message field has focus. On Android the end of the
+  /// thread is followed again when this changes, so the composer settles just
+  /// above the bar once the keyboard is in place (IT-22).
   var isChatKeyboardUp: Bool {
 #if os(Android)
     // On Android, Back puts the keyboard away but leaves the field focused, so
@@ -1182,8 +1186,8 @@ struct ChatSessionView: View {
 #if os(Android)
   /// Follows the system keyboard while the message field has focus. Android
   /// has no SwiftUI signal for it, so it is polled, as AskTeacherSheet does.
-  /// Where the keyboard cannot be observed (Android 10 and older) the bar is
-  /// left in place, as before IT-22.
+  /// Where the keyboard cannot be observed (Android 10 and older) the thread
+  /// is followed on focus alone.
   func followAndroidKeyboard() async {
     guard isMessageFieldFocused, SoftKeyboard.isVisibilityObservable else {
       isAndroidKeyboardShown = false
