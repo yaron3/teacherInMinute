@@ -306,8 +306,9 @@ struct BrandModal<Content: View>: View {
         }
         .padding(24)
         // An explicit width: a maximum one lets the card's background spread
-        // across the screen on Android.
-        .frame(width: min(354, proxy.size.width - 48))
+        // across the screen on Android. Clamped at zero: the proxy can report
+        // a zero size on the first layout pass, which would make it negative.
+        .frame(width: max(0, min(354, proxy.size.width - 48)))
         .background(theme.brandModalBackground)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay {
