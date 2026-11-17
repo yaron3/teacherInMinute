@@ -1,4 +1,15 @@
 #include "../Skip.env"
+#include "../Config/Environment.xcconfig"
+
+// The Firebase project this build uses, a folder under teacher-minute/Config.
+// The "Select the Firebase config" build phase bundles that folder's plist.
+TIM_FIREBASE_ENV[config=Debug] = $(TIM_FIREBASE_ENV_DEBUG)
+TIM_FIREBASE_ENV[config=Release] = $(TIM_FIREBASE_ENV_RELEASE)
+
+// Each project gives each app its own Google sign-in client. The targets set
+// TIM_GOOGLE_URL_SCHEME_Prod and TIM_GOOGLE_URL_SCHEME_Staging to the
+// REVERSED_CLIENT_ID of the matching plist; Info.plist registers this one.
+TIM_GOOGLE_URL_SCHEME = $(TIM_GOOGLE_URL_SCHEME_$(TIM_FIREBASE_ENV))
 
 // Set the action that will be executed as part of the Xcode Run Script phase
 // Setting to "launch" will build and run the app in the first open Android emulator or device
