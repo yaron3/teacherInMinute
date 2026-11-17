@@ -1,15 +1,12 @@
-# Debug-build Firebase config
+# Debug-build sources
 
-Put the staging project's `google-services.json` in this directory and debug
-builds of both apps will use it; release builds keep the production one in
-`app/`. The file has to list both packages, `com.yaronj.student` and
-`com.yaronj.tim`, so register both apps in the staging project before
-downloading it.
+`google-services.json` in this directory, and in `../release/`, is copied there
+by `app/build.gradle.kts` on every build from `teacher-minute/Config/<project>/`
+and is gitignored. Edit the file under `Config/`, and pick which project each
+build type uses in `Config/Environment.xcconfig`.
 
-Nothing in `build.gradle.kts` selects it. The Google Services plugin looks for
-`src/<buildType>/google-services.json` before falling back to
-`app/google-services.json`, flavors or not, so the file's location is the
-whole mechanism.
+The copy lands here because the Google Services plugin has no setting for its
+file's location: it reads `src/<buildType>/google-services.json` first.
 
 Staging is not a product flavor. The flavors are the two apps, student and
 teacher, and Xcode's "Run skip gradle" phase names one of them in every task it

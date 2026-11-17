@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "315853704604",
+    "firebase_url": "https://teacher-in-a-moment-staging-default-rtdb.firebaseio.com",
+    "project_id": "teacher-in-a-moment-staging",
+    "storage_bucket": "teacher-in-a-moment-staging.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:315853704604:android:ffad114e7289918ef88c59",
+        "android_client_info": {
+          "package_name": "com.yaronj.student"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaYhoWEJ00j40RMyNXGsE5aUi66Rv3Ums"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:315853704604:android:5077ee0c1a7fc9c9f88c59",
+        "android_client_info": {
+          "package_name": "com.yaronj.tim"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaYhoWEJ00j40RMyNXGsE5aUi66Rv3Ums"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

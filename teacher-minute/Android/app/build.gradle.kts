@@ -31,6 +31,44 @@ plugins {
 skip {
 }
 
+// The Firebase project each build type talks to comes from
+// teacher-minute/Config/Environment.xcconfig (TIM_FIREBASE_ENV_DEBUG and
+// TIM_FIREBASE_ENV_RELEASE), the same file the iOS build reads; a value names a
+// folder under Config/ that holds that project's google-services.json.
+// -PtimFirebaseEnv=<folder> overrides both, and Xcode's "Run skip gradle" phase
+// passes it so the Android build follows the iOS one.
+//
+// The Google Services plugin has no setting for where its file lives: it reads
+// src/<buildType>/google-services.json first. So the chosen file is copied
+// there (both copies are gitignored). Build types rather than a product flavor,
+// because the flavors are the two apps and Xcode's phase names one of them in
+// every task it runs; see src/debug/README.md.
+val firebaseConfigDir = rootDir.resolve("../Config").normalize()
+run {
+    val environmentFile = firebaseConfigDir.resolve("Environment.xcconfig")
+    val defaults = environmentFile.readLines()
+        .mapNotNull { Regex("""^\s*TIM_FIREBASE_ENV_(DEBUG|RELEASE)\s*=\s*(\S+)""").find(it) }
+        .associate { it.groupValues[1].lowercase() to it.groupValues[2] }
+    val override = providers.gradleProperty("timFirebaseEnv").orNull?.takeIf { it.isNotBlank() }
+    listOf("debug", "release").forEach { buildType ->
+        val environment = override ?: defaults[buildType] ?: throw GradleException(
+            "$environmentFile does not set TIM_FIREBASE_ENV_${buildType.uppercase()}."
+        )
+        val source = firebaseConfigDir.resolve("$environment/google-services.json")
+        if (!source.isFile) {
+            throw GradleException(
+                "The $buildType build uses Firebase $environment, but $source does not exist."
+            )
+        }
+        val target = file("src/$buildType/google-services.json")
+        if (!target.isFile || target.readText() != source.readText()) {
+            target.parentFile.mkdirs()
+            source.copyTo(target, overwrite = true)
+        }
+        logger.lifecycle("Firebase config ($buildType): $environment")
+    }
+}
+
 val keystorePropertiesFile = file("keystore.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.isFile) {

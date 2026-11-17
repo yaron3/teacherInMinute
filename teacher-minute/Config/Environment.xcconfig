@@ -1,0 +1,19 @@
+// Which Firebase project each build configuration talks to. A value names a
+// folder next to this file:
+//
+//   Prod/     google-services.json, InstantTeacher/ and ProTeacher/
+//             GoogleService-Info.plist
+//   Staging/  the same files for the staging project
+//
+// Both platforms read this file: Darwin/TeacherMinute.xcconfig includes it,
+// and Android/app/build.gradle.kts parses these two lines. Flip a line here
+// and the next build of either platform switches project.
+//
+// One-off overrides, without editing this file:
+//   xcodebuild ... TIM_FIREBASE_ENV=Prod
+//   ./gradlew ... -PtimFirebaseEnv=Prod
+// The Xcode "Run skip gradle" phase forwards the first to the second, so an
+// Xcode build and the Android build it launches always agree.
+
+TIM_FIREBASE_ENV_DEBUG = Staging
+TIM_FIREBASE_ENV_RELEASE = Prod
