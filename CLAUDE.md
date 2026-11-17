@@ -110,6 +110,10 @@ Reuse the standing demo accounts (password `123456` for all four):
 | English  | `teacher_demo_english@example.com` | `student_demo_english@example.com` |
 | Hebrew   | `teacher_demo_hebrew@example.com` | `student_demo_hebrew@example.com` |
 
+These accounts live in the production Firebase project. Debug builds use
+staging (`teacher-minute/Config/Environment.xcconfig`), so build screenshot
+runs with `TIM_FIREBASE_ENV=Prod` on the `xcodebuild` command line.
+
 The apps sign in against the live Firebase backend, so Claude cannot type these
 passwords itself: navigate to the login screen and ask the user to sign in.
 Make it easy for them: paste the email in (`simctl pbcopy` + Paste — don't use

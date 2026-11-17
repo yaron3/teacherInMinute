@@ -28,11 +28,15 @@ back out and returned to the welcome screen, which says where it belongs:
   a link the dialog shows only its message.
 - A teacher in Instant Teacher is told to sign in to Pro Teacher.
 
-Each app is its own Firebase app. `Darwin/InstantTeacher/` and
-`Darwin/ProTeacher/` each hold that app's `GoogleService-Info.plist`, and
-`Android/app/google-services.json` lists both packages. A target's
-`TIM_GOOGLE_URL_SCHEME` build setting has to be the `REVERSED_CLIENT_ID` from
-its plist; the build fails with a note saying so when it is not.
+Each app is its own Firebase app, in each of two Firebase projects. The
+configs live under `Config/<project>/` (`Prod`, `Staging`):
+`InstantTeacher/GoogleService-Info.plist`, `ProTeacher/GoogleService-Info.plist`,
+and a `google-services.json` that lists both packages.
+`Config/Environment.xcconfig` picks the project per build configuration (Debug
+→ Staging, Release → Prod) for both platforms. A target's
+`TIM_GOOGLE_URL_SCHEME_<project>` build setting has to be the
+`REVERSED_CLIENT_ID` from that project's plist; the build fails with a note
+saying so when it is not. See `STAGING.md` at the repository root.
 
 
 <!-- TODO: add iOS screenshots to fastlane metadata
