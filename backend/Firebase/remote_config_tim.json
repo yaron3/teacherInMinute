@@ -8659,6 +8659,34 @@
       },
       "valueType": "STRING"
     },
+    "make_sure_microphone_enabled_teacher": {
+      "defaultValue": {
+        "value": "Make sure your microphone is enabled so your student can hear you."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ודא שהמיקרופון מופעל כדי שהתלמיד יוכל לשמוע אותך."
+        },
+        "HebrewApp": {
+          "value": "ודא שהמיקרופון מופעל כדי שהתלמיד יוכל לשמוע אותך."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "make_sure_camera_enabled_teacher": {
+      "defaultValue": {
+        "value": "Make sure your camera is enabled so your student can see you."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ודא שהמצלמה מופעלת כדי שהתלמיד יוכל לראות אותך."
+        },
+        "HebrewApp": {
+          "value": "ודא שהמצלמה מופעלת כדי שהתלמיד יוכל לראות אותך."
+        }
+      },
+      "valueType": "STRING"
+    },
     "make_sure_camera_enabled": {
       "defaultValue": {
         "value": "Make sure your camera is enabled so your teacher can see your work."
@@ -12317,6 +12345,20 @@
         },
         "HebrewApp": {
           "value": "השלם את המסמכים שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_student_will": {
+      "defaultValue": {
+        "value": "The student will join shortly"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד יצטרף בקרוב"
+        },
+        "HebrewApp": {
+          "value": "התלמיד יצטרף בקרוב"
         }
       },
       "valueType": "STRING"

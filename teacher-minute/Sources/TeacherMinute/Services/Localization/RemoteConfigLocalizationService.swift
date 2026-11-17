@@ -117,6 +117,11 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Go Offline": "עבור למצב לא מקוון",
         // Starting a lesson by chat while its audio connects. Remote Config
         // carries these too; the fallback covers the time before it deploys.
+        // The teacher's side of the connecting screen. Remote Config carries
+        // these too; the fallback covers the time before it deploys.
+        "The student will join shortly": "התלמיד יצטרף בקרוב",
+        "Make sure your microphone is enabled so your student can hear you.": "ודא שהמיקרופון מופעל כדי שהתלמיד יוכל לשמוע אותך.",
+        "Make sure your camera is enabled so your student can see you.": "ודא שהמצלמה מופעלת כדי שהתלמיד יוכל לראות אותך.",
         "Audio is taking longer than usual": "חיבור השמע לוקח יותר זמן מהרגיל",
         "Video is taking longer than usual": "חיבור הווידאו לוקח יותר זמן מהרגיל",
         "You can start with your teacher by chat now. We'll keep connecting in the background.": "אפשר להתחיל עם המורה בצ׳אט כבר עכשיו. נמשיך להתחבר ברקע.",
@@ -1270,6 +1275,9 @@ enum LocalizationKey {
         "Log out?": "log_out_qmark",
         // `make_sure_your` holds the microphone sentence.
         "Make sure your camera is enabled so your teacher can see your work.": "make_sure_camera_enabled",
+        // The teacher's side of the same two permission cards.
+        "Make sure your microphone is enabled so your student can hear you.": "make_sure_microphone_enabled_teacher",
+        "Make sure your camera is enabled so your student can see you.": "make_sure_camera_enabled_teacher",
         // `minutes` holds the lowercase unit; the menu's section name is its own.
         "Minutes": "menu_minutes",
         // `completed` holds an old "%d completed"; the activity count's label is its own.
