@@ -443,6 +443,7 @@
 				TIM_APP_ROLE = student;
 				TIM_APP_URL_SCHEME = teacherminute;
 				TIM_GOOGLE_URL_SCHEME_Prod = "com.googleusercontent.apps.922632930084-783f3pcf4e6r9d0entjoveo3g2muejt3";
+				TIM_GOOGLE_URL_SCHEME_Staging = "com.googleusercontent.apps.315853704604-qau34dvugdgnubbfqph3e8tn8pspqq4g";
 			};
 			name = Debug;
 		};
@@ -475,6 +476,7 @@
 				TIM_APP_ROLE = student;
 				TIM_APP_URL_SCHEME = teacherminute;
 				TIM_GOOGLE_URL_SCHEME_Prod = "com.googleusercontent.apps.922632930084-783f3pcf4e6r9d0entjoveo3g2muejt3";
+				TIM_GOOGLE_URL_SCHEME_Staging = "com.googleusercontent.apps.315853704604-qau34dvugdgnubbfqph3e8tn8pspqq4g";
 			};
 			name = Release;
 		};
@@ -667,6 +669,7 @@
 				TIM_APP_ROLE = teacher;
 				TIM_APP_URL_SCHEME = proteacher;
 				TIM_GOOGLE_URL_SCHEME_Prod = "com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m";
+				TIM_GOOGLE_URL_SCHEME_Staging = "com.googleusercontent.apps.315853704604-uib3es0pigh731i3hnn519bgiqp99qa1";
 			};
 			name = Debug;
 		};
@@ -696,6 +699,7 @@
 				TIM_APP_ROLE = teacher;
 				TIM_APP_URL_SCHEME = proteacher;
 				TIM_GOOGLE_URL_SCHEME_Prod = "com.googleusercontent.apps.922632930084-1ulavn8uovc3uu1f10pn91sjlq7vm16m";
+				TIM_GOOGLE_URL_SCHEME_Staging = "com.googleusercontent.apps.315853704604-uib3es0pigh731i3hnn519bgiqp99qa1";
 			};
 			name = Release;
 		};
