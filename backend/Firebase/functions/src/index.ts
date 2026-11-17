@@ -41,6 +41,9 @@ export {
 // push token to be reached by instead
 export { teacherKeepAliveWatchdog } from "./keepAlive";
 
+// Once a minute: removes invite cards and searching questions whose search ended
+export { staleQuestionSweep } from "./staleInvites";
+
 // Platform statistics
 export { onUserRoleChange } from "./stats";
 
