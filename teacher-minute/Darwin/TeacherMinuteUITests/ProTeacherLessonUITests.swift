@@ -138,12 +138,26 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
     @MainActor
     func testTeachingALessonAndEndingIt() async throws {
         let (uid, _) = try await joinTheStudentsLesson()
-        pause(seconds: 35)
+        if sessionShotsEnabled {
+            // Session screenshots (SESSION_SHOTS=1): a message, then the
+            // middle of the lesson, inside the same 35 seconds.
+            let started = Date()
+            sendSessionMessage(app, "Hello! Let's move the 3 to the other side first.")
+            pause(seconds: 15)
+            sessionShot("03-teacher-during")
+            pause(seconds: max(0, 35 - Date().timeIntervalSince(started)))
+        } else {
+            pause(seconds: 35)
+        }
         let end = app.buttons["session_end_button"]
         try require(tapWhenHittable(end, "End"), "End was never tappable")
-        try require(tapWhenHittable(app.buttons["chat_end_prompt_primary"], "the end confirmation"), "ending asked nothing")
+        let confirm = app.buttons["chat_end_prompt_primary"]
+        if sessionShotsEnabled, confirm.waitForExistence(timeout: 10) { pause(seconds: 1) }
+        sessionShot("04-teacher-end-confirm")
+        try require(tapWhenHittable(confirm, "the end confirmation"), "ending asked nothing")
         try require(waitForDisappearance(end, timeout: 60), "ending did not leave the lesson")
         try await expectFreeOnTheDashboard(uid)
+        sessionShot("05-teacher-after")
     }
 
     // MARK: - Steps
@@ -216,6 +230,7 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         try require(type == Self.lessonType, "the student never chose a \(Self.lessonType) lesson (\(type))")
         let accept = visibleAcceptButton(timeout: 60)
         try require(accept != nil, "the question's card never showed")
+        sessionShot("01-teacher-invite")
         accept?.tap()
         // The base class's tearDown marks currentQid unanswered, for questions
         // a test left searching; this one becomes a lesson the student's half
@@ -228,6 +243,8 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         let entered = waitForAny([end, textOnly], timeout: 90) { [self] in _ = dismissSystemPromptIfPresent() }
         if entered == textOnly { _ = tapWhenHittable(textOnly, "Continue with text only") }
         try require(end.waitForExistence(timeout: 90), "the teacher never entered the lesson")
+        if sessionShotsEnabled { pause(seconds: 2) }
+        sessionShot("02-teacher-lesson-start")
         // IOS-D-12: the accept is this teacher's, in both stores.
         let accepted = try await backend.fields("questions/\(qid)") ?? [:]
         XCTAssertEqual((accepted["acceptedByTeacher"] as? [String: Any])?["stringValue"] as? String, uid,

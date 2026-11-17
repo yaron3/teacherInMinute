@@ -71,6 +71,12 @@ class CrossPlatformLessonTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(intent)
         device.wait(Until.hasObject(By.pkg(context.packageName).depth(0)), 30_000)
+        // A cold start keeps the main thread busy for seconds after the window
+        // shows (7 s on a loaded emulator). Input sent then is an ANR to
+        // Android ("waited for FocusEvent"), so let the start finish first.
+        device.waitForIdle(20_000)
+        Thread.sleep(5_000)
+        device.waitForIdle(20_000)
     }
 
     // Teacher
@@ -108,6 +114,7 @@ class CrossPlatformLessonTest {
             ?: failWithScreen("teacher-type", "the student never chose a text lesson")
         val accept = device.wait(Until.findObject(By.res("invite_accept_$qid")), 60_000)
             ?: failWithScreen("teacher-card", "the question's card never showed")
+        shot("01-teacher-invite")
         accept.click()
 
         enterTheLesson("teacher")
@@ -115,13 +122,27 @@ class CrossPlatformLessonTest {
             backend.strings("questions/$qid")?.get("acceptedByTeacher"))
         assertEquals("text", type)
 
-        Thread.sleep(35_000)
+        if (sessionShots) {
+            // Session screenshots: a message, then the middle of the lesson,
+            // inside the same 35 seconds.
+            val started = System.currentTimeMillis()
+            sendMessage("Hello! Let's move the 3 to the other side first.")
+            Thread.sleep(15_000)
+            shot("03-teacher-during")
+            Thread.sleep(maxOf(0L, 35_000 - (System.currentTimeMillis() - started)))
+        } else {
+            Thread.sleep(35_000)
+        }
         device.findObject(endButton)?.click() ?: failWithScreen("teacher-end", "End was never there")
         val confirm = device.wait(Until.findObject(By.res("chat_end_prompt_primary")), 15_000)
             ?: failWithScreen("teacher-end-confirm", "ending asked nothing")
+        if (sessionShots) Thread.sleep(1_000)
+        shot("04-teacher-end-confirm")
         confirm.click()
         if (!device.wait(Until.gone(endButton), 60_000)) failWithScreen("teacher-left", "ending did not leave the lesson")
         expectTheLessonOver(qid, uid)
+        if (sessionShots) Thread.sleep(2_000)
+        shot("05-teacher-after")
 
         // Nobody stays online on the emulators after the run.
         backend.patch("teachers/$uid", JSONObject().put("status", "offline"))
@@ -169,15 +190,25 @@ class CrossPlatformLessonTest {
         (choice ?: failWithScreen("student-choice", "the search screen offers no text lesson")).click()
         waitFor(15_000) { stringValue(backend.fields("questions/$qid"), "conversationType")?.takeIf { it == "text" } }
             ?: failWithScreen("student-type", "choosing text did not reach the question")
+        shot("01-student-searching")
 
         enterTheLesson("student")
+        if (sessionShots) {
+            sendMessage("Hi! I'm stuck on 2x + 3 = 11.")
+            Thread.sleep(12_000)
+            shot("03-student-during")
+        }
         // The teacher's half ends it after 35 seconds; the rating shows it.
         val close = device.wait(Until.findObject(By.res("rate_session_close")), 180_000)
             ?: failWithScreen("student-rating", "the teacher's ending never reached the student")
+        if (sessionShots) Thread.sleep(1_000)
+        shot("04-student-end-rating")
         close.click()
         if (!device.wait(Until.hasObject(By.res("question_home_mode_text")), 30_000)) {
             failWithScreen("student-home", "closing the rating did not return home")
         }
+        if (sessionShots) Thread.sleep(1_000)
+        shot("05-student-after")
         expectTheLessonOver(qid, teacher)
     }
 
@@ -233,6 +264,35 @@ class CrossPlatformLessonTest {
             Thread.sleep(1_000)
         }
         if (!device.hasObject(endButton)) failWithScreen("$side-lesson", "the $side never entered the lesson")
+        if (sessionShots) Thread.sleep(2_000)
+        shot("02-$side-lesson-start")
+    }
+
+    // Session screenshots, for scripts/ui-tests/run_session_screenshots.sh.
+    // Off unless the run passes sessionShots=1, so the sanity run is unchanged.
+
+    private val sessionShots: Boolean get() = args.getString("sessionShots") == "1"
+
+    /** A picture of the screen, in files/ui-test/shots, for the script to pull. */
+    private fun shot(name: String) {
+        if (!sessionShots) return
+        val dir = java.io.File(context.filesDir, "ui-test/shots").apply { mkdirs() }
+        device.takeScreenshot(java.io.File(dir, "$name.png"))
+    }
+
+    /** One chat message, best effort: a lesson without a reachable field goes on. */
+    private fun sendMessage(text: String) {
+        device.findObject(By.res("session_tab_chat"))?.let { runCatching { it.click() } }
+        val tagged = device.wait(Until.findObject(By.res("chat_message_field")), 10_000) ?: return
+        val field: UiObject2 = tagged.findObject(By.clazz("android.widget.EditText")) ?: tagged
+        runCatching {
+            field.click()
+            field.text = text
+            device.wait(Until.findObject(By.res("chat_send_button")), 5_000)?.click()
+            Thread.sleep(500)
+            // Back closes the keyboard; with no keyboard up it would leave the lesson.
+            if (device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")) device.pressBack()
+        }
     }
 
     /** The question completed and the teacher free. */

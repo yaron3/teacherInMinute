@@ -341,13 +341,23 @@ final class StudentAskUITests: XCTestCase {
     @MainActor
     func testTakingALessonTheTeacherEndsThenSkippingTheRating() async throws {
         let (teacher, _, qid) = try await joinALesson()
+        // Session screenshots only (SESSION_SHOTS=1): a message, then the
+        // middle of the lesson.
+        if sessionShotsEnabled {
+            sendSessionMessage(app, "Hi! I'm stuck on 2x + 3 = 11.")
+            pause(seconds: 12)
+            sessionShot("03-student-during")
+        }
         // The teacher's half ends it after 35 seconds. The rating comes up
         // over the lesson screen, whose End stays in the hierarchy beneath it,
         // so the rating itself is what shows the end arrived.
         let close = app.buttons["rate_session_close"]
         try require(close.waitForExistence(timeout: 180), "the teacher's ending never reached the student")
+        pause(seconds: sessionShotsEnabled ? 1 : 0)
+        sessionShot("04-student-end-rating")
         try require(tapWhenHittable(close, "the rating's close"), "the rating could not be closed")
         try require(waitForHome(timeout: 30), "closing the rating did not return home")
+        sessionShot("05-student-after")
 
         try await expectTheLessonOver(qid, teacher: teacher)
         let rating = try await backend.fields("teachers/\(teacher)/ratings/\(qid)")
@@ -605,6 +615,7 @@ final class StudentAskUITests: XCTestCase {
             if chosen != type { try await Task.sleep(nanoseconds: 500_000_000) }
         }
         try require(chosen == type, "choosing \(type) did not reach the question (\(chosen))")
+        sessionShot("01-student-searching")
         return (teacher, student, qid)
     }
 
@@ -618,6 +629,8 @@ final class StudentAskUITests: XCTestCase {
         let entered = waitForAny([end, textOnly], timeout: 300)
         if entered == textOnly { try require(tapWhenHittable(textOnly, "Continue with text only"), "text only was never tappable") }
         try require(end.waitForExistence(timeout: 120), "the student never entered the lesson")
+        if sessionShotsEnabled { pause(seconds: 2) }
+        sessionShot("02-student-lesson-start")
         return (teacher, student, qid)
     }
 
