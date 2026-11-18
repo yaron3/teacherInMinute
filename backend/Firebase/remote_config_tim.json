@@ -10364,6 +10364,20 @@
       },
       "valueType": "STRING"
     },
+    "you_offline_the": {
+      "defaultValue": {
+        "value": "You're offline. The lesson ends in %d:%02d unless you reconnect."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין חיבור לאינטרנט. השיעור יסתיים בעוד %d:%02d אם החיבור לא יחזור."
+        },
+        "HebrewApp": {
+          "value": "אין חיבור לאינטרנט. השיעור יסתיים בעוד %d:%02d אם החיבור לא יחזור."
+        }
+      },
+      "valueType": "STRING"
+    },
     "earnings_yet_your": {
       "defaultValue": {
         "value": "No earnings yet. Your first lesson will show up here."

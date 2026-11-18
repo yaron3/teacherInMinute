@@ -220,7 +220,11 @@ struct ChatSessionView: View {
         }
       }
 
-      if let secondsLeft = viewModel.peerSecondsToReconnect(at: displayDate) {
+      if let secondsLeft = viewModel.selfSecondsToReconnect(at: displayDate) {
+        // This phone's own connection dropped (IT-36). The timer has stopped,
+        // and the lesson ends here unless it is back in time.
+        holdBanner(viewModel.selfReconnectingText(secondsLeft: secondsLeft), id: "session_banner_self_reconnecting")
+      } else if let secondsLeft = viewModel.peerSecondsToReconnect(at: displayDate) {
         // The other side's connection dropped. Unless it is back in time, the
         // lesson ends as of that moment — see PeerPresenceTracker.
         holdBanner(viewModel.peerReconnectingText(secondsLeft: secondsLeft), id: "session_banner_peer_reconnecting")

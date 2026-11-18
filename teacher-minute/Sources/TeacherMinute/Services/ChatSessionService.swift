@@ -135,6 +135,8 @@ final class ChatSessionService {
   private let connectedRef: FirebaseDatabase.DatabaseReference
   private var presenceHandle: DatabaseHandle?
   private var connectedHandle: DatabaseHandle?
+  /// What `.info/connected` last said while presence is kept.
+  private var databaseConnected = false
   private var sessionHandle: DatabaseHandle?
   private var messagesHandle: DatabaseHandle?
   private var boardHandle: DatabaseHandle?
@@ -759,8 +761,10 @@ final class ChatSessionService {
       connectedRef.removeObserver(withHandle: connectedHandle)
     }
     let side = presenceRef.child(role)
-    connectedHandle = connectedRef.observe(.value) { snapshot in
-      guard (snapshot.value as? Bool) == true else { return }
+    connectedHandle = connectedRef.observe(.value) { [weak self] snapshot in
+      let connected = (snapshot.value as? Bool) == true
+      self?.databaseConnected = connected
+      guard connected else { return }
       // A new entry for each connection: the handler of one that dropped
       // removes its own entry only, however late the server gets to it.
       let entry = side.child("connections").childByAutoId()
@@ -786,6 +790,7 @@ final class ChatSessionService {
       connectedRef.removeObserver(withHandle: connectedHandle)
       self.connectedHandle = nil
     }
+    databaseConnected = false
     // Cancels the handlers here and on everything beneath. Not waited on, as
     // on Android: waiting cannot save the handlers of a connection that is
     // already down, which the server runs regardless. The block form is
@@ -797,6 +802,33 @@ final class ChatSessionService {
         logger.error("[ChatSession] cancelling presence handlers failed questionId=\(questionId): \(error.localizedDescription)")
       }
     }
+#endif
+  }
+
+  /// This device's own database connection, while presence is kept. False
+  /// before `.info/connected` first reports, and once presence stops.
+  var isDatabaseConnected: Bool {
+#if os(Android)
+    AndroidChatBridge.isDatabaseConnected()
+#else
+    databaseConnected
+#endif
+  }
+
+  /// Stops adding connection entries but leaves the disconnect handlers armed,
+  /// for a side that gave up while offline (IT-36). The server must still stamp
+  /// `lostAt` for the connection that dropped, and a new entry written on
+  /// reconnect would read as this side coming back. `stopPresence` cancels the
+  /// handlers instead, which is right only for a side that leaves online.
+  func detachPresence() {
+#if os(Android)
+    AndroidChatBridge.detachLessonPresence()
+#else
+    if let connectedHandle {
+      connectedRef.removeObserver(withHandle: connectedHandle)
+      self.connectedHandle = nil
+    }
+    databaseConnected = false
 #endif
   }
 
@@ -1283,6 +1315,10 @@ protocol ChatSessionViewModeling: AnyObject {
   /// connection is lost. Nil while it is in the lesson.
   func peerSecondsToReconnect(at date: Date) -> Int?
 
+  /// Whole seconds this side still has to reconnect, while its own connection
+  /// is lost (IT-36). Nil while it is online.
+  func selfSecondsToReconnect(at date: Date) -> Int?
+
   // MARK: Connecting
   //
   // What each side tells the other while the lesson connects — a permission
@@ -1526,6 +1562,8 @@ extension ChatSessionViewModeling {
 
   func peerSecondsToReconnect(at date: Date) -> Int? { nil }
 
+  func selfSecondsToReconnect(at date: Date) -> Int? { nil }
+
   func endLessonWithFarewell(_ message: String) async { await endLesson() }
 
   var peerFarewellNote: String? { nil }
@@ -1585,6 +1623,16 @@ extension ChatSessionViewModeling {
     String(
       format: LocalizationSupport.localized("%@ lost connection. The lesson ends in %d:%02d unless they reconnect."),
       participantName,
+      secondsLeft / 60,
+      secondsLeft % 60
+    )
+  }
+
+  /// Shown on the side that lost its own connection, counting down the time
+  /// it has to come back — see `selfSecondsToReconnect`.
+  func selfReconnectingText(secondsLeft: Int) -> String {
+    String(
+      format: LocalizationSupport.localized("You're offline. The lesson ends in %d:%02d unless you reconnect."),
       secondsLeft / 60,
       secondsLeft % 60
     )
@@ -2013,6 +2061,18 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private var peerLossCount = 0
   /// This side's presence is being kept — see `startPresenceIfLessonStarted`.
   private var isKeepingPresence = false
+  /// When this device lost its own connection to the database, while it still
+  /// has (IT-36). The timer stops there, and the lesson ends on this side if
+  /// the connection is not back within the grace period.
+  private(set) var selfLostSince: Date?
+  /// `.info/connected` has said true at least once in this lesson. It reports
+  /// false as it is first read, which is not a loss.
+  private var hasBeenOnline = false
+  /// Counts this side's own losses, so a check still waiting on an earlier one
+  /// knows it has been overtaken.
+  private var selfLossCount = 0
+  /// Reads this device's own connection once a second while presence is kept.
+  private var selfConnectionTask: Task<Void, Never>?
   /// This side's leave has been stamped — see `markLeavingLesson`.
   private var hasStampedLeave = false
   /// Presence writes, chained so they land in the order they were made: a stop
@@ -2213,7 +2273,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
           }
         } catch {
           logger.error("[ChatSessionService] \(error.localizedDescription)")
-          errorMessage = error.localizedDescription
+          // Offline, every read fails; the offline banner already says so.
+          if selfLostSince == nil {
+            errorMessage = error.localizedDescription
+          }
         }
         try? await Task.sleep(nanoseconds: 1_500_000_000)
       }
@@ -2870,6 +2933,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private func startPresenceIfLessonStarted() {
     guard hasLessonStarted, !isKeepingPresence, !isLeaving, !hasHandledSessionEnd else { return }
     isKeepingPresence = true
+    watchSelfConnection()
     let side = roleKey(role)
     let previous = presenceWrite
     presenceWrite = Task {
@@ -2884,6 +2948,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
 
   private func stopKeepingPresence() {
+    selfConnectionTask?.cancel()
+    selfConnectionTask = nil
     guard isKeepingPresence else { return }
     isKeepingPresence = false
     let side = roleKey(role)
@@ -2917,6 +2983,112 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         // a moment later than the leave itself.
         logger.error("[ChatSession] markLeft failed questionId=\(self.questionId): \(error.localizedDescription)")
       }
+    }
+  }
+
+  // MARK: This side's own connection (IT-36)
+  //
+  // A phone that loses its network hears nothing from anyone: not the other
+  // side, not the backend that ends the lesson once the database server
+  // notices. So it watches its own connection, stops its timer when it drops,
+  // and ends the lesson itself if it is not back within the grace period the
+  // other side and the backend give it.
+
+  private func watchSelfConnection() {
+    selfConnectionTask?.cancel()
+    selfConnectionTask = Task { [weak self] in
+      while !Task.isCancelled {
+        guard let self else { return }
+        self.receiveSelfConnection(self.service.isDatabaseConnected)
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+      }
+    }
+  }
+
+  private func receiveSelfConnection(_ connected: Bool) {
+    guard !isLeaving, !hasHandledSessionEnd else { return }
+    if connected {
+      hasBeenOnline = true
+      guard selfLostSince != nil else { return }
+      selfLostSince = nil
+      logger.info("[ChatSession] this side reconnected questionId=\(self.questionId) role=\(self.role)")
+      onSessionDetailsUpdated?()
+      return
+    }
+    guard hasBeenOnline, selfLostSince == nil else { return }
+    selfLostSince = Date()
+    selfLossCount += 1
+    let loss = selfLossCount
+    logger.info("[ChatSession] this side lost its connection questionId=\(self.questionId) role=\(self.role)")
+    onSessionDetailsUpdated?()
+    Task { [weak self] in
+      try? await Task.sleep(
+        nanoseconds: UInt64((PeerPresenceTracker.graceSeconds + Self.peerLostEndMarginSeconds) * 1_000_000_000)
+      )
+      guard let self, loss == self.selfLossCount, self.selfLostSince != nil else { return }
+      await self.endAfterLosingConnection()
+    }
+  }
+
+  /// Whole seconds this side still has to reconnect, while its own connection
+  /// is lost.
+  func selfSecondsToReconnect(at date: Date) -> Int? {
+    guard !isLeaving, !hasHandledSessionEnd, let selfLostSince else { return nil }
+    let remaining = PeerPresenceTracker.graceSeconds - date.timeIntervalSince(selfLostSince)
+    return max(0, Int(remaining.rounded(.up)))
+  }
+
+  /// Closes the lesson on this side after its connection stayed down for the
+  /// whole grace period. The backend ends it too, once the database server
+  /// notices (endLostLesson in functions/src/lessons.ts), and bills it to that
+  /// moment.
+  ///
+  /// Nothing here may undo that. `markLeft` is not called: written offline it
+  /// lands at reconnect, with the reconnect's timestamp. The disconnect
+  /// handlers are not cancelled, and no new connection entry is written on
+  /// reconnect, either of which would read as this side never having gone.
+  private func endAfterLosingConnection() async {
+    guard didObserveActiveSession || details != nil else { return }
+    guard !hasHandledSessionEnd, !isLeaving else { return }
+    hasHandledSessionEnd = true
+    logger.info("[ChatSession] this side stayed offline; ending the lesson questionId=\(self.questionId) role=\(self.role)")
+    isKeepingPresence = false
+    service.detachPresence()
+    pollingTask?.cancel()
+    pollingTask = nil
+    stopWatchingPeerSetup()
+    service.stopListening()
+    await LiveKitService.shared.disconnect()
+    onSessionEnded?()
+    reportEndOnceOnline()
+  }
+
+  /// Tells the backend the lesson is over as soon as the network is back, and
+  /// takes the time it settled. Offline the call fails at once, so it is
+  /// retried for a few minutes. By then the backend has usually ended the
+  /// lesson already, and the call reads back what it settled.
+  private func reportEndOnceOnline() {
+    guard !hasReportedLessonEnd else { return }
+    hasReportedLessonEnd = true
+    let questionId = self.questionId
+    Task { [weak self] in
+      for attempt in 1...36 {
+        do {
+          let result = try await FunctionsService.shared.endLesson(questionId: questionId)
+          guard let self else { return }
+          if let lessonSeconds = result.lessonSeconds {
+            self.settledLessonSeconds = lessonSeconds
+            self.settledBilledSeconds = result.billedSeconds
+            self.onSessionDetailsUpdated?()
+          }
+          logger.info("[ChatSession] endLesson reported after reconnecting questionId=\(questionId) attempt=\(attempt)")
+          return
+        } catch {
+          logger.info("[ChatSession] endLesson still offline questionId=\(questionId) attempt=\(attempt): \(error.localizedDescription)")
+          try? await Task.sleep(nanoseconds: 5_000_000_000)
+        }
+      }
+      logger.error("[ChatSession] endLesson never reached the backend after losing the connection questionId=\(questionId)")
     }
   }
 
@@ -3075,7 +3247,9 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     if let settledLessonSeconds { return settledLessonSeconds }
     let startMilliseconds = details?.startedAt ?? 0
     guard startMilliseconds > 0 else { return 0 }
-    return max(0, Int(date.timeIntervalSince1970 - startMilliseconds / 1000.0))
+    // Stopped where this side lost its connection, until it is back.
+    let counted = selfLostSince.map { min($0, date) } ?? date
+    return max(0, Int(counted.timeIntervalSince1970 - startMilliseconds / 1000.0))
   }
 
   var teacherId: String {
@@ -3447,6 +3621,14 @@ private enum AndroidChatBridge {
     name: "stopLessonPresence",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
   )!
+  private static let detachLessonPresenceMethod = managerClass.getStaticMethodID(
+    name: "detachLessonPresence",
+    sig: "()V"
+  )!
+  private static let isDatabaseConnectedMethod = managerClass.getStaticMethodID(
+    name: "isDatabaseConnected",
+    sig: "()Z"
+  )!
   private static let markLeftLessonMethod = managerClass.getStaticMethodID(
     name: "markLeftLesson",
     sig: "(Ljava/lang/String;Ljava/lang/String;)V"
@@ -3755,6 +3937,32 @@ private enum AndroidChatBridge {
         ]
       )
     }
+  }
+
+  static func detachLessonPresence() {
+    jniContext {
+      do {
+        try managerClass.callStatic(
+          method: detachLessonPresenceMethod,
+          options: [.kotlincompat],
+          args: []
+        )
+      } catch {
+        logger.error("[ChatSession][Android] detachLessonPresence failed: \(error)")
+      }
+    }
+  }
+
+  static func isDatabaseConnected() -> Bool {
+    let connected: Bool? = try? jniContext {
+      let value: Bool = try managerClass.callStatic(
+        method: isDatabaseConnectedMethod,
+        options: [.kotlincompat],
+        args: []
+      )
+      return value
+    }
+    return connected ?? false
   }
 
   static func markLeftLesson(questionId: String, role: String) throws {
