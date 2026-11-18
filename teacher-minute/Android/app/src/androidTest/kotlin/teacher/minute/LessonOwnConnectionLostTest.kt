@@ -18,11 +18,13 @@ import java.util.regex.Pattern
  *
  *  1. The teacher accepts a seeded text question, and the lesson is marked
  *     started so the app keeps its presence.
- *  2. Airplane mode goes on. The offline banner appears and the timer stops.
+ *  2. The app's database connection is cut. The offline banner appears and
+ *     the timer stops.
  *  3. About 35 seconds later the lesson closes on this phone.
  *  4. Back online, the lesson is over in the backend too.
  *
  * Runs on the local Firebase emulators; see ProTeacherAcceptRaceTest for how.
+ * Run it on its own: see `setDatabaseOnline`.
  */
 @RunWith(AndroidJUnit4::class)
 class LessonOwnConnectionLostTest : ProTeacherEmulatorTest() {
@@ -36,10 +38,10 @@ class LessonOwnConnectionLostTest : ProTeacherEmulatorTest() {
         Thread.sleep(5_000)
 
         try {
-            setAirplaneMode(true)
+            setDatabaseOnline(false)
 
             assertTrue(
-                "no offline banner after the network went: ${screenText()}",
+                "no offline banner after the connection went: ${screenText()}",
                 device.wait(Until.hasObject(By.res("session_banner_self_reconnecting")), 20_000)
             )
             shot("it36-offline-banner")
@@ -54,7 +56,7 @@ class LessonOwnConnectionLostTest : ProTeacherEmulatorTest() {
             )
             shot("it36-ended-offline")
         } finally {
-            setAirplaneMode(false)
+            setDatabaseOnline(true)
         }
 
         // Back online: the lesson is over in the backend as well, whichever of
@@ -89,9 +91,20 @@ class LessonOwnConnectionLostTest : ProTeacherEmulatorTest() {
         // The app's own: the status bar's clock matches the pattern too.
         device.findObjects(By.pkg(context.packageName).text(timerPattern)).map { it.text }.sorted()
 
-    private fun setAirplaneMode(on: Boolean) {
-        device.executeShellCommand("cmd connectivity airplane-mode ${if (on) "enable" else "disable"}")
-        Thread.sleep(1_000)
+    /**
+     * Cuts or restores this app's database connection, as losing and regaining
+     * the network does: `.info/connected` turns false and the server stamps
+     * `lostAt`. Airplane mode does the same, and passed too.
+     *
+     * On the emulator a dropped connection does not come back in the same
+     * process, by either route: minutes later `.info/connected` was still
+     * false, with no lesson involved at all. Real phones do reconnect. The
+     * tests of a run share that process, so run this class on its own, or the
+     * tests after it find their app with no connection.
+     */
+    private fun setDatabaseOnline(online: Boolean) {
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+        if (online) database.goOnline() else database.goOffline()
     }
 
     /** A screenshot and the window hierarchy, where `adb pull` can reach them. */
