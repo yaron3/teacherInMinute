@@ -13,6 +13,7 @@
 
 import Foundation
 import Observation
+import SkipFuse
 
 @MainActor
 @Observable

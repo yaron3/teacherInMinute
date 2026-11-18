@@ -9,6 +9,7 @@
 
 import Foundation
 import Observation
+import SkipFuse
 
 @Observable
 @MainActor
