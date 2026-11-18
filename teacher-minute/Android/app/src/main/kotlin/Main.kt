@@ -301,8 +301,8 @@ open class MainActivity: AppCompatActivity {
 
         /**
          * Takes back away from the navigation stack for the duration of a
-         * lesson, so it backgrounds the app — what it already does on the tabs
-         * — instead of popping a live session.
+         * lesson and hands it to the lesson screen, which asks whether to end
+         * the lesson, instead of popping a live session.
          */
         @JvmStatic
         fun setSessionBackBlocked(blocked: Boolean) {
@@ -314,8 +314,11 @@ open class MainActivity: AppCompatActivity {
                     }
                     val callback = object : OnBackPressedCallback(true) {
                         override fun handleOnBackPressed() {
-                            logger.info("[BackNav] suppressing system back during live session")
-                            activity.moveTaskToBack(true)
+                            // The lesson registers its own handler, which asks
+                            // whether to end it (IT-41). Backgrounding here
+                            // left the whole app with the lesson still on.
+                            logger.info("[BackNav] system back during live session — handing to the lesson")
+                            OnboardingBackBridge.shared.handleBack()
                         }
                     }
                     activity.sessionBackCallback = callback

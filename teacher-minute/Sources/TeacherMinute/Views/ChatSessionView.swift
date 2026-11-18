@@ -312,6 +312,7 @@ struct ChatSessionView: View {
       // A formula from the other side needs the room the keyboard takes.
       dismissChatInput()
     }
+    .onSystemBack { handleSystemBack() }
     .onDisappear {
       if !didRequestLessonEnd, !viewModel.isInSetup {
         didRequestLessonEnd = true
@@ -879,6 +880,23 @@ struct ChatSessionView: View {
     Task {
       await viewModel.endLesson()
       onClose()
+    }
+  }
+
+  /// Android's system Back during a lesson (IT-41) asks what the End control
+  /// asks. Back again closes that question, as its Cancel does. While
+  /// connecting, on the rating prompt, and on the holds and notes that have no
+  /// Cancel, Back does nothing: it never leaves the lesson silently.
+  func handleSystemBack() {
+    trackTap("chat_system_back")
+    guard !viewModel.isInSetup, !isRatingPromptVisible, !isEndingSession else { return }
+    switch endSessionPrompt {
+    case nil:
+      requestEndSession()
+    case .confirmEnd:
+      endSessionPrompt = nil
+    default:
+      break
     }
   }
 
