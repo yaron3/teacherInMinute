@@ -14,6 +14,7 @@ import androidx.test.uiautomator.Until
 import com.google.firebase.auth.FirebaseAuth
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -146,6 +147,93 @@ class CrossPlatformLessonTest {
 
         // Nobody stays online on the emulators after the run.
         backend.patch("teachers/$uid", JSONObject().put("status", "offline"))
+    }
+
+    /** IT-42 end to end, the teacher's half — pairs with the iOS student's
+     *  StudentAskUITests.testABlockedTeacherGetsNoQuestionsUntilUnblocked.
+     *  The teacher takes the lesson; the student ends it, reports and blocks
+     *  them, and asks again: that question must never show on this screen.
+     *  Once the student unblocks and asks once more, its card shows here and
+     *  is declined, which tells the student's half it was seen. */
+    @Test
+    fun teachesThenIsBlockedThenUnblocked() {
+        assumeTrue("the teacher app's half", context.packageName == "com.yaronj.tim")
+        val email = args.getString("lessonTeacherEmail")
+        val password = args.getString("lessonTeacherPassword")
+        assumeTrue("pass lessonTeacherEmail and lessonTeacherPassword", email != null && password != null)
+        val uid = args.getString("lessonTeacherUid")!!
+
+        openTeacherLogin()
+        type(email!!, into = "email_input")
+        type(password!!, into = "password_input")
+        device.findObject(By.res("login_submit")).click()
+        if (!device.wait(Until.hasObject(By.res("availability_toggle")), 90_000)) {
+            failWithScreen("teacher-dashboard", "signing in did not reach the dashboard")
+        }
+        comeOnline(uid)
+
+        val qid = waitFor(300_000) { backend.childKeys("teacherInvites/$uid").firstOrNull() }
+            ?: failWithScreen("teacher-invite", "no question reached the teacher")
+        waitFor(120_000) { backend.strings("questions/$qid")?.get("conversationType")?.takeIf { it == "text" } }
+            ?: failWithScreen("teacher-type", "the student never chose a text lesson")
+        (device.wait(Until.findObject(By.res("invite_accept_$qid")), 60_000)
+            ?: failWithScreen("teacher-card", "the question's card never showed")).click()
+        enterTheLesson("teacher")
+        val student = backend.strings("questions/$qid")?.get("studentUid")
+            ?: failWithScreen("teacher-student", "the question names no student")
+
+        // The student ends it; any note on the way out is closed.
+        val ended = System.currentTimeMillis() + 300_000
+        while (System.currentTimeMillis() < ended && device.hasObject(endButton)) {
+            device.findObject(By.res("chat_end_prompt_primary"))?.let { runCatching { it.click() } }
+            Thread.sleep(2_000)
+        }
+        if (device.hasObject(endButton)) failWithScreen("teacher-ended", "the student's ending never reached the teacher")
+        expectTheLessonOver(qid, uid)
+        device.wait(Until.findObject(By.res("dialog_confirm_button")), 5_000)?.let { runCatching { it.click() } }
+
+        // Blocked: the student's next question must not show here.
+        waitFor(300_000) { if (backend.strings("users/$student/blockedTeachers/$uid") != null) true else null }
+            ?: failWithScreen("teacher-blocked", "the student never blocked the teacher")
+        comeOnline(uid)
+        val blockedQid = waitFor(300_000) {
+            backend.documentIds("questions", "studentUid", student).firstOrNull { it != qid }
+        } ?: failWithScreen("teacher-blocked-question", "the student never asked while the teacher was blocked")
+        val watchUntil = System.currentTimeMillis() + 25_000
+        while (System.currentTimeMillis() < watchUntil) {
+            if (device.hasObject(By.res("invite_accept_$blockedQid"))) {
+                failWithScreen("teacher-blocked-card", "the blocked teacher was shown the student's question")
+            }
+            assertFalse("the blocked teacher was sent the question", backend.exists("teacherInvites/$uid/$blockedQid"))
+            Thread.sleep(1_000)
+        }
+
+        // Unblocked: the student's next question shows here, and is declined.
+        waitFor(300_000) { if (backend.strings("users/$student/blockedTeachers/$uid") == null) true else null }
+            ?: failWithScreen("teacher-unblocked", "the student never unblocked the teacher")
+        val unblockedQid = waitFor(300_000) {
+            backend.documentIds("questions", "studentUid", student).firstOrNull { it != qid && it != blockedQid }
+        } ?: failWithScreen("teacher-unblocked-question", "the student never asked after unblocking")
+        val decline = device.wait(Until.findObject(By.res("invite_decline_$unblockedQid")), 60_000)
+            ?: failWithScreen("teacher-unblocked-card", "the unblocked teacher was never shown the student's question")
+        decline.click()
+        if (!device.wait(Until.gone(By.res("invite_accept_$unblockedQid")), 15_000)) {
+            failWithScreen("teacher-declined", "the card stayed after declining")
+        }
+
+        backend.patch("teachers/$uid", JSONObject().put("status", "offline"))
+    }
+
+    /** Online and listed, switching availability on by hand if needed. */
+    private fun comeOnline(uid: String) {
+        var online = false
+        for (attempt in 0 until 60) {
+            online = backend.exists("onlineTeachers/$uid")
+            if (online) break
+            if (attempt == 10 || attempt == 40) device.findObject(By.res("availability_toggle"))?.let { holdTap(it) }
+            Thread.sleep(1_000)
+        }
+        if (!online) failWithScreen("teacher-online", "the teacher never came online")
     }
 
     // Student

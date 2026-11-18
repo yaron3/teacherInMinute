@@ -8,6 +8,11 @@
 #                    the rating and finds the lesson in its history
 #   android-student  Instant Teacher on Android asks; Pro Teacher on the iPhone
 #                    takes it and ends it; the student closes the rating
+#   ios-student-block  (only when named) Instant Teacher on the iPhone takes a
+#                    lesson from Pro Teacher on Android, then reports and
+#                    blocks them; a question asked then never shows on the
+#                    teacher's screen; after unblocking in Privacy Controls the
+#                    next one does (IT-42)
 #
 # Each direction runs its two halves at the same time; they meet only through
 # the emulators (see CrossPlatformLessonTest.kt for the protocol). The iOS
@@ -152,8 +157,9 @@ PY
 }
 
 status=0
-for direction in ios-student android-student; do
+for direction in ios-student android-student ios-student-block; do
   [[ -n "$ONLY" && "$ONLY" != "$direction" ]] && continue
+  [[ -z "$ONLY" && "$direction" == ios-student-block ]] && continue
   [[ "${SESSION_SHOTS:-0}" == 1 ]] && clear_android_shots
   read -r TEACHER_EMAIL TEACHER_PASSWORD TEACHER_UID <<< "$(new_teacher)"
   echo "$direction: teacher $TEACHER_EMAIL uid=$TEACHER_UID"
@@ -161,7 +167,13 @@ for direction in ios-student android-student; do
   export TEST_RUNNER_LESSON_TEACHER_PASSWORD="$TEACHER_PASSWORD"
   export TEST_RUNNER_LESSON_TEACHER_UID="$TEACHER_UID"
   export TEST_RUNNER_QUESTION_TEXT="$QUESTION_TEXT"
-  if [[ "$direction" == "ios-student" ]]; then
+  if [[ "$direction" == "ios-student-block" ]]; then
+    run_android com.yaronj.tim.test teachesThenIsBlockedThenUnblocked "$direction-android-teacher" &
+    teacher_pid=$!
+    run_ios StudentAskUITests/testABlockedTeacherGetsNoQuestionsUntilUnblocked "$direction-ios-student" &
+    student_pid=$!
+    halves=("$direction-android-teacher" "$direction-ios-student")
+  elif [[ "$direction" == "ios-student" ]]; then
     run_android com.yaronj.tim.test teachesALessonAndEndsIt "$direction-android-teacher" &
     teacher_pid=$!
     run_ios StudentAskUITests/testTakingALessonTheTeacherEndsThenSkippingTheRating "$direction-ios-student" &
