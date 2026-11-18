@@ -160,8 +160,12 @@ abstract class ProTeacherEmulatorTest {
 
     // Scene
 
-    /** A searching question sent to both teachers, cards delivered. */
-    protected fun seedQuestion() {
+    /**
+     * A searching question sent to both teachers, cards delivered. With
+     * [started] false it carries no lesson, so accepting it leaves the two
+     * sides connecting.
+     */
+    protected fun seedQuestion(started: Boolean = true) {
         qid = "race-${UUID.randomUUID().toString().take(8)}"
         val now = Date()
         val expires = Date(now.time + 180_000)
@@ -185,10 +189,9 @@ abstract class ProTeacherEmulatorTest {
                 // once instead of minutes later; a student already in a started
                 // lesson keeps it from writing the lesson off.
                 "joinedParticipants" to listOf(student.uid),
-                "lessonId" to "$qid-lesson",
                 "createdAt" to now,
                 "updatedAt" to now,
-            )
+            ) + (if (started) mapOf("lessonId" to "$qid-lesson") else emptyMap())
         )
         for (teacher in listOf(appTeacher, otherTeacher)) backend.put("teacherInvites/${teacher.uid}/$qid", card())
     }

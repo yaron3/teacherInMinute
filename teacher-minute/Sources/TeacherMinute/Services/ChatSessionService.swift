@@ -2135,6 +2135,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       logger.info("[ChatSession] connected questionId=\(self.questionId) role=\(self.role)")
       beginListening()
       await reportLessonJoined()
+      // Kept from here, while the two sides are still connecting: a side whose
+      // app is killed then is noticed in seconds rather than at the 5-minute
+      // check for lessons that never started (IT-38).
+      startPresenceIfLessonStarted()
     }
   }
 
@@ -2927,13 +2931,20 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     roleKey(role) == "teacher" ? "student" : "teacher"
   }
 
-  /// Starts keeping this side's presence once the lesson has started: only a
-  /// lesson that started ends with a side going. Called wherever the start may
-  /// just have become known.
+  /// Starts keeping this side's presence once it has joined the lesson, while
+  /// still connecting (IT-38), and watching its own connection once the lesson
+  /// has started (IT-36). Called wherever either may just have become known.
+  ///
+  /// The own-connection watch waits for the start: while connecting, a trip to
+  /// Settings for a permission takes the app off the network, and must not
+  /// end the lesson.
   private func startPresenceIfLessonStarted() {
-    guard hasLessonStarted, !isKeepingPresence, !isLeaving, !hasHandledSessionEnd else { return }
+    guard hasLessonStarted || hasReportedLessonJoin, !isLeaving, !hasHandledSessionEnd else { return }
+    if hasLessonStarted, selfConnectionTask == nil {
+      watchSelfConnection()
+    }
+    guard !isKeepingPresence else { return }
     isKeepingPresence = true
-    watchSelfConnection()
     let side = roleKey(role)
     let previous = presenceWrite
     presenceWrite = Task {
@@ -3104,8 +3115,15 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private func receivePeerPresence(_ sides: [String: LessonPresenceReading]) {
     guard !isLeaving, !hasHandledSessionEnd else { return }
     let wasLost = peerPresence.lostSince != nil
+    var reading = sides[peerRoleKey]
+    // Away in Settings turning on a permission, which takes an iPhone app off
+    // the network. Not a loss: the backend skips it too, and a side that never
+    // comes back is written off by the check for lessons that never started.
+    if isInSetup, peerSetup.peerSignal == .finishingSetup, reading?.isLost == true {
+      reading = nil
+    }
     var updated = peerPresence
-    updated.receive(sides[peerRoleKey], at: Date())
+    updated.receive(reading, at: Date())
     guard updated != peerPresence else { return }
     peerPresence = updated
 
