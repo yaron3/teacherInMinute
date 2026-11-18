@@ -1200,6 +1200,10 @@ enum LocalizationKey {
         // The string that matches the value already in the template keeps the
         // original key; the other one is moved here.
 
+        // The dashboard's Status chip while the database connection is down
+        // (IT-49). `connection` is the bare word "Connection".
+        "No connection": "status_no_connection",
+
         // The verification link's results. `thanks_for_verifying` holds the
         // student's reward message; the two link-error messages share a prefix.
         "Thanks for verifying your email.": "email_verified_thanks",

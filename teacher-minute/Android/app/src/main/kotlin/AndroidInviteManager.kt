@@ -26,6 +26,18 @@ object AndroidInviteManager {
     private var listenerRef: DatabaseReference? = null
     private var listenerTeacherId: String? = null
 
+    // `.info/connected`, watched beside the invite listener (IT-49). The
+    // listener keeps its last snapshot through an outage, so having one says
+    // nothing about whether a new question could arrive. -1 until the first
+    // report, then 0 or 1.
+    @Volatile private var databaseConnected = -1
+    private var connectedListener: ValueEventListener? = null
+    private var connectedRef: DatabaseReference? = null
+
+    /** This device's database connection: -1 not reported yet, 0 down, 1 up. */
+    @JvmStatic
+    fun databaseConnectionState(): Int = databaseConnected
+
     @JvmStatic
     @Synchronized
     fun startListening(teacherId: String) {
@@ -53,6 +65,22 @@ object AndroidInviteManager {
         listenerRef = ref
         listenerTeacherId = teacherId
         Log.i(TAG, "Invite listener attached uid=$teacherId")
+
+        val infoRef = FirebaseDatabase.getInstance().getReference(".info/connected")
+        val infoListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val connected = snapshot.getValue(Boolean::class.java) == true
+                databaseConnected = if (connected) 1 else 0
+                Log.i(TAG, "Database connected=$connected uid=$teacherId")
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Connection listener cancelled uid=$teacherId", error.toException())
+            }
+        }
+        infoRef.addValueEventListener(infoListener)
+        connectedListener = infoListener
+        connectedRef = infoRef
     }
 
     @JvmStatic
@@ -69,6 +97,14 @@ object AndroidInviteManager {
         listenerTeacherId = null
         cachedInvitesJson = null
         liveError = null
+        val infoListener = connectedListener
+        val infoRef = connectedRef
+        if (infoListener != null && infoRef != null) {
+            infoRef.removeEventListener(infoListener)
+        }
+        connectedListener = null
+        connectedRef = null
+        databaseConnected = -1
     }
 
     /**

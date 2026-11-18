@@ -15796,6 +15796,20 @@
       },
       "valueType": "STRING"
     },
+    "status_no_connection": {
+      "defaultValue": {
+        "value": "No connection"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין חיבור"
+        },
+        "HebrewApp": {
+          "value": "אין חיבור"
+        }
+      },
+      "valueType": "STRING"
+    },
     "offline_option": {
       "defaultValue": {
         "value": "Offline"
