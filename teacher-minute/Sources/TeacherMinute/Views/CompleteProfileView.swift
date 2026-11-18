@@ -40,6 +40,7 @@ struct CompleteProfileView: View {
           .padding(.horizontal, 20)
           .padding(.top, 16)
           .padding(.bottom, 20)
+          .tapDismissesKeyboard("complete_profile_background") { focusedField = nil }
         }
         .formScrollDismissesKeyboard()
       }

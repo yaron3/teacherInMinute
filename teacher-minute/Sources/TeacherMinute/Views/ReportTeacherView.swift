@@ -74,6 +74,7 @@ struct ReportTeacherView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
+        .tapDismissesKeyboard("report_teacher_background")
       }
       formButtons
         .padding(.horizontal, 20)

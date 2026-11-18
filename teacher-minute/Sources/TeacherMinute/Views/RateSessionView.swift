@@ -204,6 +204,7 @@ struct RateSessionView: View {
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 18)
+        .tapDismissesKeyboard("rate_session_background")
       }
 
       Button(action: { trackTap("rate_session_send"); send() }) {

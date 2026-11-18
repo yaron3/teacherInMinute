@@ -25,6 +25,7 @@ struct CreateAccountView: View {
           .padding(.horizontal, 20)
           .padding(.top, 16)
           .padding(.bottom, 20)
+          .tapDismissesKeyboard("create_account_background") { focusedField = nil }
         }
         .formScrollDismissesKeyboard()
       }
