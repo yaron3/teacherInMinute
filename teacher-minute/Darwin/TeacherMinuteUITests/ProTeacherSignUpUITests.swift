@@ -48,6 +48,7 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
         openSignUpForm()
         fillSignUp(email: email, password: password, confirmation: password, agreeToTerms: true)
         submitSignUp()
+        acknowledgeSignupSuccess()
 
         // T-05: the profile comes next, not the ID step.
         XCTAssertTrue(nameField.waitForExistence(timeout: 60), "signing up did not reach the profile step")
@@ -83,6 +84,7 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
         openSignUpForm()
         fillSignUp(email: email, password: password, confirmation: password, agreeToTerms: true)
         submitSignUp()
+        acknowledgeSignupSuccess()
 
         let front = app.buttons["identity_front_upload"]
         XCTAssertTrue(front.waitForExistence(timeout: 60), "signing up did not reach the ID step")
@@ -133,6 +135,7 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
         fillSignUp(email: EmulatorBackend.newEmail(prefix: "signup.profile"), password: password,
                    confirmation: password, agreeToTerms: true)
         submitSignUp()
+        acknowledgeSignupSuccess()
         XCTAssertTrue(nameField.waitForExistence(timeout: 60), "signing up did not reach the profile step")
 
         XCTAssertFalse(profileContinue.isEnabled, "Continue was on with nothing filled in")
@@ -198,6 +201,7 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
         openSignUpForm()
         fillSignUp(email: email, password: password, confirmation: password, agreeToTerms: true)
         submitSignUp()
+        acknowledgeSignupSuccess()
         XCTAssertTrue(nameField.waitForExistence(timeout: 60), "signing up did not reach the profile step")
 
         app.terminate()
@@ -371,6 +375,15 @@ final class ProTeacherSignUpUITests: ProTeacherEmulatorTestCase {
             pause(seconds: 0.25)
         } while Date() < deadline
         return false
+    }
+
+    /// IT-51: a successful sign-up says the account is ready, and where the
+    /// verification link went, before onboarding goes on.
+    @MainActor
+    private func acknowledgeSignupSuccess() {
+        let ready = app.staticTexts["Your account is ready"]
+        XCTAssertTrue(ready.waitForExistence(timeout: 60), "signing up did not say the account is ready")
+        XCTAssertTrue(tapWhenHittable(app.buttons["dialog_confirm_button"], "the sign-up dialog's OK"))
     }
 
     @MainActor

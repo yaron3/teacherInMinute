@@ -279,6 +279,9 @@ final class AccountLifecycleUITests: XCTestCase {
                 continue
             }
 
+            // IT-51: sign-up says the account is ready before onboarding.
+            if app.staticTexts["Your account is ready"].exists,
+               tapIfPresent(app.buttons["dialog_confirm_button"]) { continue }
             if tapIfPresent(app.buttons["verify_email_not_now"]) { continue }
             if tapIfPresent(app.buttons["permissions_setup_skip"]) { continue }
 

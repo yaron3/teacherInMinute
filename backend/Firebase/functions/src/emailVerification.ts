@@ -26,7 +26,15 @@ import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { Timestamp } from "firebase-admin/firestore";
 
 import { isValidEmailSyntax, normalizeEmail } from "./emailValidation";
-import { claimEmailRewardFor, ClaimResponse, RewardRole } from "./emailRewards";
+import {
+  claimEmailRewardFor,
+  ClaimResponse,
+  EMAIL_REWARD_PROMOTION_COLLECTION,
+  getEmailRewardOffer,
+  RewardRole,
+  studentSlotsRemaining,
+} from "./emailRewards";
+import { INBOX_COLLECTION, INBOX_MESSAGE_IDS, inboxDocument, verificationSentMessage } from "./inboxMessages";
 import { sendMail } from "./mailer";
 
 const firestore = admin.firestore();
@@ -291,6 +299,24 @@ export const sendVerificationEmail = onCall(async (req) => {
   const link = `${functionsBaseUrl()}/verifyEmailLink?t=${encodeURIComponent(token)}`;
   const sent = await sendMail({ to: target, ...buildVerificationEmail(link, role, language) });
   if (!sent) throw new HttpsError("unavailable", "Email is not configured");
+
+  // The bell says where the link went and what it unlocks (IT-51). One note,
+  // replaced by each send, so a resend or a new address does not pile up.
+  try {
+    const offer = await getEmailRewardOffer();
+    const promotion = await firestore.collection(EMAIL_REWARD_PROMOTION_COLLECTION).doc("student").get();
+    const studentRewardOpen = studentSlotsRemaining(offer, promotion.data()?.granted) > 0;
+    const reward = role === "student" && !studentRewardOpen ? undefined : offer;
+    await firestore
+      .collection("users")
+      .doc(uid)
+      .collection(INBOX_COLLECTION)
+      .doc(INBOX_MESSAGE_IDS.verificationSent)
+      .set(inboxDocument("verificationSent", verificationSentMessage(role, target, reward)));
+  } catch (err) {
+    // The email went; a missing inbox note must not fail the call.
+    logger.error(`[emailVerification] inbox message failed uid=${uid}`, err);
+  }
 
   logger.info(`[emailVerification] sent uid=${uid} change=${target !== current}`);
   return { status: "sent" };

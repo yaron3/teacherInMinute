@@ -58,6 +58,16 @@ struct CreateAccountView: View {
       message: viewModel.alertMessage ?? "",
       actions: [AppDialogAction(viewModel.okLabel)]
     )
+    .appDialog(
+      viewModel.signupSuccessTitle,
+      isPresented: $viewModel.showsSignupSuccess,
+      message: viewModel.signupSuccessMessage,
+      actions: [
+        AppDialogAction(viewModel.okLabel) {
+          viewModel.signupSuccessDismissed()
+        }
+      ]
+    )
     .sheet(isPresented: $viewModel.showingTerms) {
       if let url = viewModel.termsURL {
         NavigationStack { AboutWebView(url: url, title: viewModel.eulaTitle, backLabel: viewModel.backLabel) }

@@ -15796,6 +15796,34 @@
       },
       "valueType": "STRING"
     },
+    "your_account_ready": {
+      "defaultValue": {
+        "value": "Your account is ready"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "החשבון שלך מוכן"
+        },
+        "HebrewApp": {
+          "value": "החשבון שלך מוכן"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_signup_verification_sent": {
+      "defaultValue": {
+        "value": "We sent a verification link to %@. Open it on this phone to verify your email address."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שלחנו קישור אימות אל %@. פתח/י אותו בטלפון הזה כדי לאמת את כתובת המייל."
+        },
+        "HebrewApp": {
+          "value": "שלחנו קישור אימות אל %@. פתח/י אותו בטלפון הזה כדי לאמת את כתובת המייל."
+        }
+      },
+      "valueType": "STRING"
+    },
     "status_no_connection": {
       "defaultValue": {
         "value": "No connection"

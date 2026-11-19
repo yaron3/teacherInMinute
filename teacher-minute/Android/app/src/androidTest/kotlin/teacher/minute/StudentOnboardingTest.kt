@@ -221,6 +221,12 @@ class StudentOnboardingTest {
         val profile = rewardedProfile(guest.uid)
         assertEquals("the reward was not credited once", 15, intValue(profile, "remainingMinutes"))
         assertEquals(15, intValue(profile, "totalMinutes"))
+        // IT-51: the bell keeps the reward and the verification email.
+        assertEquals(
+            "no sign-up minutes message in the bell",
+            "15 free minutes added",
+            backend.strings("users/${guest.uid}/incomingMessages/account-signup-minutes")?.get("title")
+        )
 
         // The question kept through sign-up goes out on the reward.
         val teacher = bringATeacherOnline()
@@ -610,7 +616,18 @@ class StudentOnboardingTest {
         type(email, into = "sign_up_email")
         type(password, into = "sign_up_password")
         type(password, into = "sign_up_confirm_password")
+        // The keyboard stays up after the last field and can cover the box:
+        // a click there lands on the keyboard. Close it first, as a person
+        // would to see the box.
+        closeKeyboard()
         (findScrolling(By.res("sign_up_terms")) ?: failWithScreen("terms", "no terms box")).click()
+    }
+
+    private fun closeKeyboard() {
+        if (device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")) {
+            device.pressBack()
+            Thread.sleep(700)
+        }
     }
 
     private fun submitSignUp() {
@@ -624,6 +641,10 @@ class StudentOnboardingTest {
         val deadline = System.currentTimeMillis() + 150_000
         while (System.currentTimeMillis() < deadline) {
             if (waitForHome(1_000)) return
+            // IT-51: sign-up says the account is ready before onboarding.
+            if (device.hasObject(By.text("Your account is ready"))) {
+                device.findObject(By.res("dialog_confirm_button"))?.let { runCatching { it.click() } }
+            }
             if (!filledName && device.hasObject(By.res("complete_profile_full_name"))) {
                 type(name, into = "complete_profile_full_name")
                 filledName = true

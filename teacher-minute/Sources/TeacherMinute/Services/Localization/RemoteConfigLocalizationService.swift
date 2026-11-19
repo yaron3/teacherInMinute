@@ -1200,6 +1200,10 @@ enum LocalizationKey {
         // The string that matches the value already in the template keeps the
         // original key; the other one is moved here.
 
+        // The sign-up success dialog (IT-51). `sent_verification_link` is the
+        // shorter "We sent a verification link to".
+        "We sent a verification link to %@. Open it on this phone to verify your email address.": "fmt_signup_verification_sent",
+
         // The dashboard's Status chip while the database connection is down
         // (IT-49). `connection` is the bare word "Connection".
         "No connection": "status_no_connection",

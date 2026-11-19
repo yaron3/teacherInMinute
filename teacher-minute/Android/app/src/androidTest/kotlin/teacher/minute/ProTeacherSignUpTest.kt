@@ -84,6 +84,10 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertEquals("teacher", profile["role"])
         assertEquals("Signup Teacher", profile["fullName"])
         assertEquals("0521234567", profile["phoneNumber"])
+
+        // IT-51's inbox note on the verification email is written only once
+        // the email has gone out, and the emulators send no mail, so it is
+        // covered by inboxMessages.test.ts rather than here.
     }
 
     /** AND-T-04: with the ID step on (the debug Remote Config override
@@ -103,6 +107,9 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
             openSignUpForm()
             fillSignUp(email, password, password, agreeToTerms = true)
             submitSignUp()
+            // IT-51: sign-up says the account is ready before the ID step.
+            device.wait(Until.findObject(By.text("Your account is ready")), 60_000)
+                ?.let { device.findObject(By.res("dialog_confirm_button"))?.click() }
 
             val front = device.wait(Until.findObject(By.res("identity_front_upload")), 60_000)
             if (front == null) {
@@ -498,11 +505,22 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         type(email, into = "sign_up_email")
         type(password, into = "sign_up_password")
         type(confirmation, into = "sign_up_confirm_password")
+        // The keyboard stays up after the last field and can cover the box:
+        // a click there lands on the keyboard. Close it first, as a person
+        // would to see the box.
+        closeKeyboard()
         if (termsChecked != agreeToTerms) {
             val box = findScrolling(By.res("sign_up_terms"))
             assertNotNull("no terms box", box)
             box!!.click()
             termsChecked = agreeToTerms
+        }
+    }
+
+    private fun closeKeyboard() {
+        if (device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")) {
+            device.pressBack()
+            Thread.sleep(700)
         }
     }
 
@@ -513,7 +531,16 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
     }
 
     private fun reachProfile() {
-        if (!device.wait(Until.hasObject(By.res("complete_profile_full_name")), 60_000)) {
+        // IT-51: sign-up says the account is ready, and where the link went,
+        // before the profile step.
+        val deadline = System.currentTimeMillis() + 60_000
+        while (System.currentTimeMillis() < deadline && !device.hasObject(By.res("complete_profile_full_name"))) {
+            if (device.hasObject(By.text("Your account is ready"))) {
+                device.findObject(By.res("dialog_confirm_button"))?.let { runCatching { it.click() } }
+            }
+            Thread.sleep(500)
+        }
+        if (!device.wait(Until.hasObject(By.res("complete_profile_full_name")), 1_000)) {
             capture("profile")
             fail("signing up did not reach the profile step: ${screenText()}")
         }

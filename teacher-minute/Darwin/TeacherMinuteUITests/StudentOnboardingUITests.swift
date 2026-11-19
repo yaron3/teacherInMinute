@@ -735,6 +735,10 @@ final class StudentOnboardingUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(150)
         while Date() < deadline {
             if waitForHome(timeout: 1) { return }
+            // IT-51: sign-up says the account is ready before onboarding.
+            if app.staticTexts["Your account is ready"].exists {
+                _ = tapIfPresent(app.buttons["dialog_confirm_button"])
+            }
             let nameField = app.textFields["complete_profile_full_name"]
             if nameField.exists && !filledName {
                 type(name, into: nameField, "the profile's name field")

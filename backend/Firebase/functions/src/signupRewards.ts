@@ -36,6 +36,7 @@ import {
 } from "./emailRewards";
 import { normalizeEmail } from "./emailValidation";
 import { readRcNumber } from "./remoteConfig";
+import { INBOX_COLLECTION, INBOX_MESSAGE_IDS, inboxDocument, signupMinutesMessage } from "./inboxMessages";
 
 const firestore = admin.firestore();
 
@@ -161,6 +162,11 @@ export async function grantSignupRewardFor(uid: string): Promise<SignupGrantStat
       minutesRemaining: minutes,
       minutesUsed: 0,
     });
+    // Also in the bell, for a student who never saw the home screen say so (IT-51).
+    tx.set(
+      userRef.collection(INBOX_COLLECTION).doc(INBOX_MESSAGE_IDS.signupMinutes),
+      inboxDocument("signupMinutes", signupMinutesMessage(minutes))
+    );
     return "granted";
   });
 }

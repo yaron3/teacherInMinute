@@ -29,6 +29,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { domainOf, normalizeEmail } from "./emailValidation";
 import { provenEmailsFor } from "./emailOwnership";
 import { readRcNumber } from "./remoteConfig";
+import { INBOX_COLLECTION, INBOX_MESSAGE_IDS, emailRewardMessage, inboxDocument } from "./inboxMessages";
 
 const firestore = admin.firestore();
 
@@ -278,6 +279,11 @@ export async function claimEmailRewardFor(uid: string): Promise<ClaimResponse> {
 
     const now = Timestamp.now();
     tx.set(claimRef, { [role]: { uid, claimedAt: now } }, { merge: true });
+    // The bell keeps what the dialog said (IT-51).
+    tx.set(
+      userRef.collection(INBOX_COLLECTION).doc(INBOX_MESSAGE_IDS.emailReward),
+      inboxDocument("emailReward", emailRewardMessage(role, offer))
+    );
 
     if (role === "student") {
       const minutes = offer.studentMinutes;

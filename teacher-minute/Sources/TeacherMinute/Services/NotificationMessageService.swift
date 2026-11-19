@@ -163,8 +163,13 @@ final class NotificationMessageService {
         data: [String: Any],
         fallbackTimestamp: Date?
     ) -> NotificationMessage? {
-        let title = firstString(in: data, keys: ["title", "subject", "heading"])
-        let text = firstString(in: data, keys: ["text", "message", "body", "description"])
+        // Messages the backend writes carry Hebrew beside the English (IT-51:
+        // sign-up and the welcome rewards); the admin panel's carry one text.
+        let hebrew = LocalizationSupport.currentLanguageCode == "he"
+        let title = (hebrew ? firstString(in: data, keys: ["titleHe"]).nilIfEmpty : nil)
+            ?? firstString(in: data, keys: ["title", "subject", "heading"])
+        let text = (hebrew ? firstString(in: data, keys: ["textHe"]).nilIfEmpty : nil)
+            ?? firstString(in: data, keys: ["text", "message", "body", "description"])
         guard !title.isEmpty || !text.isEmpty else { return nil }
 
         return NotificationMessage(

@@ -84,6 +84,12 @@ final class CreateAccountViewModel {
   // Alert state
   var alertMessage: String?
   var showAlert       = false
+  /// Shown once the account exists, before onboarding (IT-51): where the
+  /// verification link went, and what verifying unlocks.
+  var signupSuccessMessage = ""
+  var showsSignupSuccess = false
+  /// Where onboarding starts, held until the success dialog is closed.
+  private var destinationAfterSuccess: OnboardingResume?
   var focusField: SignupField?
   
   let authService = AuthService()
@@ -173,8 +179,13 @@ final class CreateAccountViewModel {
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpSuccess, parameters: ["method": "email"])
 	  sendVerificationEmail()
 	  // A brand-new account has no profile yet, so it starts at the first
-	  // onboarding step for this app's role.
-	  destination = UserService.shared.onboardingStart
+	  // onboarding step for this app's role — once the user has read that the
+	  // account is ready.
+	  destinationAfterSuccess = UserService.shared.onboardingStart
+	  signupSuccessMessage = await signupSuccessText(
+		email: emailOrPhone.trimmingCharacters(in: .whitespacesAndNewlines)
+	  )
+	  showsSignupSuccess = true
 	} catch {
 	  logger.error("[CreateAccount] email sign-up failed: \(String(describing: error))")
 	  AnalyticsService.shared.logEvent(AnalyticsEvent.signUpFailure, parameters: ["method": "email", "reason": error.localizedDescription])
@@ -184,6 +195,31 @@ final class CreateAccountViewModel {
 	}
   }
   
+  /// The success dialog closed: on to onboarding.
+  func signupSuccessDismissed() {
+	destination = destinationAfterSuccess
+	destinationAfterSuccess = nil
+  }
+
+  /// Where the link went, and the welcome reward verifying it unlocks, when one
+  /// is on offer. The amounts come from the backend's offer; asking costs
+  /// nothing and claims nothing for an address not yet verified. Without an
+  /// answer the dialog still says where the link went.
+  private func signupSuccessText(email: String) async -> String {
+	let sent = verificationSentText(email: email)
+	guard let reward = await attempt({ try await FunctionsService.shared.claimEmailReward() }) else {
+	  return sent
+	}
+	switch AuthRole.appRole {
+	case .teacher where reward.teacherBonusMinutes > 0:
+	  return sent + "\n\n" + teacherRewardOfferText(percent: reward.teacherSharePercent, minutes: reward.teacherBonusMinutes)
+	case .student where reward.studentMinutes > 0 && reward.studentSlotsRemaining > 0:
+	  return sent + "\n\n" + studentRewardOfferText(minutes: reward.studentMinutes)
+	default:
+	  return sent
+	}
+  }
+
   /// Fired off without waiting: signup is already done, and a failed send can
   /// be retried from the home screen's verify-email banner.
   func sendVerificationEmail() {
