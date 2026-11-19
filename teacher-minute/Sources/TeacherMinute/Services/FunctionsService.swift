@@ -18,9 +18,11 @@ import Foundation
 
 #if !os(Android)
 import FirebaseAuth
+import FirebaseCore
 #else
 import SkipBridge
 import SkipFirebaseAuth
+import SkipFirebaseCore
 #endif
 
 // MARK: - Errors
@@ -324,7 +326,13 @@ final class FunctionsService {
   private init() {}
 
   private let baseURLKey = "baseURL"
-  private let defaultBaseURL = "https://us-central1-teacher-in-a-moment.cloudfunctions.net"
+  /// The functions of the project this build signs in to. A fixed production
+  /// address sent a staging build's calls to production, which turned its
+  /// staging ID token away as UNAUTHENTICATED.
+  private var defaultBaseURL: String {
+    let project = FirebaseApp.app()?.options.projectID ?? "teacher-in-a-moment"
+    return "https://us-central1-\(project).cloudfunctions.net"
+  }
 
   // MARK: - Student callables
 
