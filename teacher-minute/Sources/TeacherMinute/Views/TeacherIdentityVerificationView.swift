@@ -34,7 +34,8 @@ struct TeacherIdentityVerificationView: View {
         label: viewModel.stepIndicatorText,
         title: viewModel.screenTitle,
         backLabel: viewModel.onboardingBackLabel,
-        onBack: { OnboardingBackCoordinator.shared.handleBack() }
+        onBack: { OnboardingBackCoordinator.shared.handleBack() },
+        showsBack: router.canStepBack
       ) {
         content
       }

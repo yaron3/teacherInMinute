@@ -303,6 +303,56 @@ class StudentOnboardingTest {
         assertEquals("not signed in to the existing account", existing.uid, FirebaseAuth.getInstance().currentUser?.uid)
     }
 
+    /** After logging in, Back never returns to the welcome or login screens. */
+    @Test
+    fun backAfterLoggingInStaysSignedIn() {
+        val existing = backend.createAccount("back.login")
+        backend.merge("users/${existing.uid}", mapOf("role" to "student", "fullName" to "Back Login Student"))
+        startAsGuest()
+        logInFromTheMenu(existing.email, existing.password)
+        if (!waitForHome(90_000)) failWithScreen("login", "logging in did not reach home")
+        expectBackKeepsHome("logging in")
+    }
+
+    /** After signing up, Back never returns to the welcome, sign-up or
+     *  onboarding screens. */
+    @Test
+    fun backAfterSigningUpStaysSignedIn() {
+        startAsGuest()
+        askAndExpectTheOffer()
+        device.findObject(offer).click()
+        assertTrue("Create account did not open sign-up", device.wait(Until.hasObject(By.res("sign_up_email")), 20_000))
+        fillSignUp(backend.newEmail("back.signup"), "Emulator-${(100_000..999_999).random()}")
+        submitSignUp()
+        finishOnboarding("Back Signup Student")
+        expectBackKeepsHome("signing up")
+    }
+
+    /** Back on home three times: each time the app either stays on home or
+     *  goes to the background, and coming back to it shows home again. */
+    private fun expectBackKeepsHome(after: String) {
+        repeat(3) { attempt ->
+            device.pressBack()
+            Thread.sleep(2_000)
+            if (onSignedOutScreen()) failWithScreen("back-$attempt", "Back #${attempt + 1} after $after left home for a sign-in screen")
+            if (device.currentPackageName != context.packageName) {
+                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)!!
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                device.wait(Until.hasObject(By.pkg(context.packageName).depth(0)), 15_000)
+                Thread.sleep(2_000)
+            }
+            if (onSignedOutScreen()) failWithScreen("reopen-$attempt", "after Back #${attempt + 1} the app reopened on a sign-in screen")
+            if (!device.wait(Until.hasObject(By.res("question_home_mode_text")), 10_000)) {
+                failWithScreen("home-$attempt", "home is gone after Back #${attempt + 1}")
+            }
+        }
+    }
+
+    private fun onSignedOutScreen(): Boolean =
+        listOf("welcome_log_in", "email_input", "sign_up_email", "student_intro_start", "complete_profile_full_name")
+            .any { device.hasObject(By.res(it)) }
+
     /** AND-S-11: a guest signing up with a taken address is refused. */
     @Test
     fun aGuestSigningUpWithATakenAddressIsRefused() {

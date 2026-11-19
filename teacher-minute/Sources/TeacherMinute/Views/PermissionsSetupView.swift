@@ -136,9 +136,11 @@ struct PermissionsSetupView: View {
   private var header: some View {
     HStack(spacing: 12) {
       Spacer(minLength: 0)
-      BrandBackButton(accessibilityLabel: viewModel.onboardingBackLabel) {
-        trackTap("permissions_setup_back")
-        OnboardingBackCoordinator.shared.handleBack()
+      if router.canStepBack {
+        BrandBackButton(accessibilityLabel: viewModel.onboardingBackLabel) {
+          trackTap("permissions_setup_back")
+          OnboardingBackCoordinator.shared.handleBack()
+        }
       }
     }
     .padding(.horizontal, 20)

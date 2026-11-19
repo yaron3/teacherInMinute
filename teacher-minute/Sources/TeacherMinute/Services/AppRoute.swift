@@ -52,6 +52,11 @@ final class AppRouter: @unchecked Sendable {
 	path.append(route)
   }
 
+  /// Whether the screen on top of the welcome stack has an earlier step to go
+  /// back to. The first onboarding step has none: the screens behind it are
+  /// the welcome and sign-in screens of an account that is now signed in.
+  var canStepBack: Bool { path.count > 1 }
+
   func pop() {
 	guard !path.isEmpty else { return }
 	path.removeLast()

@@ -95,6 +95,8 @@ struct BrandSubpage<Content: View>: View {
   /// What the back button does, when it is not to dismiss the page: an
   /// onboarding step walks back through its own handler.
   var onBack: (() -> Void)?
+  /// False hides the back button, for a screen with nowhere to go back to.
+  var showsBack = true
   let content: Content
 
   @Environment(\.dismiss) var dismiss
@@ -105,6 +107,7 @@ struct BrandSubpage<Content: View>: View {
     backLabel: String,
     scrolls: Bool = true,
     onBack: (() -> Void)? = nil,
+    showsBack: Bool = true,
     @ViewBuilder content: () -> Content
   ) {
     self.label = label
@@ -112,6 +115,7 @@ struct BrandSubpage<Content: View>: View {
     self.backLabel = backLabel
     self.scrolls = scrolls
     self.onBack = onBack
+    self.showsBack = showsBack
     self.content = content()
   }
 
@@ -120,12 +124,14 @@ struct BrandSubpage<Content: View>: View {
       BrandScreenBackground(streaks: .subpage)
       VStack(spacing: 0) {
         BrandPageHeader(label: label, title: title) {
-          BrandBackButton(accessibilityLabel: backLabel) {
-            trackTap("subpage_back")
-            if let onBack {
-              onBack()
-            } else {
-              dismiss()
+          if showsBack {
+            BrandBackButton(accessibilityLabel: backLabel) {
+              trackTap("subpage_back")
+              if let onBack {
+                onBack()
+              } else {
+                dismiss()
+              }
             }
           }
         }

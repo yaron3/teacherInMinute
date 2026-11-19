@@ -16,6 +16,22 @@ enum AndroidBackNavigationBridge {
         name: "setOnboardingBackHandling",
         sig: "(Z)V"
     )!
+    private static let moveAppToBackMethod = activityClass.getStaticMethodID(
+        name: "moveAppToBack",
+        sig: "()V"
+    )!
+
+    /// Sends the app to the background, as the system back button does on the
+    /// home tabs: for a screen with no way back that the user should take.
+    static func moveAppToBack() {
+        jniContext {
+            do {
+                try activityClass.callStatic(method: moveAppToBackMethod, options: [.kotlincompat], args: [])
+            } catch {
+                logger.error("[BackNav][Android] failed to move the app to the back: \(error)")
+            }
+        }
+    }
 
     /// Blocks back for the duration of a lesson. Separate from
     /// `setSystemBackBlocked` because that callback is registered before the
