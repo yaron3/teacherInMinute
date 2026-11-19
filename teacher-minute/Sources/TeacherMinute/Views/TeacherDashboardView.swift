@@ -73,7 +73,7 @@ struct TeacherDashboardView: View {
 		VStack(spacing: 0) {
 		  BrandPageHeader(label: viewModel.teacherEyebrow, title: viewModel.teacherName) {
 			HStack(spacing: 8) {
-			  BrandMessagesButton { showsMessages = true }
+			  BrandMessagesButton(showsBadge: viewModel.hasUnreadMessages) { showsMessages = true }
 			  BrandMenuButton()
 			}
 		  }

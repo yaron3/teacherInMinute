@@ -692,7 +692,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: [])
   var totalPurchasedText = LessonFormatting.minutesText(0)
   var lessonCount = 0
-  var hasUnreadMessages = false
+  /// Live, from `UnreadMessagesStore`: the bell's badge follows messages as
+  /// they arrive and are read.
+  var hasUnreadMessages: Bool {
+    get { UnreadMessagesStore.shared.hasUnreadMessages }
+    set { UnreadMessagesStore.shared.hasUnreadMessages = newValue }
+  }
   var profileImageURL: String {
     get { UserPhotoStore.shared.profileImageURL }
     set { UserPhotoStore.shared.profileImageURL = newValue }
@@ -1296,7 +1301,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       didLoadProfile = false
     }
     // After the profile, so the fee is quoted in the student's own currency.
-    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
+    UnreadMessagesStore.shared.start()
     await loadRecentLessons(uid: uid)
   }
 
@@ -1407,7 +1412,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
     // Pull-to-refresh: re-read the measured connect time rather than reuse the
     // one cached when the screen first appeared.
-    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
+    UnreadMessagesStore.shared.start()
+    UnreadMessagesStore.shared.refresh()
     await loadRecentLessons(uid: uid)
   }
 
@@ -1480,7 +1486,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func refreshUnreadMessages() async {
     guard let uid = Auth.auth().currentUser?.uid else { return }
-    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
+    UnreadMessagesStore.shared.start()
+    UnreadMessagesStore.shared.refresh()
   }
 
   private func loadPricingOptions() async {

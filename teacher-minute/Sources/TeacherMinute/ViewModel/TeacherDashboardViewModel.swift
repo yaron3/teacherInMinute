@@ -22,6 +22,8 @@ import SkipFirebaseAuth
 protocol TeacherDashboardViewModeling: AnyObject {
   var teacherName: String { get set }
   var teacherImageURL: String { get set }
+  /// A message the teacher has not opened yet, for the bell's badge.
+  var hasUnreadMessages: Bool { get }
   var isOnline: Bool { get set }
   /// True from the tap that asks to go online until the permission round trip
   /// behind it finishes. `isOnline` is still false through that window, so the
@@ -436,6 +438,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
     get { UserPhotoStore.shared.profileImageURL }
     set { UserPhotoStore.shared.profileImageURL = newValue }
   }
+  var hasUnreadMessages: Bool { UnreadMessagesStore.shared.hasUnreadMessages }
   var isOnline = false
   private(set) var isAwaitingOnlinePermission = false
   var inviteIDs: [String] = []
@@ -609,6 +612,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   // MARK: - Init
   
   init() {
+	UnreadMessagesStore.shared.start()
 	// Subjects edited from Profile as well as from here: either way an online
 	// teacher's listing has to follow them.
 	subjectsSavedObserver = NotificationCenter.default.addObserver(
@@ -1816,6 +1820,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   var teacherName: String
   var teacherImageURL: String = ""
+  var hasUnreadMessages = false
   var isOnline: Bool
   var inviteIDs: [String] = []
   var inviteTopics: [String: String] = [:]
