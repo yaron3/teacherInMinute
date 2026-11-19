@@ -16173,6 +16173,34 @@
         }
       },
       "valueType": "STRING"
+    },
+    "minutes_unavailable": {
+      "defaultValue": {
+        "value": "Minutes unavailable"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הדקות לא זמינות"
+        },
+        "HebrewApp": {
+          "value": "הדקות לא זמינות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "couldn_load_the": {
+      "defaultValue": {
+        "value": "We couldn't load the minute packages. Check your connection and try again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא הצלחנו לטעון את חבילות הדקות. כדאי לבדוק את החיבור ולנסות שוב."
+        },
+        "HebrewApp": {
+          "value": "לא הצלחנו לטעון את חבילות הדקות. כדאי לבדוק את החיבור ולנסות שוב."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {
