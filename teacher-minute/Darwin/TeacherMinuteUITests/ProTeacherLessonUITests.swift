@@ -122,6 +122,71 @@ final class ProTeacherLessonUITests: ProTeacherEmulatorTestCase {
         try await waitForTheStudentToEnd(uid: uid, qid: qid)
     }
 
+    /// IT-42 end to end, the teacher's half — pairs with the Android
+    /// student's CrossPlatformLessonTest.asksBlocksThenUnblocksTheTeacher.
+    /// The teacher takes the lesson; the student ends it, reports and blocks
+    /// them, and asks again: that question must never show on this screen.
+    /// Once the student unblocks and asks once more, its card shows here and
+    /// is declined, which tells the student's half it was seen.
+    @MainActor
+    func testTeachingThenBeingBlockedThenUnblocked() async throws {
+        let (uid, qid) = try await joinTheStudentsLesson()
+        try await waitForTheLessonToEnd(timeout: 300)
+        try await expectFreeOnTheDashboard(uid)
+        let student = try await backend.strings("questions/\(qid)")?["studentUid"] ?? ""
+        try require(!student.isEmpty, "the question names no student")
+
+        // Blocked: the student's next question must not show here. (The
+        // block is a Firestore document; `exists` reads the Realtime Database.)
+        try require(try await waitUntil(300) { (try await self.backend.fields("users/\(student)/blockedTeachers/\(uid)")) != nil },
+                    "the student never blocked the teacher")
+        var blockedQid = ""
+        _ = try await waitUntil(300) {
+            blockedQid = try await self.backend.documentIDs("questions", where: "studentUid", is: student).first { $0 != qid } ?? ""
+            return !blockedQid.isEmpty
+        }
+        try require(!blockedQid.isEmpty, "the student never asked while the teacher was blocked")
+        attach("question while blocked", blockedQid)
+        let watchUntil = Date().addingTimeInterval(25)
+        while Date() < watchUntil {
+            let shown = app.buttons.matching(identifier: "invite_accept_\(blockedQid)").firstMatch.exists
+            XCTAssertFalse(shown, "the blocked teacher was shown the student's question")
+            let sent = try await backend.exists("teacherInvites/\(uid)/\(blockedQid)")
+            XCTAssertFalse(sent, "the blocked teacher was sent the question")
+            if shown || sent { break }
+            pause(seconds: 1)
+        }
+
+        // Unblocked: the student's next question shows here, and is declined.
+        try require(try await waitUntil(300) { !((try await self.backend.fields("users/\(student)/blockedTeachers/\(uid)")) != nil) },
+                    "the student never unblocked the teacher")
+        var unblockedQid = ""
+        _ = try await waitUntil(300) {
+            unblockedQid = try await self.backend.documentIDs("questions", where: "studentUid", is: student)
+                .first { $0 != qid && $0 != blockedQid } ?? ""
+            return !unblockedQid.isEmpty
+        }
+        try require(!unblockedQid.isEmpty, "the student never asked after unblocking")
+        currentQid = unblockedQid
+        let decline = visibleCardButton("decline", timeout: 60)
+        try require(decline != nil, "the unblocked teacher was never shown the student's question")
+        decline?.tap()
+        try require(waitForDisappearance(acceptButton, timeout: 15), "the card stayed after declining")
+        // The student's half closes this question itself.
+        currentQid = ""
+    }
+
+    /// Polls `probe` every second until it is true or `seconds` pass.
+    @MainActor
+    private func waitUntil(_ seconds: TimeInterval, _ probe: () async throws -> Bool) async throws -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        repeat {
+            if try await probe() { return true }
+            pause(seconds: 1)
+        } while Date() < deadline
+        return false
+    }
+
     @MainActor
     private func waitForTheStudentToEnd(uid: String, qid: String) async throws {
         let end = app.buttons["session_end_button"]

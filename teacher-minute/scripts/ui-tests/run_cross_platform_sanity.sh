@@ -13,6 +13,8 @@
 #                    blocks them; a question asked then never shows on the
 #                    teacher's screen; after unblocking in Privacy Controls the
 #                    next one does (IT-42)
+#   android-student-block  (only when named) the same, the other way round:
+#                    Instant Teacher on Android blocks Pro Teacher on the iPhone
 #
 # Each direction runs its two halves at the same time; they meet only through
 # the emulators (see CrossPlatformLessonTest.kt for the protocol). The iOS
@@ -88,7 +90,10 @@ if [[ -z "${SKIP_ANDROID_BUILD:-}" ]]; then
   export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
   export SWIFT_TOOLCHAIN_DIR="${SWIFT_TOOLCHAIN_DIR:-$HOME/Library/Developer/Toolchains-SkipShim}"
   scripts/android-toolchain-shim.sh --quiet
-  (cd Android && ./gradlew -q :app:assembleTeacherDebug :app:assembleStudentDebug \
+  # Built with the prod Firebase config: a debug build on the staging one
+  # loses its connection to the emulators (the student's balance never
+  # loads). Either way the app talks only to the emulators.
+  (cd Android && ./gradlew -q -PtimFirebaseEnv=Prod :app:assembleTeacherDebug :app:assembleStudentDebug \
       :app:assembleTeacherDebugAndroidTest :app:assembleStudentDebugAndroidTest) \
     > "$RESULTS_DIR/android-build.log" 2>&1 || { echo "Android build failed; see $RESULTS_DIR/android-build.log" >&2; exit 1; }
 fi
@@ -157,9 +162,9 @@ PY
 }
 
 status=0
-for direction in ios-student android-student ios-student-block; do
+for direction in ios-student android-student ios-student-block android-student-block; do
   [[ -n "$ONLY" && "$ONLY" != "$direction" ]] && continue
-  [[ -z "$ONLY" && "$direction" == ios-student-block ]] && continue
+  [[ -z "$ONLY" && "$direction" == *-block ]] && continue
   [[ "${SESSION_SHOTS:-0}" == 1 ]] && clear_android_shots
   read -r TEACHER_EMAIL TEACHER_PASSWORD TEACHER_UID <<< "$(new_teacher)"
   echo "$direction: teacher $TEACHER_EMAIL uid=$TEACHER_UID"
@@ -173,6 +178,12 @@ for direction in ios-student android-student ios-student-block; do
     run_ios StudentAskUITests/testABlockedTeacherGetsNoQuestionsUntilUnblocked "$direction-ios-student" &
     student_pid=$!
     halves=("$direction-android-teacher" "$direction-ios-student")
+  elif [[ "$direction" == "android-student-block" ]]; then
+    run_ios ProTeacherLessonUITests/testTeachingThenBeingBlockedThenUnblocked "$direction-ios-teacher" &
+    teacher_pid=$!
+    run_android com.yaronj.student.test asksBlocksThenUnblocksTheTeacher "$direction-android-student" &
+    student_pid=$!
+    halves=("$direction-ios-teacher" "$direction-android-student")
   elif [[ "$direction" == "ios-student" ]]; then
     run_android com.yaronj.tim.test teachesALessonAndEndsIt "$direction-android-teacher" &
     teacher_pid=$!

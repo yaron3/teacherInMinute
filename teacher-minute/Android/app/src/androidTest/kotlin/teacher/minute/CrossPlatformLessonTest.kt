@@ -15,6 +15,7 @@ import com.google.firebase.auth.FirebaseAuth
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -298,6 +299,130 @@ class CrossPlatformLessonTest {
         if (sessionShots) Thread.sleep(1_000)
         shot("05-student-after")
         expectTheLessonOver(qid, teacher)
+    }
+
+    /** IT-42 end to end, the student's half — pairs with the iOS teacher's
+     *  ProTeacherLessonUITests.testTeachingThenBeingBlockedThenUnblocked.
+     *  After a lesson the student reports and blocks the teacher from the
+     *  rating screen; a question asked then reaches no one; Privacy Controls
+     *  lists the teacher and Unblock lifts the block; the next question
+     *  reaches the teacher, whose half declines it from its card. */
+    @Test
+    fun asksBlocksThenUnblocksTheTeacher() {
+        assumeTrue("the student app's half", context.packageName == "com.yaronj.student")
+        val teacher = args.getString("lessonTeacherUid")!!
+        val student = signedInStudent()
+
+        waitFor(240_000) { if (backend.exists("onlineTeachers/$teacher")) true else null }
+            ?: failWithScreen("student-wait", "the teacher's half never came online")
+        for (uid in backend.childKeys("teachers")) {
+            if (uid != teacher) backend.patch("teachers/$uid", JSONObject().put("status", "offline"))
+        }
+
+        // The lesson, which the student ends after 35 seconds (the rating is
+        // offered only after 30).
+        val qid = askAQuestion("Help me with quadratic equations, please", student.uid, emptyList())
+        var choice = device.findObject(By.res("search_choice_text"))
+        repeat(4) {
+            if (choice == null) {
+                device.findObject(By.res("search_details_next"))?.click()
+                choice = device.wait(Until.findObject(By.res("search_choice_text")), 3_000)
+            }
+        }
+        (choice ?: failWithScreen("student-choice", "the search screen offers no text lesson")).click()
+        enterTheLesson("student")
+        Thread.sleep(35_000)
+        (device.findObject(endButton) ?: failWithScreen("student-end", "End was never there")).click()
+        (device.wait(Until.findObject(By.res("chat_end_prompt_primary")), 15_000)
+            ?: failWithScreen("student-end-confirm", "ending asked nothing")).click()
+        device.wait(Until.findObject(By.text("Save to chat only")), 5_000)?.click()
+
+        // Report, with "Also block" left as it starts: ticked.
+        (device.wait(Until.findObject(By.res("rating_report_teacher")), 60_000)
+            ?: failWithScreen("student-rating", "the rating screen offers no report")).click()
+        (device.wait(Until.findObject(By.res("report_reason_not_teaching")), 15_000)
+            ?: failWithScreen("student-report", "the report offers no reasons")).click()
+        if (!device.wait(Until.hasObject(By.res("report_also_block")), 10_000)) {
+            failWithScreen("student-report-block", "the report offers no block")
+        }
+        var send = device.findObject(By.res("report_send"))
+        repeat(3) {
+            if (send == null) {
+                device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 20)
+                send = device.wait(Until.findObject(By.res("report_send")), 3_000)
+            }
+        }
+        (send ?: failWithScreen("student-report-send", "the report has no Send")).click()
+        (device.wait(Until.findObject(By.res("report_done")), 30_000)
+            ?: failWithScreen("student-report-done", "sending the report showed no confirmation")).click()
+        waitFor(30_000) { if (backend.strings("users/${student.uid}/blockedTeachers/$teacher") != null) true else null }
+            ?: failWithScreen("student-blocked", "the teacher is not on the student's blocked list")
+        if (!waitForStudentHome(30_000)) failWithScreen("student-home", "not back home after the report")
+
+        // Blocked: the teacher is the only one online, so this goes to nobody.
+        val blockedQid = askAQuestion("Blocked check - this must not reach the teacher", student.uid, listOf(qid))
+        val carried = backend.stringArray("questions/$blockedQid", "blockedTeachers")
+        assertTrue("the question does not carry the block: $carried", teacher in carried)
+        Thread.sleep(20_000)
+        assertFalse("the blocked teacher was sent the question", backend.exists("teacherInvites/$teacher/$blockedQid"))
+        device.findObject(By.res("search_details_cancel"))?.click()
+        if (!waitForStudentHome(30_000)) failWithScreen("student-home", "closing the search did not return home")
+
+        // Privacy Controls lists the teacher, and Unblock lifts the block.
+        val settings = By.res("side_menu_item_settings")
+        repeat(4) {
+            if (!device.hasObject(settings)) {
+                device.findObject(By.res("side_menu_button"))?.click()
+                device.wait(Until.hasObject(settings), 5_000)
+            }
+        }
+        (device.findObject(settings) ?: failWithScreen("student-menu", "no Settings in the menu")).click()
+        (device.wait(Until.findObject(By.res("settings_row_privacyControls")), 15_000)
+            ?: failWithScreen("student-settings", "Settings has no Privacy Controls row")).click()
+        val unblock = device.wait(Until.findObject(By.res("unblock_teacher_$teacher")), 30_000)
+            ?: failWithScreen("student-blocked-list", "the blocked teacher is not listed in Privacy Controls")
+        if (!device.hasObject(By.text("Lesson Teacher"))) {
+            failWithScreen("student-blocked-name", "the blocked teacher is listed without their name")
+        }
+        unblock.click()
+        if (!device.wait(Until.gone(By.res("unblock_teacher_$teacher")), 20_000)) {
+            failWithScreen("student-unblocked", "the teacher stayed listed after unblocking")
+        }
+        waitFor(20_000) { if (backend.strings("users/${student.uid}/blockedTeachers/$teacher") == null) true else null }
+            ?: fail("unblocking left the teacher on the blocked list")
+
+        // Unblocked: home again, still signed in, and the next question
+        // reaches the teacher, whose half declines it from its card.
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)!!
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        context.startActivity(intent)
+        if (!waitForStudentHome(60_000)) failWithScreen("student-home", "relaunching did not reach home")
+        val unblockedQid = askAQuestion("Unblocked check - this must reach the teacher", student.uid, listOf(qid, blockedQid))
+        waitFor(30_000) { if (backend.exists("teacherInvites/$teacher/$unblockedQid")) true else null }
+            ?: failWithScreen("student-unblocked-invite", "the unblocked teacher was not sent the question")
+        waitFor(90_000) { backend.strings("questions/$unblockedQid/invites/$teacher")?.get("response")?.takeIf { it == "decline" } }
+            ?: fail("the teacher's half never declined the card, so it was never on their screen")
+        device.findObject(By.res("search_details_cancel"))?.click()
+    }
+
+    /** Writes `text` on the Text tab, taps Find a teacher, and returns the
+     *  new question, the first of the student's not in `known`. */
+    private fun askAQuestion(text: String, studentUid: String, known: List<String>): String {
+        repeat(4) {
+            if (!device.hasObject(By.res("question_text"))) {
+                device.wait(Until.findObject(By.res("question_home_mode_text")), 10_000)?.click()
+                device.wait(Until.hasObject(By.res("question_text")), 5_000)
+            }
+        }
+        type(text, into = "question_text")
+        device.pressBack() // the keyboard
+        (device.wait(Until.findObject(By.res("find_teacher")), 15_000)
+            ?: failWithScreen("student-find", "no Find a teacher")).click()
+        if (!device.wait(Until.hasObject(By.res("search_details_cancel")), 30_000)) {
+            failWithScreen("student-search", "Find a teacher did not start a search")
+        }
+        return waitFor(20_000) { backend.documentIds("questions", "studentUid", studentUid).firstOrNull { it !in known } }
+            ?: failWithScreen("student-question", "no question was created")
     }
 
     // Steps
