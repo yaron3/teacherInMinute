@@ -21,16 +21,24 @@ The same bundle ids and packages as production are deliberate: a staging and a
 production build of one app never coexist on one device, and keeping them equal
 means nothing else in the project has to know which environment it is.
 
-## 2. Drop the two files in
+## 2. Drop the files in
+
+Everything Firebase-specific lives under `teacher-minute/Config/`, one folder
+per project:
 
 | File | Goes to |
 | --- | --- |
-| Instant Teacher's `GoogleService-Info.plist` (staging) | `teacher-minute/Darwin/InstantTeacher/GoogleService-Info-Staging.plist` |
-| Pro Teacher's `GoogleService-Info.plist` (staging) | `teacher-minute/Darwin/ProTeacher/GoogleService-Info-Staging.plist` |
-| `google-services.json` (staging) | `teacher-minute/Android/app/src/debug/google-services.json` |
+| Instant Teacher's `GoogleService-Info.plist` | `Config/<project>/InstantTeacher/GoogleService-Info.plist` |
+| Pro Teacher's `GoogleService-Info.plist` | `Config/<project>/ProTeacher/GoogleService-Info.plist` |
+| `google-services.json` (lists both packages) | `Config/<project>/google-services.json` |
 
-Commit both. Firebase config files are not secrets — they ship inside the app —
-and the team needs the same staging target.
+`<project>` is `Prod` or `Staging`. Commit them. Firebase config files are not
+secrets — they ship inside the app — and the team needs the same targets.
+
+When a project gives an app a Google sign-in client, set that target's
+`TIM_GOOGLE_URL_SCHEME_<project>` build setting (`TIM_GOOGLE_URL_SCHEME_Staging`
+for staging) to the plist's `REVERSED_CLIENT_ID`. The build fails until they
+match.
 
 ## 3. Seed it
 
@@ -42,23 +50,31 @@ and the team needs the same staging target.
 
 ## How the switch works
 
-**Debug builds use staging, release builds use production.** There is no flag
-to set and no scheme to remember.
+`teacher-minute/Config/Environment.xcconfig` picks the project per build
+configuration, for both platforms:
 
-- **iOS** — the "Select the Firebase config" build phase overwrites the bundled
-  `GoogleService-Info.plist` with the staging one from the app's folder when
-  `$CONFIGURATION` is `Debug` and that file exists. Until the file exists the
-  phase is a no-op, so the build keeps working. Staging gives each app its own
-  Google sign-in client, so set the target's `TIM_GOOGLE_URL_SCHEME` for the
-  Debug configuration to the staging plist's `REVERSED_CLIENT_ID`; the same
-  build phase fails the build until they match.
-- **Android** — the Google Services plugin prefers
-  `src/debug/google-services.json` over `app/google-services.json`, for both
-  flavors. Nothing in `build.gradle.kts` selects it; see the README in that
-  directory for why staging is not a product flavor.
+```
+TIM_FIREBASE_ENV_DEBUG = Staging
+TIM_FIREBASE_ENV_RELEASE = Prod
+```
 
-Both builds log which config they took, as `Firebase config: staging` in the
-Xcode build log and the project id in the Android manifest merger output.
+- **iOS** — `Darwin/TeacherMinute.xcconfig` includes that file and sets
+  `TIM_FIREBASE_ENV` from it. The "Select the Firebase config" build phase
+  copies `Config/$TIM_FIREBASE_ENV/$PRODUCT_NAME/GoogleService-Info.plist` into
+  the app, and fails the build when the file is missing or was registered for a
+  different bundle id. `TIM_GOOGLE_URL_SCHEME` follows the project too.
+- **Android** — `app/build.gradle.kts` reads the same two lines and copies
+  `Config/<project>/google-services.json` to `src/debug/` and `src/release/`
+  (gitignored), where the Google Services plugin looks first. See the README
+  in `src/debug/` for why staging is not a product flavor.
+
+To build one configuration against the other project without editing the
+file: `xcodebuild … TIM_FIREBASE_ENV=Prod`, or `./gradlew … -PtimFirebaseEnv=Prod`.
+Xcode's "Run skip gradle" phase passes its `TIM_FIREBASE_ENV` on to gradle, so
+an Xcode build and the Android build it launches always use the same project.
+
+Both builds log which config they took: `Firebase config: Staging (<project id>)`
+in the Xcode build log, `Firebase config (debug): Staging` in the gradle output.
 
 Nothing in the app names a database URL any more. Both platforms take it from
 whichever Firebase config they were built with — iOS from `DATABASE_URL` in the

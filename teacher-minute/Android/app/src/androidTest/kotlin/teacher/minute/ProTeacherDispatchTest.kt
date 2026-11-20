@@ -142,6 +142,58 @@ class ProTeacherDispatchTest : ProTeacherEmulatorTest() {
         assertFalse("the blocked teacher's app shows the question", device.hasObject(acceptSelector()))
     }
 
+    /** AND-D-23 + AND-R-04 (IT-42), end to end through the real callables: the
+     *  student blocks the teacher of an earlier lesson, asks, and the teacher's
+     *  app never shows the question; the block is in the student's list; after
+     *  unblocking, the next question reaches the teacher's app. */
+    @Test
+    fun blockingThenUnblockingStopsAndRestoresQuestions() {
+        prepareRealDispatch()
+        // A finished lesson this teacher took, which is what blockTeacher
+        // checks before blocking.
+        val earlier = "earlier-${java.util.UUID.randomUUID().toString().take(8)}"
+        backend.merge(
+            "questions/$earlier",
+            mapOf(
+                "studentUid" to student.uid,
+                "acceptedByTeacher" to appTeacher.uid,
+                "status" to "completed",
+                "topic" to topic,
+                "text" to questionText,
+                "createdAt" to Date(),
+            )
+        )
+        val blocked = backend.call("blockTeacher", student, JSONObject().put("questionId", earlier))
+        assertTrue("blockTeacher: $blocked", blocked.succeeded)
+
+        // Blocked: the question goes to the other teacher only.
+        val first = ask()
+        assertTrue("dispatch did not run: the other teacher was not invited either", waitForInvite(otherTeacher, first))
+        Thread.sleep(5_000)
+        assertFalse("the blocked teacher was invited", backend.exists("teacherInvites/${appTeacher.uid}/$first"))
+        assertFalse("the blocked teacher's app shows the question", device.hasObject(acceptSelector()))
+
+        // The student's list shows the block.
+        val listed = backend.call("listBlockedTeachers", student, JSONObject())
+        assertTrue("listBlockedTeachers: $listed", listed.succeeded)
+        val rows = listed.result?.optJSONArray("teachers")
+        val uids = (0 until (rows?.length() ?: 0)).map { rows!!.getJSONObject(it).optString("teacherUid") }
+        assertEquals("the blocked list is not just this teacher", listOf(appTeacher.uid), uids)
+
+        val cancelled = backend.call("cancelQuestion", student, JSONObject().put("questionId", first))
+        assertTrue("cancelQuestion: $cancelled", cancelled.succeeded)
+
+        // Unblocked: the next question reaches the teacher's app.
+        val unblocked = backend.call("unblockTeacher", student, JSONObject().put("teacherUid", appTeacher.uid))
+        assertTrue("unblockTeacher: $unblocked", unblocked.succeeded)
+        val afterList = backend.call("listBlockedTeachers", student, JSONObject())
+        assertEquals("the teacher is still listed after unblocking", 0, afterList.result?.optJSONArray("teachers")?.length() ?: 0)
+
+        val second = ask()
+        assertTrue("the unblocked teacher was not invited", waitForInvite(appTeacher, second))
+        assertTrue("the unblocked teacher's app never showed the question", device.wait(Until.hasObject(acceptSelector()), 20_000))
+    }
+
     /** AND-D-17: every teacher declines. The question keeps searching until its
      *  search ends, and only then is unanswered. */
     @Test

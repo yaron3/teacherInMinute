@@ -84,6 +84,10 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertEquals("teacher", profile["role"])
         assertEquals("Signup Teacher", profile["fullName"])
         assertEquals("0521234567", profile["phoneNumber"])
+
+        // IT-51's inbox note on the verification email is written only once
+        // the email has gone out, and the emulators send no mail, so it is
+        // covered by inboxMessages.test.ts rather than here.
     }
 
     /** AND-T-04: with the ID step on (the debug Remote Config override
@@ -103,6 +107,9 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
             openSignUpForm()
             fillSignUp(email, password, password, agreeToTerms = true)
             submitSignUp()
+            // IT-51: sign-up says the account is ready before the ID step.
+            device.wait(Until.findObject(By.text("Your account is ready")), 60_000)
+                ?.let { device.findObject(By.res("dialog_confirm_button"))?.click() }
 
             val front = device.wait(Until.findObject(By.res("identity_front_upload")), 60_000)
             if (front == null) {
@@ -431,10 +438,12 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertTrue("Terms and Privacy opened the same page: $pages", pages["sign_up_terms_link"] != pages["sign_up_privacy_link"])
     }
 
-    /** AND-T-16: Back on a later step goes one step back; on the first step it
-     *  asks before signing out, and only then returns to the welcome screen. */
+    /** AND-T-16: Back on a later step goes one step back. On the first step
+     *  there is no step behind it, only the sign-in screens of an account now
+     *  signed in, so Back sends the app to the background and coming back
+     *  finds the same step, still signed in. */
     @Test
-    fun backInOnboardingStepsBackAndAsksBeforeSigningOut() {
+    fun backInOnboardingStepsBackButNeverToSignIn() {
         val email = backend.newEmail("signup.back")
         val password = "Emulator-${(100_000..999_999).random()}"
         openSignUpForm()
@@ -442,11 +451,12 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         submitSignUp()
         reachProfile()
 
-        // The first step asks; Cancel stays.
-        pressBackForDialog("the profile step")
-        device.findObject(By.res("dialog_cancel_button")).click()
-        assertTrue("Cancel left the profile step", device.wait(Until.hasObject(By.res("complete_profile_full_name")), 10_000))
-        assertNotNull("cancelling signed the teacher out", FirebaseAuth.getInstance().currentUser)
+        backToTheBackground("the profile step")
+        reopen()
+        assertTrue("reopening did not return to the profile step: ${screenText()}",
+            device.wait(Until.hasObject(By.res("complete_profile_full_name")), 15_000))
+        assertFalse("the first step left for a sign-in screen", onSignedOutScreen())
+        assertNotNull("Back on the first step signed the teacher out", FirebaseAuth.getInstance().currentUser)
 
         // A later step goes back one step.
         type("Back Teacher", into = "complete_profile_full_name")
@@ -459,24 +469,74 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         assertTrue("Back on the next step did not return to the profile",
             device.wait(Until.hasObject(By.res("complete_profile_full_name")), 15_000))
 
-        // And on the first step, confirming signs out to the welcome screen.
-        pressBackForDialog("the profile step again")
-        device.findObject(dialogButton).click()
-        assertTrue("confirming did not return to the welcome screen",
-            device.wait(Until.hasObject(By.res("welcome_log_in")), 20_000))
-        assertNull("still signed in on the welcome screen", FirebaseAuth.getInstance().currentUser)
+        // And on the first step again, still no way back to sign-in.
+        backToTheBackground("the profile step again")
+        reopen()
+        assertTrue("reopening did not return to the profile step: ${screenText()}",
+            device.wait(Until.hasObject(By.res("complete_profile_full_name")), 15_000))
+        assertNotNull("Back on the first step signed the teacher out", FirebaseAuth.getInstance().currentUser)
     }
 
-    /** Back until the sign-out question shows: the first Back may only close
-     *  the keyboard. */
-    private fun pressBackForDialog(where: String) {
+    /** Back until the app is in the background: the first Back may only close
+     *  the keyboard. It must never show a sign-in screen on the way. */
+    private fun backToTheBackground(where: String) {
         repeat(2) {
             device.pressBack()
-            if (device.wait(Until.hasObject(By.res("dialog_cancel_button")), 4_000)) return
+            Thread.sleep(1_500)
+            if (onSignedOutScreen()) {
+                capture("back-sign-in")
+                fail("Back on $where returned to a sign-in screen: ${screenText()}")
+            }
+            if (device.currentPackageName != context.packageName) return
         }
-        capture("back-dialog")
-        fail("Back on $where did not ask before signing out: ${screenText()}")
+        capture("back-stayed")
+        fail("Back on $where did not send the app to the background: ${screenText()}")
     }
+
+    /** Brings the app back as the launcher would, without restarting it. */
+    private fun reopen() {
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)!!
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        device.wait(Until.hasObject(By.pkg(context.packageName).depth(0)), 15_000)
+    }
+
+    /** After signing up and reaching the dashboard, Back never returns to
+     *  the welcome, sign-up or onboarding screens. */
+    @Test
+    fun backAfterSigningUpStaysOnTheDashboard() {
+        val email = backend.newEmail("signup.after-back")
+        val password = "Emulator-${(100_000..999_999).random()}"
+        openSignUpForm()
+        fillSignUp(email, password, password, agreeToTerms = true)
+        submitSignUp()
+        reachProfile()
+        type("After Back Teacher", into = "complete_profile_full_name")
+        type("0521234567", into = "complete_profile_phone")
+        findScrolling(By.res("complete_profile_continue"))!!.click()
+        device.wait(Until.findObject(dialogButton), 15_000)?.click() // no payout method yet: go on
+        reachDashboard("finishing the profile")
+
+        repeat(3) { attempt ->
+            device.pressBack()
+            Thread.sleep(2_000)
+            assertFalse("Back #${attempt + 1} after sign-up left the dashboard for a sign-in screen: ${screenText()}", onSignedOutScreen())
+            assertFalse("Back #${attempt + 1} after sign-up went back into onboarding: ${screenText()}",
+                device.hasObject(By.res("complete_profile_full_name")) || device.hasObject(By.res("permissions_setup_skip")))
+            if (device.currentPackageName != context.packageName) {
+                reopen()
+                Thread.sleep(2_000)
+            }
+            assertFalse("after Back #${attempt + 1} the app reopened on a sign-in screen: ${screenText()}", onSignedOutScreen())
+            assertTrue("the dashboard is gone after Back #${attempt + 1}: ${screenText()}",
+                device.wait(Until.hasObject(By.res("availability_toggle")), 10_000))
+        }
+    }
+
+    /** The welcome, login or sign-up screen. */
+    private fun onSignedOutScreen(): Boolean =
+        listOf("welcome_log_in", "email_input", "sign_up_email")
+            .any { device.hasObject(By.res(it)) }
 
     // Steps
 
@@ -498,11 +558,22 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
         type(email, into = "sign_up_email")
         type(password, into = "sign_up_password")
         type(confirmation, into = "sign_up_confirm_password")
+        // The keyboard stays up after the last field and can cover the box:
+        // a click there lands on the keyboard. Close it first, as a person
+        // would to see the box.
+        closeKeyboard()
         if (termsChecked != agreeToTerms) {
             val box = findScrolling(By.res("sign_up_terms"))
             assertNotNull("no terms box", box)
             box!!.click()
             termsChecked = agreeToTerms
+        }
+    }
+
+    private fun closeKeyboard() {
+        if (device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")) {
+            device.pressBack()
+            Thread.sleep(700)
         }
     }
 
@@ -513,7 +584,16 @@ class ProTeacherSignUpTest : ProTeacherEmulatorTest() {
     }
 
     private fun reachProfile() {
-        if (!device.wait(Until.hasObject(By.res("complete_profile_full_name")), 60_000)) {
+        // IT-51: sign-up says the account is ready, and where the link went,
+        // before the profile step.
+        val deadline = System.currentTimeMillis() + 60_000
+        while (System.currentTimeMillis() < deadline && !device.hasObject(By.res("complete_profile_full_name"))) {
+            if (device.hasObject(By.text("Your account is ready"))) {
+                device.findObject(By.res("dialog_confirm_button"))?.let { runCatching { it.click() } }
+            }
+            Thread.sleep(500)
+        }
+        if (!device.wait(Until.hasObject(By.res("complete_profile_full_name")), 1_000)) {
             capture("profile")
             fail("signing up did not reach the profile step: ${screenText()}")
         }

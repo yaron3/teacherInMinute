@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>315853704604-qau34dvugdgnubbfqph3e8tn8pspqq4g.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.315853704604-qau34dvugdgnubbfqph3e8tn8pspqq4g</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>315853704604-69o3uhuvisusa8vo4s86nssv7anu4pfh.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDN-3oYhTvbw-kIrpu4e2Bnx3BK7_Y3vXg</string>
+	<key>GCM_SENDER_ID</key>
+	<string>315853704604</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.yaronj.student</string>
+	<key>PROJECT_ID</key>
+	<string>teacher-in-a-moment-staging</string>
+	<key>STORAGE_BUCKET</key>
+	<string>teacher-in-a-moment-staging.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:315853704604:ios:baa784cc8a806af8f88c59</string>
+	<key>DATABASE_URL</key>
+	<string>https://teacher-in-a-moment-staging-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>

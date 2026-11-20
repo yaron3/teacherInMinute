@@ -40,6 +40,7 @@ struct CompleteProfileView: View {
           .padding(.horizontal, 20)
           .padding(.top, 16)
           .padding(.bottom, 20)
+          .tapDismissesKeyboard("complete_profile_background") { focusedField = nil }
         }
         .formScrollDismissesKeyboard()
       }
@@ -106,9 +107,11 @@ struct CompleteProfileView: View {
         .lineLimit(1)
         .minimumScaleFactor(0.6)
       Spacer(minLength: 0)
-      BrandBackButton(accessibilityLabel: viewModel.backLabel) {
-        trackTap("complete_profile_back")
-        OnboardingBackCoordinator.shared.handleBack()
+      if router.canStepBack {
+        BrandBackButton(accessibilityLabel: viewModel.backLabel) {
+          trackTap("complete_profile_back")
+          OnboardingBackCoordinator.shared.handleBack()
+        }
       }
     }
     .padding(.horizontal, 20)

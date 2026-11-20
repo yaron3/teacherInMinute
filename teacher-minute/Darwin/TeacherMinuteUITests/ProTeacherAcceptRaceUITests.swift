@@ -162,8 +162,19 @@ final class ProTeacherAcceptRaceUITests: ProTeacherEmulatorTestCase {
             if dialogButton.exists {
                 let text = dialogText()
                 attach("dialog", text)
-                XCTAssertTrue(takenMessages.contains { text.contains($0) },
-                              "the losing app showed something other than \"already taken\": \(text)")
+                // A new teacher's dashboard opens with the verify-your-email
+                // banner, whose Resend button sits under the card's Accept.
+                // When the card closes before the tap, the tap resends the
+                // email instead, and its outcome is no answer about the
+                // question.
+                let fellThroughToBanner = !takenMessages.contains { text.contains($0) }
+                    && resendOutcomeMessages.contains { text.contains($0) }
+                if fellThroughToBanner {
+                    attach("tap fell through", "the card closed first; the tap reached the verify-email banner")
+                } else {
+                    XCTAssertTrue(takenMessages.contains { text.contains($0) },
+                                  "the losing app showed something other than \"already taken\": \(text)")
+                }
             }
             let ownInvite = try await backend.strings("questions/\(qid)/invites/\(appTeacher.uid)")
             XCTAssertEqual(ownInvite?["response"], "pending", "the losing teacher's invite was marked accepted")

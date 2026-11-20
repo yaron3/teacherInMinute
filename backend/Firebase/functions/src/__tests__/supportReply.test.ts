@@ -21,7 +21,15 @@ jest.mock("firebase-admin", () => {
     },
   });
   const firestore = { collection: () => ({ doc }) };
-  return { firestore: () => firestore, database: () => ({}), auth: () => ({}) };
+  const bucket = {
+    file: (path: string) => ({
+      getSignedUrl: async () => {
+        if (path.endsWith("/1.jpg")) throw new Error("No such object");
+        return [`https://signed.example/${path}`];
+      },
+    }),
+  };
+  return { firestore: () => firestore, database: () => ({}), auth: () => ({}), storage: () => ({ bucket: () => bucket }) };
 });
 jest.mock("firebase-admin/firestore", () => {
   class Timestamp {
@@ -45,7 +53,7 @@ jest.mock("../pilot", () => ({ PILOT_COLLECTION: "pilotRegistrations" }));
 jest.mock("../accountDeletion", () => ({}));
 jest.mock("../presenceHistory", () => ({}));
 
-import { adminRespondToContactRequest, supportReplySubject } from "../admin";
+import { adminGetContactRequest, adminRespondToContactRequest, supportReplySubject } from "../admin";
 
 const respond = adminRespondToContactRequest as unknown as (req: unknown) => Promise<any>;
 const ADMIN = { auth: { uid: "admin", token: { email: "yaronj3@gmail.com", email_verified: true, admin: true } } };
@@ -149,5 +157,24 @@ describe("adminRespondToContactRequest", () => {
     await expect(respond(agent(false))).rejects.toMatchObject({ code: "permission-denied" });
     await respond(agent(true));
     expect(mockDocs.get("case-123")!.responses[0].sentBy).toBe("agent@example.com");
+  });
+});
+
+describe("adminGetContactRequest", () => {
+  const get = adminGetContactRequest as unknown as (req: unknown) => Promise<any>;
+
+  it("signs a link to each attachment, null for one that cannot be signed", async () => {
+    mockDocs.set("case-123", { ...mockDocs.get("case-123"), userId: "user-1", attachmentCount: 3 });
+    const { request } = await get({ ...ADMIN, data: { requestId: "case-123" } });
+    expect(request.attachmentUrls).toEqual([
+      "https://signed.example/contactAttachments/user-1/case-123/0.jpg",
+      null,
+      "https://signed.example/contactAttachments/user-1/case-123/2.jpg",
+    ]);
+  });
+
+  it("has no attachments on a request sent without any", async () => {
+    const { request } = await get({ ...ADMIN, data: { requestId: "case-123" } });
+    expect(request.attachmentUrls).toEqual([]);
   });
 });

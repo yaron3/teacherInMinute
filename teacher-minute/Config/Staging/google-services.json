@@ -1,0 +1,99 @@
+{
+  "project_info": {
+    "project_number": "315853704604",
+    "firebase_url": "https://teacher-in-a-moment-staging-default-rtdb.firebaseio.com",
+    "project_id": "teacher-in-a-moment-staging",
+    "storage_bucket": "teacher-in-a-moment-staging.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:315853704604:android:ffad114e7289918ef88c59",
+        "android_client_info": {
+          "package_name": "com.yaronj.student"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "315853704604-69o3uhuvisusa8vo4s86nssv7anu4pfh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yaronj.student",
+            "certificate_hash": "812f5d3081a6a1811949e2f66be445d9cf574edf"
+          }
+        },
+        {
+          "client_id": "315853704604-40rojjq3eatnipdumnh9flq8bl145gm6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaYhoWEJ00j40RMyNXGsE5aUi66Rv3Ums"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "315853704604-40rojjq3eatnipdumnh9flq8bl145gm6.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "315853704604-qau34dvugdgnubbfqph3e8tn8pspqq4g.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.yaronj.student"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:315853704604:android:5077ee0c1a7fc9c9f88c59",
+        "android_client_info": {
+          "package_name": "com.yaronj.tim"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "315853704604-b1dnetkdaivtu9s5v651lq2ma2b3323m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yaronj.tim",
+            "certificate_hash": "812f5d3081a6a1811949e2f66be445d9cf574edf"
+          }
+        },
+        {
+          "client_id": "315853704604-40rojjq3eatnipdumnh9flq8bl145gm6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaYhoWEJ00j40RMyNXGsE5aUi66Rv3Ums"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "315853704604-40rojjq3eatnipdumnh9flq8bl145gm6.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "315853704604-qau34dvugdgnubbfqph3e8tn8pspqq4g.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.yaronj.student"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

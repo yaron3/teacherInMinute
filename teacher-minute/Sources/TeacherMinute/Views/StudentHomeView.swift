@@ -17,6 +17,8 @@ struct StudentHomeView: View {
   @State var showingBalanceLoadingAlert = false
   @State var showingCouponAlert = false
   @State var showingPurchaseSummaryAlert = false
+  /// Minutes or "Load minutes" was tapped, but no package could be loaded.
+  @State var showingPricingUnavailableAlert = false
   @State var showsAskTeacher = false
   @State var showsNotificationExplainer = false
   @State var pendingCheckoutOption: PricingOption?
@@ -220,6 +222,12 @@ struct StudentHomeView: View {
 	  viewModel.balanceLoadingTitle,
 	  isPresented: $showingBalanceLoadingAlert,
 	  message: viewModel.balanceLoadingMessage,
+	  actions: [AppDialogAction(viewModel.okLabel)]
+	)
+	.appDialog(
+	  viewModel.pricingUnavailableTitle,
+	  isPresented: $showingPricingUnavailableAlert,
+	  message: viewModel.pricingUnavailableMessage,
 	  actions: [AppDialogAction(viewModel.okLabel)]
 	)
 	.appDialog(
@@ -507,6 +515,7 @@ struct StudentHomeView: View {
 	Task { @MainActor in
 	  await viewModel.preparePaymentOptions()
 	  showsPurchaseScreen = !viewModel.pricingOptions.isEmpty
+	  showingPricingUnavailableAlert = viewModel.pricingOptions.isEmpty
 	  viewModel.isPreparingCheckout = false
 	}
   }

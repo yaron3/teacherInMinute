@@ -25,6 +25,7 @@ struct CreateAccountView: View {
           .padding(.horizontal, 20)
           .padding(.top, 16)
           .padding(.bottom, 20)
+          .tapDismissesKeyboard("create_account_background") { focusedField = nil }
         }
         .formScrollDismissesKeyboard()
       }
@@ -56,6 +57,16 @@ struct CreateAccountView: View {
       isPresented: $viewModel.showAlert,
       message: viewModel.alertMessage ?? "",
       actions: [AppDialogAction(viewModel.okLabel)]
+    )
+    .appDialog(
+      viewModel.signupSuccessTitle,
+      isPresented: $viewModel.showsSignupSuccess,
+      message: viewModel.signupSuccessMessage,
+      actions: [
+        AppDialogAction(viewModel.okLabel) {
+          viewModel.signupSuccessDismissed()
+        }
+      ]
     )
     .sheet(isPresented: $viewModel.showingTerms) {
       if let url = viewModel.termsURL {

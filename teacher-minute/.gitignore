@@ -87,3 +87,8 @@ Carthage/Build/
 **/fastlane/Preview.html
 **/fastlane/test_output
 .derivedData/
+
+# Copied from Config/<project>/ by Android/app/build.gradle.kts on every build;
+# edit the file under Config/ instead.
+Android/app/src/debug/google-services.json
+Android/app/src/release/google-services.json

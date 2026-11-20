@@ -15,6 +15,25 @@ extension CreateAccountViewModel {
     var signUpDialogTitle: String { LocalizationSupport.localized("Sign Up") }
     var okLabel: String { LocalizationSupport.localized("OK") }
 
+    // MARK: Signed up (IT-51)
+    var signupSuccessTitle: String { LocalizationSupport.localized("Your account is ready") }
+    func verificationSentText(email: String) -> String {
+        String(
+            format: LocalizationSupport.localized("We sent a verification link to %@. Open it on this phone to verify your email address."),
+            email
+        )
+    }
+    func studentRewardOfferText(minutes: Int) -> String {
+        String(format: LocalizationSupport.localized("Verify your email address and get %d free minutes."), minutes)
+    }
+    func teacherRewardOfferText(percent: Int, minutes: Int) -> String {
+        String(
+            format: LocalizationSupport.localized("Verify your email address and keep %d%% of your earnings for your first %d minutes of teaching."),
+            percent,
+            minutes
+        )
+    }
+
     // MARK: Legal documents
     var eulaTitle: String { LocalizationSupport.localized("EULA") }
     var privacyPolicyTitle: String { LocalizationSupport.localized("Privacy Policy") }

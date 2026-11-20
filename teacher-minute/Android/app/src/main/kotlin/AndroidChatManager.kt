@@ -665,6 +665,17 @@ object AndroidChatManager {
     private var presenceConnectedRef: DatabaseReference? = null
 
     /**
+     * This device's own database connection, as `.info/connected` last said
+     * while presence is kept. False until it first reports, and again once
+     * presence stops. Read by the lesson to tell this side it is offline (IT-36).
+     */
+    @Volatile
+    private var databaseConnected = false
+
+    @JvmStatic
+    fun isDatabaseConnected(): Boolean = databaseConnected
+
+    /**
      * Keeps this side's presence while the lesson runs. On every connection —
      * the first, and each reconnect — adds an entry the server removes when
      * that connection drops, and asks the server to stamp `lostAt` then.
@@ -677,7 +688,12 @@ object AndroidChatManager {
         val connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected")
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.getValue(Boolean::class.java) != true) return
+                val connected = snapshot.getValue(Boolean::class.java) == true
+                databaseConnected = connected
+                if (!connected) {
+                    Log.i(TAG, "Lesson presence disconnected questionId=$questionId role=$role")
+                    return
+                }
                 // A new entry for each connection: the handler of one that
                 // dropped removes its own entry only, however late the server
                 // gets to it.
@@ -708,6 +724,19 @@ object AndroidChatManager {
     fun stopLessonPresence(questionId: String, role: String) {
         detachPresenceListener()
         lessonPresenceSide(questionId, role).onDisconnect().cancel()
+    }
+
+    /**
+     * Stops adding connection entries, and leaves the disconnect handlers
+     * alone: for a side that gave up while offline. The server still has to
+     * stamp `lostAt` for the connection that dropped, and a new entry written
+     * on reconnect would read as this side coming back and keep the lesson
+     * going (IT-36).
+     */
+    @JvmStatic
+    @Synchronized
+    fun detachLessonPresence() {
+        detachPresenceListener()
     }
 
     /** Stamps this side leaving the lesson, on the server's clock. */
@@ -750,6 +779,7 @@ object AndroidChatManager {
         }
         presenceListener = null
         presenceConnectedRef = null
+        databaseConnected = false
     }
 
     private fun appendingQuestionText(addition: String, current: String): String {

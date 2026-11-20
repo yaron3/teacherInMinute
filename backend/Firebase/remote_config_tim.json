@@ -2920,6 +2920,76 @@
       },
       "valueType": "STRING"
     },
+    "add_image": {
+      "defaultValue": {
+        "value": "Add image"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הוסף תמונה"
+        },
+        "HebrewApp": {
+          "value": "הוסף תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "add_screenshots_photos": {
+      "defaultValue": {
+        "value": "Add up to 3 screenshots or photos."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אפשר לצרף עד 3 צילומי מסך או תמונות."
+        },
+        "HebrewApp": {
+          "value": "אפשר לצרף עד 3 צילומי מסך או תמונות."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "attachments": {
+      "defaultValue": {
+        "value": "Attachments"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "קבצים מצורפים"
+        },
+        "HebrewApp": {
+          "value": "קבצים מצורפים"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "could_not_attach": {
+      "defaultValue": {
+        "value": "Could not attach this image."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא ניתן לצרף את התמונה הזו."
+        },
+        "HebrewApp": {
+          "value": "לא ניתן לצרף את התמונה הזו."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "remove_image": {
+      "defaultValue": {
+        "value": "Remove image"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הסר תמונה"
+        },
+        "HebrewApp": {
+          "value": "הסר תמונה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "too_many_failed": {
       "defaultValue": {
         "value": "Too many failed attempts. Please try again later."
@@ -8589,6 +8659,34 @@
       },
       "valueType": "STRING"
     },
+    "make_sure_microphone_enabled_teacher": {
+      "defaultValue": {
+        "value": "Make sure your microphone is enabled so your student can hear you."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ודא שהמיקרופון מופעל כדי שהתלמיד יוכל לשמוע אותך."
+        },
+        "HebrewApp": {
+          "value": "ודא שהמיקרופון מופעל כדי שהתלמיד יוכל לשמוע אותך."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "make_sure_camera_enabled_teacher": {
+      "defaultValue": {
+        "value": "Make sure your camera is enabled so your student can see you."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "ודא שהמצלמה מופעלת כדי שהתלמיד יוכל לראות אותך."
+        },
+        "HebrewApp": {
+          "value": "ודא שהמצלמה מופעלת כדי שהתלמיד יוכל לראות אותך."
+        }
+      },
+      "valueType": "STRING"
+    },
     "make_sure_camera_enabled": {
       "defaultValue": {
         "value": "Make sure your camera is enabled so your teacher can see your work."
@@ -10262,6 +10360,20 @@
         },
         "HebrewApp": {
           "value": "החיבור של %@ נותק. השיעור יסתיים בעוד %d:%02d אם החיבור לא יחזור."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "you_offline_the": {
+      "defaultValue": {
+        "value": "You're offline. The lesson ends in %d:%02d unless you reconnect."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין חיבור לאינטרנט. השיעור יסתיים בעוד %d:%02d אם החיבור לא יחזור."
+        },
+        "HebrewApp": {
+          "value": "אין חיבור לאינטרנט. השיעור יסתיים בעוד %d:%02d אם החיבור לא יחזור."
         }
       },
       "valueType": "STRING"
@@ -12247,6 +12359,20 @@
         },
         "HebrewApp": {
           "value": "השלם את המסמכים שלך"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "the_student_will": {
+      "defaultValue": {
+        "value": "The student will join shortly"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התלמיד יצטרף בקרוב"
+        },
+        "HebrewApp": {
+          "value": "התלמיד יצטרף בקרוב"
         }
       },
       "valueType": "STRING"
@@ -15670,6 +15796,48 @@
       },
       "valueType": "STRING"
     },
+    "your_account_ready": {
+      "defaultValue": {
+        "value": "Your account is ready"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "החשבון שלך מוכן"
+        },
+        "HebrewApp": {
+          "value": "החשבון שלך מוכן"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "fmt_signup_verification_sent": {
+      "defaultValue": {
+        "value": "We sent a verification link to %@. Open it on this phone to verify your email address."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "שלחנו קישור אימות אל %@. פתח/י אותו בטלפון הזה כדי לאמת את כתובת המייל."
+        },
+        "HebrewApp": {
+          "value": "שלחנו קישור אימות אל %@. פתח/י אותו בטלפון הזה כדי לאמת את כתובת המייל."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "status_no_connection": {
+      "defaultValue": {
+        "value": "No connection"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אין חיבור"
+        },
+        "HebrewApp": {
+          "value": "אין חיבור"
+        }
+      },
+      "valueType": "STRING"
+    },
     "offline_option": {
       "defaultValue": {
         "value": "Offline"
@@ -16002,6 +16170,34 @@
         },
         "HebrewApp": {
           "value": "אף מקצוע או תת־נושא לא תואם לחיפוש."
+        }
+      },
+      "valueType": "STRING"
+    },
+    "minutes_unavailable": {
+      "defaultValue": {
+        "value": "Minutes unavailable"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "הדקות לא זמינות"
+        },
+        "HebrewApp": {
+          "value": "הדקות לא זמינות"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "couldn_load_the": {
+      "defaultValue": {
+        "value": "We couldn't load the minute packages. Check your connection and try again."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לא הצלחנו לטעון את חבילות הדקות. כדאי לבדוק את החיבור ולנסות שוב."
+        },
+        "HebrewApp": {
+          "value": "לא הצלחנו לטעון את חבילות הדקות. כדאי לבדוק את החיבור ולנסות שוב."
         }
       },
       "valueType": "STRING"

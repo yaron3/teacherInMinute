@@ -341,13 +341,23 @@ final class StudentAskUITests: XCTestCase {
     @MainActor
     func testTakingALessonTheTeacherEndsThenSkippingTheRating() async throws {
         let (teacher, _, qid) = try await joinALesson()
+        // Session screenshots only (SESSION_SHOTS=1): a message, then the
+        // middle of the lesson.
+        if sessionShotsEnabled {
+            sendSessionMessage(app, "Hi! I'm stuck on 2x + 3 = 11.")
+            pause(seconds: 12)
+            sessionShot("03-student-during")
+        }
         // The teacher's half ends it after 35 seconds. The rating comes up
         // over the lesson screen, whose End stays in the hierarchy beneath it,
         // so the rating itself is what shows the end arrived.
         let close = app.buttons["rate_session_close"]
         try require(close.waitForExistence(timeout: 180), "the teacher's ending never reached the student")
+        pause(seconds: sessionShotsEnabled ? 1 : 0)
+        sessionShot("04-student-end-rating")
         try require(tapWhenHittable(close, "the rating's close"), "the rating could not be closed")
         try require(waitForHome(timeout: 30), "closing the rating did not return home")
+        sessionShot("05-student-after")
 
         try await expectTheLessonOver(qid, teacher: teacher)
         let rating = try await backend.fields("teachers/\(teacher)/ratings/\(qid)")
@@ -454,6 +464,79 @@ final class StudentAskUITests: XCTestCase {
         let (teacher, student, qid) = try await joinALesson()
         try endTheLesson()
 
+        try await reportAndBlock(teacher: teacher, student: student, qid: qid)
+        try await unblockInPrivacyControls(teacher: teacher, student: student)
+    }
+
+    /// IOS-R-04 end to end with a real teacher (IT-42) — pairs with the Pro
+    /// Teacher half CrossPlatformLessonTest.teachesThenIsBlockedThenUnblocked
+    /// on Android. After the lesson the student reports and blocks the
+    /// teacher; a question asked then never reaches them; Privacy Controls
+    /// lists them; after unblocking the next question does reach them, and
+    /// the teacher's half declines it from its card, which shows it was on
+    /// their screen.
+    @MainActor
+    func testABlockedTeacherGetsNoQuestionsUntilUnblocked() async throws {
+        let (teacher, student, qid) = try await joinALesson()
+        try endTheLesson()
+        try await reportAndBlock(teacher: teacher, student: student, qid: qid)
+
+        // Blocked: the teacher is the only one online, so the question goes
+        // to nobody.
+        try require(waitForHome(timeout: 30), "not back home after the report")
+        try ask("Blocked check - this must not reach the teacher")
+        try require(searchCancel.waitForExistence(timeout: 30), "Find a teacher did not start a search")
+        let blockedQid = try await waitForNewQuestion(of: student.uid, excluding: [qid])
+        attach("question while blocked", blockedQid)
+        let copied = try await backend.fields("questions/\(blockedQid)")?["blockedTeachers"] as? [String: Any]
+        let copiedUids = ((copied?["arrayValue"] as? [String: Any])?["values"] as? [[String: Any]])?
+            .compactMap { $0["stringValue"] as? String } ?? []
+        XCTAssertTrue(copiedUids.contains(teacher), "the question does not carry the block: \(copiedUids)")
+        // Long enough for dispatch's first waves.
+        pause(seconds: 20)
+        let invitedWhileBlocked = try await backend.exists("teacherInvites/\(teacher)/\(blockedQid)")
+        XCTAssertFalse(invitedWhileBlocked, "the blocked teacher was sent the question")
+        let alreadyInvited = (try await backend.fields("questions/\(blockedQid)")?["alreadyInvited"] as? [String: Any])
+        attach("invited while blocked", "\(alreadyInvited ?? [:])")
+        if searchCancel.exists { _ = tapWhenHittable(searchCancel, "the search's close button") }
+        try require(waitForHome(timeout: 30), "closing the search did not return home")
+
+        try await unblockInPrivacyControls(teacher: teacher, student: student)
+
+        // Unblocked: the next question reaches the teacher, whose half
+        // declines it from the card on its screen. Home again from Settings by
+        // relaunching, still signed in.
+        app.terminate()
+        app.launchArguments = [
+            "-firebaseEmulatorHost", EmulatorBackend.host,
+            "-tutorial.student.hidden", "YES",
+        ]
+        app.launch()
+        try require(waitForHome(timeout: 90), "relaunching did not reach home")
+        try ask("Unblocked check - this must reach the teacher")
+        try require(searchCancel.waitForExistence(timeout: 30), "Find a teacher did not start a search")
+        let unblockedQid = try await waitForNewQuestion(of: student.uid, excluding: [qid, blockedQid])
+        attach("question after unblocking", unblockedQid)
+        var invited = false
+        for _ in 0..<60 where !invited {
+            invited = try await backend.exists("teacherInvites/\(teacher)/\(unblockedQid)")
+            if !invited { try await Task.sleep(nanoseconds: 500_000_000) }
+        }
+        try require(invited, "the unblocked teacher was not sent the question")
+        var response = ""
+        let seen = Date().addingTimeInterval(90)
+        repeat {
+            response = stringValue(try await backend.fields("questions/\(unblockedQid)/invites/\(teacher)")?["response"]) ?? ""
+            if response != "decline" { try await Task.sleep(nanoseconds: 1_000_000_000) }
+        } while response != "decline" && Date() < seen
+        XCTAssertEqual(response, "decline", "the teacher's half never declined the card, so it was never on their screen")
+        if searchCancel.exists { _ = tapWhenHittable(searchCancel, "the search's close button") }
+    }
+
+    /// From the rating screen: Report, with "Also block" left ticked. The
+    /// report is stored and the teacher is on the student's blocked list.
+    @MainActor
+    private func reportAndBlock(teacher: String, student: EmulatorBackend.Account, qid: String) async throws {
         try require(tapWhenHittable(app.buttons["rating_report_teacher"], "Report"), "the rating screen offers no report")
         try require(tapWhenHittable(app.buttons["report_reason_not_teaching"], "a reason"), "the report offers no reasons")
         // "Also block" starts ticked (ReportTeacherViewModel.alsoBlock), so it
@@ -485,12 +568,23 @@ final class StudentAskUITests: XCTestCase {
         } while !(reported && blocked) && Date() < deadline
         XCTAssertTrue(reported, "the report was not stored")
         try require(blocked, "the teacher is not on the student's blocked list")
+    }
 
+    /// Settings → Privacy Controls lists the blocked teacher by name, and
+    /// Unblock there lifts the block in the backend.
+    @MainActor
+    private func unblockInPrivacyControls(teacher: String, student: EmulatorBackend.Account) async throws {
         // IOS-R-04's other half: the block shows in Settings → Privacy
         // Controls, and unblocking there lifts it.
         try require(waitForHome(timeout: 30), "not back home after the report")
-        try require(tapWhenHittable(app.buttons["side_menu_button"], "the menu"), "no menu button")
-        try require(tapWhenHittable(app.buttons["side_menu_item_settings"], "Settings"), "no Settings in the menu")
+        // A tap on the menu button while home is still settling (after a
+        // closed search, say) opens nothing, so it is tapped until it does.
+        let settings = app.buttons["side_menu_item_settings"]
+        for _ in 0..<4 where !settings.exists {
+            try require(tapWhenHittable(app.buttons["side_menu_button"], "the menu"), "no menu button")
+            _ = settings.waitForExistence(timeout: 5)
+        }
+        try require(tapWhenHittable(settings, "Settings"), "no Settings in the menu")
         // A tap while the menu is still closing does not open the row, so it
         // is tapped until the page comes up.
         let privacy = app.buttons["settings_row_privacyControls"]
@@ -605,6 +699,7 @@ final class StudentAskUITests: XCTestCase {
             if chosen != type { try await Task.sleep(nanoseconds: 500_000_000) }
         }
         try require(chosen == type, "choosing \(type) did not reach the question (\(chosen))")
+        sessionShot("01-student-searching")
         return (teacher, student, qid)
     }
 
@@ -618,6 +713,8 @@ final class StudentAskUITests: XCTestCase {
         let entered = waitForAny([end, textOnly], timeout: 300)
         if entered == textOnly { try require(tapWhenHittable(textOnly, "Continue with text only"), "text only was never tappable") }
         try require(end.waitForExistence(timeout: 120), "the student never entered the lesson")
+        if sessionShotsEnabled { pause(seconds: 2) }
+        sessionShot("02-student-lesson-start")
         return (teacher, student, qid)
     }
 
@@ -762,6 +859,15 @@ final class StudentAskUITests: XCTestCase {
             try await Task.sleep(nanoseconds: 500_000_000)
         }
         return []
+    }
+
+    private func waitForNewQuestion(of studentUid: String, excluding known: [String]) async throws -> String {
+        for _ in 0..<40 {
+            let ids = try await backend.documentIDs("questions", where: "studentUid", is: studentUid)
+            if let qid = ids.first(where: { !known.contains($0) }) { return qid }
+            try await Task.sleep(nanoseconds: 500_000_000)
+        }
+        throw StepFailed("no new question was created")
     }
 
     private func waitForQuestion(of studentUid: String) async throws -> String {

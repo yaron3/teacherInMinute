@@ -73,7 +73,7 @@ struct TeacherDashboardView: View {
 		VStack(spacing: 0) {
 		  BrandPageHeader(label: viewModel.teacherEyebrow, title: viewModel.teacherName) {
 			HStack(spacing: 8) {
-			  BrandMessagesButton { showsMessages = true }
+			  BrandMessagesButton(showsBadge: viewModel.hasUnreadMessages) { showsMessages = true }
 			  BrandMenuButton()
 			}
 		  }
@@ -518,7 +518,14 @@ struct TeacherDashboardView: View {
 		verticalRule
 		statusItem(icon: "video.fill", title: viewModel.camStatusTitle, subtitle: viewModel.camStatusSubtitle, color: viewModel.hasCameraAccess ? theme.positive : theme.secondaryText)
 		verticalRule
-		statusItem(icon: "circle.fill", title: viewModel.connectionStatusTitle, subtitle: viewModel.connectionStatusSubtitle, color: theme.positive)
+		// Android draws "circle.fill" as a green emoji whatever the colour, so
+		// a lost connection gets its own icon rather than only another colour.
+		statusItem(
+		  icon: viewModel.isServerConnected ? "circle.fill" : "exclamationmark.triangle.fill",
+		  title: viewModel.connectionStatusTitle,
+		  subtitle: viewModel.connectionStatusSubtitle,
+		  color: viewModel.isServerConnected ? theme.positive : theme.danger
+		)
 	  }
 	}
   }
@@ -1020,6 +1027,7 @@ struct TeacherIncomingQuestionOverlay: View {
 
 #Preview("Online — Unreachable") {
   let viewModel = MockTeacherDashboardViewModel(isOnline: true)
+  viewModel.isServerConnected = false
   viewModel.errorMessageGeneral = viewModel.poorConnectionWarning
   return TeacherDashboardView(
     viewModel: viewModel,

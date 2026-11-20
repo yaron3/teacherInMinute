@@ -1,6 +1,6 @@
 /**
  * The suites that need a Firebase emulator running. `npm run test:emulator`
- * starts the database and Firestore emulators and runs them all;
+ * starts the database, Firestore and Storage emulators and runs them all;
  * `npm run test:rules` runs only the database rules suite. Plain `npm test`
  * skips them.
  *

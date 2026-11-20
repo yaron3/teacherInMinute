@@ -173,9 +173,11 @@ struct VerifyEmailView: View {
   private var header: some View {
     HStack(spacing: 12) {
       Spacer(minLength: 0)
-      BrandBackButton(accessibilityLabel: viewModel.backLabel) {
-        trackTap("verify_email_back")
-        OnboardingBackCoordinator.shared.handleBack()
+      if router.canStepBack {
+        BrandBackButton(accessibilityLabel: viewModel.backLabel) {
+          trackTap("verify_email_back")
+          OnboardingBackCoordinator.shared.handleBack()
+        }
       }
     }
     .padding(.horizontal, 20)

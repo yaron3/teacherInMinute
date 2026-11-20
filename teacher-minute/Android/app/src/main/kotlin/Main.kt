@@ -76,9 +76,9 @@ open class MainActivity: AppCompatActivity {
 
     /**
      * Back handling while an onboarding step is on screen. Onboarding is a
-     * stack of steps the user should be able to walk back through, and backing
-     * out of the first one means signing out — decisions the app makes, so this
-     * callback only forwards the press.
+     * stack of steps the user should be able to walk back through, but never
+     * past the first one to the sign-in screens — decisions the app makes, so
+     * this callback only forwards the press.
      */
     private var onboardingBackCallback: OnBackPressedCallback? = null
 
@@ -259,6 +259,16 @@ open class MainActivity: AppCompatActivity {
             return questionId
         }
 
+        /** Sends the app to the background, as back does on the home tabs. */
+        @JvmStatic
+        fun moveAppToBack() {
+            val activity = currentActivity ?: return
+            activity.runOnUiThread {
+                logger.info("[BackNav] back with nowhere to go — moving the app to the back")
+                activity.moveTaskToBack(true)
+            }
+        }
+
         @JvmStatic
         fun setSystemBackBlocked(blocked: Boolean) {
             val activity = currentActivity ?: return
@@ -268,7 +278,8 @@ open class MainActivity: AppCompatActivity {
         }
 
         /**
-         * Routes the system back button to the onboarding step on screen.
+         * Routes the system back button to the onboarding step on screen,
+         * which steps back, or on the first step sends the app to the back.
          *
          * Registered while onboarding is up, which puts it after the callback
          * Compose Navigation adds for the destination and so first to run —
@@ -301,8 +312,8 @@ open class MainActivity: AppCompatActivity {
 
         /**
          * Takes back away from the navigation stack for the duration of a
-         * lesson, so it backgrounds the app — what it already does on the tabs
-         * — instead of popping a live session.
+         * lesson and hands it to the lesson screen, which asks whether to end
+         * the lesson, instead of popping a live session.
          */
         @JvmStatic
         fun setSessionBackBlocked(blocked: Boolean) {
@@ -314,8 +325,11 @@ open class MainActivity: AppCompatActivity {
                     }
                     val callback = object : OnBackPressedCallback(true) {
                         override fun handleOnBackPressed() {
-                            logger.info("[BackNav] suppressing system back during live session")
-                            activity.moveTaskToBack(true)
+                            // The lesson registers its own handler, which asks
+                            // whether to end it (IT-41). Backgrounding here
+                            // left the whole app with the lesson still on.
+                            logger.info("[BackNav] system back during live session — handing to the lesson")
+                            OnboardingBackBridge.shared.handleBack()
                         }
                     }
                     activity.sessionBackCallback = callback

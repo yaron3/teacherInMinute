@@ -45,6 +45,18 @@ extension SettingsViewModeling {
     var contactSupportDescriptionCounterText: String {
         "\(contactSupportDescription.count)/\(contactSupportDescriptionMaxLength)"
     }
+    var contactSupportAttachmentsSectionTitle: String { LocalizationSupport.localized("Attachments") }
+    var contactSupportAttachmentsHint: String {
+        LocalizationSupport.localized("Add up to 3 screenshots or photos.")
+    }
+    var contactSupportAttachmentsCounterText: String {
+        "\(contactSupportAttachments.count)/\(ContactSupportService.maxAttachments)"
+    }
+    var contactSupportAddAttachmentLabel: String { LocalizationSupport.localized("Add image") }
+    var contactSupportRemoveAttachmentLabel: String { LocalizationSupport.localized("Remove image") }
+    var canAddContactSupportAttachment: Bool {
+        contactSupportAttachments.count < ContactSupportService.maxAttachments
+    }
 
     // MARK: Payment history
     var noPaymentsTitle: String { LocalizationSupport.localized("No payments yet") }

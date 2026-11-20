@@ -1656,11 +1656,35 @@ export const endLostLesson = onTaskDispatched<{
       return;
     }
 
-    // Only a lesson that started is ended here. One still connecting is
-    // endAbandonedLesson's to write off.
-    const status = (
-      (await firestore.collection("questions").doc(questionId).get()).data() as StoredQuestion | undefined
-    )?.status;
+    const question = (await firestore.collection("questions").doc(questionId).get()).data() as
+      | (StoredQuestion & { studentUid?: string; acceptedByTeacher?: string; lessonId?: string })
+      | undefined;
+    const status = question?.status;
+
+    // Still connecting (IT-38): a side whose app was killed or cut off before
+    // the lesson started. Written off as if it had cancelled, so nobody is
+    // billed and the teacher is free at once rather than at the check for
+    // lessons that never started. A side that said it went to Settings for a
+    // permission is off the network by design and is left to that check.
+    if (status === "accepted" && !question?.lessonId) {
+      const signal = (await db.ref(`questions/${questionId}/connectionSetup/${role}`).once("value")).val();
+      if (signal === "settings") {
+        logger.info(`[lessons] endLostLesson skipped qid=${questionId} role=${role}: finishing setup in Settings`);
+        return;
+      }
+      const lostUid = role === "student" ? question?.studentUid : question?.acceptedByTeacher;
+      if (!lostUid) {
+        logger.warn(`[lessons] endLostLesson cannot write off qid=${questionId}: no uid for role=${role}`);
+        return;
+      }
+      const cancelledBy = await writeOffUnstartedLesson(questionId, lostUid);
+      logger.warn(
+        `[lessons] endLostLesson wrote off a lesson still connecting qid=${questionId} role=${role} cancelledBy=${cancelledBy ?? "already"}`
+      );
+      return;
+    }
+
+    // Otherwise only a lesson that started is ended here.
     if (status !== "in_progress" && !isEndedStatus(status)) {
       logger.info(`[lessons] endLostLesson skipped qid=${questionId} status=${status ?? "none"}`);
       return;

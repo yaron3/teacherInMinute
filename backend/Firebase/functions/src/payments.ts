@@ -34,8 +34,10 @@ import { extendLessonMinutes } from "./lessons";
 
 const firestore = admin.firestore();
 
+/** This deployment's own functions, so a staging deploy never hands out
+ *  production URLs when PUBLIC_BASE_URL is not set. */
 const FUNCTIONS_BASE_URL =
-  "https://us-central1-teacher-in-a-moment.cloudfunctions.net";
+  `https://us-central1-${process.env.GCLOUD_PROJECT ?? "teacher-in-a-moment"}.cloudfunctions.net`;
 
 /** Coerce a value from Firestore (may be string, number, null, undefined) to a safe integer. */
 function toSafeMinutes(value: unknown): number {

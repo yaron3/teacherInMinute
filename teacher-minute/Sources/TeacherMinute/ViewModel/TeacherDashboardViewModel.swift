@@ -22,11 +22,16 @@ import SkipFirebaseAuth
 protocol TeacherDashboardViewModeling: AnyObject {
   var teacherName: String { get set }
   var teacherImageURL: String { get set }
+  /// A message the teacher has not opened yet, for the bell's badge.
+  var hasUnreadMessages: Bool { get }
   var isOnline: Bool { get set }
   /// True from the tap that asks to go online until the permission round trip
   /// behind it finishes. `isOnline` is still false through that window, so the
   /// switch reads this as well to stay where the teacher put it.
   var isAwaitingOnlinePermission: Bool { get }
+  /// This device's connection to the database the invites ride on (IT-49).
+  /// True until an outage has actually been seen.
+  var isServerConnected: Bool { get }
   var inviteIDs: [String] { get set }
   var inviteTopics: [String: String] { get set }
   var inviteTexts: [String: String] { get set }
@@ -307,7 +312,11 @@ extension TeacherDashboardViewModeling {
   }
 
   var connectionStatusTitle: String { LocalizationSupport.localized("Status") }
-  var connectionStatusSubtitle: String { LocalizationSupport.localized("Connected") }
+  var connectionStatusSubtitle: String {
+    isServerConnected
+      ? LocalizationSupport.localized("Connected")
+      : LocalizationSupport.localized("No connection")
+  }
 
   // MARK: Live queue
   
@@ -429,6 +438,7 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
     get { UserPhotoStore.shared.profileImageURL }
     set { UserPhotoStore.shared.profileImageURL = newValue }
   }
+  var hasUnreadMessages: Bool { UnreadMessagesStore.shared.hasUnreadMessages }
   var isOnline = false
   private(set) var isAwaitingOnlinePermission = false
   var inviteIDs: [String] = []
@@ -597,11 +607,12 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// Defaults to connected so the header stays down until an outage has
   /// actually been observed — a warning that flashes on every launch is one
   /// teachers learn to read past.
-  private var hasServerConnection = true
+  private(set) var isServerConnected = true
   
   // MARK: - Init
   
   init() {
+	UnreadMessagesStore.shared.start()
 	// Subjects edited from Profile as well as from here: either way an online
 	// teacher's listing has to follow them.
 	subjectsSavedObserver = NotificationCenter.default.addObserver(
@@ -830,12 +841,18 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
   /// when it returns — but only if the connection is what put it up, so this
   /// never clears a notification warning that is still true.
   private func setServerConnection(_ connected: Bool) {
-	guard hasServerConnection != connected else { return }
-	hasServerConnection = connected
+	guard isServerConnected != connected else { return }
+	isServerConnected = connected
 	logger.info("[VM] server connection changed connected=\(connected)")
 	if connected {
 	  if errorMessageGeneral == poorConnectionWarning {
 		errorMessageGeneral = nil
+	  }
+	  // Back after an outage: say so to the backend at once rather than at
+	  // the next minute's keep-alive, so a teacher it took out of the pool
+	  // while silent is back in it straight away.
+	  if isOnline {
+		keepAlive?.sendNow()
 	  }
 	} else {
 	  errorMessageGeneral = poorConnectionWarning
@@ -968,10 +985,10 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 		case .ready(let updated):
 		  guard !Task.isCancelled else { return }
 		  self?.setInvites(updated)
-		  // The listener is how a question reaches an Android teacher, so its
-		  // own health is the connection signal here — there is no Swift-side
-		  // database handle on this path to watch instead.
-		  self?.setServerConnection(true)
+		  // The listener keeps its last snapshot through an outage, so having
+		  // one says nothing about the connection. `.info/connected`, watched
+		  // beside it in Kotlin, does (IT-49).
+		  self?.setServerConnection(AndroidInviteFetcher.databaseConnected() ?? true)
 		  if updated.count != lastCount {
 			lastCount = updated.count
 			logger.info("[VM] Android invites changed count=\(updated.count) uid=\(uid)")
@@ -1803,6 +1820,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   
   var teacherName: String
   var teacherImageURL: String = ""
+  var hasUnreadMessages = false
   var isOnline: Bool
   var inviteIDs: [String] = []
   var inviteTopics: [String: String] = [:]
@@ -1928,6 +1946,7 @@ final class MockTeacherDashboardViewModel: TeacherDashboardViewModeling {
   }
 
   var isAwaitingOnlinePermission: Bool = false
+  var isServerConnected: Bool = true
 
   func toggleOnline() { isOnline.toggle() }
   /// Inert in previews: the mock never touches the permission system, so a

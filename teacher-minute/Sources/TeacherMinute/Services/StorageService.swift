@@ -128,6 +128,38 @@ final class StorageService {
   }
 #endif
 
+  /// Uploads one image sent with a Contact Us request, at the path the
+  /// backend reads it from (functions/src/contactAttachments.ts).
+  func uploadContactAttachment(
+    data: Data,
+    uid: String,
+    requestID: String,
+    index: Int
+  ) async throws {
+    let path = "contactAttachments/\(uid)/\(requestID)/\(index).jpg"
+
+#if os(iOS)
+    final class BGTaskBox { var id = UIBackgroundTaskIdentifier.invalid }
+    let box = BGTaskBox()
+    box.id = UIApplication.shared.beginBackgroundTask(withName: "upload-contact-attachment") {
+      UIApplication.shared.endBackgroundTask(box.id)
+      box.id = .invalid
+    }
+    defer {
+      if box.id != .invalid {
+        UIApplication.shared.endBackgroundTask(box.id)
+        box.id = .invalid
+      }
+    }
+#endif
+
+    let ref = Storage.storage().reference().child(path)
+    let metadata = StorageMetadata()
+    metadata.contentType = "image/jpeg"
+    _ = try await ref.putDataAsync(data, metadata: metadata)
+    logger.info("Uploaded contact attachment: \(path)")
+  }
+
   func uploadQuestionImage(
     data: Data,
     uid: String,

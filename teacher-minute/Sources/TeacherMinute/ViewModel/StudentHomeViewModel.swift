@@ -339,6 +339,10 @@ extension StudentHomeViewModeling {
   var balanceLoadingMessage: String {
     LocalizationSupport.localized("Your minutes are still loading. This takes a moment the first time you open the app.")
   }
+  var pricingUnavailableTitle: String { LocalizationSupport.localized("Minutes unavailable") }
+  var pricingUnavailableMessage: String {
+    LocalizationSupport.localized("We couldn't load the minute packages. Check your connection and try again.")
+  }
   var okLabel: String { LocalizationSupport.localized("OK") }
   var purchaseCompleteTitle: String { LocalizationSupport.localized("Purchase complete") }
   var openingCheckoutText: String { LocalizationSupport.localized("Opening secure checkout\u{2026}") }
@@ -688,7 +692,12 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var totalTimeLearnedText = LessonFormatting.totalDurationText(lessons: [])
   var totalPurchasedText = LessonFormatting.minutesText(0)
   var lessonCount = 0
-  var hasUnreadMessages = false
+  /// Live, from `UnreadMessagesStore`: the bell's badge follows messages as
+  /// they arrive and are read.
+  var hasUnreadMessages: Bool {
+    get { UnreadMessagesStore.shared.hasUnreadMessages }
+    set { UnreadMessagesStore.shared.hasUnreadMessages = newValue }
+  }
   var profileImageURL: String {
     get { UserPhotoStore.shared.profileImageURL }
     set { UserPhotoStore.shared.profileImageURL = newValue }
@@ -954,7 +963,14 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   /// sheet with no bare frame in between.
   func preparePaymentOptions() async {
     isPreparingCheckout = true
-    await loadPaymentMethods()
+    // The packages are read with the profile; if that read failed (offline at
+    // launch, a project with none yet), try again rather than leave the
+    // purchase screen unable to open.
+    if pricingOptions.isEmpty {
+      await loadPricingOptions()
+    } else {
+      await loadPaymentMethods()
+    }
 #if canImport(UIKit)
     if availablePaymentMethods.contains(.applePay) {
       ApplePayService.shared.warmUpPaymentButton()
@@ -1285,7 +1301,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       didLoadProfile = false
     }
     // After the profile, so the fee is quoted in the student's own currency.
-    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
+    UnreadMessagesStore.shared.start()
     await loadRecentLessons(uid: uid)
   }
 
@@ -1396,7 +1412,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
     }
     // Pull-to-refresh: re-read the measured connect time rather than reuse the
     // one cached when the screen first appeared.
-    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
+    UnreadMessagesStore.shared.start()
+    UnreadMessagesStore.shared.refresh()
     await loadRecentLessons(uid: uid)
   }
 
@@ -1469,7 +1486,8 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
 
   func refreshUnreadMessages() async {
     guard let uid = Auth.auth().currentUser?.uid else { return }
-    hasUnreadMessages = await UserService.shared.hasUnreadMessages(uid: uid)
+    UnreadMessagesStore.shared.start()
+    UnreadMessagesStore.shared.refresh()
   }
 
   private func loadPricingOptions() async {

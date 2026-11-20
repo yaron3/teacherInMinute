@@ -1170,13 +1170,50 @@ describe("a side cut off for the whole grace period", () => {
     expect(question()).toMatchObject({ status: "completed", cost: 10 });
   });
 
-  test("leaves a lesson that never started to endAbandonedLesson", async () => {
-    seedQuestion();
+  // IT-38: a side whose app is killed while the two are still connecting.
+  test("writes off a lesson still connecting, charging nobody", async () => {
+    seedQuestion({ joinedParticipants: ["student-1"] });
+    rtdb.set(PRESENCE_PATH, {
+      student: { lostAt: LOST_AT },
+      teacher: { connections: { c1: true } },
+    });
+
+    await checkStudent();
+
+    expect(question()).toMatchObject({
+      status: "cancelled",
+      endedBy: "student",
+      endedReason: "cancelled_while_connecting",
+      billedSeconds: 0,
+      cost: 0,
+      teacherEarnings: 0,
+    });
+    // The teacher's connecting screen ends on the node going, and they are
+    // free again at once.
+    expect(rtdb.has(QUESTION_PATH)).toBe(false);
+    expect(rtdb.has(PRESENCE_PATH)).toBe(false);
+    expect(mockReleaseTeacherBusy).toHaveBeenCalledWith("teacher-1", "q-1");
+    expect(backfillPendingQuestionsForTeacher).toHaveBeenCalledWith("teacher-1");
+  });
+
+  test("writes it off as the teacher's when the teacher dropped", async () => {
+    seedQuestion({ joinedParticipants: ["student-1"] });
+    rtdb.set(PRESENCE_PATH, { teacher: { lostAt: LOST_AT } });
+
+    await runLostCheck({ data: { questionId: "q-1", role: "teacher", lostAt: LOST_AT } });
+
+    expect(question()).toMatchObject({ status: "cancelled", endedBy: "teacher", billedSeconds: 0 });
+  });
+
+  test("leaves a side finishing setup in Settings to the check for lessons that never started", async () => {
+    seedQuestion({ joinedParticipants: ["student-1"] });
+    rtdb.set(`${QUESTION_PATH}/connectionSetup/student`, "settings");
     rtdb.set(PRESENCE_PATH, { student: { lostAt: LOST_AT } });
 
     await checkStudent();
 
     expect(question().status).toBe("accepted");
     expect(rtdb.has(QUESTION_PATH)).toBe(true);
+    expect(mockReleaseTeacherBusy).not.toHaveBeenCalled();
   });
 });

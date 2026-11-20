@@ -10,10 +10,10 @@ import SwiftUI
 /// Which onboarding step owns the back gesture, and what back should do there.
 ///
 /// Onboarding steps sit on the router's path, so back means "one step back".
-/// The first step is the exception: popping it leaves onboarding for the
-/// sign-in screen, and the account is still signed in at that point — so that
-/// step asks before it undoes the sign-in rather than dropping the user on a
-/// login screen while logged in.
+/// The first step is the exception: behind it are the welcome and sign-in
+/// screens, and the account is signed in by then, so back never goes there.
+/// That step has no back button, and Android's system back sends the app to
+/// the background, as it does on the home tabs.
 ///
 /// Android's system back is routed here too, through `MainActivity`. The
 /// handlers are a stack because pushing a screen composes the arriving screen's
@@ -113,18 +113,17 @@ struct OnboardingBackHandlingModifier: ViewModifier {
     @Environment(\.appRouter) var router
     @Environment(\.colorScheme) var colorScheme
     @State var id = UUID()
-    @State var isConfirmingSignOut = false
 
     var theme: AppTheme { AppTheme(colorScheme: colorScheme) }
 
     func body(content: Content) -> some View {
         content
             // The step draws its own back button so that both platforms go
-            // through the same decision — a system back item would pop straight
-            // out of onboarding without asking.
+            // through the same decision — a system back item would pop the
+            // first step straight back to the sign-in screens.
             .navigationBarBackButtonHidden(isActive)
             .toolbar {
-                if isActive {
+                if isActive && router.canStepBack {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
                             trackTap("onboarding_back")
@@ -148,17 +147,6 @@ struct OnboardingBackHandlingModifier: ViewModifier {
                     }
                 }
             }
-            .appDialog(
-                viewModel.onboardingBackTitle,
-                isPresented: $isConfirmingSignOut,
-                message: viewModel.onboardingBackMessage,
-                actions: [
-                    AppDialogAction(viewModel.onboardingBackCancelLabel, kind: .cancel),
-                    AppDialogAction(viewModel.onboardingBackConfirmLabel, kind: .destructive) {
-                        signOutAndReturnToSignIn()
-                    }
-                ]
-            )
             .onAppear {
                 guard isActive else { return }
                 OnboardingBackCoordinator.shared.register(id: id) {
@@ -170,21 +158,16 @@ struct OnboardingBackHandlingModifier: ViewModifier {
             }
     }
 
-    /// One step back, or the question, when there is no step left to go back to.
+    /// One step back. On the first step there is none: the sign-in screens
+    /// behind it are not a way back for a signed-in account, so Android's
+    /// system back leaves the app in the background on this step.
     func handleBack() {
-        if router.path.count > 1 {
+        if router.canStepBack {
             router.pop()
         } else {
-            isConfirmingSignOut = true
+#if os(Android)
+            AndroidBackNavigationBridge.moveAppToBack()
+#endif
         }
-    }
-
-    func signOutAndReturnToSignIn() {
-        do {
-            try AuthService().signOut()
-        } catch {
-            logger.error("[Onboarding] sign out from back navigation failed: \(error)")
-        }
-        router.signOut()
     }
 }

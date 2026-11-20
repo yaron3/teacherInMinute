@@ -9,6 +9,7 @@
 
 import SwiftUI
 import Observation
+import SkipFuse
 import Foundation
 
 @Observable

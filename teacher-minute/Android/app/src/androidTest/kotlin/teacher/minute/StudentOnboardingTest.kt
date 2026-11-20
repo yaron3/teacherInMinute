@@ -221,6 +221,12 @@ class StudentOnboardingTest {
         val profile = rewardedProfile(guest.uid)
         assertEquals("the reward was not credited once", 15, intValue(profile, "remainingMinutes"))
         assertEquals(15, intValue(profile, "totalMinutes"))
+        // IT-51: the bell keeps the reward and the verification email.
+        assertEquals(
+            "no sign-up minutes message in the bell",
+            "15 free minutes added",
+            backend.strings("users/${guest.uid}/incomingMessages/account-signup-minutes")?.get("title")
+        )
 
         // The question kept through sign-up goes out on the reward.
         val teacher = bringATeacherOnline()
@@ -296,6 +302,56 @@ class StudentOnboardingTest {
         assertNotNull("the existing account is gone", backend.user(existing.uid))
         assertEquals("not signed in to the existing account", existing.uid, FirebaseAuth.getInstance().currentUser?.uid)
     }
+
+    /** After logging in, Back never returns to the welcome or login screens. */
+    @Test
+    fun backAfterLoggingInStaysSignedIn() {
+        val existing = backend.createAccount("back.login")
+        backend.merge("users/${existing.uid}", mapOf("role" to "student", "fullName" to "Back Login Student"))
+        startAsGuest()
+        logInFromTheMenu(existing.email, existing.password)
+        if (!waitForHome(90_000)) failWithScreen("login", "logging in did not reach home")
+        expectBackKeepsHome("logging in")
+    }
+
+    /** After signing up, Back never returns to the welcome, sign-up or
+     *  onboarding screens. */
+    @Test
+    fun backAfterSigningUpStaysSignedIn() {
+        startAsGuest()
+        askAndExpectTheOffer()
+        device.findObject(offer).click()
+        assertTrue("Create account did not open sign-up", device.wait(Until.hasObject(By.res("sign_up_email")), 20_000))
+        fillSignUp(backend.newEmail("back.signup"), "Emulator-${(100_000..999_999).random()}")
+        submitSignUp()
+        finishOnboarding("Back Signup Student")
+        expectBackKeepsHome("signing up")
+    }
+
+    /** Back on home three times: each time the app either stays on home or
+     *  goes to the background, and coming back to it shows home again. */
+    private fun expectBackKeepsHome(after: String) {
+        repeat(3) { attempt ->
+            device.pressBack()
+            Thread.sleep(2_000)
+            if (onSignedOutScreen()) failWithScreen("back-$attempt", "Back #${attempt + 1} after $after left home for a sign-in screen")
+            if (device.currentPackageName != context.packageName) {
+                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)!!
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                device.wait(Until.hasObject(By.pkg(context.packageName).depth(0)), 15_000)
+                Thread.sleep(2_000)
+            }
+            if (onSignedOutScreen()) failWithScreen("reopen-$attempt", "after Back #${attempt + 1} the app reopened on a sign-in screen")
+            if (!device.wait(Until.hasObject(By.res("question_home_mode_text")), 10_000)) {
+                failWithScreen("home-$attempt", "home is gone after Back #${attempt + 1}")
+            }
+        }
+    }
+
+    private fun onSignedOutScreen(): Boolean =
+        listOf("welcome_log_in", "email_input", "sign_up_email", "student_intro_start", "complete_profile_full_name")
+            .any { device.hasObject(By.res(it)) }
 
     /** AND-S-11: a guest signing up with a taken address is refused. */
     @Test
@@ -610,7 +666,18 @@ class StudentOnboardingTest {
         type(email, into = "sign_up_email")
         type(password, into = "sign_up_password")
         type(password, into = "sign_up_confirm_password")
+        // The keyboard stays up after the last field and can cover the box:
+        // a click there lands on the keyboard. Close it first, as a person
+        // would to see the box.
+        closeKeyboard()
         (findScrolling(By.res("sign_up_terms")) ?: failWithScreen("terms", "no terms box")).click()
+    }
+
+    private fun closeKeyboard() {
+        if (device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")) {
+            device.pressBack()
+            Thread.sleep(700)
+        }
     }
 
     private fun submitSignUp() {
@@ -624,6 +691,10 @@ class StudentOnboardingTest {
         val deadline = System.currentTimeMillis() + 150_000
         while (System.currentTimeMillis() < deadline) {
             if (waitForHome(1_000)) return
+            // IT-51: sign-up says the account is ready before onboarding.
+            if (device.hasObject(By.text("Your account is ready"))) {
+                device.findObject(By.res("dialog_confirm_button"))?.let { runCatching { it.click() } }
+            }
             if (!filledName && device.hasObject(By.res("complete_profile_full_name"))) {
                 type(name, into = "complete_profile_full_name")
                 filledName = true

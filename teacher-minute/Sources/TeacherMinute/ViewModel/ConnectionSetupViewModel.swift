@@ -75,7 +75,12 @@ final class ConnectionSetupViewModel {
     self.participantName = participantName
     self.participantTeacherId = participantTeacherId
     self.conversationType = conversationType
-    self.footerText = footerText ?? LocalizationSupport.localized("Your teacher will join shortly")
+    // Each side is told the other is on the way. Without a session behind the
+    // screen it is the teacher's accept placeholder, which passes its own text.
+    let isStudentSide = sessionViewModel?.role == "student"
+    self.footerText = footerText ?? (isStudentSide
+      ? LocalizationSupport.localized("Your teacher will join shortly")
+      : LocalizationSupport.localized("The student will join shortly"))
     self.sessionViewModel = sessionViewModel
     self.liveKitRoom = liveKitRoom
     self.liveKitToken = liveKitToken
@@ -158,11 +163,15 @@ final class ConnectionSetupViewModel {
 
   var microphonePermissionTitle: String { LocalizationSupport.localized("Microphone Permission") }
   var microphonePermissionMessage: String {
-    LocalizationSupport.localized("Make sure your microphone is enabled for the best learning experience.")
+    isStudent
+      ? LocalizationSupport.localized("Make sure your microphone is enabled for the best learning experience.")
+      : LocalizationSupport.localized("Make sure your microphone is enabled so your student can hear you.")
   }
   var cameraPermissionTitle: String { LocalizationSupport.localized("Camera Permission") }
   var cameraPermissionMessage: String {
-    LocalizationSupport.localized("Make sure your camera is enabled so your teacher can see your work.")
+    isStudent
+      ? LocalizationSupport.localized("Make sure your camera is enabled so your teacher can see your work.")
+      : LocalizationSupport.localized("Make sure your camera is enabled so your student can see you.")
   }
 
   var cameraButtonTitle: String {

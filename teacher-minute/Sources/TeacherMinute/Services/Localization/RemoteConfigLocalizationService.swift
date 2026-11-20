@@ -117,6 +117,11 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Go Offline": "עבור למצב לא מקוון",
         // Starting a lesson by chat while its audio connects. Remote Config
         // carries these too; the fallback covers the time before it deploys.
+        // The teacher's side of the connecting screen. Remote Config carries
+        // these too; the fallback covers the time before it deploys.
+        "The student will join shortly": "התלמיד יצטרף בקרוב",
+        "Make sure your microphone is enabled so your student can hear you.": "ודא שהמיקרופון מופעל כדי שהתלמיד יוכל לשמוע אותך.",
+        "Make sure your camera is enabled so your student can see you.": "ודא שהמצלמה מופעלת כדי שהתלמיד יוכל לראות אותך.",
         "Audio is taking longer than usual": "חיבור השמע לוקח יותר זמן מהרגיל",
         "Video is taking longer than usual": "חיבור הווידאו לוקח יותר זמן מהרגיל",
         "You can start with your teacher by chat now. We'll keep connecting in the background.": "אפשר להתחיל עם המורה בצ׳אט כבר עכשיו. נמשיך להתחבר ברקע.",
@@ -365,6 +370,11 @@ struct RemoteConfigLocalizationService: LocalizationServiceProtocol {
         "Description": "תיאור",
         "Preview and Submit": "תצוגה מקדימה ושליחה",
         "Data to be sent": "הנתונים שיישלחו",
+        "Add image": "הוסף תמונה",
+        "Add up to 3 screenshots or photos.": "אפשר לצרף עד 3 צילומי מסך או תמונות.",
+        "Attachments": "קבצים מצורפים",
+        "Could not attach this image.": "לא ניתן לצרף את התמונה הזו.",
+        "Remove image": "הסר תמונה",
         "Preview": "תצוגה מקדימה",
         "Send": "שלח",
         "OK": "אישור",
@@ -1190,6 +1200,14 @@ enum LocalizationKey {
         // The string that matches the value already in the template keeps the
         // original key; the other one is moved here.
 
+        // The sign-up success dialog (IT-51). `sent_verification_link` is the
+        // shorter "We sent a verification link to".
+        "We sent a verification link to %@. Open it on this phone to verify your email address.": "fmt_signup_verification_sent",
+
+        // The dashboard's Status chip while the database connection is down
+        // (IT-49). `connection` is the bare word "Connection".
+        "No connection": "status_no_connection",
+
         // The verification link's results. `thanks_for_verifying` holds the
         // student's reward message; the two link-error messages share a prefix.
         "Thanks for verifying your email.": "email_verified_thanks",
@@ -1265,6 +1283,9 @@ enum LocalizationKey {
         "Log out?": "log_out_qmark",
         // `make_sure_your` holds the microphone sentence.
         "Make sure your camera is enabled so your teacher can see your work.": "make_sure_camera_enabled",
+        // The teacher's side of the same two permission cards.
+        "Make sure your microphone is enabled so your student can hear you.": "make_sure_microphone_enabled_teacher",
+        "Make sure your camera is enabled so your student can see you.": "make_sure_camera_enabled_teacher",
         // `minutes` holds the lowercase unit; the menu's section name is its own.
         "Minutes": "menu_minutes",
         // `completed` holds an old "%d completed"; the activity count's label is its own.

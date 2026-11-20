@@ -13,6 +13,7 @@ import { DEMO_USER_FIELD, inChunks, readDemoUserUids } from "./demoUsers";
 import { deleteAccountData } from "./accountDeletion";
 import { sendMail, supportSmtpConfig } from "./mailer";
 import { readSupportSettings, supportCaseUrl, writeSupportSettings } from "./supportSettings";
+import { contactAttachmentPaths } from "./contactAttachments";
 import { sendAdminPush } from "./fcm";
 import { wantsPush } from "./scoring";
 import {
@@ -1301,9 +1302,34 @@ export const adminGetContactRequest = onCall(async (req) => {
       ...serializeDoc(data),
       id: snap.id,
       sentAtMs: dateFieldToMs(data.sentAt),
+      attachmentUrls: await contactAttachmentUrls(data),
     },
   };
 });
+
+/**
+ * Short-lived signed links to a request's attachments, for the support page.
+ * The files are owner-only in storage.rules, so the page cannot read them
+ * itself. A file that cannot be signed comes back as null, so the page can
+ * still say it was sent.
+ */
+async function contactAttachmentUrls(data: Record<string, unknown>): Promise<(string | null)[]> {
+  const bucket = admin.storage().bucket();
+  return Promise.all(
+    contactAttachmentPaths(data).map(async (path) => {
+      try {
+        const [url] = await bucket.file(path).getSignedUrl({
+          action: "read",
+          expires: Date.now() + 3600 * 1000,
+        });
+        return url;
+      } catch (e) {
+        logger.warn(`[admin] failed to sign URL for ${path}: ${e}`);
+        return null;
+      }
+    })
+  );
+}
 
 /**
  * Writes a support request the way the app's Contact Us does, so the whole

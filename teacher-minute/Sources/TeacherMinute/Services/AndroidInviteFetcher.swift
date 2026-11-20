@@ -21,6 +21,28 @@ enum AndroidInviteFetcher {
     name: "liveInvitesJson",
     sig: "()Ljava/lang/String;"
   )!
+  private static let databaseConnectionStateMethod = managerClass.getStaticMethodID(
+    name: "databaseConnectionState",
+    sig: "()I"
+  )!
+
+  /// This device's database connection, as `.info/connected` last said while
+  /// the invite listener is attached. Nil before it has said anything.
+  static func databaseConnected() -> Bool? {
+    let state: Int32? = try? jniContext {
+      let value: Int32 = try managerClass.callStatic(
+        method: databaseConnectionStateMethod,
+        options: [.kotlincompat],
+        args: []
+      )
+      return value
+    }
+    switch state {
+    case 1: return true
+    case 0: return false
+    default: return nil
+    }
+  }
 
   /// What the Kotlin listener currently holds.
   enum LiveInvites {

@@ -52,6 +52,9 @@ struct StudentQuestionHomeView: View {
   /// reports the full window with the navigation bar still inset below it.
   @State var keyboardSettlesAt = Date.distantPast
   @State var algebraKeyboardHeight: CGFloat = 0
+  /// The bell's inbox: sign-up and the welcome rewards leave their news there
+  /// (IT-51), as they do on the teacher dashboard.
+  @State var showsMessages = false
 #if os(iOS)
   @State var showsLibraryPicker = false
   @State var libraryItem: PhotosPickerItem?
@@ -105,6 +108,11 @@ struct StudentQuestionHomeView: View {
       }
     }
     .modifier(dialogs)
+    // Presented by the screen, not by the bell inside the top bar; see
+    // BrandMessagesButton.
+    .sheet(isPresented: $showsMessages) {
+      NotificationMessagesView()
+    }
 #if os(iOS)
     .photosPicker(isPresented: $showsLibraryPicker, selection: $libraryItem, matching: .images)
     .onChange(of: libraryItem) { _, item in
@@ -261,6 +269,11 @@ struct StudentQuestionHomeView: View {
     ZStack(alignment: .topLeading) {
       menuButton
         .offset(x: 24, y: layout.menuTop)
+      BrandMessagesButton(showsBadge: viewModel.hasUnreadMessages) {
+        dismissKeyboard()
+        showsMessages = true
+      }
+      .offset(x: layout.bellLeading, y: layout.bellTop)
       modeToggle(width: layout.toggleWidth)
         .offset(x: layout.size.width - 24 - layout.toggleWidth, y: layout.toggleTop)
     }

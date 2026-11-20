@@ -36,7 +36,12 @@ const firestore = admin.firestore();
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-async function archiveUnanswered(qid: string, alreadyInvited: string[]): Promise<boolean> {
+/** Declares a question nobody took unanswered and clears its RTDB nodes.
+ *
+ *  `alreadyInvited` is what the caller last saw, but the invites cleared are
+ *  the ones the transaction reads: a wave that went out after the caller's read
+ *  would otherwise leave its cards on those teachers' dashboards for good. */
+export async function archiveUnanswered(qid: string, alreadyInvited: string[] = []): Promise<boolean> {
   logger.warn(
     `[dispatch] archiveUnanswered start qid=${qid} invitedCount=${alreadyInvited.length}`
   );
@@ -48,6 +53,7 @@ async function archiveUnanswered(qid: string, alreadyInvited: string[]): Promise
   );
 
   const qRef = firestore.collection("questions").doc(qid);
+  let invitedAtArchive = alreadyInvited;
   const archived = await firestore.runTransaction(async (tx) => {
     const snap = await tx.get(qRef);
     if (!snap.exists) {
@@ -62,6 +68,8 @@ async function archiveUnanswered(qid: string, alreadyInvited: string[]): Promise
       );
       return false;
     }
+
+    invitedAtArchive = [...new Set([...alreadyInvited, ...(current.alreadyInvited ?? [])])];
 
     tx.update(qRef, {
       status: "unanswered",
@@ -80,11 +88,11 @@ async function archiveUnanswered(qid: string, alreadyInvited: string[]): Promise
 
   await Promise.all([
     questionRef.remove(),
-    ...alreadyInvited.map((tid) => db.ref(`teacherInvites/${tid}/${qid}`).remove()),
+    ...invitedAtArchive.map((tid) => db.ref(`teacherInvites/${tid}/${qid}`).remove()),
   ]);
 
   logger.warn(
-    `[dispatch] archiveUnanswered done qid=${qid} removedQuestion=${questionExists} removedTeacherInvites=${alreadyInvited.length}`
+    `[dispatch] archiveUnanswered done qid=${qid} removedQuestion=${questionExists} removedTeacherInvites=${invitedAtArchive.length}`
   );
 
   return true;
@@ -100,6 +108,29 @@ function searchEndsAtMillis(question: Pick<QuestionDoc, "searchEndsAt">): number
 /** Whole seconds from now until `millis`, at least one. */
 function secondsUntil(millis: number): number {
   return Math.max(1, Math.ceil((millis - Date.now()) / 1000));
+}
+
+/** Takes back invite cards that were written after their question stopped
+ *  searching, and says whether it had to.
+ *
+ *  Every path that ends a question (cancel, accept, the watchdog) commits the
+ *  new status first and then removes the RTDB card of each teacher in
+ *  `alreadyInvited`. A wave writes its cards before it records those teachers,
+ *  and a backfill records the teacher before it writes the card, so either can
+ *  land after that cleanup has run and leave a card on a teacher's dashboard
+ *  that nothing will ever remove. Call this once the cards are written and
+ *  their teachers recorded: if the question has ended by then, the cards go. */
+async function withdrawIfSearchEnded(qid: string, teacherUids: string[]): Promise<boolean> {
+  if (teacherUids.length === 0) return false;
+  const snap = await firestore.collection("questions").doc(qid).get();
+  const status = snap.exists ? (snap.data() as QuestionDoc).status : "missing";
+  if (status === "searching") return false;
+
+  logger.warn(
+    `[dispatch] qid=${qid} ended (${status}) while inviting — withdrawing ${teacherUids.length} late invite card(s)`
+  );
+  await Promise.all(teacherUids.map((uid) => db.ref(`teacherInvites/${uid}/${qid}`).remove()));
+  return true;
 }
 
 /** Only the teachers who could actually take a question right now.
@@ -427,6 +458,8 @@ async function tryInviteTeacherForQuestionWave(
     ...(invitePayload.struggle ? { struggle: invitePayload.struggle } : {}),
   });
 
+  if (await withdrawIfSearchEnded(qid, [teacherUid])) return false;
+
   if (hasPushToken(teacher) && teacher.fcmToken) {
     await sendInvitePush({
       teacherUid,
@@ -695,6 +728,7 @@ export async function dispatchFirstWave(qid: string, data: QuestionDoc): Promise
     update.alreadyInvited = FieldValue.arrayUnion(...invited);
   }
   await qRef.update(update);
+  if (await withdrawIfSearchEnded(qid, invited)) return;
 
   logger.info(`[dispatch] qid=${qid} wave 1 complete invitedNow=${invited.length}`);
 
@@ -869,6 +903,7 @@ export const evaluateWave = onTaskDispatched<{ questionId: string; wave: number 
       alreadyInvited: FieldValue.arrayUnion(...invited),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    if (await withdrawIfSearchEnded(qid, invited)) return;
 
     logger.info(`[evaluateWave] qid=${qid} dispatchWave updated to ${nextWave} invitedNow=${invited.length}`);
 

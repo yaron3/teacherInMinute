@@ -47,19 +47,26 @@ class ChatKeyboardTest : ProTeacherEmulatorTest() {
             "the message input runs under the keyboard (input bottom ${typing!!.visibleBounds.bottom}, keyboard top $keyboardTop)",
             typing.visibleBounds.bottom <= keyboardTop!!
         )
-        // The bar stays behind the keyboard rather than riding up on top of it.
+        // The lesson's controls ride up with the keyboard: right under the
+        // input, above the keyboard.
+        val typingTimer = device.wait(Until.findObject(By.text("Session Time")), 5_000)
+        assertNotNull("the lesson's bottom bar is hidden while typing", typingTimer)
         assertTrue(
-            "the lesson's bottom bar rose with the keyboard",
-            device.wait(Until.gone(By.text("Session Time")), 5_000)
+            "the bottom bar is not below the input (input bottom ${typing.visibleBounds.bottom}, timer top ${typingTimer!!.visibleBounds.top})",
+            typing.visibleBounds.bottom <= typingTimer.visibleBounds.top
+        )
+        assertTrue(
+            "the bottom bar is under the keyboard (timer bottom ${typingTimer.visibleBounds.bottom}, keyboard top $keyboardTop)",
+            typingTimer.visibleBounds.bottom <= keyboardTop
         )
 
         // Back puts the keyboard away but leaves the field focused; the bar,
-        // with the timer and media controls, comes back all the same.
+        // with the timer and media controls, stays.
         device.pressBack()
         Thread.sleep(1_500)
         shot("it22-keyboard-closed")
         assertTrue(
-            "the lesson's bottom bar stayed hidden after the keyboard closed",
+            "the lesson's bottom bar is gone after the keyboard closed",
             device.wait(Until.hasObject(By.text("Session Time")), 5_000)
         )
         // ...and does not cover the input.

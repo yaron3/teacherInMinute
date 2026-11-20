@@ -65,10 +65,18 @@ enum QuestionCamera {
   /// The photo in a file of its own, for `LocalPhotoThumbnail` to draw. The
   /// last one is cleared first, and each takes a new name, so the image
   /// loader never shows a cached earlier photo in its place.
-  static func previewFile(for data: Data) -> URL? {
-    let directory = ScratchFiles.directory("QuestionPhotoPreview")
-    for old in (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] {
-      try? FileManager.default.removeItem(at: old)
+  ///
+  /// A screen that shows several photos at once passes a directory of its own
+  /// and `replacingEarlier: false`, and clears it with `clearPreviewFiles`
+  /// when it is done with them.
+  static func previewFile(
+    for data: Data,
+    directoryName: String = "QuestionPhotoPreview",
+    replacingEarlier: Bool = true
+  ) -> URL? {
+    let directory = ScratchFiles.directory(directoryName)
+    if replacingEarlier {
+      clearPreviewFiles(directoryName: directoryName)
     }
     do {
       let file = directory.appendingPathComponent("\(UUID().uuidString).jpg")
@@ -79,14 +87,21 @@ enum QuestionCamera {
       return nil
     }
   }
+
+  static func clearPreviewFiles(directoryName: String) {
+    let directory = ScratchFiles.directory(directoryName)
+    for old in (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] {
+      try? FileManager.default.removeItem(at: old)
+    }
+  }
 #endif
 
 #if os(iOS)
   /// A photo as it is uploaded: an upright JPEG no larger than `maxDimension`
   /// on its longer side, whatever it arrived as — the camera's full-size
   /// capture, or a HEIC from the library.
-  static func preparedForUpload(_ data: Data) throws -> Data {
-    guard let image = downsampled(data, maxPixelSize: maxDimension),
+  static func preparedForUpload(_ data: Data, maxPixelSize: CGFloat = maxDimension) throws -> Data {
+    guard let image = downsampled(data, maxPixelSize: maxPixelSize),
           let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.8) else {
       throw CaptureError.unreadable
     }

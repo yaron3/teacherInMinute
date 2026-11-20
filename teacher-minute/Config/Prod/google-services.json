@@ -15,11 +15,43 @@
       },
       "oauth_client": [
         {
+          "client_id": "922632930084-2lb2bdtv4jmthuikp26jq9dms027ijfp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yaronj.student",
+            "certificate_hash": "ca925911117dbe9cbdd6ded87fc5e3cca2d62c5d"
+          }
+        },
+        {
+          "client_id": "922632930084-640m53s66fau09jbs7k638t4qvhe1sqe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yaronj.student",
+            "certificate_hash": "81317753284073684db0a25fd05690334ac23b74"
+          }
+        },
+        {
+          "client_id": "922632930084-6c5c4u69aa41vqcl5lggdu3le9q5ved8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yaronj.student",
+            "certificate_hash": "bb877e53fe9c2b633e58845d5eacce49593a0ea0"
+          }
+        },
+        {
           "client_id": "922632930084-d0a89pnuaq9guks7nm9og9sq5s17828c.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.yaronj.student",
             "certificate_hash": "812f5d3081a6a1811949e2f66be445d9cf574edf"
+          }
+        },
+        {
+          "client_id": "922632930084-f6h11hgv1uck2c75dqkbgapa3118rk0k.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yaronj.student",
+            "certificate_hash": "355e48a5a393820522b2bb01db3b4695d8fb20db"
           }
         },
         {
@@ -100,6 +132,22 @@
           "android_info": {
             "package_name": "com.yaronj.tim",
             "certificate_hash": "812f5d3081a6a1811949e2f66be445d9cf574edf"
+          }
+        },
+        {
+          "client_id": "922632930084-lhj83lqdc1gssjrl49g52gajlkrll99o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yaronj.tim",
+            "certificate_hash": "81317753284073684db0a25fd05690334ac23b74"
+          }
+        },
+        {
+          "client_id": "922632930084-vt5i5i0qmj03jpjjiimht62tjb3b1u4b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yaronj.tim",
+            "certificate_hash": "828917ee24e4b179cdf67b3b2eed1bccb3167e40"
           }
         },
         {

@@ -306,8 +306,9 @@ struct BrandModal<Content: View>: View {
         }
         .padding(24)
         // An explicit width: a maximum one lets the card's background spread
-        // across the screen on Android.
-        .frame(width: min(354, proxy.size.width - 48))
+        // across the screen on Android. Clamped at zero: the proxy can report
+        // a zero size on the first layout pass, which would make it negative.
+        .frame(width: max(0, min(354, proxy.size.width - 48)))
         .background(theme.brandModalBackground)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay {
@@ -433,6 +434,28 @@ extension View {
 #else
     scrollDismissesKeyboard(.interactively)
 #endif
+  }
+
+  /// Lets a tap on a form's empty space put the keyboard away (IT-10).
+  ///
+  /// Apply it to the content inside the form's `ScrollView`, not to the
+  /// `ScrollView` itself: on Android the scroll container takes the hit, so a
+  /// layer behind it never sees the tap. Fields and buttons sit above this
+  /// layer and keep their own taps.
+  ///
+  /// `clearFocus` clears the screen's `@FocusState`. On Android SkipUI asks for
+  /// focus again on every recomposition while the binding holds a field, which
+  /// would bring the keyboard straight back.
+  func tapDismissesKeyboard(_ element: String, clearFocus: @escaping () -> Void = {}) -> some View {
+    background {
+      Color.clear
+        .tappableFrame()
+        .onTapGesture {
+          trackTap(element)
+          clearFocus()
+          SoftKeyboard.dismiss()
+        }
+    }
   }
 }
 

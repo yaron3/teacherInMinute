@@ -1,4 +1,5 @@
 let settingsDoc: Record<string, unknown> | undefined;
+jest.mock("firebase-functions", () => ({ logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() } }));
 jest.mock("firebase-admin", () => ({
   firestore: () => ({
     collection: () => ({ doc: () => ({ get: async () => ({ data: () => settingsDoc }) }) }),
@@ -11,6 +12,9 @@ import * as path from "node:path";
 
 import {
   buildContactEmail,
+  contactAttachmentPaths,
+  loadContactAttachments,
+  MAX_CONTACT_ATTACHMENTS,
   readContactRecipients,
   readSupportSettings,
   supportCaseUrl,
@@ -82,5 +86,53 @@ describe("buildContactEmail", () => {
     expect(subject).not.toMatch(/[\r\n]/);
     expect(text).toContain("Help me");
     expect(text).toContain("Dana <d@x.com>");
+  });
+});
+
+describe("contact attachments", () => {
+  const request = { id: "REQ-1", userId: "user-1" };
+
+  it("derives each attachment's path from the request, by index", () => {
+    expect(contactAttachmentPaths({ ...request, attachmentCount: 2 })).toEqual([
+      "contactAttachments/user-1/REQ-1/0.jpg",
+      "contactAttachments/user-1/REQ-1/1.jpg",
+    ]);
+  });
+
+  it("has none without a valid count, and never more than the maximum", () => {
+    expect(contactAttachmentPaths(request)).toEqual([]);
+    expect(contactAttachmentPaths({ ...request, attachmentCount: -1 })).toEqual([]);
+    expect(contactAttachmentPaths({ ...request, attachmentCount: 1.5 })).toEqual([]);
+    expect(contactAttachmentPaths({ ...request, attachmentCount: "2" })).toEqual([]);
+    expect(contactAttachmentPaths({ ...request, attachmentCount: 99 })).toHaveLength(MAX_CONTACT_ATTACHMENTS);
+    expect(contactAttachmentPaths({ attachmentCount: 2 })).toEqual([]);
+  });
+
+  it("says in the email how many images came with it", () => {
+    expect(buildContactEmail({ description: "Help", attachmentCount: 2 }, "https://x/support.html?case=1").text)
+      .toContain("Attachments: 2 images (attached to this email and on the case page)");
+    expect(buildContactEmail({ description: "Help", attachmentCount: 1 }).text)
+      .toContain("Attachments: 1 image (attached to this email)");
+    expect(buildContactEmail({ description: "Help" }).text).not.toContain("Attachments:");
+  });
+
+  it("downloads each attachment for the email, leaving out one it cannot read", async () => {
+    const files: Record<string, Buffer> = {
+      "contactAttachments/user-1/REQ-1/0.jpg": Buffer.from("first"),
+      "contactAttachments/user-1/REQ-1/2.jpg": Buffer.from("third"),
+    };
+    const bucket = {
+      file: (p: string) => ({
+        download: async (): Promise<[Buffer]> => {
+          if (!files[p]) throw new Error("No such object");
+          return [files[p]];
+        },
+      }),
+    };
+    const attachments = await loadContactAttachments({ ...request, attachmentCount: 3 }, bucket);
+    expect(attachments).toEqual([
+      { filename: "attachment-1.jpg", content: Buffer.from("first"), contentType: "image/jpeg" },
+      { filename: "attachment-3.jpg", content: Buffer.from("third"), contentType: "image/jpeg" },
+    ]);
   });
 });

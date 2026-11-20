@@ -50,6 +50,29 @@ struct ContactSupportPreviewSheet: View {
             }
             .brandCard()
 
+            if !viewModel.contactSupportAttachments.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(viewModel.contactSupportAttachmentsSectionTitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.brandSecondaryText)
+                    HStack(spacing: 10) {
+                        ForEach(0..<viewModel.contactSupportAttachments.count, id: \.self) { index in
+                            LocalPhotoThumbnail(
+                                data: viewModel.contactSupportAttachments[index],
+                                maxPointSize: 96,
+                                previewDirectory: ContactSupportService.attachmentPreviewDirectory,
+                                replacesEarlierPreviews: false
+                            )
+                            .frame(width: 72, height: 96)
+                            .background(theme.brandBackgroundTop)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+                .brandCard()
+            }
+
             BrandPrimaryButton(title: viewModel.sendLabel, isLoading: isSubmitting) {
                 trackTap("contact_support_preview_send")
                 onSubmit()

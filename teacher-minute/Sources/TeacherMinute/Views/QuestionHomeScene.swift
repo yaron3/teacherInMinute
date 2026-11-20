@@ -33,7 +33,12 @@ struct QuestionHomeLayout {
 
   var menuTop: CGFloat { safeTop + 3 }
   var toggleTop: CGFloat { safeTop - 1 }
-  var toggleWidth: CGFloat { max(0, min(266, size.width - 110)) }
+  /// The messages bell sits between the menu and the toggle (IT-51), so the
+  /// toggle leaves room for it: menu 52, bell 44, and 8 between each.
+  var toggleWidth: CGFloat { max(0, min(266, size.width - 164)) }
+  var bellLeading: CGFloat { 24 + 52 + 8 }
+  /// Centred on the 52-point menu.
+  var bellTop: CGFloat { menuTop + 4 }
 
   var panelTop: CGFloat { safeTop + 83 }
   var panelWidth: CGFloat { max(0,size.width - 52) }

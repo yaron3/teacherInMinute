@@ -36,7 +36,8 @@ struct TeacherSubjectsView: View {
           label: viewModel.stepIndicatorText,
           title: viewModel.navigationTitle(isEditing: false),
           backLabel: viewModel.onboardingBackLabel,
-          onBack: { OnboardingBackCoordinator.shared.handleBack() }
+          onBack: { OnboardingBackCoordinator.shared.handleBack() },
+          showsBack: router.canStepBack
         ) {
           content
         }
