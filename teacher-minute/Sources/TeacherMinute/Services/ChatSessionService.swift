@@ -1393,6 +1393,10 @@ protocol ChatSessionViewModeling: AnyObject {
   /// This side's own microphone and camera, as the user left them.
   var isMicMuted: Bool { get set }
   var isCameraOff: Bool { get set }
+  /// True while the camera is off only because both sides are reading the
+  /// chat, so leaving the chat turns it back on. A camera the user turned off
+  /// stays off.
+  var isCameraPausedForChat: Bool { get set }
   //
   // The lesson's audio and video. The connection itself belongs to
   // `LiveKitService`, so it outlives the screen that asked for it.
@@ -1452,6 +1456,7 @@ extension ChatSessionViewModeling {
   }
 
   func toggleCamera() {
+    isCameraPausedForChat = false
     isCameraOff.toggle()
     publishMediaState()
     let enabled = !isCameraOff
@@ -1460,8 +1465,16 @@ extension ChatSessionViewModeling {
 
   /// Turns the camera off while both sides are reading the chat of a video
   /// lesson, and back on when either returns to the video.
+  /// Only a camera this pause turned off is turned back on: one the user
+  /// switched off keeps the lesson in audio until they switch it on again.
   func setCameraPaused(_ paused: Bool) {
-    guard paused != isCameraOff else { return }
+    if paused {
+      guard !isCameraOff else { return }
+      isCameraPausedForChat = true
+    } else {
+      guard isCameraPausedForChat else { return }
+      isCameraPausedForChat = false
+    }
     isCameraOff = paused
     publishMediaState()
     Task { await setCameraEnabled(!paused) }
@@ -1469,6 +1482,7 @@ extension ChatSessionViewModeling {
 
   /// A new medium starts with the microphone and camera on.
   func resetMediaToggles() {
+    isCameraPausedForChat = false
     isMicMuted = false
     isCameraOff = false
     publishMediaState()
@@ -1942,6 +1956,7 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   private(set) var incomingFormulaCount = 0
   var isMicMuted = false
   var isCameraOff = false
+  var isCameraPausedForChat = false
   var participantName: String {
     if isTeacherRole {
 	  return nonEmpty(details?.studentName) ?? LocalizationSupport.localized("Student")

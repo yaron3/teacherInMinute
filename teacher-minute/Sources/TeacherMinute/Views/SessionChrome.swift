@@ -206,6 +206,10 @@ struct SessionStatusBadge: Identifiable {
 
   let id: String
   let kind: Kind
+  /// Set on this side's own badges: the same as the matching button in the
+  /// media pill, so a tap flips the microphone or camera. Nil for the other
+  /// side's, which only show.
+  var action: (() -> Void)? = nil
 
   var iconName: String {
     switch kind {
@@ -333,7 +337,22 @@ struct SessionPeople: View {
     }
   }
 
+  @ViewBuilder
   func badgeView(_ badge: SessionStatusBadge) -> some View {
+    if let action = badge.action {
+      Button {
+        trackTap("session_badge", detail: badge.id)
+        action()
+      } label: {
+        badgeImage(badge)
+      }
+      .buttonStyle(.plain)
+    } else {
+      badgeImage(badge)
+    }
+  }
+
+  func badgeImage(_ badge: SessionStatusBadge) -> some View {
     Image(badge.iconName, bundle: .module)
       .renderingMode(.template)
       .resizable()
