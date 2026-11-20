@@ -33,6 +33,7 @@ final class MockChatSessionViewModel: ChatSessionViewModeling {
   let incomingFormulaCount = 0
   var isMicMuted = false
   var isCameraOff = false
+  var isCameraPausedForChat = false
   let participantName: String
   let participantImageURL: String
   let currentUserImageURL: String

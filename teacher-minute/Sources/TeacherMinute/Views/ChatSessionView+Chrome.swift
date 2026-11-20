@@ -205,7 +205,7 @@ extension ChatSessionView {
       name: viewModel.youLabel,
       subtitle: isStudent ? viewModel.studentRoleLabel : viewModel.teacherRoleLabel,
       isLive: true,
-      badges: statusBadges(for: ownState, prefix: "own")
+      badges: statusBadges(for: ownState, prefix: "own", isOwn: true)
     )
     let peer = SessionIdentity(
       id: "peer",
@@ -218,22 +218,22 @@ extension ChatSessionView {
     return isStudent ? [own, peer] : [peer, own]
   }
 
-  /// A video lesson shows the camera, and a muted microphone beside it; an
-  /// audio lesson shows the microphone.
-  func statusBadges(for state: MediaDeviceState, prefix: String) -> [SessionStatusBadge] {
+  /// A video lesson shows the microphone with the camera beside it, in the
+  /// media pill's order; an audio lesson shows the microphone. This side's own
+  /// badges flip their device when tapped, as the media pill's buttons do.
+  func statusBadges(for state: MediaDeviceState, prefix: String, isOwn: Bool = false) -> [SessionStatusBadge] {
+    let cameraAction: (() -> Void)? = isOwn ? { viewModel.toggleCamera() } : nil
+    let micAction: (() -> Void)? = isOwn ? { viewModel.toggleMicrophone() } : nil
+    guard hasAudio else { return [] }
+    var badges = [
+      SessionStatusBadge(id: "\(prefix)-mic", kind: state.micMuted ? .micOff : .mic, action: micAction)
+    ]
     if hasVideo {
-      var badges = [
-        SessionStatusBadge(id: "\(prefix)-camera", kind: state.cameraOff ? .videoOff : .video)
-      ]
-      if state.micMuted {
-        badges.append(SessionStatusBadge(id: "\(prefix)-mic", kind: .micOff))
-      }
-      return badges
+      badges.append(
+        SessionStatusBadge(id: "\(prefix)-camera", kind: state.cameraOff ? .videoOff : .video, action: cameraAction)
+      )
     }
-    if hasAudio {
-      return [SessionStatusBadge(id: "\(prefix)-mic", kind: state.micMuted ? .micOff : .mic)]
-    }
-    return []
+    return badges
   }
 
   /// What the mascot says, if anything: that this side is being waited on, or
