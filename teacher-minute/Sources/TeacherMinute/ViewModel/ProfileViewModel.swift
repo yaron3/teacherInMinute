@@ -79,13 +79,29 @@ final class ProfileViewModel {
         return formatter.string(from: dateOfBirth)
     }
 
+  static let currencyKeys = ["ils", "usd"]
+
   var availableCurrencies: [String] {
-	[LocalizationSupport.localized("ils"), LocalizationSupport.localized("usd")]
+	Self.currencyKeys.map { LocalizationSupport.localized($0) }
   }
 
+  /// The untranslated currency behind a chip's label, for a tap's `detail`.
+  static func currencyKey(for label: String) -> String {
+	currencyKeys.first { LocalizationSupport.localized($0) == label } ?? ""
+  }
+
+  static let studentGradeKeys: [String] =
+	schoolGrades.map { "Grade \($0)" } + ["College", "Adult Learner"]
+
   var availableStudentGrades: [String] {
-	Self.schoolGrades.map { LocalizationSupport.localized("Grade \($0)") }
-	  + [LocalizationSupport.localized("College"), LocalizationSupport.localized("Adult Learner")]
+	Self.studentGradeKeys.map { LocalizationSupport.localized($0) }
+  }
+
+  /// `grade_8`, `adult_learner`: a grade, canonical or as the picker shows
+  /// it, in a form a tap's `detail` can carry.
+  static func gradeAnalyticsKey(for grade: String) -> String {
+	let key = studentGradeKeys.first { $0 == grade || LocalizationSupport.localized($0) == grade } ?? grade
+	return key.lowercased().replacingOccurrences(of: " ", with: "_")
   }
 
     var shouldShowTeachingDetails: Bool {

@@ -286,6 +286,7 @@ struct MainTabView: View {
 
 	  case .earnings:
 		TeacherEarningsView()
+		  .trackScreen(AnalyticsScreen.teacherEarnings)
 
 	  case .profile:
 		ProfileView(viewModel: profileViewModel)
@@ -297,6 +298,7 @@ struct MainTabView: View {
 
 	  case .help:
 		HelpSupportView(role: viewModel.userMode)
+		  .trackScreen(AnalyticsScreen.helpSupport)
 	}
   }
   

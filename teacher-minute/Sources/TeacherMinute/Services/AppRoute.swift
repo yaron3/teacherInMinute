@@ -34,7 +34,9 @@ enum RootScreen: Hashable {
 
 @Observable
 final class AppRouter: @unchecked Sendable {
-  var rootScreen: RootScreen = .welcome
+  var rootScreen: RootScreen = .welcome {
+	didSet { reportTapRole() }
+  }
   var path = NavigationPath() {
 	didSet { returnGuestHomeIfBackedOut() }
   }
@@ -86,6 +88,17 @@ final class AppRouter: @unchecked Sendable {
 	guestLeftHome = false
 	path = NavigationPath()
 	rootScreen = .mainTabs(role: role)
+  }
+
+  /// Every tap carries the side of the tab bar on view; signed out, none.
+  private func reportTapRole() {
+	var role: String?
+	if case .mainTabs(let signedInRole) = rootScreen {
+	  role = signedInRole.rawValue
+	}
+	Task { @MainActor in
+	  AnalyticsService.shared.setTapRole(role)
+	}
   }
 
   func signOut() {

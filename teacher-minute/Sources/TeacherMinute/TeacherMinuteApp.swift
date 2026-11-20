@@ -52,7 +52,6 @@ let logger = AppLogger(subsystem: "com.yaronj.tim", category: "TeacherMinute")
 							  .trackScreen(AnalyticsScreen.teacherIdentity)
 						  case .teacherSubjects:
 							TeacherSubjectsView()
-							  .trackScreen(AnalyticsScreen.teacherSubjects)
 						  case .completeProfile(let role):
 							completeProfileScreen(role: role)
 						  case .verifyEmail(let email):

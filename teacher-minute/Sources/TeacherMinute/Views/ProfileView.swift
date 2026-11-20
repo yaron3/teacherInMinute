@@ -635,6 +635,7 @@ struct ProfileTeachingGradePicker: View {
 		  ForEach(grades, id: \.self) { grade in
 			ProfileTeachingGradeChip(
 			  title: viewModel.gradeLabel(for: grade),
+			  grade: grade,
 			  isSelected: selectedGrades.contains(grade)
 			) {
 			  toggleGrade(grade)
@@ -762,7 +763,7 @@ struct ProfileGradePicker: View {
       Menu {
         ForEach(grades, id: \.self) { grade in
           Button(grade) {
-            trackTap("profile_grade_option", detail: grade)
+            trackTap("profile_grade_option", detail: ProfileViewModel.gradeAnalyticsKey(for: grade))
             selectedGrade = grade
           }
         }
@@ -854,7 +855,7 @@ struct ProfileCurrencyChip: View {
   }
 
   var body: some View {
-    Button(action: { trackTap("profile_currency_chip", detail: title); action() }) {
+    Button(action: { trackTap("profile_currency_chip", detail: ProfileViewModel.currencyKey(for: title)); action() }) {
       Text(title)
         .font(.system(size: 13, weight: .medium))
         .foregroundStyle(theme.primaryText)
@@ -873,6 +874,8 @@ struct ProfileCurrencyChip: View {
 
 struct ProfileTeachingGradeChip: View {
   let title: String
+  /// The untranslated grade, for the tap's `detail`.
+  let grade: String
   let isSelected: Bool
   let action: () -> Void
   @Environment(\.colorScheme) var colorScheme
@@ -881,7 +884,7 @@ struct ProfileTeachingGradeChip: View {
   }
 
   var body: some View {
-    Button(action: { trackTap("profile_teaching_grade_chip", detail: title); action() }) {
+    Button(action: { trackTap("profile_teaching_grade_chip", detail: ProfileViewModel.gradeAnalyticsKey(for: grade)); action() }) {
       HStack(spacing: 7) {
         PlatformIcon(systemName: "graduationcap")
           .font(.system(size: 12, weight: .semibold))

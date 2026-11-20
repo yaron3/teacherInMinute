@@ -57,7 +57,7 @@ struct LessonHistoryRow: View {
         AppTheme(colorScheme: colorScheme)
     }
     var body: some View {
-        Button(action: { trackTap("lesson_history_row"); action() }) {
+        Button(action: { trackTap("lesson_history_row", detail: lesson.questionId); action() }) {
             rowContent
         }
         .buttonStyle(.plain)
@@ -362,6 +362,7 @@ struct LessonDetailView: View {
                 ReportTeacherView(viewModel: reportViewModel)
             }
         }
+        .trackScreen(AnalyticsScreen.lessonDetail, context: ["question_id": lesson.questionId])
     }
 
     var reportButton: some View {

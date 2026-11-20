@@ -52,8 +52,20 @@ struct SettingsView: View {
     }
 
     /// Each page draws its own header, with the way back.
+    /// Each page under Settings is its own screen for taps; a web page
+    /// tracks itself (`AboutWebView`).
     @ViewBuilder
     func destinationView(_ destination: SettingsDestination) -> some View {
+        if let screen = destination.analyticsScreen {
+            destinationContent(destination)
+                .trackScreen(screen)
+        } else {
+            destinationContent(destination)
+        }
+    }
+
+    @ViewBuilder
+    func destinationContent(_ destination: SettingsDestination) -> some View {
         switch destination {
         case .accountSecurity:
             AccountSecuritySettingsView(viewModel: viewModel)

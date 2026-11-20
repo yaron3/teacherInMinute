@@ -332,7 +332,11 @@ struct ChatSessionView: View {
       }
       viewModel.stop()
     }
-    .trackScreen(AnalyticsScreen.chatSession)
+    .trackScreen(AnalyticsScreen.chatSession, context: [
+      "question_id": viewModel.questionId,
+      "conversation_type": conversationType,
+      "session_tab": selectedTab.rawValue.lowercased(),
+    ])
     .appDialog(
       viewModel.peerUpgradeTitle(for: pendingPeerConversationType ?? ""),
       isPresented: Binding(

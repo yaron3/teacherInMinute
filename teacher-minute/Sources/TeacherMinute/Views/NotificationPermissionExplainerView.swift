@@ -73,6 +73,7 @@ struct NotificationPermissionExplainerView: View {
         .padding(.horizontal, 24)
         .screenGround()
         .environment(\.colorScheme, .dark)
+        .trackScreen(AnalyticsScreen.notificationExplainer)
     }
 
     private func enable() async {

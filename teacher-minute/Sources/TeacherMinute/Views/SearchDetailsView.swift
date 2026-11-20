@@ -171,6 +171,7 @@ struct SearchDetailsView: View {
       ]
     )
     .systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
+    .trackScreen(AnalyticsScreen.searchingTeacher)
   }
 
   // MARK: - The questions
