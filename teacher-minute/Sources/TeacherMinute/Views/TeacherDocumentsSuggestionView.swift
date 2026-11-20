@@ -73,5 +73,6 @@ struct TeacherDocumentsSuggestionView: View {
         .padding(.horizontal, 24)
         .screenGround()
         .environment(\.colorScheme, .dark)
+        .trackScreen(AnalyticsScreen.documentsSuggestion)
     }
 }

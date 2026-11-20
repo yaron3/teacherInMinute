@@ -133,7 +133,9 @@ enum AnalyticsEvent {
 
     // Every tap and every error, whatever else they log
     /// A button, toggle, picker or other control was tapped. `element` names
-    /// it (`login_submit`) and `screen` is the last screen logged.
+    /// it (`login_submit`), `screen` is the tracked screen on top, `role` the
+    /// signed-in side, and the screens on view add their own context
+    /// (`question_id`, `conversation_type`, `session_tab`…). See `logTap`.
     static let uiTap    = "ui_tap"
     /// An error was thrown or logged. `source` is where (`Type.function`),
     /// `message` what.
@@ -174,6 +176,22 @@ enum AnalyticsScreen {
     static let rateSession           = "rate_session"
     static let studentTutorial       = "student_tutorial"
     static let reportTeacher         = "report_teacher"
+    static let helpSupport           = "help_support"
+    static let lessonDetail          = "lesson_detail"
+    static let minutesPurchase       = "minutes_purchase"
+    static let purchaseSuccess       = "purchase_success"
+    static let paymentMethod         = "payment_method"
+    static let searchingTeacher      = "searching_teacher"
+    static let notificationExplainer = "notification_explainer"
+    static let documentsSuggestion   = "documents_suggestion"
+    static let contactSupportPreview = "contact_support_preview"
+}
+
+/// A screen on view, as `.trackScreen` recorded it. See
+/// `AnalyticsService.screenStack`.
+struct TrackedScreen {
+    let name: String
+    var context: [String: String]
 }
 
 @MainActor
@@ -182,8 +200,19 @@ final class AnalyticsService {
 
     private init() {}
 
-    /// The screen most recently logged, attached to every tap.
+    /// The screen most recently logged. A tap reports it only when no tracked
+    /// screen is on view.
     var currentScreen = ""
+    /// The tracked screens on view, bottom first: pushed as each appears,
+    /// removed as it disappears. The top one is the screen a tap reports, so a
+    /// sheet or tab that closes hands taps back to the screen beneath it
+    /// (`onAppear` alone does not fire again under a dismissed sheet). Their
+    /// contexts merge, top winning, so a sheet over a lesson keeps the
+    /// lesson's `question_id`.
+    var screenStack: [TrackedScreen] = []
+    /// The signed-in side, `student` or `teacher`, sent with every tap. Set
+    /// by `AppRouter` as the tab bar comes and goes.
+    var tapRole: String?
     /// When each error source last reached Analytics, so one failing in a
     /// loop does not flood it.
     var lastErrorReport: [String: Date] = [:]
@@ -244,16 +273,92 @@ final class AnalyticsService {
         Crashlytics.crashlytics().log("screen_view \(screen)")
     }
 
-    /// Counts a tap. `element` is a stable snake_case name for the control,
-    /// prefixed by its screen (`login_submit`); `detail` tells apart the
-    /// items of a list (`subject` id, star count…), never personal data.
-    func logTap(_ element: String, detail: String? = nil) {
-        var params: [String: Any] = ["element": element, "screen": currentScreen]
-        if let detail, !detail.isEmpty {
-            params["detail"] = detail
+    // MARK: - Screens on view
+
+    /// A tracked screen appeared: it goes on top, or moves there if it is
+    /// already on view (iOS fires `onAppear` again when a pushed screen pops
+    /// back to it). Context it already had is kept unless replaced.
+    func screenAppeared(_ screen: String, context: [String: String]) {
+        var entry = TrackedScreen(name: screen, context: [:])
+        if let index = screenStack.lastIndex(where: { $0.name == screen }) {
+            entry = screenStack.remove(at: index)
         }
-        logEvent(AnalyticsEvent.uiTap, parameters: params)
+        entry.context.merge(context) { _, new in new }
+        screenStack.append(entry)
+        // A screen whose `onDisappear` never came must not grow this forever.
+        if screenStack.count > AnalyticsService.maxScreenStack {
+            screenStack.removeFirst(screenStack.count - AnalyticsService.maxScreenStack)
+        }
     }
+
+    /// A tracked screen disappeared. Removed by name, so the order in which
+    /// the next screen's appear and this one's disappear arrive does not
+    /// matter, nor does a screen tracked both by its caller and inside.
+    func screenDisappeared(_ screen: String) {
+        if let index = screenStack.lastIndex(where: { $0.name == screen }) {
+            screenStack.remove(at: index)
+        }
+    }
+
+    /// Context a screen on view learned after it appeared — the lesson's tab
+    /// or conversation type changing. An empty value removes the key.
+    func updateScreenContext(_ screen: String, context: [String: String]) {
+        guard let index = screenStack.lastIndex(where: { $0.name == screen }) else { return }
+        screenStack[index].context.merge(context) { _, new in new }
+    }
+
+    func setTapRole(_ role: String?) {
+        tapRole = role
+    }
+
+    // MARK: - Taps
+
+    /// Counts a tap as one `ui_tap` event. `element` is a stable snake_case
+    /// name for the control, prefixed by its screen (`login_submit`);
+    /// `detail` tells apart the items of a list (`subject` id, star count…),
+    /// never personal data. The event also carries `screen` — the tracked
+    /// screen on top, so a shared component reports the screen it is drawn
+    /// on — `role`, and the context of the screens on view.
+    func logTap(_ element: String, detail: String? = nil) {
+        logEvent(AnalyticsEvent.uiTap, parameters: tapParameters(element, detail: detail))
+    }
+
+    func tapParameters(_ element: String, detail: String?) -> [String: Any] {
+        var context: [String: String] = [:]
+        for screen in screenStack {
+            context.merge(screen.context) { _, new in new }
+        }
+        if let tapRole {
+            context["role"] = tapRole
+        }
+        if let detail {
+            context["detail"] = detail
+        }
+        context["screen"] = screenStack.last?.name ?? currentScreen
+        context["element"] = element
+        return AnalyticsService.limitedParameters(context)
+    }
+
+    /// Fits a tap's parameters to what Firebase Analytics keeps: names of at
+    /// most 40 characters, string values of at most 100, and 25 parameters
+    /// an event. Empty values are dropped; the core keys are kept first.
+    static func limitedParameters(_ values: [String: String]) -> [String: Any] {
+        let coreKeys = ["element", "screen", "detail", "role"]
+        let otherKeys = values.keys.filter { !coreKeys.contains($0) }.sorted()
+        var result: [String: Any] = [:]
+        for key in coreKeys + otherKeys {
+            guard result.count < maxEventParameters else { break }
+            guard let value = values[key], !value.isEmpty,
+                  !key.isEmpty, key.count <= maxParameterNameLength else { continue }
+            result[key] = String(value.prefix(maxParameterValueLength))
+        }
+        return result
+    }
+
+    static let maxEventParameters = 25
+    static let maxParameterNameLength = 40
+    static let maxParameterValueLength = 100
+    static let maxScreenStack = 20
 
     // MARK: - Purchase helpers
 
@@ -429,11 +534,20 @@ final class AnalyticsService {
 
  struct TrackScreenModifier: ViewModifier {
     let screen: String
+    let context: [String: String]
 
     func body(content: Content) -> some View {
-        content.onAppear {
-            AnalyticsService.shared.logScreen(screen)
-        }
+        content
+            .onAppear {
+                AnalyticsService.shared.screenAppeared(screen, context: context)
+                AnalyticsService.shared.logScreen(screen)
+            }
+            .onDisappear {
+                AnalyticsService.shared.screenDisappeared(screen)
+            }
+            .onChange(of: context) { _, newContext in
+                AnalyticsService.shared.updateScreenContext(screen, context: newContext)
+            }
     }
 }
 
@@ -446,9 +560,13 @@ func trackTap(_ element: String, detail: String? = nil) {
 }
 
 extension View {
-    /// Records a `screen_view` Analytics event the first time the view
-    /// appears. Use one of the `AnalyticsScreen` constants for the name.
-    func trackScreen(_ screen: String) -> some View {
-        modifier(TrackScreenModifier(screen: screen))
+    /// Records a `screen_view` Analytics event when the view appears, and
+    /// makes it the screen every tap reports while it is on top. `context`
+    /// is sent with each of those taps — ids and enum cases (`question_id`,
+    /// `session_tab`), never localized text or personal data — and follows
+    /// the values it is built from. Use one of the `AnalyticsScreen`
+    /// constants for the name.
+    func trackScreen(_ screen: String, context: [String: String] = [:]) -> some View {
+        modifier(TrackScreenModifier(screen: screen, context: context))
     }
 }

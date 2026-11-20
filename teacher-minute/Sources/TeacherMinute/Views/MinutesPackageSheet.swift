@@ -40,6 +40,7 @@ struct MinutesPackageSheet: View {
 
       Spacer()
     }
+    .trackScreen(AnalyticsScreen.minutesPackage)
   }
 
   /// Same geometry as the payment-method rows, so the two steps of one

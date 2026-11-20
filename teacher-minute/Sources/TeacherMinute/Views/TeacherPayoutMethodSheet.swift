@@ -67,6 +67,7 @@ struct TeacherPayoutMethodSheet: View {
       }
       .brandCard()
     }
+    .trackScreen(AnalyticsScreen.teacherPayoutMethod)
   }
 
   // MARK: - Type picker

@@ -237,6 +237,7 @@ struct RateSessionView: View {
       .padding(.bottom, 24)
     }
     .screenGround()
+    .trackScreen(AnalyticsScreen.rateSession, context: ["question_id": questionId])
   }
 
   func reportLink(_ action: @escaping @MainActor () -> Void) -> some View {

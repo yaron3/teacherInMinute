@@ -78,5 +78,6 @@ struct ContactSupportPreviewSheet: View {
                 onSubmit()
             }
         }
+        .trackScreen(AnalyticsScreen.contactSupportPreview)
     }
 }

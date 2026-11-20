@@ -30,6 +30,7 @@ struct PurchaseSuccessView: View {
     .onAppear {
       viewModel.logPurchaseSuccessShown(summary)
     }
+    .trackScreen(AnalyticsScreen.purchaseSuccess)
   }
 
   private var confirmation: some View {

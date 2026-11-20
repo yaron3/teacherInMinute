@@ -50,6 +50,7 @@ struct PaymentMethodSheet: View {
     .background(theme.brandModalBackground.ignoresSafeArea())
     .environment(\.colorScheme, .dark)
     .presentationDetents([.medium])
+    .trackScreen(AnalyticsScreen.paymentMethod)
   }
 
   @ViewBuilder

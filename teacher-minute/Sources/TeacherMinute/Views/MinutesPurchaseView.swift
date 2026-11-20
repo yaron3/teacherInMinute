@@ -54,6 +54,7 @@ struct MinutesPurchaseView: View {
     .onAppear {
       viewModel.logPurchaseScreenShown()
     }
+    .trackScreen(AnalyticsScreen.minutesPurchase)
   }
 
   private var purchase: some View {

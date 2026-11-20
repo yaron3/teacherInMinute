@@ -19,6 +19,23 @@ enum SettingsDestination: Hashable {
     case contactUs
     case webPage(title: String, url: URL)
 
+    /// The page's `screen` for Analytics; none for a web page, whose view
+    /// tracks itself.
+    var analyticsScreen: String? {
+        switch self {
+        case .accountSecurity: "settings_account_security"
+        case .appPreferences: "settings_preferences"
+        case .teacherPayouts: "settings_teacher_payouts"
+        case .studentPayments: "settings_student_payments"
+        case .notifications: "settings_notifications"
+        case .privacyControls: "settings_privacy"
+        case .language: "settings_language"
+        case .about: "settings_about"
+        case .contactUs: "settings_contact_us"
+        case .webPage: nil
+        }
+    }
+
     var title: String {
         switch self {
         case .accountSecurity: LocalizationSupport.localized("Account & Security")

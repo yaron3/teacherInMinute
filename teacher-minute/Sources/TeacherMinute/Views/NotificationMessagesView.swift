@@ -128,7 +128,7 @@ struct NotificationMessageRow: View {
                         .foregroundStyle(theme.secondaryText)
                 }
 
-                Button(action: { trackTap("notification_message_delete"); deleteAction() }) {
+                Button(action: { trackTap("notification_message_delete", detail: message.id); deleteAction() }) {
                     PlatformIcon(
                         systemName: "trash.fill",
                         size: 13,

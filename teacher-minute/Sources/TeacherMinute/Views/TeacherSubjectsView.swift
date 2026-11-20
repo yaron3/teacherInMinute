@@ -70,6 +70,9 @@ struct TeacherSubjectsView: View {
         viewModel.checkAndAutoAdvance()
       }
     }
+    // Here rather than at each caller: onboarding pushes it, Profile and the
+    // dashboard open it as an editor.
+    .trackScreen(AnalyticsScreen.teacherSubjects, context: ["subjects_mode": isEditing ? "edit" : "onboarding"])
   }
 
   // Split out of `body`, which the type checker would otherwise have to solve

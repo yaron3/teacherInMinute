@@ -40,7 +40,7 @@ struct ReportTeacherView: View {
         }
       }
     }
-    .trackScreen(AnalyticsScreen.reportTeacher)
+    .trackScreen(AnalyticsScreen.reportTeacher, context: ["question_id": viewModel.questionId])
     .onAppear { viewModel.appeared() }
     .appDialog(
       viewModel.blockConfirmTitle,

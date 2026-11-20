@@ -64,8 +64,15 @@ view model", the way `.trackScreen` already is:
   `onSubmit`, a `BrandToggle`'s action, a `Binding` setter behind a picker —
   is `trackTap("<screen>_<control>")`, with `detail:` to tell list items apart
   (an id or enum case, never the localized title or personal data). It logs
-  one `ui_tap` event with `element`, `detail` and `screen`, so new controls
-  never add event types. Shared components that own their action
+  one `ui_tap` event with `element`, `detail`, `screen` and `role`, so new
+  controls never add event types. `screen` is the `.trackScreen` on top of
+  what is on view (a stack: a closed sheet hands taps back to the screen
+  beneath), so every presented screen or sheet whose taps should be told
+  apart gets its own `.trackScreen`. Context a screen knows — ids and enum
+  cases, never text or personal data — goes in
+  `.trackScreen(_:context:)` once and rides on every tap made over it
+  (the lesson sends `question_id`, `conversation_type`, `session_tab`);
+  don't thread it through `detail` at each call site. Shared components that own their action
   (`BrandMenuButton`, `BrandTabBar`, `BrandSettingsRows`, `BrandOptionPicker`,
   chips, `AppDialog`'s buttons) count inside; components that take an action
   (`BrandPrimaryButton`, `BrandBackButton`, `AuthPrimaryButton`…) are counted
