@@ -15,6 +15,12 @@
 #                    next one does (IT-42)
 #   android-student-block  (only when named) the same, the other way round:
 #                    Instant Teacher on Android blocks Pro Teacher on the iPhone
+#   android-android  (needs ANDROID_TEACHER) Instant Teacher on <android-serial>
+#                    asks; Pro Teacher on the second emulator, $ANDROID_TEACHER,
+#                    takes it and ends it; the student closes the rating. Part
+#                    of a full run whenever ANDROID_TEACHER is set.
+#
+# iPhone to iPhone is run_lesson_tests.sh's teacher-ends pair.
 #
 # Each direction runs its two halves at the same time; they meet only through
 # the emulators (see CrossPlatformLessonTest.kt for the protocol). The iOS
@@ -26,6 +32,7 @@
 #
 # Usage:
 #   scripts/ui-tests/run_cross_platform_sanity.sh <ios-simulator-udid> <android-serial> [direction]
+#   ANDROID_TEACHER=<second-android-serial> scripts/ui-tests/run_cross_platform_sanity.sh …
 #
 # The Android app and test APKs are built and installed first; set
 # SKIP_ANDROID_BUILD=1 to install the ones already built. QUESTION_TEXT words
@@ -43,6 +50,7 @@ set -euo pipefail
 IOS_SIM="${1:?iOS simulator UDID}"
 ANDROID="${2:?Android emulator serial, e.g. emulator-5558}"
 ONLY="${3:-}"
+ANDROID_TEACHER="${ANDROID_TEACHER:-}"
 HOST="${EMULATOR_HOST:-127.0.0.1}"
 PROJECT="demo-teacher-in-a-moment"
 QUESTION_TEXT="${QUESTION_TEXT:-Sanity test - Dont answer}"
@@ -53,6 +61,15 @@ APK="$ROOT/.build/Android/app/outputs/apk"
 
 curl -sf "http://$HOST:9099/" > /dev/null || { echo "Firebase emulators not running on $HOST" >&2; exit 1; }
 adb -s "$ANDROID" get-state > /dev/null || { echo "no Android device $ANDROID" >&2; exit 1; }
+if [[ "$ONLY" == "android-android" && -z "$ANDROID_TEACHER" ]]; then
+  echo "android-android needs ANDROID_TEACHER=<second emulator serial>" >&2; exit 1
+fi
+if [[ -n "$ANDROID_TEACHER" ]]; then
+  [[ "$ANDROID_TEACHER" != "$ANDROID" ]] || { echo "ANDROID_TEACHER must be a second device" >&2; exit 1; }
+  adb -s "$ANDROID_TEACHER" get-state > /dev/null || { echo "no Android device $ANDROID_TEACHER" >&2; exit 1; }
+fi
+ANDROID_DEVICES=("$ANDROID")
+[[ -n "$ANDROID_TEACHER" ]] && ANDROID_DEVICES+=("$ANDROID_TEACHER")
 
 # 1. The teacher, on the emulators only. "Lesson Teacher" is the name the iOS
 #    student's half looks for in its history.
@@ -97,10 +114,17 @@ if [[ -z "${SKIP_ANDROID_BUILD:-}" ]]; then
       :app:assembleTeacherDebugAndroidTest :app:assembleStudentDebugAndroidTest) \
     > "$RESULTS_DIR/android-build.log" 2>&1 || { echo "Android build failed; see $RESULTS_DIR/android-build.log" >&2; exit 1; }
 fi
-for apk in teacher/debug/app-teacher-debug.apk student/debug/app-student-debug.apk \
-           androidTest/teacher/debug/app-teacher-debug-androidTest.apk \
-           androidTest/student/debug/app-student-debug-androidTest.apk; do
-  adb -s "$ANDROID" install -r -t "$APK/$apk" > /dev/null
+for device in "${ANDROID_DEVICES[@]}"; do
+  for apk in teacher/debug/app-teacher-debug.apk student/debug/app-student-debug.apk \
+             androidTest/teacher/debug/app-teacher-debug-androidTest.apk \
+             androidTest/student/debug/app-student-debug-androidTest.apk; do
+    adb -s "$device" install -r -t "$APK/$apk" > /dev/null
+  done
+  # The RTDB emulator's handshake names 127.0.0.1:9000 as its host, and the
+  # Android SDK makes every reconnect there. On an emulator that is the device
+  # itself, so once the connection drops (60 s idle, or a test cutting it) the
+  # app's database stays offline for good. Map the device's port to the Mac's.
+  adb -s "$device" reverse tcp:9000 tcp:9000 > /dev/null
 done
 
 # 3. Each direction's halves at once.
@@ -112,8 +136,8 @@ run_ios() {
     > "$RESULTS_DIR/$name.log" 2>&1
 }
 run_android() {
-  local runner="$1" test="$2" name="$3"
-  adb -s "$ANDROID" shell am instrument -w -r \
+  local device="$1" runner="$2" test="$3" name="$4"
+  adb -s "$device" shell am instrument -w -r \
     -e class "teacher.minute.CrossPlatformLessonTest#$test" \
     -e lessonTeacherEmail "$TEACHER_EMAIL" -e lessonTeacherPassword "$TEACHER_PASSWORD" \
     -e lessonTeacherUid "$TEACHER_UID" -e questionText "'$QUESTION_TEXT'" \
@@ -134,21 +158,26 @@ report() {
 SHOTS_DIR="${SHOTS_DIR:-$RESULTS_DIR/shots}"
 export TEST_RUNNER_SESSION_SHOTS="${SESSION_SHOTS:-0}"
 clear_android_shots() {
-  for pkg in com.yaronj.tim com.yaronj.student; do
-    adb -s "$ANDROID" shell run-as "$pkg" rm -rf files/ui-test/shots > /dev/null 2>&1 || true
+  local device pkg
+  for device in "${ANDROID_DEVICES[@]}"; do
+    for pkg in com.yaronj.tim com.yaronj.student; do
+      adb -s "$device" shell run-as "$pkg" rm -rf files/ui-test/shots > /dev/null 2>&1 || true
+    done
   done
 }
-collect_shots() {
-  local direction="$1" android_pkg="$2" android_side="$3" ios_half="$4" ios_side="$5"
-  local adir="$SHOTS_DIR/$direction/android-$android_side" idir="$SHOTS_DIR/$direction/ios-$ios_side"
-  mkdir -p "$adir" "$idir"
-  for f in $(adb -s "$ANDROID" shell run-as "$android_pkg" ls files/ui-test/shots 2>/dev/null | tr -d '\r'); do
-    adb -s "$ANDROID" exec-out run-as "$android_pkg" cat "files/ui-test/shots/$f" > "$adir/$f"
+pull_android_shots() {
+  local device="$1" pkg="$2" out="$3" f
+  mkdir -p "$out"
+  for f in $(adb -s "$device" shell run-as "$pkg" ls files/ui-test/shots 2>/dev/null | tr -d '\r'); do
+    adb -s "$device" exec-out run-as "$pkg" cat "files/ui-test/shots/$f" > "$out/$f"
   done
-  local raw="$RESULTS_DIR/$ios_half-attachments"
+}
+pull_ios_shots() {
+  local half="$1" out="$2" raw="$RESULTS_DIR/$1-attachments"
+  mkdir -p "$out"
   rm -rf "$raw"
-  xcrun xcresulttool export attachments --path "$RESULTS_DIR/$ios_half.xcresult" --output-path "$raw" > /dev/null 2>&1 || true
-  [[ -f "$raw/manifest.json" ]] && python3 - "$raw" "$idir" <<'PY'
+  xcrun xcresulttool export attachments --path "$RESULTS_DIR/$half.xcresult" --output-path "$raw" > /dev/null 2>&1 || true
+  [[ -f "$raw/manifest.json" ]] && python3 - "$raw" "$out" <<'PY'
 import json, shutil, sys, os
 raw, out = sys.argv[1], sys.argv[2]
 for test in json.load(open(os.path.join(raw, "manifest.json"))):
@@ -159,12 +188,14 @@ for test in json.load(open(os.path.join(raw, "manifest.json"))):
             clean = name[len("shot-"):].split("_")[0]
             shutil.copy(os.path.join(raw, a["exportedFileName"]), os.path.join(out, clean + ".png"))
 PY
+  return 0
 }
 
 status=0
-for direction in ios-student android-student ios-student-block android-student-block; do
+for direction in ios-student android-student android-android ios-student-block android-student-block; do
   [[ -n "$ONLY" && "$ONLY" != "$direction" ]] && continue
   [[ -z "$ONLY" && "$direction" == *-block ]] && continue
+  [[ "$direction" == "android-android" && -z "$ANDROID_TEACHER" ]] && continue
   [[ "${SESSION_SHOTS:-0}" == 1 ]] && clear_android_shots
   read -r TEACHER_EMAIL TEACHER_PASSWORD TEACHER_UID <<< "$(new_teacher)"
   echo "$direction: teacher $TEACHER_EMAIL uid=$TEACHER_UID"
@@ -173,7 +204,7 @@ for direction in ios-student android-student ios-student-block android-student-b
   export TEST_RUNNER_LESSON_TEACHER_UID="$TEACHER_UID"
   export TEST_RUNNER_QUESTION_TEXT="$QUESTION_TEXT"
   if [[ "$direction" == "ios-student-block" ]]; then
-    run_android com.yaronj.tim.test teachesThenIsBlockedThenUnblocked "$direction-android-teacher" &
+    run_android "$ANDROID" com.yaronj.tim.test teachesThenIsBlockedThenUnblocked "$direction-android-teacher" &
     teacher_pid=$!
     run_ios StudentAskUITests/testABlockedTeacherGetsNoQuestionsUntilUnblocked "$direction-ios-student" &
     student_pid=$!
@@ -181,19 +212,25 @@ for direction in ios-student android-student ios-student-block android-student-b
   elif [[ "$direction" == "android-student-block" ]]; then
     run_ios ProTeacherLessonUITests/testTeachingThenBeingBlockedThenUnblocked "$direction-ios-teacher" &
     teacher_pid=$!
-    run_android com.yaronj.student.test asksBlocksThenUnblocksTheTeacher "$direction-android-student" &
+    run_android "$ANDROID" com.yaronj.student.test asksBlocksThenUnblocksTheTeacher "$direction-android-student" &
     student_pid=$!
     halves=("$direction-ios-teacher" "$direction-android-student")
   elif [[ "$direction" == "ios-student" ]]; then
-    run_android com.yaronj.tim.test teachesALessonAndEndsIt "$direction-android-teacher" &
+    run_android "$ANDROID" com.yaronj.tim.test teachesALessonAndEndsIt "$direction-android-teacher" &
     teacher_pid=$!
     run_ios StudentAskUITests/testTakingALessonTheTeacherEndsThenSkippingTheRating "$direction-ios-student" &
     student_pid=$!
     halves=("$direction-android-teacher" "$direction-ios-student")
+  elif [[ "$direction" == "android-android" ]]; then
+    run_android "$ANDROID_TEACHER" com.yaronj.tim.test teachesALessonAndEndsIt "$direction-android-teacher" &
+    teacher_pid=$!
+    run_android "$ANDROID" com.yaronj.student.test asksAndTakesALesson "$direction-android-student" &
+    student_pid=$!
+    halves=("$direction-android-teacher" "$direction-android-student")
   else
     run_ios ProTeacherLessonUITests/testTeachingALessonAndEndingIt "$direction-ios-teacher" &
     teacher_pid=$!
-    run_android com.yaronj.student.test asksAndTakesALesson "$direction-android-student" &
+    run_android "$ANDROID" com.yaronj.student.test asksAndTakesALesson "$direction-android-student" &
     student_pid=$!
     halves=("$direction-ios-teacher" "$direction-android-student")
   fi
@@ -201,11 +238,17 @@ for direction in ios-student android-student ios-student-block android-student-b
   wait "$student_pid" || status=1
   for half in "${halves[@]}"; do report "$half"; done
   if [[ "${SESSION_SHOTS:-0}" == 1 ]]; then
-    if [[ "$direction" == "ios-student" ]]; then
-      collect_shots "$direction" com.yaronj.tim teacher "$direction-ios-student" student
-    else
-      collect_shots "$direction" com.yaronj.student student "$direction-ios-teacher" teacher
-    fi
+    case "$direction" in
+      ios-student|ios-student-block)
+        pull_android_shots "$ANDROID" com.yaronj.tim "$SHOTS_DIR/$direction/android-teacher"
+        pull_ios_shots "$direction-ios-student" "$SHOTS_DIR/$direction/ios-student" ;;
+      android-android)
+        pull_android_shots "$ANDROID_TEACHER" com.yaronj.tim "$SHOTS_DIR/$direction/android-teacher"
+        pull_android_shots "$ANDROID" com.yaronj.student "$SHOTS_DIR/$direction/android-student" ;;
+      *)
+        pull_android_shots "$ANDROID" com.yaronj.student "$SHOTS_DIR/$direction/android-student"
+        pull_ios_shots "$direction-ios-teacher" "$SHOTS_DIR/$direction/ios-teacher" ;;
+    esac
   fi
 done
 echo "results in $RESULTS_DIR"
