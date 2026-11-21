@@ -21,14 +21,23 @@ const mockDeleteUser = jest.fn();
 const mockSendMail = jest.fn();
 const mockSendAdminPush = jest.fn();
 const mockRtdb = new Map<string, unknown>();
+const mockInboxWrites: { path: string; data: Record<string, unknown> }[] = [];
 
 jest.mock("firebase-admin", () => {
   const userDoc = (uid: string) => ({
     id: uid,
     get: async () => ({ id: uid, exists: mockBalances.has(uid), data: () => (mockBalances.has(uid) ? { remainingMinutes: mockBalances.get(uid) } : undefined) }),
+    collection: (name: string) => ({ doc: () => ({ path: `users/${uid}/${name}` }) }),
   });
   const firestore = {
     collection: () => ({ doc: userDoc }),
+    batch: () => {
+      const pending: { path: string; data: Record<string, unknown> }[] = [];
+      return {
+        set: (ref: { path: string }, data: Record<string, unknown>) => pending.push({ path: ref.path, data }),
+        commit: async () => { mockInboxWrites.push(...pending); },
+      };
+    },
     getAll: async (...refs: { get: () => Promise<unknown> }[]) => Promise.all(refs.map((r) => r.get())),
   };
   const auth = {
@@ -53,7 +62,7 @@ jest.mock("firebase-admin", () => {
   };
   return { firestore: () => firestore, database: () => database, auth: () => auth };
 });
-jest.mock("firebase-admin/firestore", () => ({ Timestamp: class {}, FieldValue: {} }));
+jest.mock("firebase-admin/firestore", () => ({ Timestamp: class { static now() { return "now"; } }, FieldValue: {} }));
 jest.mock("firebase-functions", () => ({ logger: { info: jest.fn(), warn: jest.fn() } }));
 jest.mock("firebase-functions/v2/https", () => ({
   onCall: (a: unknown, b?: unknown) => b ?? a,
@@ -66,7 +75,7 @@ jest.mock("../accountDeletion", () => ({ deleteAccountData: mockDeleteAccountDat
 jest.mock("../mailer", () => ({ sendMail: mockSendMail }));
 jest.mock("../fcm", () => ({ sendAdminPush: mockSendAdminPush }));
 
-import { adminFindInactiveAnonymous, adminBulkDeleteUsers, adminSendEmail, adminSendPush, adminCheckPushTokens, adminListUsers } from "../admin";
+import { adminFindInactiveAnonymous, adminBulkDeleteUsers, adminSendEmail, adminSendInboxMessage, adminSendPush, adminCheckPushTokens, adminListUsers, BULK_INBOX_MAX } from "../admin";
 
 const call = (fn: unknown, data: unknown, uid = "admin-uid") =>
   (fn as (req: unknown) => Promise<any>)({
@@ -101,6 +110,7 @@ beforeEach(() => {
   mockSendMail.mockReset().mockResolvedValue(true);
   mockSendAdminPush.mockReset().mockImplementation(async ({ tokens }: { tokens: string[] }) => ({ sent: tokens.length, dead: [], failed: [] }));
   mockRtdb.clear();
+  mockInboxWrites.length = 0;
   process.env.SMTP_HOST = "smtp.example.com";
 });
 afterEach(() => jest.restoreAllMocks());
@@ -236,6 +246,36 @@ describe("adminSendEmail", () => {
   it("requires a subject and a message", async () => {
     await expect(call(adminSendEmail, { uids: ["a"], subject: " ", text: "t" })).rejects.toMatchObject({ code: "invalid-argument" });
     await expect(call(adminSendEmail, { uids: ["a"], subject: "s", text: "" })).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+});
+
+describe("adminSendInboxMessage", () => {
+  it("leaves one trimmed message in each existing user's bell list", async () => {
+    add(member("a", 1), guest("g", 1));
+    const d = await call(adminSendInboxMessage, { uids: ["a", "g", "a", "missing"], title: " Hi ", text: " Hello " });
+    expect(d).toEqual({ sent: 2, notFound: 1 });
+    expect(mockInboxWrites.map((w) => w.path)).toEqual(["users/a/incomingMessages", "users/g/incomingMessages"]);
+    expect(mockInboxWrites[0].data).toEqual({ title: "Hi", text: "Hello", kind: "admin", createdAt: "now", readTimestamp: null });
+  });
+
+  it("stores the Hebrew pair when given", async () => {
+    add(member("a", 1));
+    await call(adminSendInboxMessage, { uids: ["a"], title: "Hi", text: "Hello", titleHe: " שלום ", textHe: " מה נשמע " });
+    expect(mockInboxWrites[0].data).toMatchObject({ titleHe: "שלום", textHe: "מה נשמע" });
+  });
+
+  it("refuses incomplete messages and oversized lists", async () => {
+    const bad = [
+      { uids: [], title: "t", text: "x" },
+      { uids: ["a"], title: " ", text: "x" },
+      { uids: ["a"], title: "t", text: "" },
+      { uids: ["a"], title: "t", text: "x", titleHe: "כותרת" },
+      { uids: Array.from({ length: BULK_INBOX_MAX + 1 }, (_, i) => `u${i}`), title: "t", text: "x" },
+    ];
+    for (const data of bad) {
+      await expect(call(adminSendInboxMessage, data)).rejects.toMatchObject({ code: "invalid-argument" });
+    }
+    expect(mockInboxWrites).toHaveLength(0);
   });
 });
 

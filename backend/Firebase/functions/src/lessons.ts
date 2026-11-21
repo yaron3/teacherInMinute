@@ -18,12 +18,15 @@ import {
   LessonSidePresence,
   PurchaseDoc,
 } from "./types";
-import { calculateBilling, billingStartMillis, applyTeacherBonus } from "./billing";
+import { calculateBilling, billingStartMillis, teacherEarningsFor } from "./billing";
 import { backfillPendingQuestionsForTeacher } from "./dispatch";
 import { stampAuthoritativeRating } from "./presence";
 import { releaseTeacherBusy } from "./busy";
-import { getConnectionFeeCents, resolvePricingForStudent } from "./pricing";
-import { readTeacherBonus } from "./emailRewards";
+import {
+  getConnectionFeeCents,
+  resolvePricingForStudent,
+  resolveTeacherRatePerMinute,
+} from "./pricing";
 import { deferredInEmulator } from "./emulatorSchedule";
 
 const firestore = admin.firestore();
@@ -435,25 +438,26 @@ async function migrateQuestionToFirestore(
     cost,
   } = calculateBilling(billingStartMs, billableEndedAtMs, pricePerMinute, teacherShare);
 
-  // A teacher's welcome bonus (./emailRewards) raises their share on its first
-  // minutes. It is read now rather than stamped at start, so a lesson only
-  // draws on what is actually left when it is settled.
   const teacherRef = firestore.collection("users").doc(teacherUid);
-  const teacherBonus = readTeacherBonus((await teacherRef.get()).data()?.teacherBonus);
-  const { teacherEarnings, bonusMinutesUsed, effectiveShare } = applyTeacherBonus(
-    cost,
-    roundedMinutes,
-    teacherShare,
-    teacherBonus?.share ?? teacherShare,
-    teacherBonus?.minutesRemaining ?? 0
-  );
+  const teacherData = (await teacherRef.get()).data();
+
+  // The teacher is paid their per-minute rate, as it stood when the lesson
+  // started. A lesson already running when rates were introduced has none
+  // stamped and takes the current one.
+  const stampedTeacherRate = Number(lessonRecord?.data.teacherRatePerMinute);
+  const teacherRatePerMinute =
+    Number.isFinite(stampedTeacherRate) && stampedTeacherRate > 0
+      ? stampedTeacherRate
+      : await resolveTeacherRatePerMinute(teacherData, currencyCode);
+
+  const teacherEarnings = teacherEarningsFor(roundedMinutes, teacherRatePerMinute);
   const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
   logger.info(
     `[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`
   );
 
   logger.info(
-    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} heldSeconds=${heldSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherShare=${teacherShare} bonusMinutesUsed=${bonusMinutesUsed} effectiveShare=${effectiveShare} teacherEarnings=${teacherEarnings}`
+    `[lessons] cost computed qid=${questionId} rawSeconds=${rawSeconds} roundedSeconds=${roundedSeconds} heldSeconds=${heldSeconds} currency=${currencyCode} pricePerMinute=${pricePerMinute} cost=${cost} teacherRatePerMinute=${teacherRatePerMinute} teacherEarnings=${teacherEarnings}`
   );
 
   const qDocRef = firestore.collection("questions").doc(questionId);
@@ -492,8 +496,7 @@ async function migrateQuestionToFirestore(
         pricePerMinute,
         exchangeRateToUsd,
         teacherShare,
-        teacherBonusMinutesUsed: bonusMinutesUsed,
-        effectiveTeacherShare: effectiveShare,
+        teacherRatePerMinute,
         cost,
         teacherEarnings,
         // Legacy aliases for clients still reading the old field names.
@@ -518,8 +521,7 @@ async function migrateQuestionToFirestore(
           currencyCode,
           pricePerMinute,
           teacherShare,
-          teacherBonusMinutesUsed: bonusMinutesUsed,
-          effectiveTeacherShare: effectiveShare,
+          teacherRatePerMinute,
           exchangeRateToUsd,
           cost,
           teacherEarnings,
@@ -551,9 +553,6 @@ async function migrateQuestionToFirestore(
         totalEarnings: FieldValue.increment(teacherEarnings),
         earnings: FieldValue.increment(teacherEarnings),
         totalRevenueGenerated: FieldValue.increment(cost),
-        ...(bonusMinutesUsed > 0
-          ? { teacherBonus: { minutesRemaining: FieldValue.increment(-bonusMinutesUsed) } }
-          : {}),
       },
       { merge: true }
     );
@@ -878,10 +877,11 @@ async function startWhenBothReady(
 interface LessonStartInputs {
   liveKitRoom: string;
   pricing: Awaited<ReturnType<typeof resolvePricingForStudent>>;
+  /** What this teacher is paid per billed minute, in the lesson's currency. */
+  teacherRatePerMinute: number;
   connectionFeeCents: number;
   /** The student's balance in whole minutes. */
   minutesAvailable: number;
-  teacherBonus: ReturnType<typeof readTeacherBonus>;
 }
 
 async function readLessonStartInputs(
@@ -897,17 +897,18 @@ async function readLessonStartInputs(
     firestore.collection("users").doc(q.studentUid).get(),
     firestore.collection("users").doc(q.acceptedByTeacher!).get(),
   ]);
+  const teacherRatePerMinute = await resolveTeacherRatePerMinute(teacherSnap.data(), pricing.currency);
 
   return {
     // The room acceptInvite stored with the question.
     liveKitRoom: (q as { agoraChannel?: string }).agoraChannel ?? `lesson_${questionId}`,
     pricing,
+    teacherRatePerMinute,
     connectionFeeCents,
     minutesAvailable: Math.max(
       0,
       Math.floor(Number((studentSnap.data() ?? {}).remainingMinutes) || 0)
     ),
-    teacherBonus: readTeacherBonus((teacherSnap.data() ?? {}).teacherBonus),
   };
 }
 
@@ -926,7 +927,7 @@ function lessonStartWrites(
   lessonId: string,
   now: Date
 ): LessonStart {
-  const { pricing, connectionFeeCents, minutesAvailable, teacherBonus, liveKitRoom } = inputs;
+  const { pricing, teacherRatePerMinute, connectionFeeCents, minutesAvailable, liveKitRoom } = inputs;
   const hardCapAt = new Date(now.getTime() + HARD_CAP_MINUTES * 60 * 1000);
   const pricePerMinuteCents = Math.round(pricing.pricePerMinute * 100);
 
@@ -946,6 +947,7 @@ function lessonStartWrites(
     currencyCode: pricing.currency,
     pricePerMinute: pricing.pricePerMinute,
     teacherShare: pricing.teacherShare,
+    teacherRatePerMinute,
     exchangeRateToUsd: pricing.exchangeRateToUsd,
     status: "in_progress",
     liveKitRoom,
@@ -954,10 +956,9 @@ function lessonStartWrites(
     ...(q.isDemo ? { isDemo: true } : {}),
   };
 
-  // The live figure shows the welcome-bonus share while the teacher has bonus
-  // minutes left. Settlement splits a lesson that outlasts them, so this is an
-  // estimate at the edge; `teacherShare` itself stays the base rate.
-  const teacherSharePercent = Math.round((teacherBonus?.share ?? pricing.teacherShare) * 100);
+  // Display only, for app versions from before fixed rates: they work out the
+  // live figure as a percent of the price. Pay never reads this.
+  const teacherSharePercent = Math.round((teacherRatePerMinute / pricing.pricePerMinute) * 100);
 
   return {
     lessonId,
@@ -972,6 +973,7 @@ function lessonStartWrites(
       currencyCode: pricing.currency,
       pricePerMinute: pricing.pricePerMinute,
       teacherShare: pricing.teacherShare,
+      teacherRatePerMinute,
       exchangeRateToUsd: pricing.exchangeRateToUsd,
       updatedAt: FieldValue.serverTimestamp(),
     },
@@ -996,7 +998,8 @@ function lessonStartWrites(
       pricePerMinuteCents,
       teacherShare: pricing.teacherShare,
       teacherSharePercent,
-      teacherBonusMinutesAvailable: teacherBonus?.minutesRemaining ?? 0,
+      teacherRatePerMinute,
+      teacherRatePerMinuteCents: Math.round(teacherRatePerMinute * 100),
       exchangeRateToUsd: pricing.exchangeRateToUsd,
       connectionFeeCents,
     },

@@ -13,6 +13,7 @@ const DEFAULT_PRICE_PER_MINUTE_USD = 0.5;
 const DEFAULT_PRICE_PER_MINUTE_ILS = 2.0;
 const DEFAULT_EXCHANGE_RATE_ILS = 4.0;
 const DEFAULT_TEACHER_SHARE = 0.75;
+const DEFAULT_TEACHER_RATE_PER_MINUTE_ILS = 2;
 
 export interface ResolvedPricing {
   currency: string;
@@ -96,6 +97,51 @@ export async function getTeacherShare(): Promise<number> {
   const fromRc = await readRcNumber("teacher_share");
   if (fromRc !== undefined && fromRc > 0 && fromRc <= 1) return fromRc;
   return DEFAULT_TEACHER_SHARE;
+}
+
+/** A per-teacher rate in ILS, or undefined when none usable is set. */
+export function readTeacherRateIls(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/** Catches a mistyped per-minute rate before it is paid out. */
+export const MAX_TEACHER_RATE_ILS = 100;
+
+/**
+ * A rate as the admin console submits it: rounded to agorot, or `null` to
+ * return the teacher to the default. `undefined` means it is not acceptable.
+ */
+export function parseAdminTeacherRate(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  const rate = readTeacherRateIls(value);
+  if (rate === undefined || rate > MAX_TEACHER_RATE_ILS) return undefined;
+  const rounded = Math.round(rate * 100) / 100;
+  return rounded > 0 ? rounded : undefined;
+}
+
+/**
+ * What a teacher is paid per billed minute, in major units of `currency`.
+ *
+ * The rate is independent of the student's price: the teacher's own
+ * `teacherRatePerMinuteIls` when the admin console set one, otherwise Remote
+ * Config `teacher_rate_per_minute_ils`. Rates are held in ILS and converted
+ * for a lesson billed in another currency.
+ */
+export async function resolveTeacherRatePerMinute(
+  teacher: { teacherRatePerMinuteIls?: unknown } | undefined,
+  currency: string
+): Promise<number> {
+  const ownRate = readTeacherRateIls(teacher?.teacherRatePerMinuteIls);
+  const rateIls =
+    ownRate ??
+    readTeacherRateIls(await readRcNumber("teacher_rate_per_minute_ils")) ??
+    DEFAULT_TEACHER_RATE_PER_MINUTE_ILS;
+  if (currency === "ILS") return rateIls;
+  const [ilsPerUsd, currencyPerUsd] = await Promise.all([
+    getExchangeRateToUsd("ILS"),
+    getExchangeRateToUsd(currency),
+  ]);
+  return Math.round((rateIls / ilsPerUsd) * currencyPerUsd * 100) / 100;
 }
 
 export async function resolvePricingForStudent(studentUid: string): Promise<ResolvedPricing> {

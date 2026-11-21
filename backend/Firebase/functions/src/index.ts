@@ -119,6 +119,7 @@ export {
   adminGetTeacherDocs,
   adminVerifyTeacher,
   adminSendTeacherMessage,
+  adminSendInboxMessage,
   adminRecomputePlatformStats,
   adminRepublishOnlineTeachers,
   adminFindInactiveAnonymous,

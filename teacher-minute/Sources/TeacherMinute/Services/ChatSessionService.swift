@@ -78,6 +78,9 @@ struct ChatSessionDetails: Equatable {
   /// milliseconds, as published by `startLesson`. Zero until then: nothing is
   /// counted, or billed, before it.
   var startedAt: Double = 0
+  /// What the teacher is paid per billed minute, as published by `startLesson`.
+  /// Zero for a lesson from before fixed rates, which falls back to the share.
+  var teacherRatePerMinuteCents: Int = 0
 }
 
 /// The room and token one participant joins the lesson's media with.
@@ -1145,7 +1148,8 @@ final class ChatSessionService {
       currencyCode: currencyCode(from: dict),
       minutesDeadlineAt: normalizedMilliseconds(doubleValue(dict["minutesDeadlineAt"]) ?? 0),
       conversationType: firstString(in: dict, keys: ["conversationType"]),
-      startedAt: normalizedMilliseconds(doubleValue(dict["startedAt"]) ?? 0)
+      startedAt: normalizedMilliseconds(doubleValue(dict["startedAt"]) ?? 0),
+      teacherRatePerMinuteCents: intValue(dict["teacherRatePerMinuteCents"]) ?? 0
     )
   }
 
@@ -1987,6 +1991,12 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
   }
   var primaryAmountSubtitle: String {
     if isTeacherRole {
+      if teacherRatePerMinuteCents > 0 {
+        return String(
+          format: LocalizationSupport.localized("Your rate: %@ per minute"),
+          currencyText(cents: Double(teacherRatePerMinuteCents))
+        )
+      }
       return String(
         format: LocalizationSupport.localized("Your share (%d%%)"),
         teacherSharePercent
@@ -2428,7 +2438,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     // Once settled, what was billed: the lesson rounded to whole minutes.
     let elapsedMinutes = Double(settledBilledSeconds ?? sessionDurationSeconds(at: date)) / 60.0
     let grossCents = elapsedMinutes * Double(pricePerMinuteCents)
-    let cents = isTeacherRole ? grossCents * (teacherSharePercent / 100.0) : grossCents
+    let teacherCents = teacherRatePerMinuteCents > 0
+      ? elapsedMinutes * Double(teacherRatePerMinuteCents)
+      : grossCents * (teacherSharePercent / 100.0)
+    let cents = isTeacherRole ? teacherCents : grossCents
     return currencyText(cents: max(0, cents))
   }
 
@@ -3272,6 +3285,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
     details?.teacherSharePercent ?? 75
   }
 
+  private var teacherRatePerMinuteCents: Int {
+    details?.teacherRatePerMinuteCents ?? 0
+  }
+
   /// Counted from when the lesson started — both sides in — as it is billed.
   /// Zero while either side is still connecting. Once the lesson is over, the
   /// time the backend settled it at, as of the first side to go: the same on
@@ -3329,7 +3346,10 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
         : current.minutesDeadlineAt,
       conversationType: nonEmpty(updated.conversationType) ?? current.conversationType,
       // Once known, kept: a snapshot that omits it must not stop the count.
-      startedAt: updated.startedAt > 0 ? updated.startedAt : current.startedAt
+      startedAt: updated.startedAt > 0 ? updated.startedAt : current.startedAt,
+      teacherRatePerMinuteCents: updated.teacherRatePerMinuteCents > 0
+        ? updated.teacherRatePerMinuteCents
+        : current.teacherRatePerMinuteCents
     )
   }
 
@@ -3354,7 +3374,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       currencyCode: current.currencyCode,
       minutesDeadlineAt: current.minutesDeadlineAt,
       conversationType: current.conversationType,
-      startedAt: current.startedAt
+      startedAt: current.startedAt,
+      teacherRatePerMinuteCents: current.teacherRatePerMinuteCents
     )
     onSessionDetailsUpdated?()
   }
@@ -3408,7 +3429,8 @@ final class ChatSessionViewModel: ChatSessionViewModeling {
       currencyCode: current.currencyCode,
       minutesDeadlineAt: current.minutesDeadlineAt,
       conversationType: current.conversationType,
-      startedAt: current.startedAt
+      startedAt: current.startedAt,
+      teacherRatePerMinuteCents: current.teacherRatePerMinuteCents
     )
   }
 

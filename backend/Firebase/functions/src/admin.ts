@@ -16,6 +16,7 @@ import { readSupportSettings, supportCaseUrl, writeSupportSettings } from "./sup
 import { contactAttachmentPaths } from "./contactAttachments";
 import { sendAdminPush } from "./fcm";
 import { wantsPush } from "./scoring";
+import { MAX_TEACHER_RATE_ILS, parseAdminTeacherRate } from "./pricing";
 import {
   isPlausibleEmail,
   parseRecipients,
@@ -794,10 +795,13 @@ export const adminMutateUser = onCall({ timeoutSeconds: 540 }, async (req) => {
       | "disable"
       | "enable"
       | "goOffline"
-      | "setRole";
+      | "setRole"
+      | "setTeacherRate";
     uid: string;
     delta?: number;
     role?: string;
+    /** ILS per minute; null returns the teacher to the default rate. */
+    ratePerMinuteIls?: number | null;
   };
 
   const { action, uid } = data;
@@ -862,6 +866,20 @@ export const adminMutateUser = onCall({ timeoutSeconds: 540 }, async (req) => {
       }
       await firestore.collection("users").doc(uid).set({ role }, { merge: true });
       logger.info(`[admin] set role uid=${uid} role=${role}`);
+      return { success: true };
+    }
+
+    // Applies to lessons that start after it: a running lesson keeps its rate.
+    case "setTeacherRate": {
+      const rate = parseAdminTeacherRate(data.ratePerMinuteIls);
+      if (rate === undefined) {
+        throw new HttpsError("invalid-argument", `Rate must be above 0 and at most ${MAX_TEACHER_RATE_ILS}`);
+      }
+      await firestore.collection("users").doc(uid).set(
+        { teacherRatePerMinuteIls: rate === null ? FieldValue.delete() : rate },
+        { merge: true }
+      );
+      logger.info(`[admin] set teacher rate uid=${uid} rateIls=${rate ?? "default"} by=${req.auth?.token?.email}`);
       return { success: true };
     }
 
@@ -1847,6 +1865,54 @@ export const adminSendEmail = onCall({ timeoutSeconds: 540 }, async (req) => {
     withoutEmail: users.filter((u) => !u.email).length,
     notFound: uids.length - users.length,
   };
+});
+
+export const BULK_INBOX_MAX = 100;
+
+/**
+ * Leaves one message per user in the list the app's bell opens. The English
+ * title and text are required; the Hebrew pair is optional and, when given,
+ * is what the app shows while it is in Hebrew. Uids with no account are
+ * counted and skipped, so a stale selection cannot create a stray user path.
+ */
+export const adminSendInboxMessage = onCall({ timeoutSeconds: 120 }, async (req) => {
+  assertAdmin(req);
+  const { uids, title, text, titleHe, textHe } = req.data as {
+    uids?: unknown;
+    title?: string;
+    text?: string;
+    titleHe?: string;
+    textHe?: string;
+  };
+  if (!Array.isArray(uids) || uids.length === 0 || !uids.every((u) => typeof u === "string" && u)) {
+    throw new HttpsError("invalid-argument", "uids must be a non-empty list");
+  }
+  if (uids.length > BULK_INBOX_MAX) throw new HttpsError("invalid-argument", `At most ${BULK_INBOX_MAX} users per call`);
+  if (!title?.trim() || !text?.trim()) throw new HttpsError("invalid-argument", "title and text required");
+  const hebrewTitle = titleHe?.trim() ?? "";
+  const hebrewText = textHe?.trim() ?? "";
+  if (Boolean(hebrewTitle) !== Boolean(hebrewText)) {
+    throw new HttpsError("invalid-argument", "Hebrew title and text go together");
+  }
+
+  const unique = [...new Set(uids as string[])];
+  const { users } = await admin.auth().getUsers(unique.map((uid) => ({ uid })));
+  const message = {
+    title: title.trim(),
+    text: text.trim(),
+    ...(hebrewTitle ? { titleHe: hebrewTitle, textHe: hebrewText } : {}),
+    kind: "admin",
+    createdAt: Timestamp.now(),
+    readTimestamp: null,
+  };
+  const batch = firestore.batch();
+  for (const user of users) {
+    batch.set(firestore.collection("users").doc(user.uid).collection("incomingMessages").doc(), message);
+  }
+  await batch.commit();
+
+  logger.info(`[admin] inbox message "${message.title}": sent=${users.length} notFound=${unique.length - users.length} by=${req.auth?.token?.email}`);
+  return { sent: users.length, notFound: unique.length - users.length };
 });
 
 export const BULK_PUSH_MAX = 100;

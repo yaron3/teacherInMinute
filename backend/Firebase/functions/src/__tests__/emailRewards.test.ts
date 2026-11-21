@@ -3,7 +3,6 @@ jest.mock("firebase-admin", () => ({
 }));
 
 import { canonicalEmailIdentity, emailClaimId, readTeacherBonus } from "../emailRewards";
-import { applyTeacherBonus } from "../billing";
 
 describe("canonicalEmailIdentity", () => {
   it.each([
@@ -70,37 +69,5 @@ describe("readTeacherBonus", () => {
     [{ minutesRemaining: 10 }],
   ])("treats %p as no bonus", (value) => {
     expect(readTeacherBonus(value)).toBeUndefined();
-  });
-});
-
-describe("applyTeacherBonus", () => {
-  it("pays the base share when there is no bonus", () => {
-    expect(applyTeacherBonus(20, 10, 0.75, 0.75, 0)).toEqual({
-      teacherEarnings: 15,
-      bonusMinutesUsed: 0,
-      effectiveShare: 0.75,
-    });
-  });
-
-  it("pays the full bonus share for a lesson inside the bonus", () => {
-    expect(applyTeacherBonus(20, 10, 0.75, 1, 300)).toEqual({
-      teacherEarnings: 20,
-      bonusMinutesUsed: 10,
-      effectiveShare: 1,
-    });
-  });
-
-  it("splits a lesson that outlasts the remaining bonus", () => {
-    // 4 of 10 minutes at 100%, 6 at 75%: 8 + 9 = 17.
-    expect(applyTeacherBonus(20, 10, 0.75, 1, 4)).toEqual({
-      teacherEarnings: 17,
-      bonusMinutesUsed: 4,
-      effectiveShare: 0.85,
-    });
-  });
-
-  it("does not spend bonus minutes on a lesson that cost nothing", () => {
-    expect(applyTeacherBonus(0, 0, 0.75, 1, 300).bonusMinutesUsed).toBe(0);
-    expect(applyTeacherBonus(0, 5, 0.75, 1, 300).bonusMinutesUsed).toBe(0);
   });
 });

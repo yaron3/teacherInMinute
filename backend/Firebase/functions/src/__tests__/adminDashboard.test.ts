@@ -587,6 +587,7 @@ describe("verify teachers", () => {
       adminListPendingTeachers: { teachers: [
         { uid: "t-1", displayName: "Noa", email: "n@example.com", uploadedDocuments: ["selfie_1"], subjectSelections: {} },
       ] },
+      adminSendInboxMessage: { sent: 1, notFound: 0 },
     });
     await page.signIn();
     await page.nav("Verify Teachers");
@@ -595,9 +596,56 @@ describe("verify teachers", () => {
     (page.$("#msg-text") as HTMLTextAreaElement).value = "Please re-upload your ID.";
     page.button("#teacher-msg-modal", "Send Message").click();
     await page.settle();
-    expect(page.callsTo("adminSendTeacherMessage")[0].data).toEqual({
-      uid: "t-1", title: "Documents", text: "Please re-upload your ID.",
+    expect(page.callsTo("adminSendInboxMessage")[0].data).toEqual({
+      uids: ["t-1"], title: "Documents", text: "Please re-upload your ID.", titleHe: "", textHe: "",
     });
+    expect(page.confirm).not.toHaveBeenCalled();
+    expect(page.$("#toast").textContent).toContain("Message sent to 1 user");
+  });
+
+  it("sends an in-app message to a selection, and a retry skips who already got it", async () => {
+    let calls = 0;
+    page = openConsole({
+      adminDashboardStatus: dashboard(),
+      adminSendInboxMessage: (data: { uids: string[] }) => {
+        calls++;
+        if (calls === 2) throw new Error("network");
+        return { sent: data.uids.length, notFound: 0 };
+      },
+    });
+    await page.signIn();
+    const uids = Array.from({ length: 150 }, (_, i) => `u${i}`);
+    page.window.openInboxMessage(uids);
+    expect(page.$("#msg-teacher-label").textContent).toBe("150 selected users");
+    (page.$("#msg-title") as HTMLInputElement).value = "News";
+    (page.$("#msg-text") as HTMLTextAreaElement).value = "Hello";
+    (page.$("#msg-title-he") as HTMLInputElement).value = "חדשות";
+    (page.$("#msg-text-he") as HTMLTextAreaElement).value = "שלום";
+
+    page.button("#teacher-msg-modal", "Send Message").click();
+    await page.settle();
+    expect(page.confirm).toHaveBeenCalledTimes(1);
+    expect(page.$("#toast").textContent).toContain("Sent to 100 of 150");
+
+    page.button("#teacher-msg-modal", "Send Message").click();
+    await page.settle();
+    const sends = page.callsTo("adminSendInboxMessage");
+    expect(sends.map((c) => c.data.uids.length)).toEqual([100, 50, 50]);
+    expect(sends[2].data.uids[0]).toBe("u100");
+    expect(sends[2].data).toMatchObject({ titleHe: "חדשות", textHe: "שלום" });
+  });
+
+  it("refuses half a Hebrew translation", async () => {
+    page = openConsole({ adminDashboardStatus: dashboard() });
+    await page.signIn();
+    page.window.openInboxMessage(["u1"], "Noa");
+    (page.$("#msg-title") as HTMLInputElement).value = "News";
+    (page.$("#msg-text") as HTMLTextAreaElement).value = "Hello";
+    (page.$("#msg-title-he") as HTMLInputElement).value = "חדשות";
+    page.button("#teacher-msg-modal", "Send Message").click();
+    await page.settle();
+    expect(page.callsTo("adminSendInboxMessage")).toHaveLength(0);
+    expect(page.$("#toast").textContent).toContain("both Hebrew fields");
   });
 });
 

@@ -710,20 +710,23 @@
 <div class="modal-overlay" id="teacher-msg-modal">
   <div class="modal" style="max-width:460px">
     <div class="modal-head">
-      <h2>Send Message</h2>
+      <h2>Send In-App Message</h2>
       <button class="btn-icon" onclick="closeModal('teacher-msg-modal')">✕</button>
     </div>
     <div class="modal-body">
       <p style="font-size:.85rem;color:var(--muted2);margin-bottom:16px">
-        To: <strong id="msg-teacher-label"></strong> — lands in their in-app inbox
-        (<code>users/{uid}/incomingMessages</code>).
+        To: <strong id="msg-teacher-label"></strong>. Shows under the bell in the
+        app the next time they open it. No push or email is sent.
       </p>
-      <div class="form-group"><label>Title</label><input id="msg-title" placeholder="e.g. Document Review Update"></div>
-      <div class="form-group"><label>Message</label><textarea id="msg-text" rows="5" placeholder="Write your message…"></textarea></div>
+      <div class="form-group"><label>Title</label><input id="msg-title" placeholder="e.g. New teachers are online"></div>
+      <div class="form-group"><label>Message</label><textarea id="msg-text" rows="4" placeholder="Write your message…"></textarea></div>
+      <div class="form-group"><label>Title in Hebrew (optional)</label><input id="msg-title-he" dir="rtl"></div>
+      <div class="form-group"><label>Message in Hebrew (optional)</label><textarea id="msg-text-he" dir="rtl" rows="4"></textarea></div>
+      <div style="font-size:.78rem;color:var(--muted2)">Without Hebrew, users of the Hebrew app see the text above.</div>
     </div>
     <div class="modal-foot">
       <button class="btn-ghost btn-sm" onclick="closeModal('teacher-msg-modal')">Cancel</button>
-      <button class="btn-primary btn-sm" onclick="sendTeacherMessage()">Send Message</button>
+      <button class="btn-primary btn-sm" id="msg-send" onclick="sendInboxMessage()">Send Message</button>
     </div>
   </div>
 </div>
@@ -1374,7 +1377,7 @@ function renderUserTable(key, users, teachers) {
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn-ghost btn-sm" onclick="viewUser(${jsArg(u.uid)})">View</button>
         ${teachers ? "" : `<button class="btn-ghost btn-sm" onclick="openAdjust(${jsArg(u.uid)},${jsArg(u.email||u.uid)})">± Min</button>`}
-        <button class="btn-ghost btn-sm" onclick="openTeacherMsg(${jsArg(u.uid)},${jsArg(u.displayName||u.email||u.uid)})">✉</button>
+        <button class="btn-ghost btn-sm" title="Send in-app message (shows under the bell)" onclick="openTeacherMsg(${jsArg(u.uid)},${jsArg(u.displayName||u.email||u.uid)})">✉</button>
         <button class="btn-ghost btn-sm" title="Send push notification" onclick="openBulkPush([${jsArg(u.uid)}])">🔔</button>
         <button class="btn-ghost btn-sm" onclick="doPasswordReset(${jsArg(u.uid)})">Reset PW</button>
         <button class="btn-ghost btn-sm" onclick="toggleDisable(${jsArg(u.uid)},${u.disabled ? "true" : "false"})">${u.disabled ? "Enable" : "Disable"}</button>
@@ -1829,6 +1832,7 @@ function renderUserDetail(d) {
     ? `
       <div class="info-row"><div class="info-key">Minutes Taught</div><div class="info-val">${fs.totalMinutes ?? 0}</div></div>
       <div class="info-row"><div class="info-key">Total Earnings</div><div class="info-val" style="color:var(--green);font-weight:700">${moneyIn(fs.totalEarnings != null ? Math.round(fs.totalEarnings*100) : null, cur)}</div></div>
+      <div class="info-row"><div class="info-key">Rate per Minute</div><div class="info-val">${fs.teacherRatePerMinuteIls != null ? `₪${Number(fs.teacherRatePerMinuteIls).toFixed(2)}` : "Default"} <button class="btn-ghost btn-sm" onclick="setTeacherRate(${jsArg(a.uid)},${fs.teacherRatePerMinuteIls ?? "null"})">Edit</button></div></div>
       <div class="info-row"><div class="info-key">Revenue Generated</div><div class="info-val">${moneyIn(fs.totalRevenueGenerated != null ? Math.round(fs.totalRevenueGenerated*100) : null, cur)}</div></div>
       <div class="info-row"><div class="info-key">Lessons Taught</div><div class="info-val">${(d.taughtQuestions||[]).length}${(d.taughtQuestions||[]).length === 20 ? "+" : ""}</div></div>`
     : `
@@ -1920,6 +1924,24 @@ async function setRole(uid, role) {
     showToast(`Role set to ${role}`);
     viewUser(uid);
     if (allUsers.length) loadUsers();
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
+  }
+}
+
+async function setTeacherRate(uid, current) {
+  const entered = prompt("Rate per minute in ₪ for this teacher. Leave empty for the default rate.", current ?? "");
+  if (entered === null) return;
+  const text = entered.trim();
+  const ratePerMinuteIls = text === "" ? null : Number(text);
+  if (ratePerMinuteIls !== null && !(ratePerMinuteIls > 0)) {
+    showToast("Enter a rate above 0", "error");
+    return;
+  }
+  try {
+    await call("adminMutateUser", { action: "setTeacherRate", uid, ratePerMinuteIls });
+    showToast(ratePerMinuteIls === null ? "Teacher is on the default rate" : `Rate set to ₪${ratePerMinuteIls.toFixed(2)}`);
+    viewUser(uid);
   } catch (e) {
     showToast("Failed: " + e.message, "error");
   }
@@ -2739,25 +2761,49 @@ async function verifyTeacher(uid, name) {
   }
 }
 
-let msgTeacherUid = null;
+let msgUids = [];
 function openTeacherMsg(uid, name) {
-  msgTeacherUid = uid;
-  document.getElementById("msg-teacher-label").textContent = name;
-  document.getElementById("msg-title").value = "";
-  document.getElementById("msg-text").value = "";
+  openInboxMessage([uid], name);
+}
+
+/** Opens the in-app message form for `uids`; `label` names a single recipient. */
+function openInboxMessage(uids, label) {
+  msgUids = [...new Set(uids)].filter(Boolean);
+  const n = msgUids.length;
+  if (!n) { showToast("None of the selected rows has a user", "error"); return; }
+  document.getElementById("msg-teacher-label").textContent = label || `${n} selected user${n === 1 ? "" : "s"}`;
+  for (const id of ["msg-title", "msg-text", "msg-title-he", "msg-text-he"]) {
+    document.getElementById(id).value = "";
+  }
   openModal("teacher-msg-modal");
 }
 
-async function sendTeacherMessage() {
-  const title = document.getElementById("msg-title").value.trim();
-  const text = document.getElementById("msg-text").value.trim();
+async function sendInboxMessage() {
+  const value = id => document.getElementById(id).value.trim();
+  const title = value("msg-title"), text = value("msg-text");
+  const titleHe = value("msg-title-he"), textHe = value("msg-text-he");
   if (!title || !text) { showToast("Title and message are required", "error"); return; }
+  if (Boolean(titleHe) !== Boolean(textHe)) { showToast("Fill in both Hebrew fields, or neither", "error"); return; }
+  const total = msgUids.length;
+  if (total > 1 && !confirm(`Send "${title}" to the in-app inbox of ${total} users?`)) return;
+  const btn = document.getElementById("msg-send");
+  btn.disabled = true;
+  const CHUNK = 100;
+  let sent = 0, notFound = 0;
   try {
-    await call("adminSendTeacherMessage", { uid: msgTeacherUid, title, text });
+    // Delivered chunks leave the list, so sending again after a failure
+    // continues with the rest instead of giving anyone the message twice.
+    while (msgUids.length) {
+      const d = await call("adminSendInboxMessage", { uids: msgUids.slice(0, CHUNK), title, text, titleHe, textHe });
+      sent += d.sent; notFound += d.notFound;
+      msgUids = msgUids.slice(CHUNK);
+    }
     closeModal("teacher-msg-modal");
-    showToast("Message sent to teacher");
+    showToast(`Message sent to ${sent} user${sent === 1 ? "" : "s"}` + (notFound ? ` · ${notFound} not found` : ""), sent ? "success" : "error");
   } catch (e) {
-    showToast("Failed: " + e.message, "error");
+    showToast(`Sent to ${sent} of ${total}. ${e.message}. Press Send to retry the rest.`, "error");
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -2782,6 +2828,7 @@ const TABLES = {
     keepHidden: true,
     actions: [
       { label: "📧 Email", fn: ids => openBulkEmail(ids) },
+      { label: "✉ In-app message", fn: ids => openInboxMessage(ids) },
       { label: "🔔 Push", fn: ids => openBulkPush(ids) },
       { label: "🧪 Mark as demo", fn: ids => setDemoUsers(ids, true) },
       { label: "Unmark demo", fn: ids => setDemoUsers(ids, false) },
@@ -2792,6 +2839,7 @@ const TABLES = {
     keepHidden: true,
     actions: [
       { label: "📧 Email", fn: ids => openBulkEmail(ids) },
+      { label: "✉ In-app message", fn: ids => openInboxMessage(ids) },
       { label: "🔔 Push", fn: ids => openBulkPush(ids) },
       { label: "🧪 Mark as demo", fn: ids => setDemoUsers(ids, true) },
       { label: "Unmark demo", fn: ids => setDemoUsers(ids, false) },
