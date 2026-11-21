@@ -1849,6 +1849,54 @@ export const adminSendEmail = onCall({ timeoutSeconds: 540 }, async (req) => {
   };
 });
 
+export const BULK_INBOX_MAX = 100;
+
+/**
+ * Leaves one message per user in the list the app's bell opens. The English
+ * title and text are required; the Hebrew pair is optional and, when given,
+ * is what the app shows while it is in Hebrew. Uids with no account are
+ * counted and skipped, so a stale selection cannot create a stray user path.
+ */
+export const adminSendInboxMessage = onCall({ timeoutSeconds: 120 }, async (req) => {
+  assertAdmin(req);
+  const { uids, title, text, titleHe, textHe } = req.data as {
+    uids?: unknown;
+    title?: string;
+    text?: string;
+    titleHe?: string;
+    textHe?: string;
+  };
+  if (!Array.isArray(uids) || uids.length === 0 || !uids.every((u) => typeof u === "string" && u)) {
+    throw new HttpsError("invalid-argument", "uids must be a non-empty list");
+  }
+  if (uids.length > BULK_INBOX_MAX) throw new HttpsError("invalid-argument", `At most ${BULK_INBOX_MAX} users per call`);
+  if (!title?.trim() || !text?.trim()) throw new HttpsError("invalid-argument", "title and text required");
+  const hebrewTitle = titleHe?.trim() ?? "";
+  const hebrewText = textHe?.trim() ?? "";
+  if (Boolean(hebrewTitle) !== Boolean(hebrewText)) {
+    throw new HttpsError("invalid-argument", "Hebrew title and text go together");
+  }
+
+  const unique = [...new Set(uids as string[])];
+  const { users } = await admin.auth().getUsers(unique.map((uid) => ({ uid })));
+  const message = {
+    title: title.trim(),
+    text: text.trim(),
+    ...(hebrewTitle ? { titleHe: hebrewTitle, textHe: hebrewText } : {}),
+    kind: "admin",
+    createdAt: Timestamp.now(),
+    readTimestamp: null,
+  };
+  const batch = firestore.batch();
+  for (const user of users) {
+    batch.set(firestore.collection("users").doc(user.uid).collection("incomingMessages").doc(), message);
+  }
+  await batch.commit();
+
+  logger.info(`[admin] inbox message "${message.title}": sent=${users.length} notFound=${unique.length - users.length} by=${req.auth?.token?.email}`);
+  return { sent: users.length, notFound: unique.length - users.length };
+});
+
 export const BULK_PUSH_MAX = 100;
 export const PUSH_TITLE_MAX_CHARS = 100;
 export const PUSH_BODY_MAX_CHARS = 500;
