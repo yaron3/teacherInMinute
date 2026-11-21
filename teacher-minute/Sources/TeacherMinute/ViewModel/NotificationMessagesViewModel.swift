@@ -14,9 +14,24 @@ final class NotificationMessagesViewModel {
     var messages: [NotificationMessage] = []
     var isLoading = true
     var errorMessage: String?
+    /// Kept here, not in the row: a lazy list drops a row's state when it
+    /// scrolls away, which would collapse a message being read.
+    private(set) var expandedMessageIDs: Set<String> = []
 
     var isEmpty: Bool {
         !isLoading && messages.isEmpty
+    }
+
+    func isExpanded(_ message: NotificationMessage) -> Bool {
+        expandedMessageIDs.contains(message.id)
+    }
+
+    func toggleExpanded(_ message: NotificationMessage) {
+        if expandedMessageIDs.contains(message.id) {
+            expandedMessageIDs.remove(message.id)
+        } else {
+            expandedMessageIDs.insert(message.id)
+        }
     }
 
     func loadMessages() async {
