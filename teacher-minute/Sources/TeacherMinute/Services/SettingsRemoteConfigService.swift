@@ -23,6 +23,7 @@ final class SettingsRemoteConfigService {
         static let privacyPolicyURL = "privacy_policy"
         static let subjects = "subjects"
         static let teacherShare = "teacher_share"
+        static let teacherRatePerMinuteIls = "teacher_rate_per_minute_ils"
         static let pricePerMinutePrefix = "price_per_minute"
         static let costPerMinute = "cost_per_minute"
         static let payPalPayoutEnabled = "enable_paypal_payout"
@@ -33,6 +34,7 @@ final class SettingsRemoteConfigService {
 
     private let defaultSupportEmail = "support@tim.app"
     private let defaultTeacherShare = 0.75
+    private let defaultTeacherRatePerMinuteIls = 2.0
     private let defaultPricePerMinuteByCurrency: [String: Double] = ["ILS": 2.0, "USD": 0.5]
     private let defaultContactSupportTitleMaxLength = 50
     private let defaultContactSupportDescriptionMaxLength = 1024
@@ -83,6 +85,19 @@ final class SettingsRemoteConfigService {
         }
 
         return min(max(share, 0), 1)
+    }
+
+    /// What a teacher is paid per minute, in agorot: their own rate when the
+    /// admin console set one, otherwise Remote Config
+    /// `teacher_rate_per_minute_ils` (default 2), as the backend settles it.
+    func fetchTeacherRatePerMinuteCents(ownRateIls: Double?) async -> Int {
+        if let ownRateIls, ownRateIls > 0 {
+            return Int((ownRateIls * 100.0).rounded())
+        }
+        await RemoteConfigService.shared.ready()
+        let configured = RemoteConfigService.shared.getNumber(Key.teacherRatePerMinuteIls)
+        let rate = configured > 0 ? configured : defaultTeacherRatePerMinuteIls
+        return Int((rate * 100.0).rounded())
     }
 
     /// Per-minute lesson price (in cents) for the given currency. Lessons are

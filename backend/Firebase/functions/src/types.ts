@@ -279,6 +279,9 @@ export interface LessonDoc {
   currencyCode: string;          // e.g. "ILS", "USD"
   pricePerMinute: number;        // in major units of currencyCode
   teacherShare: number;          // 0–1, e.g. 0.75
+  /** What the teacher is paid per billed minute, in major units of
+   *  `currencyCode`. Absent on a lesson started before fixed rates. */
+  teacherRatePerMinute?: number;
   exchangeRateToUsd: number;     // multiplicative rate USD → currencyCode
   totalCents?: number;
   /** Settled at endLesson, in major units of `currencyCode` (not cents). */

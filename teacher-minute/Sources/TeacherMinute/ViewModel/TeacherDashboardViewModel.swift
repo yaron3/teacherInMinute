@@ -1621,6 +1621,13 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	return nil
   }
   
+  private static func doubleValue(_ value: Any?) -> Double? {
+	if let value = value as? Double { return value }
+	if let value = value as? Int { return Double(value) }
+	if let value = value as? NSNumber { return value.doubleValue }
+	return nil
+  }
+
   private func loadProfile(uid: String) async {
 	guard !didLoadProfile else { return }
 	didLoadProfile = true
@@ -1631,7 +1638,9 @@ final class TeacherDashboardViewModel: TeacherDashboardViewModeling {
 	  teacherImageURL = summary?.profileImageURL ?? ""
 	  subjects = summary?.subjects ?? []
 	  subjectRawKeys = summary?.rawSubjectKeys ?? []
-	  ratePerMinuteCents = Self.intValue(data["ratePerMinuteCents"]) ?? 50
+	  ratePerMinuteCents = await SettingsRemoteConfigService.shared.fetchTeacherRatePerMinuteCents(
+		ownRateIls: Self.doubleValue(data["teacherRatePerMinuteIls"])
+	  )
 	  totalMinutes = summary?.totalMinutes ?? 0
 	}
 	

@@ -16,6 +16,7 @@ import { readSupportSettings, supportCaseUrl, writeSupportSettings } from "./sup
 import { contactAttachmentPaths } from "./contactAttachments";
 import { sendAdminPush } from "./fcm";
 import { wantsPush } from "./scoring";
+import { MAX_TEACHER_RATE_ILS, parseAdminTeacherRate } from "./pricing";
 import {
   isPlausibleEmail,
   parseRecipients,
@@ -794,10 +795,13 @@ export const adminMutateUser = onCall({ timeoutSeconds: 540 }, async (req) => {
       | "disable"
       | "enable"
       | "goOffline"
-      | "setRole";
+      | "setRole"
+      | "setTeacherRate";
     uid: string;
     delta?: number;
     role?: string;
+    /** ILS per minute; null returns the teacher to the default rate. */
+    ratePerMinuteIls?: number | null;
   };
 
   const { action, uid } = data;
@@ -862,6 +866,20 @@ export const adminMutateUser = onCall({ timeoutSeconds: 540 }, async (req) => {
       }
       await firestore.collection("users").doc(uid).set({ role }, { merge: true });
       logger.info(`[admin] set role uid=${uid} role=${role}`);
+      return { success: true };
+    }
+
+    // Applies to lessons that start after it: a running lesson keeps its rate.
+    case "setTeacherRate": {
+      const rate = parseAdminTeacherRate(data.ratePerMinuteIls);
+      if (rate === undefined) {
+        throw new HttpsError("invalid-argument", `Rate must be above 0 and at most ${MAX_TEACHER_RATE_ILS}`);
+      }
+      await firestore.collection("users").doc(uid).set(
+        { teacherRatePerMinuteIls: rate === null ? FieldValue.delete() : rate },
+        { merge: true }
+      );
+      logger.info(`[admin] set teacher rate uid=${uid} rateIls=${rate ?? "default"} by=${req.auth?.token?.email}`);
       return { success: true };
     }
 

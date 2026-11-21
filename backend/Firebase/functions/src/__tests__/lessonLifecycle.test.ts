@@ -207,6 +207,9 @@ jest.mock("../pricing", () => ({
     teacherShare: 0.75,
   }),
   getConnectionFeeCents: jest.fn().mockResolvedValue(50),
+  resolveTeacherRatePerMinute: jest.fn(
+    async (teacher?: { teacherRatePerMinuteIls?: number }) => teacher?.teacherRatePerMinuteIls ?? 2
+  ),
 }));
 
 jest.mock("../dispatch", () => ({
@@ -636,10 +639,30 @@ describe("the student's minute allowance", () => {
     // 8 billable minutes at 2 a minute, not the 10 on the wall clock.
     expect(saved.durationSeconds).toBe(480);
     expect(saved.cost).toBe(16);
-    expect(saved.teacherEarnings).toBe(12);
+    // The teacher's default 2 a minute, whatever the student pays.
+    expect(saved.teacherRatePerMinute).toBe(2);
+    expect(saved.teacherEarnings).toBe(16);
     expect(store.get("users/student-1")).toMatchObject({
       remainingMinutes: { __increment: -8 },
     });
+  });
+
+  it("pays a teacher's own rate instead of the default", async () => {
+    store.set("users/teacher-1", { teacherRatePerMinuteIls: 3 });
+    seedQuestion({ status: "in_progress", lessonId: "lesson-1" });
+    rtdb.set(QUESTION_PATH, {
+      studentUid: "student-1",
+      teacherUid: "teacher-1",
+      acceptedAt: NOW_MS - 660_000,
+      startedAt: NOW_MS - 600_000,
+    });
+
+    await callEndLesson({ auth: { uid: "teacher-1" }, data: { questionId: "q-1" } });
+
+    expect(question().teacherRatePerMinute).toBe(3);
+    // 10 minutes at 3, though the student paid 2 a minute.
+    expect(question().cost).toBe(20);
+    expect(question().teacherEarnings).toBe(30);
   });
 });
 
@@ -786,7 +809,7 @@ describe("a lesson is billed once, however many calls end it", () => {
     });
 
     expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 12 });
-    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 12 });
+    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 16 });
     expect(question()).toMatchObject({ status: "completed", endedBy: "teacher" });
     // Completed along with the billing: the calls that clear up after a dead
     // one leave the lesson document alone.
@@ -805,7 +828,7 @@ describe("a lesson is billed once, however many calls end it", () => {
 
     expect(results.filter((result) => result.alreadyEnded)).toHaveLength(1);
     expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 12 });
-    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 12 });
+    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 16 });
     expect(rtdb.has(QUESTION_PATH)).toBe(false);
   });
 });
@@ -906,12 +929,12 @@ describe("a lesson ends with the first side to go", () => {
       lessonSeconds: 360,
       durationSeconds: 360,
       cost: 12,
-      teacherEarnings: 9,
+      teacherEarnings: 12,
     });
     expect(question().endedReason).toBeUndefined();
     expect(endedAtMs()).toBe(NOW_MS - 240_000);
     expect(store.get("users/student-1")).toMatchObject({ remainingMinutes: 14 });
-    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 9 });
+    expect(store.get("users/teacher-1")).toMatchObject({ totalEarnings: 12 });
     // Cleared with the question node.
     expect(rtdb.has(PRESENCE_PATH)).toBe(false);
   });

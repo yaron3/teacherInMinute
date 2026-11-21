@@ -24,6 +24,8 @@ service cloud.firestore {
         'totalRevenueGenerated',
         'emailRewards',
         'teacherBonus',
+        // Set from the admin console; what this teacher is paid per minute.
+        'teacherRatePerMinuteIls',
         // Set from the admin console; keeps an account out of statistics.
         'isDemoUser'
       ];

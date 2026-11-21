@@ -9916,6 +9916,27 @@
       },
       "valueType": "NUMBER"
     },
+    "teacher_rate_per_minute_ils": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "description": "What a teacher is paid per billed minute, in ILS, unless their profile has its own rate. Independent of the student price.",
+      "valueType": "NUMBER"
+    },
+    "your_rate_per": {
+      "defaultValue": {
+        "value": "Your rate: %@ per minute"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התעריף שלך: %@ לדקה"
+        },
+        "HebrewApp": {
+          "value": "התעריף שלך: %@ לדקה"
+        }
+      },
+      "valueType": "STRING"
+    },
     "complete_your_verification": {
       "defaultValue": {
         "value": "Complete your verification"

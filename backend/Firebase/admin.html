@@ -1832,6 +1832,7 @@ function renderUserDetail(d) {
     ? `
       <div class="info-row"><div class="info-key">Minutes Taught</div><div class="info-val">${fs.totalMinutes ?? 0}</div></div>
       <div class="info-row"><div class="info-key">Total Earnings</div><div class="info-val" style="color:var(--green);font-weight:700">${moneyIn(fs.totalEarnings != null ? Math.round(fs.totalEarnings*100) : null, cur)}</div></div>
+      <div class="info-row"><div class="info-key">Rate per Minute</div><div class="info-val">${fs.teacherRatePerMinuteIls != null ? `₪${Number(fs.teacherRatePerMinuteIls).toFixed(2)}` : "Default"} <button class="btn-ghost btn-sm" onclick="setTeacherRate(${jsArg(a.uid)},${fs.teacherRatePerMinuteIls ?? "null"})">Edit</button></div></div>
       <div class="info-row"><div class="info-key">Revenue Generated</div><div class="info-val">${moneyIn(fs.totalRevenueGenerated != null ? Math.round(fs.totalRevenueGenerated*100) : null, cur)}</div></div>
       <div class="info-row"><div class="info-key">Lessons Taught</div><div class="info-val">${(d.taughtQuestions||[]).length}${(d.taughtQuestions||[]).length === 20 ? "+" : ""}</div></div>`
     : `
@@ -1923,6 +1924,24 @@ async function setRole(uid, role) {
     showToast(`Role set to ${role}`);
     viewUser(uid);
     if (allUsers.length) loadUsers();
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
+  }
+}
+
+async function setTeacherRate(uid, current) {
+  const entered = prompt("Rate per minute in ₪ for this teacher. Leave empty for the default rate.", current ?? "");
+  if (entered === null) return;
+  const text = entered.trim();
+  const ratePerMinuteIls = text === "" ? null : Number(text);
+  if (ratePerMinuteIls !== null && !(ratePerMinuteIls > 0)) {
+    showToast("Enter a rate above 0", "error");
+    return;
+  }
+  try {
+    await call("adminMutateUser", { action: "setTeacherRate", uid, ratePerMinuteIls });
+    showToast(ratePerMinuteIls === null ? "Teacher is on the default rate" : `Rate set to ₪${ratePerMinuteIls.toFixed(2)}`);
+    viewUser(uid);
   } catch (e) {
     showToast("Failed: " + e.message, "error");
   }
