@@ -189,6 +189,13 @@ async function createFallbackQuestion(params: {
     isDemo: true,
     demoFallback: true,
     demoTeacherUid: params.teacherUid,
+    // No app stands behind the canned student to report in, so it is counted
+    // as joined and ready from the start. Without it the lesson — which starts
+    // only once both sides are ready (startLesson) — never starts, and the
+    // teacher waits on "Waiting for the student" until the lesson is written
+    // off as one the student never joined.
+    joinedParticipants: [DEMO_STUDENT_UID],
+    readyParticipants: [DEMO_STUDENT_UID],
   });
 
   const expiresAt = now + INVITE_EXPIRY_SECONDS * 1000;

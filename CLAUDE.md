@@ -125,6 +125,22 @@ Mac keyboard, or clicking in Simulator.app itself, does not reach the field.
 If the on-screen keyboard is gone, set `ConnectHardwareKeyboard` false in
 `com.apple.iphonesimulator` and reboot the simulator.
 
+#### Staging accounts
+
+The staging project (`teacher-in-a-moment-staging`, a Debug build or
+`TIM_FIREBASE_ENV=Staging`) holds only test data. On a simulator build that
+talks to staging, Claude may create test accounts and drive sign-up and
+onboarding itself, filling in everything except the password: the password
+still goes to the hosted Firebase Auth, so the user types it (`123456`) in the
+simulator panel. Record every staging account in the table below.
+
+| Role | Email | Password | Display name |
+|------|-------|----------|--------------|
+| Teacher | `teacher_demo_staging@example.com` | `123456` | Ton Din |
+
+This covers staging only. On a build pointed at production (`TIM_FIREBASE_ENV=Prod`,
+the demo accounts above), the user still types the password.
+
 Create new accounts only when the screen being captured *is* a sign-up or
 onboarding step, since those screens cannot be reached on an existing account.
 Record any new account in the set's README with role, email, password and
