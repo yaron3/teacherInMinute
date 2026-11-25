@@ -17,3 +17,7 @@
 
 TIM_FIREBASE_ENV_DEBUG = Staging
 TIM_FIREBASE_ENV_RELEASE = Prod
+// The Staging build configuration / Android build type: a release-style build
+// (optimised, signed) that talks to the staging project, for TestFlight and
+// Play internal testing. See scripts/release-staging.sh.
+TIM_FIREBASE_ENV_STAGING = Staging

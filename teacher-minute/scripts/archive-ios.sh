@@ -9,7 +9,7 @@
 #
 # Before archiving, the build number (CURRENT_PROJECT_VERSION) goes up by one.
 # App Store Connect refuses a build number it has already seen for a version,
-# so every run gets a new one. The number lives in the four app build
+# so every run gets a new one. The number lives in the six app build
 # configurations in Darwin/TeacherMinute.xcodeproj; they override Skip.env, so
 # that file is left alone, and so is the UI-test target. Both apps get the same
 # number. The bump stays in the working tree for you to commit.
@@ -25,6 +25,11 @@
 # Manager or Admin). Without them it falls back to the Apple account signed in
 # to Xcode (Settings → Accounts), whose sign-in expires every so often and then
 # fails the upload with "missing Xcode-Token".
+#
+# TIM_BUILD=staging archives the Staging configuration instead of Release: the
+# same apps and bundle ids, talking to the staging Firebase project, for
+# TestFlight testing (the schemes "Instant Teacher Staging" and "Pro Teacher
+# Staging"). The build number still goes up, shared with production builds.
 #
 # UPLOAD=0 exports the .ipa files into build/ios-archives instead of uploading.
 # The Android build is switched off for the archive (SKIP_ACTION=none).
@@ -44,10 +49,16 @@ PBXPROJ="$ROOT/Darwin/TeacherMinute.xcodeproj/project.pbxproj"
 EXPORT_OPTIONS="$ROOT/Darwin/ExportOptions.plist"
 OUT="$ROOT/build/ios-archives"
 
+case "${TIM_BUILD:-release}" in
+  release) SUFFIX="" ;;
+  staging) SUFFIX=" Staging" ;;
+  *) echo "TIM_BUILD must be release or staging" >&2; exit 2 ;;
+esac
+
 case "$WHICH" in
-  both)    SCHEMES=("Instant Teacher" "Pro Teacher") ;;
-  student) SCHEMES=("Instant Teacher") ;;
-  teacher) SCHEMES=("Pro Teacher") ;;
+  both)    SCHEMES=("Instant Teacher$SUFFIX" "Pro Teacher$SUFFIX") ;;
+  student) SCHEMES=("Instant Teacher$SUFFIX") ;;
+  teacher) SCHEMES=("Pro Teacher$SUFFIX") ;;
   *) echo "usage: $0 [both|student|teacher]" >&2; exit 2 ;;
 esac
 
@@ -83,8 +94,8 @@ def app_config(i):
 
 targets = [i for i, l in enumerate(lines)
            if re.match(r"\s*CURRENT_PROJECT_VERSION = \d+;", l) and app_config(i)]
-if len(targets) != 4:
-    sys.exit(f"expected 4 app build configurations, found {len(targets)}")
+if len(targets) != 6:
+    sys.exit(f"expected 6 app build configurations, found {len(targets)}")
 current = max(int(re.search(r"\d+", lines[i]).group()) for i in targets)
 new = current + 1
 for i in targets:

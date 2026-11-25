@@ -92,3 +92,4 @@ Carthage/Build/
 # edit the file under Config/ instead.
 Android/app/src/debug/google-services.json
 Android/app/src/release/google-services.json
+Android/app/src/staging/google-services.json
