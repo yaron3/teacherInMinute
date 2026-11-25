@@ -202,6 +202,19 @@ android {
         // versionCode = CURRENT_PROJECT_VERSION
         // versionName = MARKETING_VERSION
 
+        // Ship only the ABIs the Swift libraries are built for. Some AARs
+        // (Crashlytics, LiveKit, CameraX, …) carry 32-bit x86 libraries, so
+        // without this the bundle had a lib/x86 split holding none of the
+        // Swift .so files. A device whose first ABI is x86 (Play's Android 11
+        // pre-launch test devices) got that split, System.loadLibrary failed
+        // quietly inside Skip's AndroidBridge.initBridge, and launch died with
+        // UnsatisfiedLinkError on Swift_Companion_initAndroidBridge_0
+        // (Crashlytics 64ac48c0…). Without an x86 split such a device gets
+        // its translated armeabi-v7a split, or cannot install the app at all.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+
         // Instrumented UI tests (src/androidTest) run on the local Firebase
         // emulators; this runner switches a debug build over before it starts.
         testInstrumentationRunner = "teacher.minute.EmulatorTestRunner"
