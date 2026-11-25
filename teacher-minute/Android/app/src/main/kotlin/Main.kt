@@ -45,6 +45,9 @@ open class AndroidAppMain: Application {
         // instrumented test asks for them; release builds have started it
         // already. Has to come before anything uses Firebase.
         AndroidFirebaseEmulator.startFirebase(this)
+        // Before ProcessInfo.launch loads the Swift libraries, so a crash
+        // while they load still carries the device and user.
+        AndroidCrashlyticsManager.setLaunchKeys()
         logger.info("starting app")
         ProcessInfo.launch(applicationContext)
         AndroidLocaleManager.initialize(this)
