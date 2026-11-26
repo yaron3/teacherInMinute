@@ -12,6 +12,7 @@ import { ProfileScreen } from "./screens/ProfileScreen";
 import { HelpScreen } from "./screens/HelpScreen";
 import { TeacherHome } from "./screens/TeacherHome";
 import { TeacherEarnings, TeacherLessons } from "./screens/TeacherEarnings";
+import { TeacherSubjects } from "./screens/TeacherSubjects";
 import { LegalLink, LegalProvider } from "./screens/LegalViewer";
 import "./styles.css";
 
@@ -105,6 +106,36 @@ function App() {
   // The dashboard is drawn for the account's role, so it waits for the profile.
   if (!profile) return null;
   const isTeacher = profile.role === "teacher";
+
+  // A teacher without subjects finishes onboarding first: dispatch matches
+  // questions on them (UserService.resumeRoute → .teacherSubjects).
+  if (isTeacher && !Object.values(profile.subjectSelections).some((keys) => keys.length > 0)) {
+    return (
+      <LanguageContext.Provider value={ctx}>
+        <LegalProvider>
+          {usingEmulators && <div className="dev-banner">{t.devBanner}</div>}
+          <div className="narrow onboarding">
+            <header className="top">
+              <div>
+                <h1>{t.welcomeTeacher(profile.fullName.split(" ")[0] ?? "")}</h1>
+                <p className="muted">{t.welcomeTeacherBody}</p>
+              </div>
+              <div className="top-actions">
+                <button className="link" onClick={ctx.toggle}>
+                  {t.language}
+                </button>
+                <button className="link" onClick={() => signOut()}>
+                  {t.signOut}
+                </button>
+              </div>
+            </header>
+            {/* The profile listener sees the save and lets the dashboard in. */}
+            <TeacherSubjects current={profile.subjectSelections} onSaved={() => {}} />
+          </div>
+        </LegalProvider>
+      </LanguageContext.Provider>
+    );
+  }
   const PAGES = isTeacher ? TEACHER_PAGES : STUDENT_PAGES;
   const shown: Page = PAGES.includes(page) ? page : "home";
 
@@ -115,7 +146,7 @@ function App() {
       <div className="shell">
         <nav className="sidebar" aria-label={t.appName}>
           <div className="brand">
-            <img src="/icons/icon-192.png" alt="" />
+            <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" />
             <strong>{t.appName}</strong>
           </div>
           {isTeacher ? (

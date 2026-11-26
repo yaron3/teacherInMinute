@@ -8,6 +8,7 @@ import {
   declineInvite,
   fetchTeacherDetails,
   goOnline,
+  publishSubjects,
   watchInvites,
   watchPresence,
   type Invite,
@@ -54,9 +55,15 @@ export function TeacherHome({ profile }: { profile: StudentProfile | null }) {
 
   useEffect(() => {
     if (!uid) return;
-    fetchTeacherDetails(uid).then(setDetails, (e) => console.error("[teacher] details failed", e));
     return watchPresence(uid, setPresence);
   }, [uid]);
+  // Again whenever the subjects change (Profile → Edit subjects), so going
+  // online publishes the new ones.
+  const subjectsKey = JSON.stringify(profile?.subjectSelections ?? {});
+  useEffect(() => {
+    if (!uid) return;
+    fetchTeacherDetails(uid).then(setDetails, (e) => console.error("[teacher] details failed", e));
+  }, [uid, subjectsKey]);
 
   const setOnline = useCallback(
     async (on: boolean) => {
@@ -75,6 +82,16 @@ export function TeacherHome({ profile }: { profile: StudentProfile | null }) {
     },
     [uid, details],
   );
+
+  // Subjects edited while online go into presence straight away.
+  const publishedKeys = useRef<string | null>(null);
+  useEffect(() => {
+    const keys = JSON.stringify(details?.subjectKeys ?? []);
+    if (wantOnline && details && publishedKeys.current !== null && publishedKeys.current !== keys) {
+      void publishSubjects(uid, details.subjectKeys).catch((e) => console.error("[teacher] subjects publish failed", e));
+    }
+    publishedKeys.current = wantOnline ? keys : null;
+  }, [details, wantOnline, uid]);
 
   // Offline before signing out, and when the page goes away with this tab.
   useEffect(() => {

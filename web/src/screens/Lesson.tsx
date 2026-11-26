@@ -178,7 +178,7 @@ function LiveLesson({ vm }: { vm: LessonModel }) {
         <div className={vm.minutesState === "held" ? "session-banner danger-banner" : "session-banner warn-banner"} role="alert">
           {vm.minutesState === "held" ? t.minutesHeld : t.minutesWarning(vm.secondsLeft ?? 0)}
           {/* A new tab, so the lesson stays open; minutes bought there extend it. */}
-          <a className="banner-link" href="/#buy" target="_blank" rel="noreferrer">
+          <a className="banner-link" href={`${import.meta.env.BASE_URL}#buy`} target="_blank" rel="noreferrer">
             {t.buyMinutesLink}
           </a>
         </div>

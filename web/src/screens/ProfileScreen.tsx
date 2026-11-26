@@ -3,6 +3,7 @@ import { useStrings } from "../i18n";
 import { STUDENT_GRADES, updateProfile, type StudentProfile } from "../services/account";
 import { auth } from "../services/firebase";
 import { fetchTeacherDetails, type TeacherDetails } from "../services/teacher";
+import { TeacherSubjects } from "./TeacherSubjects";
 
 type Save = "idle" | "saving" | "saved" | "failed";
 
@@ -23,11 +24,13 @@ export function ProfileScreen({ profile }: { profile: StudentProfile | null }) {
   const [loadedFor, setLoadedFor] = useState("");
   const isTeacher = profile?.role === "teacher";
   const [teacher, setTeacher] = useState<TeacherDetails | null>(null);
+  const [editingSubjects, setEditingSubjects] = useState(false);
+  const [subjectsVersion, setSubjectsVersion] = useState(0);
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!isTeacher || !uid) return;
     fetchTeacherDetails(uid).then(setTeacher, (e) => console.error("[profile] teacher details failed", e));
-  }, [isTeacher]);
+  }, [isTeacher, subjectsVersion]);
 
   // Fill the form once per profile load, not on every live update, so an
   // edit in progress is not overwritten.
@@ -123,9 +126,26 @@ export function ProfileScreen({ profile }: { profile: StudentProfile | null }) {
         </div>
       </form>
 
-      {isTeacher && (
+      {isTeacher && teacher && editingSubjects && (
+        <TeacherSubjects
+          current={teacher.subjectSelections}
+          onCancel={() => setEditingSubjects(false)}
+          onSaved={() => {
+            setEditingSubjects(false);
+            setSubjectsVersion((v) => v + 1);
+          }}
+        />
+      )}
+      {isTeacher && !editingSubjects && (
         <div className="card form">
-          <h3 className="section-title">{t.mySubjects}</h3>
+          <div className="subject-area-head">
+            <h3 className="section-title">{t.mySubjects}</h3>
+            {teacher && (
+              <button className="secondary small" onClick={() => setEditingSubjects(true)}>
+                {t.editSubjects}
+              </button>
+            )}
+          </div>
           {teacher === null ? (
             <div className="pulse small-pulse" />
           ) : Object.keys(teacher.subjectSelections).length === 0 ? (
@@ -133,7 +153,7 @@ export function ProfileScreen({ profile }: { profile: StudentProfile | null }) {
           ) : (
             Object.entries(teacher.subjectSelections).map(([area, keys]) => (
               <div key={area} className="subject-area">
-                <strong>{area}</strong>
+                <strong>{t.subjectAreas[area] ?? area}</strong>
                 <div className="chips">
                   {keys.map((k) => (
                     <span key={k} className="chip static">
@@ -144,7 +164,6 @@ export function ProfileScreen({ profile }: { profile: StudentProfile | null }) {
               </div>
             ))
           )}
-          <p className="muted small">{t.editSubjectsInApp}</p>
         </div>
       )}
     </section>

@@ -19,6 +19,8 @@ export interface StudentProfile {
   dateOfBirth: string;
   photoUrl: string;
   remainingMinutes: number;
+  /** A teacher's subjects: area → subtopic keys. Empty for a student. */
+  subjectSelections: Record<string, string[]>;
 }
 
 /** The grades a student picks from (ProfileViewModel.studentGradeKeys). */
@@ -112,6 +114,43 @@ export function onBeforeSignOut(task: () => Promise<void>): () => void {
   return () => beforeSignOut.delete(task);
 }
 
+/** A phone number as the profile stores it (String.normalizedProfilePhoneNumber):
+ *  an Israeli one in local form ("0521234567"), any other in international form
+ *  ("+15550000000"). Empty when it is neither. */
+export function normalizePhone(raw: string): string {
+  let kept = raw.replace(/[\s\-().]/g, "");
+  let digits = kept.startsWith("+") ? kept.slice(1) : kept.startsWith("00") ? kept.slice(2) : kept;
+  if (/^\d+$/.test(digits)) {
+    if (digits.startsWith("972")) digits = "0" + digits.slice(3);
+    if (/^0\d{8,9}$/.test(digits)) return digits;
+  }
+  if (kept.startsWith("00")) kept = "+" + kept.slice(2);
+  return /^\+[1-9]\d{7,14}$/.test(kept) ? kept : "";
+}
+
+/** Creates a teacher account with the fields the teacher app's onboarding
+ *  writes (CompleteProfileViewModel): a teacher needs a name and a phone.
+ *  Subjects are chosen next. */
+export async function signUpTeacher(fullName: string, email: string, password: string, phone: string): Promise<void> {
+  const phoneNumber = normalizePhone(phone);
+  if (!phoneNumber) throw new Error("invalid phone");
+  const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  await setDoc(
+    doc(firestore, "users", user.uid),
+    {
+      uid: user.uid,
+      email: user.email ?? email.trim(),
+      fullName: fullName.trim(),
+      phoneNumber,
+      grade: "",
+      role: "teacher",
+      createdAt: new Date().toISOString(),
+      currency: "ILS",
+    },
+    { merge: true },
+  );
+}
+
 export async function signOut(): Promise<void> {
   await Promise.all([...beforeSignOut].map((task) => task().catch((e) => console.error("[account] before sign-out failed", e))));
   await firebaseSignOut(auth);
@@ -131,6 +170,9 @@ export function watchProfile(uid: string, onChange: (profile: StudentProfile | n
         grade: String(data.grade ?? ""),
         dateOfBirth: String(data.dateOfBirth ?? ""),
         photoUrl: String(data.profileImageURL ?? data.photoURL ?? data.imageURL ?? ""),
+        subjectSelections: Object.fromEntries(
+          Object.entries((data.subjectSelections ?? {}) as Record<string, unknown>).map(([k, v]) => [k, Array.isArray(v) ? v.map(String) : []]),
+        ),
         remainingMinutes: Number(data.remainingMinutes ?? 0),
       });
     },

@@ -1,5 +1,5 @@
 import { onDisconnect, onValue, ref, serverTimestamp, update, type Unsubscribe } from "firebase/database";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { database, firestore, functions } from "./firebase";
 
@@ -20,6 +20,33 @@ const KEEP_ALIVE_MS = 60_000;
 
 /** The presence key of a subtopic, as UserProfileSummary.rawSubjectKeys makes it. */
 export const subjectKey = (raw: string) => raw.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+
+/** The subjects a teacher can offer, as Remote Config publishes them today
+ *  (`subjects`, `subTaskMath`); the apps read the same keys. Moving this onto
+ *  Remote Config is part of reading the template (README, next slices). */
+export const SUBJECT_CATALOG: { area: string; subtopics: string[] }[] = [
+  { area: "Math", subtopics: ["Algebra", "Geometry", "Trigonometry", "Calculus"] },
+];
+
+/** Saves the teacher's subjects as TeacherSubjectsViewModel does: by area, as
+ *  the lowercase keys dispatch matches on. The backend republishes an online
+ *  teacher's presence when they change. */
+export async function saveSubjects(uid: string, selected: Record<string, string[]>): Promise<void> {
+  const areas = SUBJECT_CATALOG.filter((a) => (selected[a.area] ?? []).length > 0);
+  const subjectSelections = Object.fromEntries(
+    areas.map((a) => [a.area, [...new Set(selected[a.area].map(subjectKey))].sort()]),
+  );
+  await setDoc(
+    doc(firestore, "users", uid),
+    {
+      // SubjectPresentation.matchKey: lowercase letters and digits.
+      subjectAreaIDs: areas.map((a) => subjectKey(a.area)),
+      subjectAreas: areas.map((a) => a.area),
+      subjectSelections,
+    },
+    { merge: true },
+  );
+}
 
 export interface TeacherDetails {
   /** Subject area → its subtopic keys, as the apps store `subjectSelections`. */
@@ -71,6 +98,12 @@ export function goOnline(uid: string, subjects: string[]): () => Promise<void> {
     await onDisconnect(teacherRef).cancel();
     await update(teacherRef, { availability: "dnd", status: "offline" });
   };
+}
+
+/** New subjects for a teacher who is online: dispatch reads them from
+ *  presence, which otherwise keeps the old ones until they go off and on. */
+export async function publishSubjects(uid: string, subjects: string[]): Promise<void> {
+  await update(ref(database, `teachers/${uid}`), { subjects });
 }
 
 /** Whether the backend has this teacher online, and in a session. */

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useStrings } from "../i18n";
 import { formatPrice } from "../services/purchase";
 import { fetchEarnings, type EarningsSummary, type TeacherLesson } from "../services/teacher";
+import { LessonDetail } from "./LessonDetail";
 
 type Load = { kind: "loading" } | { kind: "failed" } | { kind: "ready"; summary: EarningsSummary };
 
@@ -85,39 +86,22 @@ export function TeacherLessons() {
         ))}
 
       {open && load.kind === "ready" && (
-        <div className="scrim" role="dialog" aria-modal="true" aria-label={t.lessonDetails} onClick={() => setOpen(null)}>
-          <div className="dialog details" onClick={(e) => e.stopPropagation()}>
-            <h3>{t.lessonDetails}</h3>
-            <dl>
-              <dt>{t.questionLabel}</dt>
-              <dd dir="auto">{open.text || title(open)}</dd>
-              {open.photoUrls.length > 0 && (
-                <dd className="photos">
-                  {open.photoUrls.map((u) => (
-                    <a key={u} href={u} target="_blank" rel="noreferrer">
-                      <img src={u} alt="" />
-                    </a>
-                  ))}
-                </dd>
-              )}
-              <dt>{t.studentRole}</dt>
-              <dd>{open.studentName || "—"}</dd>
-              <dt>{t.dateLabel}</dt>
-              <dd>{new Date(open.acceptedAt).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })}</dd>
-              <dt>{t.durationLabel}</dt>
-              <dd>{t.minutesShort(Math.round(open.lessonSeconds / 60))}</dd>
-              <dt>{t.earnedLabel}</dt>
-              <dd>{money(open.earningsCents, open.currency || load.summary.currency)}</dd>
-              <dt>{t.studentsRating}</dt>
-              <dd>{open.studentRating ? <span className="row-stars">{"★".repeat(open.studentRating)}</span> : t.notRated}</dd>
-            </dl>
-            <div className="dialog-actions">
-              <button className="primary" onClick={() => setOpen(null)}>
-                {t.close}
-              </button>
-            </div>
-          </div>
-        </div>
+        <LessonDetail
+          viewerRole="teacher"
+          onClose={() => setOpen(null)}
+          lesson={{
+            questionId: open.questionId,
+            title: title(open),
+            questionText: open.text,
+            photoUrls: open.photoUrls,
+            otherName: open.studentName,
+            at: Date.parse(open.acceptedAt) || 0,
+            durationSeconds: open.lessonSeconds,
+            amount: money(open.earningsCents, open.currency || load.summary.currency),
+            conversationType: "",
+            rating: open.studentRating,
+          }}
+        />
       )}
     </section>
   );

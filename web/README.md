@@ -42,6 +42,42 @@ Emulator test account created while building this (emulator only, gone when
 the emulators restart): student `web-test-student@example.com` / `webtest123`,
 display name "Web Test Student".
 
+## On the Firebase Hosting site, at /app/
+
+The web client is served from the same Hosting site as the existing pages
+(`backend/Firebase/public`), at `/app/`. `firebase deploy --only hosting`
+builds it first (the hosting `predeploy` step runs
+`scripts/build-hosting.mjs`), with the config of the project being deployed:
+
+| Project | Config | App |
+|---|---|---|
+| `teacher-in-a-moment-staging` | `.env.staging` | `https://teacher-in-a-moment-staging.web.app/app/` |
+| `teacher-in-a-moment` | `.env.prod` (not created yet) | left out until then |
+
+A project with no config deploys the site without `/app/`, so production
+site deploys carry on as before. The build goes to `public/app/`, which git
+ignores. `firebase.json` adds the `/app/**` rewrite, `no-cache` on the app's
+pages and offline-cache files, and long caching for its hashed assets. The
+app's install manifest and offline cache cover only `/app/`.
+
+To deploy staging (from `backend/Firebase`):
+
+```bash
+npx firebase deploy --only hosting -P staging
+```
+
+To build and look at it locally first:
+
+```bash
+npm --prefix web run build:staging
+```
+
+then start the `hosting-staging` launch configuration (Hosting on
+http://localhost:8793, talking to the real staging project).
+
+For production: register a Web app in `teacher-in-a-moment`, put its config in
+`web/.env.prod` (as `.env.staging`), and deploy with `-P prod`.
+
 ## Against a real project
 
 Register a Web app in the Firebase project and fill the `VITE_FIREBASE_*`
@@ -58,8 +94,14 @@ to Auth's authorized domains. Read the dispatch warning in the root
   with the minutes balance always in view. The page is in the URL hash
   (`#lessons`, `#buy`, `#profile`), so the back button works.
 - My lessons: every lesson in `users/{uid}.questions` (HistoryModel), with
-  lessons, minutes and teachers added up, and each lesson's question, teacher,
-  date, length, cost, medium and the student's rating.
+  lessons, minutes and teachers added up. A lesson opens the same details as
+  the app's `LessonDetailView`: who, when and how long, the cost (or, for a
+  teacher, the earnings), the medium and rating, the original question with
+  its photos, a summary, and the whole chat as it happened, read from the
+  `messages` the backend archives on the question when the lesson settles
+  (board snapshots and photos show as images). A student can report or
+  block the teacher there (`reportTeacher`, which emails support, and
+  `blockTeacher`).
 - Buy minutes: the active packages in `pricing`, then `createCheckoutSession`
   with `credit_card`, which opens the hosted Tranzila card page in a new tab.
   The page follows `paymentCheckouts/{id}` and the balance, which the backend
@@ -104,7 +146,14 @@ to Auth's authorized domains. Read the dispatch warning in the root
   The URLs are fixed in `src/config/legal.ts` for now; the apps read them
   from Remote Config (`eula_url`, `privacy_policy`).
 - Teachers. The sign-in form has a Student / Teacher choice; an account of
-  the other role is refused with a message (teachers sign up in the app).
+  the other role is refused with a message. Teachers can create an account:
+  name, email, password and phone (normalized as the app does), then the
+  subjects step before the dashboard, as the app's onboarding requires
+  (`subjectSelections` by area, lowercase subtopic keys). The catalogue is
+  Remote Config's today (Math: algebra, geometry, trigonometry, calculus),
+  fixed in `services/teacher.ts`. Identity documents are skipped, as the app
+  skips them while `teacher_identity_onboarding` is off; the sign-up
+  verification email is not sent yet.
   A teacher's dashboard has Teach, My lessons, Earnings, Profile and Help:
   - Teach: the availability switch writes `teachers/{uid}` as
     `TeacherPresenceService` does (`availability`, `status`, `subjects` from
@@ -118,7 +167,8 @@ to Auth's authorized domains. Read the dispatch warning in the root
     ask to draw. No rating at the end.
   - My lessons and Earnings both come from `teacherEarningsSummary`: lessons
     with earnings and the student's rating, the total, the next payout and
-    each month. Profile shows the subjects (edited in the app).
+    each month. Profile shows the subjects, with Edit subjects; an online
+    teacher's new subjects go into their presence straight away.
 - English and Hebrew (RTL), with the choice saved under
   `settings.language.preference`.
 
@@ -187,5 +237,5 @@ to the state file it prints, so a second tab can join the room as the teacher.
 3. A profile photo (upload to Storage), and deleting the account.
 4. Google and Apple sign-in (they need OAuth web clients and authorized domains).
 5. Web push (FCM with a VAPID key), then the teacher side.
-6. Hosting: a separate Firebase Hosting site or target, so `public/` (the
-   marketing site) stays as it is.
+6. A production Web app config (`.env.prod`), and a link to `/app/` from the
+   site's home page.

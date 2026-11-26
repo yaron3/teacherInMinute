@@ -44,3 +44,6 @@ teacher-minute/Pro Teacher */
 # Integration-test run output
 backend/Firebase/functions/scripts/lesson-result-*.json
 .derivedData/
+
+# The web client, built into the Hosting site by web/scripts/build-hosting.mjs
+backend/Firebase/public/app/

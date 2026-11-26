@@ -4,7 +4,10 @@ import type { Language } from "../i18n";
 // (`eula_url`, `privacy_policy`, localized); until the web client reads that
 // template too, they are fixed here. Hebrew opens the site's `_he` pages, as
 // CreateAccountViewModel.legalURL falls back to.
-const SITE = "https://teacher-in-a-moment.web.app";
+//
+// Hosted at /app/ on a project's site, the pages are next door on the same
+// site (staging's own pages on staging); run anywhere else, the live site's.
+const SITE = import.meta.env.BASE_URL === "/app/" ? "" : "https://teacher-in-a-moment.web.app";
 
 export function legalUrls(language: Language): { eula: string; privacy: string } {
   const suffix = language === "hebrew" ? "_he" : "";

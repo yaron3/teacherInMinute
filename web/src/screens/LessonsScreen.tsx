@@ -3,14 +3,9 @@ import { useStrings } from "../i18n";
 import { auth } from "../services/firebase";
 import { billedMinutes, fetchLessons, type PastLesson } from "../services/history";
 import { formatPrice } from "../services/purchase";
+import { LessonDetail } from "./LessonDetail";
 
 type Load = { kind: "loading" } | { kind: "failed" } | { kind: "ready"; lessons: PastLesson[] };
-
-function duration(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 /** The student's past lessons (StudentLessonHistoryViewModel), newest first,
  *  with what they add up to. */
@@ -104,43 +99,23 @@ export function LessonsScreen() {
       )}
 
       {open && (
-        <div className="scrim" role="dialog" aria-modal="true" aria-label={t.lessonDetails} onClick={() => setOpen(null)}>
-          <div className="dialog details" onClick={(e) => e.stopPropagation()}>
-            <h3>{t.lessonDetails}</h3>
-            <dl>
-              <dt>{t.questionLabel}</dt>
-              <dd dir="auto" className="question-text">{open.questionText || title(open)}</dd>
-              {open.photoUrls.length > 0 && (
-                <dd className="photos">
-                  {open.photoUrls.map((u) => (
-                    <a key={u} href={u} target="_blank" rel="noreferrer">
-                      <img src={u} alt="" />
-                    </a>
-                  ))}
-                </dd>
-              )}
-              <dt>{t.teacherLabel}</dt>
-              <dd>{open.teacherName || "—"}</dd>
-              <dt>{t.dateLabel}</dt>
-              <dd>{open.at ? new Date(open.at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "—"}</dd>
-              <dt>{t.durationLabel}</dt>
-              <dd>
-                <bdi>{duration(open.durationSeconds)}</bdi> · {t.minutesShort(billedMinutes(open.durationSeconds))}
-              </dd>
-              <dt>{t.costLabel}</dt>
-              <dd>{cost(open)}</dd>
-              <dt>{t.mediumLabel}</dt>
-              <dd>{t.mediums[open.conversationType] ?? open.conversationType}</dd>
-              <dt>{t.yourRating}</dt>
-              <dd>{open.rating ? <span className="row-stars">{"★".repeat(open.rating)}</span> : t.notRated}</dd>
-            </dl>
-            <div className="dialog-actions">
-              <button className="primary" onClick={() => setOpen(null)}>
-                {t.close}
-              </button>
-            </div>
-          </div>
-        </div>
+        <LessonDetail
+          viewerRole="student"
+          onClose={() => setOpen(null)}
+          lesson={{
+            questionId: open.questionId,
+            title: title(open),
+            questionText: open.questionText,
+            photoUrls: open.photoUrls,
+            otherName: open.teacherName,
+            at: open.at,
+            durationSeconds: open.durationSeconds,
+            amount: open.costCents === null ? null : cost(open),
+            conversationType: open.conversationType,
+            rating: open.rating,
+            messages: open.messages,
+          }}
+        />
       )}
     </section>
   );
