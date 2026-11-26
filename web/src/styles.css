@@ -511,3 +511,31 @@ input[type="date"] { color-scheme: dark; }
 .dialog-actions.inline { margin-top: 0; }
 .danger-text { color: rgb(255, 92, 120); padding-inline: 0; }
 .danger-button { background: rgb(255, 20, 71); color: #fff; padding: 10px 20px; font-weight: 600; }
+
+/* ─── Sign-up, sign-in and onboarding ─────────────────────────────────────── */
+.form label.consent { flex-direction: row; }
+.success { color: rgb(110, 231, 160); margin: 0; }
+.social { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; }
+.social-buttons { display: flex; gap: 10px; width: 100%; }
+.social-buttons button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.social-mark { font-weight: 800; }
+.intro { gap: 14px; }
+.intro-headline { font-size: 1.7rem; line-height: 1.25; margin: 0; }
+.intro-headline .accent { color: var(--accent); }
+.promo { align-self: stretch; text-align: center; background: rgba(84, 232, 246, 0.14); color: var(--accent); font-weight: 600; }
+.intro-links { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.banner { flex-direction: row; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+.verify-banner { background: rgba(84, 232, 246, 0.1); border-color: rgba(84, 232, 246, 0.35); }
+.bonus-banner { background: rgba(110, 231, 160, 0.1); }
+.banner-icon { font-size: 1.4rem; line-height: 1; color: var(--accent); }
+.banner-body { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.banner-body .muted { margin: 0; }
+.banner-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.create-account { display: flex; flex-direction: column; gap: 10px; align-items: stretch; text-align: center; }
+.create-account .muted { margin: 0; }
+.dialog.account-sheet { position: relative; width: min(460px, calc(100vw - 32px)); max-height: 92vh; overflow-y: auto; }
+.dialog.account-sheet .sheet-close { position: absolute; inset-block-start: 12px; inset-inline-end: 12px; }
+.dialog.account-sheet .form { display: flex; flex-direction: column; gap: 12px; }
+.banner-slot { max-width: 880px; margin: 0 auto; padding: 28px 24px 0; }
+.banner-slot:empty { display: none; }
+.banner-slot .banner { margin-bottom: 0; }

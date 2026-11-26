@@ -13,7 +13,7 @@ export const usingEmulators = env.VITE_USE_EMULATORS === "true";
 // Against the emulators only the project id matters; the rest are placeholders
 // the SDK insists on. Against a real project they come from a registered Web
 // app (see .env.example).
-const app = initializeApp({
+export const app = initializeApp({
   apiKey: env.VITE_FIREBASE_API_KEY || "emulator-placeholder",
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
   // In the emulator the Admin SDK writes to a namespace named after the bare

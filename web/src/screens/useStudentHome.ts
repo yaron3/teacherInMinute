@@ -18,13 +18,29 @@ export type SearchState =
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
 
+const DRAFT_KEY = "studentHome.draft";
+function readDraft(): { topic?: Topic; text?: string; conversationType?: ConversationType } {
+  try {
+    return JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
 /** The student home's view model: owns the ask → search → match flow, so the
  *  screen only renders state and forwards taps. */
 export function useStudentHome() {
   const { t } = useStrings();
-  const [topic, setTopic] = useState<Topic>("algebra");
-  const [text, setText] = useState("");
-  const [conversationType, setConversationType] = useState<ConversationType>("text");
+  // The question being written outlives the screen (QuestionDraftStore): an
+  // anonymous student who creates an account to send it comes back to it
+  // after the profile step.
+  const draft = readDraft();
+  const [topic, setTopic] = useState<Topic>(draft.topic ?? "algebra");
+  const [text, setText] = useState(draft.text ?? "");
+  const [conversationType, setConversationType] = useState<ConversationType>(draft.conversationType ?? "text");
+  useEffect(() => {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ topic, text, conversationType }));
+  }, [topic, text, conversationType]);
   const [search, setSearch] = useState<SearchState>({ kind: "idle" });
   const stopListening = useRef<(() => void) | null>(null);
 

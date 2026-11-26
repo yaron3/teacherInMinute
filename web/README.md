@@ -102,9 +102,42 @@ to Auth's authorized domains. Read the dispatch warning in the root
 
 ## What it does today
 
-- Email/password sign-in and student sign-up; sign-up needs the Terms of
-  Service and Privacy Policy accepted, as on the apps. It writes the same `users/{uid}`
-  fields as `UserProfile.firestoreData`.
+- The way in follows the apps (`StudentIntroView`, `LoginView`,
+  `CreateAccountView`, `CompleteProfileView`, `UserService.resumeRoute`):
+  - A student lands on the intro and can **Get started** without an account
+    (anonymous auth, `role: "student"`, `isAnonymous: true`). Asking, buying
+    minutes or the profile then offer **Create a user account**, which links
+    the email or Google account to the same uid (so the question being
+    written stays), or **Log In**, after which the anonymous account is
+    deleted through `deleteAnonymousAccount`. Flipping `isAnonymous` to false
+    is what `onStudentSignup` watches for.
+  - Sign-up is email, password, confirm password and the Terms; then the
+    verification email (`sendVerificationEmail`) and "Your account is ready"
+    with the offer from `claimEmailReward`. Log in has **Forgot Password?**
+    (Firebase's reset email, in the app's language). Auth errors read as the
+    apps word them, in English and Hebrew.
+  - **Google** sign-in by popup. **Apple** is built but hidden: neither
+    project has an Apple Services ID for the web, so set
+    `VITE_APPLE_SIGN_IN=true` only once that is configured in Firebase. There
+    is no redirect fallback: the site (`web.app`) and the auth domain
+    (`firebaseapp.com`) differ, and partitioned browsers lose a redirect's
+    result; a blocked popup says to allow pop-ups.
+  - Onboarding is resumed from what the profile has, as `resumeRoute` does:
+    no role yet → onboarding as the side chosen on the sign-in form. A
+    student completes name, optional phone and grade; a teacher chooses
+    subjects, then name and phone. Saving the profile saves the role.
+  - Home shows the verify-your-email banner (Resend, I've verified; the page
+    also re-checks when it regains focus) while a reward is on offer, and
+    claims the reward whenever it opens, so a Google account or a link
+    followed elsewhere is credited.
+  - Left out on purpose: the teacher app's payout-method choice (the app
+    keeps it only on the phone, and the web has no payout-details form), the
+    permissions step (the browser asks on first use), the "send me
+    updates" box (the app only logs it to analytics), and the profile
+    step's email field that lets a student with an unverified address
+    correct it (`sendVerificationEmail` with a new `email`).
+  - Log Out asks first, as the apps' settings do. A failed profile read
+    shows a retry rather than onboarding, which could overwrite the role.
 - A dashboard: a side menu on a wide screen and a tab bar on a narrow one,
   with the minutes balance always in view. The page is in the URL hash
   (`#lessons`, `#buy`, `#profile`), so the back button works.
@@ -161,14 +194,12 @@ to Auth's authorized domains. Read the dispatch warning in the root
   The URLs are fixed in `src/config/legal.ts` for now; the apps read them
   from Remote Config (`eula_url`, `privacy_policy`).
 - Teachers. The sign-in form has a Student / Teacher choice; an account of
-  the other role is refused with a message. Teachers can create an account:
-  name, email, password and phone (normalized as the app does), then the
-  subjects step before the dashboard, as the app's onboarding requires
-  (`subjectSelections` by area, lowercase subtopic keys). The catalogue is
+  the other role is refused with a message. A new teacher chooses subjects
+  first, as the app's onboarding requires (`subjectSelections` by area,
+  lowercase subtopic keys), then name and phone (normalized as the app does). The catalogue is
   Remote Config's today (Math: algebra, geometry, trigonometry, calculus),
   fixed in `services/teacher.ts`. Identity documents are skipped, as the app
-  skips them while `teacher_identity_onboarding` is off; the sign-up
-  verification email is not sent yet.
+  skips them while `teacher_identity_onboarding` is off.
   A teacher's dashboard has Teach, My lessons, Earnings, Profile and Help:
   - Teach: the availability switch writes `teachers/{uid}` as
     `TeacherPresenceService` does (`availability`, `status`, `subjects` from

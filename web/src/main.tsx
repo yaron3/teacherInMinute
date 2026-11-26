@@ -1,8 +1,8 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import React, { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { User } from "firebase/auth";
-import { LanguageContext, initialLanguage, stringsFor, type Language } from "./i18n";
-import { signOut, watchAuth, watchProfile, watchRoleCheck, type StudentProfile } from "./services/account";
+import { LanguageContext, initialLanguage, stringsFor, useStrings, type Language } from "./i18n";
+import { resumeRoute, saveAnonymousStudentProfile, signOut, watchAuth, watchProfile, watchRoleCheck, type StudentProfile } from "./services/account";
 import { usingEmulators } from "./services/firebase";
 import { SignIn } from "./screens/SignIn";
 import { StudentHome } from "./screens/StudentHome";
@@ -14,6 +14,10 @@ import { TeacherHome } from "./screens/TeacherHome";
 import { TeacherEarnings, TeacherLessons } from "./screens/TeacherEarnings";
 import { TeacherSubjects } from "./screens/TeacherSubjects";
 import { LegalLink, LegalProvider } from "./screens/LegalViewer";
+import { CompleteProfile } from "./screens/CompleteProfile";
+import { EmailBanner } from "./screens/EmailBanner";
+import { Notices } from "./screens/Notices";
+import { CreateAccountPrompt } from "./screens/CreateAccount";
 import "./styles.css";
 
 type Page = "home" | "lessons" | "buy" | "earnings" | "profile" | "help";
@@ -40,16 +44,30 @@ function usePage(): [Page, (p: Page) => void] {
 
 function App() {
   const [language, setLanguage] = useState<Language>(initialLanguage);
-  const [user, setUser] = useState<User | null | undefined>(undefined);
-  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  // The revision changes when the same user changes in place (an email linked
+  // to an anonymous account, an address verified), so everything re-reads it.
+  const [auth, setAuth] = useState<{ user: User | null; revision: number } | undefined>(undefined);
+  const user = auth?.user;
+  // undefined while loading; null when the account has no profile document.
+  const [profile, setProfile] = useState<StudentProfile | null | undefined>(undefined);
   const [checkingRole, setCheckingRole] = useState(false);
   useEffect(() => watchRoleCheck(setCheckingRole), []);
 
-  useEffect(() => watchAuth(setUser), []);
+  useEffect(() => watchAuth((u, revision) => setAuth({ user: u, revision })), []);
+  const uid = user?.uid;
+  const [profileFailed, setProfileFailed] = useState(false);
   useEffect(() => {
-    if (!user) return setProfile(null);
-    return watchProfile(user.uid, setProfile);
-  }, [user]);
+    setProfile(undefined);
+    setProfileFailed(false);
+    if (!uid) return;
+    return watchProfile(uid, setProfile, () => setProfileFailed(true));
+  }, [uid]);
+
+  // An anonymous student whose profile was lost is written again
+  // (UserService.resumeRoute).
+  useEffect(() => {
+    if (user?.isAnonymous && profile === null) void saveAnonymousStudentProfile(user.uid).catch((e) => console.error("[app] anonymous profile", e));
+  }, [user, profile]);
 
   useEffect(() => {
     localStorage.setItem("settings.language.preference", language);
@@ -68,81 +86,114 @@ function App() {
   const { t } = ctx;
 
   const [page, go] = usePage();
-  const isTeacherLabel = profile?.role === "teacher";
-  const label: Record<Page, string> = { home: isTeacherLabel ? t.navTeach : t.navHome, lessons: t.navLessons, buy: t.navBuy, earnings: t.navEarnings, profile: t.navProfile, help: t.navHelp };
+  // Log Out asks first, as the apps' settings do (SettingsConfirmation.logOut).
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
 
-  if (user === undefined) return null;
+  if (auth === undefined) return null;
 
-  if (!user || checkingRole) {
-    return (
-      <LanguageContext.Provider value={ctx}>
+  const wrap = (body: React.ReactNode) => (
+    <LanguageContext.Provider value={ctx}>
       <LegalProvider>
         {usingEmulators && <div className="dev-banner">{t.devBanner}</div>}
-        <div className="narrow">
-          <header className="top">
-            <div>
-              <h1>{t.appName}</h1>
-              <p className="muted">{t.tagline}</p>
-            </div>
-            <div className="top-actions">
-              <button className="link" onClick={ctx.toggle}>
-                {t.language}
-              </button>
-            </div>
-          </header>
-          <main>
-            <SignIn />
-          </main>
-          <footer className="legal-foot">
-            <LegalLink page="eula">{t.termsOfService}</LegalLink>
-            <LegalLink page="privacy">{t.privacyPolicy}</LegalLink>
-          </footer>
-        </div>
-            </LegalProvider>
-    </LanguageContext.Provider>
-    );
-  }
-
-  // The dashboard is drawn for the account's role, so it waits for the profile.
-  if (!profile) return null;
-  const isTeacher = profile.role === "teacher";
-
-  // A teacher without subjects finishes onboarding first: dispatch matches
-  // questions on them (UserService.resumeRoute → .teacherSubjects).
-  if (isTeacher && !Object.values(profile.subjectSelections).some((keys) => keys.length > 0)) {
-    return (
-      <LanguageContext.Provider value={ctx}>
-        <LegalProvider>
-          {usingEmulators && <div className="dev-banner">{t.devBanner}</div>}
-          <div className="narrow onboarding">
-            <header className="top">
-              <div>
-                <h1>{t.welcomeTeacher(profile.fullName.split(" ")[0] ?? "")}</h1>
-                <p className="muted">{t.welcomeTeacherBody}</p>
-              </div>
-              <div className="top-actions">
-                <button className="link" onClick={ctx.toggle}>
-                  {t.language}
+        {body}
+        <Notices />
+        {confirmingSignOut && (
+          <div className="scrim" onClick={() => setConfirmingSignOut(false)}>
+            <div className="dialog" role="alertdialog" aria-modal="true" aria-label={t.signOut} onClick={(e) => e.stopPropagation()}>
+              <h3>{t.signOut}</h3>
+              <p className="muted">{t.logOutConfirm}</p>
+              <div className="dialog-actions">
+                <button className="secondary" autoFocus onClick={() => setConfirmingSignOut(false)}>
+                  {t.cancel}
                 </button>
-                <button className="link" onClick={() => signOut()}>
+                <button
+                  className="danger-button"
+                  onClick={() => {
+                    setConfirmingSignOut(false);
+                    void signOut();
+                  }}
+                >
                   {t.signOut}
                 </button>
               </div>
-            </header>
-            {/* The profile listener sees the save and lets the dashboard in. */}
-            <TeacherSubjects current={profile.subjectSelections} onSaved={() => {}} />
+            </div>
           </div>
-        </LegalProvider>
-      </LanguageContext.Provider>
+        )}
+      </LegalProvider>
+    </LanguageContext.Provider>
+  );
+
+  /** A screen of its own before the dashboard: signing in and onboarding. */
+  const single = (heading: string, sub: string, body: React.ReactNode, signedIn: boolean) =>
+    wrap(
+      <div className="narrow onboarding">
+        <header className="top">
+          <div>
+            <h1>{heading}</h1>
+            <p className="muted">{sub}</p>
+          </div>
+          <div className="top-actions">
+            <button className="link" onClick={ctx.toggle}>
+              {t.language}
+            </button>
+            {signedIn && (
+              <button className="link" onClick={() => setConfirmingSignOut(true)}>
+                {t.signOut}
+              </button>
+            )}
+          </div>
+        </header>
+        <main>{body}</main>
+        <footer className="legal-foot">
+          <LegalLink page="eula">{t.termsOfService}</LegalLink>
+          <LegalLink page="privacy">{t.privacyPolicy}</LegalLink>
+        </footer>
+      </div>,
+    );
+
+  if (!user || checkingRole) return single(t.appName, t.tagline, <SignIn />, false);
+
+  if (profileFailed) {
+    return single(
+      t.appName,
+      t.tagline,
+      <div className="card center">
+        <p>{t.loadFailed}</p>
+        <button className="secondary" onClick={() => location.reload()}>
+          {t.retry}
+        </button>
+      </div>,
+      true,
     );
   }
+
+  const { route, role } = resumeRoute(user, profile);
+  if (route === "loading") return null;
+
+  // A teacher chooses subjects first: dispatch matches questions on them
+  // (UserService.resumeRoute → .teacherSubjects).
+  if (route === "teacherSubjects") {
+    return single(
+      t.welcomeTeacher(profile?.fullName.split(" ")[0] ?? ""),
+      t.welcomeTeacherBody,
+      // The profile listener sees the save and moves on.
+      <TeacherSubjects current={profile?.subjectSelections ?? {}} onSaved={() => {}} />,
+      true,
+    );
+  }
+  if (route === "completeProfile") {
+    return single(t.appName, t.tagline, <CompleteProfile key={user.uid} role={role} user={user} profile={profile ?? null} />, true);
+  }
+
+  // Home: the profile is there and complete.
+  const me = profile!;
+  const isTeacher = role === "teacher";
+  const anonymous = user.isAnonymous;
   const PAGES = isTeacher ? TEACHER_PAGES : STUDENT_PAGES;
   const shown: Page = PAGES.includes(page) ? page : "home";
+  const label: Record<Page, string> = { home: isTeacher ? t.navTeach : t.navHome, lessons: t.navLessons, buy: t.navBuy, earnings: t.navEarnings, profile: t.navProfile, help: t.navHelp };
 
-  return (
-    <LanguageContext.Provider value={ctx}>
-      <LegalProvider>
-      {usingEmulators && <div className="dev-banner">{t.devBanner}</div>}
+  return wrap(
       <div className="shell">
         <nav className="sidebar" aria-label={t.appName}>
           <div className="brand">
@@ -152,11 +203,12 @@ function App() {
           {isTeacher ? (
             <div className="role-chip">{t.teacherRole}</div>
           ) : (
-            <button className="balance-chip" onClick={() => go("buy")} aria-label={`${t.minutesBalance}: ${profile.remainingMinutes}. ${t.navBuy}`}>
+            <button className="balance-chip" onClick={() => go("buy")} aria-label={`${t.minutesBalance}: ${me.remainingMinutes}. ${t.navBuy}`}>
               <span>{t.minutesBalance}</span>
-              <strong>{profile.remainingMinutes}</strong>
+              <strong>{me.remainingMinutes}</strong>
             </button>
           )}
+          {anonymous && <div className="role-chip">{t.anonymousLabel}</div>}
           <ul>
             {PAGES.map((p) => (
               <li key={p}>
@@ -177,7 +229,7 @@ function App() {
             <button className="link" onClick={ctx.toggle}>
               {t.language}
             </button>
-            <button className="link" onClick={() => signOut()}>
+            <button className="link" onClick={() => setConfirmingSignOut(true)}>
               {t.signOut}
             </button>
           </div>
@@ -188,18 +240,22 @@ function App() {
               on while other pages are open. */}
           {isTeacher ? (
             <div hidden={shown !== "home"}>
-              <TeacherHome key={user.uid} profile={profile} />
+              <div className="banner-slot">
+                <EmailBanner user={user} role="teacher" />
+              </div>
+              <TeacherHome key={user.uid} profile={me} />
             </div>
           ) : (
             <div hidden={shown !== "home"} className="narrow">
-              <StudentHome profile={profile} />
+              {!anonymous && <EmailBanner user={user} role="student" />}
+              <StudentHome profile={me} anonymous={anonymous} />
             </div>
           )}
           {shown === "lessons" && (isTeacher ? <TeacherLessons /> : <LessonsScreen />)}
-          {shown === "buy" && <BuyMinutes remainingMinutes={profile.remainingMinutes} />}
+          {shown === "buy" && (anonymous ? <AnonymousBuy /> : <BuyMinutes remainingMinutes={me.remainingMinutes} />)}
           {shown === "earnings" && <TeacherEarnings />}
-          {shown === "profile" && <ProfileScreen profile={profile} />}
-          {shown === "help" && <HelpScreen profile={profile} />}
+          {shown === "profile" && (anonymous ? <AnonymousProfile /> : <ProfileScreen profile={me} />)}
+          {shown === "help" && <HelpScreen profile={me} />}
         </main>
 
         <nav className="tabbar" aria-label={t.appName}>
@@ -210,9 +266,34 @@ function App() {
             </button>
           ))}
         </nav>
+      </div>,
+  );
+}
+
+/** Purchases belong to an account (accountForPurchaseMessage). */
+function AnonymousBuy() {
+  const { t } = useStrings();
+  return (
+    <section className="page">
+      <h2 className="page-title">{t.navBuy}</h2>
+      <div className="card">
+        <CreateAccountPrompt message={t.accountToBuy} />
       </div>
-          </LegalProvider>
-    </LanguageContext.Provider>
+    </section>
+  );
+}
+
+/** ProfileView for an anonymous student: no details to edit, only the way to
+ *  an account. */
+function AnonymousProfile() {
+  const { t } = useStrings();
+  return (
+    <section className="page">
+      <h2 className="page-title">{t.navProfile}</h2>
+      <div className="card">
+        <CreateAccountPrompt title={t.usingAnonymously} message={t.createAccountToKeep} />
+      </div>
+    </section>
   );
 }
 
