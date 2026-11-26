@@ -595,4 +595,17 @@ describe("wallet checkout routing", () => {
     expect(apple.checkoutUrl).toEqual(expect.stringContaining("tranzilaCheckout?checkoutId="));
     expect(google.clientToken).toBe("braintree-token");
   });
+
+  // The web raises Google's own sheet and needs Braintree's token, while the
+  // app keeps getting Tranzila's page.
+  test("gives Google Pay a Braintree token when the caller asks for Braintree", async () => {
+    withEnv(TRANZILA_ENV);
+
+    const web = (await googlePay({ ...request, data: { ...request.data, processor: "braintree" } })) as Record<string, unknown>;
+    const app = (await googlePay(request)) as Record<string, unknown>;
+
+    expect(web.clientToken).toBe("braintree-token");
+    expect(web).not.toHaveProperty("checkoutUrl");
+    expect(app.checkoutUrl).toEqual(expect.stringContaining("tranzilaCheckout?checkoutId="));
+  });
 });

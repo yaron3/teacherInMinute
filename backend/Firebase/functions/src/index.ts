@@ -152,6 +152,7 @@ export {
   paypalSuccess,
   getPayPalWebConfig,
   capturePayPalOrder,
+  getGooglePayWebConfig,
   paypalCancel,
   paypalWebhook,
   billingPage,

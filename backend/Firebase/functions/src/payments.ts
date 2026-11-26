@@ -524,6 +524,9 @@ async function startWalletCheckout(params: {
   wallet: "apple_pay" | "google_pay";
   walletLabel: string;
   webReturnUrl?: string;
+  /** Skip Tranzila's page: the caller raises the wallet itself and needs a
+   *  Braintree client token (the web's own Google Pay button). */
+  braintreeOnly?: boolean;
 }): Promise<
   | { checkoutId: string; checkoutUrl: string }
   | { checkoutId: string; clientToken: string; pkg: PricingDoc & { priceCents: number } }
@@ -535,7 +538,7 @@ async function startWalletCheckout(params: {
     webReturnUrl: params.webReturnUrl,
   });
 
-  if (isTranzilaWalletEnabled(params.wallet) && tranzilaSupportsCurrency(pkg.currency)) {
+  if (!params.braintreeOnly && isTranzilaWalletEnabled(params.wallet) && tranzilaSupportsCurrency(pkg.currency)) {
     return { checkoutId, checkoutUrl: await openTranzilaCheckout(checkoutRef) };
   }
 
@@ -706,6 +709,9 @@ export const createGooglePayCheckout = onCall(async (req) => {
     wallet: "google_pay",
     walletLabel: "Google Pay",
     webReturnUrl: allowedWebReturnUrl(data.webReturnUrl),
+    // The web raises Google's own sheet (pay.js) with Braintree as the
+    // gateway, then confirms the nonce through confirmGooglePayPayment.
+    braintreeOnly: data.processor === "braintree",
   });
   if ("checkoutUrl" in started) return started;
   const { checkoutId, clientToken, pkg } = started;
@@ -719,6 +725,36 @@ export const createGooglePayCheckout = onCall(async (req) => {
     merchantName: GOOGLE_PAY_MERCHANT_NAME,
     countryCode: GOOGLE_PAY_COUNTRY_CODE,
     label: GOOGLE_PAY_MERCHANT_NAME,
+    // Google's merchant id, issued once Google approves production access in
+    // the Google Pay & Wallet Console; not needed in TEST.
+    ...(process.env.GOOGLE_PAY_MERCHANT_ID ? { googleMerchantId: process.env.GOOGLE_PAY_MERCHANT_ID } : {}),
+  };
+});
+
+/**
+ * What the web's own Google Pay button needs before a buyer taps it (Google
+ * requires loadPaymentData to open straight from the tap): a Braintree client
+ * token for the gateway parameters, Google's environment and merchant details.
+ * The checkout itself is opened after the buyer approves, with
+ * createGooglePayCheckout({ processor: "braintree" }).
+ */
+export const getGooglePayWebConfig = onCall(async (req) => {
+  if (!req.auth?.uid) throw new HttpsError("unauthenticated", "Sign in required");
+  const data = (req.data ?? {}) as Record<string, unknown>;
+  const currency = String(data.currency ?? "ILS").replace(/[^A-Za-z]/g, "").toUpperCase();
+  let clientToken: string;
+  try {
+    clientToken = await generateBraintreeClientToken(currency);
+  } catch (err) {
+    logger.warn(`[payments] getGooglePayWebConfig: no Braintree token for currency=${currency}`, err);
+    throw new HttpsError("failed-precondition", "Google Pay is not available yet. Please choose another payment method.");
+  }
+  return {
+    clientToken,
+    environment: process.env.BRAINTREE_ENV === "production" ? "PRODUCTION" : "TEST",
+    merchantName: GOOGLE_PAY_MERCHANT_NAME,
+    countryCode: GOOGLE_PAY_COUNTRY_CODE,
+    ...(process.env.GOOGLE_PAY_MERCHANT_ID ? { googleMerchantId: process.env.GOOGLE_PAY_MERCHANT_ID } : {}),
   };
 });
 

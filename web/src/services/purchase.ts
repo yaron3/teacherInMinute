@@ -67,10 +67,12 @@ export function applePayAvailable(): boolean {
 }
 
 /** The methods this browser is offered, in the apps' order
- *  (PaymentMethod.availableForCurrentPlatform): its own wallet — Apple Pay in
- *  Safari, Google Pay elsewhere — then PayPal and card. */
-export function availablePayMethods(): PayMethod[] {
-  return [applePayAvailable() ? "apple_pay" : "google_pay", "paypal", "card"];
+ *  (PaymentMethod.configuredForCheckout): its own wallet — Apple Pay in
+ *  Safari, Google Pay elsewhere while Remote Config's `enable_google_pay` is
+ *  on — then PayPal and card. */
+export function availablePayMethods(googlePayEnabled: boolean): PayMethod[] {
+  const wallet: PayMethod[] = applePayAvailable() ? ["apple_pay"] : googlePayEnabled ? ["google_pay"] : [];
+  return [...wallet, "paypal", "card"];
 }
 
 /** Thrown when the backend has no web page for a wallet (Apple Pay or Google

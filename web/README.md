@@ -168,11 +168,23 @@ to Auth's authorized domains. Read the dispatch warning in the root
   - Payment methods, as the apps offer them (`PaymentMethod`): the
     browser's own wallet — Apple Pay in Safari (`ApplePaySession`), Google
     Pay elsewhere — then PayPal and credit card; the choice is remembered.
-    Card, Apple Pay (`createApplePayCheckout`) and Google Pay
-    (`createGooglePayCheckout`) open the Tranzila page in the sheet. The
-    wallets have that page only while the functions' `TRANZILA_WALLETS`
-    lists them (`apple_pay,google_pay`); otherwise the backend answers for
-    Braintree's native sheet and the web says the wallet is not available.
+    Card and Apple Pay (`createApplePayCheckout`) open the Tranzila page in
+    the sheet; Apple Pay has its button there only while the functions'
+    `TRANZILA_WALLETS` lists `apple_pay`.
+    Google Pay is hidden unless Remote Config's `enable_google_pay` is on
+    (off when unset or unreadable), as in the apps. When on, it follows
+    Google's Google Pay API for the web, with Braintree as
+    the gateway (`services/googlepay.ts`): `pay.js`, `isReadyToPay`, Google's
+    own button, and `loadPaymentData` straight from the tap at the package
+    price, with Braintree's gateway parameters taken from the client token
+    that `getGooglePayWebConfig` returns. Once the buyer approves, the page
+    opens the checkout (`createGooglePayCheckout` with
+    `processor: "braintree"`, which skips Tranzila even where
+    `TRANZILA_WALLETS` lists Google Pay for the app) and the backend charges
+    the nonce for the checkout's own price (`confirmGooglePayPayment`).
+    Production needs Google's approval in the Google Pay & Wallet Console
+    (its merchant id goes in `GOOGLE_PAY_MERCHANT_ID`) and a live Braintree
+    account (`BRAINTREE_ENV=production`); until then the sheet runs in TEST.
     PayPal is PayPal's standard checkout: its own buttons (JS SDK, loaded
     from paypal.com with the client id from `getPayPalWebConfig`) in each
     package. `createOrder` opens the checkout through `createCheckoutSession`

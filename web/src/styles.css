@@ -551,3 +551,7 @@ input[type="date"] { color-scheme: dark; }
    Not `.paypal-buttons`: that is the class of PayPal's own element. */
 .paypal-slot { min-height: 44px; margin-top: 4px; }
 .paypal-slot.busy { opacity: 0.5; pointer-events: none; }
+.wallet-slot { min-height: 44px; margin-top: 4px; }
+.wallet-slot.busy { opacity: 0.5; pointer-events: none; }
+.gpay-button { height: 44px; }
+.gpay-button:empty { display: none; }

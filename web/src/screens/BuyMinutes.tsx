@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStrings } from "../i18n";
+import { fetchFlag } from "../services/promotion";
+import { GooglePayCancelled, chargeGooglePay, googlePayButton, prepareGooglePay, requestGooglePayNonce } from "../services/googlepay";
 import {
   WalletUnavailableError,
   availablePayMethods,
@@ -35,13 +37,16 @@ export function BuyMinutes({ remainingMinutes }: { remainingMinutes: number }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [checkout, setCheckout] = useState<Checkout>({ kind: "idle" });
   const stopWatching = useRef<(() => void) | null>(null);
-  const [methods] = useState(availablePayMethods);
-  const [method, setMethod] = useState<PayMethod>(() => {
-    const saved = localStorage.getItem("buy.payMethod") as PayMethod | null;
-    return saved && methods.includes(saved) ? saved : methods[0];
-  });
+  // Google Pay waits for Remote Config (`enable_google_pay`, off when unset),
+  // as in the apps.
+  const [methods, setMethods] = useState(() => availablePayMethods(false));
+  useEffect(() => {
+    void fetchFlag("enable_google_pay", false).then((on) => setMethods(availablePayMethods(on)));
+  }, []);
+  const [chosen, setChosen] = useState<PayMethod | null>(() => localStorage.getItem("buy.payMethod") as PayMethod | null);
+  const method: PayMethod = chosen && methods.includes(chosen) ? chosen : methods[0];
   const chooseMethod = (m: PayMethod) => {
-    setMethod(m);
+    setChosen(m);
     localStorage.setItem("buy.payMethod", m);
   };
 
@@ -203,6 +208,8 @@ export function BuyMinutes({ remainingMinutes }: { remainingMinutes: number }) {
                 <div className="muted small">{t.perMinute(formatPrice(Math.round(p.priceCents / p.minutes), p.currency, locale))}</div>
                 {method === "paypal" ? (
                   <PayPalButtons pkg={p} disabled={busy} flow={paypal} />
+                ) : method === "google_pay" ? (
+                  <GooglePayButton pkg={p} disabled={busy} flow={paypal} />
                 ) : (
                   <button className="primary" onClick={() => void buy(p)} disabled={busy}>
                     {t.buyWith(t.payMethodNames[method])}
@@ -293,6 +300,62 @@ function PayPalButtons({
       {state === "loading" && <div className="pulse small-pulse" aria-hidden />}
       {state === "unavailable" && <p className="error small">{t.walletUnavailable(t.payMethodNames.paypal)}</p>}
       <div ref={container} />
+    </div>
+  );
+}
+
+/** Google's own Google Pay button for one package (Google Pay API for the
+ *  web, Braintree as the gateway). The sheet opens straight from the tap at
+ *  the package's price; the checkout is opened and charged once the buyer
+ *  approves, for the checkout's own price. */
+function GooglePayButton({
+  pkg,
+  disabled,
+  flow,
+}: {
+  pkg: MinutesPackage;
+  disabled: boolean;
+  flow: { approved: () => void; done: (pkg: MinutesPackage) => void; cancelled: () => void; failed: () => void };
+}) {
+  const { t, language } = useStrings();
+  const container = useRef<HTMLDivElement>(null);
+  const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const handlers = useRef(flow);
+  handlers.current = flow;
+
+  useEffect(() => {
+    let closed = false;
+    void prepareGooglePay(pkg.currency).then((pay) => {
+      if (closed || !container.current) return;
+      if (!pay) return setState("unavailable");
+      const onClick = () => {
+        // loadPaymentData runs inside requestGooglePayNonce before any await,
+        // so the sheet opens from the tap itself.
+        requestGooglePayNonce(pay, { cents: pkg.priceCents, currency: pkg.currency })
+          .then(async (nonce) => {
+            handlers.current.approved();
+            await chargeGooglePay(pkg.id, nonce);
+            handlers.current.done(pkg);
+          })
+          .catch((e) => {
+            if (e instanceof GooglePayCancelled) return handlers.current.cancelled();
+            console.error("[buy] Google Pay failed", e);
+            handlers.current.failed();
+          });
+      };
+      container.current.replaceChildren(googlePayButton(pay, onClick, language));
+      setState("ready");
+    });
+    return () => {
+      closed = true;
+    };
+  }, [pkg, language]);
+
+  return (
+    <div className={disabled ? "wallet-slot busy" : "wallet-slot"}>
+      {state === "loading" && <div className="pulse small-pulse" aria-hidden />}
+      {state === "unavailable" && <p className="error small">{t.walletUnavailable(t.payMethodNames.google_pay)}</p>}
+      <div ref={container} className="gpay-button" />
     </div>
   );
 }
