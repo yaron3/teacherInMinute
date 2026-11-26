@@ -50,6 +50,7 @@ async function resolvePricingAndCreateCheckout(params: {
   uid: string;
   packageId: string;
   paymentMethod?: string;
+  webReturnUrl?: string;
 }): Promise<{
   checkoutId: string;
   checkoutRef: FirebaseFirestore.DocumentReference;
@@ -65,15 +66,19 @@ async function resolvePricingAndCreateCheckout(params: {
   // Coerce to number — Firestore may return string if field was set via console
   const priceCents = Math.floor(Number(pkg.priceCents));
 
+  // A code typed into the console can carry stray quotes or spaces (staging's
+  // package read `"ILS"`), which no provider recognises: Tranzila was skipped
+  // for it and PayPal refused the order. Keep the letters only.
+  const currency = String(pkg.currency ?? "").replace(/[^A-Za-z]/g, "").toUpperCase();
   if (!priceCents || priceCents <= 0)
     throw new HttpsError("internal", "Invalid package price");
-  if (!pkg.currency)
+  if (currency.length !== 3)
     throw new HttpsError("internal", "Invalid package currency");
   if (minutes <= 0)
     throw new HttpsError("internal", "Invalid package minutes");
 
   logger.info(
-    `[payments] package fetched packageId=${params.packageId} priceCents=${priceCents} currency=${pkg.currency} minutes=${minutes}`
+    `[payments] package fetched packageId=${params.packageId} priceCents=${priceCents} currency=${currency} minutes=${minutes}`
   );
 
   const checkoutId = uuidv4();
@@ -83,7 +88,7 @@ async function resolvePricingAndCreateCheckout(params: {
     packageId: params.packageId,
     packageType: pkg.type,
     priceCents,
-    currency: pkg.currency,
+    currency,
     minutes,
     status: "created",
     createdAt: Timestamp.now(),
@@ -91,10 +96,11 @@ async function resolvePricingAndCreateCheckout(params: {
     // Omit rather than write `undefined` — the plain-PayPal flow sends no
     // wallet, and Firestore rejects undefined field values.
     ...(params.paymentMethod ? { paymentMethod: params.paymentMethod } : {}),
+    ...(params.webReturnUrl ? { webReturnUrl: params.webReturnUrl } : {}),
   };
   await checkoutRef.set(checkoutDoc);
 
-  return { checkoutId, checkoutRef, pkg: { ...pkg, priceCents } };
+  return { checkoutId, checkoutRef, pkg: { ...pkg, priceCents, currency } };
 }
 
 /**
@@ -233,6 +239,61 @@ async function markCheckoutCancelled(
   });
 }
 
+/**
+ * The page a web checkout returns to, if the caller asked for one we trust:
+ * this project's own Hosting site (`<project>.web.app`, `.firebaseapp.com`),
+ * or localhost under the emulators. Anything else is dropped, so a checkout
+ * link can never be made to send a buyer to someone else's site.
+ */
+export function allowedWebReturnUrl(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || !raw) return undefined;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return undefined;
+  }
+  const project = process.env.GCLOUD_PROJECT ?? "";
+  const hosted =
+    url.protocol === "https:" &&
+    !!project &&
+    (url.host === `${project}.web.app` || url.host === `${project}.firebaseapp.com`);
+  const local =
+    process.env.FUNCTIONS_EMULATOR === "true" &&
+    url.protocol === "http:" &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1");
+  if (!hosted && !local) return undefined;
+  url.hash = "";
+  url.search = "";
+  return url.toString();
+}
+
+/**
+ * Where a payment page sends the buyer once it is done: back into the app by
+ * its `teacherminute://payment-return` link, or, for a checkout the web client
+ * opened, to its page with the same outcome in `payment` and `checkout_id`.
+ */
+function paymentReturnLink(
+  checkout: Pick<PaymentCheckoutDoc, "webReturnUrl"> | null | undefined,
+  status: "success" | "cancelled" | "no_response",
+  checkoutId: string,
+  orderId?: string
+): string {
+  if (checkout?.webReturnUrl) {
+    const url = new URL(checkout.webReturnUrl);
+    url.searchParams.set("payment", status);
+    url.searchParams.set("checkout_id", checkoutId);
+    return url.toString();
+  }
+  if (status === "no_response") return `teacherminute://payment-return?status=no_response&checkout_id=${checkoutId}`;
+  if (status === "cancelled") {
+    return orderId === undefined
+      ? `teacherminute://payment-return?status=cancelled&checkout_id=${checkoutId}`
+      : `teacherminute://payment-return?status=cancelled&checkout_id=${checkoutId}&order_id=${orderId}`;
+  }
+  return `teacherminute://payment-return?status=success&order_id=${orderId ?? "unknown"}&checkout_id=${checkoutId}`;
+}
+
 /** Points a fresh checkout at the Tranzila checkout page and returns its URL. */
 async function openTranzilaCheckout(
   checkoutRef: FirebaseFirestore.DocumentReference
@@ -306,6 +367,7 @@ export const createCheckoutSession = onCall(async (req) => {
     uid,
     packageId,
     paymentMethod: rawWallet,
+    webReturnUrl: allowedWebReturnUrl(data.webReturnUrl),
   });
   const returnUrl = `${FUNCTIONS_BASE_URL}/paypalSuccess?checkoutId=${checkoutId}`;
   const cancelUrl = `${FUNCTIONS_BASE_URL}/paypalCancel?checkoutId=${checkoutId}`;
@@ -317,7 +379,7 @@ export const createCheckoutSession = onCall(async (req) => {
     isTranzilaConfigured() &&
     tranzilaSupportsCurrency(pkg.currency)
   ) {
-    return { checkoutUrl: await openTranzilaCheckout(checkoutRef) };
+    return { checkoutUrl: await openTranzilaCheckout(checkoutRef), checkoutId };
   }
 
   if (rawWallet === "bit") {
@@ -402,7 +464,9 @@ export const createCheckoutSession = onCall(async (req) => {
     `[payments] checkout saved checkoutId=${checkoutId} paypalOrderId=${order.id}`
   );
 
-  return { checkoutUrl };
+  // The ids let the web client follow a PayPal checkout, whose approval link
+  // does not carry the checkout's, and hand the order to PayPal's buttons.
+  return { checkoutUrl, checkoutId, orderId: order.id };
 });
 
 // ─── createPaymentSettingsSession ─────────────────────────────────────────────
@@ -459,6 +523,7 @@ async function startWalletCheckout(params: {
   packageId: string;
   wallet: "apple_pay" | "google_pay";
   walletLabel: string;
+  webReturnUrl?: string;
 }): Promise<
   | { checkoutId: string; checkoutUrl: string }
   | { checkoutId: string; clientToken: string; pkg: PricingDoc & { priceCents: number } }
@@ -467,6 +532,7 @@ async function startWalletCheckout(params: {
     uid: params.uid,
     packageId: params.packageId,
     paymentMethod: params.wallet,
+    webReturnUrl: params.webReturnUrl,
   });
 
   if (isTranzilaWalletEnabled(params.wallet) && tranzilaSupportsCurrency(pkg.currency)) {
@@ -598,6 +664,7 @@ export const createApplePayCheckout = onCall(async (req) => {
     packageId,
     wallet: "apple_pay",
     walletLabel: "Apple Pay",
+    webReturnUrl: allowedWebReturnUrl(data.webReturnUrl),
   });
   if ("checkoutUrl" in started) return started;
   const { checkoutId, clientToken, pkg } = started;
@@ -638,6 +705,7 @@ export const createGooglePayCheckout = onCall(async (req) => {
     packageId,
     wallet: "google_pay",
     walletLabel: "Google Pay",
+    webReturnUrl: allowedWebReturnUrl(data.webReturnUrl),
   });
   if ("checkoutUrl" in started) return started;
   const { checkoutId, clientToken, pkg } = started;
@@ -827,10 +895,7 @@ export const payCardCheckout = onRequest(async (req, res) => {
 
   const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
   if (checkout.status === "completed") {
-    res.redirect(
-      302,
-      `teacherminute://payment-return?status=success&order_id=${checkout.paypalOrderId ?? "unknown"}&checkout_id=${checkoutId}`
-    );
+    res.redirect(302, paymentReturnLink(checkout, "success", checkoutId, checkout.paypalOrderId ?? undefined));
     return;
   }
   if (!checkout.paypalOrderId) {
@@ -948,7 +1013,7 @@ export const tranzilaCheckout = onRequest(async (req, res) => {
 
   const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
   if (checkout.status === "completed") {
-    res.redirect(302, tranzilaSuccessDeepLink(checkoutId, checkout.tranzilaTransactionId));
+    res.redirect(302, tranzilaSuccessDeepLink(checkout, checkoutId, checkout.tranzilaTransactionId));
     return;
   }
   if (checkout.status === "tranzila_charging") {
@@ -985,6 +1050,11 @@ export const tranzilaCheckout = onRequest(async (req, res) => {
     currency_code: checkout.currency.toUpperCase(),
     thtk,
     response_language: "english",
+    // Tranzila's control frame answers `window.top` unless told otherwise.
+    // The web client shows this page inside its own (in a checkout sheet), so
+    // the top window is the app, the answer went there, and a Pay tap waited
+    // forever. `parent` is this page whether it is framed or not.
+    returnTo: "parent",
   };
   const cardParams = {
     ...common,
@@ -1044,7 +1114,7 @@ ${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfap
   const cardParams = ${JSON.stringify(cardParams)};
   const walletParams = ${JSON.stringify(walletParams)};
   const applePayParams = ${JSON.stringify(applePayParams)};
-  const pendingUrl = ${JSON.stringify(`teacherminute://payment-return?status=no_response&checkout_id=${checkoutId}`)};
+  const pendingUrl = ${JSON.stringify(paymentReturnLink(checkout, "no_response", checkoutId))};
   const submitBtn = document.getElementById("submit-btn");
   const errorEl = document.getElementById("error");
   const noticeEl = document.getElementById("notice");
@@ -1180,7 +1250,7 @@ export const tranzilaCheckoutStatus = onRequest(async (req, res) => {
   if (checkout?.status === "completed") {
     res.json({
       status: "completed",
-      redirectUrl: tranzilaSuccessDeepLink(checkoutId, checkout.tranzilaTransactionId),
+      redirectUrl: tranzilaSuccessDeepLink(checkout, checkoutId, checkout.tranzilaTransactionId),
     });
     return;
   }
@@ -1262,8 +1332,12 @@ export const tranzilaNotify = onRequest(async (req, res) => {
   done();
 });
 
-function tranzilaSuccessDeepLink(checkoutId: string, transactionId?: string): string {
-  return `teacherminute://payment-return?status=success&order_id=${transactionId ?? "unknown"}&checkout_id=${checkoutId}`;
+function tranzilaSuccessDeepLink(
+  checkout: Pick<PaymentCheckoutDoc, "webReturnUrl"> | null | undefined,
+  checkoutId: string,
+  transactionId?: string
+): string {
+  return paymentReturnLink(checkout, "success", checkoutId, transactionId);
 }
 
 /** Hosted Fields report the expiry year as YY or YYYY; the API wants YYYY. */
@@ -1316,7 +1390,7 @@ export const tranzilaCharge = onRequest(async (req, res) => {
     return;
   }
   if (claim.outcome === "completed") {
-    res.json({ redirectUrl: tranzilaSuccessDeepLink(checkoutId, claim.checkout.tranzilaTransactionId) });
+    res.json({ redirectUrl: tranzilaSuccessDeepLink(claim.checkout, checkoutId, claim.checkout.tranzilaTransactionId) });
     return;
   }
   if (claim.outcome === "busy") {
@@ -1372,64 +1446,50 @@ export const tranzilaCharge = onRequest(async (req, res) => {
     extraCheckoutFields: { tranzilaAuthNumber: result.authNumber },
   });
 
-  res.json({ redirectUrl: tranzilaSuccessDeepLink(checkoutId, result.transactionId) });
+  res.json({ redirectUrl: tranzilaSuccessDeepLink(checkout, checkoutId, result.transactionId) });
 });
 
 // ─── paypalSuccess (HTTP) ─────────────────────────────────────────────────────
 // PayPal redirects here after buyer approval. Captures the order, credits the
 // user, then redirects to the app deep link.
 
-export const paypalSuccess = onRequest(async (req, res) => {
-  const checkoutId = req.query.checkoutId as string | undefined;
-  const token = req.query.token as string | undefined; // PayPal order id
+type PayPalCaptureOutcome =
+  | { ok: true; checkout: PaymentCheckoutDoc; orderId: string }
+  | { ok: false; checkout: PaymentCheckoutDoc | null; reason: string };
 
-  logger.info(`[payments] paypalSuccess checkoutId=${checkoutId} token=${token}`);
-
-  const failRedirect = `teacherminute://payment-return?status=cancelled&checkout_id=${checkoutId ?? "unknown"}&order_id=${token ?? "unknown"}`;
-
-  if (!checkoutId) {
-    logger.warn(`[payments] paypalSuccess missing checkoutId`);
-    res.redirect(302, failRedirect);
-    return;
-  }
-
+/**
+ * Captures a checkout's PayPal order and credits its minutes. Shared by the
+ * redirect back from PayPal (paypalSuccess) and the web's PayPal buttons
+ * (capturePayPalOrder). Idempotent: a completed checkout answers ok.
+ *
+ * The order is the one stored on the checkout, never one the caller names:
+ * approving a cheap order and then capturing against an expensive checkout's
+ * id would otherwise credit the expensive package for the cheap amount.
+ */
+async function capturePayPalCheckout(checkoutId: string, suppliedOrderId?: string): Promise<PayPalCaptureOutcome> {
   const checkoutRef = firestore.collection("paymentCheckouts").doc(checkoutId);
   const checkoutSnap = await checkoutRef.get();
-
   if (!checkoutSnap.exists) {
-    logger.error(`[payments] paypalSuccess checkout not found checkoutId=${checkoutId}`);
-    res.redirect(302, failRedirect);
-    return;
+    logger.error(`[payments] paypal capture: checkout not found checkoutId=${checkoutId}`);
+    return { ok: false, checkout: null, reason: "not-found" };
   }
-
   const checkout = checkoutSnap.data() as PaymentCheckoutDoc;
 
   if (checkout.status === "completed") {
-    logger.info(
-      `[payments] paypalSuccess already completed (idempotent) checkoutId=${checkoutId}`
-    );
-    const deepLink = `teacherminute://payment-return?status=success&order_id=${checkout.paypalOrderId ?? token ?? "unknown"}&checkout_id=${checkoutId}`;
-    logger.info(`[payments] paypalSuccess redirect ${deepLink}`);
-    res.redirect(302, deepLink);
-    return;
+    logger.info(`[payments] paypal capture: already completed (idempotent) checkoutId=${checkoutId}`);
+    return { ok: true, checkout, orderId: checkout.paypalOrderId ?? suppliedOrderId ?? "unknown" };
   }
 
-  // Bind the order to the checkout rather than trusting the query string.
-  // `token` is attacker-controlled: without this, approving a cheap order and
-  // then calling this endpoint with an expensive checkout's id captured the
-  // cheap amount and credited the expensive package's minutes.
   const storedOrderId = (checkout.paypalOrderId as string | null) ?? "";
   if (!storedOrderId) {
-    logger.error(`[payments] paypalSuccess checkout has no paypalOrderId checkoutId=${checkoutId}`);
-    res.redirect(302, failRedirect);
-    return;
+    logger.error(`[payments] paypal capture: checkout has no paypalOrderId checkoutId=${checkoutId}`);
+    return { ok: false, checkout, reason: "no-order" };
   }
-  if (token && token !== storedOrderId) {
+  if (suppliedOrderId && suppliedOrderId !== storedOrderId) {
     logger.error(
-      `[payments] paypalSuccess order mismatch checkoutId=${checkoutId} stored=${storedOrderId} supplied=${token}`
+      `[payments] paypal capture: order mismatch checkoutId=${checkoutId} stored=${storedOrderId} supplied=${suppliedOrderId}`
     );
-    res.redirect(302, failRedirect);
-    return;
+    return { ok: false, checkout, reason: "order-mismatch" };
   }
   const orderId = storedOrderId;
 
@@ -1437,44 +1497,30 @@ export const paypalSuccess = onRequest(async (req, res) => {
   try {
     capture = await captureOrder(orderId);
     logger.info(
-      `[payments] paypalSuccess capture orderId=${orderId} captureId=${capture.captureId} status=${capture.orderStatus} amountCents=${capture.amountCents} currency=${capture.currency}`
+      `[payments] paypal capture orderId=${orderId} captureId=${capture.captureId} status=${capture.orderStatus} amountCents=${capture.amountCents} currency=${capture.currency}`
     );
   } catch (err) {
-    logger.error(
-      `[payments] paypalSuccess captureOrder failed checkoutId=${checkoutId} orderId=${orderId}`,
-      err
-    );
-    // Webhook may have already captured and completed this checkout — check before failing.
-    const recheckSnap = await checkoutRef.get();
-    if (recheckSnap.data()?.status === "completed") {
-      logger.info(
-        `[payments] paypalSuccess capture failed but checkout already completed (webhook race) checkoutId=${checkoutId}`
-      );
-      const deepLink = `teacherminute://payment-return?status=success&order_id=${orderId}&checkout_id=${checkoutId}`;
-      logger.info(`[payments] paypalSuccess redirect ${deepLink}`);
-      res.redirect(302, deepLink);
-      return;
+    logger.error(`[payments] paypal captureOrder failed checkoutId=${checkoutId} orderId=${orderId}`, err);
+    // The webhook may have captured and completed this checkout already.
+    if ((await checkoutRef.get()).data()?.status === "completed") {
+      logger.info(`[payments] paypal capture failed but checkout already completed (webhook race) checkoutId=${checkoutId}`);
+      return { ok: true, checkout, orderId };
     }
-    res.redirect(302, failRedirect);
-    return;
+    return { ok: false, checkout, reason: "capture-failed" };
   }
 
   if (capture.orderStatus !== "COMPLETED") {
-    logger.error(
-      `[payments] paypalSuccess unexpected capture status checkoutId=${checkoutId} status=${capture.orderStatus}`
-    );
-    res.redirect(302, failRedirect);
-    return;
+    logger.error(`[payments] paypal capture: unexpected status checkoutId=${checkoutId} status=${capture.orderStatus}`);
+    return { ok: false, checkout, reason: "not-completed" };
   }
 
   // Second guard, matching the webhook's reconciliation: never credit a
   // package that PayPal did not actually charge for.
   if (capture.amountCents !== checkout.priceCents || capture.currency !== checkout.currency) {
     logger.error(
-      `[payments] paypalSuccess amount mismatch checkoutId=${checkoutId} captured=${capture.amountCents}/${capture.currency} expected=${checkout.priceCents}/${checkout.currency}`
+      `[payments] paypal capture: amount mismatch checkoutId=${checkoutId} captured=${capture.amountCents}/${capture.currency} expected=${checkout.priceCents}/${checkout.currency}`
     );
-    res.redirect(302, failRedirect);
-    return;
+    return { ok: false, checkout, reason: "amount-mismatch" };
   }
 
   try {
@@ -1487,21 +1533,67 @@ export const paypalSuccess = onRequest(async (req, res) => {
       extraCheckoutFields: { paypalOrderId: orderId },
     });
   } catch (err) {
-    logger.error(
-      `[payments] paypalSuccess transaction failed checkoutId=${checkoutId}`,
-      err
-    );
-    res.redirect(302, failRedirect);
+    logger.error(`[payments] paypal capture: crediting failed checkoutId=${checkoutId}`, err);
+    return { ok: false, checkout, reason: "credit-failed" };
+  }
+
+  logger.info(`[payments] paypal capture credited uid=${checkout.uid} minutes=${checkout.minutes} checkoutId=${checkoutId}`);
+  return { ok: true, checkout, orderId };
+}
+
+export const paypalSuccess = onRequest(async (req, res) => {
+  const checkoutId = req.query.checkoutId as string | undefined;
+  const token = req.query.token as string | undefined; // PayPal order id
+
+  logger.info(`[payments] paypalSuccess checkoutId=${checkoutId} token=${token}`);
+
+  if (!checkoutId) {
+    logger.warn(`[payments] paypalSuccess missing checkoutId`);
+    res.redirect(302, paymentReturnLink(null, "cancelled", "unknown", token ?? "unknown"));
     return;
   }
 
-  logger.info(
-    `[payments] paypalSuccess credited uid=${checkout.uid} minutes=${checkout.minutes} checkoutId=${checkoutId}`
-  );
+  const outcome = await capturePayPalCheckout(checkoutId, token);
+  const link = outcome.ok
+    ? paymentReturnLink(outcome.checkout, "success", checkoutId, outcome.orderId)
+    : paymentReturnLink(outcome.checkout, "cancelled", checkoutId, token ?? "unknown");
+  logger.info(`[payments] paypalSuccess redirect ${link}`);
+  res.redirect(302, link);
+});
 
-  const deepLink = `teacherminute://payment-return?status=success&order_id=${orderId}&checkout_id=${checkoutId}`;
-  logger.info(`[payments] paypalSuccess redirect ${deepLink}`);
-  res.redirect(302, deepLink);
+// ─── PayPal buttons on the web (JS SDK standard checkout) ─────────────────────
+// The web client renders PayPal's own buttons: createOrder goes through
+// createCheckoutSession (no paymentMethod), which returns the order id, and
+// onApprove calls capturePayPalOrder. Only the client id is public; the secret
+// never leaves the server.
+
+/** The public PayPal client id and environment, for the JS SDK script. */
+export const getPayPalWebConfig = onCall(async (req) => {
+  if (!req.auth?.uid) throw new HttpsError("unauthenticated", "Sign in required");
+  const clientId = process.env.PAYPAL_CLIENT_ID ?? "";
+  if (!clientId) throw new HttpsError("failed-precondition", "PayPal is not available yet.");
+  return { clientId, environment: process.env.PAYPAL_ENV === "live" ? "live" : "sandbox" };
+});
+
+/** Captures the buyer's approved PayPal order and credits the minutes. */
+export const capturePayPalOrder = onCall(async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required");
+  const data = (req.data ?? {}) as Record<string, unknown>;
+  const checkoutId = typeof data.checkoutId === "string" ? data.checkoutId : "";
+  const orderId = typeof data.orderId === "string" ? data.orderId : undefined;
+  if (!checkoutId) throw new HttpsError("invalid-argument", "Missing checkoutId");
+
+  const snap = await firestore.collection("paymentCheckouts").doc(checkoutId).get();
+  if (!snap.exists || (snap.data() as PaymentCheckoutDoc).uid !== uid) {
+    throw new HttpsError("not-found", "Checkout not found");
+  }
+
+  const outcome = await capturePayPalCheckout(checkoutId, orderId);
+  if (!outcome.ok) {
+    throw new HttpsError("aborted", "The PayPal payment could not be completed.", { reason: outcome.reason });
+  }
+  return { status: "completed", minutes: outcome.checkout.minutes };
 });
 
 // ─── paypalCancel (HTTP) ──────────────────────────────────────────────────────
@@ -1512,7 +1604,11 @@ export const paypalCancel = onRequest(async (req, res) => {
 
   logger.info(`[payments] paypalCancel checkoutId=${checkoutId} token=${token}`);
 
+  let checkout: PaymentCheckoutDoc | undefined;
   if (checkoutId) {
+    checkout = (await firestore.collection("paymentCheckouts").doc(checkoutId).get().catch(() => null))?.data() as
+      | PaymentCheckoutDoc
+      | undefined;
     // Reachable by anyone holding a checkout id, and PayPal sends a buyer here
     // after they back out — including, on a browser Back, after they already
     // paid. The guard keeps a completed purchase completed, and the order id
@@ -1526,7 +1622,7 @@ export const paypalCancel = onRequest(async (req, res) => {
     );
   }
 
-  const deepLink = `teacherminute://payment-return?status=cancelled&checkout_id=${checkoutId ?? "unknown"}`;
+  const deepLink = paymentReturnLink(checkout, "cancelled", checkoutId ?? "unknown");
   logger.info(`[payments] paypalCancel redirect ${deepLink}`);
   res.redirect(302, deepLink);
 });

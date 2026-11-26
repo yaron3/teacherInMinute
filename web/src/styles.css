@@ -539,3 +539,15 @@ input[type="date"] { color-scheme: dark; }
 .banner-slot { max-width: 880px; margin: 0 auto; padding: 28px 24px 0; }
 .banner-slot:empty { display: none; }
 .banner-slot .banner { margin-bottom: 0; }
+
+.payment-return { gap: 12px; margin-top: 10vh; }
+/* The payment page is light and narrow: a sheet that fits it, not the
+   legal viewer's full width. */
+.legal-sheet.checkout-sheet { width: min(520px, calc(100vw - 32px)); height: min(760px, calc(100vh - 48px)); }
+.pay-methods { display: flex; flex-direction: column; gap: 8px; }
+.pay-method { display: inline-flex; align-items: center; gap: 6px; }
+.pay-mark { font-weight: 800; }
+/* PayPal draws its own buttons (gold, its height); keep them in the card.
+   Not `.paypal-buttons`: that is the class of PayPal's own element. */
+.paypal-slot { min-height: 44px; margin-top: 4px; }
+.paypal-slot.busy { opacity: 0.5; pointer-events: none; }

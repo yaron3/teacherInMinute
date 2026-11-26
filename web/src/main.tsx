@@ -18,6 +18,12 @@ import { CompleteProfile } from "./screens/CompleteProfile";
 import { EmailBanner } from "./screens/EmailBanner";
 import { Notices } from "./screens/Notices";
 import { CreateAccountPrompt } from "./screens/CreateAccount";
+import { takePaymentReturn } from "./services/purchase";
+
+// The payment pages send their tab back here when they finish. The tab that
+// started the purchase follows the checkout itself, so this one only says how
+// it ended and closes.
+const paymentReturn = takePaymentReturn();
 import "./styles.css";
 
 type Page = "home" | "lessons" | "buy" | "earnings" | "profile" | "help";
@@ -88,8 +94,7 @@ function App() {
   const [page, go] = usePage();
   // Log Out asks first, as the apps' settings do (SettingsConfirmation.logOut).
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
-
-  if (auth === undefined) return null;
+  const [returned, setReturned] = useState(paymentReturn);
 
   const wrap = (body: React.ReactNode) => (
     <LanguageContext.Provider value={ctx}>
@@ -122,6 +127,9 @@ function App() {
       </LegalProvider>
     </LanguageContext.Provider>
   );
+
+  if (returned) return wrap(<PaymentReturn status={returned.status} onBack={() => setReturned(null)} />);
+  if (auth === undefined) return null;
 
   /** A screen of its own before the dashboard: signing in and onboarding. */
   const single = (heading: string, sub: string, body: React.ReactNode, signedIn: boolean) =>
@@ -267,6 +275,27 @@ function App() {
           ))}
         </nav>
       </div>,
+  );
+}
+
+/** The payment tab, back from the payment pages. */
+function PaymentReturn({ status, onBack }: { status: "success" | "cancelled" | "no_response"; onBack: () => void }) {
+  const { t } = useStrings();
+  useEffect(() => {
+    // A tab the app opened may close itself; one opened another way stays,
+    // with the way back.
+    if (status !== "no_response" && window.opener) window.close();
+  }, [status]);
+  return (
+    <div className="narrow">
+      <section className="card center payment-return">
+        <h2>{t.paymentReturnTitle(status)}</h2>
+        <p className="muted">{t.paymentReturnBody(status)}</p>
+        <button className="primary" onClick={onBack}>
+          {t.backToApp}
+        </button>
+      </section>
+    </div>
   );
 }
 

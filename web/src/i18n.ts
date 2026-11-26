@@ -299,8 +299,25 @@ const strings = {
     checkoutOpening: "Opening the secure payment page…",
     checkoutWaiting: "Finish paying in the tab that opened. Your minutes appear here as soon as the payment goes through.",
     checkoutReopen: "Open the payment page again",
+    checkoutTitle: "Secure payment",
+    buySubtitleAll: "Choose how to pay, then a package. Your minutes are added as soon as the payment goes through.",
+    choosePaymentMethod: "Choose a payment method",
+    payMethodNames: { apple_pay: "Apple Pay", google_pay: "Google Pay", paypal: "PayPal", card: "Credit card" } as Record<"apple_pay" | "google_pay" | "paypal" | "card", string>,
+    buyWith: (method: string) => `Buy with ${method}`,
+    walletUnavailable: (method: string) => `${method} isn't available right now. Please choose another payment method.`,
+    paypalWaiting: "Finish paying in PayPal's window. Your minutes appear here as soon as the payment goes through.",
+    checkoutConfirming: "Confirming your payment… Your minutes appear here as soon as it goes through.",
     checkoutDone: (m: number) => `Payment received — ${m} minutes added.`,
     checkoutCancelled: "The payment was cancelled. Nothing was charged.",
+    paymentReturnTitle: (status: "success" | "cancelled" | "no_response"): string =>
+      status === "success" ? "Payment received" : status === "cancelled" ? "Payment Cancelled" : "Checking your payment",
+    paymentReturnBody: (status: "success" | "cancelled" | "no_response"): string =>
+      status === "success"
+        ? "Your minutes have been added. You can close this tab."
+        : status === "cancelled"
+          ? "Nothing was charged. You can close this tab."
+          : "We haven't heard back about this payment yet. Your minutes appear in the app as soon as it goes through.",
+    backToApp: "Back to Instant Teacher",
     checkoutFailed: "Couldn't start the payment. Please try again.",
     popupBlocked: "Your browser blocked the payment tab.",
     profileTitle: "Profile",
@@ -618,8 +635,25 @@ const strings = {
     checkoutOpening: "פותחים את עמוד התשלום המאובטח…",
     checkoutWaiting: "יש להשלים את התשלום בלשונית שנפתחה. הדקות יופיעו כאן מיד כשהתשלום יעבור.",
     checkoutReopen: "פתיחת עמוד התשלום שוב",
+    checkoutTitle: "תשלום מאובטח",
+    buySubtitleAll: "בוחרים אמצעי תשלום ואז חבילה. הדקות נוספות מיד כשהתשלום עובר.",
+    choosePaymentMethod: "בחר אמצעי תשלום",
+    payMethodNames: { apple_pay: "Apple Pay", google_pay: "Google Pay", paypal: "PayPal", card: "כרטיס אשראי" } as Record<"apple_pay" | "google_pay" | "paypal" | "card", string>,
+    buyWith: (method: string) => `קנייה ב-${method}`,
+    walletUnavailable: (method: string) => `${method} לא זמין כרגע. אפשר לבחור אמצעי תשלום אחר.`,
+    paypalWaiting: "יש להשלים את התשלום בחלון של PayPal. הדקות יופיעו כאן מיד כשהתשלום יעבור.",
+    checkoutConfirming: "מאשרים את התשלום… הדקות יופיעו כאן מיד כשהוא יעבור.",
     checkoutDone: (m: number) => `התשלום התקבל — נוספו ${m} דקות.`,
     checkoutCancelled: "התשלום בוטל. לא חויבת.",
+    paymentReturnTitle: (status: "success" | "cancelled" | "no_response"): string =>
+      status === "success" ? "התשלום התקבל" : status === "cancelled" ? "התשלום בוטל" : "בודקים את התשלום",
+    paymentReturnBody: (status: "success" | "cancelled" | "no_response"): string =>
+      status === "success"
+        ? "הדקות נוספו לחשבון. אפשר לסגור את הלשונית."
+        : status === "cancelled"
+          ? "לא חויבת. אפשר לסגור את הלשונית."
+          : "עוד לא קיבלנו אישור על התשלום. הדקות יופיעו באפליקציה מיד כשהוא יעבור.",
+    backToApp: "חזרה למורה לרגע",
     checkoutFailed: "לא הצלחנו להתחיל את התשלום. כדאי לנסות שוב.",
     popupBlocked: "הדפדפן חסם את לשונית התשלום.",
     profileTitle: "פרופיל",

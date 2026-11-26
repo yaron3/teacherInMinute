@@ -347,6 +347,10 @@ export interface PaymentCheckoutDoc {
   tranzilaThtk?: string;
   /** Wallet the buyer picked, e.g. "apple_pay", "credit_card". Undefined means default PayPal flow. */
   paymentMethod?: string;
+  /** For a checkout opened by the web client: the page to come back to when
+   *  the payment pages finish, instead of the app's `teacherminute://` link.
+   *  Always one of the project's own Hosting origins (allowedWebReturnUrl). */
+  webReturnUrl?: string;
 }
 
 // ─── Firestore — users/{uid} ─────────────────────────────────────────────────

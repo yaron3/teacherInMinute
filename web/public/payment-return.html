@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payment</title>
+    <style>
+      body { margin: 0; background: #fff; font-family: system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <script>
+      // Where the payment pages end for a web checkout (backend
+      // paymentReturnLink → webReturnUrl). Inside the app's checkout sheet it
+      // tells the app how the payment ended, as it does from PayPal's window, which
+      // it then closes; opened on its own, it hands the
+      // same answer to the app's return screen.
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var message = { source: "tim-payment", status: params.get("payment"), checkoutId: params.get("checkout_id") };
+        if (window.parent !== window) {
+          // The app's checkout sheet.
+          window.parent.postMessage(message, location.origin);
+        } else if (window.opener && !window.opener.closed) {
+          // PayPal's own window, which the app opened.
+          try {
+            window.opener.postMessage(message, location.origin);
+          } catch (e) {}
+          window.close();
+          setTimeout(function () {
+            location.replace("./?" + params.toString());
+          }, 300);
+        } else {
+          location.replace("./?" + params.toString());
+        }
+      })();
+    </script>
+  </body>
+</html>

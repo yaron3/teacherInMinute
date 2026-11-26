@@ -150,6 +150,8 @@ export {
   tranzilaCheckoutStatus,
   tranzilaNotify,
   paypalSuccess,
+  getPayPalWebConfig,
+  capturePayPalOrder,
   paypalCancel,
   paypalWebhook,
   billingPage,

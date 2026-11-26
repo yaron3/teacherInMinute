@@ -151,10 +151,36 @@ to Auth's authorized domains. Read the dispatch warning in the root
   block the teacher there (`reportTeacher`, which emails support, and
   `blockTeacher`).
 - Buy minutes: the active packages in `pricing`, then `createCheckoutSession`
-  with `credit_card`, which opens the hosted Tranzila card page in a new tab.
+  with `credit_card`, which opens the hosted Tranzila card page in a sheet
+  inside the app (an iframe, `allow="payment"`; same origin as the app on
+  Hosting, since the page is served through its `/tranzilaCheckout` rewrite).
   The page follows `paymentCheckouts/{id}` and the balance, which the backend
   credits once the payment is confirmed. In the emulators the checkout cannot
   open (no Tranzila or PayPal keys), and the page says so.
+  - The checkout carries `webReturnUrl` (`/app/payment-return.html`), so the
+    payment pages end there instead of at the app's
+    `teacherminute://payment-return` link, which a browser cannot open. The
+    backend keeps it only for this project's own Hosting origins (localhost
+    under the emulators). In the sheet, that page posts the outcome to the
+    app, which closes the sheet; opened on its own, it hands the outcome to
+    the app's return screen. Firestore's `paymentCheckouts/{id}` closes the
+    sheet too, so a backend without `webReturnUrl` still works.
+  - Payment methods, as the apps offer them (`PaymentMethod`): the
+    browser's own wallet — Apple Pay in Safari (`ApplePaySession`), Google
+    Pay elsewhere — then PayPal and credit card; the choice is remembered.
+    Card, Apple Pay (`createApplePayCheckout`) and Google Pay
+    (`createGooglePayCheckout`) open the Tranzila page in the sheet. The
+    wallets have that page only while the functions' `TRANZILA_WALLETS`
+    lists them (`apple_pay,google_pay`); otherwise the backend answers for
+    Braintree's native sheet and the web says the wallet is not available.
+    PayPal is PayPal's standard checkout: its own buttons (JS SDK, loaded
+    from paypal.com with the client id from `getPayPalWebConfig`) in each
+    package. `createOrder` opens the checkout through `createCheckoutSession`
+    with no method, which returns the PayPal `orderId` and `checkoutId`;
+    PayPal runs the approval in its popup; `onApprove` calls
+    `capturePayPalOrder`, which captures the checkout's own order (never one
+    the page names), checks the amount and credits the minutes — the same
+    code as the app's `paypalSuccess` redirect.
 - Profile: name, phone, grade and date of birth, saved with the same fields
   and formats as `ProfileViewModel.persistProfileEdits`.
 - Help & Support: the contact form (title up to 50, description up to 1,024,
