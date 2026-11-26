@@ -1,0 +1,94 @@
+/* The mobile apps are drawn dark throughout, whatever the system says; the
+   web client follows them. */
+:root {
+  --bg: #0b0f1a;
+  --surface: #151b2b;
+  --surface-2: #1e2638;
+  --text: #f2f4f8;
+  --muted: #9aa3b5;
+  --accent: #5b8cff;
+  --accent-text: #ffffff;
+  --error: #ff6b6b;
+  color-scheme: dark;
+  font-family: system-ui, "Segoe UI", -apple-system, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; }
+#root { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+
+h1 { margin: 0; font-size: 1.5rem; }
+h2 { margin: 0 0 16px; font-size: 1.25rem; }
+.muted { color: var(--muted); margin: 4px 0 0; }
+
+.dev-banner {
+  position: fixed; inset-block-start: 0; inset-inline-end: 0;
+  background: #b7791f; color: #000; font-size: 12px; padding: 2px 10px;
+  border-end-start-radius: 8px;
+}
+
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 24px; }
+.top-actions { display: flex; gap: 4px; }
+
+.card {
+  background: var(--surface); border-radius: 16px; padding: 24px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.card.center { align-items: center; text-align: center; }
+
+input, textarea {
+  font: inherit; color: var(--text); background: var(--surface-2);
+  border: 1px solid transparent; border-radius: 10px; padding: 12px; width: 100%;
+}
+input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+textarea { resize: vertical; }
+
+button { font: inherit; cursor: pointer; border: none; border-radius: 10px; }
+button:disabled { opacity: 0.45; cursor: default; }
+.primary { background: var(--accent); color: var(--accent-text); padding: 12px 20px; font-weight: 600; }
+.secondary { background: var(--surface-2); color: var(--text); padding: 10px 20px; }
+.link { background: none; color: var(--accent); padding: 6px 8px; }
+
+.label { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { background: var(--surface-2); color: var(--text); padding: 8px 14px; border-radius: 999px; }
+.chip.selected { background: var(--accent); color: var(--accent-text); }
+.pill { align-self: flex-start; margin: 0; background: var(--surface-2); padding: 4px 12px; border-radius: 999px; font-size: 0.85rem; }
+.error { color: var(--error); margin: 0; }
+
+.pulse {
+  width: 56px; height: 56px; border-radius: 50%; background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+.small { font-size: 0.85rem; }
+.danger { background: #c53030; color: #fff; padding: 10px 16px; }
+
+.lesson { gap: 10px; min-height: 70vh; }
+.lesson-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.lesson-actions { display: flex; gap: 8px; }
+
+.video-stage { position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+.video-stage .remote { width: 100%; height: 100%; object-fit: cover; }
+.video-stage .self {
+  position: absolute; inset-block-end: 10px; inset-inline-end: 10px; width: 28%;
+  border-radius: 8px; border: 2px solid var(--surface); transform: scaleX(-1);
+}
+
+.messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; min-height: 200px; max-height: 50vh; }
+.bubble {
+  align-self: flex-start; background: var(--surface-2); padding: 8px 12px;
+  border-radius: 14px; max-width: 80%; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.bubble.mine { align-self: flex-end; background: var(--accent); color: var(--accent-text); }
+.composer { display: flex; gap: 8px; }
+
+.stars { display: flex; gap: 6px; }
+.star { background: none; font-size: 2rem; color: var(--surface-2); padding: 0 2px; }
+.star.on { color: #f6c343; }
