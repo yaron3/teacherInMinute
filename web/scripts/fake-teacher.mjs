@@ -78,8 +78,14 @@ if (process.argv[2] === "leave") {
   process.exit(0);
 }
 
-const qid = await newestSearchingQuestion();
-if (!qid) throw new Error("no searching question — ask one in the web app first");
+// Waits for one, so the script can be started before or after asking.
+let qid = await newestSearchingQuestion();
+if (!qid) console.log("waiting for a question — ask one in the web app (up to 2 minutes)…");
+for (let waited = 0; !qid && waited < 120; waited++) {
+  await new Promise((r) => setTimeout(r, 1000));
+  qid = await newestSearchingQuestion();
+}
+if (!qid) throw new Error("no searching question after 2 minutes — ask one in the web app and leave it searching");
 
 await firestorePatch(`users/${teacher.uid}`, {
   uid: str(teacher.uid), role: str("teacher"), fullName: str(NAME), email: str(EMAIL),
