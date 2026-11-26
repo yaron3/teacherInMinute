@@ -34,7 +34,7 @@ export async function fetchPackages(languageCode: "en" | "he"): Promise<MinutesP
           description: local("description"),
           minutes: Number(data.minutes ?? data.minutesGranted ?? 0),
           priceCents: Math.floor(Number(data.priceCents ?? 0)),
-          currency: String(data.currency ?? "ILS").toUpperCase(),
+          currency: currencyCode(String(data.currency ?? "ILS")),
           highlighted: data.isHighlighted === true,
         } satisfies MinutesPackage,
       };
@@ -80,10 +80,26 @@ export function watchCheckout(checkoutId: string, onChange: (state: CheckoutStat
   );
 }
 
+/** A currency code as Intl takes it. Stored codes are not always clean:
+ *  staging's package has `"ILS"`, quotes included. */
+export function currencyCode(raw: string): string {
+  const code = raw.replace(/[^A-Za-z]/g, "").toUpperCase();
+  return code.length === 3 ? code : "ILS";
+}
+
+/** A price as LessonFormatting.currencyText writes it: no ".00" on a whole
+ *  amount. */
 export function formatPrice(cents: number, currency: string, locale: string) {
+  const code = currencyCode(currency);
+  const whole = cents % 100 === 0;
   try {
-    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(cents / 100);
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: whole ? 0 : 2,
+      maximumFractionDigits: whole ? 0 : 2,
+    }).format(cents / 100);
   } catch {
-    return `${(cents / 100).toFixed(2)} ${currency}`;
+    return `${(cents / 100).toFixed(whole ? 0 : 2)} ${code}`;
   }
 }

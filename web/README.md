@@ -78,6 +78,21 @@ http://localhost:8793, talking to the real staging project).
 For production: register a Web app in `teacher-in-a-moment`, put its config in
 `web/.env.prod` (as `.env.staging`), and deploy with `-P prod`.
 
+### Staging test accounts
+
+Created by the UI test run on staging (`teacher-in-a-moment-staging`); the
+password was generated for the run and is not kept in the repository.
+
+| Role | Email | Name | Notes |
+|---|---|---|---|
+| Student | `ui-student-11261348@example.com` | UI Test Student | got the sign-up minutes (60) |
+| Teacher | `ui-teacher-11261348@example.com` | UI Test Teacher | subjects: Math → trigonometry; offline |
+
+A new student account is credited sign-up minutes within seconds, while the
+page can still show 0, so check the balance on the server before asking a
+question, and read `onlineTeachers` first: with fewer than three teachers on
+a topic, dispatch sends a question to every online teacher.
+
 ## Against a real project
 
 Register a Web app in the Firebase project and fill the `VITE_FIREBASE_*`
