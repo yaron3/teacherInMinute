@@ -28,7 +28,7 @@ export function StudentHome({ profile }: { profile: StudentProfile | null }) {
     return (
       <Lesson
         key={search.questionId}
-        input={{ questionId: search.questionId, conversationType: search.conversationType, liveKitToken: search.liveKitToken }}
+        input={{ questionId: search.questionId, conversationType: search.conversationType, liveKitToken: search.liveKitToken, questionText: search.questionText }}
         onFinished={vm.finishLesson}
       />
     );

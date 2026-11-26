@@ -3,6 +3,12 @@
 // named demo-*, which the emulators never forward to a real backend.
 //
 //   node web/scripts/fake-teacher.mjs            # accept the newest searching question
+//   node web/scripts/fake-teacher.mjs draw       # draw a triangle on the board
+//   node web/scripts/fake-teacher.mjs grant      # let the student draw (answers their ask)
+//   node web/scripts/fake-teacher.mjs decline    # refuse the student's ask to draw
+//   node web/scripts/fake-teacher.mjs media video|audio|text   # switch the lesson's medium
+//   node web/scripts/fake-teacher.mjs state <bits>  # 1 = mic muted, 2 = camera off
+//   node web/scripts/fake-teacher.mjs say "text" # send a chat message
 //   node web/scripts/fake-teacher.mjs leave      # then leave the lesson it accepted
 //
 // Accepting is faked with admin writes (the real path, acceptInvite, needs the
@@ -11,7 +17,7 @@
 
 import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from "firebase/auth";
-import { connectDatabaseEmulator, getDatabase, push, ref, serverTimestamp, set } from "firebase/database";
+import { connectDatabaseEmulator, get, getDatabase, push, ref, serverTimestamp, set } from "firebase/database";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -70,11 +76,39 @@ async function newestSearchingQuestion() {
 const teacher = await signIn();
 const str = (v) => ({ stringValue: v });
 
-if (process.argv[2] === "leave") {
+const command = process.argv[2];
+if (command) {
   const { qid } = JSON.parse(readFileSync(STATE, "utf8"));
-  await set(ref(db, `lessonPresence/${qid}/teacher/leftAt`), serverTimestamp());
-  const result = await httpsCallable(fns, "endLesson")({ questionId: qid });
-  console.log("teacher left; endLesson ->", JSON.stringify(result.data));
+  const q = (path) => ref(db, `questions/${qid}/${path}`);
+  if (command === "leave") {
+    await set(ref(db, `lessonPresence/${qid}/teacher/leftAt`), serverTimestamp());
+    const result = await httpsCallable(fns, "endLesson")({ questionId: qid });
+    console.log("teacher left; endLesson ->", JSON.stringify(result.data));
+  } else if (command === "draw") {
+    // A right triangle, like the iPad screenshots: shapes travel as points.
+    const pts = [{ x: 500, y: 600 }, { x: 500, y: 1400 }, { x: 1500, y: 1400 }, { x: 500, y: 600 }];
+    await set(push(q("board/strokes")), { points: pts, createdAt: Date.now(), senderUid: teacher.uid });
+    await set(ref(db, `questions/${qid}/board/viewports/teacher`), { x: 0, y: 0, width: 2000, height: 2000, updatedAt: Date.now() });
+    console.log("drew a triangle");
+  } else if (command === "grant" || command === "decline") {
+    const p = (await get(q("boardPermission"))).val();
+    if (!p?.requestId) throw new Error("the student has not asked to draw");
+    await set(q("boardPermission"), { status: command === "grant" ? "granted" : "declined", requestId: p.requestId, updatedAt: serverTimestamp() });
+    console.log(`${command}ed request`, p.requestId);
+  } else if (command === "media") {
+    const type = process.argv[3];
+    if (!["text", "audio", "video"].includes(type)) throw new Error("media text|audio|video");
+    await set(q("conversationType"), type);
+    console.log("switched the lesson to", type);
+  } else if (command === "state") {
+    await set(q("mediaState/teacher"), Number(process.argv[3] ?? 0));
+    console.log("teacher media state", process.argv[3]);
+  } else if (command === "say") {
+    await set(push(q("messages")), { text: process.argv[3] ?? "", senderUid: teacher.uid, senderRole: "teacher", createdAt: Date.now(), kind: "text" });
+    console.log("sent");
+  } else {
+    throw new Error(`unknown command ${command}`);
+  }
   process.exit(0);
 }
 

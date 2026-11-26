@@ -5,21 +5,81 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from "firebase/auth";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { auth, firestore } from "./firebase";
 
 export interface StudentProfile {
   role: string;
   fullName: string;
+  email: string;
+  phoneNumber: string;
+  /** Canonical value, e.g. "Grade 8", "College", "Adult Learner". */
+  grade: string;
+  /** ISO date-time, as the apps store it; empty when never set. */
+  dateOfBirth: string;
+  photoUrl: string;
   remainingMinutes: number;
+}
+
+/** The grades a student picks from (ProfileViewModel.studentGradeKeys). */
+export const STUDENT_GRADES = ["Grade 8", "Grade 9", "Grade 10", "Grade 11", "Grade 12", "College", "Adult Learner"];
+
+/** The fields a student edits, written as ProfileViewModel.persistProfileEdits
+ *  does. Minutes and earnings are server-owned and never sent. */
+export async function updateProfile(
+  uid: string,
+  fields: { fullName: string; phoneNumber: string; grade: string; dateOfBirth: string },
+): Promise<void> {
+  const data: Record<string, string> = {
+    fullName: fields.fullName.trim(),
+    phoneNumber: fields.phoneNumber.trim(),
+    grade: fields.grade,
+    updatedAt: new Date().toISOString(),
+  };
+  if (fields.dateOfBirth) data.dateOfBirth = fields.dateOfBirth;
+  await updateDoc(doc(firestore, "users", uid), data);
 }
 
 export function watchAuth(onChange: (user: User | null) => void): () => void {
   return onAuthStateChanged(auth, onChange);
 }
 
-export async function signIn(email: string, password: string): Promise<void> {
-  await signInWithEmailAndPassword(auth, email.trim(), password);
+// While a sign-in checks the account's role, the app shows no dashboard, so a
+// wrong choice never flashes the other side's screens.
+let checkingRole = false;
+const roleCheckListeners = new Set<(checking: boolean) => void>();
+export function watchRoleCheck(onChange: (checking: boolean) => void): () => void {
+  roleCheckListeners.add(onChange);
+  onChange(checkingRole);
+  return () => roleCheckListeners.delete(onChange);
+}
+const setChecking = (v: boolean) => {
+  checkingRole = v;
+  roleCheckListeners.forEach((l) => l(v));
+};
+
+export type AccountRole = "student" | "teacher";
+
+/** Thrown when the account is the other role from the one chosen. */
+export class WrongRoleError extends Error {
+  constructor(readonly actual: AccountRole) {
+    super(`account is a ${actual}`);
+  }
+}
+
+/** Signs in as `role`; an account of the other role is signed out again. */
+export async function signIn(email: string, password: string, role: AccountRole = "student"): Promise<void> {
+  setChecking(true);
+  try {
+    const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
+    const actual: AccountRole = (await getDoc(doc(firestore, "users", user.uid))).data()?.role === "teacher" ? "teacher" : "student";
+    if (actual !== role) {
+      await firebaseSignOut(auth);
+      throw new WrongRoleError(actual);
+    }
+  } finally {
+    setChecking(false);
+  }
 }
 
 /** Creates a student account with the same profile fields the mobile apps
@@ -44,7 +104,16 @@ export async function signUpStudent(fullName: string, email: string, password: s
   );
 }
 
+/** Work to finish while still signed in, such as taking a teacher offline:
+ *  signing out does not clear presence by itself. */
+const beforeSignOut = new Set<() => Promise<void>>();
+export function onBeforeSignOut(task: () => Promise<void>): () => void {
+  beforeSignOut.add(task);
+  return () => beforeSignOut.delete(task);
+}
+
 export async function signOut(): Promise<void> {
+  await Promise.all([...beforeSignOut].map((task) => task().catch((e) => console.error("[account] before sign-out failed", e))));
   await firebaseSignOut(auth);
 }
 
@@ -57,6 +126,11 @@ export function watchProfile(uid: string, onChange: (profile: StudentProfile | n
       onChange({
         role: String(data.role ?? ""),
         fullName: String(data.fullName ?? ""),
+        email: String(data.email ?? ""),
+        phoneNumber: String(data.phoneNumber ?? ""),
+        grade: String(data.grade ?? ""),
+        dateOfBirth: String(data.dateOfBirth ?? ""),
+        photoUrl: String(data.profileImageURL ?? data.photoURL ?? data.imageURL ?? ""),
         remainingMinutes: Number(data.remainingMinutes ?? 0),
       });
     },

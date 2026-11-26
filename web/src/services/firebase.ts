@@ -3,6 +3,7 @@ import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectDatabaseEmulator, getDatabase } from "firebase/database";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
+import { connectStorageEmulator, getStorage } from "firebase/storage";
 
 const env = import.meta.env;
 const projectId = env.VITE_FIREBASE_PROJECT_ID || "demo-teacher-in-a-moment";
@@ -29,6 +30,7 @@ export const firestore = getFirestore(app);
 export const database = getDatabase(app);
 // The backend sets no region, so every callable lives in us-central1.
 export const functions = getFunctions(app, "us-central1");
+export const storage = getStorage(app);
 
 if (usingEmulators) {
   // Ports from backend/Firebase/firebase.json.
@@ -36,4 +38,5 @@ if (usingEmulators) {
   connectFirestoreEmulator(firestore, "127.0.0.1", 8085);
   connectDatabaseEmulator(database, "127.0.0.1", 9000);
   connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+  connectStorageEmulator(storage, "127.0.0.1", 9199);
 }

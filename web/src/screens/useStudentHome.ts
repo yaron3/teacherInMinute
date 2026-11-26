@@ -13,7 +13,7 @@ export type SearchState =
   | { kind: "idle" }
   | { kind: "sending" }
   | { kind: "searching"; questionId: string }
-  | { kind: "matched"; questionId: string; conversationType: ConversationType; liveKitToken?: string }
+  | { kind: "matched"; questionId: string; conversationType: ConversationType; liveKitToken?: string; questionText: string }
   | { kind: "noMatch" }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -40,12 +40,13 @@ export function useStudentHome() {
     if (!canAsk) return;
     setSearch({ kind: "sending" });
     try {
-      const { questionId, liveKitToken } = await createQuestion(topic, text.trim(), conversationType);
+      const asked = text.trim();
+      const { questionId, liveKitToken } = await createQuestion(topic, asked, conversationType);
       setSearch({ kind: "searching", questionId });
       stop();
       stopListening.current = watchQuestionStatus(questionId, (status) => {
         if (status === "accepted" || status === "in_progress") {
-          setSearch({ kind: "matched", questionId, conversationType, liveKitToken });
+          setSearch({ kind: "matched", questionId, conversationType, liveKitToken, questionText: asked });
           stop();
         } else if (status === "unanswered" || status === null) {
           setSearch({ kind: "noMatch" });

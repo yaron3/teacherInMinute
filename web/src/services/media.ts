@@ -62,3 +62,20 @@ export function localCameraTrack(room: Room) {
 export async function setMicrophone(room: Room, on: boolean) {
   await room.localParticipant.setMicrophoneEnabled(on);
 }
+
+export async function setCamera(room: Room, on: boolean) {
+  await room.localParticipant.setCameraEnabled(on);
+}
+
+/** Asks the browser for the microphone (and camera) up front, so a lesson only
+ *  switches medium once the devices are allowed — prepareMedia on the apps. */
+export async function probeDevices(withVideo: boolean): Promise<boolean> {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo });
+    stream.getTracks().forEach((t) => t.stop());
+    return true;
+  } catch (error) {
+    console.error("[media] device permission refused", error);
+    return false;
+  }
+}
