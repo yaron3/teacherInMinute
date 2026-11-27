@@ -9,6 +9,8 @@ import { republishAllTeacherPresence, ONLINE_TEACHERS_PATH } from "./presence";
 import { PILOT_COLLECTION } from "./pilot";
 import { summarizeOnlineTeachers } from "./presenceHistory";
 import { readLiveStatus } from "./liveStatus";
+import { readLiveDetails } from "./liveDetails";
+import { repairQuestionTimes } from "./questionTimes";
 import { DEMO_USER_FIELD, inChunks, readDemoUserUids } from "./demoUsers";
 import { deleteAccountData } from "./accountDeletion";
 import { sendMail, supportSmtpConfig } from "./mailer";
@@ -17,6 +19,24 @@ import { contactAttachmentPaths } from "./contactAttachments";
 import { sendAdminPush } from "./fcm";
 import { wantsPush } from "./scoring";
 import { MAX_TEACHER_RATE_ILS, parseAdminTeacherRate } from "./pricing";
+import { PURCHASE_WINDOWS, PurchaseRow, purchaseMethod, summarizePurchases } from "./purchaseStats";
+import {
+  STALE_LIVE_AFTER_MS,
+  STALE_LIVE_CLOSE_MAX,
+  StaleLiveRef,
+  StaleLiveResult,
+  buildStaleLivePreview,
+  closeStaleLiveItem,
+  isStaleLiveRef,
+} from "./staleLive";
+import {
+  DEMO_CLEANUP_ACCOUNTS_MAX,
+  DEMO_CLEANUP_ITEMS_MAX,
+  buildDemoCleanupPreview,
+  deleteDemoCleanupItem,
+  DemoCleanupItemRef,
+  isCleanupKind,
+} from "./demoCleanup";
 import {
   isPlausibleEmail,
   parseRecipients,
@@ -431,10 +451,14 @@ export const adminDashboardStatus = onCall(async (req) => {
     if (oldest) oldestSearching = { id: oldest.id, ...serializeDoc(oldest.data()) };
   }
 
-  const completedPaymentsSnap = await firestore
-    .collection("paymentCheckouts")
-    .where("status", "==", "completed")
-    .get();
+  const [completedPaymentsSnap, recentCheckoutsSnap] = await Promise.all([
+    firestore.collection("paymentCheckouts").where("status", "==", "completed").get(),
+    // Checkouts opened in the longest purchase window, for the abandoned counts.
+    firestore
+      .collection("paymentCheckouts")
+      .where("createdAt", ">=", Timestamp.fromMillis(Date.now() - PURCHASE_WINDOWS[PURCHASE_WINDOWS.length - 1].ms))
+      .get(),
+  ]);
 
   // Sums, averages and the outlier check are per currency: 5000 ILS and 5000
   // USD are not the same payment, so nothing here adds or compares across them.
@@ -493,6 +517,22 @@ export const adminDashboardStatus = onCall(async (req) => {
   });
 
   const nowMs = Date.now();
+  const purchaseRows = new Map<string, PurchaseRow>();
+  for (const d of [...completedPaymentsSnap.docs, ...recentCheckoutsSnap.docs]) {
+    const data = d.data();
+    purchaseRows.set(d.id, {
+      uid: String(data.uid ?? ""),
+      status: String(data.status ?? ""),
+      currency: (data.currency as string) || "USD",
+      priceCents: Number(data.priceCents) || 0,
+      minutes: Number(data.minutes) || 0,
+      method: purchaseMethod(data),
+      createdAtMs: dateFieldToMs(data.createdAt),
+      completedAtMs: dateFieldToMs(data.completedAt),
+    });
+  }
+  const purchases = summarizePurchases([...purchaseRows.values()], nowMs, demoUids);
+
   const [lastDayQuestions, lastDayTeachers] = await Promise.all([
     summarizeLastDayQuestions(nowMs, demoUids),
     summarizeOnlineTeachers(nowMs, DAY_MS),
@@ -534,6 +574,7 @@ export const adminDashboardStatus = onCall(async (req) => {
       teachers: lastDayTeachers,
     },
     platform: platformStats,
+    purchases,
     revenue: {
       totalCents: totalRevenueCents,
       currency: revenueCurrency,
@@ -551,6 +592,25 @@ export const adminDashboardStatus = onCall(async (req) => {
 export const adminLiveStatus = onCall(async (req) => {
   assertAdmin(req);
   return readLiveStatus(Date.now());
+});
+
+/**
+ * Turns question times saved as plain milliseconds back into Timestamps (see
+ * ./questionTimes). `dryRun` only counts. Call again while `more` is true.
+ */
+export const adminRepairQuestionTimes = onCall({ timeoutSeconds: 300 }, async (req) => {
+  assertAdmin(req);
+  const dryRun = (req.data as { dryRun?: unknown })?.dryRun !== false;
+  const result = await repairQuestionTimes(dryRun);
+  logger.info(`[admin] question times ${dryRun ? "dry run" : "repair"} found=${result.found} repaired=${result.repaired} more=${result.more} by=${req.auth?.token?.email}`);
+  return result;
+});
+
+/** The Live page's slower poll: each online teacher in detail, and recent
+ *  sign-ups (see ./liveDetails). */
+export const adminLiveDetails = onCall({ timeoutSeconds: 120 }, async (req) => {
+  assertAdmin(req);
+  return readLiveDetails(Date.now());
 });
 
 // ─── adminListUsers ────────────────────────────────────────────────────────────
@@ -1827,6 +1887,114 @@ export const adminBulkDeleteUsers = onCall({ timeoutSeconds: 540 }, async (req) 
   logger.info(`[admin] bulk delete: requested=${uids.length} deleted=${deleted} anonymousOnly=${days != null} by=${req.auth?.token?.email}`);
   return { results };
 });
+
+// ─── Demo data cleanup ─────────────────────────────────────────────────────────
+//
+// The console lists what demo users left behind (see ./demoCleanup) as a
+// checklist, then sends the ticked records and accounts back in chunks.
+
+/** Every demo account and record the cleanup could delete. Reads only. */
+export const adminDemoCleanupPreview = onCall({ timeoutSeconds: 120 }, async (req) => {
+  assertAdmin(req);
+  const preview = await buildDemoCleanupPreview();
+  logger.info(`[admin] demo cleanup preview accounts=${preview.accounts.length} items=${preview.items.length} by=${req.auth?.token?.email}`);
+  return preview;
+});
+
+/**
+ * Deletes the ticked records, then the ticked accounts. Each is checked again
+ * first: a record that is live or involves a real user, or an account no
+ * longer marked demo, is skipped and reported, never deleted.
+ */
+export const adminDemoCleanup = onCall({ timeoutSeconds: 540 }, async (req) => {
+  assertAdmin(req);
+  const { items = [], accounts = [] } = req.data as { items?: unknown; accounts?: unknown };
+  if (!Array.isArray(items) || !items.every((i) => isCleanupItemRef(i))) {
+    throw new HttpsError("invalid-argument", "items must be a list of {kind, id}");
+  }
+  if (!Array.isArray(accounts) || !accounts.every((u) => typeof u === "string" && u)) {
+    throw new HttpsError("invalid-argument", "accounts must be a list of uids");
+  }
+  if (items.length > DEMO_CLEANUP_ITEMS_MAX) throw new HttpsError("invalid-argument", `At most ${DEMO_CLEANUP_ITEMS_MAX} records per call`);
+  if (accounts.length > DEMO_CLEANUP_ACCOUNTS_MAX) throw new HttpsError("invalid-argument", `At most ${DEMO_CLEANUP_ACCOUNTS_MAX} accounts per call`);
+  if (items.length === 0 && accounts.length === 0) throw new HttpsError("invalid-argument", "Nothing selected");
+
+  const demoUids = await readDemoUserUids();
+
+  const itemResults: (DemoCleanupItemRef & { status: string; reason?: string })[] = [];
+  for (const ref of items as DemoCleanupItemRef[]) {
+    try {
+      itemResults.push({ ...ref, ...(await deleteDemoCleanupItem(ref, demoUids)) });
+    } catch (err) {
+      itemResults.push({ ...ref, status: "failed", reason: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  const accountResults: { uid: string; status: string; reason?: string }[] = [];
+  for (const uid of [...new Set(accounts as string[])]) {
+    try {
+      if (uid === req.auth?.uid) accountResults.push({ uid, status: "skipped", reason: "your own admin account" });
+      else if (!demoUids.has(uid)) accountResults.push({ uid, status: "skipped", reason: "not a demo user" });
+      else {
+        await deleteUserCompletely(uid);
+        accountResults.push({ uid, status: "deleted" });
+      }
+    } catch (err) {
+      accountResults.push({ uid, status: "failed", reason: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  if (accountResults.some((r) => r.status === "deleted")) {
+    await recomputeRegisteredTeacherCount().catch((err) => logger.warn(`[admin] teacher recount after demo cleanup failed`, err));
+  }
+
+  const count = (rs: { status: string }[], s: string) => rs.filter((r) => r.status === s).length;
+  logger.info(
+    `[admin] demo cleanup records deleted=${count(itemResults, "deleted")}/${items.length} accounts deleted=${count(accountResults, "deleted")}/${accounts.length} by=${req.auth?.token?.email}`
+  );
+  return { items: itemResults, accounts: accountResults };
+});
+
+// ─── Stale live questions and lessons ────────────────────────────────────────
+//
+// Records still marked live long after any lesson could be running (see
+// ./staleLive). The console lists them and closes the ticked ones as a
+// write-off: nobody is charged or paid.
+
+/** Every stale live question and lesson. Reads only. */
+export const adminStaleLivePreview = onCall({ timeoutSeconds: 120 }, async (req) => {
+  assertAdmin(req);
+  const items = await buildStaleLivePreview();
+  logger.info(`[admin] stale live preview items=${items.length} by=${req.auth?.token?.email}`);
+  return { items, staleAfterHours: STALE_LIVE_AFTER_MS / 3600000 };
+});
+
+/** Closes the ticked records, each checked again first. */
+export const adminCloseStaleLive = onCall({ timeoutSeconds: 540 }, async (req) => {
+  assertAdmin(req);
+  const { items } = req.data as { items?: unknown };
+  if (!Array.isArray(items) || items.length === 0 || !items.every((i) => isStaleLiveRef(i))) {
+    throw new HttpsError("invalid-argument", "items must be a non-empty list of {kind, id}");
+  }
+  if (items.length > STALE_LIVE_CLOSE_MAX) throw new HttpsError("invalid-argument", `At most ${STALE_LIVE_CLOSE_MAX} records per call`);
+
+  const results: (StaleLiveRef & StaleLiveResult)[] = [];
+  for (const ref of items as StaleLiveRef[]) {
+    try {
+      results.push({ ...ref, ...(await closeStaleLiveItem(ref)) });
+    } catch (err) {
+      results.push({ ...ref, status: "failed", reason: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  logger.info(
+    `[admin] stale live closed=${results.filter((r) => r.status === "closed").length}/${items.length} by=${req.auth?.token?.email}`
+  );
+  return { items: results };
+});
+
+function isCleanupItemRef(value: unknown): value is DemoCleanupItemRef {
+  const v = value as DemoCleanupItemRef | null;
+  return !!v && typeof v === "object" && isCleanupKind(v.kind) && typeof v.id === "string" && v.id.length > 0 && !v.id.includes("/");
+}
 
 /**
  * Emails up to BULK_EMAIL_MAX users, one message each — recipients never see
