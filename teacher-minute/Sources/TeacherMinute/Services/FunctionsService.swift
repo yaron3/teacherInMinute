@@ -154,6 +154,19 @@ struct QuestionStatusResult {
 
 struct CheckoutSessionResult {
   let checkoutURL: URL
+  /// The PayPal order behind a plain PayPal checkout, and our checkout doc,
+  /// for approving it in the native SDK and capturing it afterwards. Absent
+  /// for the wallet and card flows, which only have a URL.
+  var checkoutID: String? = nil
+  var orderID: String? = nil
+}
+
+/// What the native PayPal SDK is configured with. `merchantID` is empty until
+/// the backend has PAYPAL_MERCHANT_ID; the SDK cannot run without it.
+struct PayPalSDKConfig {
+  let clientID: String
+  let isLive: Bool
+  let merchantID: String
 }
 
 struct ApplePayCheckoutSession {
@@ -551,7 +564,31 @@ final class FunctionsService {
       logger.error("[PaymentReturn] createCheckoutSession missing checkout URL in result=\(result)")
       throw FunctionsError.decodingError(function: "createCheckoutSession", response: "\(result)")
     }
-    return CheckoutSessionResult(checkoutURL: checkoutURL)
+    return CheckoutSessionResult(
+      checkoutURL: checkoutURL,
+      checkoutID: Self.firstString(in: result, keys: ["checkoutId", "checkoutID"]),
+      orderID: Self.firstString(in: result, keys: ["orderId", "orderID"])
+    )
+  }
+
+  /// The public PayPal settings the native SDK needs (`getPayPalWebConfig`,
+  /// shared with the web's JS SDK).
+  func payPalSDKConfig() async throws -> PayPalSDKConfig {
+    let result = try await call(function: "getPayPalWebConfig", data: [:])
+    guard let clientID = Self.firstString(in: result, keys: ["clientId"]) else {
+      throw FunctionsError.decodingError(function: "getPayPalWebConfig", response: "\(result)")
+    }
+    return PayPalSDKConfig(
+      clientID: clientID,
+      isLive: (result["environment"] as? String) == "live",
+      merchantID: Self.firstString(in: result, keys: ["merchantId"]) ?? ""
+    )
+  }
+
+  /// Captures a PayPal order the buyer approved in the native SDK and credits
+  /// the minutes; the same call the web makes from PayPal's onApprove.
+  func capturePayPalOrder(checkoutID: String, orderID: String) async throws {
+    _ = try await call(function: "capturePayPalOrder", data: ["checkoutId": checkoutID, "orderId": orderID])
   }
 
   func createApplePayCheckout(pricingOptionID: String) async throws -> ApplePayCheckoutSession {

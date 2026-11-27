@@ -13,8 +13,6 @@ struct MinutesPurchaseView: View {
   let onClose: () -> Void
 
   @State var selectedOptionID: String?
-  @State var selectedMethod: PaymentMethod?
-  @State var showsMethodPicker = false
 
   @Environment(\.colorScheme) var colorScheme
   var theme: AppTheme {
@@ -38,19 +36,6 @@ struct MinutesPurchaseView: View {
     }
     .environment(\.colorScheme, .dark)
     .systemBarIcons(darkStatusBar: false, darkNavigationBar: false)
-    .sheet(isPresented: $showsMethodPicker) {
-      if let option = selectedOption {
-        PaymentMethodSheet(
-          viewModel: viewModel,
-          methods: viewModel.supportedPaymentMethods(for: option),
-          theme: AppTheme(colorScheme: colorScheme),
-          savedPayPalEmail: viewModel.savedPayPalEmail
-        ) { method in
-          selectedMethod = method
-          showsMethodPicker = false
-        }
-      }
-    }
     .onAppear {
       viewModel.logPurchaseScreenShown()
     }
@@ -75,7 +60,6 @@ struct MinutesPurchaseView: View {
         VStack(alignment: .leading, spacing: 24) {
           header
           packageSection
-          paymentSection
 		  explanation
           summaryCard
           payActions
@@ -248,79 +232,6 @@ struct MinutesPurchaseView: View {
 
   // MARK: - Payment method
 
-  private var paymentSection: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(viewModel.paymentMethodTitle)
-        .font(.system(size: 17, weight: .bold))
-        .foregroundStyle(theme.onDarkFill)
-
-      if let method = currentMethod {
-        methodCard(method)
-      }
-    }
-  }
-
-  private func methodCard(_ method: PaymentMethod) -> some View {
-    HStack(spacing: 10) {
-      Text(viewModel.paymentMethodShortName(method))
-        .font(.system(size: 14))
-        .foregroundStyle(theme.brandSecondaryText)
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
-        .padding(.horizontal, 6)
-        .frame(width: 108, height: 52)
-        .background(theme.brandBackgroundTop)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay {
-          RoundedRectangle(cornerRadius: 10)
-            .stroke(theme.brandControlBorder, lineWidth: 1)
-        }
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text(viewModel.paymentMethodTitle(method))
-          .font(.system(size: 15, weight: .bold))
-          .foregroundStyle(theme.onDarkFill)
-          .lineLimit(1)
-          .minimumScaleFactor(0.8)
-        if method == .savedPayPal, let email = viewModel.savedPayPalEmail {
-          Text(email)
-            .font(.system(size: 12))
-            .foregroundStyle(theme.brandSecondaryText)
-            .lineLimit(1)
-        }
-      }
-
-      Spacer(minLength: 0)
-
-      if availableMethods.count > 1 {
-        Button {
-          trackTap("purchase_change_method")
-          showsMethodPicker = true
-        } label: {
-          HStack(spacing: 5) {
-            Text(viewModel.changePaymentMethodLabel)
-              .font(.system(size: 12, weight: .bold))
-              .foregroundStyle(theme.brandActionBackground)
-            ForwardChevron(color: theme.brandActionBackground)
-          }
-          .padding(.vertical, 8)
-          .tappableFrame()
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("purchase_change_method")
-      }
-    }
-    .padding(.leading, 16)
-    .padding(.trailing, 14)
-    .frame(height: 76)
-    .background(theme.brandPanelBackground)
-    .clipShape(RoundedRectangle(cornerRadius: 14))
-    .overlay {
-      RoundedRectangle(cornerRadius: 14)
-        .stroke(theme.brandControlBorder, lineWidth: 1)
-    }
-  }
-
   // MARK: - Summary
 
   private var summaryCard: some View {
@@ -370,9 +281,21 @@ struct MinutesPurchaseView: View {
   }
   // MARK: - Paying
 
+  /// One button per way to pay, as on the web: a tap pays with that method,
+  /// with no method to choose first.
   private var payActions: some View {
-    VStack(spacing: 8) {
-      payButton
+    VStack(alignment: .leading, spacing: 10) {
+      Text(viewModel.paymentMethodTitle)
+        .font(.system(size: 17, weight: .bold))
+        .foregroundStyle(theme.onDarkFill)
+
+      if let option = selectedOption {
+        VStack(spacing: 10) {
+          ForEach(availableMethods, id: \.self) { method in
+            payButton(option, method: method)
+          }
+        }
+      }
 
       HStack(spacing: 6) {
         Image("brand-lock", bundle: .module)
@@ -385,45 +308,57 @@ struct MinutesPurchaseView: View {
           .font(.system(size: 11))
           .foregroundStyle(theme.brandMutedText)
       }
+      .frame(maxWidth: .infinity)
     }
   }
 
-  /// The design's cyan "Pay" for PayPal and cards. Apple Pay and Google Pay
-  /// are started from their own buttons, which their brand rules require.
+  /// Apple Pay, Google Pay and PayPal each in their owner's button, as their
+  /// brand rules require; a card in the design's cyan.
   @ViewBuilder
-  private var payButton: some View {
-    if let option = selectedOption, let method = currentMethod {
-      switch method {
+  private func payButton(_ option: PricingOption, method: PaymentMethod) -> some View {
+    switch method {
 #if canImport(UIKit)
-      case .applePay:
-        ApplePayButtonView { pay(option, with: method) }
-          .frame(height: 56)
-          .disabled(viewModel.isStartingCheckout)
-#endif
-      case .googlePay:
-        Button {
-          trackTap("purchase_google_pay")
-          pay(option, with: method)
-        } label: {
-          Image("google-pay-logo", bundle: .module)
-            .resizable()
-            .scaledToFit()
-            .frame(height: 22)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
+    case .applePay:
+      ApplePayButtonView { pay(option, with: method) }
+        .frame(height: 56)
         .disabled(viewModel.isStartingCheckout)
-      default:
-        BrandPrimaryButton(
-          title: viewModel.payLabel(for: option),
-          isLoading: viewModel.isStartingCheckout
-        ) {
-          trackTap("purchase_pay", detail: "\(method)")
-          pay(option, with: method)
-        }
+#endif
+    case .googlePay:
+      Button {
+        trackTap("purchase_google_pay")
+        pay(option, with: method)
+      } label: {
+        Image("google-pay-logo", bundle: .module)
+          .resizable()
+          .scaledToFit()
+          .frame(height: 22)
+          .frame(maxWidth: .infinity)
+          .frame(height: 56)
+          .background(Color.black)
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+      }
+      .buttonStyle(.plain)
+      .disabled(viewModel.isStartingCheckout)
+    case .paypal, .savedPayPal:
+      Button {
+        trackTap("purchase_paypal", detail: method.rawValue)
+        pay(option, with: method)
+      } label: {
+        PayPalButtonLabel(
+          savedEmail: method == .savedPayPal ? viewModel.savedPayPalEmail : nil,
+          minHeight: 56
+        )
+      }
+      .buttonStyle(.plain)
+      .disabled(viewModel.isStartingCheckout)
+      .accessibilityIdentifier("purchase_pay_\(method.rawValue)")
+    default:
+      BrandPrimaryButton(
+        title: viewModel.paymentMethodButtonTitle(method),
+        isLoading: viewModel.isStartingCheckout
+      ) {
+        trackTap("purchase_pay", detail: method.rawValue)
+        pay(option, with: method)
       }
     }
   }
@@ -447,16 +382,6 @@ struct MinutesPurchaseView: View {
   private var availableMethods: [PaymentMethod] {
     guard let option = selectedOption else { return [] }
     return viewModel.supportedPaymentMethods(for: option)
-  }
-
-  /// The method chosen, while the package allows it, or else the first one
-  /// the package allows.
-  private var currentMethod: PaymentMethod? {
-    let methods = availableMethods
-    if let selectedMethod, methods.contains(selectedMethod) {
-      return selectedMethod
-    }
-    return methods.first
   }
 }
 

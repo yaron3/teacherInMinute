@@ -364,6 +364,12 @@ final class RemoteConfigService {
     }
 
     func getStringArray(_ key: String) -> [String] {
+        #if DEBUG
+        // `-rcOverride.<key> a,b,c` for this launch, as for the switches above.
+        if let override = UserDefaults.standard.string(forKey: "rcOverride.\(key)") {
+            return override.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        }
+        #endif
         #if !os(Android)
         guard FirebaseApp.app() != nil else { return [] }
         #endif

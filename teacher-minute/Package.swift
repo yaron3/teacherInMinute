@@ -37,6 +37,11 @@ let package = Package(
         // Firebase moves to nanopb 0.4.
         .package(url: "https://github.com/livekit/client-sdk-swift.git", "2.0.0" ..< "2.17.0"),
         .package(url: "https://github.com/braintree/braintree_ios", from: "7.9.0"),
+        // PayPal's native checkout SDK (Orders v2 order id in, approval out),
+        // the iOS side of what the web does with PayPal's JS SDK. A local
+        // copy of two of its modules: see Vendor/PayPalCheckout/Package.swift
+        // for why it cannot be the paypal-ios package itself.
+        .package(path: "Vendor/PayPalCheckout"),
         // Lottie animations on iOS; Android draws the same files with
         // lottie-compose (Android/app/build.gradle.kts).
         .package(url: "https://github.com/airbnb/lottie-spm.git", from: "4.6.0"),
@@ -60,6 +65,8 @@ let package = Package(
                 .product(name: "BraintreeCore", package: "braintree_ios", condition: .when(platforms: [.iOS])),
                 .product(name: "BraintreeApplePay", package: "braintree_ios", condition: .when(platforms: [.iOS])),
                 .product(name: "BraintreePayPal", package: "braintree_ios", condition: .when(platforms: [.iOS])),
+                .product(name: "CorePayments", package: "PayPalCheckout", condition: .when(platforms: [.iOS])),
+                .product(name: "PayPalPayments", package: "PayPalCheckout", condition: .when(platforms: [.iOS])),
                 .product(name: "Lottie", package: "lottie-spm", condition: .when(platforms: [.iOS])),
             ],
             // KaTeX is copied rather than processed: its stylesheet reaches the

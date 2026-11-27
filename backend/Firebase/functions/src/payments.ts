@@ -1030,6 +1030,36 @@ button:disabled{background:#93c5fd;cursor:not-allowed}
 
 const TRANZILA_WALLETS: readonly string[] = ["apple_pay", "google_pay"];
 
+/** The app's brand colours (AppTheme: brandModalBackground, brandPanelBackground,
+ *  brandControlBorder, brandActionBackground/onBrandAction, brandSecondaryText,
+ *  brandMutedText), for the page the iOS app opens with `theme=dark`. */
+const DARK_CHECKOUT_CSS = `
+html,body{background:#171625}
+body{color:#fff}
+.amount,label{color:#b3afca}
+.field{background:#201f2f;border-color:#4c4986}
+button{background:#54e8f6;color:#000;font-weight:600}
+button:disabled{background:#54e8f6;opacity:.45}
+#pay-apple{-apple-pay-button-style:white}
+#pay-google{background:#000;color:#fff;border:1px solid #4c4986}
+.divider,.cancel{color:#a6a0bb}
+.error{color:#ff6b85}
+.notice{color:#fff}
+`;
+
+/** Styles Tranzila applies inside its card-field iframes, which the page's
+ *  own stylesheet cannot reach. */
+const LIGHT_FIELD_STYLES = { input: { height: "2.4rem", "font-size": "1rem" } };
+const DARK_FIELD_STYLES = {
+  input: {
+    height: "2.4rem",
+    "font-size": "1rem",
+    color: "#ffffff",
+    "background-color": "transparent",
+  },
+  "input::placeholder": { color: "#a6a0bb" },
+};
+
 export const tranzilaCheckout = onRequest(async (req, res) => {
   // Served through Hosting, whose CDN would otherwise keep an error page (a
   // failed handshake, a checkout mid-charge) for this checkout's URL.
@@ -1075,6 +1105,13 @@ export const tranzilaCheckout = onRequest(async (req, res) => {
     return;
   }
 
+  // The iOS app shows this page in a sheet over its own dark screens and asks
+  // for the same look; every other caller (the web client, a browser) gets
+  // the light page as before.
+  const dark = req.query.theme === "dark";
+  // Set by the iOS app, which then hears about a failed card attempt and can
+  // offer another way to pay; the page itself stays open for a retry.
+  const reportsToApp = req.query.client === "ios";
   const wallet = TRANZILA_WALLETS.includes(checkout.paymentMethod ?? "")
     ? (checkout.paymentMethod as "apple_pay" | "google_pay")
     : null;
@@ -1124,6 +1161,7 @@ button:disabled{background:#93c5fd;cursor:not-allowed}
 .error{color:#b91c1c;font-size:.85rem;margin-top:1rem;display:none}
 .notice{color:#111;font-size:.95rem;margin-top:1rem;display:none}
 .cancel{display:block;text-align:center;margin-top:1rem;font-size:.85rem;color:#6b7280}
+${dark ? DARK_CHECKOUT_CSS : ""}
 </style>
 </head>
 <body>
@@ -1155,6 +1193,7 @@ ${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfap
   const errorEl = document.getElementById("error");
   const noticeEl = document.getElementById("notice");
   const GENERIC_ERROR = "Payment failed. Please check your details and try again.";
+  const reportsToApp = ${JSON.stringify(reportsToApp)};
   let fields = null;
 
   function showError(message) {
@@ -1165,6 +1204,13 @@ ${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfap
     const txn = response && response.transaction_response;
     const errors = (err && (err.messages || err.errors)) || (response && response.errors) || [];
     return (txn && txn.error) || (errors[0] && errors[0].message) || GENERIC_ERROR;
+  }
+  // Tells the iOS app a card attempt failed. The app's sheet catches this
+  // link and leaves the page where it is.
+  function reportCardFailure() {
+    if (!reportsToApp) return;
+    window.location.href = "teacherminute://checkout-event?type=card_failed&checkout_id=" +
+      encodeURIComponent(checkoutId);
   }
   function showWallet(id) {
     const button = document.getElementById(id);
@@ -1215,7 +1261,7 @@ ${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfap
         cvv: { selector: "#card-cvv", placeholder: "123" },
         expiry: { selector: "#card-expiry", placeholder: "MM/YY", version: "1" },
       },
-      styles: { input: { height: "2.4rem", "font-size": "1rem" } },
+      styles: ${JSON.stringify(dark ? DARK_FIELD_STYLES : LIGHT_FIELD_STYLES)},
     });
     fields.onEvent("googleIsEnable", () => showWallet("pay-google"));
     // Tranzila loads its control frame first, then the card fields, then
@@ -1236,6 +1282,7 @@ ${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfap
           console.error(err, response);
           showError(firstError(err, response));
           submitBtn.disabled = false;
+          reportCardFailure();
           return;
         }
         fetch("tranzilaCharge", {
@@ -1256,6 +1303,7 @@ ${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfap
             }
             showError(result.error || GENERIC_ERROR);
             if (result.retry) submitBtn.disabled = false;
+            reportCardFailure();
           })
           .catch((e) => {
             console.error(e);
@@ -1608,12 +1656,19 @@ export const paypalSuccess = onRequest(async (req, res) => {
 // onApprove calls capturePayPalOrder. Only the client id is public; the secret
 // never leaves the server.
 
-/** The public PayPal client id and environment, for the JS SDK script. */
+/** The public PayPal client id and environment, for the JS SDK script and
+ *  the iOS app's native PayPal SDK. The SDK also needs the merchant account
+ *  id (PAYPAL_MERCHANT_ID, from the PayPal dashboard); empty while it is
+ *  unset, and the app then keeps to the browser checkout. */
 export const getPayPalWebConfig = onCall(async (req) => {
   if (!req.auth?.uid) throw new HttpsError("unauthenticated", "Sign in required");
   const clientId = process.env.PAYPAL_CLIENT_ID ?? "";
   if (!clientId) throw new HttpsError("failed-precondition", "PayPal is not available yet.");
-  return { clientId, environment: process.env.PAYPAL_ENV === "live" ? "live" : "sandbox" };
+  return {
+    clientId,
+    environment: process.env.PAYPAL_ENV === "live" ? "live" : "sandbox",
+    merchantId: process.env.PAYPAL_MERCHANT_ID ?? "",
+  };
 });
 
 /** Captures the buyer's approved PayPal order and credits the minutes. */

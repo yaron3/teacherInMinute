@@ -249,12 +249,18 @@ extension StudentHomeViewModeling {
   var purchaseBackLabel: String { LocalizationSupport.localized("Back") }
   var bestValueLabel: String { LocalizationSupport.localized("Best value") }
   var paymentMethodTitle: String { LocalizationSupport.localized("Payment Method") }
-  var changePaymentMethodLabel: String { LocalizationSupport.localized("Change") }
   var purchaseSummaryTitle: String { LocalizationSupport.localized("Purchase summary") }
   var minutesPackageLabel: String { LocalizationSupport.localized("Minutes package") }
   var totalToPayLabel: String { LocalizationSupport.localized("Total to pay") }
   var reciptExplain: String { LocalizationSupport.localized("Payment to the teacher is processed via the app, and an invoice from 'Moreh LaRega' is issued solely for the brokerage fee.")}
   var securePaymentNote: String { LocalizationSupport.localized("Your payment is secure and encrypted") }
+  /// Close on the in-app payment page (iOS).
+  var checkoutCloseLabel: String { LocalizationSupport.localized("Close") }
+  /// The offer over the in-app card page when a card attempt fails (iOS).
+  var cardFailedTitle: String { LocalizationSupport.localized("Card payment did not go through") }
+  var cardFailedPayPalMessage: String { LocalizationSupport.localized("Try paying with PayPal instead.") }
+  var payWithPayPalLabel: String { LocalizationSupport.localized("Pay with PayPal") }
+  var tryAgainLabel: String { LocalizationSupport.localized("Try again") }
 
   var purchaseBalanceText: String {
     remainingMinutes == 1
@@ -290,28 +296,10 @@ extension StudentHomeViewModeling {
       : String(format: LocalizationSupport.localized("%d minutes"), minutes)
   }
 
-  func payLabel(for option: PricingOption) -> String {
-    String(format: LocalizationSupport.localized("Pay %@"), option.priceText)
-  }
-
-  /// The chosen method's title: "Paying by PayPal", short enough for its
-  /// card, and a card payment in the app's own words.
-  func paymentMethodTitle(_ method: PaymentMethod) -> String {
-    method == .creditCard
-      ? method.displayName
-      : String(format: LocalizationSupport.localized("Paying by %@"), paymentMethodShortName(method))
-  }
-
-  /// The name in the method's box. Brand names stay as their owners write
-  /// them, in every language.
-  func paymentMethodShortName(_ method: PaymentMethod) -> String {
-    switch method {
-    case .applePay: return "Apple Pay"
-    case .googlePay: return "Google Pay"
-    case .paypal, .savedPayPal: return "PayPal"
-    case .bit: return "Bit"
-    case .creditCard: return LocalizationSupport.localized("Credit card")
-    }
+  /// The label on a payment button that is not drawn in its brand's own
+  /// artwork: "Pay with credit card".
+  func paymentMethodButtonTitle(_ method: PaymentMethod) -> String {
+    method.displayName
   }
 
   func logPurchaseScreenShown() {
