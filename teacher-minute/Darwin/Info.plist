@@ -27,7 +27,13 @@
 	<false/>
 	<key>FirebaseCrashlyticsCollectionEnabled</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>paypal</string>
+	</array>
 	<key>TIMAppRole</key>
 	<string>$(TIM_APP_ROLE)</string>
+	<key>TIMAppURLScheme</key>
+	<string>$(TIM_APP_URL_SCHEME)</string>
 </dict>
 </plist>

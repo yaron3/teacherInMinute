@@ -106,6 +106,11 @@ let logger = AppLogger(subsystem: "com.yaronj.tim", category: "TeacherMinute")
             }
             .onOpenURL { url in
               logger.info("[PaymentReturn] root onOpenURL received \(url.absoluteString)")
+#if canImport(UIKit)
+              // PayPal's native checkout coming back (Universal Link or the
+              // scheme fallback): its SDK finishes the purchase in progress.
+              if PayPalCheckoutService.shared.handleReturnURL(url) { return }
+#endif
               // Both share the app's scheme; a verification result is not a
               // payment return.
               if !emailLink.handle(url: url) {

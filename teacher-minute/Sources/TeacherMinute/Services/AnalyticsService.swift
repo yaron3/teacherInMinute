@@ -181,6 +181,7 @@ enum AnalyticsScreen {
     static let minutesPurchase       = "minutes_purchase"
     static let purchaseSuccess       = "purchase_success"
     static let paymentMethod         = "payment_method"
+    static let hostedCheckout        = "hosted_checkout"
     static let searchingTeacher      = "searching_teacher"
     static let notificationExplainer = "notification_explainer"
     static let documentsSuggestion   = "documents_suggestion"

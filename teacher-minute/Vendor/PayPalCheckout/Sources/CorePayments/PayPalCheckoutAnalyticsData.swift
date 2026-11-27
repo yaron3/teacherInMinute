@@ -1,0 +1,57 @@
+import Foundation
+
+/// Plain data holder for the analytics fields gathered over the lifetime of a checkout/vault attempt.
+/// This lives in `CorePayments` (rather than `PayPalPayments`) so `AnalyticsService`/`AnalyticsEventData`
+/// can reference it without creating a module dependency cycle, since `PayPalPayments` already depends on
+/// `CorePayments`. `PayPalPayments` populates it via a convenience initializer declared in its own module
+/// (see `PayPalCheckoutAnalyticsData.swift` under `Sources/PayPalPayments/Models`), since the types that
+/// initializer needs (`PayPalUserIdentity`, `PayPalURLConfig`, `PayPalUserAction`) live there.
+@_documentation(visibility: private)
+public final class PayPalCheckoutAnalyticsData {
+
+    public var isCachedSession: Bool?
+
+    public var shopperSessionID: String?
+    public var shopperSessionExpiration: String?
+    
+    public var url: URL?
+    public var appSwitchEligible: Bool?
+    public var ineligibleReason: String?
+
+    public var fallbackUrl: String?
+
+    public var isVaultRequest: Bool?
+
+    public var userAction: String?
+
+    public var paypalNativeAppInstalled: Bool?
+    public var venmoInstalled: Bool?
+    public var returnAppURL: URL?
+    public var cancelAppURL: URL?
+    public var fallbackSchemeURL: URL?
+
+    public init() {}
+
+    /// Returns an independent copy of the current field values.
+    ///
+    /// This class is mutated in place over the lifetime of a checkout/vault attempt, so callers that
+    /// build the wire payload asynchronously should capture a snapshot at the time the event occurs.
+    func snapshot() -> PayPalCheckoutAnalyticsData {
+        let copy = PayPalCheckoutAnalyticsData()
+        copy.isCachedSession = isCachedSession
+        copy.shopperSessionID = shopperSessionID
+        copy.shopperSessionExpiration = shopperSessionExpiration
+        copy.url = url
+        copy.appSwitchEligible = appSwitchEligible
+        copy.ineligibleReason = ineligibleReason
+        copy.fallbackUrl = fallbackUrl
+        copy.isVaultRequest = isVaultRequest
+        copy.userAction = userAction
+        copy.paypalNativeAppInstalled = paypalNativeAppInstalled
+        copy.venmoInstalled = venmoInstalled
+        copy.returnAppURL = returnAppURL
+        copy.cancelAppURL = cancelAppURL
+        copy.fallbackSchemeURL = fallbackSchemeURL
+        return copy
+    }
+}

@@ -4294,7 +4294,7 @@
       },
       "conditionalValues": {
         "iOS": {
-          "value": "apple_pay,paypal"
+          "value": "paypal"
         }
       },
       "valueType": "STRING"
@@ -16229,6 +16229,48 @@
       },
       "description": "Offer Google Pay at checkout in the apps and on the web. Off until Google approves production access and Braintree is live.",
       "valueType": "BOOLEAN"
+    },
+    "card_payment_did": {
+      "defaultValue": {
+        "value": "Card payment did not go through"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "התשלום בכרטיס לא עבר"
+        },
+        "HebrewApp": {
+          "value": "התשלום בכרטיס לא עבר"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "try_again": {
+      "defaultValue": {
+        "value": "Try again"
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "לנסות שוב"
+        },
+        "HebrewApp": {
+          "value": "לנסות שוב"
+        }
+      },
+      "valueType": "STRING"
+    },
+    "try_paying_with": {
+      "defaultValue": {
+        "value": "Try paying with PayPal instead."
+      },
+      "conditionalValues": {
+        "Hebrew": {
+          "value": "אפשר לנסות לשלם באמצעות PayPal במקום."
+        },
+        "HebrewApp": {
+          "value": "אפשר לנסות לשלם באמצעות PayPal במקום."
+        }
+      },
+      "valueType": "STRING"
     }
   },
   "version": {

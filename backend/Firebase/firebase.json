@@ -38,11 +38,18 @@
     ],
     "redirects": [
       { "source": "/teacher", "destination": "/?get=teacher", "type": 302 },
-      { "source": "/student", "destination": "/?get=student", "type": 302 }
+      { "source": "/student", "destination": "/?get=student", "type": 302 },
+      { "source": "/paypal/**", "destination": "/app", "type": 302 }
     ],
     "headers": [
       {
         "source": "/.well-known/assetlinks.json",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ]
+      },
+      {
+        "source": "/.well-known/apple-app-site-association",
         "headers": [
           { "key": "Content-Type", "value": "application/json" }
         ]

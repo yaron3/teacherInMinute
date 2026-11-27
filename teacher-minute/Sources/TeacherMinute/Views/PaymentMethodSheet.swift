@@ -92,29 +92,7 @@ struct PaymentMethodSheet: View {
       trackTap("payment_method_paypal", detail: savedEmail == nil ? "new" : "saved")
       onSelect(savedEmail == nil ? .paypal : .savedPayPal)
     } label: {
-      VStack(spacing: 2) {
-        HStack(spacing: 0) {
-          Text(verbatim: "Pay")
-            .foregroundStyle(Self.payPalNavy)
-          Text(verbatim: "Pal")
-            .foregroundStyle(Self.payPalBlue)
-        }
-        .font(.system(size: 17, weight: .bold))
-        .italic()
-        if let savedEmail {
-          Text(savedEmail)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(Self.payPalInk.opacity(0.7))
-        }
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 14)
-      .background(Self.payPalGold)
-      .overlay(
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(Self.payPalInk, lineWidth: 1)
-      )
-      .cornerRadius(12)
+      PayPalButtonLabel(savedEmail: savedEmail)
     }
   }
 
@@ -142,12 +120,6 @@ struct PaymentMethodSheet: View {
     }
   }
 
-  // PayPal brand palette (fixed in both colour schemes).
-  private static let payPalGold = Color(red: 249 / 255, green: 184 / 255, blue: 35 / 255)
-  private static let payPalNavy = Color(red: 37 / 255, green: 59 / 255, blue: 128 / 255)
-  private static let payPalBlue = Color(red: 23 / 255, green: 155 / 255, blue: 215 / 255)
-  private static let payPalInk = Color(red: 28 / 255, green: 28 / 255, blue: 28 / 255)
-
   private func standardRow(for method: PaymentMethod) -> some View {
     Button {
       trackTap("payment_method_option", detail: "\(method)")
@@ -166,4 +138,47 @@ struct PaymentMethodSheet: View {
         .cornerRadius(12)
     }
   }
+}
+
+/// PayPal's own lockup on its gold, for every button that pays with PayPal:
+/// the payment picker and the purchase screen. Brand marks must not adapt to
+/// light/dark, so the colours are fixed rather than drawn from the theme. With
+/// `savedEmail`, the saved account's address sits under the mark.
+/// `minHeight` matches the button to its neighbours.
+struct PayPalButtonLabel: View {
+  var savedEmail: String? = nil
+  var minHeight: CGFloat = 0
+
+  var body: some View {
+    VStack(spacing: 2) {
+      HStack(spacing: 0) {
+        Text(verbatim: "Pay")
+          .foregroundStyle(Self.navy)
+        Text(verbatim: "Pal")
+          .foregroundStyle(Self.blue)
+      }
+      .font(.system(size: 17, weight: .bold))
+      .italic()
+      if let savedEmail {
+        Text(savedEmail)
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(Self.ink.opacity(0.7))
+          .lineLimit(1)
+      }
+    }
+    .padding(.vertical, 14)
+    .frame(maxWidth: .infinity, minHeight: minHeight)
+    .background(Self.gold)
+    .overlay(
+      RoundedRectangle(cornerRadius: 12)
+        .stroke(Self.ink, lineWidth: 1)
+    )
+    .cornerRadius(12)
+  }
+
+  // PayPal brand palette (fixed in both colour schemes).
+  static let gold = Color(red: 249 / 255, green: 184 / 255, blue: 35 / 255)
+  static let navy = Color(red: 37 / 255, green: 59 / 255, blue: 128 / 255)
+  static let blue = Color(red: 23 / 255, green: 155 / 255, blue: 215 / 255)
+  static let ink = Color(red: 28 / 255, green: 28 / 255, blue: 28 / 255)
 }

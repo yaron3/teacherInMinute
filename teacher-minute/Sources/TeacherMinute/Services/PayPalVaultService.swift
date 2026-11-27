@@ -3,8 +3,8 @@
 //  teacher-minute
 //
 // Runs Braintree's PayPal login so an account can be confirmed and vaulted —
-// distinct from the plain, always-redirect PayPal checkout used elsewhere (see
-// PaymentMethod.swift / paypal.ts on the backend).
+// distinct from the plain PayPal checkout used elsewhere (PayPalCheckoutService
+// on iOS, a browser redirect on Android; see PaymentMethod.swift).
 //
 // The two platforms reach the same result by different routes:
 //   iOS     — `BTPayPalClient` presents its own `ASWebAuthenticationSession`,

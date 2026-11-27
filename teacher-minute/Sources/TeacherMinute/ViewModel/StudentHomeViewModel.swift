@@ -1014,10 +1014,23 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       isPreparingCheckout = false
       return
     }
+    if method == .paypal, await checkoutWithNativePayPal(option) {
+      return
+    }
 #endif
 
     do {
       let result = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: method)
+#if canImport(UIKit) && canImport(WebKit)
+      // The card page opens in a sheet over the app. PayPal's own approval
+      // page, which a PayPal checkout falls back to, stays in the browser:
+      // PayPal does not allow its login inside an app's web view.
+      if method == .creditCard {
+        logger.info("[PaymentReturn] card checkout in app url=\(result.checkoutURL.absoluteString)")
+        await runInAppCheckout(result.checkoutURL)
+        return
+      }
+#endif
       checkoutURL = result.checkoutURL
       // Left running on purpose. The browser takes over from here, and the
       // purchase is only finished once we are back in the app and the balance
@@ -1048,7 +1061,11 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       let session = try await FunctionsService.shared.createApplePayCheckout(pricingOptionID: option.id)
       if let hostedURL = session.hostedCheckoutURL {
         logger.info("[PaymentReturn] Apple Pay via Tranzila url=\(hostedURL.absoluteString)")
+#if canImport(WebKit)
+        await runInAppCheckout(hostedURL)
+#else
         checkoutURL = hostedURL
+#endif
         return true
       }
       let nonce = try await ApplePayService.shared.startPayment(
@@ -1085,6 +1102,70 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   }
   #endif
 
+  /// Runs a hosted payment page (Tranzila's card or Apple Pay page) in a
+  /// sheet over the app, then settles it the way a return from the browser
+  /// is settled. The spinner stays up throughout and is cleared by that
+  /// settling. `isAwaitingPaymentReturn` is only raised once the sheet has
+  /// closed: while it is up, the Apple Pay sheet can make the app inactive and
+  /// active again, and `handleAppActiveAfterCheckout` must not read that as a
+  /// return with no result while the buyer is still paying.
+  #if canImport(UIKit) && canImport(WebKit)
+  private func runInAppCheckout(_ url: URL) async {
+    // Tranzila's page draws in the app's dark colours when asked; a page
+    // that does not know the parameter ignores it.
+    var pageURL = url
+    if var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+      let items = components.queryItems ?? []
+      // client=ios: the page tells the sheet when a card attempt fails.
+      components.queryItems = items + [
+        URLQueryItem(name: "theme", value: "dark"),
+        URLQueryItem(name: "client", value: "ios"),
+      ]
+      pageURL = components.url ?? url
+    }
+    // A failed card attempt offers PayPal instead, where PayPal is one of
+    // the ways to pay.
+    let offersPayPal = availablePaymentMethods.contains(.paypal) || availablePaymentMethods.contains(.savedPayPal)
+    let offer = offersPayPal
+      ? HostedCheckoutService.CardFailureOffer(
+          title: cardFailedTitle,
+          message: cardFailedPayPalMessage,
+          payPalLabel: payWithPayPalLabel,
+          retryLabel: tryAgainLabel
+        )
+      : nil
+    switch await HostedCheckoutService.shared.present(
+      url: pageURL,
+      closeLabel: checkoutCloseLabel,
+      cardFailureOffer: offer
+    ) {
+    case .returned(let returnURL):
+      // The same path as a deep link: StudentHomeView sees the new result
+      // and calls `handlePaymentReturn`.
+      PaymentReturnStore.shared.handle(url: returnURL)
+    case .closed:
+      logger.info("[PaymentReturn] in-app checkout closed without a return link")
+      isAwaitingPaymentReturn = true
+      await handleAppActiveAfterCheckout()
+    case .unavailable:
+      checkoutURL = url
+    case .switchToPayPal:
+      logger.info("[PaymentReturn] card failed; buyer chose PayPal instead")
+      isPreparingCheckout = false
+      guard let option = pendingPurchaseOption else { return }
+      // `checkout` is still on the stack and refuses a second checkout until
+      // it returns, which it does without suspending from here — so a task
+      // queued on the main actor starts the PayPal checkout just after it.
+      // The card checkout left behind is never charged.
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        self.logPurchaseStarted(option, method: .paypal)
+        await self.checkout(option, method: .paypal)
+      }
+    }
+  }
+  #endif
+
   /// Charges the student's previously vaulted PayPal account directly — no
   /// checkout URL, no PayPal login, mirroring the wallet flows above.
   #if canImport(UIKit)
@@ -1105,6 +1186,69 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
       AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.chargeSavedPayPal")
       searchState = .error(LocalizationSupport.localized("Could not start checkout."))
     }
+  }
+  #endif
+
+  /// PayPal in PayPal's native SDK — its app, or its page in an in-app
+  /// browser sheet — rather than the system browser: the backend creates the
+  /// order, the SDK gets the buyer's approval, and the backend captures it,
+  /// as on the web. Returns false, before anything is created, when the SDK
+  /// cannot be used (no merchant id configured yet); the caller then runs the
+  /// browser checkout. Once the order exists, a PayPal SDK failure falls back
+  /// to that order's own approval page in the browser.
+  #if canImport(UIKit)
+  private func checkoutWithNativePayPal(_ option: PricingOption) async -> Bool {
+    guard let config = await attempt({ try await FunctionsService.shared.payPalSDKConfig() }),
+          !config.merchantID.isEmpty
+    else {
+      logger.info("[PaymentReturn] native PayPal not configured; using the browser checkout")
+      return false
+    }
+    // Started before the order so PayPal's session and our order overlap.
+    PayPalCheckoutService.shared.prepare(config)
+
+    let session: CheckoutSessionResult
+    do {
+      session = try await FunctionsService.shared.createCheckoutSession(pricingOptionID: option.id, paymentMethod: .paypal)
+    } catch {
+      isPreparingCheckout = false
+      logger.error("[PaymentReturn] createCheckoutSession failed details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.createCheckoutSession")
+      searchState = .error(LocalizationSupport.localized("Could not start checkout."))
+      return true
+    }
+    guard let orderID = session.orderID, let checkoutID = session.checkoutID else {
+      logger.error("[PaymentReturn] PayPal checkout has no order id; opening the browser checkout")
+      checkoutURL = session.checkoutURL
+      return true
+    }
+
+    do {
+      if try await PayPalCheckoutService.shared.approve(orderID: orderID) == .cancelled {
+        logger.info("[PaymentReturn] native PayPal cancelled by user checkoutId=\(checkoutID)")
+        isPreparingCheckout = false
+        return true
+      }
+    } catch {
+      logger.error("[PaymentReturn] native PayPal failed; opening the browser checkout details=\(error.localizedDescription)")
+      checkoutURL = session.checkoutURL
+      return true
+    }
+
+    do {
+      try await FunctionsService.shared.capturePayPalOrder(checkoutID: checkoutID, orderID: orderID)
+      logger.info("[PaymentReturn] native PayPal captured checkoutId=\(checkoutID)")
+      if let uid = Auth.auth().currentUser?.uid {
+        _ = await refreshAfterPurchase(uid: uid, startingMinutes: checkoutStartedRemainingMinutes)
+      }
+      announcePurchase(option)
+    } catch {
+      logger.error("[PaymentReturn] PayPal capture failed checkoutId=\(checkoutID) details=\(error.localizedDescription)")
+      AnalyticsService.shared.recordPermissionIfNeeded(error, context: "StudentHome.capturePayPalOrder")
+      searchState = .error(LocalizationSupport.localized("The payment did not complete. Please try again."))
+    }
+    isPreparingCheckout = false
+    return true
   }
   #endif
 
