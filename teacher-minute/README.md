@@ -57,6 +57,28 @@ This project is both a stand-alone Swift Package Manager module,
 as well as an Xcode project that builds and translates the project
 into a Kotlin Gradle project for Android using the skipstone plugin.
 
+### Staging builds for testing
+
+Besides Debug (a debug build on the staging project) and Release (production),
+there is a **Staging** build: release-style (optimised, signed) and talking to
+the staging Firebase project, so testers get it from TestFlight and Google
+Play's internal track.
+
+| | iOS | Android |
+| --- | --- | --- |
+| Build | Xcode configuration `Staging`; schemes `Instant Teacher Staging`, `Pro Teacher Staging` | build type `staging` (`:app:bundleStudentStaging`, `:app:bundleTeacherStaging`) |
+| Firebase project | `TIM_FIREBASE_ENV_STAGING` in `Config/Environment.xcconfig` | the same line |
+
+Staging keeps each app's real id (the staging Firebase apps are registered
+under them), so a staging build replaces an installed production one, and the
+build number and version code are shared with production builds.
+
+```sh
+scripts/release-staging.sh [both|student|teacher]   # Play internal + TestFlight
+TIM_BUILD=staging scripts/archive-ios.sh            # iOS only
+TIM_BUILD=staging scripts/bundle-android.sh         # Android only
+```
+
 ### Google Play signing
 
 Create a local upload keystore before building a Play release:

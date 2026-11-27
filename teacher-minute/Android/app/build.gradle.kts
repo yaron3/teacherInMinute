@@ -47,10 +47,10 @@ val firebaseConfigDir = rootDir.resolve("../Config").normalize()
 run {
     val environmentFile = firebaseConfigDir.resolve("Environment.xcconfig")
     val defaults = environmentFile.readLines()
-        .mapNotNull { Regex("""^\s*TIM_FIREBASE_ENV_(DEBUG|RELEASE)\s*=\s*(\S+)""").find(it) }
+        .mapNotNull { Regex("""^\s*TIM_FIREBASE_ENV_(DEBUG|RELEASE|STAGING)\s*=\s*(\S+)""").find(it) }
         .associate { it.groupValues[1].lowercase() to it.groupValues[2] }
     val override = providers.gradleProperty("timFirebaseEnv").orNull?.takeIf { it.isNotBlank() }
-    listOf("debug", "release").forEach { buildType ->
+    listOf("debug", "release", "staging").forEach { buildType ->
         val environment = override ?: defaults[buildType] ?: throw GradleException(
             "$environmentFile does not set TIM_FIREBASE_ENV_${buildType.uppercase()}."
         )
@@ -335,6 +335,18 @@ android {
                 "proguard-rules.pro"
             )
         }
+        // Staging: the release build (same signing, R8, optimisation) pointed at
+        // the staging Firebase project, for Play internal testing; the Xcode
+        // "Staging" configuration is its iOS twin. It keeps the apps' real
+        // application ids, since the staging Firebase apps are registered under
+        // them, so a staging build replaces an installed production one.
+        // matchingFallbacks: the Skip library modules only have debug and
+        // release variants.
+        create("staging") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.findByName("release")
+            matchingFallbacks += listOf("release")
+        }
     }
 }
 
@@ -427,7 +439,8 @@ tasks.configureEach {
 
 gradle.taskGraph.whenReady {
     val isReleaseBuild = allTasks.any { task ->
-        task.name.contains("Release", ignoreCase = true)
+        task.name.contains("Release", ignoreCase = true) ||
+            task.name.contains("Staging", ignoreCase = true)
     }
 
     if (isReleaseBuild && !hasReleaseSigning) {
@@ -453,7 +466,7 @@ tasks.configureEach {
         }
     }
 
-    if (name.contains("Release", ignoreCase = true) &&
+    if ((name.contains("Release", ignoreCase = true) || name.contains("Staging", ignoreCase = true)) &&
         (name.contains("Bundle", ignoreCase = true) ||
             name.contains("Package", ignoreCase = true) ||
             name.contains("Assemble", ignoreCase = true))

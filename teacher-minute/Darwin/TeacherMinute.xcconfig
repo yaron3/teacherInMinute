@@ -5,6 +5,7 @@
 // The "Select the Firebase config" build phase bundles that folder's plist.
 TIM_FIREBASE_ENV[config=Debug] = $(TIM_FIREBASE_ENV_DEBUG)
 TIM_FIREBASE_ENV[config=Release] = $(TIM_FIREBASE_ENV_RELEASE)
+TIM_FIREBASE_ENV[config=Staging] = $(TIM_FIREBASE_ENV_STAGING)
 
 // Each project gives each app its own Google sign-in client. The targets set
 // TIM_GOOGLE_URL_SCHEME_Prod and TIM_GOOGLE_URL_SCHEME_Staging to the

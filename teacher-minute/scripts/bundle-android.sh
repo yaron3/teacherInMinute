@@ -15,6 +15,11 @@
 # same code, and each bundle is checked to carry it. The bump stays in the
 # working tree for you to commit.
 #
+# TIM_BUILD=staging builds the staging build type instead of release: the same
+# apps and application ids, talking to the staging Firebase project, uploaded
+# to the same Play track (internal by default) for testing. The version code
+# is shared with production builds. Staging has no Crashlytics symbol upload.
+#
 # Signing uses Android/app/keystore.properties (or the TEACHER_MINUTE_UPLOAD_*
 # environment variables; see keystore.properties.example).
 #
@@ -41,6 +46,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKIP_ENV="$ROOT/Skip.env"
 OUT="$ROOT/build/android-bundles"
 BUNDLES="$ROOT/.build/Android/app/outputs/bundle"
+
+case "${TIM_BUILD:-release}" in
+  release) BUILD_TYPE=Release; build_type=release; TAG="";         CRASHLYTICS="${CRASHLYTICS:-1}" ;;
+  staging) BUILD_TYPE=Staging; build_type=staging; TAG="-staging"; CRASHLYTICS=0 ;;
+  *) echo "TIM_BUILD must be release or staging" >&2; exit 2 ;;
+esac
 
 case "$WHICH" in
   both)    FLAVORS=(student teacher) ;;
@@ -75,7 +86,7 @@ export SWIFT_TOOLCHAIN_DIR="${SWIFT_TOOLCHAIN_DIR:-$HOME/Library/Developer/Toolc
 
 TASKS=()
 for flavor in "${FLAVORS[@]}"; do
-  variant="$(capital "$flavor")Release"
+  variant="$(capital "$flavor")$BUILD_TYPE"
   TASKS+=(":app:bundle$variant")
   [[ "${CRASHLYTICS:-1}" == "0" ]] || TASKS+=(":app:uploadCrashlyticsSymbolFile$variant")
 done
@@ -86,8 +97,8 @@ say "Android: build complete"
 
 # 3. Check, collect and upload each bundle.
 for flavor in "${FLAVORS[@]}"; do
-  built="$BUNDLES/${flavor}Release/app-$flavor-release.aab"
-  aab="$OUT/$(name_of "$flavor")-$VERSION-$NEW.aab"
+  built="$BUNDLES/${flavor}${BUILD_TYPE}/app-$flavor-${build_type}.aab"
+  aab="$OUT/$(name_of "$flavor")$TAG-$VERSION-$NEW.aab"
   code=$(bundletool dump manifest --bundle "$built" --xpath /manifest/@android:versionCode)
   [[ "$code" == "$NEW" ]] || { say "Android: $built has version code $code, not $NEW" >&2; exit 1; }
   cp "$built" "$aab"
