@@ -1206,9 +1206,6 @@ ${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfap
     if (fields) fields.chargeGpay(walletParams, onWalletResult);
   }
 
-  if (document.getElementById("pay-apple") && window.ApplePaySession && ApplePaySession.canMakePayments()) {
-    showWallet("pay-apple");
-  }
 
   try {
     fields = TzlaHostedFields.create({
@@ -1221,7 +1218,15 @@ ${wallet === "apple_pay" ? `<script src="https://hf.tranzila.com/assets/js/thfap
       styles: { input: { height: "2.4rem", "font-size": "1rem" } },
     });
     fields.onEvent("googleIsEnable", () => showWallet("pay-google"));
-    submitBtn.disabled = false;
+    // Tranzila loads its control frame first, then the card fields, then
+    // fires "ready". A charge sent before that frame exists is lost and Pay
+    // stays disabled for good, so Pay and Apple Pay wait for "ready".
+    fields.onEvent("ready", () => {
+      submitBtn.disabled = false;
+      if (document.getElementById("pay-apple") && window.ApplePaySession && ApplePaySession.canMakePayments()) {
+        showWallet("pay-apple");
+      }
+    });
     submitBtn.addEventListener("click", () => {
       submitBtn.disabled = true;
       errorEl.style.display = "none";
