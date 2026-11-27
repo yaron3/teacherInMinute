@@ -11,6 +11,8 @@ build/
 .env
 .env.local
 .env.*.local
+# Production-only functions settings (live PayPal keys)
+backend/Firebase/functions/.env.teacher-in-a-moment
 *firebase-adminsdk*.json
 
 # Firebase tooling
@@ -44,3 +46,6 @@ teacher-minute/Pro Teacher */
 # Integration-test run output
 backend/Firebase/functions/scripts/lesson-result-*.json
 .derivedData/
+
+# The web client, built into the Hosting site by web/scripts/build-hosting.mjs
+backend/Firebase/public/app/

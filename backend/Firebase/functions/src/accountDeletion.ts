@@ -25,6 +25,18 @@ async function removeMatches(query: FirebaseFirestore.Query): Promise<void> {
   }
 }
 
+/** A question and everything hung off it: pending teacher invitations, the
+ *  RTDB mirror and lesson presence, board snapshots, and its subcollections. */
+export async function deleteQuestionRecords(ref: FirebaseFirestore.DocumentReference): Promise<void> {
+  const database = admin.database();
+  const invites = await ref.collection("invites").listDocuments();
+  for (const invite of invites) await database.ref(`teacherInvites/${invite.id}/${ref.id}`).remove();
+  await database.ref(`questions/${ref.id}`).remove();
+  await database.ref(`lessonPresence/${ref.id}`).remove();
+  await admin.storage().bucket().deleteFiles({ prefix: `boardSnapshots/${ref.id}/` });
+  await admin.firestore().recursiveDelete(ref);
+}
+
 export async function deleteAccountData(uid: string): Promise<void> {
   const firestore = admin.firestore();
   const database = admin.database();
@@ -45,14 +57,7 @@ export async function deleteAccountData(uid: string): Promise<void> {
     }
   }
 
-  for (const question of questions.values()) {
-    const invites = await question.ref.collection("invites").listDocuments();
-    for (const invite of invites) await database.ref(`teacherInvites/${invite.id}/${question.id}`).remove();
-    await database.ref(`questions/${question.id}`).remove();
-    await database.ref(`lessonPresence/${question.id}`).remove();
-    await bucket.deleteFiles({ prefix: `boardSnapshots/${question.id}/` });
-    await firestore.recursiveDelete(question.ref);
-  }
+  for (const question of questions.values()) await deleteQuestionRecords(question.ref);
   for (const [collection, field] of [
     ["lessons", "studentUid"], ["lessons", "teacherUid"],
     ["paymentCheckouts", "uid"], ["billingSessions", "uid"],

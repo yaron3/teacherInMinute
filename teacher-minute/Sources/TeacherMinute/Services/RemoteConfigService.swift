@@ -24,6 +24,10 @@ enum RemoteConfigKey: String {
     /// this key, so the client reads a single key and falls back to the built-in
     /// per-platform defaults when the key is absent.
     case paymentMethods = "payment_methods"
+    /// Whether Google Pay is offered at checkout, in the apps and on the web.
+    /// Off until its production setup (Google's approval, a live Braintree
+    /// account) is done; a missing key reads as off.
+    case enableGooglePay = "enable_google_pay"
     /// Instant Teacher's store page, which Pro Teacher offers a student
     /// account. Google Play by default and the App Store under the `iOS`
     /// condition; empty until the listing exists, which leaves the offer out.

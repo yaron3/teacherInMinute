@@ -662,7 +662,7 @@ final class StudentHomeViewModel: StudentHomeViewModeling {
   var questionId: String?
 
   var pricingOptions: [PricingOption] = []
-  var availablePaymentMethods: [PaymentMethod] = PaymentMethod.availableForCurrentPlatform
+  var availablePaymentMethods: [PaymentMethod] = PaymentMethod.beforeRemoteConfig
   var savedPayPalEmail: String?
 
   var recentLessons: [RecentLesson] = []
@@ -1879,7 +1879,7 @@ final class MockStudentHomeViewModel: StudentHomeViewModeling {
   var questionId: String?
 
   let pricingOptions: [PricingOption]
-  var availablePaymentMethods: [PaymentMethod] = PaymentMethod.availableForCurrentPlatform
+  var availablePaymentMethods: [PaymentMethod] = PaymentMethod.beforeRemoteConfig
   var savedPayPalEmail: String?
   var recentLessons: [RecentLesson]
   var onlineTeachers: [OnlineTeacher] = [

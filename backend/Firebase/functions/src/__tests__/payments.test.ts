@@ -131,7 +131,10 @@ jest.mock("../tranzila", () => ({
   createHandshake: jest.fn(),
 }));
 
+import { captureOrder } from "../paypal";
 import {
+  allowedWebReturnUrl,
+  capturePayPalOrder,
   confirmGooglePayPayment,
   createApplePayCheckout,
   createGooglePayCheckout,
@@ -235,6 +238,99 @@ describe("paypalCancel", () => {
       302,
       expect.stringContaining("teacherminute://payment-return?status=cancelled")
     );
+  });
+
+  test("sends a web checkout back to the web page it came from", async () => {
+    seedCheckout({ webReturnUrl: "https://demo.web.app/app/" });
+    const res = fakeResponse();
+
+    await cancel({ query: { checkoutId: "checkout-1" } }, res);
+
+    expect(res.redirect).toHaveBeenCalledWith(302, "https://demo.web.app/app/?payment=cancelled&checkout_id=checkout-1");
+  });
+});
+
+describe("capturePayPalOrder", () => {
+  const capture = capturePayPalOrder as unknown as CallableHandler;
+  const captured = (over: Partial<{ amountCents: number; currency: string; orderStatus: string }> = {}) =>
+    (captureOrder as jest.Mock).mockResolvedValue({
+      captureId: "capture-1",
+      orderStatus: "COMPLETED",
+      amountCents: 1000,
+      currency: "ILS",
+      ...over,
+    });
+
+  test("captures the checkout's own order and credits the minutes", async () => {
+    seedCheckout();
+    captured();
+
+    await expect(capture({ auth: { uid: "student-1" }, data: { checkoutId: "checkout-1", orderId: "order-1" } })).resolves.toEqual({
+      status: "completed",
+      minutes: 30,
+    });
+    expect(captureOrder).toHaveBeenCalledWith("order-1");
+    expect(checkoutStatus()).toBe("completed");
+  });
+
+  test("refuses another user's checkout without touching PayPal", async () => {
+    seedCheckout();
+
+    await expect(capture({ auth: { uid: "someone-else" }, data: { checkoutId: "checkout-1" } })).rejects.toMatchObject({ code: "not-found" });
+    expect(captureOrder).not.toHaveBeenCalled();
+  });
+
+  test("refuses an order id that is not the checkout's", async () => {
+    seedCheckout();
+
+    await expect(capture({ auth: { uid: "student-1" }, data: { checkoutId: "checkout-1", orderId: "order-999" } })).rejects.toMatchObject({
+      code: "aborted",
+    });
+    expect(captureOrder).not.toHaveBeenCalled();
+  });
+
+  test("does not credit a capture for a different amount", async () => {
+    seedCheckout();
+    captured({ amountCents: 100 });
+
+    await expect(capture({ auth: { uid: "student-1" }, data: { checkoutId: "checkout-1" } })).rejects.toMatchObject({ code: "aborted" });
+    expect(checkoutStatus()).toBe("paypal_created");
+  });
+
+  test("answers a completed checkout without capturing again", async () => {
+    seedCheckout({ status: "completed" });
+
+    await expect(capture({ auth: { uid: "student-1" }, data: { checkoutId: "checkout-1" } })).resolves.toMatchObject({ status: "completed" });
+    expect(captureOrder).not.toHaveBeenCalled();
+  });
+});
+
+describe("allowedWebReturnUrl", () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  test("keeps this project's own Hosting site, without query or hash", () => {
+    process.env.GCLOUD_PROJECT = "demo";
+    expect(allowedWebReturnUrl("https://demo.web.app/app/?x=1#buy")).toBe("https://demo.web.app/app/");
+    expect(allowedWebReturnUrl("https://demo.firebaseapp.com/app/")).toBe("https://demo.firebaseapp.com/app/");
+  });
+
+  test("drops any other site, plain http, and non-URLs", () => {
+    process.env.GCLOUD_PROJECT = "demo";
+    delete process.env.FUNCTIONS_EMULATOR;
+    expect(allowedWebReturnUrl("https://evil.example/app/")).toBeUndefined();
+    expect(allowedWebReturnUrl("https://demo.web.app.evil.example/")).toBeUndefined();
+    expect(allowedWebReturnUrl("http://demo.web.app/app/")).toBeUndefined();
+    expect(allowedWebReturnUrl("http://localhost:5180/")).toBeUndefined();
+    expect(allowedWebReturnUrl("javascript:alert(1)")).toBeUndefined();
+    expect(allowedWebReturnUrl(42)).toBeUndefined();
+  });
+
+  test("allows localhost only under the emulators", () => {
+    process.env.FUNCTIONS_EMULATOR = "true";
+    expect(allowedWebReturnUrl("http://localhost:5180/")).toBe("http://localhost:5180/");
   });
 });
 
@@ -498,5 +594,18 @@ describe("wallet checkout routing", () => {
 
     expect(apple.checkoutUrl).toEqual(expect.stringContaining("tranzilaCheckout?checkoutId="));
     expect(google.clientToken).toBe("braintree-token");
+  });
+
+  // The web raises Google's own sheet and needs Braintree's token, while the
+  // app keeps getting Tranzila's page.
+  test("gives Google Pay a Braintree token when the caller asks for Braintree", async () => {
+    withEnv(TRANZILA_ENV);
+
+    const web = (await googlePay({ ...request, data: { ...request.data, processor: "braintree" } })) as Record<string, unknown>;
+    const app = (await googlePay(request)) as Record<string, unknown>;
+
+    expect(web.clientToken).toBe("braintree-token");
+    expect(web).not.toHaveProperty("checkoutUrl");
+    expect(app.checkoutUrl).toEqual(expect.stringContaining("tranzilaCheckout?checkoutId="));
   });
 });

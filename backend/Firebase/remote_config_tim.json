@@ -16222,6 +16222,13 @@
         }
       },
       "valueType": "STRING"
+    },
+    "enable_google_pay": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Offer Google Pay at checkout in the apps and on the web. Off until Google approves production access and Braintree is live.",
+      "valueType": "BOOLEAN"
     }
   },
   "version": {

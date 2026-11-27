@@ -170,6 +170,20 @@
   .loader { text-align: center; padding: 40px; color: var(--muted); font-size: .85rem; }
   .pulse { animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  /* ── Request spinner ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes busybar { 0% { left: -40%; } 100% { left: 100%; } }
+  .busy-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; overflow: hidden; z-index: 3000; display: none; }
+  .busy-bar::before { content: ""; position: absolute; top: 0; width: 40%; height: 100%; background: var(--accent); animation: busybar 1.1s ease-in-out infinite; }
+  .busy-pill { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 3000; display: none; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px; background: var(--card); border: 1px solid var(--border);
+    font-size: .78rem; color: var(--muted2); box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+  body.busy .busy-bar, body.busy .busy-pill { display: flex; }
+  body.busy .busy-bar { display: block; }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; flex: none; }
+  button.is-busy { pointer-events: none; opacity: .75; }
+  button.is-busy::after { content: ""; display: inline-block; width: 11px; height: 11px; margin-left: 7px; vertical-align: -1px;
+    border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
   .filter-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
   .filter-tab { padding: 5px 13px; border-radius: 20px; font-size: .75rem; font-weight: 600; cursor: pointer; background: var(--card); color: var(--muted2); border: 1px solid var(--border); transition: all .15s; }
   .filter-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -203,6 +217,18 @@
   th.sort-desc::after { content: "▼"; opacity: .9; }
   tr.selected { background: rgba(79,124,255,.08); }
   input[type=checkbox] { width: auto; cursor: pointer; }
+  .dc-tools { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .dc-count { margin-left: auto; font-size: .8rem; color: var(--muted2); }
+  .dc-group { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .dc-head { display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: var(--card); flex-wrap: wrap; }
+  .dc-head label { display: flex; gap: 6px; align-items: center; cursor: pointer; font-size: .8rem; color: var(--muted2); white-space: nowrap; }
+  .dc-who { font-weight: 600; font-size: .85rem; }
+  .dc-who small { font-weight: 400; color: var(--muted2); margin-left: 6px; }
+  .dc-row { display: grid; grid-template-columns: 22px 86px 1fr auto; gap: 8px; align-items: center; padding: 5px 12px; font-size: .8rem; border-top: 1px solid var(--border); cursor: pointer; }
+  .dc-row.blocked, .dc-row.implied { cursor: default; color: var(--muted2); }
+  .dc-row .dc-when { color: var(--muted2); white-space: nowrap; }
+  .dc-why { color: var(--yellow, #d29922); font-size: .75rem; }
+  .dc-warn { color: var(--red); font-size: .75rem; }
   .progress { height: 6px; background: var(--card); border-radius: 3px; overflow: hidden; margin-top: 10px; }
   .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
   .adjust-row { display: flex; gap: 8px; align-items: center; }
@@ -285,6 +311,10 @@
       <div id="overview-summary" class="stat-grid">
         <div class="stat-card"><div class="stat-label">Loading</div><div class="stat-value pulse">…</div></div>
       </div>
+      <div class="stat-section-label">Purchases</div>
+      <div id="overview-purchases" class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Loading</div><div class="stat-value pulse">…</div></div>
+      </div>
       <div class="stat-section-label">All time</div>
       <div id="overview-stats" class="stat-grid">
         <div class="stat-card"><div class="stat-label">Loading</div><div class="stat-value pulse">…</div></div>
@@ -316,7 +346,7 @@
         </div>
       </div>
       <div class="table-wrap">
-        <div class="table-header"><h3>📚 Active Lessons</h3></div>
+        <div class="table-header"><h3>📚 Active Lessons</h3><button class="refresh-btn" onclick="openStaleLive()" title="Questions and lessons still marked live a day or more after any activity">🧹 Close stale lessons</button></div>
         <table><thead><tr><th>Lesson ID</th><th>Student</th><th>Teacher</th><th>Started</th><th>Hard Cap</th><th>Rate</th></tr></thead>
         <tbody id="active-lessons-table"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
         </table>
@@ -342,6 +372,24 @@
         <tbody id="live-checks"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
         </table>
       </div>
+      <div class="stat-section-label" style="margin-top:22px">New sign-ups <span id="live-details-updated" style="text-transform:none;letter-spacing:0;font-weight:400"></span></div>
+      <div id="live-signups" class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Loading</div><div class="stat-value pulse">…</div></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><h3>🟢 Online teachers in detail</h3>
+          <label style="font-size:.8rem;color:var(--muted2);display:flex;gap:6px;align-items:center"><input type="checkbox" id="live-hide-demo" checked onchange="renderLiveDetails()"> Hide demo</label>
+        </div>
+        <table><thead><tr><th>Teacher</th><th>Status</th><th>Online since</th><th>Last question sent</th><th>Last taken</th><th>Sent · taken (24h / 7d)</th><th>Rating</th><th>Joined</th></tr></thead>
+        <tbody id="live-teachers"><tr class="empty-row"><td colspan="8">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><h3>🆕 Latest sign-ups</h3></div>
+        <table><thead><tr><th>User</th><th>Role</th><th>Signed up</th></tr></thead>
+        <tbody id="live-recent-signups"><tr class="empty-row"><td colspan="3">Loading…</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ── Users ── -->
@@ -361,6 +409,7 @@
         </select>
         <button class="btn-ghost btn-sm" id="users-force-refresh" onclick="forceRefreshUsers()">⟳ Force refresh</button>
         <button class="btn-ghost btn-sm" onclick="openCleanup()">🧹 Clean up anonymous</button>
+        <button class="btn-ghost btn-sm" onclick="openDemoCleanup()">🧪 Clean demo data</button>
       </div>
       <div class="table-wrap section-gap">
         <div class="table-header"><h3>🎓 Students <span id="students-count" style="color:var(--muted2);font-weight:400"></span></h3></div>
@@ -813,7 +862,72 @@
   </div>
 </div>
 
+<!-- ── Demo Data Cleanup Modal ── -->
+<div class="modal-overlay" id="demo-cleanup-modal">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-head">
+      <h2>Clean Demo Data</h2>
+      <button class="btn-icon" onclick="closeModal('demo-cleanup-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.85rem;color:var(--muted2);margin-bottom:12px">
+        Everything users marked 🧪 demo left behind in this project — purchases,
+        Contact Us requests, questions, lessons, coupons — and the demo accounts
+        themselves. Untick anything to keep it. Each item is checked again on
+        the server before it is deleted: anything live, or involving a real
+        user, is skipped. Deleting a purchase does not take back the minutes it
+        added.
+      </p>
+      <div id="demo-cleanup-tools" class="dc-tools" style="display:none">
+        <button class="btn-ghost btn-sm" onclick="demoCleanupSelectAll(true)">Tick all records</button>
+        <button class="btn-ghost btn-sm" onclick="demoCleanupSelectAll(false)">Untick everything</button>
+        <span id="demo-cleanup-count" class="dc-count"></span>
+      </div>
+      <div id="demo-cleanup-result"><div class="loader pulse" style="padding:12px">Listing demo data…</div></div>
+      <div class="progress" id="demo-cleanup-progress" style="display:none"><div></div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost btn-sm" onclick="closeModal('demo-cleanup-modal')">Close</button>
+      <button class="btn-danger btn-sm" id="demo-cleanup-delete" style="display:none" onclick="runDemoCleanup()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="stale-live-modal">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-head">
+      <h2>Close Stale Lessons</h2>
+      <button class="btn-icon" onclick="closeModal('stale-live-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.85rem;color:var(--muted2);margin-bottom:12px">
+        Questions and lessons still marked searching, accepted or in progress
+        though nothing has happened on them for <span id="stale-live-hours">24</span> hours or more —
+        their ending never ran. Closing one writes it off: <b>nobody is charged
+        or paid</b>, its teacher is freed, and a search ends as unanswered. A
+        lesson whose question already ended takes that question's figures.
+        Real users' records start unticked: closing a lesson that really
+        happened pays its teacher nothing. Each record is checked again first.
+      </p>
+      <div id="stale-live-tools" class="dc-tools" style="display:none">
+        <button class="btn-ghost btn-sm" onclick="staleLiveSelect('demo')">Tick demo only</button>
+        <button class="btn-ghost btn-sm" onclick="staleLiveSelect('all')">Tick all</button>
+        <button class="btn-ghost btn-sm" onclick="staleLiveSelect('none')">Untick all</button>
+        <span id="stale-live-count" class="dc-count"></span>
+      </div>
+      <div id="stale-live-result"><div class="loader pulse" style="padding:12px">Looking for stale records…</div></div>
+      <div class="progress" id="stale-live-progress" style="display:none"><div></div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost btn-sm" onclick="closeModal('stale-live-modal')">Cancel</button>
+      <button class="btn-danger btn-sm" id="stale-live-close" style="display:none" onclick="runCloseStaleLive()">Close ticked</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Toast ── -->
+<div class="busy-bar" aria-hidden="true"></div>
+<div class="busy-pill" role="status" aria-live="polite"><span class="spinner"></span><span id="busy-label">Working…</span></div>
 <div class="toast" id="toast"></div>
 
 <!-- ── Firebase SDK ── -->
@@ -839,8 +953,55 @@ const fns = firebase.functions();
 fns.region = "us-central1";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function call(name, data = {}) {
-  return fns.httpsCallable(name)(data).then(r => r.data);
+// Every request the console makes goes through call(), so this is where the
+// spinner lives: a bar across the top and a "Working…" pill while any request
+// runs, and a spinner on the button that started it. Background polls pass
+// { quiet: true } so the page does not flash every half minute.
+const BUSY_DELAY_MS = 200;   // a fast answer shows nothing at all
+const busyRequests = new Map();
+let busySeq = 0;
+let busyTimer = null;
+
+function updateBusy() {
+  clearTimeout(busyTimer);
+  if (!busyRequests.size) {
+    document.body.classList.remove("busy");
+    return;
+  }
+  const names = [...busyRequests.values()];
+  const label = BUSY_LABELS[names[names.length - 1]] || "Working";
+  document.getElementById("busy-label").textContent =
+    `${label}…${names.length > 1 ? ` (+${names.length - 1} more)` : ""}`;
+  if (document.body.classList.contains("busy")) return;
+  busyTimer = setTimeout(() => { if (busyRequests.size) document.body.classList.add("busy"); }, BUSY_DELAY_MS);
+}
+
+/** Friendlier words for the pill than the function names. */
+const BUSY_LABELS = {
+  adminDashboardStatus: "Loading overview", adminLiveStatus: "Checking status", adminLiveDetails: "Loading teachers & sign-ups",
+  adminListUsers: "Loading users", adminGetUserDetail: "Loading user", adminDemoCleanupPreview: "Listing demo data",
+  adminDemoCleanup: "Deleting", adminStaleLivePreview: "Looking for stale lessons", adminCloseStaleLive: "Closing",
+  adminBulkDeleteUsers: "Deleting users", adminSendEmail: "Sending email", adminSendPush: "Sending push",
+};
+
+function call(name, data = {}, { quiet = false } = {}) {
+  const request = fns.httpsCallable(name)(data).then(r => r.data);
+  if (quiet) return request;
+  const id = ++busySeq;
+  busyRequests.set(id, name);
+  // The button that was just clicked, if any, spins until its request is done.
+  const btn = document.activeElement?.closest?.("button");
+  if (btn) btn.dataset.busy = String((Number(btn.dataset.busy) || 0) + 1), btn.classList.add("is-busy");
+  updateBusy();
+  return request.finally(() => {
+    busyRequests.delete(id);
+    if (btn) {
+      const left = (Number(btn.dataset.busy) || 1) - 1;
+      if (left > 0) btn.dataset.busy = String(left);
+      else { delete btn.dataset.busy; btn.classList.remove("is-busy"); }
+    }
+    updateBusy();
+  });
 }
 
 function fmt(ms) {
@@ -1028,21 +1189,95 @@ const LIVE_BADGES = { ok: ["OK", "green"], warn: ["Warning", "yellow"], down: ["
 let liveTimer = null;
 let liveInFlight = false;
 
+// The details list every account and scan a week of questions, so they poll
+// more slowly than the status checks.
+const LIVE_DETAILS_POLL_MS = 120_000;
+let liveDetailsTimer = null;
+let liveDetailsInFlight = false;
+let liveDetails = null;
+
 function startLivePolling() {
   stopLivePolling();
   loadLive();
-  liveTimer = setInterval(loadLive, LIVE_POLL_MS);
+  loadLiveDetails();
+  liveTimer = setInterval(() => loadLive(true), LIVE_POLL_MS);
+  liveDetailsTimer = setInterval(() => loadLiveDetails(true), LIVE_DETAILS_POLL_MS);
 }
 function stopLivePolling() {
   clearInterval(liveTimer);
+  clearInterval(liveDetailsTimer);
   liveTimer = null;
+  liveDetailsTimer = null;
 }
 
-async function loadLive() {
+async function loadLiveDetails(quiet = false) {
+  if (liveDetailsInFlight) return;
+  liveDetailsInFlight = true;
+  try {
+    liveDetails = await call("adminLiveDetails", {}, { quiet });
+    renderLiveDetails();
+  } catch (e) {
+    document.getElementById("live-teachers").innerHTML = `<tr class="empty-row"><td colspan="8" style="color:var(--red)">${esc(e.message)}</td></tr>`;
+  } finally {
+    liveDetailsInFlight = false;
+  }
+}
+
+function renderLiveDetails() {
+  const d = liveDetails;
+  if (!d) return;
+  document.getElementById("live-details-updated").textContent =
+    `· updated ${new Date(d.checkedAt).toLocaleTimeString()}, every 2 minutes · demo users left out`;
+
+  const card = (title, w, tone) => `
+    <div class="stat-card ${tone}">
+      <div class="stat-label">${title}</div>
+      <div class="stat-value">${w.total}</div>
+      <div class="stat-sub">${w.students} student${w.students === 1 ? "" : "s"} · ${w.teachers} teacher${w.teachers === 1 ? "" : "s"}${w.noRole ? ` · ${w.noRole} no role yet` : ""}</div>
+      <div class="stat-sub">${w.anonymous} anonymous (opened the app, no account)</div>
+    </div>`;
+  document.getElementById("live-signups").innerHTML =
+    card("Signed up · last 24 hours", d.signups.day, "stat-green") +
+    card("Signed up · last 7 days", d.signups.week, "stat-blue") +
+    card("Signed up · last 30 days", d.signups.month, "stat-blue");
+
+  const hideDemo = document.getElementById("live-hide-demo").checked;
+  const teachers = d.teachers.filter(t => !hideDemo || !t.demo);
+  const when = ms => ms ? `<span title="${esc(fmtFull(ms))}">${ago(ms)}</span>` : `<span style="color:var(--muted2)">—</span>`;
+  document.getElementById("live-teachers").innerHTML = teachers.length ? teachers.map(t => {
+    const status = t.busy ? badge("In a session", "purple")
+      : t.availability === "dnd" ? badge("Do not disturb", "yellow")
+      : badge("Available", "green");
+    const seenLate = t.lastSeenAt && Date.now() - t.lastSeenAt > 3 * 60_000;
+    return `<tr style="cursor:pointer" onclick="viewUser(${jsArg(t.uid)})" title="Open the user's details">
+      <td>
+        <div style="font-weight:600">${esc(t.name || "—")}${t.verified ? "" : " " + badge("unverified", "yellow")}${t.demo ? " " + badge("🧪 Demo", "purple") : ""}</div>
+        <div style="font-size:.75rem;color:var(--muted2)">${esc(t.email || t.uid)}</div>
+        <div style="font-size:.72rem;color:var(--muted2)">${esc(t.subjects.join(", ") || "no subjects")}</div>
+      </td>
+      <td>${status}${t.lastSeenAt ? `<div style="font-size:.72rem;color:${seenLate ? "var(--yellow, #d29922)" : "var(--muted2)"}">app seen ${ago(t.lastSeenAt)}</div>` : ""}</td>
+      <td>${when(t.onlineSince)}</td>
+      <td>${t.lastInvitedAt ? when(t.lastInvitedAt) : `<span style="color:var(--muted2)">not in ${d.inviteLookbackDays}d</span>`}</td>
+      <td>${t.lastAcceptedAt ? when(t.lastAcceptedAt) : `<span style="color:var(--muted2)">never</span>`}</td>
+      <td>${t.invitedLastDay} · ${t.acceptedLastDay} <span style="color:var(--muted2)">/</span> ${t.invitedLastWeek} · ${t.acceptedLastWeek}</td>
+      <td>${t.rating ? `⭐ ${t.rating.toFixed(1)} <span style="color:var(--muted2)">(${t.ratingCount})</span>` : `<span style="color:var(--muted2)">—</span>`}</td>
+      <td>${t.joinedAt ? fmtDate(t.joinedAt) : "—"}<div style="font-size:.72rem;color:var(--muted2)">${t.totalMinutes} min taught</div></td>
+    </tr>`;
+  }).join("") : `<tr class="empty-row"><td colspan="8">No teachers online${hideDemo && d.teachers.length ? " (demo teachers hidden)" : ""}</td></tr>`;
+
+  document.getElementById("live-recent-signups").innerHTML = d.recentSignups.length ? d.recentSignups.map(u => `
+    <tr style="cursor:pointer" onclick="viewUser(${jsArg(u.uid)})">
+      <td><div style="font-weight:600">${esc(u.name || "—")}</div><div style="font-size:.75rem;color:var(--muted2)">${esc(u.email || u.uid)}</div></td>
+      <td>${u.role ? badge(u.role, u.role === "teacher" ? "purple" : "blue") : `<span style="color:var(--muted2)">not chosen</span>`}</td>
+      <td title="${esc(fmtFull(u.createdAt))}">${ago(u.createdAt)}</td>
+    </tr>`).join("") : `<tr class="empty-row"><td colspan="3">No sign-ups in the last 30 days</td></tr>`;
+}
+
+async function loadLive(quiet = false) {
   if (liveInFlight) return;
   liveInFlight = true;
   try {
-    renderLive(await call("adminLiveStatus"));
+    renderLive(await call("adminLiveStatus", {}, { quiet }));
   } catch (e) {
     // The backend itself not answering is the one outage the checks cannot report.
     renderLiveBanner("down", "Backend not responding", e.message);
@@ -1083,9 +1318,9 @@ function renderLive(d) {
 }
 
 // ── Overview ─────────────────────────────────────────────────────────────────
-async function loadOverview() {
+async function loadOverview(quiet = false) {
   try {
-    const d = await call("adminDashboardStatus");
+    const d = await call("adminDashboardStatus", {}, { quiet });
     renderOverview(d);
   } catch (e) {
     showToast("Failed to load overview: " + e.message, "error");
@@ -1137,6 +1372,8 @@ function renderOverview(d) {
       <div class="stat-sub">${dq.answered ?? 0} answered · unanswered excluded</div>
     </div>
   `;
+
+  renderPurchaseWindows(d.purchases);
 
   document.getElementById("overview-stats").innerHTML = `
     <div class="stat-card stat-blue">
@@ -1192,6 +1429,26 @@ function renderOverview(d) {
 
   // Active lessons, with the pricing snapshot frozen at startLesson.
   renderActiveLessons(d);
+}
+
+/** Completed purchases in the last 24 hours, 7 days and 30 days (rolling),
+ *  per currency, with the methods used. Demo users are left out. */
+const PAY_METHOD_LABELS = { paypal: "PayPal", card: "Card", apple_pay: "Apple Pay", google_pay: "Google Pay", saved_paypal: "Saved PayPal", braintree: "Braintree" };
+function renderPurchaseWindows(p) {
+  const el = document.getElementById("overview-purchases");
+  if (!p) { el.innerHTML = `<div class="stat-card"><div class="stat-label">Purchases</div><div class="stat-value">—</div><div class="stat-sub">Deploy the admin functions to see purchases by period</div></div>`; return; }
+  const windows = [["day", "Last 24 hours", "stat-green"], ["week", "Last 7 days", "stat-blue"], ["month", "Last 30 days", "stat-purple"]];
+  el.innerHTML = windows.map(([key, label, tone]) => {
+    const w = p[key] || {};
+    const methods = Object.entries(w.byMethod || {}).sort((a, b) => b[1] - a[1])
+      .map(([m, n]) => `${esc(PAY_METHOD_LABELS[m] || m)} ${n}`).join(" · ");
+    return `<div class="stat-card ${w.count ? tone : ""}">
+      <div class="stat-label">Purchases · ${label}</div>
+      <div class="stat-value" style="font-size:1.1rem">${w.count ? formatRevenue({ byCurrency: w.byCurrency }) : money(0, defaultCurrency)}</div>
+      <div class="stat-sub">${w.count || 0} purchase${w.count === 1 ? "" : "s"} · ${w.buyers || 0} buyer${w.buyers === 1 ? "" : "s"} · ${w.minutes || 0} min sold</div>
+      <div class="stat-sub">${methods || "No completed purchases"}${w.abandoned ? ` · <span title="Checkouts opened in this period that were not paid">${w.abandoned} not completed</span>` : ""}</div>
+    </div>`;
+  }).join("");
 }
 
 let onlineTeacherRows = [];
@@ -1662,6 +1919,295 @@ async function runCleanup() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// ── Demo data cleanup ────────────────────────────────────────────────────────
+// A checklist of every demo account and the records demo users left behind.
+// Records start ticked unless the server says they can't go (live, or shared
+// with a real user). Accounts start ticked except the standing screenshot
+// accounts and any whose deletion would take a real user's records with it.
+let demoCleanup = null;              // { accounts, items } from the server
+const dcItems = new Set();           // "kind/id" of ticked records
+const dcAccounts = new Set();        // uids of ticked accounts
+const DC_KIND_LABELS = { purchase: "Purchase", contact: "Contact Us", question: "Question", lesson: "Lesson", coupon: "Coupon" };
+const DC_KIND_TONES = { purchase: "green", contact: "blue", question: "purple", lesson: "purple", coupon: "yellow" };
+const dcKey = (i) => `${i.kind}/${i.id}`;
+
+async function openDemoCleanup() {
+  demoCleanup = null;
+  dcItems.clear();
+  dcAccounts.clear();
+  document.getElementById("demo-cleanup-tools").style.display = "none";
+  document.getElementById("demo-cleanup-delete").style.display = "none";
+  document.getElementById("demo-cleanup-progress").style.display = "none";
+  document.getElementById("demo-cleanup-result").innerHTML = `<div class="loader pulse" style="padding:12px">Listing demo data…</div>`;
+  openModal("demo-cleanup-modal");
+  try {
+    demoCleanup = await call("adminDemoCleanupPreview");
+  } catch (e) {
+    document.getElementById("demo-cleanup-result").innerHTML = `<p style="color:var(--red);font-size:.85rem">${esc(e.message)}</p>`;
+    return;
+  }
+  demoCleanup.items.filter(i => !i.blocked).forEach(i => dcItems.add(dcKey(i)));
+  demoCleanup.accounts.filter(a => !a.standing && !a.sharedRecords && !a.live).forEach(a => dcAccounts.add(a.uid));
+  renderDemoCleanup();
+}
+
+/** A record goes with its account when any demo party's account is ticked. */
+function dcImplied(item) {
+  return item.ownerUid != null && dcAccounts.has(item.ownerUid);
+}
+
+function renderDemoCleanup() {
+  const out = document.getElementById("demo-cleanup-result");
+  const { accounts, items } = demoCleanup;
+  if (!accounts.length && !items.length) {
+    out.innerHTML = `<p style="font-size:.85rem;color:var(--muted2)">No demo users or demo records in this project. Mark accounts as 🧪 demo on the Users page first.</p>`;
+    document.getElementById("demo-cleanup-tools").style.display = "none";
+    document.getElementById("demo-cleanup-delete").style.display = "none";
+    return;
+  }
+  const row = (i) => {
+    const implied = dcImplied(i);
+    const checked = implied || dcItems.has(dcKey(i));
+    const disabled = !!i.blocked || implied;
+    const note = i.blocked ? `<span class="dc-why">kept · ${esc(i.blocked)}</span>`
+      : implied ? `<span class="dc-why" style="color:var(--muted2)">goes with the account</span>` : "";
+    return `<label class="dc-row ${i.blocked ? "blocked" : implied ? "implied" : ""}">
+      <input type="checkbox" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""} onchange="dcToggleItem(${jsArg(dcKey(i))}, this.checked)">
+      <span>${badge(DC_KIND_LABELS[i.kind] || i.kind, DC_KIND_TONES[i.kind] || "blue")}</span>
+      <span>${esc(i.summary || "—")} ${note}</span>
+      <span class="dc-when">${i.at ? fmt(i.at) : "—"}</span>
+    </label>`;
+  };
+  const groups = accounts.map(a => {
+    const own = items.filter(i => i.ownerUid === a.uid);
+    const selectable = own.filter(i => !i.blocked);
+    const allOn = selectable.length > 0 && selectable.every(i => dcItems.has(dcKey(i)));
+    const warn = [
+      a.standing ? `<span class="tag">screenshot account (CLAUDE.md)</span>` : "",
+      a.live ? `<span class="dc-warn">⚠ ${a.live} live — can't be deleted now</span>` : "",
+      a.sharedRecords ? `<span class="dc-warn">⚠ deleting the account also deletes ${a.sharedRecords} record${a.sharedRecords === 1 ? "" : "s"} shared with real users</span>` : "",
+    ].filter(Boolean).join(" ");
+    return `<div class="dc-group">
+      <div class="dc-head">
+        <label title="Delete the account and all of its data"><input type="checkbox" ${dcAccounts.has(a.uid) ? "checked" : ""} onchange="dcToggleAccount(${jsArg(a.uid)}, this.checked)"> Delete account</label>
+        <span class="dc-who">${esc(a.name || a.email || a.uid)}<small>${esc(a.email && a.name ? a.email : "")}${a.role ? ` · ${esc(a.role)}` : ""}</small></span>
+        ${warn}
+        ${selectable.length && !dcAccounts.has(a.uid) ? `<label style="margin-left:auto"><input type="checkbox" ${allOn ? "checked" : ""} onchange="dcToggleOwner(${jsArg(a.uid)}, this.checked)"> All ${selectable.length} record${selectable.length === 1 ? "" : "s"}</label>` : ""}
+      </div>
+      ${own.length ? own.map(row).join("") : `<div class="dc-row" style="cursor:default;color:var(--muted2)"><span></span><span></span><span>No records</span><span></span></div>`}
+    </div>`;
+  });
+  const orphans = items.filter(i => i.ownerUid == null);
+  if (orphans.length) {
+    groups.push(`<div class="dc-group">
+      <div class="dc-head"><span class="dc-who">Sample support requests<small>sent from this console</small></span></div>
+      ${orphans.map(row).join("")}
+    </div>`);
+  }
+  out.innerHTML = groups.join("");
+  document.getElementById("demo-cleanup-tools").style.display = "flex";
+  updateDemoCleanupCount();
+}
+
+/** The records to send: ticked, and not already going with a ticked account. */
+function dcSelectedItems() {
+  return demoCleanup.items.filter(i => !i.blocked && !dcImplied(i) && dcItems.has(dcKey(i))).map(i => ({ kind: i.kind, id: i.id }));
+}
+
+function updateDemoCleanupCount() {
+  const nItems = dcSelectedItems().length;
+  const nAccounts = dcAccounts.size;
+  const parts = [];
+  if (nItems) parts.push(`${nItems} record${nItems === 1 ? "" : "s"}`);
+  if (nAccounts) parts.push(`${nAccounts} account${nAccounts === 1 ? "" : "s"} with all their data`);
+  document.getElementById("demo-cleanup-count").textContent = parts.length ? `Will delete ${parts.join(" and ")}` : "Nothing ticked";
+  const btn = document.getElementById("demo-cleanup-delete");
+  btn.style.display = parts.length ? "inline-block" : "none";
+  btn.textContent = `Delete ${parts.join(" + ")}`;
+}
+
+function dcToggleItem(key, on) {
+  on ? dcItems.add(key) : dcItems.delete(key);
+  renderDemoCleanup();
+}
+function dcToggleOwner(uid, on) {
+  demoCleanup.items.filter(i => i.ownerUid === uid && !i.blocked).forEach(i => on ? dcItems.add(dcKey(i)) : dcItems.delete(dcKey(i)));
+  renderDemoCleanup();
+}
+function dcToggleAccount(uid, on) {
+  const a = demoCleanup.accounts.find(x => x.uid === uid);
+  if (on && a?.standing && !confirm(`${a.email} is a standing App Store screenshot account (CLAUDE.md). Delete it anyway?`)) { renderDemoCleanup(); return; }
+  on ? dcAccounts.add(uid) : dcAccounts.delete(uid);
+  renderDemoCleanup();
+}
+function demoCleanupSelectAll(on) {
+  dcItems.clear();
+  if (on) demoCleanup.items.filter(i => !i.blocked).forEach(i => dcItems.add(dcKey(i)));
+  else dcAccounts.clear();
+  renderDemoCleanup();
+}
+
+async function runDemoCleanup() {
+  const items = dcSelectedItems();
+  const accounts = [...dcAccounts];
+  if (!items.length && !accounts.length) return;
+  const names = accounts.slice(0, 6).map(uid => {
+    const a = demoCleanup.accounts.find(x => x.uid === uid);
+    return "• " + (a?.email || a?.name || uid);
+  }).join("\n");
+  const project = firebase.app().options.projectId;
+  if (!confirm(`Delete from ${project}:\n\n` +
+      (items.length ? `${items.length} record${items.length === 1 ? "" : "s"} (purchases, contact requests, questions…)\n` : "") +
+      (accounts.length ? `${accounts.length} account${accounts.length === 1 ? "" : "s"} and all their data:\n${names}${accounts.length > 6 ? `\n…and ${accounts.length - 6} more` : ""}\n` : "") +
+      `\nThis cannot be undone.`)) return;
+
+  const btn = document.getElementById("demo-cleanup-delete");
+  const bar = document.getElementById("demo-cleanup-progress");
+  btn.disabled = true;
+  bar.style.display = "block";
+  // Records go 100 to a call; accounts, which each take a full account
+  // deletion, 3 to a call — both far inside the function's time limit.
+  const calls = [];
+  for (let i = 0; i < items.length; i += 100) calls.push({ items: items.slice(i, i + 100) });
+  for (let i = 0; i < accounts.length; i += 3) calls.push({ accounts: accounts.slice(i, i + 3) });
+  const results = [];
+  try {
+    for (let n = 0; n < calls.length; n++) {
+      const d = await call("adminDemoCleanup", calls[n]);
+      results.push(...d.items, ...d.accounts);
+      bar.firstElementChild.style.width = `${Math.round((n + 1) / calls.length * 100)}%`;
+    }
+    const deleted = results.filter(r => r.status === "deleted").length;
+    const skipped = results.filter(r => r.status === "skipped");
+    const failed = results.filter(r => r.status === "failed");
+    let msg = `Deleted ${deleted}`;
+    if (skipped.length) msg += ` · kept ${skipped.length} (${skipped[0].reason})`;
+    if (failed.length) msg += ` · failed ${failed.length} (${failed[0].reason})`;
+    showToast(msg, failed.length ? "error" : "success");
+  } catch (e) {
+    showToast("Cleanup stopped: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    bar.style.display = "none";
+    bar.firstElementChild.style.width = "0";
+  }
+  if (allUsers.length) loadUsers();
+  openDemoCleanup();
+}
+
+// ── Stale live questions and lessons ─────────────────────────────────────────
+let staleLive = null;
+const slTicked = new Set();
+const slKey = i => `${i.kind}/${i.id}`;
+
+async function openStaleLive() {
+  staleLive = null;
+  slTicked.clear();
+  document.getElementById("stale-live-tools").style.display = "none";
+  document.getElementById("stale-live-close").style.display = "none";
+  document.getElementById("stale-live-progress").style.display = "none";
+  document.getElementById("stale-live-result").innerHTML = `<div class="loader pulse" style="padding:12px">Looking for stale records…</div>`;
+  openModal("stale-live-modal");
+  try {
+    staleLive = await call("adminStaleLivePreview");
+  } catch (e) {
+    document.getElementById("stale-live-result").innerHTML = `<p style="color:var(--red);font-size:.85rem">${esc(e.message)}</p>`;
+    return;
+  }
+  document.getElementById("stale-live-hours").textContent = staleLive.staleAfterHours;
+  staleLive.items.filter(i => i.demo).forEach(i => slTicked.add(slKey(i)));
+  renderStaleLive();
+}
+
+function renderStaleLive() {
+  const out = document.getElementById("stale-live-result");
+  const items = staleLive.items;
+  if (!items.length) {
+    out.innerHTML = `<p style="font-size:.85rem;color:var(--muted2)">Nothing stale: every live question and lesson has had activity in the last ${staleLive.staleAfterHours} hours.</p>`;
+    document.getElementById("stale-live-tools").style.display = "none";
+    document.getElementById("stale-live-close").style.display = "none";
+    return;
+  }
+  const who = (name, uid) => name ? esc(name) : uid ? `<span class="mono">${esc(uid.slice(0, 8))}…</span>` : "—";
+  const row = i => {
+    const keepsPay = i.kind === "lesson" && i.questionStatus === "completed";
+    const what = (i.kind === "lesson"
+      ? `lesson in progress · question ${esc(i.questionStatus || "missing")}`
+      : `question ${esc(i.status)}`) +
+      (keepsPay ? ` <span class="dc-why" style="color:var(--muted2)">keeps the question's billing</span>` : "");
+    return `<label class="dc-row">
+      <input type="checkbox" ${slTicked.has(slKey(i)) ? "checked" : ""} onchange="slToggle(${jsArg(slKey(i))}, this.checked)">
+      <span>${badge(i.kind === "lesson" ? "Lesson" : "Question", i.kind === "lesson" ? "purple" : "blue")}</span>
+      <span>${what}${i.topic ? ` · ${esc(i.topic)}` : ""} · ${who(i.studentName, i.studentUid)} → ${who(i.teacherName, i.teacherUid)}</span>
+      <span class="dc-when">${i.lastActivityAt ? fmt(i.lastActivityAt) : "—"}</span>
+    </label>`;
+  };
+  const group = (title, list, note) => list.length ? `<div class="dc-group">
+      <div class="dc-head"><span class="dc-who">${title}<small>${list.length}</small></span>${note}</div>
+      ${list.map(row).join("")}
+    </div>` : "";
+  out.innerHTML =
+    group("Real users", items.filter(i => !i.demo), `<span class="dc-warn">a write-off pays the teacher nothing, except where the question already ended</span>`) +
+    group("Demo users", items.filter(i => i.demo), "");
+  document.getElementById("stale-live-tools").style.display = "flex";
+  document.getElementById("stale-live-close").style.display = "";
+  updateStaleLiveCount();
+}
+
+function updateStaleLiveCount() {
+  const n = slTicked.size;
+  document.getElementById("stale-live-count").textContent = n ? `Will close ${n} of ${staleLive.items.length}` : "Nothing ticked";
+  document.getElementById("stale-live-close").disabled = n === 0;
+}
+
+function slToggle(key, on) {
+  on ? slTicked.add(key) : slTicked.delete(key);
+  updateStaleLiveCount();
+}
+
+function staleLiveSelect(which) {
+  slTicked.clear();
+  staleLive.items.filter(i => which === "all" || (which === "demo" && i.demo)).forEach(i => slTicked.add(slKey(i)));
+  renderStaleLive();
+}
+
+async function runCloseStaleLive() {
+  const items = staleLive.items.filter(i => slTicked.has(slKey(i))).map(i => ({ kind: i.kind, id: i.id }));
+  if (!items.length) return;
+  const real = staleLive.items.filter(i => !i.demo && slTicked.has(slKey(i))).length;
+  const project = firebase.app().options.projectId;
+  if (!confirm(`Close ${items.length} stale record${items.length === 1 ? "" : "s"} in ${project}?\n\n` +
+      `Each is written off: nobody is charged or paid.` +
+      (real ? `\n${real} of them belong to real users.` : ""))) return;
+  const btn = document.getElementById("stale-live-close");
+  const bar = document.getElementById("stale-live-progress");
+  btn.disabled = true;
+  bar.style.display = "block";
+  const results = [];
+  try {
+    for (let i = 0; i < items.length; i += 100) {
+      const d = await call("adminCloseStaleLive", { items: items.slice(i, i + 100) });
+      results.push(...d.items);
+      bar.firstElementChild.style.width = `${Math.round(Math.min(items.length, i + 100) / items.length * 100)}%`;
+    }
+    const closed = results.filter(r => r.status === "closed").length;
+    const skipped = results.filter(r => r.status === "skipped");
+    const failed = results.filter(r => r.status === "failed");
+    let msg = `Closed ${closed}`;
+    if (skipped.length) msg += ` · skipped ${skipped.length} (${skipped[0].reason})`;
+    if (failed.length) msg += ` · failed ${failed.length} (${failed[0].reason})`;
+    showToast(msg, failed.length ? "error" : "success");
+  } catch (e) {
+    showToast("Stopped: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    bar.style.display = "none";
+    bar.firstElementChild.style.width = "0";
+  }
+  loadOverview();
+  openStaleLive();
 }
 
 async function viewUser(uid) {
@@ -3115,7 +3661,7 @@ async function bulkApprovePilot(ids) {
 // ── Auto-refresh overview every 60s ──────────────────────────────────────────
 setInterval(() => {
   const overviewActive = document.getElementById("page-overview").classList.contains("active");
-  if (overviewActive && document.visibilityState === "visible") loadOverview();
+  if (overviewActive && document.visibilityState === "visible") loadOverview(true);
 }, 60000);
 </script>
 </body>

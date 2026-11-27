@@ -28,6 +28,7 @@ import {
   resolveTeacherRatePerMinute,
 } from "./pricing";
 import { deferredInEmulator } from "./emulatorSchedule";
+import { withQuestionTimestamps } from "./questionTimes";
 
 const firestore = admin.firestore();
 const db = admin.database();
@@ -451,7 +452,9 @@ async function migrateQuestionToFirestore(
       : await resolveTeacherRatePerMinute(teacherData, currencyCode);
 
   const teacherEarnings = teacherEarningsFor(roundedMinutes, teacherRatePerMinute);
-  const migratedQuestion = sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>;
+  // The live copy keeps its times as milliseconds; Firestore keeps them as
+  // Timestamps, which "since" queries depend on (see ./questionTimes).
+  const migratedQuestion = withQuestionTimestamps(sanitizeForFirestore(rtdbQuestion) as Record<string, unknown>);
   logger.info(
     `[lessons] migrateQuestionToFirestore payload qid=${questionId} rtdbKeys=${Object.keys(rtdbQuestion).sort().join(",") || "none"}`
   );

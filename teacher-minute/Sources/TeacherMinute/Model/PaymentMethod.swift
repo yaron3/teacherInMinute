@@ -50,7 +50,21 @@ enum PaymentMethod: String, CaseIterable {
     static func configuredForCheckout() -> [PaymentMethod] {
         let raw = RemoteConfigService.shared.getStringArray(RemoteConfigKey.paymentMethods.rawValue)
         let parsed = raw.compactMap { PaymentMethod(rawValue: $0) }
-        return parsed.isEmpty ? availableForCurrentPlatform : parsed
+        return withGooglePayGate(parsed.isEmpty ? availableForCurrentPlatform : parsed)
+    }
+
+    /// `methods` without Google Pay unless Remote Config's `enable_google_pay`
+    /// turns it on (off when the key is missing).
+    @MainActor
+    static func withGooglePayGate(_ methods: [PaymentMethod]) -> [PaymentMethod] {
+        let enabled = RemoteConfigService.shared.getBool(RemoteConfigKey.enableGooglePay.rawValue, default: false)
+        return enabled ? methods : methods.filter { $0 != .googlePay }
+    }
+
+    /// What checkout shows before Remote Config has answered: the platform's
+    /// methods, Google Pay held back until the flag says otherwise.
+    static var beforeRemoteConfig: [PaymentMethod] {
+        availableForCurrentPlatform.filter { $0 != .googlePay }
     }
 
     /// Currencies the Braintree wallets can actually process — must match the
