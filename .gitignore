@@ -11,6 +11,8 @@ build/
 .env
 .env.local
 .env.*.local
+# Production-only functions settings (live PayPal keys)
+backend/Firebase/functions/.env.teacher-in-a-moment
 *firebase-adminsdk*.json
 
 # Firebase tooling

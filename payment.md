@@ -8,18 +8,24 @@ apps (`teacher-minute/`) and the backend (`backend/Firebase/functions`).
 | Method | Processor | Web | iOS app | Android app | Staging | Production |
 |---|---|---|---|---|---|---|
 | Credit card | Tranzila (hosted fields) | In-app sheet | Browser page | Browser page | Works; real card not yet tried in the web sheet | Tranzila is set up; web not deployed |
-| PayPal | PayPal Orders v2 | PayPal's own buttons (JS SDK) | Redirect | Redirect | **Verified end to end** (sandbox payment captured, 60 minutes credited) | **`PAYPAL_ENV=sandbox` — takes no real money** |
+| PayPal | PayPal Orders v2 | PayPal's own buttons (JS SDK) | Redirect | Redirect | **Verified end to end** (sandbox payment captured, 60 minutes credited) | **Live** since 2026-11-27; first real purchase not yet made |
 | Apple Pay | Tranzila page (web, and apps when `TRANZILA_WALLETS` lists it); else Braintree | Safari only, in the sheet | Native sheet (Braintree) or Tranzila page | — | Wallet page opens; button not yet seen in Safari | `TRANZILA_WALLETS` empty; Braintree is sandbox |
 | Google Pay | Braintree (web, Google Pay API); Tranzila page or Braintree in the app | **Hidden** (`enable_google_pay=false`) | — | **Hidden** (`enable_google_pay=false`) | Built, not tested | Needs Google's approval + live Braintree |
 | Bit | none | — | — | — | Backend rejects it | Not started |
 
 Current production settings on the functions (read 2026-11-26):
 
-- `PAYPAL_ENV=sandbox`, `BRAINTREE_ENV=sandbox`, `TRANZILA_WALLETS=` (empty).
+- `PAYPAL_ENV=live` (since 2026-11-27), `BRAINTREE_ENV=sandbox`,
+  `TRANZILA_WALLETS=` (empty).
 - Tranzila keys, terminal and notify key are set.
-- Production has no `functions/.env.teacher-in-a-moment` of its own; it reads
-  the shared `functions/.env`. Staging overrides it with
-  `functions/.env.teacher-in-a-moment-staging`.
+- Production reads the shared `functions/.env`, overridden by
+  `functions/.env.teacher-in-a-moment` (git-ignored; live PayPal keys only).
+  Staging overrides the shared file with
+  `functions/.env.teacher-in-a-moment-staging`, which since 2026-11-27 also
+  puts staging's PayPal on **live** (real money): `PAYPAL_ENV`, the live client
+  ID and staging's own live webhook `3AW26738MP262832D` are in that committed
+  file; the live secret comes from the shared, git-ignored `functions/.env`.
+  The emulators keep PayPal sandbox via `.env.demo-teacher-in-a-moment`.
 
 ## 1. Deploy what is already built
 
@@ -75,17 +81,16 @@ the Google Pay pieces; production has none of the web payment work.
 
 ## 3. PayPal
 
-- [ ] **Go live.** Production runs `PAYPAL_ENV=sandbox`, so production PayPal
-      orders go to sandbox.paypal.com and take no money. In the PayPal
-      developer dashboard, switch to **Live**, create (or open) the live app,
-      and set in production's functions env:
-      `PAYPAL_ENV=live`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` (live
-      pair), and `PAYPAL_WEBHOOK_ID` for a live webhook pointing at
-      `https://us-central1-teacher-in-a-moment.cloudfunctions.net/paypalWebhook`
-      (events the backend handles: `CHECKOUT.ORDER.APPROVED`,
+- [x] **Go live** (2026-11-27). Live app "Teacher In a Moment"; its keys are
+      in `functions/.env.teacher-in-a-moment`. Live webhook
+      `98395909FH710450L` → `…/paypalWebhook` with `CHECKOUT.ORDER.APPROVED`,
       `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`,
-      `PAYMENT.CAPTURE.REFUNDED`).
-- [ ] Confirm the live PayPal account accepts **ILS**.
+      `PAYMENT.CAPTURE.REFUNDED`. Deployed `createCheckoutSession`,
+      `getPayPalWebConfig`, `capturePayPalOrder`, `paypalSuccess`,
+      `paypalCancel`, `paypalWebhook`; all read `PAYPAL_ENV=live`.
+- [x] The live PayPal account's primary currency is **ILS** (USD also held;
+      other currencies convert to ILS).
+- [ ] Link a bank to the PayPal business account so payouts can be withdrawn.
 - [ ] After going live, one small real purchase from the web and from each
       app, then refund it.
 - Note: the web loads PayPal's script with the client id from
