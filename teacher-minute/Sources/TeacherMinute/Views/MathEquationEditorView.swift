@@ -13,6 +13,9 @@
 import SwiftUI
 
 struct MathEquationEditorView: View {
+    /// Callers whose editor can be rebuilt under the user — the lesson chat,
+    /// where it is a row of a lazy list — pass a model they own, so the
+    /// formula outlives the rebuild.
     @State var model = MathEquationViewModel()
     // Skip's @Observable bridge doesn't recompose when class properties
     // mutate on Android. Bumping this counter from every mutation forces
@@ -78,6 +81,7 @@ struct MathEquationEditorView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSend)
+                .accessibilityIdentifier("math_editor_send")
             }
 		  MathKeyboardView(onAction: handleKeyboardAction)
         }

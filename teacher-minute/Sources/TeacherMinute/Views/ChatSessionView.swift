@@ -44,6 +44,11 @@ struct ChatSessionView: View {
   /// The unsent message. Lives on this screen so it survives the thread
   /// re-rendering when someone else's message arrives.
   @State var messageDraft = ""
+  /// The formula being built on the math pad, kept here for the same reason.
+  /// On Android the pad is a row of the thread's lazy list, keyed by its
+  /// position, so every message that arrived rebuilt the editor and wiped a
+  /// half-written formula with its own state.
+  @State var mathDraft = MathEquationViewModel()
 #if os(Android)
   /// Whether the system keyboard is on screen; see `followAndroidKeyboard`.
   @State var isAndroidKeyboardShown = false
@@ -312,10 +317,16 @@ struct ChatSessionView: View {
     .onChange(of: conversationType) { _, _ in
       isMediaPillExpanded = false
     }
+    // Not on Android: there the keyboard stays until the user puts it away.
+    // The composer is the thread's last item, so the formula lands right above
+    // it, and closing the keyboard (and the math pad) under someone mid-word
+    // cost them a tap and a slow show to get it back.
+#if !os(Android)
     .onChange(of: viewModel.incomingFormulaCount) { _, _ in
       // A formula from the other side needs the room the keyboard takes.
       dismissChatInput()
     }
+#endif
     .onSystemBack { handleSystemBack() }
     .onDisappear {
       if !didRequestLessonEnd, !viewModel.isInSetup {
@@ -1127,18 +1138,16 @@ struct ChatSessionView: View {
                   .id(message.id)
               }
 
-#if os(Android)
-              inputBar(scrollProxy: proxy)
-                .padding(.top, 8)
-                .id(Self.chatComposerScrollID)
-#else
+              // Only the math pad scrolls with the thread. The message field is
+              // pinned below it: on Android an unkeyed row of the lazy stack
+              // is keyed by its position, so with the field in here every
+              // message that arrived rebuilt it, took its focus and closed the
+              // keyboard under the user.
               if composerMode == .algebra {
                 inputBar(scrollProxy: proxy)
                   .padding(.top, 8)
                   .id(Self.chatComposerScrollID)
-
               }
-#endif
 
               Color.clear
                 .frame(height: 0)
@@ -1150,35 +1159,38 @@ struct ChatSessionView: View {
           // never the thing that overflows.
           .frame(maxHeight: .infinity)
           .onChange(of: viewModel.messages.count) { _, _ in
-            if let last = viewModel.messages.last {
-              withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo(last.id, anchor: .bottom)
-              }
-            }
+            scrollToNewestMessage(proxy: proxy)
           }
           .onChange(of: composerMode) { _, mode in
             scrollChatForKeyboardMode(mode, proxy: proxy)
           }
           .onChange(of: isMessageFieldFocused) { _, focused in
+#if os(Android)
+            // Where the keyboard can be seen, its arrival (isChatKeyboardUp,
+            // below) moves the thread once it is really there. Scrolling on
+            // focus too ran a second pair of animated scrolls against a
+            // viewport the keyboard had not yet shrunk.
+            if focused && !SoftKeyboard.isVisibilityObservable {
+              scrollChatForKeyboardMode(.regular, proxy: proxy)
+            }
+#else
             if focused {
               scrollChatForKeyboardMode(.regular, proxy: proxy)
             }
+#endif
           }
 #if os(Android)
-          // The composer is the thread's last item here: when the keyboard or
-          // the math pad comes or goes, the end of the thread moves, so follow
-          // it.
+          // When the keyboard or the math pad comes or goes the viewport
+          // changes height, so follow the end of the thread.
           .onChange(of: isChatKeyboardUp) { _, _ in
             scrollChatForKeyboardMode(composerMode, proxy: proxy)
           }
 #endif
         }
 
-#if !os(Android)
         if composerMode == .regular {
           inputBar()
         }
-#endif
       }
       .overlay(alignment: .bottomTrailing) {
         // Your own camera, while the chat is open in a video lesson.
@@ -1224,7 +1236,7 @@ struct ChatSessionView: View {
       if shown != isAndroidKeyboardShown {
         isAndroidKeyboardShown = shown
       }
-      try? await Task.sleep(nanoseconds: 250_000_000)
+      try? await Task.sleep(nanoseconds: 150_000_000)
     }
   }
 #endif
@@ -1384,7 +1396,7 @@ struct ChatSessionView: View {
           .padding(.horizontal, 16)
           .padding(.top, 8)
 
-        MathEquationEditorView { latex in
+        MathEquationEditorView(model: mathDraft) { latex in
           sendFormula(latex)
         }
         .environment(\.layoutDirection, .leftToRight)
@@ -1453,6 +1465,25 @@ struct ChatSessionView: View {
         .clipShape(Capsule())
     }
     .buttonStyle(.plain)
+  }
+
+  /// Brings a message that just arrived into view.
+  ///
+  /// On Android the end of the thread is the target: a lazy list only lands
+  /// a bottom anchor reliably as a scroll to its last row, clamped.
+  func scrollToNewestMessage(proxy: ScrollViewProxy) {
+    guard let last = viewModel.messages.last else { return }
+#if os(Android)
+    if composerMode == .regular {
+      withAnimation(.easeOut(duration: 0.2)) {
+        proxy.scrollTo(Self.chatBottomScrollID, anchor: .top)
+      }
+      return
+    }
+#endif
+    withAnimation(.easeOut(duration: 0.2)) {
+      proxy.scrollTo(last.id, anchor: .bottom)
+    }
   }
 
   func scrollChatForKeyboardMode(_ mode: ChatComposerMode, proxy: ScrollViewProxy) {

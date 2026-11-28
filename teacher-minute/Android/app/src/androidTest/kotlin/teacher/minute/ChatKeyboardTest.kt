@@ -31,6 +31,10 @@ class ChatKeyboardTest : ProTeacherEmulatorTest() {
 
         val field = device.wait(Until.findObject(By.res("chat_message_field")), 5_000)
         assertNotNull("the message input is not on screen once the thread grows", field)
+        // The lesson opens with the field focused and the keyboard up, and
+        // messages arriving leave it there: the field used to be a row of the
+        // thread's lazy list, rebuilt — and unfocused — by every message.
+        assertTrue("messages arriving closed the keyboard", keyboardIsUp())
 
         assertTrue("the lesson's bottom bar is missing before typing", device.hasObject(By.text("Session Time")))
 
@@ -40,7 +44,10 @@ class ChatKeyboardTest : ProTeacherEmulatorTest() {
         val typing = device.wait(Until.findObject(By.res("chat_message_field")), 5_000)
         assertNotNull("the message input is not on screen with the keyboard up", typing)
         // The whole input, border included, sits above the keyboard.
-        val keyboardTop = device.findObjects(By.pkg("com.google.android.inputmethod.latin"))
+        // Measured from what the keyboard draws and takes taps on — keys and
+        // its toolbar. Gboard on Android 14 puts an empty strip about 23 px
+        // tall above its toolbar, which would otherwise count as keyboard.
+        val keyboardTop = device.findObjects(By.pkg("com.google.android.inputmethod.latin").clickable(true))
             .minOfOrNull { it.visibleBounds.top }
         assertNotNull("could not find the keyboard on screen", keyboardTop)
         assertTrue(
@@ -59,6 +66,29 @@ class ChatKeyboardTest : ProTeacherEmulatorTest() {
             "the bottom bar is under the keyboard (timer bottom ${typingTimer.visibleBounds.bottom}, keyboard top $keyboardTop)",
             typingTimer.visibleBounds.bottom <= keyboardTop
         )
+
+        // The keyboard stays until the user puts it away: a formula from the
+        // other side used to close it.
+        studentSays("\$\$x^2 + 1 = 5\$\$")
+        Thread.sleep(2_000)
+        shot("keyboard-after-formula")
+        assertTrue("a formula from the student closed the keyboard", keyboardIsUp())
+        assertNotNull(
+            "the message input left the screen when the formula arrived",
+            device.findObject(By.res("chat_message_field"))
+        )
+
+        // Enter sends, and the keyboard stays: it used to clear focus and send nothing.
+        val draft = "Sent from the keyboard"
+        device.findObject(By.res("chat_message_field")).text = draft
+        device.pressEnter()
+        assertTrue(
+            "Enter on the keyboard did not send the message",
+            device.wait(Until.hasObject(By.text(draft)), 10_000)
+        )
+        Thread.sleep(2_000)
+        shot("keyboard-after-send")
+        assertTrue("sending from the keyboard closed it", keyboardIsUp())
 
         // Back puts the keyboard away but leaves the field focused; the bar,
         // with the timer and media controls, stays.
@@ -79,6 +109,46 @@ class ChatKeyboardTest : ProTeacherEmulatorTest() {
         )
     }
 
+    /**
+     * A message that arrives while the teacher is building a formula on the
+     * math pad leaves the formula alone: the pad is a row of the thread's lazy
+     * list, rebuilt by every message, and it used to lose what was typed.
+     */
+    @Test
+    fun aMessageArrivingKeepsTheFormulaBeingWritten() {
+        openLesson()
+        device.findObject(By.res("chat_math_button")).click()
+        for (label in listOf("7", "+", "3")) {
+            val key = device.wait(Until.findObject(By.clickable(true).hasDescendant(By.text(label))), 5_000)
+                ?: failWith("the math pad has no $label key")
+            key.click()
+            Thread.sleep(300)
+        }
+
+        studentSays("A message while the teacher writes a formula")
+        studentSays("And another one")
+        Thread.sleep(2_000)
+        shot("formula-after-messages")
+
+        val send = device.wait(Until.findObject(By.res("math_editor_send")), 5_000)
+            ?: failWith("the math pad's send button is not on screen")
+        send.click()
+
+        val deadline = System.currentTimeMillis() + 10_000
+        var sent: String? = null
+        while (sent == null && System.currentTimeMillis() < deadline) {
+            val messages = backend.value("questions/$qid/messages") as? JSONObject
+            sent = messages?.keys()?.asSequence()
+                ?.map { messages.getJSONObject(it) }
+                ?.firstOrNull { it.optString("senderRole") == "teacher" }
+                ?.optString("text")
+            if (sent == null) Thread.sleep(500)
+        }
+        shot("formula-sent")
+        assertNotNull("the formula was lost when messages arrived: nothing was sent", sent)
+        assertTrue("the formula sent is not the one typed: $sent", sent!!.replace(" ", "").contains("7+3"))
+    }
+
     /** Accepts a seeded text question and waits for the lesson's chat. */
     private fun openLesson() {
         seedQuestion()
@@ -89,6 +159,9 @@ class ChatKeyboardTest : ProTeacherEmulatorTest() {
             failWith("accepting did not open the lesson's chat")
         }
     }
+
+    private fun keyboardIsUp(): Boolean =
+        device.findObjects(By.pkg("com.google.android.inputmethod.latin")).isNotEmpty()
 
     /** A message from the student, as their app writes it. */
     private fun studentSays(text: String) {

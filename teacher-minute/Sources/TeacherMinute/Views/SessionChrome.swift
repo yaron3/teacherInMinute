@@ -653,6 +653,20 @@ struct SessionMessageComposer: View {
         .font(.system(size: 14))
         .foregroundStyle(theme.onDarkFill)
         .lineLimit(1)
+        // The keyboard's action key sends, and the keyboard stays: it goes
+        // away only when the user puts it away. Every IME action clears focus
+        // on Android (SkipUI's KeyboardActions) and Return resigns on iOS, so
+        // focus is taken back — on the next turn, because a hardware Enter on
+        // Android clears focus only after this runs. Without it every message
+        // sent from the keyboard cost a hide, a tap on the field and a show.
+        .submitLabel(.send)
+        .onSubmit {
+          trackTap("session_message_submit")
+          send()
+          Task { @MainActor in
+            isFocused.wrappedValue = true
+          }
+        }
         .accessibilityIdentifier("chat_message_field")
 
       Button {
